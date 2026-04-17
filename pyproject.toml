@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.28.1,<0.29",
     "pillow>=12.2.0,<13",
+    "pypdf>=6.10.2,<7",
     "pyyaml>=6.0.2,<7",
 ]
 
@@ -34,11 +35,11 @@ dev = [
 include-package-data = false
 
 [tool.setuptools.package-dir]
-"" = ".agents/skill/bib/src"
+"" = ".agents/skills/bib/src"
 
 [tool.setuptools.packages.find]
-where = [".agents/skill/bib/src"]
+where = [".agents/skills/bib/src"]
 
 [tool.pytest.ini_options]
 addopts = "-s"
-testpaths = [".agents/skill/bib/tests"]
+testpaths = [".agents/skills/bib/tests"]

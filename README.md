@@ -6,7 +6,7 @@ Working repository for a master's thesis on computational pathology. The repo co
 
 - `papers/`: PDFs and the main bibliography file `papers/sources.bib`
 - `docs/`: thesis-related reference material and notes
-- `.agents/skill/bib/`: the project-local `bib` package, examples, tests, and references
+- `.agents/skills/bib/`: the project-local `bib` package, examples, tests, and references
 - `code/TCGA-UT/`: external or supporting code used during the thesis work
 
 The main maintained software surface in this repo is the `bib` CLI exposed by this package:
@@ -67,7 +67,7 @@ All commands accept an optional YAML config file:
 uv run bib enrich papers/sources.bib --config path/to/config.yaml --in-place
 ```
 
-Use [.agents/skill/bib/examples/config.yaml](./.agents/skill/bib/examples/config.yaml) as the starting point. It covers:
+Use [.agents/skills/bib/examples/config.yaml](./.agents/skills/bib/examples/config.yaml) as the starting point. It covers:
 
 - provider toggles and timeouts
 - cache location and TTL
@@ -83,12 +83,12 @@ uv run bib enrich papers/sources.bib --disable-online-enrichment --dry-run
 
 ## Development
 
-The Python package is defined in [pyproject.toml](./pyproject.toml) and lives under [.agents/skill/bib/src](./.agents/skill/bib/src). Tests live in [.agents/skill/bib/tests](./.agents/skill/bib/tests).
+The Python package is defined in [pyproject.toml](./pyproject.toml) and lives under [.agents/skills/bib/src](./.agents/skills/bib/src). Tests live in [.agents/skills/bib/tests](./.agents/skills/bib/tests).
 
 Useful commands:
 
 ```bash
-uv run pytest .agents/skill/bib/tests
+uv run pytest .agents/skills/bib/tests
 uv run pyright
 uv run ruff check .
 ```
@@ -97,4 +97,4 @@ uv run ruff check .
 
 - `papers/sources.bib` already stores local `file` paths and screening metadata such as `x_screening_bucket`.
 - `bib pdf-sync` is intentionally conservative. Low-confidence cases are reported for manual review rather than forced into the bibliography.
-- There is a narrower package-level README at [.agents/skill/bib/README.md](./.agents/skill/bib/README.md) if you only need details for the `bib` tool itself.
+- There is a narrower package-level README at [.agents/skills/bib/README.md](./.agents/skills/bib/README.md) if you only need details for the `bib` tool itself.
