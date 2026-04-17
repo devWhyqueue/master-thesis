@@ -9,7 +9,7 @@ providers:
     user_agent: "master-thesis-bib/0.1"
 
 cache:
-  dir: ".agents/skill/bib/.cache"
+  dir: ".agents/skills/bib/.cache"
   ttl_days: 30
   enabled: true
 

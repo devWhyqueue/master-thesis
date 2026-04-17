@@ -18,7 +18,7 @@ class ProviderConfig:
 
 @dataclass(slots=True)
 class CacheConfig:
-    dir: str = ".agents/skill/bib/.cache"
+    dir: str = ".agents/skills/bib/.cache"
     ttl_days: int = 30
     enabled: bool = True
 
