@@ -1,0 +1,93 @@
+providers:
+  crossref:
+    enabled: true
+    timeout_seconds: 15
+    user_agent: "master-thesis-bib/0.1"
+  openalex:
+    enabled: true
+    timeout_seconds: 15
+    user_agent: "master-thesis-bib/0.1"
+
+cache:
+  dir: ".agents/skill/bib/.cache"
+  ttl_days: 30
+  enabled: true
+
+resolution:
+  min_confidence: 0.74
+  ambiguity_delta: 0.06
+  provider_priority:
+    - "crossref"
+    - "openalex"
+  trust_url_identifiers: true
+  search_rows: 5
+
+enrichment:
+  overwrite_fields:
+    - "doi"
+    - "url"
+    - "journal"
+    - "booktitle"
+    - "publisher"
+    - "volume"
+    - "number"
+    - "pages"
+    - "year"
+    - "title"
+  canonicalize_title: true
+
+pdf_sync:
+  pdf_dir: "papers"
+  max_pages: 2
+  filename_parsing: true
+  match_min_confidence: 0.82
+  create_min_confidence: 0.72
+
+screening:
+  weights:
+    strong_venue: 1.5
+    good_citation_impact: 1.2
+    review_or_benchmark: 0.8
+    weak_citation_impact_old: -1.3
+    poor_venue: -1.2
+    non_target_publication_type: -1.4
+    missing_metadata: -0.7
+    duplicate_penalty: -0.4
+    serious_update: -2.0
+    retracted: -4.0
+  thresholds:
+    top_tier_venues:
+      - "nature medicine"
+      - "nature reviews bioengineering"
+      - "nature"
+      - "science"
+      - "the lancet"
+      - "new england journal of medicine"
+      - "iclr"
+      - "neurips"
+      - "icml"
+      - "cvpr"
+    non_target_publication_types:
+      - "editorial"
+      - "letter"
+      - "news"
+      - "correction"
+      - "addendum"
+      - "commentary"
+    review_like_types:
+      - "review"
+      - "systematic-review"
+      - "meta-analysis"
+      - "benchmark"
+    old_paper_years: 5
+    min_expected_citations_old: 8
+    strong_citation_ratio: 1.5
+    weak_citation_ratio: 0.4
+    missing_metadata_threshold: 2
+  bucket_rules:
+    keep_min_score: 1.25
+    exclude_max_score: -1.75
+    exclude_requires_metadata: true
+  output:
+    include_details: true
+    details_format: "compact"

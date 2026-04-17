@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bib"
+  short_description: "Enriches and screens BibTeX files"
+  default_prompt: "Use $bib to enrich or screen this BibTeX file."

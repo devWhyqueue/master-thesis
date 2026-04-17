@@ -1,3 +1,8 @@
-.venv/
+.venv*/
 __pycache__/
 *.pyc
+*.egg-info/
+.agents/skill/bib/.cache/
+pyrightconfig.json
+.pytest_cache/
+.coverage
