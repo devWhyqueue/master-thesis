@@ -39,6 +39,11 @@ def _add_refresh_parser(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Use only local metadata",
     )
+    parser.add_argument(
+        "--no-sort",
+        action="store_true",
+        help="Keep the existing entry order instead of sorting by key",
+    )
 
 
 def _add_mutation_parser(parser: argparse.ArgumentParser) -> None:
@@ -80,4 +85,9 @@ def _add_common_file_args(parser: argparse.ArgumentParser) -> None:
         "--disable-online-enrichment",
         action="store_true",
         help="Use only local metadata",
+    )
+    parser.add_argument(
+        "--sort",
+        action="store_true",
+        help="Sort BibTeX entries alphabetically by key before writing",
     )

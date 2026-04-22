@@ -9,7 +9,12 @@ from unittest.mock import patch
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
-from bib.bibtex import append_bibtex_entries, parse_bibtex, update_bibtex_fields
+from bib.bibtex import (
+    append_bibtex_entries,
+    parse_bibtex,
+    sort_bibtex_entries,
+    update_bibtex_fields,
+)
 from bib.cli import main
 from bib.config import load_config
 from bib.metadata import (
@@ -68,6 +73,51 @@ class BibTests(unittest.TestCase):
             [{"entry_type": "article", "key": "paper3", "fields": [("title", "Third Paper"), ("year", "2024")]}],
         )
         self.assertIn("@article{paper3,", updated)
+
+    def test_sort_bibtex_entries_sorts_by_key(self) -> None:
+        unsorted = """@article{paperB,
+  title = {Second}
+}
+
+@article{paperA,
+  title = {First}
+}
+"""
+        sorted_text = sort_bibtex_entries(unsorted)
+        self.assertLess(sorted_text.index("@article{paperA,"), sorted_text.index("@article{paperB,"))
+
+    def test_sort_bibtex_entries_is_stable_for_sorted_input(self) -> None:
+        sorted_text = sort_bibtex_entries(SAMPLE_BIB)
+        self.assertEqual(SAMPLE_BIB.strip(), sorted_text.strip())
+
+    def test_sort_bibtex_entries_sorts_case_insensitively(self) -> None:
+        unsorted = """@article{beta,
+  title = {Second}
+}
+
+@article{Alpha,
+  title = {First}
+}
+"""
+        sorted_text = sort_bibtex_entries(unsorted)
+        self.assertLess(sorted_text.index("@article{Alpha,"), sorted_text.index("@article{beta,"))
+
+    def test_sort_bibtex_entries_preserves_field_order(self) -> None:
+        unsorted = """@article{paperB,
+  year = {2024},
+  title = {Second}
+}
+
+@article{paperA,
+  doi = {10.1000/example},
+  title = {First},
+  year = {2023}
+}
+"""
+        sorted_text = sort_bibtex_entries(unsorted)
+        sorted_entries = parse_bibtex(sorted_text)
+        paper_a = next(entry for entry in sorted_entries if entry.key == "paperA")
+        self.assertEqual(["doi", "title", "year"], paper_a.field_order)
 
     def test_normalize_title(self) -> None:
         self.assertEqual("a review of something", normalize_title("A Review of Something!"))
@@ -316,6 +366,52 @@ class BibTests(unittest.TestCase):
             self.assertTrue(out_path.exists())
             self.assertIn("x_screening_bucket", out_path.read_text(encoding="utf-8"))
 
+    def test_cli_enrich_sort_writes_sorted_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            input_path = root / "input.bib"
+            out_path = root / "output.bib"
+            input_path.write_text(
+                """@article{paperB,
+  title = {Second}
+}
+
+@article{paperA,
+  title = {First}
+}
+""",
+                encoding="utf-8",
+            )
+            result = main(
+                ["enrich", str(input_path), "--out", str(out_path), "--sort", "--disable-online-enrichment"]
+            )
+            self.assertEqual(0, result)
+            content = out_path.read_text(encoding="utf-8")
+            self.assertLess(content.index("@article{paperA,"), content.index("@article{paperB,"))
+
+    def test_cli_screen_sort_writes_sorted_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            input_path = root / "input.bib"
+            out_path = root / "output.bib"
+            input_path.write_text(
+                """@article{paperB,
+  title = {Second}
+}
+
+@article{paperA,
+  title = {First}
+}
+""",
+                encoding="utf-8",
+            )
+            result = main(
+                ["screen", str(input_path), "--out", str(out_path), "--sort", "--disable-online-enrichment"]
+            )
+            self.assertEqual(0, result)
+            content = out_path.read_text(encoding="utf-8")
+            self.assertLess(content.index("@article{paperA,"), content.index("@article{paperB,"))
+
     def test_cli_pdf_sync_out_writes_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -348,6 +444,65 @@ class BibTests(unittest.TestCase):
             self.assertEqual(0, result)
             content = out_path.read_text(encoding="utf-8")
             self.assertIn("file = {calibration/Muttenthaler et al.; Set Learning for accurate, calibrated models.pdf}", content)
+
+    def test_cli_pdf_sync_sort_writes_sorted_output_with_new_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers" / "calibration"
+            papers_dir.mkdir(parents=True)
+            pdf_path = papers_dir / "Alpha et al.; New Paper.pdf"
+            _make_pdf(
+                pdf_path,
+                [
+                    "NEW PAPER",
+                    "Alice Alpha",
+                    "doi: 10.1000/newpaper",
+                ],
+            )
+            input_path = root / "papers" / "sources.bib"
+            input_path.write_text(
+                """@article{zzz2024existing,
+  title = {Existing Paper},
+  year = {2024}
+}
+""",
+                encoding="utf-8",
+            )
+            out_path = root / "output.bib"
+
+            def _fake_resolve(entry, providers, cache, config):
+                from bib.models import CitationStats, ResolutionResult, ResolvedMetadata
+
+                return ResolutionResult(
+                    matched=True,
+                    confidence=0.95,
+                    metadata=ResolvedMetadata(
+                        title=entry.title,
+                        year=2024,
+                        journal="Example Journal",
+                        doi="10.1000/newpaper",
+                        url="https://doi.org/10.1000/newpaper",
+                        publication_type="journal-article",
+                        citation_stats=CitationStats(),
+                    ),
+                )
+
+            with patch("bib.cli.commands.resolve_entry", new=_fake_resolve):
+                result = main(
+                    [
+                        "pdf-sync",
+                        str(input_path),
+                        "--pdf-dir",
+                        str(root / "papers"),
+                        "--out",
+                        str(out_path),
+                        "--sort",
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            content = out_path.read_text(encoding="utf-8")
+            self.assertLess(content.index("@article{alpha2024newPaper,"), content.index("@article{zzz2024existing,"))
 
     def test_cli_pdf_sync_resolves_new_entry_from_title_page_title(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -521,6 +676,72 @@ class BibTests(unittest.TestCase):
                 "file = {current reviews/Li et al.; Survey on CPath Foundation Models.pdf}",
                 content,
             )
+
+    def test_cli_refresh_sorts_output_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers"
+            papers_dir.mkdir()
+            input_path = papers_dir / "sources.bib"
+            input_path.write_text(
+                """@article{paperB,
+  title = {Second}
+}
+
+@article{paperA,
+  title = {First}
+}
+""",
+                encoding="utf-8",
+            )
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = main(["refresh", "--disable-online-enrichment"])
+            finally:
+                os.chdir(previous_cwd)
+            self.assertEqual(0, result)
+            content = input_path.read_text(encoding="utf-8")
+            self.assertLess(content.index("@article{paperA,"), content.index("@article{paperB,"))
+
+    def test_cli_refresh_no_sort_preserves_entry_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers"
+            papers_dir.mkdir()
+            input_path = papers_dir / "sources.bib"
+            input_path.write_text(
+                """@article{paperB,
+  title = {Second}
+}
+
+@article{paperA,
+  title = {First}
+}
+""",
+                encoding="utf-8",
+            )
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = main(["refresh", "--no-sort", "--disable-online-enrichment"])
+            finally:
+                os.chdir(previous_cwd)
+            self.assertEqual(0, result)
+            content = input_path.read_text(encoding="utf-8")
+            self.assertLess(content.index("@article{paperB,"), content.index("@article{paperA,"))
+
+    def test_cli_enrich_sort_dry_run_does_not_write_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            input_path = root / "input.bib"
+            out_path = root / "output.bib"
+            input_path.write_text(SAMPLE_BIB, encoding="utf-8")
+            result = main(
+                ["enrich", str(input_path), "--out", str(out_path), "--sort", "--dry-run", "--disable-online-enrichment"]
+            )
+            self.assertEqual(0, result)
+            self.assertFalse(out_path.exists())
 
     def test_cli_refresh_reports_duplicates_without_removing_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

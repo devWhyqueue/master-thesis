@@ -7,7 +7,7 @@ description: Work with BibTeX and .bib files for enrichment, metadata repair, sc
 
 ## Overview
 
-Use the local `bib` CLI for general BibTeX workflows. The default thesis-repo maintenance flow is `refresh`, which runs `pdf-sync`, `enrich`, `dedupe`, and `screen` in one pass. The main subcommands are `refresh`, `enrich`, `screen`, `dedupe`, and `pdf-sync`.
+Use the local `bib` CLI for general BibTeX workflows. The default thesis-repo maintenance flow is `refresh`, which runs `pdf-sync`, `enrich`, `dedupe`, and `screen` in one pass and then sorts entries alphabetically by BibTeX key. The main subcommands are `refresh`, `enrich`, `screen`, `dedupe`, and `pdf-sync`.
 
 Keep enrichment conservative: only write canonical fields when a provider match is confident enough. Weak or ambiguous matches should remain unchanged.
 
@@ -16,12 +16,16 @@ Keep enrichment conservative: only write canonical fields when a provider match 
 ```bash
 uv run bib refresh
 uv run bib refresh --dry-run
+uv run bib refresh --no-sort
 uv run bib refresh --input-bib papers/sources.bib --pdf-dir papers
 uv run bib enrich papers/sources.bib --dry-run
 uv run bib enrich papers/sources.bib --in-place
+uv run bib enrich papers/sources.bib --in-place --sort
 uv run bib screen papers/sources.bib --out papers/sources.screened.bib
+uv run bib screen papers/sources.bib --out papers/sources.screened.bib --sort
 uv run bib dedupe papers/sources.bib
 uv run bib pdf-sync papers/sources.bib --pdf-dir papers --dry-run
+uv run bib pdf-sync papers/sources.bib --pdf-dir papers --out papers/sources.synced.bib --sort
 ```
 
 ## Behavior
@@ -29,6 +33,8 @@ uv run bib pdf-sync papers/sources.bib --pdf-dir papers --dry-run
 - Preserve unknown BibTeX fields.
 - Use validated temp-file writes for all mutations.
 - `bib refresh` defaults to mutating `papers/sources.bib` in place and scanning PDFs under `papers/`.
+- `bib refresh` sorts entries alphabetically by BibTeX key before writing; use `--no-sort` to keep the existing order.
+- `bib enrich`, `bib screen`, and `bib pdf-sync` support `--sort` to sort output before writing.
 - Resolve metadata from DOI when present, otherwise search by title, year, URL, and venue.
 - Sync local PDFs into BibTeX entries and write a relative `file` field.
 - `bib refresh` reports duplicates, but does not merge or remove them automatically.

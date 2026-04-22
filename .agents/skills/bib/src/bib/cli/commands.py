@@ -10,6 +10,7 @@ from ..bibtex import (
     append_bibtex_entries,
     load_bibtex_file,
     parse_bibtex,
+    sort_bibtex_entries,
     strip_screening_updates,
     update_bibtex_fields,
     write_output,
@@ -44,6 +45,12 @@ from ..pdf import (
 from .parser import build_parser
 
 logger = logging.getLogger(__name__)
+
+
+def _maybe_sort_output(text: str, *, enabled: bool) -> str:
+    """Sort BibTeX output when enabled."""
+
+    return sort_bibtex_entries(text) if enabled else text
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -229,6 +236,7 @@ def _run_enrich(args: argparse.Namespace, config: BibConfig) -> int:
         logger.info(preview_text)
     if args.dry_run:
         return 0
+    updated = _maybe_sort_output(updated, enabled=args.sort)
     if args.in_place:
         write_output(args.input_bib, updated, in_place_target=args.input_bib)
     else:
@@ -242,6 +250,7 @@ def _run_screen(args: argparse.Namespace, config: BibConfig) -> int:
     logger.info(render_screening_summary(screened_entries))
     if args.dry_run:
         return 0
+    updated = _maybe_sort_output(updated, enabled=args.sort)
     if args.in_place:
         write_output(args.input_bib, updated, in_place_target=args.input_bib)
     else:
@@ -265,6 +274,7 @@ def _run_pdf_sync(args: argparse.Namespace, config: BibConfig) -> int:
         logger.info(preview)
     if args.dry_run:
         return 0
+    updated = _maybe_sort_output(updated, enabled=args.sort)
     if args.in_place:
         write_output(args.input_bib, updated, in_place_target=args.input_bib)
     else:
@@ -303,9 +313,11 @@ def _run_refresh(args: argparse.Namespace, config: BibConfig) -> int:
 
     text, screened_entries = _screen_document(text, entries, config)
     logger.info(render_screening_summary(screened_entries))
+    text = _maybe_sort_output(text, enabled=not args.no_sort)
     logger.info(
-        "refresh complete steps=pdf-sync,enrich,dedupe,screen mode=%s",
+        "refresh complete steps=pdf-sync,enrich,dedupe,screen,sort mode=%s sort=%s",
         "dry-run" if args.dry_run else "in-place",
+        "disabled" if args.no_sort else "enabled",
     )
 
     if args.dry_run:
