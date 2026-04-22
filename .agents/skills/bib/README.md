@@ -5,12 +5,17 @@ Project-local BibTeX skill and CLI for metadata enrichment, PDF-backed synchroni
 ## Usage
 
 ```bash
+uv run bib refresh
+uv run bib refresh --dry-run
+uv run bib refresh --input-bib papers/sources.bib --pdf-dir papers
 uv run bib enrich papers/sources.bib --dry-run
 uv run bib enrich papers/sources.bib --in-place
 uv run bib screen papers/sources.bib --in-place
 uv run bib dedupe papers/sources.bib
 uv run bib pdf-sync papers/sources.bib --pdf-dir papers --dry-run
 ```
+
+`bib refresh` is the repo-oriented maintenance shortcut: it runs PDF sync, enrichment, duplicate reporting, and screening in one pass, writing back to `papers/sources.bib` by default. Duplicate handling remains report-only.
 
 ## Screening fields
 

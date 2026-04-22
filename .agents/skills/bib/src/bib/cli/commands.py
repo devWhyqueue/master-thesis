@@ -9,6 +9,7 @@ from pathlib import Path
 from ..bibtex import (
     append_bibtex_entries,
     load_bibtex_file,
+    parse_bibtex,
     strip_screening_updates,
     update_bibtex_fields,
     write_output,
@@ -52,12 +53,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command in {"enrich", "screen", "pdf-sync"}:
         _validate_write_args(parser, args)
+    if args.command == "refresh":
+        args.input_bib = Path(args.input_bib)
     config = load_config(getattr(args, "config", None))
     if getattr(args, "disable_online_enrichment", False):
         config.crossref.enabled = False
         config.openalex.enabled = False
     if getattr(args, "cache_dir", None) is not None:
         config.cache.dir = str(args.cache_dir)
+    if args.command == "refresh":
+        return _run_refresh(args, config)
     if args.command == "enrich":
         return _run_enrich(args, config)
     if args.command == "screen":
@@ -91,10 +96,16 @@ def _canonical_updates(entry, resolved, config: BibConfig) -> dict[str, str | No
     return updates
 
 
-def _run_enrich(args: argparse.Namespace, config: BibConfig) -> int:
-    text, entries = load_bibtex_file(args.input_bib)
+def _build_runtime(config: BibConfig) -> tuple[ResponseCache, list[object]]:
     cache = ResponseCache(resolve_cache_paths(Path.cwd(), config.cache), config.cache)
     providers = [CrossrefProvider(config.crossref), OpenAlexProvider(config.openalex)]
+    return cache, providers
+
+
+def _enrich_document(
+    text: str, entries, config: BibConfig
+) -> tuple[str, list[EnrichmentPreview], int]:
+    cache, providers = _build_runtime(config)
     previews: list[EnrichmentPreview] = []
     updates_by_key: dict[str, dict[str, str | None]] = {}
     changed_count = 0
@@ -111,25 +122,12 @@ def _run_enrich(args: argparse.Namespace, config: BibConfig) -> int:
         )
         updates_by_key[entry.key] = updates
         changed_count += int(bool(updates))
-    logger.info(render_enrichment_summary(previews, changed_count))
-    preview_text = render_enrichment_preview(previews)
-    if preview_text:
-        logger.info(preview_text)
-    if args.dry_run:
-        return 0
-    updated = update_bibtex_fields(text, updates_by_key)
-    if args.in_place:
-        write_output(args.input_bib, updated, in_place_target=args.input_bib)
-    else:
-        write_output(args.out, updated)
-    return 0
+    return update_bibtex_fields(text, updates_by_key), previews, changed_count
 
 
-def _run_screen(args: argparse.Namespace, config: BibConfig) -> int:
-    text, entries = load_bibtex_file(args.input_bib)
+def _screen_document(text: str, entries, config: BibConfig) -> tuple[str, list[ScreenedEntry]]:
     duplicates = detect_duplicates(entries)
-    cache = ResponseCache(resolve_cache_paths(Path.cwd(), config.cache), config.cache)
-    providers = [CrossrefProvider(config.crossref), OpenAlexProvider(config.openalex)]
+    cache, providers = _build_runtime(config)
     screened_entries: list[ScreenedEntry] = []
     updates_by_key: dict[str, dict[str, str | None]] = {}
     for entry in entries:
@@ -145,34 +143,19 @@ def _run_screen(args: argparse.Namespace, config: BibConfig) -> int:
             )
         )
         updates_by_key[entry.key] = updates
-    logger.info(render_screening_summary(screened_entries))
-    if args.dry_run:
-        return 0
-    updated = update_bibtex_fields(text, updates_by_key)
-    if args.in_place:
-        write_output(args.input_bib, updated, in_place_target=args.input_bib)
-    else:
-        write_output(args.out, updated)
-    return 0
+    return update_bibtex_fields(text, updates_by_key), screened_entries
 
 
-def _run_dedupe(args: argparse.Namespace) -> int:
-    _, entries = load_bibtex_file(args.input_bib)
-    logger.info(render_duplicates(detect_duplicates(entries)))
-    return 0
-
-
-def _run_pdf_sync(args: argparse.Namespace, config: BibConfig) -> int:
-    text, entries = load_bibtex_file(args.input_bib)
+def _pdf_sync_document(
+    text: str, entries, input_bib: Path, pdf_dir: Path, config: BibConfig
+) -> tuple[str, list[PdfSyncResult]]:
     existing_keys = {entry.key for entry in entries}
-    cache = ResponseCache(resolve_cache_paths(Path.cwd(), config.cache), config.cache)
-    providers = [CrossrefProvider(config.crossref), OpenAlexProvider(config.openalex)]
-    pdf_dir = args.pdf_dir or Path(config.pdf_sync.pdf_dir)
+    cache, providers = _build_runtime(config)
     results: list[PdfSyncResult] = []
     updates_by_key: dict[str, dict[str, str | None]] = {}
     new_entries: list[dict[str, object]] = []
     for pdf_path in discover_pdfs(pdf_dir):
-        extracted = extract_pdf_metadata(pdf_path, args.input_bib, config)
+        extracted = extract_pdf_metadata(pdf_path, input_bib, config)
         matched_entry, match_confidence, reasons = match_existing_entry(
             extracted, entries, config
         )
@@ -234,17 +217,99 @@ def _run_pdf_sync(args: argparse.Namespace, config: BibConfig) -> int:
                 reasons or resolution.reasons,
             )
         )
+    return append_bibtex_entries(update_bibtex_fields(text, updates_by_key), new_entries), results
+
+
+def _run_enrich(args: argparse.Namespace, config: BibConfig) -> int:
+    text, entries = load_bibtex_file(args.input_bib)
+    updated, previews, changed_count = _enrich_document(text, entries, config)
+    logger.info(render_enrichment_summary(previews, changed_count))
+    preview_text = render_enrichment_preview(previews)
+    if preview_text:
+        logger.info(preview_text)
+    if args.dry_run:
+        return 0
+    if args.in_place:
+        write_output(args.input_bib, updated, in_place_target=args.input_bib)
+    else:
+        write_output(args.out, updated)
+    return 0
+
+
+def _run_screen(args: argparse.Namespace, config: BibConfig) -> int:
+    text, entries = load_bibtex_file(args.input_bib)
+    updated, screened_entries = _screen_document(text, entries, config)
+    logger.info(render_screening_summary(screened_entries))
+    if args.dry_run:
+        return 0
+    if args.in_place:
+        write_output(args.input_bib, updated, in_place_target=args.input_bib)
+    else:
+        write_output(args.out, updated)
+    return 0
+
+
+def _run_dedupe(args: argparse.Namespace) -> int:
+    _, entries = load_bibtex_file(args.input_bib)
+    logger.info(render_duplicates(detect_duplicates(entries)))
+    return 0
+
+
+def _run_pdf_sync(args: argparse.Namespace, config: BibConfig) -> int:
+    text, entries = load_bibtex_file(args.input_bib)
+    pdf_dir = args.pdf_dir or Path(config.pdf_sync.pdf_dir)
+    updated, results = _pdf_sync_document(text, entries, args.input_bib, pdf_dir, config)
     logger.info(render_pdf_sync_summary(results))
     preview = render_pdf_sync_preview(results)
     if preview:
         logger.info(preview)
     if args.dry_run:
         return 0
-    updated = append_bibtex_entries(
-        update_bibtex_fields(text, updates_by_key), new_entries
-    )
     if args.in_place:
         write_output(args.input_bib, updated, in_place_target=args.input_bib)
     else:
         write_output(args.out, updated)
+    return 0
+
+
+def _run_refresh(args: argparse.Namespace, config: BibConfig) -> int:
+    input_bib = args.input_bib
+    pdf_dir = args.pdf_dir or Path(config.pdf_sync.pdf_dir)
+    text, entries = load_bibtex_file(input_bib)
+
+    logger.info(
+        "refresh input=%s pdf_dir=%s mode=%s",
+        input_bib,
+        pdf_dir,
+        "dry-run" if args.dry_run else "in-place",
+    )
+
+    text, pdf_results = _pdf_sync_document(text, entries, input_bib, pdf_dir, config)
+    entries = parse_bibtex(text)
+    logger.info(render_pdf_sync_summary(pdf_results))
+    pdf_preview = render_pdf_sync_preview(pdf_results)
+    if pdf_preview:
+        logger.info(pdf_preview)
+
+    text, previews, changed_count = _enrich_document(text, entries, config)
+    entries = parse_bibtex(text)
+    logger.info(render_enrichment_summary(previews, changed_count))
+    enrich_preview = render_enrichment_preview(previews)
+    if enrich_preview:
+        logger.info(enrich_preview)
+
+    duplicates = detect_duplicates(entries)
+    logger.info(render_duplicates(duplicates))
+
+    text, screened_entries = _screen_document(text, entries, config)
+    logger.info(render_screening_summary(screened_entries))
+    logger.info(
+        "refresh complete steps=pdf-sync,enrich,dedupe,screen mode=%s",
+        "dry-run" if args.dry_run else "in-place",
+    )
+
+    if args.dry_run:
+        return 0
+
+    write_output(input_bib, text, in_place_target=input_bib)
     return 0
