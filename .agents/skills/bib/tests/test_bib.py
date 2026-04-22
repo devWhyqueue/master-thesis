@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -414,6 +415,185 @@ class BibTests(unittest.TestCase):
             input_path.write_text(SAMPLE_BIB + SAMPLE_BIB.replace("paper1", "paper3"), encoding="utf-8")
             result = main(["dedupe", str(input_path)])
             self.assertEqual(0, result)
+
+    def test_cli_refresh_dry_run_uses_default_repo_paths_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers"
+            papers_dir.mkdir()
+            input_path = papers_dir / "sources.bib"
+            input_path.write_text(SAMPLE_BIB, encoding="utf-8")
+            original = input_path.read_text(encoding="utf-8")
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = main(["refresh", "--dry-run", "--disable-online-enrichment"])
+            finally:
+                os.chdir(previous_cwd)
+            self.assertEqual(0, result)
+            self.assertEqual(original, input_path.read_text(encoding="utf-8"))
+
+    def test_cli_refresh_updates_nested_relative_file_path_in_place(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers" / "calibration" / "renamed"
+            papers_dir.mkdir(parents=True)
+            pdf_path = (
+                papers_dir
+                / "Muttenthaler et al.; Set Learning for accurate, calibrated models.pdf"
+            )
+            _make_pdf(
+                pdf_path,
+                [
+                    "Published as a conference paper at ICLR 2024",
+                    "SET LEARNING FOR ACCURATE AND CALIBRATED MODELS",
+                    "Lukas Muttenthaler",
+                    "doi: 10.48550/arXiv.2307.02245",
+                ],
+            )
+            input_path = root / "papers" / "sources.bib"
+            input_path.write_text(SAMPLE_BIB, encoding="utf-8")
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = main(["refresh", "--disable-online-enrichment"])
+            finally:
+                os.chdir(previous_cwd)
+            self.assertEqual(0, result)
+            content = input_path.read_text(encoding="utf-8")
+            self.assertIn(
+                "file = {calibration/renamed/Muttenthaler et al.; Set Learning for accurate, calibrated models.pdf}",
+                content,
+            )
+            self.assertIn("x_screening_bucket", content)
+
+    def test_cli_refresh_creates_new_entry_and_screens_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers" / "current reviews"
+            papers_dir.mkdir(parents=True)
+            pdf_path = papers_dir / "Li et al.; Survey on CPath Foundation Models.pdf"
+            _make_pdf(
+                pdf_path,
+                [
+                    "A Survey on Computational Pathology Foundation Models: Datasets, Adaptation Strategies, and Evaluation Tasks",
+                    "Dong Li, Guihong Wan, Xintao Wu",
+                    "Abstract",
+                ],
+            )
+            input_path = root / "papers" / "sources.bib"
+            input_path.write_text("", encoding="utf-8")
+
+            def _fake_resolve(entry, providers, cache, config):
+                from bib.models import CitationStats, ResolutionResult, ResolvedMetadata
+
+                return ResolutionResult(
+                    matched=True,
+                    confidence=0.95,
+                    metadata=ResolvedMetadata(
+                        title=entry.title,
+                        year=2025,
+                        journal="arXiv",
+                        doi="10.48550/arXiv.2501.15724",
+                        url="https://doi.org/10.48550/arXiv.2501.15724",
+                        publication_type="preprint",
+                        citation_stats=CitationStats(),
+                    ),
+                )
+
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch("bib.cli.commands.resolve_entry", new=_fake_resolve):
+                    result = main(["refresh"])
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(0, result)
+            content = input_path.read_text(encoding="utf-8")
+            self.assertIn(
+                "title = {A Survey on Computational Pathology Foundation Models: Datasets, Adaptation Strategies, and Evaluation Tasks}",
+                content,
+            )
+            self.assertIn("doi = {10.48550/arXiv.2501.15724}", content)
+            self.assertIn("x_screening_bucket", content)
+            self.assertIn(
+                "file = {current reviews/Li et al.; Survey on CPath Foundation Models.pdf}",
+                content,
+            )
+
+    def test_cli_refresh_reports_duplicates_without_removing_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers"
+            papers_dir.mkdir()
+            input_path = papers_dir / "sources.bib"
+            input_path.write_text(
+                SAMPLE_BIB + SAMPLE_BIB.replace("paper1", "paper3"),
+                encoding="utf-8",
+            )
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with self.assertLogs("bib.cli.commands", level="INFO") as logs:
+                    result = main(["refresh", "--disable-online-enrichment"])
+            finally:
+                os.chdir(previous_cwd)
+            self.assertEqual(0, result)
+            self.assertIn("doi 10.1000/review: paper1, paper3", "\n".join(logs.output))
+            content = input_path.read_text(encoding="utf-8")
+            self.assertIn("@article{paper1,", content)
+            self.assertIn("@article{paper3,", content)
+
+    def test_cli_refresh_disable_online_enrichment_propagates_to_all_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            papers_dir = root / "papers" / "calibration"
+            papers_dir.mkdir(parents=True)
+            pdf_path = papers_dir / "Muttenthaler et al.; Set Learning for accurate, calibrated models.pdf"
+            _make_pdf(
+                pdf_path,
+                [
+                    "Published as a conference paper at ICLR 2024",
+                    "SET LEARNING FOR ACCURATE AND CALIBRATED MODELS",
+                    "Lukas Muttenthaler",
+                ],
+            )
+            input_path = root / "papers" / "sources.bib"
+            input_path.write_text(SAMPLE_BIB, encoding="utf-8")
+            calls = 0
+
+            def _fake_resolve(entry, providers, cache, config):
+                from bib.models import CitationStats, ResolutionResult, ResolvedMetadata
+
+                nonlocal calls
+                calls += 1
+                self.assertTrue(all(not provider._config.enabled for provider in providers))
+                return ResolutionResult(
+                    matched=False,
+                    confidence=0.0,
+                    metadata=ResolvedMetadata(
+                        title=entry.title,
+                        booktitle=entry.fields.get("booktitle"),
+                        year=entry.year,
+                        url=entry.url,
+                        publication_type=entry.entry_type,
+                        citation_stats=CitationStats(),
+                        provider_notes=["no resolvable external match found"],
+                    ),
+                    reasons=["no resolvable external match found"],
+                )
+
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch("bib.cli.commands.resolve_entry", new=_fake_resolve):
+                    result = main(["refresh", "--dry-run", "--disable-online-enrichment"])
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(0, result)
+            self.assertGreater(calls, 0)
 
     def test_render_pdf_sync_summary_uses_needs_review_bucket(self) -> None:
         from bib.models import ExtractedPdfMetadata

@@ -11,11 +11,34 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(prog="bib")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    _add_refresh_parser(subparsers.add_parser("refresh"))
     for name in ("enrich", "screen"):
         _add_mutation_parser(subparsers.add_parser(name))
     _add_pdf_sync_parser(subparsers.add_parser("pdf-sync"))
     _add_dedupe_parser(subparsers.add_parser("dedupe"))
     return parser
+
+
+def _add_refresh_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--input-bib",
+        type=Path,
+        default=Path("papers") / "sources.bib",
+        help="Path to the input BibTeX file",
+    )
+    parser.add_argument("--config", type=Path, help="Optional YAML config file")
+    parser.add_argument("--pdf-dir", type=Path, help="Directory containing local PDFs")
+    parser.add_argument(
+        "--cache-dir", type=Path, help="Override the provider cache directory"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print the preview without writing"
+    )
+    parser.add_argument(
+        "--disable-online-enrichment",
+        action="store_true",
+        help="Use only local metadata",
+    )
 
 
 def _add_mutation_parser(parser: argparse.ArgumentParser) -> None:
