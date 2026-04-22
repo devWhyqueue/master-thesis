@@ -70,6 +70,27 @@ def append_bibtex_entries(text: str, new_entries: list[dict[str, object]]) -> st
     return f"{text}{suffix}{rendered}\n"
 
 
+def sort_bibtex_entries(text: str) -> str:
+    """Sort BibTeX entries alphabetically by key while preserving entry contents."""
+
+    entries = parse_bibtex(text)
+    if not entries:
+        return text
+
+    prefix = text[: entries[0].start]
+    if prefix.strip():
+        prefix = f"{prefix.rstrip()}\n\n"
+    else:
+        prefix = ""
+    rendered_entries = [
+        render_entry(entry, {}) for entry in sorted(
+            entries, key=lambda entry: (entry.key.lower(), entry.start)
+        )
+    ]
+    rendered_body = "\n\n".join(rendered_entries)
+    return f"{prefix}{rendered_body}\n"
+
+
 def strip_screening_updates() -> dict[str, str | None]:
     """Return an update map that removes existing screening fields."""
 

@@ -1,21 +1,27 @@
 # bib
 
-Project-local BibTeX skill and CLI for metadata enrichment, PDF-backed synchronization, screening, and duplicate detection.
+Project-local BibTeX skill and CLI for metadata enrichment, PDF-backed synchronization, screening, duplicate detection, and stable alphabetical entry sorting.
 
 ## Usage
 
 ```bash
 uv run bib refresh
 uv run bib refresh --dry-run
+uv run bib refresh --no-sort
 uv run bib refresh --input-bib papers/sources.bib --pdf-dir papers
 uv run bib enrich papers/sources.bib --dry-run
 uv run bib enrich papers/sources.bib --in-place
+uv run bib enrich papers/sources.bib --in-place --sort
 uv run bib screen papers/sources.bib --in-place
+uv run bib screen papers/sources.bib --in-place --sort
 uv run bib dedupe papers/sources.bib
 uv run bib pdf-sync papers/sources.bib --pdf-dir papers --dry-run
+uv run bib pdf-sync papers/sources.bib --out papers/sources.synced.bib --sort
 ```
 
-`bib refresh` is the repo-oriented maintenance shortcut: it runs PDF sync, enrichment, duplicate reporting, and screening in one pass, writing back to `papers/sources.bib` by default. Duplicate handling remains report-only.
+`bib refresh` is the repo-oriented maintenance shortcut: it runs PDF sync, enrichment, duplicate reporting, and screening in one pass, then sorts entries alphabetically by BibTeX key before writing back to `papers/sources.bib` by default. Use `--no-sort` to keep the existing order. Duplicate handling remains report-only.
+
+`bib enrich`, `bib screen`, and `bib pdf-sync` do not sort by default, but each supports `--sort` to sort entries before writing output.
 
 ## Screening fields
 
