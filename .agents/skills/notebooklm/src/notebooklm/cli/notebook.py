@@ -11,6 +11,7 @@ Commands:
 Note: Sharing commands moved to 'share' command group.
 """
 
+import logging
 import click
 from rich.table import Table
 
@@ -267,6 +268,8 @@ def register_notebook_commands(cli):
 
                             # Always print the source line (use Text to avoid Rich markup interpretation)
                             from rich.text import Text
+
+logger = logging.getLogger(__name__)
 
                             console.print(
                                 Text(f"  {i}. "),

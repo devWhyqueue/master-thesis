@@ -20,6 +20,7 @@ Usage:
     python scripts/check_rpc_health.py --full   # Full mode (create temp notebook)
 """
 
+import logging
 from __future__ import annotations
 
 import argparse
@@ -45,6 +46,8 @@ from notebooklm.rpc import (
     encode_rpc_request,
 )
 from notebooklm.rpc.decoder import (
+
+logger = logging.getLogger(__name__)
     collect_rpc_ids,
     decode_response,
     parse_chunked_response,
@@ -194,7 +197,7 @@ def load_auth() -> dict[str, str]:
         )
         sys.exit(2)
     except ValueError as e:
-        print(f"ERROR: Invalid authentication: {e}", file=sys.stderr)
+        logger.info(f"ERROR: Invalid authentication: {e}", file=sys.stderr)
         sys.exit(2)
     return cookies
 
@@ -624,7 +627,7 @@ async def setup_temp_resources(
         client, auth, RPCMethod.CREATE_NOTEBOOK, [f"RPC-Health-Check-{uuid4().hex[:8]}"]
     )
     results.append(result)
-    print(format_check_with_success(result, "temp notebook created"))
+    logger.info(format_check_with_success(result, "temp notebook created"))
 
     if result.status != CheckStatus.OK:
         return temp
@@ -667,12 +670,12 @@ async def setup_temp_resources(
         source_path=f"/notebook/{temp.notebook_id}",
     )
     results.append(result)
-    print(format_check_with_success(result, "temp source added"))
+    logger.info(format_check_with_success(result, "temp source added"))
 
     if result.status == CheckStatus.OK:
         temp.source_id = extract_id(data, 0, 0)
         if not temp.source_id:
-            print(f"  WARNING: ADD_SOURCE ID extraction failed. Response: {repr(data)[:200]}")
+            logger.info(f"  WARNING: ADD_SOURCE ID extraction failed. Response: {repr(data)[:200]}")
 
     # Test ADD_SOURCE_FILE - registers file source intent (no actual upload needed)
     # Params format: [[[filename]], notebook_id, [2], [1, None, ...]]
@@ -690,7 +693,7 @@ async def setup_temp_resources(
         source_path=f"/notebook/{temp.notebook_id}",
     )
     results.append(result)
-    print(format_check_with_success(result, "file source registered"))
+    logger.info(format_check_with_success(result, "file source registered"))
 
     # Test START_FAST_RESEARCH - starts research task (verify RPC ID only)
     # Params format: [[query, source_type], None, 1, notebook_id]
@@ -703,7 +706,7 @@ async def setup_temp_resources(
         source_path=f"/notebook/{temp.notebook_id}",
     )
     results.append(result)
-    print(format_check_with_success(result, "research started"))
+    logger.info(format_check_with_success(result, "research started"))
 
     # Test CREATE_NOTE - extract note_id from response[0]
     # Params format: [notebook_id, "", [1], None, title]
@@ -716,7 +719,7 @@ async def setup_temp_resources(
         source_path=f"/notebook/{temp.notebook_id}",
     )
     results.append(result)
-    print(format_check_with_success(result, "temp note created"))
+    logger.info(format_check_with_success(result, "temp note created"))
 
     if result.status == CheckStatus.OK:
         temp.note_id = extract_id(data, 0)
@@ -760,7 +763,7 @@ async def setup_temp_resources(
             source_path=f"/notebook/{temp.notebook_id}",
         )
         results.append(result)
-        print(format_check_with_success(result, "flashcard generation triggered"))
+        logger.info(format_check_with_success(result, "flashcard generation triggered"))
 
         if result.status == CheckStatus.OK:
             # Artifact ID is at response[0][0]
@@ -796,14 +799,14 @@ async def setup_temp_resources(
                     break
 
             if artifact_ready:
-                print(f"  Artifact ready after {polls_done * poll_interval:.0f}s polling")
+                logger.info(f"  Artifact ready after {polls_done * poll_interval:.0f}s polling")
             else:
                 print(
                     f"  Artifact not ready after {max_polls * poll_interval:.0f}s (continuing anyway)"
                 )
     else:
         # Skip artifact tests - no source_id available
-        print("SKIP     CREATE_ARTIFACT - No source_id available (source extraction failed)")
+        logger.info("SKIP     CREATE_ARTIFACT - No source_id available (source extraction failed)")
 
     return temp
 
@@ -834,9 +837,9 @@ async def cleanup_temp_resources(
                 source_path=f"/notebook/{temp.notebook_id}",
             )
             results.append(result)
-            print(format_check_with_success(result, "temp note deleted"))
+            logger.info(format_check_with_success(result, "temp note deleted"))
         except Exception as e:
-            print(f"ERROR    DELETE_NOTE - {e}")
+            logger.info(f"ERROR    DELETE_NOTE - {e}")
 
     # Test DELETE_SOURCE if we have a source (best effort)
     if temp.source_id:
@@ -850,9 +853,9 @@ async def cleanup_temp_resources(
                 source_path=f"/notebook/{temp.notebook_id}",
             )
             results.append(result)
-            print(format_check_with_success(result, "temp source deleted"))
+            logger.info(format_check_with_success(result, "temp source deleted"))
         except Exception as e:
-            print(f"ERROR    DELETE_SOURCE - {e}")
+            logger.info(f"ERROR    DELETE_SOURCE - {e}")
 
     # Test DELETE_ARTIFACT if we have an artifact (best effort)
     if temp.artifact_id:
@@ -866,19 +869,19 @@ async def cleanup_temp_resources(
                 source_path=f"/notebook/{temp.notebook_id}",
             )
             results.append(result)
-            print(format_check_with_success(result, "temp artifact deleted"))
+            logger.info(format_check_with_success(result, "temp artifact deleted"))
         except Exception as e:
-            print(f"ERROR    DELETE_ARTIFACT - {e}")
+            logger.info(f"ERROR    DELETE_ARTIFACT - {e}")
 
     # ALWAYS delete notebook - this is critical to avoid orphaned notebooks
     try:
         await asyncio.sleep(CALL_DELAY)
         result = await test_rpc_method(client, auth, RPCMethod.DELETE_NOTEBOOK, [temp.notebook_id])
         results.append(result)
-        print(format_check_with_success(result, "temp notebook deleted"))
+        logger.info(format_check_with_success(result, "temp notebook deleted"))
     except Exception as e:
-        print(f"ERROR    DELETE_NOTEBOOK - {e}")
-        print(f"WARNING: Notebook {temp.notebook_id} may need manual cleanup", file=sys.stderr)
+        logger.info(f"ERROR    DELETE_NOTEBOOK - {e}")
+        logger.info(f"WARNING: Notebook {temp.notebook_id} may need manual cleanup", file=sys.stderr)
 
 
 async def run_health_check(full_mode: bool = False) -> list[CheckResult]:
@@ -890,38 +893,38 @@ async def run_health_check(full_mode: bool = False) -> list[CheckResult]:
     )
 
     if not notebook_id and not full_mode:
-        print("WARNING: No notebook ID provided. Some methods will be skipped.", file=sys.stderr)
+        logger.info("WARNING: No notebook ID provided. Some methods will be skipped.", file=sys.stderr)
 
     results: list[CheckResult] = []
     temp_resources = TempResources()
 
-    print("Fetching auth tokens...")
+    logger.info("Fetching auth tokens...")
     try:
         csrf_token, session_id = await fetch_tokens(cookies)
     except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+        logger.info(f"ERROR: {e}", file=sys.stderr)
         sys.exit(2)
     except httpx.HTTPError as e:
-        print(f"ERROR: Network error while fetching auth tokens: {e}", file=sys.stderr)
+        logger.info(f"ERROR: Network error while fetching auth tokens: {e}", file=sys.stderr)
         sys.exit(2)
     auth = AuthTokens(cookies=cookies, csrf_token=csrf_token, session_id=session_id)
-    print(f"Auth OK (CSRF token length: {len(auth.csrf_token)})")
-    print()
+    logger.info(f"Auth OK (CSRF token length: {len(auth.csrf_token)})")
+    logger.info()
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             if full_mode:
-                print("Creating temp resources for full testing...")
+                logger.info("Creating temp resources for full testing...")
                 temp_resources = await setup_temp_resources(client, auth, results)
                 if temp_resources.notebook_id:
                     notebook_id = temp_resources.notebook_id
-                print()
+                logger.info()
 
             methods = list(RPCMethod)
             total = len(methods)
 
-            print(f"Checking {total} RPC methods...")
-            print("=" * 60)
+            logger.info(f"Checking {total} RPC methods...")
+            logger.info("=" * 60)
 
             for i, method in enumerate(methods, 1):
                 result = await check_method(client, auth, method, notebook_id, full_mode)
@@ -931,15 +934,15 @@ async def run_health_check(full_mode: bool = False) -> list[CheckResult]:
                 line = f"{status_icon:8} {method.name} ({result.expected_id})"
                 if result.error and result.status != CheckStatus.OK:
                     line += f" - {result.error}"
-                print(line)
+                logger.info(line)
 
                 if i < total and result.status != CheckStatus.SKIPPED:
                     await asyncio.sleep(CALL_DELAY)
 
         finally:
             if full_mode and temp_resources.notebook_id:
-                print()
-                print("Testing DELETE operations during cleanup...")
+                logger.info()
+                logger.info("Testing DELETE operations during cleanup...")
                 await cleanup_temp_resources(client, auth, temp_resources, results)
 
     return results
@@ -947,54 +950,54 @@ async def run_health_check(full_mode: bool = False) -> list[CheckResult]:
 
 def print_summary(results: list[CheckResult]) -> int:
     """Print summary and return exit code."""
-    print()
-    print("=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
+    logger.info()
+    logger.info("=" * 60)
+    logger.info("SUMMARY")
+    logger.info("=" * 60)
 
     counts = Counter(r.status for r in results)
     total = len(results)
     tested = total - counts[CheckStatus.SKIPPED]
 
-    print(f"TESTED:   {tested}/{total} methods")
-    print(f"OK:       {counts[CheckStatus.OK]}/{tested}")
-    print(f"MISMATCH: {counts[CheckStatus.MISMATCH]}/{tested}")
-    print(f"ERROR:    {counts[CheckStatus.ERROR]}/{tested}")
+    logger.info(f"TESTED:   {tested}/{total} methods")
+    logger.info(f"OK:       {counts[CheckStatus.OK]}/{tested}")
+    logger.info(f"MISMATCH: {counts[CheckStatus.MISMATCH]}/{tested}")
+    logger.info(f"ERROR:    {counts[CheckStatus.ERROR]}/{tested}")
 
     # Print details for mismatches
     mismatches = [r for r in results if r.status == CheckStatus.MISMATCH]
     if mismatches:
-        print()
-        print("MISMATCH DETAILS:")
-        print("-" * 40)
+        logger.info()
+        logger.info("MISMATCH DETAILS:")
+        logger.info("-" * 40)
         for r in mismatches:
-            print(f"  {r.method.name}:")
-            print(f"    Expected: '{r.expected_id}'")
-            print(f"    Found:    {r.found_ids}")
-            print(f"    Action:   Update RPCMethod.{r.method.name} in src/notebooklm/rpc/types.py")
-            print()
+            logger.info(f"  {r.method.name}:")
+            logger.info(f"    Expected: '{r.expected_id}'")
+            logger.info(f"    Found:    {r.found_ids}")
+            logger.info(f"    Action:   Update RPCMethod.{r.method.name} in src/notebooklm/rpc/types.py")
+            logger.info()
 
     # Print details for errors
     errors = [r for r in results if r.status == CheckStatus.ERROR]
     if errors:
-        print()
-        print("ERROR DETAILS:")
-        print("-" * 40)
+        logger.info()
+        logger.info("ERROR DETAILS:")
+        logger.info("-" * 40)
         for r in errors:
-            print(f"  {r.method.name} ({r.expected_id}): {r.error}")
-        print()
+            logger.info(f"  {r.method.name} ({r.expected_id}): {r.error}")
+        logger.info()
 
     # Return exit code
     # Only fail on MISMATCH (RPC ID changed) - this is what we care about
     # ERROR could be transient (rate limiting, network issues) - don't fail on these
     if counts[CheckStatus.MISMATCH] > 0:
-        print("RESULT: FAIL - RPC ID mismatches detected")
+        logger.info("RESULT: FAIL - RPC ID mismatches detected")
         return 1
     if counts[CheckStatus.ERROR] > 0:
-        print("RESULT: WARN - Some methods had errors (may be transient)")
-        print("       Review ERROR DETAILS above for potential issues")
+        logger.info("RESULT: WARN - Some methods had errors (may be transient)")
+        logger.info("       Review ERROR DETAILS above for potential issues")
         return 0  # Don't fail - could be rate limiting or network issues
-    print("RESULT: PASS - All tested RPC methods OK")
+    logger.info("RESULT: PASS - All tested RPC methods OK")
     return 0
 
 
@@ -1011,9 +1014,9 @@ def main() -> int:
     args = parser.parse_args()
 
     mode_str = "FULL" if args.full else "QUICK"
-    print(f"RPC Health Check ({mode_str} mode)")
-    print("=" * 60)
-    print()
+    logger.info(f"RPC Health Check ({mode_str} mode)")
+    logger.info("=" * 60)
+    logger.info()
 
     results = asyncio.run(run_health_check(full_mode=args.full))
     return print_summary(results)

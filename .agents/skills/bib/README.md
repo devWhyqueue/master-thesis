@@ -23,6 +23,11 @@ uv run bib pdf-sync papers/sources.bib --out papers/sources.synced.bib --sort
 
 `bib enrich`, `bib screen`, and `bib pdf-sync` do not sort by default, but each supports `--sort` to sort entries before writing output.
 
+The screening rubric treats strong venues as a positive signal. The default `top_tier_venues` list is non-exhaustive and includes:
+
+- General ML and computer vision: NeurIPS, CVPR, ICML, ICLR, ICCV, ECCV, AISTATS
+- Medical imaging: MICCAI, ISBI
+
 ## Screening fields
 
 ```bibtex

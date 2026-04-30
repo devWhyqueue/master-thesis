@@ -18,36 +18,39 @@ Usage:
 """
 
 import asyncio
+import logging
 
 from notebooklm import NotebookLMClient
 
+logger = logging.getLogger(__name__)
+
 
 async def main():
-    print("=== NotebookLM Quickstart ===\n")
+    logger.info("=== NotebookLM Quickstart ===\n")
 
     async with await NotebookLMClient.from_storage() as client:
         # 1. Create a notebook
-        print("Creating notebook...")
+        logger.info("Creating notebook...")
         nb = await client.notebooks.create("Quickstart Demo")
-        print(f"  Created: {nb.id} - {nb.title}\n")
+        logger.info(f"  Created: {nb.id} - {nb.title}\n")
 
         # 2. Add a source
-        print("Adding source...")
+        logger.info("Adding source...")
         url = "https://en.wikipedia.org/wiki/Artificial_intelligence"
         source = await client.sources.add_url(nb.id, url)
-        print(f"  Added: {source.title}\n")
+        logger.info(f"  Added: {source.title}\n")
 
         # 3. Chat with the content
-        print("Asking a question...")
+        logger.info("Asking a question...")
         result = await client.chat.ask(nb.id, "What are the main topics covered?")
-        print(f"  Answer: {result.answer[:200]}...\n")
+        logger.info(f"  Answer: {result.answer[:200]}...\n")
 
         # 4. Generate an audio overview
-        print("Generating podcast (this may take a few minutes)...")
+        logger.info("Generating podcast (this may take a few minutes)...")
         status = await client.artifacts.generate_audio(
             nb.id, instructions="Focus on the history and key milestones"
         )
-        print(f"  Started generation, task_id: {status.task_id}")
+        logger.info(f"  Started generation, task_id: {status.task_id}")
 
         # Wait for completion
         final = await client.artifacts.wait_for_completion(
@@ -55,20 +58,20 @@ async def main():
         )
 
         if final.is_complete:
-            print(f"  Complete! URL: {final.url}\n")
+            logger.info(f"  Complete! URL: {final.url}\n")
 
             # 5. Download (requires browser support)
             # output_path = await client.artifacts.download_audio(nb.id, "./podcast.mp3")
             # print(f"  Downloaded to: {output_path}")
         else:
-            print(f"  Generation status: {final.status}\n")
+            logger.info(f"  Generation status: {final.status}\n")
 
         # Cleanup: Delete the demo notebook
-        print("Cleaning up...")
+        logger.info("Cleaning up...")
         await client.notebooks.delete(nb.id)
-        print("  Deleted demo notebook\n")
+        logger.info("  Deleted demo notebook\n")
 
-    print("=== Done! ===")
+    logger.info("=== Done! ===")
 
 
 if __name__ == "__main__":

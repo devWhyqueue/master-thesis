@@ -12,6 +12,7 @@ Commands:
     flashcards   Download flashcard deck
 """
 
+import logging
 import json
 from collections.abc import Awaitable, Callable
 from functools import partial
@@ -30,6 +31,8 @@ from .download_helpers import (
     select_artifact,
 )
 from .helpers import (
+
+logger = logging.getLogger(__name__)
     console,
     handle_error,
     require_notebook,

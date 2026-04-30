@@ -9,12 +9,15 @@ Commands:
     remove       Remove user's access
 """
 
+import logging
 import click
 from rich.table import Table
 
 from ..client import NotebookLMClient
 from ..types import SharePermission, ShareViewLevel
 from .helpers import (
+
+logger = logging.getLogger(__name__)
     console,
     json_output_response,
     require_notebook,

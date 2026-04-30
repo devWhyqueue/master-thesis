@@ -8,6 +8,7 @@ Commands:
     profile rename    Rename a profile
 """
 
+import logging
 import json
 import os
 import re
@@ -178,6 +179,8 @@ def delete_cmd(name, confirm):
 
     # Block deletion of active or configured default profile
     from ..paths import _read_default_profile
+
+logger = logging.getLogger(__name__)
 
     configured_default = _read_default_profile() or "default"
     effective_active = resolve_profile()

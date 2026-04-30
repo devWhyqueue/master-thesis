@@ -1,9 +1,13 @@
 """Agent integration commands."""
 
+import logging
+
 import click
 
 from .agent_templates import get_agent_source_content
 from .helpers import console
+
+logger = logging.getLogger(__name__)
 
 
 @click.group()

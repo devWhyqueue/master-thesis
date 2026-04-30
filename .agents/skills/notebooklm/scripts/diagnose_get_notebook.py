@@ -16,6 +16,7 @@ Environment variables:
     Or run 'notebooklm login' first for local auth.
 """
 
+import logging
 from __future__ import annotations
 
 import asyncio
@@ -33,6 +34,8 @@ from notebooklm.rpc import (
     encode_rpc_request,
 )
 from notebooklm.rpc.decoder import (
+
+logger = logging.getLogger(__name__)
     collect_rpc_ids,
     decode_response,
     parse_chunked_response,
@@ -52,7 +55,7 @@ def load_auth() -> dict[str, str]:
         )
         sys.exit(1)
     except ValueError as e:
-        print(f"ERROR: Invalid authentication: {e}", file=sys.stderr)
+        logger.info(f"ERROR: Invalid authentication: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -94,20 +97,20 @@ def diagnose_response(label: str, raw: str, rpc_id: str) -> tuple[list, list, An
     Returns:
         Tuple of (chunks, found_ids, decoded_result_or_None).
     """
-    print(f"\n{'=' * 60}")
-    print(f"  {label}")
-    print(f"{'=' * 60}")
-    print(f"  Raw response length: {len(raw)} bytes")
-    print(f"  First 200 chars: {raw[:200]!r}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  {label}")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"  Raw response length: {len(raw)} bytes")
+    logger.info(f"  First 200 chars: {raw[:200]!r}")
 
     cleaned = strip_anti_xssi(raw)
     chunks = parse_chunked_response(cleaned)
     found_ids = collect_rpc_ids(chunks)
 
-    print(f"  Chunks parsed: {len(chunks)}")
-    print(f"  Found RPC IDs: {found_ids}")
-    print(f"  Target RPC ID: {rpc_id}")
-    print(f"  Target in found_ids: {rpc_id in found_ids}")
+    logger.info(f"  Chunks parsed: {len(chunks)}")
+    logger.info(f"  Found RPC IDs: {found_ids}")
+    logger.info(f"  Target RPC ID: {rpc_id}")
+    logger.info(f"  Target in found_ids: {rpc_id in found_ids}")
 
     # Show each chunk's structure
     for i, chunk in enumerate(chunks):
@@ -116,19 +119,19 @@ def diagnose_response(label: str, raw: str, rpc_id: str) -> tuple[list, list, An
             cid = chunk[1] if len(chunk) > 1 else "?"
             has_data = chunk[2] is not None if len(chunk) > 2 else False
             data_type = type(chunk[2]).__name__ if len(chunk) > 2 else "N/A"
-            print(f"  Chunk {i}: tag={tag}, id={cid}, has_data={has_data}, data_type={data_type}")
+            logger.info(f"  Chunk {i}: tag={tag}, id={cid}, has_data={has_data}, data_type={data_type}")
         else:
             preview = repr(chunk)[:100]
-            print(f"  Chunk {i}: {preview}")
+            logger.info(f"  Chunk {i}: {preview}")
 
     # Try full decode_response (uses the same parsing internally)
     decoded_result = None
     try:
         decoded_result = decode_response(raw, rpc_id)
         preview = repr(decoded_result)[:200]
-        print(f"  decode_response: OK - {preview}")
+        logger.info(f"  decode_response: OK - {preview}")
     except Exception as e:
-        print(f"  decode_response: raised {type(e).__name__}: {e}")
+        logger.info(f"  decode_response: raised {type(e).__name__}: {e}")
 
     return chunks, found_ids, decoded_result
 
@@ -137,19 +140,19 @@ async def run_diagnosis(notebook_id: str | None = None) -> None:
     """Run the diagnostic comparison."""
     cookies = load_auth()
 
-    print("Fetching auth tokens...")
+    logger.info("Fetching auth tokens...")
     try:
         csrf_token, session_id = await fetch_tokens(cookies)
     except (ValueError, httpx.HTTPError) as e:
-        print(f"ERROR: Failed to fetch auth tokens: {e}")
-        print("Try running: notebooklm login")
+        logger.info(f"ERROR: Failed to fetch auth tokens: {e}")
+        logger.info("Try running: notebooklm login")
         sys.exit(1)
     auth = AuthTokens(cookies=cookies, csrf_token=csrf_token, session_id=session_id)
-    print(f"Auth OK (CSRF length: {len(auth.csrf_token)})")
+    logger.info(f"Auth OK (CSRF length: {len(auth.csrf_token)})")
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=60.0)) as client:
         # 1. LIST_NOTEBOOKS
-        print("\n--- LIST_NOTEBOOKS ---")
+        logger.info("\n--- LIST_NOTEBOOKS ---")
         list_raw = await make_rpc_request(client, auth, RPCMethod.LIST_NOTEBOOKS, [])
         list_chunks, list_ids, list_result = diagnose_response(
             "LIST_NOTEBOOKS", list_raw, RPCMethod.LIST_NOTEBOOKS.value
@@ -167,18 +170,18 @@ async def run_diagnosis(notebook_id: str | None = None) -> None:
                         else:
                             notebook_id = first_nb[2] if len(first_nb) > 2 else None
             except (IndexError, TypeError) as e:
-                print(f"  Warning: Could not extract notebook ID from LIST_NOTEBOOKS result: {e}")
+                logger.info(f"  Warning: Could not extract notebook ID from LIST_NOTEBOOKS result: {e}")
 
             if not notebook_id:
-                print("\nERROR: Could not extract notebook ID from LIST_NOTEBOOKS.")
-                print("Please provide a notebook ID as argument:")
-                print(f"  python {sys.argv[0]} <notebook_id>")
+                logger.info("\nERROR: Could not extract notebook ID from LIST_NOTEBOOKS.")
+                logger.info("Please provide a notebook ID as argument:")
+                logger.info(f"  python {sys.argv[0]} <notebook_id>")
                 sys.exit(1)
 
-            print(f"\nUsing first notebook: {notebook_id}")
+            logger.info(f"\nUsing first notebook: {notebook_id}")
 
         # 2. GET_NOTEBOOK
-        print("\n--- GET_NOTEBOOK ---")
+        logger.info("\n--- GET_NOTEBOOK ---")
         get_raw = await make_rpc_request(
             client,
             auth,
@@ -191,37 +194,37 @@ async def run_diagnosis(notebook_id: str | None = None) -> None:
         )
 
         # 3. Side-by-side comparison
-        print(f"\n{'=' * 60}")
-        print("  COMPARISON")
-        print(f"{'=' * 60}")
+        logger.info(f"\n{'=' * 60}")
+        logger.info("  COMPARISON")
+        logger.info(f"{'=' * 60}")
         print(
             f"  LIST_NOTEBOOKS: {len(list_raw)} bytes, {len(list_chunks)} chunks, IDs: {list_ids}"
         )
-        print(f"  GET_NOTEBOOK:   {len(get_raw)} bytes, {len(get_chunks)} chunks, IDs: {get_ids}")
+        logger.info(f"  GET_NOTEBOOK:   {len(get_raw)} bytes, {len(get_chunks)} chunks, IDs: {get_ids}")
 
         list_ok = RPCMethod.LIST_NOTEBOOKS.value in list_ids
         get_ok = RPCMethod.GET_NOTEBOOK.value in get_ids
-        print(f"\n  LIST_NOTEBOOKS working: {list_ok}")
-        print(f"  GET_NOTEBOOK working:   {get_ok}")
+        logger.info(f"\n  LIST_NOTEBOOKS working: {list_ok}")
+        logger.info(f"  GET_NOTEBOOK working:   {get_ok}")
 
         if list_ok and not get_ok:
-            print("\n  DIAGNOSIS: LIST_NOTEBOOKS works but GET_NOTEBOOK does not.")
-            print("  This matches Issue #114. The GET_NOTEBOOK RPC may be:")
-            print("    - Returning null result data (server-side issue)")
-            print("    - Requiring different parameters than expected")
-            print("    - Affected by a server-side change not yet reflected in method IDs")
+            logger.info("\n  DIAGNOSIS: LIST_NOTEBOOKS works but GET_NOTEBOOK does not.")
+            logger.info("  This matches Issue #114. The GET_NOTEBOOK RPC may be:")
+            logger.info("    - Returning null result data (server-side issue)")
+            logger.info("    - Requiring different parameters than expected")
+            logger.info("    - Affected by a server-side change not yet reflected in method IDs")
         elif list_ok and get_ok:
-            print("\n  DIAGNOSIS: Both RPCs are working. Issue may be intermittent.")
+            logger.info("\n  DIAGNOSIS: Both RPCs are working. Issue may be intermittent.")
         else:
-            print("\n  DIAGNOSIS: Both RPCs are failing. Check authentication.")
+            logger.info("\n  DIAGNOSIS: Both RPCs are failing. Check authentication.")
 
 
 def main() -> None:
     """Main entry point."""
     notebook_id = sys.argv[1] if len(sys.argv) > 1 else None
 
-    print("GET_NOTEBOOK Diagnostic Tool (Issue #114)")
-    print("=" * 60)
+    logger.info("GET_NOTEBOOK Diagnostic Tool (Issue #114)")
+    logger.info("=" * 60)
 
     asyncio.run(run_diagnosis(notebook_id))
 

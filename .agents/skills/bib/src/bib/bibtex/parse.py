@@ -83,9 +83,8 @@ def sort_bibtex_entries(text: str) -> str:
     else:
         prefix = ""
     rendered_entries = [
-        render_entry(entry, {}) for entry in sorted(
-            entries, key=lambda entry: (entry.key.lower(), entry.start)
-        )
+        render_entry(entry, {})
+        for entry in sorted(entries, key=lambda entry: (entry.key.lower(), entry.start))
     ]
     rendered_body = "\n\n".join(rendered_entries)
     return f"{prefix}{rendered_body}\n"

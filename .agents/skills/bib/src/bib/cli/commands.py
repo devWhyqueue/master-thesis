@@ -132,7 +132,9 @@ def _enrich_document(
     return update_bibtex_fields(text, updates_by_key), previews, changed_count
 
 
-def _screen_document(text: str, entries, config: BibConfig) -> tuple[str, list[ScreenedEntry]]:
+def _screen_document(
+    text: str, entries, config: BibConfig
+) -> tuple[str, list[ScreenedEntry]]:
     duplicates = detect_duplicates(entries)
     cache, providers = _build_runtime(config)
     screened_entries: list[ScreenedEntry] = []
@@ -224,7 +226,9 @@ def _pdf_sync_document(
                 reasons or resolution.reasons,
             )
         )
-    return append_bibtex_entries(update_bibtex_fields(text, updates_by_key), new_entries), results
+    return append_bibtex_entries(
+        update_bibtex_fields(text, updates_by_key), new_entries
+    ), results
 
 
 def _run_enrich(args: argparse.Namespace, config: BibConfig) -> int:
@@ -267,7 +271,9 @@ def _run_dedupe(args: argparse.Namespace) -> int:
 def _run_pdf_sync(args: argparse.Namespace, config: BibConfig) -> int:
     text, entries = load_bibtex_file(args.input_bib)
     pdf_dir = args.pdf_dir or Path(config.pdf_sync.pdf_dir)
-    updated, results = _pdf_sync_document(text, entries, args.input_bib, pdf_dir, config)
+    updated, results = _pdf_sync_document(
+        text, entries, args.input_bib, pdf_dir, config
+    )
     logger.info(render_pdf_sync_summary(results))
     preview = render_pdf_sync_preview(results)
     if preview:
