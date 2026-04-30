@@ -5,12 +5,15 @@ Commands:
     wait        Wait for research to complete (blocking)
 """
 
+import logging
 import asyncio
 
 import click
 
 from ..client import NotebookLMClient
 from .helpers import (
+
+logger = logging.getLogger(__name__)
     console,
     display_report,
     display_research_sources,

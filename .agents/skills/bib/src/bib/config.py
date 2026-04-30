@@ -86,6 +86,11 @@ class ThresholdConfig:
             "neurips",
             "icml",
             "cvpr",
+            "iccv",
+            "eccv",
+            "aistats",
+            "miccai",
+            "isbi",
             "nature machine intelligence",
         ]
     )

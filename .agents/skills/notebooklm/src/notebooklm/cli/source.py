@@ -15,6 +15,7 @@ Commands:
     add-research Search web/drive and add sources from results
 """
 
+import logging
 import asyncio
 import re
 from pathlib import Path
@@ -828,6 +829,8 @@ def source_wait(ctx, source_id, notebook_id, timeout, json_output, client_auth):
       # Subagent runs: notebooklm source wait <source_id>
     """
     from ..types import SourceNotFoundError, SourceProcessingError, SourceTimeoutError
+
+logger = logging.getLogger(__name__)
 
     nb_id = require_notebook(notebook_id)
 

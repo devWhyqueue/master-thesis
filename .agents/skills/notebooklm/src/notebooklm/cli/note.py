@@ -9,12 +9,15 @@ Commands:
     delete  Delete a note
 """
 
+import logging
 import click
 from rich.table import Table
 
 from ..client import NotebookLMClient
 from ..types import Note
 from .helpers import (
+
+logger = logging.getLogger(__name__)
     console,
     require_notebook,
     resolve_note_id,

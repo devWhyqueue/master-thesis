@@ -12,8 +12,11 @@ Prerequisites:
 """
 
 import asyncio
+import logging
 
 from notebooklm import ChatGoal, ChatMode, ChatResponseLength, NotebookLMClient
+
+logger = logging.getLogger(__name__)
 
 
 async def main():
@@ -21,7 +24,7 @@ async def main():
 
     async with await NotebookLMClient.from_storage() as client:
         # Create a notebook with some content
-        print("Setting up notebook with sources...")
+        logger.info("Setting up notebook with sources...")
         notebook = await client.notebooks.create("Python Learning")
 
         # Add a source for context
@@ -29,17 +32,17 @@ async def main():
             notebook.id,
             "https://en.wikipedia.org/wiki/Python_(programming_language)",
         )
-        print(f"Added source: {source.title}")
+        logger.info(f"Added source: {source.title}")
 
         # Give NotebookLM a moment to process the source
-        print("Waiting for source processing...")
+        logger.info("Waiting for source processing...")
         await asyncio.sleep(3)
 
         # =====================================================================
         # Basic Question/Answer
         # =====================================================================
 
-        print("\n--- Basic Q&A ---")
+        logger.info("\n--- Basic Q&A ---")
 
         # Ask a question about the notebook's content
         result = await client.chat.ask(
@@ -47,16 +50,16 @@ async def main():
             "What are the main features of Python?",
         )
 
-        print("Question: What are the main features of Python?")
-        print(f"Answer: {result.answer[:500]}...")
-        print(f"Conversation ID: {result.conversation_id}")
-        print(f"Turn number: {result.turn_number}")
+        logger.info("Question: What are the main features of Python?")
+        logger.info(f"Answer: {result.answer[:500]}...")
+        logger.info(f"Conversation ID: {result.conversation_id}")
+        logger.info(f"Turn number: {result.turn_number}")
 
         # =====================================================================
         # Follow-up Questions (Conversation Threading)
         # =====================================================================
 
-        print("\n--- Follow-up Questions ---")
+        logger.info("\n--- Follow-up Questions ---")
 
         # Use the same conversation_id for follow-up questions
         # This maintains context from previous exchanges
@@ -66,10 +69,10 @@ async def main():
             conversation_id=result.conversation_id,  # Continue the conversation
         )
 
-        print("Follow-up: How does it compare to other programming languages?")
-        print(f"Answer: {followup.answer[:500]}...")
-        print(f"Is follow-up: {followup.is_follow_up}")
-        print(f"Turn number: {followup.turn_number}")
+        logger.info("Follow-up: How does it compare to other programming languages?")
+        logger.info(f"Answer: {followup.answer[:500]}...")
+        logger.info(f"Is follow-up: {followup.is_follow_up}")
+        logger.info(f"Turn number: {followup.turn_number}")
 
         # Another follow-up
         followup2 = await client.chat.ask(
@@ -78,39 +81,39 @@ async def main():
             conversation_id=result.conversation_id,
         )
 
-        print("\nFollow-up 2: What about for data science specifically?")
-        print(f"Answer: {followup2.answer[:400]}...")
+        logger.info("\nFollow-up 2: What about for data science specifically?")
+        logger.info(f"Answer: {followup2.answer[:400]}...")
 
         # =====================================================================
         # Conversation History
         # =====================================================================
 
-        print("\n--- Conversation History ---")
+        logger.info("\n--- Conversation History ---")
 
         # Get locally cached conversation turns
         turns = client.chat.get_cached_turns(result.conversation_id)
-        print(f"Cached turns in this conversation: {len(turns)}")
+        logger.info(f"Cached turns in this conversation: {len(turns)}")
         for turn in turns:
-            print(f"  Turn {turn.turn_number}:")
-            print(f"    Q: {turn.query[:50]}...")
-            print(f"    A: {turn.answer[:50]}...")
+            logger.info(f"  Turn {turn.turn_number}:")
+            logger.info(f"    Q: {turn.query[:50]}...")
+            logger.info(f"    A: {turn.answer[:50]}...")
 
         # Get conversation history from the API (all conversations)
         try:
             history = await client.chat.get_history(notebook.id, limit=10)
-            print(f"\nAPI conversation history: {type(history)}")
+            logger.info(f"\nAPI conversation history: {type(history)}")
         except Exception as e:
-            print(f"Note: History retrieval returned: {e}")
+            logger.info(f"Note: History retrieval returned: {e}")
 
         # =====================================================================
         # Configuring Chat Behavior
         # =====================================================================
 
-        print("\n--- Chat Configuration ---")
+        logger.info("\n--- Chat Configuration ---")
 
         # Method 1: Use predefined chat modes
         # Available modes: DEFAULT, LEARNING_GUIDE, CONCISE, DETAILED
-        print("Setting chat mode to LEARNING_GUIDE...")
+        logger.info("Setting chat mode to LEARNING_GUIDE...")
         await client.chat.set_mode(notebook.id, ChatMode.LEARNING_GUIDE)
 
         # Ask a question with the new mode
@@ -118,12 +121,12 @@ async def main():
             notebook.id,
             "Explain decorators in Python",
         )
-        print(f"Learning mode answer: {learning_result.answer[:400]}...")
+        logger.info(f"Learning mode answer: {learning_result.answer[:400]}...")
 
         # Method 2: Fine-grained configuration
         # ChatGoal: DEFAULT, CUSTOM, LEARNING_GUIDE
         # ChatResponseLength: SHORTER, DEFAULT, LONGER
-        print("\nSetting custom chat configuration...")
+        logger.info("\nSetting custom chat configuration...")
         await client.chat.configure(
             notebook.id,
             goal=ChatGoal.DEFAULT,
@@ -134,10 +137,10 @@ async def main():
             notebook.id,
             "What is Python used for?",
         )
-        print(f"Concise answer: {concise_result.answer[:300]}...")
+        logger.info(f"Concise answer: {concise_result.answer[:300]}...")
 
         # Method 3: Custom persona with specific instructions
-        print("\nSetting custom persona...")
+        logger.info("\nSetting custom persona...")
         await client.chat.configure(
             notebook.id,
             goal=ChatGoal.CUSTOM,
@@ -151,13 +154,13 @@ async def main():
             notebook.id,
             "How should I handle errors in Python?",
         )
-        print(f"Custom persona answer: {custom_result.answer[:500]}...")
+        logger.info(f"Custom persona answer: {custom_result.answer[:500]}...")
 
         # =====================================================================
         # Source-Specific Questions
         # =====================================================================
 
-        print("\n--- Source-Specific Questions ---")
+        logger.info("\n--- Source-Specific Questions ---")
 
         # Get source IDs to target specific sources
         sources = await client.sources.list(notebook.id)
@@ -170,7 +173,7 @@ async def main():
                 "Summarize the key points from this source",
                 source_ids=source_ids,  # Only use these sources for context
             )
-            print(f"Targeted answer: {targeted_result.answer[:400]}...")
+            logger.info(f"Targeted answer: {targeted_result.answer[:400]}...")
 
         # =====================================================================
         # Cleanup
@@ -178,7 +181,7 @@ async def main():
 
         # Clear conversation cache (optional)
         client.chat.clear_cache(result.conversation_id)
-        print("\nConversation cache cleared")
+        logger.info("\nConversation cache cleared")
 
 
 if __name__ == "__main__":

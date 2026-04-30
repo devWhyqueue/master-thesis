@@ -169,9 +169,9 @@ class NotebooksAPI:
 
         Example:
             desc = await client.notebooks.get_description(notebook_id)
-            print(desc.summary)
+            logger.info(desc.summary)
             for topic in desc.suggested_topics:
-                print(f"Q: {topic.question}")
+                logger.info(f"Q: {topic.question}")
         """
         # Get raw summary data
         params = [notebook_id, [2]]
@@ -328,11 +328,11 @@ class NotebooksAPI:
 
         Example:
             metadata = await client.notebooks.get_metadata(notebook_id)
-            print(f"Notebook: {metadata.title}")
-            print(f"Sources: {len(metadata.sources)}")
+            logger.info(f"Notebook: {metadata.title}")
+            logger.info(f"Sources: {len(metadata.sources)}")
             # Export to JSON
             import json
-            print(json.dumps(metadata.to_dict(), indent=2))
+            logger.info(json.dumps(metadata.to_dict(), indent=2))
         """
         # Get notebook details and sources list concurrently
         notebook, sources = await asyncio.gather(

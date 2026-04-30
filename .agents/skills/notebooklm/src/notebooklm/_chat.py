@@ -40,7 +40,7 @@ class ChatAPI:
         async with NotebookLMClient.from_storage() as client:
             # Ask a question
             result = await client.chat.ask(notebook_id, "What is X?")
-            print(result.answer)
+            logger.info(result.answer)
 
             # Follow-up question
             result = await client.chat.ask(

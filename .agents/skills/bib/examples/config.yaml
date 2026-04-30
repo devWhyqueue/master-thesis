@@ -67,6 +67,11 @@ screening:
       - "neurips"
       - "icml"
       - "cvpr"
+      - "iccv"
+      - "eccv"
+      - "aistats"
+      - "miccai"
+      - "isbi"
     non_target_publication_types:
       - "editorial"
       - "letter"

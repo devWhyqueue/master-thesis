@@ -11,6 +11,7 @@ Commands:
     suggestions Get AI-suggested report topics
 """
 
+import logging
 import json
 
 import click
@@ -19,6 +20,8 @@ from rich.table import Table
 from ..client import NotebookLMClient
 from ..rpc import ExportType
 from .helpers import (
+
+logger = logging.getLogger(__name__)
     cli_name_to_artifact_type,
     console,
     get_artifact_type_display,

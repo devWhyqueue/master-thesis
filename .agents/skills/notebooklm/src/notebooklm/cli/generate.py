@@ -14,6 +14,7 @@ Commands:
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -46,6 +47,8 @@ from .helpers import (
 )
 from .language import SUPPORTED_LANGUAGES, get_language
 from .options import json_option, retry_option
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LANGUAGE = "en"
 

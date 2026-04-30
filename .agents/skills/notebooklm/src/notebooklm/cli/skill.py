@@ -1,5 +1,6 @@
 """Skill management commands."""
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,8 @@ def get_package_version() -> str:
     """Get the current package version."""
     try:
         from .. import __version__
+
+logger = logging.getLogger(__name__)
 
         return __version__
     except ImportError:

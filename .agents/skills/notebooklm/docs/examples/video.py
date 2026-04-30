@@ -15,8 +15,11 @@ Prerequisites:
 """
 
 import asyncio
+import logging
 
 from notebooklm import NotebookLMClient, VideoFormat, VideoStyle
+
+logger = logging.getLogger(__name__)
 
 
 async def main():
@@ -24,22 +27,22 @@ async def main():
 
     async with await NotebookLMClient.from_storage() as client:
         # Step 1: Create a notebook with content
-        print("Creating notebook...")
+        logger.info("Creating notebook...")
         notebook = await client.notebooks.create("Video Demo Notebook")
-        print(f"Created notebook: {notebook.id}")
+        logger.info(f"Created notebook: {notebook.id}")
 
         # Add sources for video content
-        print("\nAdding sources...")
+        logger.info("\nAdding sources...")
         urls = [
             "https://en.wikipedia.org/wiki/Quantum_computing",
         ]
 
         for url in urls:
             source = await client.sources.add_url(notebook.id, url)
-            print(f"  Added: {source.title or url}")
+            logger.info(f"  Added: {source.title or url}")
 
         # Wait for source processing
-        print("\nWaiting for source processing...")
+        logger.info("\nWaiting for source processing...")
         await asyncio.sleep(5)
 
         # Step 2: Generate the video overview
@@ -57,8 +60,8 @@ async def main():
         #   - CORPORATE: Professional corporate style
         #   - DYNAMIC: Dynamic, energetic style
 
-        print("\nStarting video generation...")
-        print("Video generation typically takes 3-8 minutes")
+        logger.info("\nStarting video generation...")
+        logger.info("Video generation typically takes 3-8 minutes")
 
         generation = await client.artifacts.generate_video(
             notebook.id,
@@ -68,11 +71,11 @@ async def main():
             instructions="Create an engaging overview suitable for general audiences",
         )
 
-        print(f"Generation started: {generation.task_id}")
-        print(f"Initial status: {generation.status}")
+        logger.info(f"Generation started: {generation.task_id}")
+        logger.info(f"Initial status: {generation.status}")
 
         # Step 3: Wait for completion with status updates
-        print("\nWaiting for video generation...")
+        logger.info("\nWaiting for video generation...")
 
         try:
             final_status = await client.artifacts.wait_for_completion(
@@ -84,48 +87,48 @@ async def main():
             )
 
             if final_status.is_complete:
-                print("\nVideo generation complete!")
+                logger.info("\nVideo generation complete!")
 
                 # Step 4: Download the video
                 output_path = "quantum_video.mp4"
-                print(f"Downloading video to {output_path}...")
+                logger.info(f"Downloading video to {output_path}...")
 
                 await client.artifacts.download_video(
                     notebook.id,
                     output_path,
                     artifact_id=generation.task_id,
                 )
-                print(f"Video downloaded: {output_path}")
+                logger.info(f"Video downloaded: {output_path}")
 
             elif final_status.is_failed:
-                print(f"\nGeneration failed: {final_status.error}")
+                logger.info(f"\nGeneration failed: {final_status.error}")
 
         except TimeoutError:
-            print("\nVideo generation timed out")
-            print("Check NotebookLM web UI for completion")
+            logger.info("\nVideo generation timed out")
+            logger.info("Check NotebookLM web UI for completion")
 
         # =====================================================================
         # Alternative: Check existing artifacts
         # =====================================================================
 
-        print("\n--- Listing All Video Artifacts ---")
+        logger.info("\n--- Listing All Video Artifacts ---")
 
         # List all video artifacts in the notebook
         videos = await client.artifacts.list_video(notebook.id)
 
         for video in videos:
             status = "Ready" if video.is_completed else "Processing"
-            print(f"\n  Title: {video.title}")
-            print(f"  ID: {video.id}")
-            print(f"  Status: {status}")
+            logger.info(f"\n  Title: {video.title}")
+            logger.info(f"  ID: {video.id}")
+            logger.info(f"  Status: {status}")
             if video.created_at:
-                print(f"  Created: {video.created_at}")
+                logger.info(f"  Created: {video.created_at}")
 
         # =====================================================================
         # Manual status polling example
         # =====================================================================
 
-        print("\n--- Manual Status Polling ---")
+        logger.info("\n--- Manual Status Polling ---")
 
         if generation.task_id:
             # You can manually poll status without wait_for_completion
@@ -133,9 +136,9 @@ async def main():
                 notebook.id,
                 generation.task_id,
             )
-            print(f"Current status: {status.status}")
-            print(f"Is complete: {status.is_complete}")
-            print(f"Is in progress: {status.is_in_progress}")
+            logger.info(f"Current status: {status.status}")
+            logger.info(f"Is complete: {status.is_complete}")
+            logger.info(f"Is in progress: {status.is_in_progress}")
 
         # =====================================================================
         # Download existing video
@@ -143,14 +146,14 @@ async def main():
 
         # If you have an existing completed video, download it directly
         if videos and videos[0].is_completed:
-            print("\n--- Downloading Existing Video ---")
+            logger.info("\n--- Downloading Existing Video ---")
             existing_path = "existing_video.mp4"
             await client.artifacts.download_video(
                 notebook.id,
                 existing_path,
                 artifact_id=videos[0].id,
             )
-            print(f"Downloaded: {existing_path}")
+            logger.info(f"Downloaded: {existing_path}")
 
 
 if __name__ == "__main__":
