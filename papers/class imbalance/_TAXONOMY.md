@@ -172,21 +172,6 @@ Use these terms depending on the level of specificity:
 | Segmentation                 | `class imbalance medical image segmentation loss function`    |
 | Object detection             | `foreground background imbalance object detection focal loss` |
 
-## For your topic, I would start with these paper-search clusters
-
-For computational pathology / WSI classification, the most relevant clusters are probably:
-
-```text
-class imbalance histopathology classification
-long-tailed recognition histopathology
-rare class classification whole slide images
-class-balanced loss medical image classification
-focal loss histopathology classification
-self-supervised learning rare disease histopathology
-foundation model long-tailed histopathology classification
-few-shot and long-tailed learning computational pathology
-```
-
 A clean mental model:
 
 > **Data-level methods** change what the model sees.
