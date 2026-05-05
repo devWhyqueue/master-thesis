@@ -6,4 +6,3 @@ __pycache__/
 pyrightconfig.json
 .pytest_cache/
 .coverage
-review.bib
