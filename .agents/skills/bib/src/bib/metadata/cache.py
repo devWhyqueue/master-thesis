@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
@@ -28,6 +29,13 @@ class ResponseCache:
         self._paths = cache_paths
         self._config = config
 
+    # Most filesystems cap filenames at 255 bytes.  We stay well under that
+    # limit (200 bytes) so that the prefix "{provider}-{namespace}-" and the
+    # ".json" suffix leave enough room.  When the safe key alone would push the
+    # filename over that budget we fall back to a short SHA-256 digest instead.
+    _MAX_SAFE_FILENAME_BYTES: int = 200
+    _HASH_PREFIX_LENGTH: int = 16
+
     def _cache_path(self, provider: str, namespace: str, key: str) -> Path:
         safe_key = (
             key.replace("/", "__")
@@ -36,7 +44,11 @@ class ResponseCache:
             .replace("&", "_")
             .replace("=", "_")
         )
-        return self._paths.providers_dir / f"{provider}-{namespace}-{safe_key}.json"
+        filename = f"{provider}-{namespace}-{safe_key}.json"
+        if len(filename.encode()) > self._MAX_SAFE_FILENAME_BYTES:
+            digest = hashlib.sha256(key.encode()).hexdigest()[: self._HASH_PREFIX_LENGTH]
+            filename = f"{provider}-{namespace}-{digest}.json"
+        return self._paths.providers_dir / filename
 
     def get(self, provider: str, namespace: str, key: str) -> EnrichmentData | None:
         """Return a cached response when fresh enough."""
