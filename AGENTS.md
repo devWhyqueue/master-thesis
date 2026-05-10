@@ -2,6 +2,10 @@
 
 - `Update papers`: Look for uncommited Git changes, run compress command of skill pdf for these and bib refresh command of skill bib.
 
+# Cluster
+
+- Read `CLUSTER.md` before using the TU Berlin Hydra cluster. It contains the SSH shortcut, SLURM workflow, storage rules, and dataset safety notes.
+
 # Code
 
 - If editing Python code, run clean-code skill after a change.
