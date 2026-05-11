@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scientific Writing"
+  short_description: "Draft and revise thesis and paper prose"
+  default_prompt: "Use $scientific-writing to draft or revise a thesis or paper section with disciplined LaTeX structure, visuals, tables, and formulas."
