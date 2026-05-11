@@ -1,0 +1,49 @@
+paths:
+  tcga_root: /home/space/datasets/patho_ds/tcga-ut
+  raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
+  feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
+  outputs: experiments/class_imbalance_tcga_ut
+
+data:
+  feature_glob: "*.pt"
+  feature_suffix_pattern: "_[0-9]+"
+  min_train_slides_per_class: 1
+  validation_fraction: 0.15
+  test_fraction: 0.15
+  balanced_test_per_class: 0
+
+training:
+  seeds: [0, 1, 2]
+  batch_size: 128
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  hidden_dims: [256]
+  dropout: 0.1
+  focal_gamma: 2.0
+  center_loss_weight: 0.01
+  oko_k: 1
+  knn_k: 5
+  max_train_rows:
+  max_eval_rows:
+  device: auto
+
+methods:
+  - ce
+  - weighted_ce
+  - focal
+  - weighted_focal
+  - balanced_sampler_ce
+  - oversampling_ce
+  - balanced_sampler_weighted_focal
+  - center_ce
+  - feature_interpolation_ce
+  - oko
+  - knn
+  - ncc
+
+slurm:
+  partition: cpu-2h
+  ntasks_per_node: 8
+  container: ./environment.sif
+

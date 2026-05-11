@@ -8,7 +8,7 @@
 
 # Code
 
-- If editing Python code, run clean-code skill after a change.
+- If editing Python code, run clean-code skill after a change. To avoid producing violations in the first place, look into the skill's clean_code_rules.yml.
 
 # NotebookLM
 
