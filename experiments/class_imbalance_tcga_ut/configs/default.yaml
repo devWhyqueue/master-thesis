@@ -43,7 +43,6 @@ methods:
   - ncc
 
 slurm:
-  partition: cpu-2h
+  partition: gpu-2h
   ntasks_per_node: 8
   container: ./environment.sif
-

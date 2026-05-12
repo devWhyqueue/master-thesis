@@ -75,6 +75,16 @@ def _validate_assignments(split_manifest: pd.DataFrame) -> None:
     raise RuntimeError(f"Missing split assignments for slides: {missing}")
 
 
+def _map_slide_assignments(
+    frame: pd.DataFrame, assignments: dict[str, str]
+) -> pd.Series:
+    """Map slide IDs to split names while preserving missing assignments as NaN."""
+    split_series = frame["slide_id"].apply(
+        lambda slide_id: assignments.get(str(slide_id))
+    )
+    return cast(pd.Series, split_series)
+
+
 def _add_balanced_test_flag(
     split_manifest: pd.DataFrame,
     slide_splits: pd.DataFrame,
@@ -139,10 +149,10 @@ def main() -> None:
     slide_manifest = pd.read_csv(paths["data"] / "slide_manifest.csv")
     assignments = _build_assignments(slide_manifest, args.seed, data_config)
     split_manifest = manifest.copy()
-    split_manifest["split"] = split_manifest["slide_id"].map(assignments)
+    split_manifest["split"] = _map_slide_assignments(split_manifest, assignments)
     _validate_assignments(split_manifest)
     slide_splits = slide_manifest.copy()
-    slide_splits["split"] = slide_splits["slide_id"].map(assignments)
+    slide_splits["split"] = _map_slide_assignments(slide_splits, assignments)
     balanced_per_class = int(data_config.get("balanced_test_per_class") or 0)
     split_manifest = _add_balanced_test_flag(
         split_manifest, slide_splits, balanced_per_class, args.seed

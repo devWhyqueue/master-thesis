@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import time
 from typing import Any
 
 import yaml
@@ -53,3 +54,9 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
+
+
+def write_progress(path: Path, payload: dict[str, Any]) -> None:
+    """Write progress payload with an update timestamp."""
+    payload["updated_unix"] = time.time()
+    write_json(path, payload)

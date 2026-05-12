@@ -31,6 +31,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 
 - Prefer precise claims over broad declarations. State what is known, what is assumed, and what follows from the cited evidence.
 - Build paragraphs around one main point: topic sentence, supporting evidence or reasoning, and a clear connection to the section's purpose.
+- Place citations outside sentence grammar, at the end of the relevant paragraph, unless the document's existing style clearly requires narrative citations.
 - Maintain academic restraint. Avoid hype, marketing language, and unsupported novelty claims.
 - Make transitions explicit when moving between motivation, prior work, method, result, limitation, and implication.
 - Preserve reader orientation in long sections with short signposting paragraphs rather than excessive headings.

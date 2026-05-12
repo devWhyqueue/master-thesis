@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import logging
 import argparse
+import logging
+from pathlib import Path
 
-from scripts.common import ensure_dirs, load_config, write_json
-from scripts.training.support import _write_config_json
+from scripts.common import ensure_dirs, load_config, write_json, write_progress
 from scripts.training.eval import _train_sklearn
 from scripts.training.trainer import _load_split, _train_mlp
 
@@ -36,6 +36,10 @@ def _train_selected_method(
 
 def main() -> None:
     """Train one mitigation method and write result artifacts."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     args = parse_args()
     config = load_config(args.config)
     paths = ensure_dirs(config)
@@ -43,13 +47,31 @@ def main() -> None:
     class_names = sorted(frame["cancer_type"].unique().tolist())
     result_dir = paths["results"] / args.method / f"seed={args.seed}"
     result_dir.mkdir(parents=True, exist_ok=True)
+    _write_status(result_dir, args.method, args.seed, "started")
     results = _train_selected_method(
         args.method, frame, class_names, config, args.seed, result_dir
     )
-    _write_config_json(result_dir, args.method, args.seed, args.smoke)
-    write_json(result_dir / "validation_results.json", results["val"])
+    write_json(
+        result_dir / "config.json",
+        {"method": args.method, "seed": args.seed, "smoke": args.smoke},
+    )
+    write_json(result_dir / "val_results.json", results["val"])
     write_json(result_dir / "test_results.json", results["test"])
+    _write_status(result_dir, args.method, args.seed, "completed")
     logger.info(f"Wrote results to {result_dir}")
+
+
+def _write_status(result_dir: Path, method: str, seed: int, status: str) -> None:
+    """Write coarse progress for methods without epoch-level training."""
+    write_progress(
+        result_dir / "progress.json",
+        {
+            "method": method,
+            "seed": seed,
+            "status": status,
+        },
+    )
+    logger.info("progress method=%s seed=%s status=%s", method, seed, status)
 
 
 if __name__ == "__main__":

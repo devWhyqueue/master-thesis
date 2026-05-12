@@ -10,6 +10,19 @@
 
 - If editing Python code, run clean-code skill after a change. To avoid producing violations in the first place, look into the skill's clean_code_rules.yml.
 
+# LaTeX
+
+- TeX Live is installed on Windows and can be used from WSL via `/mnt/c/texlive/2026/bin/windows/pdflatex.exe` and `/mnt/c/texlive/2026/bin/windows/bibtex.exe`.
+- Compile from the directory containing the `.tex` file. Use a temporary build directory and copy out only the final PDF, for example:
+  - `mkdir -p .latex-build`
+  - `cp *.bib .latex-build/`
+  - `/mnt/c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode -halt-on-error -output-directory=.latex-build main.tex`
+  - `(cd .latex-build && /mnt/c/texlive/2026/bin/windows/bibtex.exe main)`
+  - `/mnt/c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode -halt-on-error -output-directory=.latex-build main.tex`
+  - `/mnt/c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode -halt-on-error -output-directory=.latex-build main.tex`
+  - `cp .latex-build/main.pdf main.pdf && rm -rf .latex-build`
+- Do not leave LaTeX auxiliary files in the worktree.
+
 # NotebookLM
 
 Notebook IDs for `papers/` imports:

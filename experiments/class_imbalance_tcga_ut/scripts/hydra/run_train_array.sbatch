@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=tcga-ut-train
-#SBATCH --partition=cpu-2h
-#SBATCH --gpus-per-node=0
+#SBATCH --partition=gpu-2h
+#SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=8
-#SBATCH --array=0-35
+#SBATCH --array=0-35%4
 #SBATCH --output=logs/train-%A-%a.out
 
 set -euo pipefail
@@ -38,6 +38,7 @@ seed_index=$((SLURM_ARRAY_TASK_ID % ${#seeds[@]}))
 method=${methods[$method_index]}
 seed=${seeds[$seed_index]}
 
+export EXPERIMENT_USE_GPU=1
 bash scripts/hydra/run_python.sh -m scripts.prep.check_env
 bash scripts/hydra/run_python.sh -m scripts.training.train \
   --config configs/default.yaml \

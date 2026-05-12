@@ -140,7 +140,8 @@ def _validate_manifest(manifest: pd.DataFrame) -> None:
     missing_columns = required_columns.difference(manifest.columns)
     if missing_columns:
         raise RuntimeError(f"Manifest is missing columns: {sorted(missing_columns)}")
-    if bool(manifest[list(required_columns)].isna().any().any()):
+    required_frame = manifest.loc[:, list(required_columns)]
+    if bool(required_frame.isna().to_numpy().any()):
         raise RuntimeError("Manifest contains empty values in required columns.")
     missing_files = [
         path for path in manifest["feature_path"].tolist() if not Path(path).exists()

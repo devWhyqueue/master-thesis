@@ -9,15 +9,20 @@ import pandas as pd
 import torch
 from torch import nn
 
+from scripts.training.eval import _save_and_evaluate as _save_and_evaluate_model
 from scripts.training.oko import _train_oko
-from scripts.training.split import _slice_split_rows
+from scripts.training.split import (
+    _progress_payload,
+    _slice_split_rows,
+    _write_training_progress,
+)
 from scripts.training.support import (
     FeatureDataset,
     Mlp,
     _batch_center_loss,
     _build_criterion,
-    _evaluate,
     _interpolate_minority,
+    _labels_to_indices,
     _make_loader,
     _resolve_device,
 )
@@ -56,9 +61,7 @@ def _train_mlp(
     device = _resolve_device(training["device"])
     class_to_idx = {class_name: idx for idx, class_name in enumerate(class_names)}
     split_sets = _split_datasets(frame, class_to_idx)
-    train_labels = (
-        split_sets.train_frame["cancer_type"].replace(class_to_idx).to_numpy()
-    )
+    train_labels = _labels_to_indices(split_sets.train_frame, class_to_idx)
     model = _build_model(split_sets.train_dataset, class_names, training, device)
     optimizer = _build_optimizer(model, training)
     if method == "oko":
@@ -70,6 +73,8 @@ def _train_mlp(
             optimizer,
             device,
             seed,
+            result_dir,
+            method,
         )
     else:
         _run_supervised_training(
@@ -81,8 +86,16 @@ def _train_mlp(
             optimizer,
             device,
             seed,
+            result_dir,
         )
-    return _save_and_evaluate(model, split_sets, class_names, device, result_dir)
+    return _save_and_evaluate_model(
+        model,
+        split_sets.val_dataset,
+        split_sets.test_dataset,
+        class_names,
+        device,
+        result_dir,
+    )
 
 
 def _split_datasets(frame: pd.DataFrame, class_to_idx: dict[str, int]) -> SplitSets:
@@ -131,17 +144,25 @@ def _run_oko_training(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     seed: int,
+    result_dir: Path,
+    method: str,
 ) -> None:
+    epochs = int(training["epochs"])
+
     _train_oko(
         model=model,
         dataset=train_dataset,
         labels=train_labels,
-        epochs=int(training["epochs"]),
+        epochs=epochs,
         steps_per_epoch=max(1, len(train_dataset) // int(training["batch_size"])),
         k_oko=int(training["oko_k"]),
         optimizer=optimizer,
         device=device,
         seed=seed,
+        progress_callback=lambda epoch: _write_training_progress(
+            result_dir,
+            _progress_payload(method, seed, device, "running", epoch, epochs),
+        ),
     )
 
 
@@ -154,6 +175,7 @@ def _run_supervised_training(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     seed: int,
+    result_dir: Path,
 ) -> None:
     loader = _make_loader(
         train_dataset, train_labels, method, int(training["batch_size"]), seed
@@ -168,8 +190,9 @@ def _run_supervised_training(
     center_weight = (
         float(training["center_loss_weight"]) if method == "center_ce" else 0.0
     )
-    for _ in range(int(training["epochs"])):
-        _run_supervised_epoch(
+    epochs = int(training["epochs"])
+    for epoch in range(1, epochs + 1):
+        loss = _run_supervised_epoch(
             model,
             loader,
             train_labels,
@@ -178,6 +201,11 @@ def _run_supervised_training(
             optimizer,
             device,
             center_weight,
+        )
+        _write_training_progress(
+            result_dir,
+            _progress_payload(method, seed, device, "running", epoch, epochs),
+            loss,
         )
 
 
@@ -190,8 +218,10 @@ def _run_supervised_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     center_weight: float,
-) -> None:
+) -> float:
     model.train()
+    total_loss = 0.0
+    n_batches = 0
     for features, targets in loader:
         features = features.to(device)
         targets = targets.to(device)
@@ -204,16 +234,6 @@ def _run_supervised_epoch(
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-
-def _save_and_evaluate(
-    model: nn.Module,
-    split_sets: SplitSets,
-    class_names: list[str],
-    device: torch.device,
-    result_dir: Path,
-) -> dict[str, dict[str, object]]:
-    val_results = _evaluate(model, split_sets.val_dataset, class_names, device)
-    test_results = _evaluate(model, split_sets.test_dataset, class_names, device)
-    torch.save(model.state_dict(), result_dir / "model.pt")
-    return {"val": val_results, "test": test_results}
+        total_loss += float(loss.detach().cpu().item())
+        n_batches += 1
+    return total_loss / max(n_batches, 1)

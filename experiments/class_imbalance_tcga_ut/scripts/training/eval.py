@@ -4,9 +4,16 @@ from typing import cast
 
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
+from torch import nn
 
-from scripts.training.support import _load_numpy, _metric_payload
+from scripts.training.support import (
+    FeatureDataset,
+    _evaluate,
+    _load_numpy,
+    _metric_payload,
+)
 
 
 def _train_sklearn(
@@ -52,3 +59,17 @@ def _evaluate_predictions(
     payload = _metric_payload(y_true.tolist(), y_pred.tolist(), [], class_names)
     payload["accuracy"] = float((y_true == y_pred).mean())
     return payload
+
+
+def _save_and_evaluate(
+    model: nn.Module,
+    val_dataset: FeatureDataset,
+    test_dataset: FeatureDataset,
+    class_names: list[str],
+    device: torch.device,
+    result_dir,
+) -> dict[str, dict[str, object]]:
+    val_results = _evaluate(model, val_dataset, class_names, device)
+    test_results = _evaluate(model, test_dataset, class_names, device)
+    torch.save(model.state_dict(), result_dir / "model.pt")
+    return {"val": val_results, "test": test_results}

@@ -1,20 +1,15 @@
-from __future__ import annotations
-
-import json
-from pathlib import Path
+import logging
 from typing import cast
 
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-    confusion_matrix,
-    precision_recall_fscore_support,
-)
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
+from sklearn.metrics import precision_recall_fscore_support
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+
+logger = logging.getLogger(__name__)
 
 
 def _feature_to_vector(path: str) -> torch.Tensor:
@@ -27,21 +22,33 @@ def _feature_to_vector(path: str) -> torch.Tensor:
     return features.flatten()
 
 
-class FeatureDataset(Dataset):
-    """Dataset that maps manifest rows to feature vectors and labels."""
+def _labels_to_indices(frame: pd.DataFrame, class_to_idx: dict[str, int]) -> np.ndarray:
+    return np.asarray(
+        [class_to_idx[str(class_name)] for class_name in frame["cancer_type"]],
+        dtype=np.int64,
+    )
 
+
+class FeatureDataset(Dataset):
     def __init__(self, frame: pd.DataFrame, class_to_idx: dict[str, int]) -> None:
-        self.frame = frame.reset_index(drop=True)
-        self.class_to_idx = class_to_idx
+        frame = frame.reset_index(drop=True)
+        self.features = torch.stack(
+            [_feature_to_vector(str(path)) for path in frame["feature_path"].tolist()]
+        )
+        self.labels = torch.tensor(
+            [
+                class_to_idx[str(class_name)]
+                for class_name in frame["cancer_type"].tolist()
+            ],
+            dtype=torch.long,
+        )
+        logger.info("Loaded %s feature tensors into memory", len(self.features))
 
     def __len__(self) -> int:
-        return len(self.frame)
+        return len(self.features)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        row = self.frame.iloc[idx]
-        return _feature_to_vector(row["feature_path"]), self.class_to_idx[
-            row["cancer_type"]
-        ]
+        return self.features[idx], int(self.labels[idx].item())
 
 
 class Mlp(nn.Module):
@@ -54,9 +61,8 @@ class Mlp(nn.Module):
         layers: list[nn.Module] = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
-            layers.extend(
-                [nn.Linear(current_dim, hidden_dim), nn.ReLU(), nn.Dropout(dropout)]
-            )
+            layers.extend([nn.Linear(current_dim, hidden_dim), nn.ReLU()])
+            layers.append(nn.Dropout(dropout))
             current_dim = hidden_dim
         layers.append(nn.Linear(current_dim, output_dim))
         self.model = nn.Sequential(*layers)
@@ -154,7 +160,7 @@ def _metric_payload(
 ) -> dict[str, object]:
     labels = list(range(len(class_names)))
     precision, recall, f1, support = precision_recall_fscore_support(
-        y_true, y_pred, labels=labels, zero_division="warn"
+        y_true, y_pred, labels=labels, zero_division=cast(str, 0)
     )
     precision = cast(np.ndarray, precision)
     recall = cast(np.ndarray, recall)
@@ -204,7 +210,7 @@ def _load_numpy(
     frame: pd.DataFrame, class_to_idx: dict[str, int]
 ) -> tuple[np.ndarray, np.ndarray]:
     features = [_feature_to_vector(path).numpy() for path in frame["feature_path"]]
-    labels = frame["cancer_type"].replace(class_to_idx).to_numpy()
+    labels = _labels_to_indices(frame, class_to_idx)
     return np.vstack(features), labels
 
 
@@ -241,9 +247,3 @@ def _interpolate_minority(
         features = torch.cat([features, mixed[same_class]], dim=0)
         targets = torch.cat([targets, minority_targets[same_class]], dim=0)
     return features, targets
-
-
-def _write_config_json(result_dir: Path, method: str, seed: int, smoke: bool) -> None:
-    payload = {"method": method, "seed": seed, "smoke": smoke}
-    with (result_dir / "config.json").open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2)

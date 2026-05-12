@@ -4,7 +4,7 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
-\usepackage{natbib}
+\usepackage[numbers,sort&compress]{natbib}
 \usepackage{siunitx}
 
 \graphicspath{{../outputs/figures/}}
@@ -17,71 +17,89 @@
 \maketitle
 
 \begin{abstract}
-Class imbalance is a central obstacle in computational pathology because clinically relevant cohorts often follow long-tailed disease distributions. This study evaluates mitigation strategies for native TCGA-UT classification using a shared frozen Virchow2 feature representation. The experiment compares feature-space probes, sampling strategies, loss reweighting, focal losses, hybrid sampling-loss combinations, and set-learning variants under the same train, validation, and test splits. The goal is to identify which methods improve minority-class recognition without obscuring majority-class trade-offs.
+Class imbalance is a persistent obstacle in computational pathology because clinically useful cohorts often follow long-tailed disease distributions. This paper evaluates imbalance-mitigation strategies on native TCGA-UT rather than on an artificially resampled benchmark. All methods use the same frozen Virchow2 feature representation and the same stratified train, validation, and test splits. Across 32 cancer classes and 8736 slides, center-regularized cross-entropy achieved the strongest aggregate test performance, reaching 0.869 macro F1, 0.856 balanced accuracy, and 0.912 accuracy. Loss weighting, focal losses, balanced sampling, and feature-space interpolation produced smaller changes around the unweighted cross-entropy baseline, while feature-space probes and the OKO set-learning variant trailed the best MLP methods. The results suggest that, for this frozen-feature TCGA-UT setting, modest objective regularization is more effective than aggressive rebalancing.
 \end{abstract}
 
 \section{Introduction}
-Computational pathology classifiers are frequently trained on datasets where common tumor types dominate rare entities. Under this regime, aggregate accuracy can hide poor minority-class behavior, and evaluation must emphasize classwise recall, macro-averaged metrics, and calibration-aware views \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}. TCGA-UT is a useful test bed because it contains many tumor classes and can be studied with frozen pathology foundation-model features.
+Class imbalance changes what a pathology classifier is rewarded for learning. When common tumor types dominate the training set, high aggregate accuracy can coexist with unreliable rare-class recall, especially if evaluation reports only micro-averaged or prevalence-sensitive summaries. Long-tailed learning and medical-image evaluation literature therefore motivate classwise recall, macro F1, and balanced accuracy as primary outcomes in imbalanced settings. \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}
 
-This paper studies mitigation methods on the native TCGA-UT distribution rather than constructing imbalance artificially. All evaluated methods use the same Virchow2 feature representation \citep{vorontsov2024virchow,zimmermann2024virchow2}, which isolates the effect of the downstream imbalance strategy.
+This study treats TCGA-UT as a native long-tailed computational pathology benchmark. Instead of inducing imbalance by downsampling a balanced dataset, the experiments preserve the natural class distribution in the training split and evaluate on validation and test splits drawn from the same native distribution. This design asks which downstream mitigation methods help when the skew is part of the dataset rather than an experimental artifact.
 
-\section{Dataset Exploration}
-The analysis starts by building a manifest that maps native TCGA-UT feature files to slide identifiers and cancer types. The manifest is used to quantify class counts, feature coverage, and imbalance ratio before training. Figure~\ref{fig:class-distribution} shows the native class distribution once generated.
+The experimental design isolates imbalance mitigation from representation learning. Every method consumes the same slide-level feature vectors derived from Virchow2 patch features, so differences in performance reflect the probe, sampler, objective, or set-learning strategy rather than a change in image encoder. \citep{vorontsov2024virchow,zimmermann2024virchow2}
+
+\section{Dataset}
+The manifest maps native TCGA-UT Virchow2 feature files to slide identifiers and cancer types. It contains 8736 slides across 32 classes. The largest class, Glioblastoma multiforme, contains 792 slides, whereas the smallest class, Lymphoid Neoplasm Diffuse Large B-cell Lymphoma, contains 28 slides. The resulting slide-level imbalance ratio is 28.3:1. Stratified splits contain 6116 training slides, 1310 validation slides, and 1310 test slides.
+
+Figure~\ref{fig:class-distribution} shows the class counts used for the experiment. The tail contains several clinically distinct classes with fewer than 100 slides, including Lymphoid Neoplasm Diffuse Large B-cell Lymphoma, Cholangiocarcinoma, Pheochromocytoma and Paraganglioma, Uveal Melanoma, Rectum adenocarcinoma, Mesothelioma, Uterine Carcinosarcoma, Kidney Chromophobe, and Ovarian serous cystadenocarcinoma.
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../outputs/figures/class_distribution.png}{\includegraphics[width=\linewidth]{class_distribution.png}}{\fbox{\parbox{0.85\linewidth}{Class-distribution figure generated by \texttt{scripts/prep/explore.py}.}}}
+  \includegraphics[width=\linewidth]{class_distribution.png}
   \caption{Native TCGA-UT slide counts by cancer type.}
   \label{fig:class-distribution}
 \end{figure}
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../outputs/figures/long_tail_profile.png}{\includegraphics[width=0.7\linewidth]{long_tail_profile.png}}{\fbox{\parbox{0.7\linewidth}{Long-tail profile generated by \texttt{scripts/prep/explore.py}.}}}
+  \includegraphics[width=0.72\linewidth]{long_tail_profile.png}
   \caption{Class-rank profile used to verify the long-tailed setting.}
   \label{fig:long-tail}
 \end{figure}
 
-\section{Mitigation Taxonomy}
-The experiments follow five method families. Data-level methods change which examples are shown during training, including oversampling and class-balanced sampling \citep{majeed2024addressingData}. Synthetic and generative methods create new minority-class examples; full image-level GAN or diffusion training is discussed as related work, while this experiment remains feature-based for comparability \citep{yuan2024aGan,ruizcasado2024enhancingHistopathological}. Algorithm-level methods change the objective through class weights, focal loss, or center/prototype regularization \citep{mahbub2024centerFocused}. Hybrid methods combine sampling and objective changes \citep{ling2025mdeMil}. Representation and architecture-level methods improve separability through model design or set-level supervision \citep{cong2022imbalancedHistopathology,muttenthaler2024oko}.
-
 \section{Methods}
-All methods consume the same native TCGA-UT Virchow2 feature manifest. The baseline is a multilayer perceptron trained with unweighted cross-entropy. Feature-space probes use $k$-nearest neighbors and nearest-centroid classification. Sampling variants use class-balanced replacement sampling. Objective variants use inverse-frequency weighting, focal loss, weighted focal loss, and a center-regularized cross-entropy variant. Hybrid variants combine balanced sampling with weighted focal loss. A set-learning variant trains on odd-$k$-out sets and evaluates the same single-example classifier at test time.
+All experiments use frozen Virchow2 features from the native TCGA-UT feature directory. Feature tensors are loaded from the shared representation, reduced to a single vector per slide when needed, and passed to downstream classifiers without fine-tuning the pathology encoder.
 
-The main evaluation uses native validation and test distributions. The primary metrics are macro F1, balanced accuracy, and classwise recall ordered by class support. These metrics are chosen because accuracy and ROC-style summaries can overstate performance under class imbalance \citep{mosquera2024classImbalance}.
+The baseline is a one-hidden-layer MLP trained with unweighted cross-entropy. Algorithm-level variants use inverse-frequency weighted cross-entropy, focal loss, weighted focal loss, and center-regularized cross-entropy. Data-level variants use balanced sampling and oversampling during MLP training. The hybrid variant combines balanced sampling with weighted focal loss. Feature-space interpolation mixes minority-class features within mini-batches and should be interpreted only as a feature-space proxy, not as validated image-level synthesis. The probe baselines are $k$-nearest neighbors and nearest-centroid classification. The representation/objective variant uses OKO set learning with the same feature representation.
+
+The mitigation taxonomy covers data-level, synthetic or generative, algorithm-level, hybrid, and representation-level approaches. This taxonomy follows recent work on class imbalance and histopathology-specific mitigation, but the empirical scope here is intentionally feature-based so that all methods share the same representation. \citep{majeed2024addressingData,yuan2024aGan,ruizcasado2024enhancingHistopathological,mahbub2024centerFocused,ling2025mdeMil,cong2022imbalancedHistopathology,muttenthaler2024oko}
+
+Each method is evaluated with seeds 0, 1, and 2. The primary metrics are macro F1, balanced accuracy, accuracy, and classwise recall on the native test split. Macro F1 is used as the main ranking metric because it penalizes poor rare-class behavior more directly than accuracy.
 
 \section{Results}
-Table~\ref{tab:summary} summarizes aggregate test performance once the training jobs complete. Figure~\ref{fig:method-summary} compares macro F1 across methods, and Figure~\ref{fig:classwise-recall} shows whether improvements are concentrated in rare classes or distributed across the class spectrum.
+All 36 method-seed training jobs completed successfully, and aggregation reported no missing runs. Table~\ref{tab:summary} summarizes validation and test performance after averaging over the three seeds. Center-regularized cross-entropy was the best test method by macro F1, improving from 0.845 for the unweighted cross-entropy baseline to 0.869. It also produced the highest test accuracy, 0.912, while balanced-sampler weighted focal loss produced the highest balanced accuracy among the non-center methods, 0.852.
 
 \begin{table}[ht]
   \centering
-  \caption{Aggregate method results. Generated from \texttt{outputs/tables/result\_summary.csv}.}
+  \caption{Aggregate method results averaged over three seeds.}
   \label{tab:summary}
-  \IfFileExists{../outputs/tables/result_summary.tex}{\input{../outputs/tables/result_summary.tex}}{\begin{tabular}{lccc}\toprule Method & Balanced accuracy & Macro F1 & Notes\\ \midrule Pending & -- & -- & Run aggregation first.\\ \bottomrule\end{tabular}}
+  \resizebox{\linewidth}{!}{\input{../outputs/tables/result_summary.tex}}
 \end{table}
+
+Figure~\ref{fig:method-summary} shows that the strongest methods form a tight MLP group. Weighted cross-entropy, feature-space interpolation, unweighted cross-entropy, focal loss, weighted focal loss, oversampling, and balanced sampling all fall between 0.837 and 0.846 macro F1 on the test split. This narrow band suggests that the frozen Virchow2 representation already provides strong separability and that many standard imbalance corrections change the operating point more than the overall class-averaged ranking.
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../outputs/figures/method_macro_f1_test.png}{\includegraphics[width=0.8\linewidth]{method_macro_f1_test.png}}{\fbox{\parbox{0.8\linewidth}{Method summary generated by \texttt{scripts/report/figures.py}.}}}
+  \includegraphics[width=0.82\linewidth]{method_macro_f1_test.png}
   \caption{Macro F1 by mitigation method on the native test distribution.}
   \label{fig:method-summary}
 \end{figure}
 
+The feature-space probes were substantially weaker than the MLP methods. KNN reached 0.769 macro F1, nearest centroid reached 0.686, and OKO reached 0.712. OKO had relatively high balanced accuracy compared with its macro F1, which indicates a different trade-off: it improved average recall for some small classes while reducing precision or head-class behavior enough to lower macro F1.
+
+Classwise recall reveals the trade-off behind the aggregate metrics. For the eight smallest test classes, OKO had the highest mean recall at 0.836, followed by weighted focal loss at 0.784, balanced-sampler weighted focal loss at 0.777, balanced-sampler cross-entropy at 0.773, and unweighted cross-entropy at 0.780. Center-regularized cross-entropy had lower mean recall on these eight smallest classes, 0.740, but much stronger recall on the eight largest classes, 0.946, and the best aggregate macro F1. The result is therefore not a simple minority-class win for the best aggregate method.
+
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../outputs/figures/classwise_recall_test.png}{\includegraphics[width=\linewidth]{classwise_recall_test.png}}{\fbox{\parbox{0.85\linewidth}{Classwise recall generated by \texttt{scripts/report/figures.py}.}}}
+  \includegraphics[width=\linewidth]{classwise_recall_test.png}
   \caption{Classwise recall by method, ordered by test support.}
   \label{fig:classwise-recall}
 \end{figure}
 
+The weakest rare-class behavior for the best method was concentrated in a small number of classes. Under center-regularized cross-entropy, mean test recall across seeds was 0.219 for Rectum adenocarcinoma, 0.448 for Esophageal carcinoma, and 0.583 for Cholangiocarcinoma. Other tail classes were recognized more reliably, including Lymphoid Neoplasm Diffuse Large B-cell Lymphoma at 0.931, Pheochromocytoma and Paraganglioma at 0.952, Uveal Melanoma at 0.938, and Kidney Chromophobe at 0.894.
+
 \section{Discussion}
-The expected comparison is not only which method maximizes macro F1, but how each method trades minority-class recall against majority-class stability. Sampling methods should improve minority exposure but can increase variance. Loss weighting and focal losses change the optimization signal without deleting majority examples. Hybrid methods may help when both exposure and objective imbalance matter, but they can overcorrect. Feature-space synthetic augmentation is interpreted cautiously because it is not equivalent to validated image-level generative pathology synthesis.
+The main finding is that center-regularized cross-entropy is the strongest aggregate method in this native TCGA-UT frozen-feature setting. Its advantage over unweighted cross-entropy is meaningful but not dramatic: macro F1 improves by 0.024, balanced accuracy by 0.009, and accuracy by 0.020. This pattern supports a conservative interpretation. With strong frozen pathology features, simple MLP training is already competitive, and the best mitigation acts as a regularizer rather than as a wholesale correction of the long tail.
+
+Standard rebalancing methods did not clearly dominate the baseline. Weighted cross-entropy, focal losses, oversampling, balanced sampling, and feature-space interpolation remained close to unweighted cross-entropy. Some variants improved balanced accuracy or rare-class recall, but these gains often came with lower macro F1 or lower head-class recall. This matters for native long-tailed pathology data because the target is not only rare-class sensitivity; the method must also preserve reliable performance on common classes that represent much of the deployment distribution.
+
+The tail analysis complicates a ranking based only on macro F1. OKO and nearest-centroid methods favored rare-class recall more strongly than the best MLP, but their aggregate macro F1 and accuracy were lower. This suggests that some methods move the classifier toward a more class-balanced operating point without producing better calibrated or more precise decisions across all classes. In applications where missing rare cancers is much more costly than head-class errors, such methods might still be useful as triage or second-look components.
+
+This study has several limitations. It evaluates frozen feature-space methods rather than end-to-end slide models or image-level generative augmentation. Feature-space interpolation is not equivalent to synthetic histopathology image generation, and no claim is made that it captures morphology. The evaluation also uses native validation and test distributions, which is appropriate for deployment-like performance but does not fully separate class frequency from intrinsic class difficulty. A balanced test analysis would help distinguish these effects.
 
 \section{Conclusion}
-This experiment package provides a reproducible workflow for studying class-imbalance mitigation on native TCGA-UT using a shared frozen feature representation. The resulting paper should report both aggregate metrics and classwise behavior so that gains for rare classes are not hidden by the head of the distribution.
+Native TCGA-UT exhibits a substantial long tail, with 32 cancer classes and a 28.3:1 slide-level imbalance ratio. In this setting, frozen Virchow2 features plus a simple MLP are strong, and center-regularized cross-entropy gives the best aggregate performance among the evaluated mitigation methods. The broader result is more nuanced: methods that improve rare-class recall can lose enough precision or head-class stability to reduce macro F1. Future work should evaluate whether these trade-offs persist with multiple-instance slide models, calibrated decision thresholds, and image-level augmentation.
 
-\bibliographystyle{plainnat}
+\bibliographystyle{ieeetr}
 \bibliography{references}
 
 \end{document}
-

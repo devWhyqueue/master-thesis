@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import argparse
+import gzip
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -23,6 +24,8 @@ def parse_args() -> argparse.Namespace:
 def read_result(path: Path, split: str) -> dict | None:
     """Read a split result JSON if present."""
     result_path = path / f"{split}_results.json"
+    if split == "val" and not result_path.exists():
+        result_path = path / "validation_results.json"
     if not result_path.exists():
         return None
     with result_path.open("r", encoding="utf-8") as handle:
@@ -45,12 +48,31 @@ def _result_row(
     }
 
 
+def _detail_row(
+    method: str, seed: int, split: str, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Build one row preserving detailed per-class results."""
+    return {
+        "method": method,
+        "seed": seed,
+        "split": split,
+        "result": _compact_result(result),
+    }
+
+
+def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep metrics needed for analysis without raw prediction arrays."""
+    raw_array_keys = {"labels", "preds", "probabilities"}
+    return {key: value for key, value in result.items() if key not in raw_array_keys}
+
+
 def _collect_rows(
     config: dict[str, Any], results_root: Path
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Collect available result rows and missing entries."""
-    rows = []
-    missing = []
+    rows: list[dict[str, Any]] = []
+    details: list[dict[str, Any]] = []
+    missing: list[dict[str, Any]] = []
     for method in config["methods"]:
         for seed in config["training"]["seeds"]:
             result_dir = results_root / method / f"seed={seed}"
@@ -60,7 +82,8 @@ def _collect_rows(
                     missing.append({"method": method, "seed": seed, "split": split})
                     continue
                 rows.append(_result_row(method, seed, split, result))
-    return rows, missing
+                details.append(_detail_row(method, seed, split, result))
+    return rows, details, missing
 
 
 def _aggregate_summary(summary: pd.DataFrame) -> pd.DataFrame:
@@ -110,15 +133,26 @@ def _write_summary_tables(
     logger.info(f"Wrote {tex_path}")
 
 
+def _write_detail_archive(rows: list[dict[str, Any]], path: Path) -> None:
+    """Write detailed per-run results to one compressed JSONL artifact."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True))
+            handle.write("\n")
+    logger.info(f"Wrote {path}")
+
+
 def main() -> None:
     """Aggregate experiment metrics across methods and seeds."""
     args = parse_args()
     config = load_config(args.config)
     paths = ensure_dirs(config)
-    rows, missing = _collect_rows(config, paths["results"])
+    rows, details, missing = _collect_rows(config, paths["results"])
     summary = pd.DataFrame(rows)
     aggregate = _aggregate_summary(summary)
     _write_summary_tables(summary, aggregate, paths["tables"])
+    _write_detail_archive(details, paths["tables"] / "result_details.jsonl.gz")
     write_json(paths["tables"] / "missing_results.json", {"missing": missing})
 
 

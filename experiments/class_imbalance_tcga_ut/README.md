@@ -48,7 +48,46 @@ and result writing before launching the full sweep.
 
 `run_all.sbatch` still exists as a sequential fallback, but the prepare +
 training-array + aggregate sequence is the intended Hydra workflow.
+The training array is capped at four concurrent tasks to avoid overwhelming
+shared storage while each job preloads feature tensors.
 
 The Apptainer definition and Python requirements live in `configs/`.
 The paper lives in `paper/main.tex`. Generated figures and tables are written
 under `outputs/figures/` and `outputs/tables/`.
+Per-run JSON files, progress files, model checkpoints, logs, and manifests are
+runtime artifacts and are ignored by Git. After aggregation, detailed per-run
+metrics are also written to one compressed artifact:
+
+```text
+outputs/tables/result_details.jsonl.gz
+```
+
+Keep `outputs/tables/` and `outputs/figures/` for paper artifacts; keep
+`outputs/results/`, `data/`, and `logs/` as local or Hydra scratch outputs.
+
+## Current status
+
+- The experiment code has been validated with a local synthetic smoke fixture.
+- Native TCGA-UT experiments have not yet been conducted.
+- Before treating the paper as a results manuscript, run the Hydra workflow and
+  inspect `outputs/tables/missing_results.json`; its `missing` list should be
+  empty for the configured methods and seeds.
+- Keep numerical claims out of `paper/main.tex` until they are generated from
+  saved result JSON files.
+
+## Monitoring Hydra runs
+
+Use SLURM plus per-method progress files to catch slow or stuck jobs:
+
+```bash
+squeue -u "$USER"
+tail -f logs/train-<array-job-id>-<task-id>.out
+cat outputs/results/<method>/seed=<seed>/progress.json
+cat outputs/tables/missing_results.json
+```
+
+MLP-style methods update `progress.json` after every epoch. Probe methods such
+as KNN and nearest centroid write coarse `started` and `completed` statuses.
+Training logs also report one-time feature preload counts before the first
+epoch, for example `Loaded 36542 feature tensors into memory`.
+Cancel individual slow array tasks with `scancel <array-job-id>_<task-id>`.

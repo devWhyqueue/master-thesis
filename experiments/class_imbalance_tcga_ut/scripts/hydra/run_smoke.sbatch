@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=tcga-ut-smoke
-#SBATCH --partition=cpu-test
-#SBATCH --gpus-per-node=0
+#SBATCH --partition=gpu-test
+#SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=4
 #SBATCH --output=logs/smoke-%j.out
 
@@ -16,4 +16,5 @@ else
   exit 1
 fi
 
+export EXPERIMENT_USE_GPU=1
 bash scripts/hydra/run_python.sh -m scripts.run_pipeline --config configs/default.yaml --smoke

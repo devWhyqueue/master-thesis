@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+
 import numpy as np
 import torch
 from torch import nn
@@ -24,6 +26,7 @@ def _train_oko(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     seed: int,
+    progress_callback: Callable[[int], None] | None = None,
 ) -> None:
     rng = np.random.default_rng(seed)
     class_indices = [
@@ -37,7 +40,7 @@ def _train_oko(
             "OKO requires at least one class with two training examples."
         )
     criterion = nn.CrossEntropyLoss()
-    for _ in range(epochs):
+    for epoch in range(1, epochs + 1):
         _run_oko_epoch(
             model,
             dataset,
@@ -50,6 +53,8 @@ def _train_oko(
             criterion,
             steps_per_epoch,
         )
+        if progress_callback is not None:
+            progress_callback(epoch)
 
 
 def _run_oko_epoch(
