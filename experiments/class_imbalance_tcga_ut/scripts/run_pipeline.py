@@ -33,7 +33,8 @@ def _smoke_overrides(
     if not smoke:
         return methods, seeds
     selected_seeds = seeds[:1]
-    selected_methods = [method for method in ["ce", "knn"] if method in methods]
+    smoke_methods = ["ce", "knn", "rankmix_mil", "cfal_mil"]
+    selected_methods = [method for method in smoke_methods if method in methods]
     return selected_methods, selected_seeds
 
 

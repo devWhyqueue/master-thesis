@@ -10,6 +10,7 @@ from typing import Any, cast
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config, write_json
+from scripts.mil.metadata import method_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,13 @@ def _result_row(
     method: str, seed: int, split: str, result: dict[str, Any]
 ) -> dict[str, Any]:
     """Build one row for seed-level summary."""
+    metadata = method_metadata(method)
     return {
         "method": method,
+        "role": metadata["role"],
+        "taxonomy_category": metadata["taxonomy_category"],
+        "representative_paper": metadata["representative_paper"],
+        "fidelity": metadata["fidelity"],
         "seed": seed,
         "split": split,
         "accuracy": result["accuracy"],
@@ -54,6 +60,7 @@ def _detail_row(
     """Build one row preserving detailed per-class results."""
     return {
         "method": method,
+        "method_metadata": method_metadata(method),
         "seed": seed,
         "split": split,
         "result": _compact_result(result),
@@ -91,6 +98,10 @@ def _aggregate_summary(summary: pd.DataFrame) -> pd.DataFrame:
     if summary.empty:
         return pd.DataFrame()
     grouped = summary.groupby(["method", "split"], as_index=False).agg(
+        role=("role", "first"),
+        taxonomy_category=("taxonomy_category", "first"),
+        representative_paper=("representative_paper", "first"),
+        fidelity=("fidelity", "first"),
         accuracy_mean=("accuracy", "mean"),
         accuracy_std=("accuracy", "std"),
         balanced_accuracy_mean=("balanced_accuracy", "mean"),
@@ -101,6 +112,10 @@ def _aggregate_summary(summary: pd.DataFrame) -> pd.DataFrame:
     rows = [
         {
             "method": str(row["method"]),
+            "role": str(row["role"]),
+            "taxonomy_category": str(row["taxonomy_category"]),
+            "representative_paper": str(row["representative_paper"]),
+            "fidelity": str(row["fidelity"]),
             "split": str(row["split"]),
             "accuracy_mean": float(row["accuracy_mean"]),
             "accuracy_std": float(row["accuracy_std"]),

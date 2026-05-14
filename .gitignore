@@ -6,6 +6,8 @@ __pycache__/
 pyrightconfig.json
 .pytest_cache/
 .coverage
+.env
+.ruff_cache/
 
 # LaTeX build outputs
 *.aux

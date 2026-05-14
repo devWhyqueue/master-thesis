@@ -27,11 +27,16 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 - Never place `\section{...}` directly before `\subsection{...}`, or one `\subsection{...}` directly before another heading. Add meaningful orienting prose between headings, or remove or merge one heading.
 - Use labels and references consistently for sections, figures, tables, and equations when the surrounding document does so.
 
-## Prose Standards
+## Writing Standards
 
 - Prefer precise claims over broad declarations. State what is known, what is assumed, and what follows from the cited evidence.
 - Build paragraphs around one main point: topic sentence, supporting evidence or reasoning, and a clear connection to the section's purpose.
+- Use reader-facing scientific terms instead of local project, pipeline, or file-structure language. Define specialized terms on first use.
+- Keep abstracts focused on the problem, scope, key result, and interpretation; omit low-level implementation details unless they are essential to the claim.
 - Place citations outside sentence grammar, at the end of the relevant paragraph, unless the document's existing style clearly requires narrative citations.
+- Avoid citation piles. For important method families, concepts, or debates, briefly explain representative work and connect it to the current study.
+- For datasets, materials, or corpora, explain why they fit the research question and what limitations or biases matter, not only their basic counts or properties.
+- In methods prose, distinguish what is varied, what is held constant, and what each design choice is meant to isolate.
 - Maintain academic restraint. Avoid hype, marketing language, and unsupported novelty claims.
 - Make transitions explicit when moving between motivation, prior work, method, result, limitation, and implication.
 - Preserve reader orientation in long sections with short signposting paragraphs rather than excessive headings.
@@ -44,6 +49,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 - For more complex or richer visualizations, use the `notebooklm` skill when available and appropriate.
 - Keep diagram labels clear and separated from boxes and arrows. Check for overlapping labels before finishing.
 - Keep figures compact enough to fit within `\textwidth` without overfull boxes.
+- Keep figures readable at paper scale; prefer visual summaries that reveal the main pattern over plots that expose every raw detail.
 - Use tables for comparisons, taxonomies, ablations, terminology mappings, and practical checklists.
 - Include formulas when they clarify a definition, objective, metric, loss, calibration measure, or evaluation protocol.
 - Give every figure and table a short explanatory caption that states what the reader should learn from it.

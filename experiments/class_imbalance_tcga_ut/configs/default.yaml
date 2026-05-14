@@ -15,6 +15,7 @@ data:
 training:
   seeds: [0, 1, 2]
   batch_size: 128
+  bag_batch_size: 8
   epochs: 30
   learning_rate: 0.001
   weight_decay: 0.0001
@@ -24,23 +25,38 @@ training:
   center_loss_weight: 0.01
   oko_k: 1
   knn_k: 5
+  max_instances_per_bag: 16
   max_train_rows:
   max_eval_rows:
   device: auto
+
+synthetic_image_gan:
+  enabled: true
+  image_size: 64
+  latent_dim: 128
+  batch_size: 64
+  epochs: 25
+  learning_rate: 0.0002
+  beta1: 0.5
+  max_real_patches_per_class: 2048
+  generated_patches_per_class: 256
+  tail_class_quantile: 0.5
+  max_classes:
+  encoded_feature_manifest_template: outputs/synthetic_features/seed={seed}/synthetic_feature_manifest.csv
+  require_encoded_features: false
 
 methods:
   - ce
   - weighted_ce
   - focal
-  - weighted_focal
   - balanced_sampler_ce
-  - oversampling_ce
-  - balanced_sampler_weighted_focal
-  - center_ce
-  - feature_interpolation_ce
-  - oko
   - knn
   - ncc
+  - rankmix_mil
+  - feature_gan_mil
+  - cfal_mil
+  - mde_mil
+  - sc_mil
 
 slurm:
   partition: gpu-2h

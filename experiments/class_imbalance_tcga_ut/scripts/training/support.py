@@ -9,6 +9,8 @@ from sklearn.metrics import precision_recall_fscore_support
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
+from scripts.mil.metrics import extra_metrics
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,8 +54,6 @@ class FeatureDataset(Dataset):
 
 
 class Mlp(nn.Module):
-    """Simple MLP classifier for frozen feature vectors."""
-
     def __init__(
         self, input_dim: int, hidden_dims: list[int], output_dim: int, dropout: float
     ) -> None:
@@ -73,8 +73,6 @@ class Mlp(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    """Multi-class focal loss."""
-
     def __init__(self, gamma: float, weights: torch.Tensor | None = None) -> None:
         super().__init__()
         self.gamma = gamma
@@ -117,8 +115,6 @@ def _build_criterion(
         return nn.CrossEntropyLoss(weight=weights)
     if method == "focal":
         return FocalLoss(gamma=gamma)
-    if method in {"weighted_focal", "balanced_sampler_weighted_focal"}:
-        return FocalLoss(gamma=gamma, weights=weights)
     return nn.CrossEntropyLoss()
 
 
@@ -129,11 +125,7 @@ def _make_loader(
     batch_size: int,
     seed: int,
 ) -> DataLoader:
-    if method not in {
-        "balanced_sampler_ce",
-        "balanced_sampler_weighted_focal",
-        "oversampling_ce",
-    }:
+    if method != "balanced_sampler_ce":
         generator = torch.Generator().manual_seed(seed)
         return DataLoader(
             dataset, batch_size=batch_size, shuffle=True, generator=generator
@@ -167,7 +159,7 @@ def _metric_payload(
     f1 = cast(np.ndarray, f1)
     support = cast(np.ndarray, support)
     present = cast(np.ndarray, support > 0)
-    return {
+    payload = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
         "macro_precision": float(np.mean(precision[present])),
@@ -183,6 +175,12 @@ def _metric_payload(
         "preds": list(map(int, y_pred)),
         "probabilities": probabilities,
     }
+    payload.update(
+        extra_metrics(
+            y_true, probabilities, precision, recall, f1, support, len(class_names)
+        )
+    )
+    return payload
 
 
 def _evaluate(

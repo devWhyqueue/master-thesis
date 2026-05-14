@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=tcga-ut-train
+#SBATCH --job-name=tcga-ut-feature-gan
 #SBATCH --partition=gpu-2h
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=8
-#SBATCH --array=0-32%4
-#SBATCH --output=logs/train-%A-%a.out
+#SBATCH --array=0-2%3
+#SBATCH --output=logs/feature-gan-mil-%A-%a.out
+#SBATCH --error=logs/feature-gan-mil-%A-%a.err
 
 set -euo pipefail
 
@@ -17,29 +18,12 @@ else
   exit 1
 fi
 
-methods=(
-  ce
-  weighted_ce
-  focal
-  balanced_sampler_ce
-  knn
-  ncc
-  rankmix_mil
-  feature_gan_mil
-  cfal_mil
-  mde_mil
-  sc_mil
-)
 seeds=(0 1 2)
-
-method_index=$((SLURM_ARRAY_TASK_ID / ${#seeds[@]}))
-seed_index=$((SLURM_ARRAY_TASK_ID % ${#seeds[@]}))
-method=${methods[$method_index]}
-seed=${seeds[$seed_index]}
+seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
 export EXPERIMENT_USE_GPU=1
 bash scripts/hydra/run_python.sh -m scripts.prep.check_env
 bash scripts/hydra/run_python.sh -m scripts.training.train \
   --config configs/default.yaml \
-  --method "$method" \
+  --method feature_gan_mil \
   --seed "$seed"

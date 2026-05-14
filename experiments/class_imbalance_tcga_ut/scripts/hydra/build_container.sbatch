@@ -16,5 +16,4 @@ else
   exit 1
 fi
 
-apptainer build environment.sif configs/environment.def
-
+apptainer build --force environment.sif configs/environment.def
