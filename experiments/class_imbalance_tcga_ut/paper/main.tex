@@ -54,7 +54,7 @@ This structure makes TCGA-UT well suited for an imbalance study because the imba
     Smallest class & Diffuse large B-cell lymphoma (DLBC), 28 slides\\
     Slide-level imbalance ratio & 28.3\\
     Shared split size per seed & 6116 train, 1310 validation, 1310 test slides\\
-    Controlled patch input & Resolution level 0, 10 deterministic patches per slide\\
+    Controlled patch input & Resolution level 0, up to 30 deterministic patches per slide\\
     WSI-bag input & Full frozen Virchow2 feature bags from the same slide identities\\
     \bottomrule
   \end{tabular}
@@ -120,7 +120,7 @@ Several data units are involved in the benchmark, and the distinction matters fo
 \subsection{Shared Splits and Benchmark Inputs}
 For each seed, slides are split into 6116 training, 1310 validation, and 1310 test slides. The same slide-level assignments are reused by both benchmarks so that no patches from the same slide can appear in different splits. This is the main leakage-control mechanism: the patch benchmark and the WSI-bag benchmark see different input units, but they inherit the same train/validation/test slide partition.
 
-The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples 10 patches per slide with a fixed rule before method-specific training begins. This makes the patch benchmark a controlled comparison of imbalance mechanisms rather than a comparison of patch-selection policies. The WSI-bag benchmark uses full frozen Virchow2 feature bags built from the same slide identities, rather than applying an additional instance cap \citep{zimmermann2024virchow2}.
+The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples up to 30 patches per slide with a fixed rule before method-specific training begins. The cap is a compromise between data coverage and slide-level control: it uses the empirical median number of raw JPG patches per slide at resolution level 0 (median 30, mean 31.1, range 10--80) while preventing slides with many extracted tumor-region patches from dominating the patch-level loss. At this resolution, 8686 of 8736 slides have at least 30 raw patches, so the cap retains the typical per-slide patch evidence while limiting only the larger slide folders. This makes the patch benchmark a controlled comparison of imbalance mechanisms rather than a comparison of patch-selection policies. The WSI-bag benchmark uses full frozen Virchow2 feature bags built from the same slide identities, rather than applying an additional instance cap \citep{zimmermann2024virchow2}.
 
 \section{Methods}
 The methods are organized by the level at which they intervene in the imbalanced learning problem. Cross-entropy (CE) is treated as the no-mitigation reference condition: it uses the observed training distribution as given and does not rebalance samples, labels, costs, representations, or generated data. The remaining methods are tested imbalance interventions grouped according to the taxonomy used in the class-imbalance literature: data-level sampling and augmentation, algorithm-level losses, hybrid sampling--loss methods, synthetic generation, and representation or architecture-level methods \citep{saini2023tacklingClass,zhang2023deepLong}.

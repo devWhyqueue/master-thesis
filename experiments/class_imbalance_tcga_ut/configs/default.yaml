@@ -17,7 +17,7 @@ data:
   test_fraction: 0.15
   balanced_test_per_class: 0
   patch_resolution: "0"
-  patches_per_slide: 10
+  patches_per_slide: 30
 
 patch_training:
   seeds: [0, 1, 2]
