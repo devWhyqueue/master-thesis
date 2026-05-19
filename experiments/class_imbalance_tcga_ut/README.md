@@ -9,94 +9,52 @@ The paper source is `paper/main.tex`; benchmark outputs are stored separately un
 `outputs/tables/`, `outputs/figures/`, `outputs/results_patch/`, and
 `outputs/results_wsi_bag/`.
 
-## Shared Preparation
+## Hydra Workflow
 
 ```bash
-sbatch scripts/hydra/build_container.sbatch
+bash scripts/hydra/submit.sh build-container
 export EXPERIMENT_CONTAINER="$PWD/environment.sif"
-sbatch scripts/hydra/run_prepare.sbatch
+bash scripts/hydra/submit.sh prepare
+bash scripts/hydra/submit.sh patch-train
+bash scripts/hydra/submit.sh progan
+bash scripts/hydra/submit.sh wsi-train
+bash scripts/hydra/submit.sh aggregate
+```
+
+Use `submit.sh` as the stable entry point for cluster jobs; it owns SLURM
+partitions, arrays, dependencies, and optional maintenance jobs such as SquashFS
+builds, smoke runs, WSI profiling, and ProGAN reruns.
+
+```bash
+bash scripts/hydra/submit.sh --help
 ```
 
 Preparation builds one slide-level split manifest per seed and derives the
 controlled patch manifests from those slide assignments, so patches from one
-slide never cross splits.
+slide never cross splits. See `CLUSTER.md` before changing Hydra storage or
+submission behavior.
 
 ## Benchmarks
 
 Patch methods: `patch_ce`, `patch_weighted_ce`, `patch_focal`,
-`patch_balanced_sampler_ce`, `patch_ce_soft_f1_balanced`, `patch_ce_soft_mcc_balanced`,
-`patch_progan_aug`.
+`patch_balanced_sampler_ce`, `patch_ce_soft_f1_balanced`,
+`patch_ce_soft_mcc_balanced`, `patch_progan_aug`.
 
 WSI-bag methods: `mil_ce`, `mil_weighted_ce`, `mil_focal`,
 `mil_balanced_sampler_ce`, `rankmix_mil`, `sc_mil`.
 
-Submit the benchmarks independently:
-
-```bash
-sbatch scripts/hydra/run_patch_train_array.sbatch
-bash scripts/hydra/submit_patch_progan.sh
-sbatch scripts/hydra/run_wsi_train_array.sbatch
-sbatch scripts/hydra/run_aggregate.sbatch
-```
-
-### Patch I/O on Hydra
-
-Patch GPU jobs stage images to node-local `$SLURM_TMPDIR` before training (see
-`CLUSTER.md`). Each job runs `scripts.staging.patch`, then trains from the staged
-manifest. If `paths.patch_sqfs` exists on the cluster, staging mounts that SquashFS via
-`squashfuse`; otherwise it hardlinks/copies the manifest images into `$SLURM_TMPDIR`.
-
-One-time SquashFS build for real controlled patches (recommended for repeated patch runs):
-
-```bash
-sbatch scripts/hydra/build_patch_sqfs.sbatch
-```
-
-ProGAN submits a dependent CPU array (`build_synthetic_sqfs_array.sbatch`) after the GAN
-jobs finish. It packs each seed's synthetic JPEGs into
-`/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed={seed}.sqfs`. GPU training then
-mounts both SquashFS images on the node and only remaps manifest paths (no per-job copy of
-tens of thousands of synthetic files).
-
-`run_patch_train_array.sbatch` covers the six non-ProGAN patch methods (`array=0-17`).
-ProGAN is submitted separately: one SLURM array task per `(seed, tail class)` on
-`gpu-5h` with `--constraint=80gb|40gb|h100`, capped at 35 concurrent GPUs (Hydra account
-limit), then a dependent three-task array trains `patch_progan_aug` on `gpu-2d` after all
-GAN jobs finish. Classifier training writes `checkpoint_latest.pt` each epoch and
-supports `--resume` (used by the train array sbatch). Reuse completed class folders when
-counts still match the manifest.
-
-To rerun classifier training only (GAN artifacts already on disk):
-
-```bash
-sbatch scripts/hydra/run_patch_progan_train_array.sbatch
-```
-
-For an end-to-end smoke run:
-
-```bash
-sbatch scripts/hydra/run_smoke.sbatch
-```
-
-Before a full WSI sweep, profile the untruncated bags once:
-
-```bash
-sbatch scripts/hydra/run_wsi_profile.sbatch
-```
-
-The default configuration leaves `max_instances_per_bag` unset. If full bags are
-not feasible on the cluster allocation, set one profiled fixed cap in
-`configs/default.yaml` and report that cap in the paper.
+Patch GPU jobs stage images to node-local storage before training. If the real
+or synthetic patch SquashFS images are available, staging uses those images;
+otherwise it falls back to the manifest paths.
 
 `patch_progan_aug` is a bounded Ruiz-Casado-style adaptation: one class-specific
 ProGAN is trained for every training class below the head-class patch count,
 generators grow progressively to 256 px using the paper's depth-dependent batch
-schedule, and synthetic patches raise those classes to the training-set head
-count. The generator uses ProGAN-style pixel normalization and minibatch standard
-deviation, validates cached generated patches against the current manifest, and
-writes per-class generation counts, per-depth training diagnostics, and Inception
-FID status whenever `torchvision` is available in the runtime environment.
-Patch checkpoints include the class list and model weights for standard logit evaluation.
+schedule, and synthetic patches raise those classes to the training-set head count.
+
+The default configuration leaves `max_instances_per_bag` unset. If full bags are
+not feasible on the cluster allocation, set one profiled fixed cap in
+`configs/default.yaml` and report that cap in the paper.
 
 ## Main Artifacts
 
