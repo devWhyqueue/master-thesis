@@ -114,16 +114,40 @@ def stage_patch_manifest(
     copy_workers = int(settings.get("copy_workers", 8))
     use_sqfs = bool(settings.get("prefer_sqfs", True)) and sqfs is not None
     mount_point = target_dir / "sqfs_mount"
+    pre_mount = os.environ.get("PATCH_SQFS_MOUNT")
+    host_mount = (
+        bool(pre_mount)
+        and Path(pre_mount).is_dir()
+        and any(Path(pre_mount).iterdir())
+    )
     try:
         if use_sqfs and sqfs is not None:
-            staged_frame, mode = _stage_with_sqfs(
-                frame, target_dir, raw_root, sqfs, copy_workers
-            )
+            if host_mount:
+                staged_frame, mode = _stage_with_sqfs(
+                    frame,
+                    target_dir,
+                    raw_root,
+                    sqfs,
+                    copy_workers,
+                    mount=Path(pre_mount),
+                )
+            else:
+                try:
+                    staged_frame, mode = _stage_with_sqfs(
+                        frame, target_dir, raw_root, sqfs, copy_workers
+                    )
+                except FileNotFoundError:
+                    logger.warning(
+                        "squashfuse not available; falling back to image copy"
+                    )
+                    staged_frame, mode = _stage_with_copy(
+                        frame, target_dir, raw_root, copy_workers, sqfs
+                    )
         else:
             staged_frame, mode = _stage_with_copy(
                 frame, target_dir, raw_root, copy_workers, sqfs
             )
-    except (FileNotFoundError, OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.CalledProcessError):
         _unmount_sqfs(mount_point)
         raise
     return _write_staged_manifest(

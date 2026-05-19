@@ -105,7 +105,20 @@ def _mount_sqfs(sqfs_source: Path, stage_dir: Path) -> Path:
 def _unmount_sqfs(mount_point: Path) -> None:
     if not mount_point.exists():
         return
-    subprocess.run(["fusermount", "-u", str(mount_point)], check=False)
+    try:
+        subprocess.run(["fusermount", "-u", str(mount_point)], check=False)
+    except FileNotFoundError:
+        return
+
+
+def _resolve_sqfs_mount(sqfs: Path, target_dir: Path) -> Path:
+    """Use a host-mounted SquashFS when available, otherwise mount locally."""
+    configured = os.environ.get("PATCH_SQFS_MOUNT")
+    if configured:
+        mount = Path(configured)
+        if mount.is_dir() and any(mount.iterdir()):
+            return mount
+    return _mount_sqfs(sqfs, target_dir)
 
 
 def _stage_with_sqfs(
@@ -114,12 +127,13 @@ def _stage_with_sqfs(
     raw_root: Path,
     sqfs: Path,
     copy_workers: int,
+    mount: Path | None = None,
 ) -> tuple[pd.DataFrame, str]:
     logger.info("Staging via SquashFS mount from %s", sqfs)
-    mount = _mount_sqfs(sqfs, target_dir)
-    os.environ["PATCH_SQFS_MOUNT"] = str(mount)
+    resolved_mount = mount or _resolve_sqfs_mount(sqfs, target_dir)
+    os.environ["PATCH_SQFS_MOUNT"] = str(resolved_mount)
     raw_frame, synthetic_frame = _split_raw_and_synthetic(frame, raw_root)
-    staged_frame = _remap_via_sqfs_mount(raw_frame, raw_root, mount)
+    staged_frame = _remap_via_sqfs_mount(raw_frame, raw_root, resolved_mount)
     if synthetic_frame.empty:
         return staged_frame, "sqfs"
     staged_synthetic = _stage_via_copy(
