@@ -32,16 +32,18 @@ def _split_raw_and_synthetic(
 
 
 def _remap_via_sqfs_mount(
-    frame: pd.DataFrame, raw_root: Path, mount_point: Path
+    frame: pd.DataFrame, image_root: Path, mount_point: Path
 ) -> pd.DataFrame:
     staged = frame.copy()
     remapped: list[str] = []
     for source in staged["image_path"].astype(str):
         path = Path(source)
-        relative = path.relative_to(raw_root)
+        relative = path.relative_to(image_root)
         target = mount_point / relative
         if not target.exists():
-            raise FileNotFoundError(f"Staged image missing on SquashFS mount: {target}")
+            raise FileNotFoundError(
+                f"Staged image missing on SquashFS mount: {target}"
+            )
         remapped.append(str(target))
     staged["image_path"] = remapped
     return staged
@@ -128,6 +130,7 @@ def _stage_with_sqfs(
     sqfs: Path,
     copy_workers: int,
     mount: Path | None = None,
+    synthetic_root: Path | None = None,
 ) -> tuple[pd.DataFrame, str]:
     logger.info("Staging via SquashFS mount from %s", sqfs)
     resolved_mount = mount or _resolve_sqfs_mount(sqfs, target_dir)
@@ -136,6 +139,21 @@ def _stage_with_sqfs(
     staged_frame = _remap_via_sqfs_mount(raw_frame, raw_root, resolved_mount)
     if synthetic_frame.empty:
         return staged_frame, "sqfs"
+    synthetic_mount_env = os.environ.get("PATCH_SYNTHETIC_SQFS_MOUNT")
+    synthetic_mount = (
+        Path(synthetic_mount_env)
+        if synthetic_mount_env and Path(synthetic_mount_env).is_dir()
+        else None
+    )
+    if synthetic_mount and synthetic_root is not None:
+        staged_synthetic = _remap_via_sqfs_mount(
+            synthetic_frame, synthetic_root, synthetic_mount
+        )
+        return (
+            pd.concat([staged_frame, staged_synthetic], ignore_index=True),
+            "sqfs+synthetic_sqfs",
+        )
+    logger.info("Synthetic SquashFS unavailable; copying synthetic patches")
     staged_synthetic = _stage_via_copy(
         synthetic_frame, target_dir, raw_root, copy_workers=copy_workers
     )

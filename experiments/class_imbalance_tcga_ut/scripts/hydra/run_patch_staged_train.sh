@@ -10,18 +10,24 @@ if [ "${1:-}" = "--include-synthetic" ]; then
   shift
 fi
 export PATCH_STAGE_DIR="${SLURM_TMPDIR:-/tmp}/tcga_ut_patch_seed=${seed}"
-SQFS_SOURCE="${PATCH_SQFS:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"
+mkdir -p "${PATCH_STAGE_DIR}"
+PATCH_SQFS="${PATCH_SQFS:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"
+SYNTH_SQFS="${PATCH_SYNTHETIC_SQFS:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
 
-cleanup_sqfs_mount() {
+cleanup_sqfs_mounts() {
   if [ -n "${PATCH_SQFS_MOUNT:-}" ] && command -v fusermount >/dev/null 2>&1; then
     fusermount -u "${PATCH_SQFS_MOUNT}" 2>/dev/null || true
   fi
+  if [ -n "${PATCH_SYNTHETIC_SQFS_MOUNT:-}" ] && command -v fusermount >/dev/null 2>&1; then
+    fusermount -u "${PATCH_SYNTHETIC_SQFS_MOUNT}" 2>/dev/null || true
+  fi
 }
 
-mount_sqfs_on_host() {
-  local mount_point="${PATCH_STAGE_DIR}/sqfs_mount"
-  local local_sqfs="${PATCH_STAGE_DIR}/patches.sqfs"
-  if [ ! -f "${SQFS_SOURCE}" ]; then
+mount_sqfs_image() {
+  local sqfs_source="$1"
+  local mount_point="$2"
+  local local_sqfs="${PATCH_STAGE_DIR}/$(basename "${sqfs_source}")"
+  if [ ! -f "${sqfs_source}" ]; then
     return 1
   fi
   if ! command -v squashfuse >/dev/null 2>&1; then
@@ -29,20 +35,28 @@ mount_sqfs_on_host() {
   fi
   mkdir -p "${mount_point}"
   if [ -n "$(ls -A "${mount_point}" 2>/dev/null)" ]; then
-    export PATCH_SQFS_MOUNT="${mount_point}"
     return 0
   fi
-  cp "${SQFS_SOURCE}" "${local_sqfs}"
+  cp "${sqfs_source}" "${local_sqfs}"
   squashfuse "${local_sqfs}" "${mount_point}"
-  export PATCH_SQFS_MOUNT="${mount_point}"
 }
 
-trap cleanup_sqfs_mount EXIT
-if mount_sqfs_on_host; then
-  echo "SquashFS mounted at ${PATCH_SQFS_MOUNT}"
+trap cleanup_sqfs_mounts EXIT
+if mount_sqfs_image "${PATCH_SQFS}" "${PATCH_STAGE_DIR}/sqfs_mount"; then
+  export PATCH_SQFS_MOUNT="${PATCH_STAGE_DIR}/sqfs_mount"
+  echo "Real-patch SquashFS mounted at ${PATCH_SQFS_MOUNT}"
 else
   unset PATCH_SQFS_MOUNT
-  echo "SquashFS mount skipped; staging will copy images if needed"
+  echo "Real-patch SquashFS mount skipped; staging will copy if needed"
+fi
+if [ "$include_synthetic" = 1 ]; then
+  if mount_sqfs_image "${SYNTH_SQFS}" "${PATCH_STAGE_DIR}/synthetic_sqfs_mount"; then
+    export PATCH_SYNTHETIC_SQFS_MOUNT="${PATCH_STAGE_DIR}/synthetic_sqfs_mount"
+    echo "Synthetic SquashFS mounted at ${PATCH_SYNTHETIC_SQFS_MOUNT}"
+  else
+    unset PATCH_SYNTHETIC_SQFS_MOUNT
+    echo "Synthetic SquashFS mount skipped; staging will copy synthetics if needed"
+  fi
 fi
 
 stage_args=(--seed "$seed")

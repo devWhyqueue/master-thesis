@@ -46,11 +46,17 @@ Patch GPU jobs stage images to node-local `$SLURM_TMPDIR` before training (see
 manifest. If `paths.patch_sqfs` exists on the cluster, staging mounts that SquashFS via
 `squashfuse`; otherwise it hardlinks/copies the manifest images into `$SLURM_TMPDIR`.
 
-One-time SquashFS build (recommended for repeated patch runs):
+One-time SquashFS build for real controlled patches (recommended for repeated patch runs):
 
 ```bash
 sbatch scripts/hydra/build_patch_sqfs.sbatch
 ```
+
+ProGAN submits a dependent CPU array (`build_synthetic_sqfs_array.sbatch`) after the GAN
+jobs finish. It packs each seed's synthetic JPEGs into
+`/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed={seed}.sqfs`. GPU training then
+mounts both SquashFS images on the node and only remaps manifest paths (no per-job copy of
+tens of thousands of synthetic files).
 
 `run_patch_train_array.sbatch` covers the six non-ProGAN patch methods (`array=0-17`).
 ProGAN is submitted separately: one SLURM array task per `(seed, tail class)` on

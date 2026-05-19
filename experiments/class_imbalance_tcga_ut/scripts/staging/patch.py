@@ -44,6 +44,14 @@ def _sqfs_path(config: dict) -> Path | None:
     return path if path.exists() else None
 
 
+def _synthetic_sqfs_path(config: dict, seed: int) -> Path | None:
+    configured = config.get("paths", {}).get("patch_synthetic_sqfs")
+    if not configured:
+        return None
+    path = Path(str(configured).format(seed=seed))
+    return path if path.exists() else None
+
+
 def load_seed_manifest(paths: dict[str, Path], seed: int) -> pd.DataFrame:
     """Load the controlled patch manifest for one seed."""
     return pd.read_csv(paths["data"] / f"patch_manifest_seed={seed}.csv")
@@ -78,6 +86,7 @@ def _write_staged_manifest(
     mode: str,
     include_synthetic: bool,
     sqfs: Path | None,
+    synthetic_sqfs: Path | None = None,
 ) -> Path:
     manifest_path = target_dir / "patch_manifest.csv"
     staged_frame.to_csv(manifest_path, index=False)
@@ -93,6 +102,9 @@ def _write_staged_manifest(
             "n_unique_images": int(staged_frame["image_path"].nunique()),
             "manifest_path": str(manifest_path),
             "sqfs_source": str(sqfs) if sqfs is not None else None,
+            "synthetic_sqfs_source": (
+                str(synthetic_sqfs) if synthetic_sqfs is not None else None
+            ),
         },
     )
     return manifest_path
@@ -111,6 +123,10 @@ def stage_patch_manifest(
     target_dir.mkdir(parents=True, exist_ok=True)
     frame = combined_training_frame(paths, config, seed, include_synthetic)
     sqfs = _sqfs_path(config)
+    synthetic_sqfs = _synthetic_sqfs_path(config, seed) if include_synthetic else None
+    synthetic_root = (
+        synthetic_output_root(paths["root"], seed) if include_synthetic else None
+    )
     copy_workers = int(settings.get("copy_workers", 8))
     use_sqfs = bool(settings.get("prefer_sqfs", True)) and sqfs is not None
     mount_point = target_dir / "sqfs_mount"
@@ -130,11 +146,17 @@ def stage_patch_manifest(
                     sqfs,
                     copy_workers,
                     mount=Path(pre_mount),
+                    synthetic_root=synthetic_root,
                 )
             else:
                 try:
                     staged_frame, mode = _stage_with_sqfs(
-                        frame, target_dir, raw_root, sqfs, copy_workers
+                        frame,
+                        target_dir,
+                        raw_root,
+                        sqfs,
+                        copy_workers,
+                        synthetic_root=synthetic_root,
                     )
                 except FileNotFoundError:
                     logger.warning(
@@ -151,7 +173,7 @@ def stage_patch_manifest(
         _unmount_sqfs(mount_point)
         raise
     return _write_staged_manifest(
-        target_dir, staged_frame, seed, mode, include_synthetic, sqfs
+        target_dir, staged_frame, seed, mode, include_synthetic, sqfs, synthetic_sqfs
     )
 
 
