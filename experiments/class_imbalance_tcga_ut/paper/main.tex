@@ -4,7 +4,7 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
-\usepackage[numbers,sort&compress]{natbib}
+\usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
 
 \graphicspath{{../outputs/figures/}}
@@ -21,7 +21,7 @@
 \end{abstract}
 
 \section{Introduction}
-Class imbalance changes what a pathology classifier is rewarded for learning. When common tumor types dominate training data, high aggregate accuracy can coexist with unreliable rare-class recall, especially if evaluation emphasizes prevalence-sensitive summaries. Long-tailed learning and medical-image evaluation literature therefore motivate classwise recall, macro F1, balanced accuracy, and calibration-aware summaries as primary outcomes in imbalanced settings. \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}
+Class imbalance changes what a pathology classifier is rewarded for learning. When common tumor types dominate training data, high aggregate accuracy can coexist with unreliable rare-class recall, especially if evaluation emphasizes prevalence-sensitive summaries. Long-tailed learning and medical-image evaluation literature therefore motivate classwise recall, macro F1, balanced accuracy, and calibration-aware summaries as primary outcomes in imbalanced settings \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}.
 
 A common source of ambiguity in pathology imbalance studies is the input regime. Some methods are naturally image-level methods: they assume labeled images, image embeddings, or directly generated image samples. Other methods are naturally WSI-level methods: they assume weak labels over bags of instances and use attention, instance ranking, or bag-level representation learning. Comparing such methods in one pooled leaderboard can confound the imbalance mechanism with changes in supervision, input size, backbone, and aggregation.
 
@@ -29,10 +29,94 @@ TCGA-UT is useful for separating these questions because it supports two legitim
 
 The contribution is a controlled benchmark design rather than a reproduction claim for every cited method. The study uses one dataset, two native tasks, and one controlled comparison within each task. Method fidelity is defined by implementing the defining imbalance mechanism in the regime for which that mechanism was designed, while holding the backbone family, split, and evaluation code fixed within each benchmark.
 
-\section{Dataset and Shared Splits}
-The dataset contains 8736 slides across 32 cancer-type labels. Class support is long-tailed: the largest class contains 792 slides, the smallest contains 28 slides, giving a slide-level imbalance ratio of 28.3. For each seed, slides are split into 6116 training, 1310 validation, and 1310 test slides. The same slide-level assignments are reused by both benchmarks so that no patches from the same slide can appear in different splits.
+\section{Dataset}
+TCGA-UT is derived from diagnostic \emph{whole-slide images} (WSIs) in The Cancer Genome Atlas (TCGA), a pan-cancer resource that links molecular and clinical cancer data with large image collections \citep{tomczak2015reviewThe}. The TCGA-UT release turns this slide archive into a computational-pathology image dataset by extracting hematoxylin and eosin (H\&E) tumor \emph{patches} from pathologist-selected \emph{uniform tumor regions}. It contains 1,608,060 RGB patches of size $256\times256$ pixels from 8736 diagnostic slides and 32 \emph{cancer-type labels}. The patch labels are slide- or cancer-type labels, not dense tissue masks or cell-level annotations \citep{komura2022universalEncoding}.
 
-The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples 10 patches per slide with a fixed rule before method-specific training begins. This makes the patch benchmark a controlled comparison of imbalance mechanisms rather than a comparison of patch-selection policies. The WSI-bag benchmark uses frozen Virchow2 feature bags built from the same slide identities. Profiling on one GPU found bags with 10--70 instances, a mean of 30.8 instances, and a profiled batch of 32 bags requiring about 55 MB of CUDA peak memory for one forward/backward pass. The configured WSI experiments therefore used full bags rather than an arbitrary instance cap.
+This structure makes TCGA-UT well suited for an imbalance study because the imbalance is native to the dataset rather than imposed only after sampling. The largest class is glioblastoma multiforme (GBM; 792 slides), while the smallest class is diffuse large B-cell lymphoma (DLBC; 28 slides). The resulting slide-level imbalance ratio is 28.3. As a consequence, the dataset exposes the practical tension that motivates this study: methods must learn from many visually related cancer categories while preserving performance on classes with far fewer slide-level examples.
+
+\begin{table}[ht]
+  \centering
+  \caption{Dataset summary used by the shared patch and WSI-bag benchmarks.}
+  \label{tab:dataset-summary}
+  \small
+  \begin{tabular}{ll}
+    \toprule
+    Property & Value\\
+    \midrule
+    Cancer-type labels & 32\\
+    Diagnostic slides & 8736\\
+    TCGA-UT patches & 1,608,060 patches of $256\times256$ pixels\\
+    Largest class & Glioblastoma multiforme (GBM), 792 slides\\
+    Smallest class & Diffuse large B-cell lymphoma (DLBC), 28 slides\\
+    Slide-level imbalance ratio & 28.3\\
+    Shared split size per seed & 6116 train, 1310 validation, 1310 test slides\\
+    Controlled patch input & Resolution level 0, 10 deterministic patches per slide\\
+    WSI-bag input & Full frozen Virchow2 feature bags from the same slide identities\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.86\linewidth]{class_distribution.png}
+  \caption{Native TCGA-UT slide support by cancer-type rank. The long-tailed distribution motivates metrics that weight classes more evenly than aggregate accuracy.}
+  \label{fig:dataset-class-distribution}
+\end{figure}
+
+\subsection{Data Units and Terminology}
+Several data units are involved in the benchmark, and the distinction matters for method comparison. A \emph{slide} or \emph{WSI} is one diagnostic histopathology image associated with one cancer-type label. A \emph{tumor region} is a pathologist-selected area of a slide from which TCGA-UT crops groups of patches. A \emph{patch} is one $256\times256$ RGB crop used directly by the patch classifier. A \emph{feature chunk} is a saved frozen-feature representation associated with a slide or slide subset. A \emph{WSI bag} is the collection of frozen patch-feature instances used by the attention-MIL model for one slide-level prediction. \emph{Head}, \emph{body}, and \emph{tail} classes refer to relative class-support tiers in the long-tailed slide distribution. A \emph{slide-disjoint split} means that all patches and features from one slide stay in exactly one of train, validation, or test.
+
+\begin{table}[ht]
+  \centering
+  \caption{Terminology used for the two native input regimes.}
+  \label{tab:dataset-terminology}
+  \small
+  \begin{tabular}{p{0.23\linewidth}p{0.68\linewidth}}
+    \toprule
+    Term & Meaning in this study\\
+    \midrule
+    \emph{Slide / WSI} & Diagnostic whole-slide image carrying one cancer-type label.\\
+    \emph{Patch} & $256\times256$ H\&E crop from a selected tumor region; patch labels inherit the slide cancer type.\\
+    \emph{Region} & Tumor area selected before patch extraction.\\
+    \emph{Cancer type} & The 32-way class label used for patch and slide-level classification.\\
+    \emph{Feature chunk} & Frozen Virchow2 feature representation used to assemble slide-level feature bags.\\
+    \emph{WSI bag} & Set of patch-feature instances for one slide, consumed by the MIL model.\\
+    \emph{Head/body/tail class} & Class-support tier derived from the slide-count distribution.\\
+    \emph{Slide-disjoint split} & Split rule preventing any slide's patches or features from crossing train, validation, and test.\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \begin{minipage}{0.30\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{tcga_ut_example_patch.jpg}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.64\linewidth}
+    \small
+    \begin{tabular}{p{0.34\linewidth}p{0.56\linewidth}}
+      \toprule
+      Field & Example value\\
+      \midrule
+      Cancer type & Glioblastoma multiforme\\
+      Resolution level & 0\\
+      Patch size & $256\times256$ RGB pixels\\
+      Source unit & One crop from a selected tumor region\\
+      Patch role & Image-level sample if selected by the controlled manifest\\
+      WSI-bag role & Candidate instance in the slide's feature bag\\
+      \bottomrule
+    \end{tabular}
+  \end{minipage}
+  \caption{Example TCGA-UT data point copied from the shared raw dataset. The image is a single patch, while the table shows how that patch relates to the manifest fields used by the benchmark.}
+  \label{fig:tcga-ut-example-patch}
+\end{figure}
+
+\subsection{Shared Splits and Benchmark Inputs}
+For each seed, slides are split into 6116 training, 1310 validation, and 1310 test slides. The same slide-level assignments are reused by both benchmarks so that no patches from the same slide can appear in different splits. This is the main leakage-control mechanism: the patch benchmark and the WSI-bag benchmark see different input units, but they inherit the same train/validation/test slide partition.
+
+The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples 10 patches per slide with a fixed rule before method-specific training begins. This makes the patch benchmark a controlled comparison of imbalance mechanisms rather than a comparison of patch-selection policies. The WSI-bag benchmark uses full frozen Virchow2 feature bags built from the same slide identities, rather than applying an additional instance cap \citep{zimmermann2024virchow2}.
 
 \section{Methods}
 The study organizes methods into four imbalance-mitigation categories: data-level augmentation, synthetic generation, algorithm-level losses, and representation or architecture methods. The central control is comparability within regime. The patch benchmark uses one shared patch-classification backbone, and the WSI-bag benchmark uses one shared attention-MIL backbone. A method is named after a cited paper only where its defining imbalance mechanism is implemented in the corresponding native regime.
@@ -48,8 +132,8 @@ The study organizes methods into four imbalance-mitigation categories: data-leve
     Category & Method & Implemented mechanism\\
     \midrule
     Baselines & CE, weighted CE, focal loss, balanced sampling & Shared patch classifier with objective or sampler changes only.\\
-    Algorithm-level & CE + soft F1/MCC (balanced) & Equal-weight sum of cross-entropy with macro soft F1 or multiclass soft MCC, trained with class-balanced oversampling. \citep{scholz2024imbalanceAware}\\
-    Synthetic generation & ProGAN augmentation & Class-specific progressive generators balance minority patch classes to the training-set head count; this is a Ruiz-Casado-style ProGAN adaptation from binary to multiclass histology. \citep{ruizcasado2024enhancingHistopathological}\\
+    Algorithm-level & CE + soft F1/MCC (balanced) & Equal-weight sum of cross-entropy with macro soft F1 or multiclass soft MCC, trained with class-balanced oversampling \citep{scholz2024imbalanceAware}.\\
+    Synthetic generation & ProGAN augmentation & Class-specific progressive generators balance minority patch classes to the training-set head count; this is a Ruiz-Casado-style ProGAN adaptation from binary to multiclass histology \citep{ruizcasado2024enhancingHistopathological}.\\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -67,8 +151,8 @@ The patch baselines isolate common imbalance interventions. Weighted CE changes 
     Category & Method & Implemented mechanism\\
     \midrule
     Baselines & MIL CE, weighted MIL, focal MIL, balanced MIL & Shared attention-MIL backbone with objective or sampler changes only.\\
-    Data-level augmentation & RankMix & Two-stage attention-MIL training with teacher-derived patch pseudo-labels, ranked representative feature subsequences, and soft-label feature mixup. \citep{chen2023rankmix}\\
-    Representation & SC-MIL & Bag-level supervised contrastive learning with a projector head and a linear curriculum from representation to classifier learning. \citep{juyal2024scMil}\\
+    Data-level augmentation & RankMix & Two-stage attention-MIL training with teacher-derived patch pseudo-labels, ranked representative feature subsequences, and soft-label feature mixup \citep{chen2023rankmix}.\\
+    Representation & SC-MIL & Bag-level supervised contrastive learning with a projector head and a linear curriculum from representation to classifier learning \citep{juyal2024scMil}.\\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -145,7 +229,7 @@ Several limitations remain. First, the study is a controlled benchmark, not a fu
 \section{Conclusion}
 TCGA-UT supports a cleaner imbalance study when patch-level and WSI-bag supervision are evaluated separately. On controlled patch classification, the strongest macro-F1 baseline is plain CE, and balancing interventions mainly change the recall--precision tradeoff. On WSI bags, RankMix provides the strongest overall result and the clearest improvement over a plain MIL baseline. The practical implication is that imbalance mitigation should be selected and evaluated at the same level where the model actually consumes data; otherwise, apparent method differences can be artifacts of incompatible task regimes.
 
-\bibliographystyle{ieeetr}
+\bibliographystyle{apalike}
 \bibliography{references}
 
 \end{document}

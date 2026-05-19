@@ -31,9 +31,9 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 
 - Prefer precise claims over broad declarations. State what is known, what is assumed, and what follows from the cited evidence.
 - Build paragraphs around one main point: topic sentence, supporting evidence or reasoning, and a clear connection to the section's purpose.
-- Use reader-facing scientific terms instead of local project, pipeline, or file-structure language. Define specialized terms on first use.
+- Use reader-facing scientific terms instead of local project, pipeline, file-structure, hardware, or runtime-log language. Define specialized terms on first use, using `\emph{...}` for the introduced term when writing LaTeX, then continue in plain text.
 - Keep abstracts focused on the problem, scope, key result, and interpretation; omit low-level implementation details unless they are essential to the claim.
-- Place citations outside sentence grammar, at the end of the relevant paragraph, unless the document's existing style clearly requires narrative citations.
+- Match the document's existing citation style. For author-year documents, use parenthetical or narrative author-year citations naturally, e.g., `(Goodfellow et al., 2016)` or `Goodfellow et al. (2016)`. For numeric styles, place citations outside sentence grammar at the end of the relevant paragraph, not after each sentence, unless a local convention clearly requires otherwise.
 - Avoid citation piles. For important method families, concepts, or debates, briefly explain representative work and connect it to the current study.
 - For datasets, materials, or corpora, explain why they fit the research question and what limitations or biases matter, not only their basic counts or properties.
 - In methods prose, distinguish what is varied, what is held constant, and what each design choice is meant to isolate.
