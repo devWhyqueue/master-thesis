@@ -14,6 +14,19 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def resolve_raw_image_path(path: Path, raw_root: Path) -> Path:
+    """Map a BeeGFS raw path to a host-mounted SquashFS path when available."""
+    mount = os.environ.get("PATCH_SQFS_MOUNT")
+    if not mount:
+        return path
+    try:
+        relative = path.relative_to(raw_root)
+    except ValueError:
+        return path
+    resolved = Path(mount) / relative
+    return resolved if resolved.exists() else path
+
+
 def _is_under_raw(image_path: str, raw_root: Path) -> bool:
     try:
         Path(image_path).relative_to(raw_root)

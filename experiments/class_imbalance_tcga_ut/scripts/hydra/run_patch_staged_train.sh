@@ -11,13 +11,11 @@ if [ "${1:-}" = "--include-synthetic" ]; then
 fi
 export PATCH_STAGE_DIR="${SLURM_TMPDIR:-/tmp}/tcga_ut_patch_seed=${seed}"
 mkdir -p "${PATCH_STAGE_DIR}"
-PATCH_SQFS="${PATCH_SQFS:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"
+export PATCH_SQFS_STAGE_DIR="${PATCH_STAGE_DIR}"
 SYNTH_SQFS="${PATCH_SYNTHETIC_SQFS:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
 
 cleanup_sqfs_mounts() {
-  if [ -n "${PATCH_SQFS_MOUNT:-}" ] && command -v fusermount >/dev/null 2>&1; then
-    fusermount -u "${PATCH_SQFS_MOUNT}" 2>/dev/null || true
-  fi
+  cleanup_real_patch_sqfs
   if [ -n "${PATCH_SYNTHETIC_SQFS_MOUNT:-}" ] && command -v fusermount >/dev/null 2>&1; then
     fusermount -u "${PATCH_SYNTHETIC_SQFS_MOUNT}" 2>/dev/null || true
   fi
@@ -42,11 +40,11 @@ mount_sqfs_image() {
 }
 
 trap cleanup_sqfs_mounts EXIT
-if mount_sqfs_image "${PATCH_SQFS}" "${PATCH_STAGE_DIR}/sqfs_mount"; then
-  export PATCH_SQFS_MOUNT="${PATCH_STAGE_DIR}/sqfs_mount"
+# shellcheck source=scripts/hydra/mount_real_patch_sqfs.sh
+source scripts/hydra/mount_real_patch_sqfs.sh copy
+if [ -n "${PATCH_SQFS_MOUNT:-}" ]; then
   echo "Real-patch SquashFS mounted at ${PATCH_SQFS_MOUNT}"
 else
-  unset PATCH_SQFS_MOUNT
   echo "Real-patch SquashFS mount skipped; staging will copy if needed"
 fi
 if [ "$include_synthetic" = 1 ]; then

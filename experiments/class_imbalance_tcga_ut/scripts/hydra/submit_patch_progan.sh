@@ -5,7 +5,12 @@ cd "$(dirname "$0")/../.."
 export EXPERIMENT_USE_GPU=1
 upper="${PROGAN_ARRAY_UPPER:-92}"
 parallel="${PROGAN_ARRAY_MAX_PARALLEL:-35}"
+gan_deps=()
+if [ -n "${PROGAN_GAN_DEPENDENCY:-}" ]; then
+  gan_deps=(--dependency="${PROGAN_GAN_DEPENDENCY}")
+fi
 gan_job=$(sbatch --parsable \
+  "${gan_deps[@]}" \
   --array="0-${upper}%${parallel}" \
   --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
   --partition="${PROGAN_PARTITION:-gpu-5h}" \

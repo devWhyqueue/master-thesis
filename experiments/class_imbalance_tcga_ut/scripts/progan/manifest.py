@@ -21,6 +21,7 @@ from scripts.progan.storage import (
     write_manifest,
 )
 from scripts.progan.train import train_class_progan, write_generated_images
+from scripts.staging.io import resolve_raw_image_path
 from scripts.training.support import _resolve_device
 
 
@@ -123,12 +124,16 @@ def decode_progan_array_task(
 
 
 def _class_image_paths(
-    train_frame: pd.DataFrame, class_name: str, settings: ProGanSettings
+    train_frame: pd.DataFrame,
+    class_name: str,
+    settings: ProGanSettings,
+    raw_root: Path,
 ) -> list[Path]:
     values = train_frame.loc[train_frame["cancer_type"] == class_name, "image_path"]
-    return [Path(path) for path in values.tolist()][
-        : settings.max_real_patches_per_class
+    paths = [
+        resolve_raw_image_path(Path(path), raw_root) for path in values.tolist()
     ]
+    return paths[: settings.max_real_patches_per_class]
 
 
 def _train_and_write_class(
@@ -137,8 +142,9 @@ def _train_and_write_class(
     output_root: Path,
     class_name: str,
     seed: int,
+    raw_root: Path,
 ) -> dict[str, object]:
-    image_paths = _class_image_paths(train_frame, class_name, settings)
+    image_paths = _class_image_paths(train_frame, class_name, settings, raw_root)
     n_real = int((train_frame["cancer_type"] == class_name).sum())
     expected = expected_generated_counts(train_frame, settings)[class_name]
     device = _resolve_device("auto")
@@ -172,7 +178,10 @@ def generate_class_progan(
         return load_class_diagnostics(diag_path)
     if class_dir.exists():
         shutil.rmtree(class_dir)
-    return _train_and_write_class(train_frame, settings, output_root, class_name, seed)
+    raw_root = Path(config["paths"]["raw_root"])
+    return _train_and_write_class(
+        train_frame, settings, output_root, class_name, seed, raw_root
+    )
 
 
 def merge_patch_gan_manifest(config: dict, seed: int, smoke: bool = False) -> Path:
