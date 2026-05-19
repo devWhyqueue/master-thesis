@@ -27,10 +27,15 @@ from scripts.patch.data import PatchImageDataset, patch_loader, uses_balanced_sa
 from scripts.staging.io import stage_destination
 from scripts.patch.models import PatchClassifier
 from scripts.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
-from scripts.progan.core import ProgressiveDiscriminator, ProgressiveGenerator
+from scripts.progan.core import (
+    ProgressiveDiscriminator,
+    ProgressiveGenerator,
+    ProGanSettings,
+)
 from scripts.progan.train import paper_batch_size
 from scripts.common import ensure_dirs
 from scripts.progan.manifest import (
+    _class_image_paths,
     balance_target as _balance_target,
     decode_progan_array_task,
     progan_array_upper_bound,
@@ -309,6 +314,34 @@ def test_decode_progan_array_task_maps_seed_and_class(tmp_path: Path) -> None:
     frame.to_csv(paths["data"] / "patch_manifest_seed=0.csv", index=False)
     assert decode_progan_array_task(config, 0, smoke=True) == (0, "B")
     assert decode_progan_array_task(config, 9, smoke=True) is None
+
+
+def test_progan_subsamples_real_patches_with_stable_seed() -> None:
+    frame = pd.DataFrame(
+        {
+            "cancer_type": ["A"] * 10,
+            "image_path": [f"/data/raw/A/0/slide/{index}.jpg" for index in range(10)],
+        }
+    )
+    settings = ProGanSettings(
+        image_size=256,
+        latent_dim=8,
+        epochs_per_depth=1,
+        learning_rate=0.001,
+        beta1=0.5,
+        max_real_patches_per_class=4,
+        balance_target="max_train_class_count",
+        max_classes=None,
+        fade_in_fraction=0.5,
+        base_channels=32,
+    )
+    raw_root = Path("/data/raw")
+    first = _class_image_paths(frame, "A", settings, raw_root, benchmark_seed=1)
+    second = _class_image_paths(frame, "A", settings, raw_root, benchmark_seed=1)
+    other_seed = _class_image_paths(frame, "A", settings, raw_root, benchmark_seed=2)
+    assert len(first) == 4
+    assert first == second
+    assert first != other_seed
 
 
 def test_progan_balances_to_head_patch_count() -> None:

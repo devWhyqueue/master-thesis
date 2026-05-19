@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 from pathlib import Path
 from typing import cast
 
+import numpy as np
 import pandas as pd
 
 from scripts.common import ensure_dirs
@@ -123,17 +125,29 @@ def decode_progan_array_task(
     return seed, classes[class_idx]
 
 
+def _progan_subsample_seed(benchmark_seed: int, class_name: str) -> int:
+    """Return a stable RNG seed for subsampling real patches per benchmark seed and class."""
+    digest = hashlib.sha256(f"{benchmark_seed}:{class_name}".encode()).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
 def _class_image_paths(
     train_frame: pd.DataFrame,
     class_name: str,
     settings: ProGanSettings,
     raw_root: Path,
+    benchmark_seed: int,
 ) -> list[Path]:
     values = train_frame.loc[train_frame["cancer_type"] == class_name, "image_path"]
     paths = [
         resolve_raw_image_path(Path(path), raw_root) for path in values.tolist()
     ]
-    return paths[: settings.max_real_patches_per_class]
+    limit = settings.max_real_patches_per_class
+    if len(paths) <= limit:
+        return paths
+    rng = np.random.default_rng(_progan_subsample_seed(benchmark_seed, class_name))
+    picked = rng.choice(len(paths), size=limit, replace=False)
+    return [paths[int(index)] for index in picked]
 
 
 def _train_and_write_class(
@@ -144,7 +158,9 @@ def _train_and_write_class(
     seed: int,
     raw_root: Path,
 ) -> dict[str, object]:
-    image_paths = _class_image_paths(train_frame, class_name, settings, raw_root)
+    image_paths = _class_image_paths(
+        train_frame, class_name, settings, raw_root, benchmark_seed=seed
+    )
     n_real = int((train_frame["cancer_type"] == class_name).sum())
     expected = expected_generated_counts(train_frame, settings)[class_name]
     device = _resolve_device("auto")
