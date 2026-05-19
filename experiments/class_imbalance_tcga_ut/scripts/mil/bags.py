@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import cast
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -32,48 +33,55 @@ class BagFeatureDataset(Dataset):
         frame: pd.DataFrame,
         class_to_idx: dict[str, int],
         max_instances: int | None,
+        cache_dir: Path | None = None,
+        split: str | None = None,
     ) -> None:
         rows = frame.reset_index(drop=True)
-        self.bags = [
-            _feature_to_bag(str(path), max_instances)
-            for path in rows["feature_path"].tolist()
-        ]
+        self.feature_paths = [str(path) for path in rows["feature_path"].tolist()]
+        self.max_instances = max_instances
         self.labels = torch.tensor(
             [class_to_idx[str(name)] for name in rows["cancer_type"].tolist()],
             dtype=torch.long,
         )
+        self.cache = _BagCache(cache_dir, split) if cache_dir and split else None
+        if self.cache and len(self.cache) != len(self.labels):
+            raise ValueError(f"Cache row count does not match manifest split: {split}")
 
     def __len__(self) -> int:
-        return len(self.bags)
+        return len(self.feature_paths)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        return self.bags[idx], int(self.labels[idx].item())
-
-
-class SyntheticBagFeatureDataset(BagFeatureDataset):
-    """Feature-bag dataset with optional generated-image feature bags."""
-
-    def append_rows(
-        self,
-        frame: pd.DataFrame,
-        class_to_idx: dict[str, int],
-        max_instances: int | None,
-    ) -> int:
-        """Append synthetic feature rows and return how many were added."""
-        rows = frame.reset_index(drop=True)
-        if rows.empty:
-            return 0
-        extra_bags = [
-            _feature_to_bag(str(path), max_instances)
-            for path in rows["feature_path"].tolist()
-        ]
-        extra_labels = torch.tensor(
-            [class_to_idx[str(name)] for name in rows["cancer_type"].tolist()],
-            dtype=torch.long,
+        bag = (
+            self.cache.bag(idx, self.max_instances)
+            if self.cache
+            else _feature_to_bag(self.feature_paths[idx], self.max_instances)
         )
-        self.bags.extend(extra_bags)
-        self.labels = torch.cat([self.labels, extra_labels])
-        return len(extra_bags)
+        return bag, int(self.labels[idx].item())
+
+
+class _BagCache:
+    """Memory-mapped feature-bag cache backed by large contiguous arrays."""
+
+    def __init__(self, cache_dir: Path, split: str) -> None:
+        features_path = cache_dir / f"{split}_features.npy"
+        offsets_path = cache_dir / f"{split}_offsets.npy"
+        if not features_path.exists() or not offsets_path.exists():
+            raise FileNotFoundError(f"Incomplete WSI bag cache for split: {split}")
+        self.features = np.load(features_path, mmap_mode="r")
+        self.offsets = np.load(offsets_path)
+
+    def __len__(self) -> int:
+        return int(len(self.offsets) - 1)
+
+    def bag(self, idx: int, max_instances: int | None) -> torch.Tensor:
+        """Return one cached bag as a CPU tensor."""
+        start, end = int(self.offsets[idx]), int(self.offsets[idx + 1])
+        array = np.asarray(self.features[start:end], dtype=np.float32)
+        bag = torch.from_numpy(array.copy())
+        if max_instances and len(bag) > max_instances:
+            indices = torch.linspace(0, len(bag) - 1, max_instances).long()
+            bag = bag.index_select(0, indices)
+        return bag
 
 
 def bag_collate(
@@ -98,6 +106,11 @@ class AttentionMil(nn.Module):
         )
         self.attention = nn.Linear(hidden_dim, 1)
         self.classifier = nn.Linear(hidden_dim, output_dim)
+        self.projector = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+        )
 
     def forward_bags(
         self, bags: list[torch.Tensor]
@@ -113,31 +126,19 @@ class AttentionMil(nn.Module):
         bag_embeddings = torch.stack(embeddings)
         return self.classifier(bag_embeddings), bag_embeddings, attention_weights
 
-    def forward(self, features: torch.Tensor) -> torch.Tensor:
+    def forward(self, features: torch.Tensor) -> torch.Tensor:  # noqa
         """Classify already pooled feature vectors."""
         encoded = self.instance_encoder(features)
         return self.classifier(encoded)
 
+    def rank_scores(self, bag: torch.Tensor, class_id: int) -> torch.Tensor:
+        """Return teacher pseudo-label scores for one class across a bag."""
+        encoded = self.instance_encoder(bag)
+        return torch.softmax(self.classifier(encoded), dim=1)[:, class_id]
 
-class MdeMil(nn.Module):
-    """Two-expert MIL classifier for original and rebalanced objectives."""
-
-    def __init__(
-        self, input_dim: int, hidden_dim: int, output_dim: int, dropout: float
-    ) -> None:
-        super().__init__()
-        self.original = AttentionMil(input_dim, hidden_dim, output_dim, dropout)
-        self.rebalanced = AttentionMil(input_dim, hidden_dim, output_dim, dropout)
-
-    def forward_bags(
-        self, bags: list[torch.Tensor]
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Classify feature bags with both experts."""
-        original_logits, original_embeddings, _ = self.original.forward_bags(bags)
-        rebalanced_logits, rebalanced_embeddings, _ = self.rebalanced.forward_bags(bags)
-        logits = 0.5 * (original_logits + rebalanced_logits)
-        embeddings = 0.5 * (original_embeddings + rebalanced_embeddings)
-        return logits, embeddings, original_logits, rebalanced_logits
+    def project_bag_embeddings(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """Project and normalize bag embeddings for supervised contrastive loss."""
+        return nn.functional.normalize(self.projector(embeddings), dim=1)
 
 
 def class_weights(

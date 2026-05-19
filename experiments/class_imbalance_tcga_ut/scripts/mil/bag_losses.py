@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import cast
 
-import numpy as np
 import torch
 from torch import nn
 
-from scripts.mil.bags import AttentionMil, MdeMil
+from scripts.mil.bags import AttentionMil
 
 
 def bag_loss(
@@ -14,121 +13,155 @@ def bag_loss(
     model: nn.Module,
     bags: list[torch.Tensor],
     targets: torch.Tensor,
-    train_labels: np.ndarray,
     weights: torch.Tensor,
-    feature_gan_noise: bool = True,
-) -> torch.Tensor:
-    """Compute the selected feature-bag objective."""
-    if method == "mde_mil":
-        return _mde_loss(model, bags, targets, weights)
+    progress: float,
+    config: dict,
+    teacher: AttentionMil | None = None,
+) -> tuple[torch.Tensor, dict[str, int]]:
+    """Compute a WSI-bag loss and return activation diagnostics."""
     attention_model = cast(AttentionMil, model)
-    logits, embeddings, attention = attention_model.forward_bags(bags)
+    logits, embeddings, _ = attention_model.forward_bags(bags)
     if method == "rankmix_mil":
-        logits, targets = _append_rankmix_examples(
-            model, logits, embeddings, attention, targets
-        )
-    if method == "feature_gan_mil" and feature_gan_noise:
-        logits, targets = _append_synthetic_tail_examples(
-            model, logits, embeddings, targets, train_labels
-        )
-    loss = nn.functional.cross_entropy(logits, targets, weight=weights)
-    if method == "cfal_mil":
-        loss = loss + 0.1 * _cfal_affinity_loss(embeddings, targets, weights)
+        return _rankmix_loss(attention_model, teacher, bags, targets, config)
+    loss = _base_bag_loss(method, logits, targets, weights, config)
     if method == "sc_mil":
-        loss = loss + 0.1 * _supervised_contrastive_loss(embeddings, targets)
-    return loss
+        return _sc_mil_loss(
+            attention_model, embeddings, targets, loss, progress, config
+        )
+    return loss, {}
 
 
-def _mde_loss(
-    model: nn.Module,
+def _base_bag_loss(
+    method: str,
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    weights: torch.Tensor,
+    config: dict,
+) -> torch.Tensor:
+    if method == "mil_focal":
+        return _focal_loss(logits, targets, float(config["focal_gamma"]))
+    ce_weights = weights if method == "mil_weighted_ce" else None
+    return nn.functional.cross_entropy(logits, targets, weight=ce_weights)
+
+
+def _rankmix_loss(
+    model: AttentionMil,
+    teacher: AttentionMil | None,
     bags: list[torch.Tensor],
     targets: torch.Tensor,
-    weights: torch.Tensor,
-) -> torch.Tensor:
-    logits, _, original_logits, rebalanced_logits = cast(MdeMil, model).forward_bags(
-        bags
+    config: dict,
+) -> tuple[torch.Tensor, dict[str, int]]:
+    if teacher is None:
+        raise ValueError("RankMix requires a frozen teacher model.")
+    logits, soft_targets, diagnostics = _rankmix_batch(
+        model, teacher, bags, targets, float(config["rankmix_alpha"])
     )
-    consistency = torch.mean((original_logits - rebalanced_logits.detach()) ** 2)
-    return (
-        nn.functional.cross_entropy(logits, targets, weight=weights) + 0.1 * consistency
-    )
+    return _soft_cross_entropy(logits, soft_targets), diagnostics
 
 
-def _append_rankmix_examples(
-    model: nn.Module,
-    logits: torch.Tensor,
-    embeddings: torch.Tensor,
-    attention: list[torch.Tensor],
-    targets: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    if len(targets) < 2:
-        return logits, targets
-    scores = torch.tensor(
-        [float(weights.max().detach().cpu()) for weights in attention],
-        device=logits.device,
-    )
-    tail = targets.bincount(minlength=int(targets.max()) + 1)[targets] <= 1
-    mixable = torch.where(tail | (scores < scores.median()))[0]
-    if len(mixable) < 2:
-        return logits, targets
-    perm = mixable[torch.randperm(len(mixable), device=logits.device)]
-    same_class = targets[mixable] == targets[perm]
-    if not bool(same_class.any()):
-        return logits, targets
-    mixed = 0.5 * embeddings[mixable] + 0.5 * embeddings[perm]
-    mixed_logits = cast(AttentionMil, model).classifier(mixed[same_class])
-    mixed_targets = targets[mixable][same_class]
-    return torch.cat([logits, mixed_logits]), torch.cat([targets, mixed_targets])
-
-
-def _append_synthetic_tail_examples(
-    model: nn.Module,
-    logits: torch.Tensor,
+def _sc_mil_loss(
+    model: AttentionMil,
     embeddings: torch.Tensor,
     targets: torch.Tensor,
-    train_labels: np.ndarray,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    counts = np.bincount(train_labels)
-    median_count = np.median(counts[counts > 0])
-    mask = torch.tensor(
-        [counts[int(label)] <= median_count for label in targets],
-        device=targets.device,
+    base_loss: torch.Tensor,
+    progress: float,
+    config: dict,
+) -> tuple[torch.Tensor, dict[str, int]]:
+    projections = model.project_bag_embeddings(embeddings)
+    contrastive, positive_pairs = _supervised_contrastive_loss(
+        projections, targets, float(config["sc_mil_temperature"])
     )
-    if int(mask.sum().item()) == 0:
-        return logits, targets
-    synthetic = embeddings[mask] + 0.05 * torch.randn_like(embeddings[mask])
-    synthetic_logits = cast(AttentionMil, model).classifier(synthetic)
-    return torch.cat([logits, synthetic_logits]), torch.cat([targets, targets[mask]])
+    beta = 1.0 - progress
+    return beta * contrastive + (1.0 - beta) * base_loss, {
+        "positive_pairs": positive_pairs
+    }
 
 
-def _cfal_affinity_loss(
-    embeddings: torch.Tensor, targets: torch.Tensor, weights: torch.Tensor
+def _focal_loss(
+    logits: torch.Tensor, targets: torch.Tensor, gamma: float
 ) -> torch.Tensor:
-    loss = torch.tensor(0.0, device=embeddings.device)
-    for class_id in targets.unique():
-        mask = targets == class_id
-        if int(mask.sum().item()) < 2:
-            continue
-        class_embeddings = embeddings[mask]
-        center = class_embeddings.mean(dim=0, keepdim=True)
-        distances = torch.norm(class_embeddings - center, dim=1)
-        hard = distances >= distances.mean()
-        local = distances[hard].mean() if bool(hard.any()) else distances.mean()
-        loss = loss + weights[class_id] * local
-    return loss / max(1, len(targets.unique()))
+    log_probs = torch.log_softmax(logits, dim=1)
+    pt = log_probs.exp().gather(1, targets.unsqueeze(1)).squeeze(1)
+    log_pt = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+    return (-((1 - pt) ** gamma) * log_pt).mean()
+
+
+def _rankmix_batch(
+    model: AttentionMil,
+    teacher: AttentionMil,
+    bags: list[torch.Tensor],
+    targets: torch.Tensor,
+    alpha: float,
+) -> tuple[torch.Tensor, torch.Tensor, dict[str, int]]:
+    if len(bags) < 2:
+        logits, _, _ = model.forward_bags(bags)
+        return (
+            logits,
+            nn.functional.one_hot(targets, logits.shape[1]).float(),
+            {"mixed_examples": 0},
+        )
+    permutation = torch.randperm(len(bags), device=targets.device)
+    lambdas = (
+        torch.distributions.Beta(alpha, alpha).sample((len(bags),)).to(targets.device)
+    )
+    mixed_bags: list[torch.Tensor] = []
+    for idx, other_idx in enumerate(permutation.tolist()):
+        mixed_bags.append(
+            _mix_ranked_bags(
+                teacher,
+                bags[idx],
+                bags[other_idx],
+                int(targets[idx].item()),
+                int(targets[other_idx].item()),
+                float(lambdas[idx].item()),
+            )
+        )
+    logits, _, _ = model.forward_bags(mixed_bags)
+    one_hot = nn.functional.one_hot(targets, logits.shape[1]).float()
+    mixed_targets = lambdas.unsqueeze(1) * one_hot + (1.0 - lambdas).unsqueeze(
+        1
+    ) * one_hot.index_select(0, permutation)
+    return logits, mixed_targets, {"mixed_examples": len(mixed_bags)}
+
+
+def _mix_ranked_bags(
+    teacher: AttentionMil,
+    first_bag: torch.Tensor,
+    second_bag: torch.Tensor,
+    first_class: int,
+    second_class: int,
+    mix_lambda: float,
+) -> torch.Tensor:
+    keep = min(len(first_bag), len(second_bag))
+    first = _rank_representative_features(teacher, first_bag, first_class, keep)
+    second = _rank_representative_features(teacher, second_bag, second_class, keep)
+    return mix_lambda * first + (1.0 - mix_lambda) * second
+
+
+def _rank_representative_features(
+    teacher: AttentionMil, bag: torch.Tensor, class_id: int, keep: int
+) -> torch.Tensor:
+    scores = teacher.rank_scores(bag, class_id)
+    ranked = torch.topk(scores, keep).indices
+    original_order = torch.sort(ranked).values
+    return bag.index_select(0, original_order)
+
+
+def _soft_cross_entropy(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    return -(targets * torch.log_softmax(logits, dim=1)).sum(dim=1).mean()
 
 
 def _supervised_contrastive_loss(
-    embeddings: torch.Tensor, targets: torch.Tensor
-) -> torch.Tensor:
-    normalized = nn.functional.normalize(embeddings, dim=1)
-    logits = torch.matmul(normalized, normalized.T) / 0.2
+    embeddings: torch.Tensor, targets: torch.Tensor, temperature: float
+) -> tuple[torch.Tensor, int]:
+    logits = torch.matmul(embeddings, embeddings.T) / temperature
     same = targets.unsqueeze(0) == targets.unsqueeze(1)
     self_mask = torch.eye(len(targets), dtype=torch.bool, device=targets.device)
     positive = same & ~self_mask
-    if not bool(positive.any()):
-        return torch.tensor(0.0, device=embeddings.device)
+    positive_pairs = int(positive.sum().item())
+    if positive_pairs == 0:
+        return torch.tensor(0.0, device=embeddings.device), 0
     log_prob = logits - torch.logsumexp(
         logits.masked_fill(self_mask, -1e9), dim=1, keepdim=True
     )
-    return -(log_prob * positive.float()).sum() / positive.float().sum()
+    return -(log_prob * positive.float()).sum() / positive.float().sum(), positive_pairs

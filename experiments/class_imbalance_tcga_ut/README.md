@@ -1,64 +1,73 @@
 # TCGA-UT Class-Imbalance Experiment
 
-Taxonomy-grounded class-imbalance experiments on TCGA-UT using frozen Virchow2
-WSI feature bags.
+Controlled class-imbalance benchmarks on TCGA-UT with two native input regimes:
 
-Default Hydra feature path:
+- a **patch-level benchmark** on labeled histopathology patches,
+- a **WSI-bag benchmark** on frozen Virchow2 feature bags.
 
-```text
-/home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
-```
+The paper source is `paper/main.tex`; benchmark outputs are stored separately under
+`outputs/tables/`, `outputs/figures/`, `outputs/results_patch/`, and
+`outputs/results_wsi_bag/`.
 
-## Main Hydra Run
-
-Submit from this experiment directory:
+## Shared Preparation
 
 ```bash
 sbatch scripts/hydra/build_container.sbatch
 export EXPERIMENT_CONTAINER="$PWD/environment.sif"
-sbatch scripts/hydra/run_smoke.sbatch
 sbatch scripts/hydra/run_prepare.sbatch
-sbatch scripts/hydra/run_train_array.sbatch
+```
+
+Preparation builds one slide-level split manifest per seed and derives the
+controlled patch manifests from those slide assignments, so patches from one
+slide never cross splits.
+
+## Benchmarks
+
+Patch methods: `patch_ce`, `patch_weighted_ce`, `patch_focal`,
+`patch_balanced_sampler_ce`, `patch_cfal`, `patch_progan_aug`.
+
+WSI-bag methods: `mil_ce`, `mil_weighted_ce`, `mil_focal`,
+`mil_balanced_sampler_ce`, `rankmix_mil`, `sc_mil`.
+
+Submit the benchmarks independently:
+
+```bash
+sbatch scripts/hydra/run_patch_train_array.sbatch
+sbatch scripts/hydra/run_wsi_train_array.sbatch
 sbatch scripts/hydra/run_aggregate.sbatch
 ```
 
-Outputs used by the paper are kept in `outputs/tables/` and `outputs/figures/`.
-Runtime outputs such as `outputs/results/`, `outputs/synthetic_*`, `data/`, and
-`logs/` are scratch artifacts.
-
-## Methods
-
-Baselines: `ce`, `weighted_ce`, `focal`, `balanced_sampler_ce`, `knn`, `ncc`.
-
-Representative methods: `rankmix_mil`, `feature_gan_mil`, `cfal_mil`,
-`mde_mil`, `sc_mil`.
-
-## Image-GAN Bridge
-
-The full synthetic-image path is:
+For an end-to-end smoke run:
 
 ```bash
-gan=$(sbatch --parsable scripts/hydra/run_synthetic_gan.sbatch)
-collect=$(sbatch --parsable --dependency=afterok:$gan scripts/hydra/run_synthetic_collect.sbatch)
-encode=$(sbatch --parsable --dependency=afterok:$collect scripts/hydra/run_synthetic_encode.sbatch)
-feature_gan=$(sbatch --parsable --dependency=afterok:$encode scripts/hydra/run_feature_gan_mil_array.sbatch)
-sbatch --dependency=afterok:$feature_gan scripts/hydra/run_aggregate.sbatch
+sbatch scripts/hydra/run_smoke.sbatch
 ```
 
-`run_synthetic_encode.sbatch` needs `HF_TOKEN` or `HUGGINGFACE_HUB_TOKEN` for the
-gated `paige-ai/Virchow2` model.
-
-Latest completed run: image-GAN job `4341844` generated 4096 patches per seed,
-encoder job `4341846` encoded 4096 features per seed, and `feature_gan_mil` job
-`4341847` consumed all encoded synthetic features.
-
-## Monitoring
+Before a full WSI sweep, profile the untruncated bags once:
 
 ```bash
-squeue -u "$USER"
-cat outputs/results/<method>/seed=<seed>/progress.json
-cat outputs/tables/missing_results.json
+sbatch scripts/hydra/run_wsi_profile.sbatch
 ```
 
-The paper source is `paper/main.tex`; rebuild it after refreshing tables or
-figures.
+The default configuration leaves `max_instances_per_bag` unset. If full bags are
+not feasible on the cluster allocation, set one profiled fixed cap in
+`configs/default.yaml` and report that cap in the paper.
+
+`patch_progan_aug` is a bounded Ruiz-Casado-style adaptation: one class-specific
+ProGAN is trained for every training class below the head-class patch count,
+generators grow progressively to 256 px using the paper's depth-dependent batch
+schedule, and synthetic patches raise those classes to the training-set head
+count. The synthetic summary records per-class generated counts and Inception
+FID whenever `torchvision` is available in the runtime environment.
+
+## Main Artifacts
+
+- `outputs/tables/result_summary_patch.csv`
+- `outputs/tables/result_summary_wsi_bag.csv`
+- `outputs/figures/method_macro_f1_patch_test.png`
+- `outputs/figures/method_macro_f1_wsi_bag_test.png`
+- `outputs/results_patch/<method>/seed=<seed>/`
+- `outputs/results_wsi_bag/<method>/seed=<seed>/`
+
+Runtime outputs such as generated synthetic patches, detailed result folders,
+`data/`, and `logs/` remain scratch artifacts.

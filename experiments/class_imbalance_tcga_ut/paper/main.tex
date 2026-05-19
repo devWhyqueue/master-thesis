@@ -9,7 +9,7 @@
 
 \graphicspath{{../outputs/figures/}}
 
-\title{Paper-Faithful Imbalance Mitigation for TCGA-UT Frozen WSI Features}
+\title{Imbalance Mitigation for TCGA-UT Across Patch and WSI-Bag Regimes}
 \author{}
 \date{}
 
@@ -17,117 +17,133 @@
 \maketitle
 
 \begin{abstract}
-Class imbalance is a persistent obstacle in computational pathology because clinically relevant cohorts often follow long-tailed disease distributions. This study evaluates imbalance-mitigation methods on TCGA-UT using a shared frozen Virchow2 whole-slide-image feature representation and identical stratified splits. The revised experiment is grounded in a five-part taxonomy: data-level augmentation, synthetic generation, algorithm-level losses, hybrid methods, and representation or architecture methods. Unlike a proxy-only comparison, each empirical method is implemented as a representative method that can operate on frozen WSI feature bags. Across three seeds, the strongest test macro F1 is achieved by focal loss (0.849), unweighted cross-entropy (0.846), balanced sampling (0.845), and weighted cross-entropy (0.844). The best representative bag method, RankMix-style MIL, reaches 0.825 macro F1, while the encoded image-GAN synthetic condition reaches 0.822. These results indicate that frozen-feature TCGA-UT performance is dominated by the strength of the Virchow2 representation and simple downstream losses, while more structured bag-level representatives remain sensitive to adaptation and resource constraints.
+\noindent Class imbalance in computational pathology is not a single evaluation problem: labeled image patches support ordinary image classification, whereas whole-slide image (WSI) classification is commonly formulated as weakly supervised multiple-instance learning over patch-feature bags. This study evaluates imbalance mitigation on TCGA-UT with two native-regime benchmarks rather than a single cross-regime leaderboard. The patch benchmark compares cross-entropy, class weighting, focal loss, balanced sampling, Center-Focused Affinity Loss (CFAL), and ProGAN-based synthetic augmentation. The WSI-bag benchmark compares matched attention-MIL baselines with RankMix and SC-MIL. All methods use slide-disjoint splits, repeated three-seed evaluation, and shared backbones within each benchmark. On patches, plain cross-entropy gives the highest macro F1 ($0.314 \pm 0.004$), while balanced sampling gives the highest balanced accuracy ($0.333 \pm 0.013$) at lower macro F1. On WSI bags, RankMix is the strongest method, improving balanced accuracy over plain MIL CE from $0.836 \pm 0.020$ to $0.863 \pm 0.008$ and macro F1 from $0.840 \pm 0.020$ to $0.848 \pm 0.017$. The results show that advanced imbalance mechanisms are not uniformly beneficial, but can help when their assumptions match the native input regime.
 \end{abstract}
 
 \section{Introduction}
-Class imbalance changes what a pathology classifier is rewarded for learning. When common tumor types dominate the training set, high aggregate accuracy can coexist with unreliable rare-class recall, especially if evaluation reports only micro-averaged or prevalence-sensitive summaries. Long-tailed learning and medical-image evaluation literature therefore motivate classwise recall, macro F1, balanced accuracy, and calibration-aware summaries as primary outcomes in imbalanced settings. \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}
+Class imbalance changes what a pathology classifier is rewarded for learning. When common tumor types dominate training data, high aggregate accuracy can coexist with unreliable rare-class recall, especially if evaluation emphasizes prevalence-sensitive summaries. Long-tailed learning and medical-image evaluation literature therefore motivate classwise recall, macro F1, balanced accuracy, and calibration-aware summaries as primary outcomes in imbalanced settings. \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}
 
-This study treats TCGA-UT as a long-tailed computational pathology benchmark. The experiments preserve the observed class distribution in the training split and evaluate on validation and test splits drawn from the same distribution. This design asks which downstream mitigation methods help when class frequency is part of the cohort structure that the model must handle.
+A common source of ambiguity in pathology imbalance studies is the input regime. Some methods are naturally image-level methods: they assume labeled images, image embeddings, or directly generated image samples. Other methods are naturally WSI-level methods: they assume weak labels over bags of instances and use attention, instance ranking, or bag-level representation learning. Comparing such methods in one pooled leaderboard can confound the imbalance mechanism with changes in supervision, input size, backbone, and aggregation.
 
-The revised comparison addresses a limitation of the earlier proxy sweep. Methods such as oversampling, feature interpolation, and center regularization are useful baselines, but they do not reproduce the methodological commitments of the representative papers in the taxonomy. The new experiment therefore evaluates WSI feature-bag implementations where possible and explicitly marks image-level or multimodal components that cannot be reproduced from the available frozen features.
+TCGA-UT is useful for separating these questions because it supports two legitimate tasks with different native inputs. The dataset provides labeled histopathology patches cropped from pathologist-selected tumor regions and slide identities that can be grouped into WSI-level bags. Patch labels are class labels, not dense pixel masks or cell-level annotations. This study therefore uses the available supervision directly: image-level methods are evaluated on controlled patch classification, while MIL methods are evaluated on slide-level feature bags.
 
-\section{Dataset}
-The dataset used in this experiment contains 8736 whole-slide images from TCGA-UT, assigned to 32 cancer-type labels after matching slide identifiers to available frozen Virchow2 feature tensors. The largest class is Glioblastoma multiforme with 792 slides, followed by Brain Lower Grade Glioma with 784 and Breast invasive carcinoma with 770. The smallest class is Lymphoid Neoplasm Diffuse Large B-cell Lymphoma with 28 slides, followed by Cholangiocarcinoma with 30 and Pheochromocytoma and Paraganglioma with 45. The resulting slide-level imbalance ratio is 28.3:1. Stratified splits contain 6116 training slides, 1310 validation slides, and 1310 test slides.
+The contribution is a controlled benchmark design rather than a reproduction claim for every cited method. The study uses one dataset, two native tasks, and one controlled comparison within each task. Method fidelity is defined by implementing the defining imbalance mechanism in the regime for which that mechanism was designed, while holding the backbone family, split, and evaluation code fixed within each benchmark.
 
-This distribution is a useful example of the long-tailed class-imbalance problem because the skew is not limited to a single rare outlier. The eight largest classes account for 4565 slides, or 52.3\% of the cohort, while the eight smallest classes account for only 444 slides, or 5.1\%. Nine classes have fewer than 100 slides each. These classes are not interchangeable technical labels; they correspond to distinct diagnostic categories.
+\section{Dataset and Shared Splits}
+The dataset contains 8736 slides across 32 cancer-type labels. Class support is long-tailed: the largest class contains 792 slides, the smallest contains 28 slides, giving a slide-level imbalance ratio of 28.3. For each seed, slides are split into 6116 training, 1310 validation, and 1310 test slides. The same slide-level assignments are reused by both benchmarks so that no patches from the same slide can appear in different splits.
 
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=\linewidth]{class_distribution.png}
-  \caption{Native TCGA-UT class distribution by cancer-type rank. Bars are grouped into head, body, and tail regions, and the log-scaled y-axis keeps the rare classes visible.}
-  \label{fig:class-distribution}
-\end{figure}
-
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=0.72\linewidth]{long_tail_profile.png}
-  \caption{Slide mass by class-support tier. The smallest-support classes are many in label space but contribute little to the total number of training examples.}
-  \label{fig:long-tail}
-\end{figure}
+The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples 10 patches per slide with a fixed rule before method-specific training begins. This makes the patch benchmark a controlled comparison of imbalance mechanisms rather than a comparison of patch-selection policies. The WSI-bag benchmark uses frozen Virchow2 feature bags built from the same slide identities. Profiling on one GPU found bags with 10--70 instances, a mean of 30.8 instances, and a profiled batch of 32 bags requiring about 55 MB of CUDA peak memory for one forward/backward pass. The configured WSI experiments therefore used full bags rather than an arbitrary instance cap.
 
 \section{Methods}
-All experiments use frozen Virchow2 features. Virchow and Virchow2 are computational-pathology foundation models trained to encode H\&E WSI patches into reusable feature vectors for downstream pathology tasks. The revised representative methods preserve WSI feature bags when the method family depends on slide structure. To fit the available Hydra GPU job memory while keeping all 33 method--seed runs comparable, bag methods use up to 16 evenly spaced feature instances per slide and a bag batch size of 8. Mean-pooled vectors remain only for simple reference baselines such as cross-entropy MLPs, $k$-nearest neighbors, and nearest-centroid classification. \citep{vorontsov2024virchow,zimmermann2024virchow2}
+The study organizes methods into four imbalance-mitigation categories: data-level augmentation, synthetic generation, algorithm-level losses, and representation or architecture methods. The central control is comparability within regime. The patch benchmark uses one shared patch-classification backbone, and the WSI-bag benchmark uses one shared attention-MIL backbone. A method is named after a cited paper only where its defining imbalance mechanism is implemented in the corresponding native regime.
 
-Table~\ref{tab:method-taxonomy} summarizes the method families and the implementation contract used in this experiment. The central rule is that a method is reported as a representative only when its key mechanism is implemented on the available TCGA-UT feature bags. Otherwise, it is described as a baseline or as an excluded image-level extension.
-
+\subsection{Patch-Level Benchmark}
 \begin{table}[ht]
   \centering
-  \caption{Representative method families used in the revised experiment.}
-  \label{tab:method-taxonomy}
+  \caption{Patch-level benchmark methods.}
+  \label{tab:patch-methods}
   \small
-  \begin{tabular}{p{0.18\linewidth}p{0.23\linewidth}p{0.49\linewidth}}
+  \begin{tabular}{p{0.22\linewidth}p{0.25\linewidth}p{0.43\linewidth}}
     \toprule
-    Category & Representative & Implemented mechanism\\
+    Category & Method & Implemented mechanism\\
     \midrule
-    Data-level & RankMix & Attention-based WSI feature-bag classifier with ranked same-class feature mixing for minority or weakly attended bags. \citep{chen2023rankmix}\\
-    Synthetic generation & GAN/WGAN augmentation & Tail-class patch-image GAN export plus optional encoded-feature ingestion; image-quality metrics and Virchow2 re-encoding are separate pipeline stages. \citep{yuan2024aGan,ruizcasado2024enhancingHistopathological}\\
-    Algorithm-level & CFAL & Effective-number class weighting with prototype-oriented affinity and hard-sample compactness penalties on bag embeddings. \citep{mahbub2024centerFocused}\\
-    Hybrid & MDE-MIL & Two-expert MIL model combining original-distribution and rebalanced objectives with consistency regularization; multimodal distillation is omitted. \citep{ling2025mdeMil}\\
-    Representation & SC-MIL & Attention MIL with supervised contrastive regularization on slide-level bag embeddings. \citep{juyal2024scMil}\\
+    Baselines & CE, weighted CE, focal loss, balanced sampling & Shared patch classifier with objective or sampler changes only.\\
+    Algorithm-level & CFAL & Class-balanced Gaussian-affinity loss over learned class prototypes, with center-focused modulation on patch embeddings. \citep{mahbub2024centerFocused}\\
+    Synthetic generation & ProGAN augmentation & Class-specific progressive generators balance minority patch classes to the training-set head count; this is a Ruiz-Casado-style ProGAN adaptation from binary to multiclass histology. \citep{ruizcasado2024enhancingHistopathological}\\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\subsection{Baselines}
-The reference baselines are six simple methods: unweighted cross-entropy, weighted cross-entropy, focal loss, balanced-sampler cross-entropy, KNN, and nearest-centroid classification. These methods provide context for whether a paper-faithful WSI method improves over simple objective, sampling, or feature-geometry baselines.
+The patch baselines isolate common imbalance interventions. Weighted CE changes the class contribution to the loss, focal loss down-weights easy examples, and balanced sampling changes minibatch composition without changing the loss. CFAL adds a prototype-affinity objective on learned patch embeddings with class-balanced weighting. ProGAN augmentation trains class-specific generators for minority classes and augments the patch training set; generated patches are used only as additional patch-classification training examples, not as synthetic slide bags.
 
-\subsection{Representative Implementations}
-The data-level representative is a RankMix-style WSI feature-bag method. It preserves multiple instances per slide, estimates instance importance through attention weights, and adds same-class mixed bag embeddings for examples that are rare or weakly attended. This captures the RankMix premise that WSI augmentation should respect variable bag sizes and class imbalance rather than treating each slide as a fixed image. \citep{chen2023rankmix}
-
-The synthetic-generation representative has two layers. First, an image-level stage trains small per-tail-class DCGAN generators on raw TCGA-UT training patch JPEGs and exports generated patch images with a manifest, following the central idea of GAN-based minority image augmentation. Second, the generated patches are re-encoded with Virchow2 and appended to the frozen-feature training bags. To keep this stage inside the Hydra runtime envelope, the image-GAN jobs are parallelized over seed and tail class; each seed produces 4096 generated patches, and the encoder produces 4096 compatible feature tensors that are consumed by the corresponding \texttt{feature\_gan\_mil} run. If the encoded-feature manifest is absent, the classifier records the omission and falls back to the earlier feature-space synthetic condition. This avoids presenting unencoded JPEGs as if they had been used by the frozen-feature WSI classifier. \citep{yuan2024aGan,ruizcasado2024enhancingHistopathological}
-
-The algorithm-level representative implements CFAL-style ingredients on bag embeddings: effective-number class weights, class-prototype compactness, and a hard-sample term for embeddings far from their class center. This replaces the earlier batch-logit center penalty with a loss that more directly reflects the affinity and prototype motivation of Center-Focused Affinity Loss. \citep{mahbub2024centerFocused}
-
-The hybrid representative follows the MDE-MIL idea through two MIL experts. One expert learns from the original distribution, the other from rebalanced sampling, and the training objective adds a consistency term between their logits. Because no pathology-text encoder artifacts are available in this experiment package, multimodal distillation is treated as a controlled omission rather than silently approximated.
-
-The representation-level representative follows SC-MIL by combining attention-based MIL with supervised contrastive learning on bag embeddings. This directly targets the feature space, asking whether slides from the same class become more compact and separable under label imbalance. \citep{juyal2024scMil}
-
-\subsection{Evaluation}
-Each method is evaluated with seeds 0, 1, and 2. The primary metrics are macro F1, balanced accuracy, accuracy, and classwise recall on the native test split. The result payload also records classwise precision, recall, F1, support, head/body/tail summaries, negative log likelihood, multiclass Brier score, and expected calibration error when probabilities are available. Macro F1 is used as the main ranking metric because it penalizes poor rare-class behavior more directly than accuracy, while support-tier summaries reveal whether gains concentrate in head, body, or tail classes.
-
-\section{Results}
-The full Hydra sweep completed for all 11 methods and all three seeds. The generated missing-results manifest contains an empty missing list, so the aggregate table is based on the complete configured experiment rather than a partial run.
-
+\subsection{WSI-Bag Benchmark}
 \begin{table}[ht]
   \centering
-  \caption{Aggregate test performance over three seeds. Methods are sorted by macro F1.}
-  \label{tab:results}
+  \caption{WSI-bag benchmark methods.}
+  \label{tab:wsi-methods}
   \small
-  \input{../outputs/tables/result_summary.tex}
+  \begin{tabular}{p{0.22\linewidth}p{0.25\linewidth}p{0.43\linewidth}}
+    \toprule
+    Category & Method & Implemented mechanism\\
+    \midrule
+    Baselines & MIL CE, weighted MIL, focal MIL, balanced MIL & Shared attention-MIL backbone with objective or sampler changes only.\\
+    Data-level augmentation & RankMix & Two-stage attention-MIL training with teacher-derived patch pseudo-labels, ranked representative feature subsequences, and soft-label feature mixup. \citep{chen2023rankmix}\\
+    Representation & SC-MIL & Bag-level supervised contrastive learning with a projector head and a linear curriculum from representation to classifier learning. \citep{juyal2024scMil}\\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
-The strongest methods are the simple mean-pooled MLP baselines. Focal loss obtains the highest test macro F1 (0.849) with balanced accuracy 0.846, followed closely by unweighted cross-entropy (macro F1 0.846), balanced-sampler cross-entropy (0.845), and weighted cross-entropy (0.844). Balanced sampling gives the highest balanced accuracy among all methods (0.853), but this does not translate into the highest macro F1.
+The WSI baselines use the same attention-MIL architecture and frozen feature bags. RankMix first trains a teacher MIL model, derives ranked instance subsets from the teacher attention and pseudo-label signal, and then trains with mixed representative feature subsequences and soft labels. SC-MIL adds a supervised-contrastive bag representation objective through a projection head and linearly shifts training weight toward the classifier objective over time. Activation diagnostics are recorded for both methods to verify that augmentation and contrastive pair construction occur during training.
 
-Among the taxonomy representatives, RankMix-style MIL is the strongest test performer, with macro F1 0.825 and balanced accuracy 0.827. SC-MIL and the encoded image-GAN synthetic condition are close behind at 0.824 and 0.822 macro F1, respectively. The image-GAN bridge completed for all three seeds: it generated 4096 tail-class patches per seed, encoded all 4096 patches per seed with Virchow2, and \texttt{feature\_gan\_mil} loaded all encoded synthetic features without missing files or unknown classes. CFAL reaches 0.818 macro F1, while the MDE-MIL two-expert adaptation reaches 0.804. The representative implementations are therefore viable and substantially stronger than nonparametric feature-space probes such as KNN (0.769 macro F1) and nearest-centroid classification (0.686), but the completed image-level synthetic path still does not outperform the strongest simple baselines.
+\section{Evaluation}
+Both benchmarks use seeds 0, 1, and 2. Macro F1 is the primary ranking metric within each benchmark because it weights classes equally and penalizes failure on rare classes. Balanced accuracy, accuracy, classwise precision/recall/F1, head/body/tail summaries, negative log likelihood, multiclass Brier score, and expected calibration error are also computed where probabilities are available. Patch and WSI-bag methods are never ranked against each other, because they answer related but different questions with different input units and supervision.
+
+All reported tables use the held-out test split and show mean $\pm$ standard deviation over seeds. Separate validation summaries are retained as artifacts for model-selection checks. The completed sweep contains no missing planned results for either benchmark.
+
+\section{Results}
+\subsection{Patch-Level Results}
+\begin{table}[ht]
+  \centering
+  \caption{Patch-level test results over three seeds. Methods share the same patch manifest, resolution, classifier family, and evaluation code.}
+  \label{tab:patch-results}
+  \small
+  \input{../outputs/tables/result_summary_patch.tex}
+\end{table}
+
+Plain CE is the strongest patch method by the primary metric, with macro F1 $0.314 \pm 0.004$ and accuracy $0.412 \pm 0.011$ (Table~\ref{tab:patch-results}). Focal loss is close, with macro F1 $0.310 \pm 0.011$. Balanced sampling and weighted CE shift the operating point toward rare-class sensitivity: they produce the highest balanced accuracies, $0.333 \pm 0.013$ and $0.330 \pm 0.016$, but lower macro F1 and accuracy. This tradeoff indicates that the class-balancing interventions improved average recall but introduced enough precision or head-class loss to reduce the harmonic classwise summary.
+
+The two representative advanced patch methods do not improve the controlled patch benchmark. ProGAN augmentation reaches macro F1 $0.299 \pm 0.021$, below CE and focal loss, and CFAL reaches $0.278 \pm 0.007$. The result should not be interpreted as a general rejection of synthetic generation or prototype-affinity objectives. It is narrower: under this fixed patch set, classifier family, and three-seed configuration, the extra mechanisms did not outperform simpler objective and sampler baselines.
 
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=0.78\linewidth]{method_macro_f1_test.png}
-  \caption{Test macro F1 by method. Error bars summarize seed-to-seed variation across the three configured seeds.}
-  \label{fig:method-macro-f1}
+  \includegraphics[width=0.82\linewidth]{method_macro_f1_patch_test.png}
+  \caption{Patch-level macro F1 on the held-out test split. The figure visualizes the same ranking as Table~\ref{tab:patch-results}; absolute values should only be interpreted within the patch benchmark.}
+  \label{fig:patch-macro-f1}
 \end{figure}
 
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=\linewidth]{classwise_recall_test.png}
-  \caption{Classwise test recall by method. The figure makes the head--tail variation visible rather than reducing performance to a single aggregate score.}
-  \label{fig:classwise-recall}
+  \includegraphics[width=0.95\linewidth]{classwise_recall_patch_test.png}
+  \caption{Patch-level classwise recall on the held-out test split. The plot exposes the class-level variation hidden by aggregate accuracy and motivates reporting balanced accuracy and macro F1.}
+  \label{fig:patch-classwise-recall}
 \end{figure}
 
-Support-tier summaries explain why balanced accuracy and macro F1 do not always agree. Balanced sampling has the highest tail recall among neural methods (0.787), but its tail F1 is 0.760 because precision falls relative to focal loss. Focal loss has lower tail recall (0.764) but the highest tail F1 among neural methods (0.774), and it also maintains strong head and body F1. MDE-MIL increases tail recall to 0.768, similar to focal loss, but its tail F1 drops to 0.714 and its overall accuracy falls to 0.855, indicating that the two-expert adaptation trades precision and head stability for rare-class sensitivity.
+\subsection{WSI-Bag Results}
+\begin{table}[ht]
+  \centering
+  \caption{WSI-bag test results over three seeds. Methods share the same full feature bags, attention-MIL backbone family, and evaluation code.}
+  \label{tab:wsi-results}
+  \small
+  \input{../outputs/tables/result_summary_wsi_bag.tex}
+\end{table}
 
-Probability-quality metrics point in the same direction. Focal loss has the lowest mean Brier score among probabilistic neural methods (0.176), whereas the bag representatives range from 0.218 for SC-MIL to 0.263 for MDE-MIL. The encoded image-GAN condition and RankMix-style MIL are therefore not only below the strongest baselines in macro F1, but also less well calibrated under this frozen-feature setup.
+RankMix is the strongest WSI-bag method by all three aggregate metrics (Table~\ref{tab:wsi-results}). Relative to plain MIL CE, it improves balanced accuracy from $0.836 \pm 0.020$ to $0.863 \pm 0.008$ and macro F1 from $0.840 \pm 0.020$ to $0.848 \pm 0.017$. The macro-F1 gain is modest, but the balanced-accuracy gain is larger and consistent with RankMix directly augmenting representative instance subsequences in the MIL regime.
+
+The remaining WSI methods cluster closely. Balanced-sampling MIL and SC-MIL produce similar balanced accuracy ($0.837$), but both trail RankMix in macro F1. SC-MIL performs well on validation but does not exceed plain MIL CE on the test macro-F1 average. Weighted MIL CE and focal MIL do not improve over plain MIL CE in this configuration, with focal MIL giving the lowest WSI macro F1. Activation diagnostics confirm that the advanced WSI objectives were active: RankMix generated about 1.10 million mixed examples per seed, and SC-MIL constructed about 1.06 million positive pairs per seed.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.82\linewidth]{method_macro_f1_wsi_bag_test.png}
+  \caption{WSI-bag macro F1 on the held-out test split. RankMix is the top method within the WSI-bag benchmark, but the absolute scale is not comparable to the patch benchmark because the task input differs.}
+  \label{fig:wsi-macro-f1}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\linewidth]{classwise_recall_wsi_bag_test.png}
+  \caption{WSI-bag classwise recall on the held-out test split. The spread across classes shows why aggregate accuracy alone is insufficient for the long-tailed setting.}
+  \label{fig:wsi-classwise-recall}
+\end{figure}
 
 \section{Discussion}
-The revised experiment is narrower than a full reproduction of every cited paper, but it is more faithful to the taxonomy than a proxy-only comparison. The study evaluates methods that can be implemented on frozen TCGA-UT WSI feature bags and avoids claiming results for unavailable multimodal components. This matters for interpretation: the new GAN stage generates minority-class patch images and uses them only after a Virchow2 encoding pass, while a two-expert MIL condition can test rebalanced expert learning but cannot evaluate pathology-text distillation without the corresponding encoder.
+The two benchmarks support different conclusions. In the patch benchmark, simple CE and focal loss are hard to beat by macro F1, while class-balanced sampling and weighting mainly trade macro F1 for balanced accuracy. In the WSI-bag benchmark, RankMix improves the strongest baseline and is the clearest case where a more elaborate imbalance-specific mechanism helps. The same study therefore contains both a negative result for advanced patch mechanisms and a positive result for WSI-native feature mixing.
 
-The main empirical finding is conservative. On frozen Virchow2 features, standard losses and sampling are difficult to beat. This suggests that much of the class-separating signal is already present in the frozen representation and that added MIL structure can be outweighed by adaptation cost, limited bag resolution, or optimization variance. The result should not be read as evidence that RankMix, CFAL, MDE-MIL, or SC-MIL are ineffective in their original settings. It shows that the frozen-feature analogues used here do not outperform simple downstream baselines on TCGA-UT.
+This pattern reinforces the need to evaluate imbalance methods in their native input regimes. A patch generator should not be judged by first converting synthetic images into one-instance MIL bags, and a MIL feature-mixing method should not be compared directly against a patch classifier. The controlled design narrows the claims but makes them easier to defend: within each benchmark, the split, backbone family, input budget, and evaluation code are shared.
 
-The main limitation is therefore not only computational but evidential. Frozen Virchow2 features isolate downstream imbalance mitigation from representation learning, which makes comparisons controlled, but it also prevents conclusions about end-to-end fine-tuning, patch-level supervision, and image-level generative augmentation. The bag methods also use a 16-instance cap per WSI to keep three-seed Hydra runs inside the available memory envelope. This cap preserves slide-level bags but discards much of the original instance set, so conclusions about attention-based MIL should be treated as conclusions about bounded frozen-feature bags rather than full-resolution WSI bags. Results from this experiment should be read as evidence about downstream WSI feature-bag methods under native TCGA-UT imbalance.
+Several limitations remain. First, the study is a controlled benchmark, not a full reproduction of every original paper. The ProGAN experiment keeps the progressive-generator mechanism from Ruiz-Casado-style histology augmentation but adapts it from binary breast histology to multiclass TCGA-UT and does not reproduce the full GAN-family comparison. Second, TCGA-UT patch labels come from pathologist-selected tumor regions; they are useful patch-level class labels but not dense annotations. Third, the WSI benchmark uses frozen Virchow2 feature bags and an attention-MIL family, so conclusions apply to this representation setting. Finally, advanced methods may benefit from additional hyperparameter tuning beyond the fixed three-seed benchmark used here.
 
 \section{Conclusion}
-This revision turns the TCGA-UT class-imbalance experiment into a taxonomy-grounded comparison with one runnable representative per method family. The complete three-seed sweep shows that focal loss, cross-entropy, balanced sampling, and weighted cross-entropy remain the strongest choices for frozen Virchow2 TCGA-UT features, while the adapted representative bag methods trail by roughly two to five macro-F1 points. The image-GAN bridge confirms that generated tail-class patches can be re-encoded and consumed by the frozen-feature classifier, but this completed synthetic path remains below the strongest simple losses. The study therefore supports a restrained conclusion: for this frozen-feature benchmark, careful baselines are more effective than more elaborate representative adaptations, and multimodal claims require dedicated pipelines rather than feature-space substitutes.
+TCGA-UT supports a cleaner imbalance study when patch-level and WSI-bag supervision are evaluated separately. On controlled patch classification, the strongest macro-F1 baseline is plain CE, and balancing interventions mainly change the recall--precision tradeoff. On WSI bags, RankMix provides the strongest overall result and the clearest improvement over a plain MIL baseline. The practical implication is that imbalance mitigation should be selected and evaluated at the same level where the model actually consumes data; otherwise, apparent method differences can be artifacts of incompatible task regimes.
 
 \bibliographystyle{ieeetr}
 \bibliography{references}

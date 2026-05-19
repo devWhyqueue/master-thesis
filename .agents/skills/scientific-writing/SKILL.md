@@ -40,6 +40,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 - Maintain academic restraint. Avoid hype, marketing language, and unsupported novelty claims.
 - Make transitions explicit when moving between motivation, prior work, method, result, limitation, and implication.
 - Preserve reader orientation in long sections with short signposting paragraphs rather than excessive headings.
+- Treat each revision as a standalone final artifact, not as a change log. Avoid meta-revision language such as "revised", "earlier", "previous", "new", "old", or "now" unless the document explicitly needs historical comparison. Describe the current claim, evidence, and interpretation directly.
 - When revising, improve argument flow, specificity, and citation placement without changing the author's intended contribution.
 
 ## Visuals, Tables, And Math

@@ -1,47 +1,34 @@
 from __future__ import annotations
 
-import logging
 import argparse
 import subprocess
 import sys
 
 from scripts.common import EXPERIMENT_ROOT, load_config
 
-logger = logging.getLogger(__name__)
-
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for end-to-end pipeline execution."""
+    """Parse end-to-end pipeline arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config", default=str(EXPERIMENT_ROOT / "configs" / "default.yaml")
+    )
+    parser.add_argument(
+        "--benchmark", choices=["patch", "wsi_bag", "all"], default="all"
     )
     parser.add_argument("--smoke", action="store_true")
     return parser.parse_args()
 
 
-def run(args: list[str]) -> None:
-    """Run one subprocess command in the experiment root."""
-    logger.info(" ".join(args))
+def _run(args: list[str]) -> None:
     subprocess.run(args, cwd=EXPERIMENT_ROOT, check=True)
 
 
-def _smoke_overrides(
-    methods: list[str], seeds: list[int], smoke: bool
-) -> tuple[list[str], list[int]]:
-    """Adjust seed/method selection for smoke mode."""
-    if not smoke:
-        return methods, seeds
-    selected_seeds = seeds[:1]
-    smoke_methods = ["ce", "knn", "rankmix_mil", "cfal_mil"]
-    selected_methods = [method for method in smoke_methods if method in methods]
-    return selected_methods, selected_seeds
-
-
-def _run_split_jobs(python: str, config_path: str, seeds: list[int]) -> None:
-    """Run split generation for all seeds."""
+def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
+    _run([python, "-m", "scripts.prep.check_env"])
+    _run([python, "-m", "scripts.prep.manifest", "--config", config_path])
     for seed in seeds:
-        run(
+        _run(
             [
                 python,
                 "-m",
@@ -52,15 +39,77 @@ def _run_split_jobs(python: str, config_path: str, seeds: list[int]) -> None:
                 str(seed),
             ]
         )
+        _run(
+            [
+                python,
+                "-m",
+                "scripts.prep.patch_manifest",
+                "--config",
+                config_path,
+                "--seed",
+                str(seed),
+            ]
+        )
+    _run(
+        [
+            python,
+            "-m",
+            "scripts.prep.explore",
+            "--config",
+            config_path,
+            "--seed",
+            str(seeds[0]),
+        ]
+    )
 
 
-def _run_train_jobs(
-    python: str, config_path: str, methods: list[str], seeds: list[int], smoke: bool
-) -> None:
-    """Run model training jobs for all method/seed pairs."""
-    for method in methods:
+def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> None:
+    seeds = _seeds(config["patch_training"]["seeds"], smoke)
+    for method in config["patch_methods"]:
         for seed in seeds:
-            command = [
+            cmd = [
+                python,
+                "-m",
+                "scripts.patch.train",
+                "--config",
+                config_path,
+                "--method",
+                method,
+                "--seed",
+                str(seed),
+            ]
+            if smoke:
+                cmd.append("--smoke")
+            _run(cmd)
+    _run(
+        [
+            python,
+            "-m",
+            "scripts.report.aggregate",
+            "--config",
+            config_path,
+            "--benchmark",
+            "patch",
+        ]
+    )
+    _run(
+        [
+            python,
+            "-m",
+            "scripts.report.figures",
+            "--config",
+            config_path,
+            "--benchmark",
+            "patch",
+        ]
+    )
+
+
+def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None:
+    seeds = _seeds(config["wsi_training"]["seeds"], smoke)
+    for method in config["wsi_bag_methods"]:
+        for seed in seeds:
+            cmd = [
                 python,
                 "-m",
                 "scripts.training.train",
@@ -72,36 +121,55 @@ def _run_train_jobs(
                 str(seed),
             ]
             if smoke:
-                command.append("--smoke")
-            run(command)
-
-
-def main() -> None:
-    """Run the full experiment workflow in sequence."""
-    args = parse_args()
-    config = load_config(args.config)
-    python = sys.executable
-    seeds = config["training"]["seeds"]
-    methods = config["methods"]
-    methods, seeds = _smoke_overrides(methods, seeds, args.smoke)
-    first_seed = str(seeds[0])
-    run([python, "-m", "scripts.prep.check_env"])
-    run([python, "-m", "scripts.prep.manifest", "--config", args.config])
-    _run_split_jobs(python, args.config, seeds)
-    run(
+                cmd.append("--smoke")
+            _run(cmd)
+    _run(
         [
             python,
             "-m",
-            "scripts.prep.explore",
+            "scripts.report.aggregate",
             "--config",
-            args.config,
-            "--seed",
-            first_seed,
+            config_path,
+            "--benchmark",
+            "wsi_bag",
         ]
     )
-    _run_train_jobs(python, args.config, methods, seeds, args.smoke)
-    run([python, "-m", "scripts.report.aggregate", "--config", args.config])
-    run([python, "-m", "scripts.report.figures", "--config", args.config])
+    _run(
+        [
+            python,
+            "-m",
+            "scripts.report.figures",
+            "--config",
+            config_path,
+            "--benchmark",
+            "wsi_bag",
+        ]
+    )
+
+
+def main() -> None:
+    """Run shared preparation and the requested benchmark pipelines."""
+    args = parse_args()
+    config = load_config(args.config)
+    python = sys.executable
+    seeds = _seeds(
+        sorted(
+            set(config["patch_training"]["seeds"])
+            | set(config["wsi_training"]["seeds"])
+        ),
+        args.smoke,
+    )
+    _prepare(python, args.config, seeds)
+    if args.benchmark in {"patch", "all"}:
+        _train_patch(python, args.config, config, args.smoke)
+    if args.benchmark in {"wsi_bag", "all"}:
+        _train_wsi(python, args.config, config, args.smoke)
+
+
+def _seeds(seeds: list[int], smoke: bool) -> list[int]:
+    """Return configured seeds, restricted to one seed for smoke runs."""
+    selected = sorted(seeds)
+    return selected[:1] if smoke else selected
 
 
 if __name__ == "__main__":

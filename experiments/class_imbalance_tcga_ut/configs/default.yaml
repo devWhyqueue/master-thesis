@@ -7,55 +7,75 @@ paths:
 data:
   feature_glob: "*.pt"
   feature_suffix_pattern: "_[0-9]+"
-  min_train_slides_per_class: 1
   validation_fraction: 0.15
   test_fraction: 0.15
   balanced_test_per_class: 0
+  patch_resolution: "0"
+  patches_per_slide: 10
 
-training:
+patch_training:
   seeds: [0, 1, 2]
   batch_size: 128
-  bag_batch_size: 8
+  num_workers: 4
   epochs: 30
   learning_rate: 0.001
   weight_decay: 0.0001
-  hidden_dims: [256]
+  hidden_dim: 256
   dropout: 0.1
+  image_size: 256
   focal_gamma: 2.0
-  center_loss_weight: 0.01
-  oko_k: 1
-  knn_k: 5
-  max_instances_per_bag: 16
+  cfal_beta: 0.999
+  cfal_sigma: 130.0
+  cfal_margin: 0.1
+  cfal_gamma: 2.0
+  device: auto
   max_train_rows:
   max_eval_rows:
-  device: auto
 
-synthetic_image_gan:
+wsi_training:
+  seeds: [0, 1, 2]
+  bag_batch_size: 32
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  hidden_dim: 256
+  dropout: 0.1
+  focal_gamma: 2.0
+  max_instances_per_bag:
+  rankmix_teacher_epochs: 30
+  rankmix_alpha: 1.0
+  sc_mil_temperature: 1.0
+  device: auto
+  max_train_rows:
+  max_eval_rows:
+
+patch_synthetic_progan:
   enabled: true
-  image_size: 64
+  image_size: 256
   latent_dim: 128
-  batch_size: 64
-  epochs: 25
+  epochs_per_depth: 25
   learning_rate: 0.0002
   beta1: 0.5
   max_real_patches_per_class: 2048
-  generated_patches_per_class: 256
-  tail_class_quantile: 0.5
+  balance_target: max_train_class_count
+  fade_in_fraction: 0.5
+  base_channels: 512
   max_classes:
-  encoded_feature_manifest_template: outputs/synthetic_features/seed={seed}/synthetic_feature_manifest.csv
-  require_encoded_features: false
 
-methods:
-  - ce
-  - weighted_ce
-  - focal
-  - balanced_sampler_ce
-  - knn
-  - ncc
+patch_methods:
+  - patch_ce
+  - patch_weighted_ce
+  - patch_focal
+  - patch_balanced_sampler_ce
+  - patch_cfal
+  - patch_progan_aug
+
+wsi_bag_methods:
+  - mil_ce
+  - mil_weighted_ce
+  - mil_focal
+  - mil_balanced_sampler_ce
   - rankmix_mil
-  - feature_gan_mil
-  - cfal_mil
-  - mde_mil
   - sc_mil
 
 slurm:

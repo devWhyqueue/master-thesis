@@ -22,3 +22,11 @@ pyrightconfig.json
 *.synctex.gz
 *.toc
 .latex-build/
+
+# TCGA-UT experiment run outputs (keep summary tables/figures separately)
+experiments/class_imbalance_tcga_ut/outputs/archive/
+experiments/class_imbalance_tcga_ut/outputs/results/
+experiments/class_imbalance_tcga_ut/outputs/results_patch/
+experiments/class_imbalance_tcga_ut/outputs/results_wsi_bag/
+experiments/class_imbalance_tcga_ut/outputs/synthetic_features/
+experiments/class_imbalance_tcga_ut/outputs/tables/result_details*.jsonl.gz

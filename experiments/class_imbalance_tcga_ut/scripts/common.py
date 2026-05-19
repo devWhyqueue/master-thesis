@@ -41,6 +41,8 @@ def ensure_dirs(config: dict[str, Any]) -> dict[str, Path]:
         "figures": artifacts_root / "figures",
         "tables": artifacts_root / "tables",
         "results": artifacts_root / "results",
+        "patch_results": artifacts_root / "results_patch",
+        "wsi_results": artifacts_root / "results_wsi_bag",
         "logs": root / "logs",
     }
     for path in paths.values():

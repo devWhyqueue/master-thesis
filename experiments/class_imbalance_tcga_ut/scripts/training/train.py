@@ -4,11 +4,12 @@ import argparse
 import logging
 from pathlib import Path
 
+import pandas as pd
+
 from scripts.common import ensure_dirs, load_config, write_json, write_progress
 from scripts.mil.bag_trainer import _train_bag_method
 from scripts.mil.metadata import BAG_METHODS, method_metadata
-from scripts.training.eval import _train_sklearn
-from scripts.training.trainer import _load_split, _train_mlp
+from scripts.training.split import _slice_split_rows
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +26,28 @@ def parse_args() -> argparse.Namespace:
 
 def _train_selected_method(
     method: str,
-    frame,
+    frame: pd.DataFrame,
     class_names: list[str],
     config: dict,
     seed: int,
-    result_dir,
+    result_dir: Path,
 ) -> dict[str, dict[str, object]]:
     if method in BAG_METHODS:
         return _train_bag_method(method, frame, class_names, config, seed, result_dir)
-    if method in {"knn", "ncc"}:
-        return _train_sklearn(method, frame, class_names, config)
-    return _train_mlp(method, frame, class_names, config, seed, result_dir)
+    raise ValueError(f"Unknown WSI-bag benchmark method: {method}")
+
+
+def _load_split(
+    paths: dict[str, Path], seed: int, smoke: bool, config: dict
+) -> pd.DataFrame:
+    """Load the shared slide-level split manifest for WSI-bag training."""
+    frame = pd.read_csv(paths["data"] / f"manifest_splits_seed={seed}.csv")
+    max_train = config["wsi_training"].get("max_train_rows")
+    max_eval = config["wsi_training"].get("max_eval_rows")
+    if smoke:
+        max_train = min(int(max_train or 8), 8)
+        max_eval = min(int(max_eval or 4), 4)
+    return _slice_split_rows(frame, max_train, max_eval)
 
 
 def main() -> None:
@@ -49,7 +61,7 @@ def main() -> None:
     paths = ensure_dirs(config)
     frame = _load_split(paths, args.seed, args.smoke, config)
     class_names = sorted(frame["cancer_type"].unique().tolist())
-    result_dir = paths["results"] / args.method / f"seed={args.seed}"
+    result_dir = paths["wsi_results"] / args.method / f"seed={args.seed}"
     result_dir.mkdir(parents=True, exist_ok=True)
     _write_status(result_dir, args.method, args.seed, "started")
     results = _train_selected_method(
