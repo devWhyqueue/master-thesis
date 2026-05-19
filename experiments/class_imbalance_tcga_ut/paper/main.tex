@@ -1,11 +1,15 @@
 \documentclass[11pt]{article}
 
 \usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 
 \graphicspath{{../outputs/figures/}}
 
@@ -119,45 +123,193 @@ For each seed, slides are split into 6116 training, 1310 validation, and 1310 te
 The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples 10 patches per slide with a fixed rule before method-specific training begins. This makes the patch benchmark a controlled comparison of imbalance mechanisms rather than a comparison of patch-selection policies. The WSI-bag benchmark uses full frozen Virchow2 feature bags built from the same slide identities, rather than applying an additional instance cap \citep{zimmermann2024virchow2}.
 
 \section{Methods}
-The study organizes methods into four imbalance-mitigation categories: data-level augmentation, synthetic generation, algorithm-level losses, and representation or architecture methods. The central control is comparability within regime. The patch benchmark uses one shared patch-classification backbone, and the WSI-bag benchmark uses one shared attention-MIL backbone. A method is named after a cited paper only where its defining imbalance mechanism is implemented in the corresponding native regime.
+The methods are organized by the level at which they intervene in the imbalanced learning problem. Cross-entropy (CE) is treated as the no-mitigation reference condition: it uses the observed training distribution as given and does not rebalance samples, labels, costs, representations, or generated data. The remaining methods are tested imbalance interventions grouped according to the taxonomy used in the class-imbalance literature: data-level sampling and augmentation, algorithm-level losses, hybrid sampling--loss methods, synthetic generation, and representation or architecture-level methods \citep{saini2023tacklingClass,zhang2023deepLong}.
 
-\subsection{Patch-Level Benchmark}
-\begin{table}[ht]
+The comparison is regime-specific. Patch methods consume individual RGB patches and use one shared patch-classification backbone. WSI-bag methods consume frozen Virchow2 feature bags and use one shared attention-MIL backbone. Thus, method differences within a benchmark correspond to imbalance mechanisms rather than changes in input unit, split, or evaluation code.
+
+\begin{figure}[ht]
   \centering
-  \caption{Patch-level benchmark methods.}
-  \label{tab:patch-methods}
-  \small
-  \begin{tabular}{p{0.22\linewidth}p{0.25\linewidth}p{0.43\linewidth}}
-    \toprule
-    Category & Method & Implemented mechanism\\
-    \midrule
-    Baselines & CE, weighted CE, focal loss, balanced sampling & Shared patch classifier with objective or sampler changes only.\\
-    Algorithm-level & CE + soft F1/MCC (balanced) & Equal-weight sum of cross-entropy with macro soft F1 or multiclass soft MCC, trained with class-balanced oversampling \citep{scholz2024imbalanceAware}.\\
-    Synthetic generation & ProGAN augmentation & Class-specific progressive generators balance minority patch classes to the training-set head count; this is a Ruiz-Casado-style ProGAN adaptation from binary to multiclass histology \citep{ruizcasado2024enhancingHistopathological}.\\
-    \bottomrule
-  \end{tabular}
-\end{table}
+  \begin{tikzpicture}[
+    node distance=0.45cm and 0.55cm,
+    box/.style={draw, rounded corners=2pt, align=center, inner sep=5pt, font=\small, minimum height=0.72cm},
+    baseline/.style={box, fill=gray!10, minimum width=3.0cm},
+    family/.style={box, fill=blue!6, minimum width=3.55cm},
+    method/.style={box, fill=white, minimum width=3.55cm},
+    arrow/.style={-{Latex[length=2mm]}, thick}
+  ]
+    \node[baseline] (ce) {No-mitigation\\baseline\\CE / MIL CE};
+    \node[family, right=of ce] (data) {Data-level\\sampling and augmentation};
+    \node[method, below=of data] (dataMethods) {Balanced sampling\\RankMix};
+    \node[family, right=of data] (loss) {Algorithm-level\\losses};
+    \node[method, below=of loss] (lossMethods) {Weighted CE\\Focal loss};
+    \node[family, below=1.45cm of ce] (hybrid) {Hybrid\\sampling--loss};
+    \node[method, below=of hybrid] (hybridMethods) {CE + soft F1\\CE + soft MCC};
+    \node[family, right=of hybrid] (synthetic) {Synthetic data\\generation};
+    \node[method, below=of synthetic] (syntheticMethods) {ProGAN\\augmentation};
+    \node[family, right=of synthetic] (repr) {Representation and\\architecture};
+    \node[method, below=of repr] (reprMethods) {SC-MIL};
+    \draw[arrow] (data) -- (dataMethods);
+    \draw[arrow] (loss) -- (lossMethods);
+    \draw[arrow] (hybrid) -- (hybridMethods);
+    \draw[arrow] (synthetic) -- (syntheticMethods);
+    \draw[arrow] (repr) -- (reprMethods);
+  \end{tikzpicture}
+  \caption{Method organization used in the benchmark. Cross-entropy is the no-mitigation reference, while the tested alternatives intervene through sampling, loss design, synthetic data, WSI feature augmentation, or representation learning.}
+  \label{fig:method-taxonomy}
+\end{figure}
 
-The patch baselines isolate common imbalance interventions. Weighted CE changes the class contribution to the loss, focal loss down-weights easy examples, and balanced sampling changes minibatch composition without changing the loss. The Scholz representatives follow the authors' strongest configuration: class-balanced oversampling together with an equal-weight combination of cross-entropy and a differentiable macro soft-F1 or multiclass soft-MCC objective. ProGAN augmentation trains class-specific generators for minority classes and augments the patch training set; generated patches are used only as additional patch-classification training examples, not as synthetic slide bags.
+\subsection{Notation}
+Let $C$ be the number of cancer-type classes and let $n_c$ denote the number of training examples from class $c$. For a labeled patch or slide-level bag with label $y\in\{1,\ldots,C\}$, the model outputs logits $\mathbf{z}\in\mathbb{R}^{C}$ and class probabilities
+\begin{equation}
+  p_c = \frac{\exp(z_c)}{\sum_{j=1}^{C}\exp(z_j)}.
+  \label{eq:softmax}
+\end{equation}
+For WSI-bag methods, a slide is represented as a bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ of frozen patch-feature instances. The attention-MIL backbone maps each bag to a bag embedding $\mathbf{b}(B)$ and class logits. Unless a method explicitly changes the sampler, objective, or representation loss, the empirical class frequencies in the training set define the optimization signal.
 
-\subsection{WSI-Bag Benchmark}
-\begin{table}[ht]
-  \centering
-  \caption{WSI-bag benchmark methods.}
-  \label{tab:wsi-methods}
-  \small
-  \begin{tabular}{p{0.22\linewidth}p{0.25\linewidth}p{0.43\linewidth}}
-    \toprule
-    Category & Method & Implemented mechanism\\
-    \midrule
-    Baselines & MIL CE, weighted MIL, focal MIL, balanced MIL & Shared attention-MIL backbone with objective or sampler changes only.\\
-    Data-level augmentation & RankMix & Two-stage attention-MIL training with teacher-derived patch pseudo-labels, ranked representative feature subsequences, and soft-label feature mixup \citep{chen2023rankmix}.\\
-    Representation & SC-MIL & Bag-level supervised contrastive learning with a projector head and a linear curriculum from representation to classifier learning \citep{juyal2024scMil}.\\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\subsection{Cross-Entropy Baseline}
+Unweighted cross-entropy is the baseline because it is the standard supervised objective without an explicit class-imbalance correction. For an example with label $y$, the loss is
+\begin{equation}
+  \mathcal{L}_{\mathrm{CE}}(\mathbf{z},y) = -\log p_y.
+  \label{eq:ce}
+\end{equation}
+In the patch benchmark, this objective trains the shared patch classifier on the controlled patch manifest. In the WSI-bag benchmark, the same objective trains the shared attention-MIL model on slide-level feature bags. In both cases, CE uses the observed class distribution directly: majority classes appear more often in minibatches and therefore contribute more loss terms over an epoch. This makes CE an appropriate reference for asking whether an imbalance-specific intervention actually improves the rare-class tradeoff.
 
-The WSI baselines use the same attention-MIL architecture and frozen feature bags. RankMix first trains a teacher MIL model, derives ranked instance subsets from the teacher attention and pseudo-label signal, and then trains with mixed representative feature subsequences and soft labels. SC-MIL adds a supervised-contrastive bag representation objective through a projection head and linearly shifts training weight toward the classifier objective over time. Activation diagnostics are recorded for both methods to verify that augmentation and contrastive pair construction occur during training.
+\subsection{Data-Level Sampling and Augmentation}
+Data-level methods change what the optimizer sees, rather than changing the mathematical penalty assigned to one observed example. In the taxonomy, this family includes resampling, augmentation, and WSI-specific feature mixing strategies that make minority or informative examples more visible during training \citep{saini2023tacklingClass}.
+
+\subsubsection{Balanced Sampling}
+Balanced sampling changes minibatch composition by sampling training examples with probabilities inversely related to their class support. For an example $i$ with class $y_i$, the sampler weight is proportional to
+\begin{equation}
+  q_i \propto \frac{1}{n_{y_i}}.
+  \label{eq:balanced-sampling}
+\end{equation}
+After normalization across the training set, this makes the expected class exposure closer to uniform even though the underlying dataset remains long-tailed. The patch variant applies this sampler to patch examples and still optimizes CE. The MIL variant applies the same idea at slide-bag level and also optimizes CE. Balanced sampling therefore tests a pure data-level intervention: it asks whether equalizing training exposure is enough without changing the loss formula.
+
+\subsubsection{RankMix}
+RankMix is a WSI-native data-augmentation method for weakly supervised slide classification. Ordinary image mixup assumes two inputs with compatible spatial shapes, but WSI bags can contain different numbers of feature instances and lack instance-level labels. RankMix addresses this by mixing representative feature subsequences rather than raw slides \citep{chen2023rankmix}.
+
+The tested implementation follows the defining two-stage idea. First, a teacher attention-MIL model is trained with slide labels. For each bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ and target class, the teacher assigns ranking scores to instances; the highest-scoring instances are kept as a representative subsequence while preserving their original order in the bag. For two bags $a$ and $b$, the selected feature matrices $H_a$ and $H_b$ are truncated to a shared length and mixed with $\lambda\sim\mathrm{Beta}(\alpha,\alpha)$:
+\begin{equation}
+  \widetilde{H}=\lambda H_a+(1-\lambda)H_b,
+  \qquad
+  \widetilde{\mathbf{y}}=\lambda \mathbf{y}_a+(1-\lambda)\mathbf{y}_b.
+  \label{eq:rankmix}
+\end{equation}
+The student MIL model is then trained with soft-label cross-entropy on the mixed bags. This mechanism is categorized as data-level augmentation because it increases the diversity of the training bags in feature space while retaining the same attention-MIL prediction architecture.
+
+\subsection{Algorithm-Level Losses}
+Algorithm-level methods keep the training examples fixed but alter how errors are penalized. They are cost-sensitive or difficulty-sensitive objectives: minority examples may receive larger explicit weights, or easy examples may contribute less to the gradient \citep{saini2023tacklingClass,scholz2024imbalanceAware}.
+
+\subsubsection{Class-Weighted Cross-Entropy}
+Class-weighted CE multiplies each example's CE term by a class-dependent cost:
+\begin{equation}
+  \mathcal{L}_{\mathrm{WCE}}(\mathbf{z},y) = -w_y\log p_y,
+  \qquad
+  w_c \propto \frac{1}{n_c}.
+  \label{eq:weighted-ce}
+\end{equation}
+The implementation normalizes the inverse-frequency weights so that the average scale of the loss remains comparable across methods. This method leaves the sample order and model architecture unchanged, but increases the loss contribution of classes with fewer training examples. It is evaluated for both patch classification and attention-MIL.
+
+\subsubsection{Focal Loss}
+Focal loss reduces the contribution of confidently classified examples and concentrates optimization on examples that remain difficult. With focusing parameter $\gamma$, the multiclass focal objective is
+\begin{equation}
+  \mathcal{L}_{\mathrm{focal}}(\mathbf{z},y) =
+  -(1-p_y)^{\gamma}\log p_y.
+  \label{eq:focal}
+\end{equation}
+This study uses $\gamma=2.0$ for the patch and WSI-bag variants. The method is relevant to imbalance because many minority-class examples can remain hard under a classifier dominated by head-class gradients, but the focal term does not directly encode the class counts. It is therefore a difficulty-sensitive loss rather than a sampler or explicit prior correction.
+
+\subsection{Hybrid Sampling--Loss Methods}
+Hybrid methods combine data-level and algorithm-level changes. The Scholz-style representatives are placed here because the tested variants use class-balanced oversampling together with metric-derived losses. This coupling matters: their effect cannot be attributed only to a new loss or only to a new sampler.
+
+\subsubsection{Scholz-Style CE + Soft F1}
+Scholz et al. motivate losses derived from metrics that are already used to evaluate imbalanced medical classification, including F1 and Matthews correlation coefficient (MCC) \citep{scholz2024imbalanceAware}. The intuition is that CE optimizes the log-probability of the correct class one example at a time, whereas macro F1 evaluates a different object: the balance between precision and recall at class level. In a long-tailed dataset, this distinction matters because a model can reduce CE substantially by fitting frequent classes while still leaving tail-class recall or precision weak.
+
+The obstacle is that ordinary F1 is computed from hard counts after prediction, so it is not directly usable as a gradient-based training loss. The Scholz-style soft-F1 objective replaces those hard counts with probability-weighted counts inside each minibatch. For one class, a confident correct prediction contributes almost one soft true positive, a confident prediction for the wrong class contributes to soft false positives, and low probability on a true class contributes to soft false negatives. Formally, for one-hot labels $y_i$ and predicted probabilities $\hat{y}_i$:
+\begin{equation}
+  \mathrm{TP}=\sum_i y_i\hat{y}_i,\quad
+  \mathrm{FP}=\sum_i (1-y_i)\hat{y}_i,\quad
+  \mathrm{FN}=\sum_i y_i(1-\hat{y}_i).
+  \label{eq:soft-confusion-f1}
+\end{equation}
+\noindent These terms keep the familiar meaning of a confusion matrix but make every component differentiable with respect to the model probabilities. They then define soft precision, soft recall, and soft F1:
+\begin{equation}
+  \mathrm{F1}_{\mathrm{soft}} =
+  \frac{2\,\mathrm{precision}_{\mathrm{soft}}\,\mathrm{recall}_{\mathrm{soft}}}
+       {\mathrm{precision}_{\mathrm{soft}}+\mathrm{recall}_{\mathrm{soft}}}.
+  \label{eq:soft-f1}
+\end{equation}
+\noindent The multiclass implementation applies this construction separately to each class and averages the resulting classwise terms. This macro-style averaging is the imbalance-aware part: each class contributes one term regardless of how many samples it has in the full dataset. The tested objective does not replace CE completely; it adds the metric-derived term to CE so that optimization still rewards calibrated class probabilities while also pushing the minibatch toward higher macro soft F1:
+\begin{equation}
+  \mathcal{L}_{\mathrm{CE+F1}} = \mathcal{L}_{\mathrm{CE}} +
+  \left(1-\frac{1}{C}\sum_{c=1}^{C}\mathrm{F1}_{\mathrm{soft},c}\right).
+  \label{eq:ce-soft-f1}
+\end{equation}
+\noindent The benchmark trains this loss with balanced sampling on the patch manifest. That design is important for interpretation: the loss tries to optimize a macro-style class metric, while the sampler ensures that tail classes occur often enough in minibatches for their soft-F1 terms to provide a regular training signal.
+
+\subsubsection{Scholz-Style CE + Soft MCC}
+The soft-MCC variant uses the same principle but starts from a different evaluation metric. MCC is often used in imbalanced classification because it summarizes all cells of the confusion matrix rather than emphasizing only the positive class or only accuracy. In multiclass form, it can be read as a normalized agreement between the predicted class distribution and the true class distribution. A high value requires more than frequent-class accuracy: the predicted mass must line up with the correct classes without collapsing onto the head classes.
+
+To make MCC trainable, the hard predicted labels are again replaced by probabilities. Let $Y\in\{0,1\}^{N\times C}$ be the one-hot label matrix for a minibatch and $\widehat{Y}\in[0,1]^{N\times C}$ the predicted probability matrix. The numerator measures probability-weighted agreement after subtracting agreement expected from the marginal class totals. The denominator normalizes by the spread of the predicted and true class totals, so the quantity remains comparable across minibatches:
+\begin{equation}
+  \mathrm{MCC}_{\mathrm{soft}} =
+  \frac{N\sum_{i,c}Y_{ic}\widehat{Y}_{ic}
+        -\sum_c\left(\sum_i Y_{ic}\right)\left(\sum_i\widehat{Y}_{ic}\right)}
+       {\sqrt{N^2-\sum_c\left(\sum_i\widehat{Y}_{ic}\right)^2}
+        \sqrt{N^2-\sum_c\left(\sum_iY_{ic}\right)^2}}.
+  \label{eq:soft-mcc}
+\end{equation}
+\noindent As with soft F1, the training objective turns a score to be maximized into a loss to be minimized and adds it to CE:
+\begin{equation}
+  \mathcal{L}_{\mathrm{CE+MCC}} =
+  \mathcal{L}_{\mathrm{CE}} + \left(1-\mathrm{MCC}_{\mathrm{soft}}\right).
+  \label{eq:ce-soft-mcc}
+\end{equation}
+\noindent This variant is also evaluated only in the patch benchmark and is trained with class-balanced oversampling. The soft-F1 and soft-MCC variants therefore ask a focused question: once tail classes are regularly presented to the optimizer, does adding a differentiable version of a class-balanced evaluation metric improve the controlled patch classifier beyond CE and simple balanced sampling?
+
+\subsection{Synthetic Data Generation}
+Synthetic generation is data-level in spirit but is separated because it introduces new generated samples rather than resampling observed ones. In histopathology, this family is attractive because deleting majority-class tissue wastes data, while naive image-space interpolation often produces unrealistic pathology images \citep{saini2023tacklingClass,ruizcasado2024enhancingHistopathological}. The practical hope is simple: if real minority-class patches are scarce, a generator may learn enough of their stain, texture, and tissue morphology distribution to provide additional plausible training examples.
+
+\subsubsection{ProGAN Augmentation}
+The ProGAN experiment adapts the GAN-based histopathology augmentation idea of Ruiz-Casado et al. to multiclass TCGA-UT patches \citep{ruizcasado2024enhancingHistopathological}. A generative adversarial network (GAN) has two coupled models. The generator $G$ maps random latent vectors to synthetic images, while the discriminator $D$ tries to distinguish real training patches from generated patches. Training alternates between making $D$ better at this distinction and making $G$ produce images that $D$ cannot reliably reject. The standard objective expresses this competition as
+\begin{equation}
+  \min_G \max_D
+  \mathbb{E}_{\mathbf{x}\sim p_{\mathrm{data}}}[\log D(\mathbf{x})]
+  + \mathbb{E}_{\mathbf{u}\sim p(\mathbf{u})}[\log(1-D(G(\mathbf{u})))].
+  \label{eq:gan}
+\end{equation}
+\noindent This equation is not a classification loss for the final TCGA-UT classifier. It is the pretraining objective for producing additional patch images. After generation, the classifier simply sees a larger patch training set.
+
+ProGAN modifies ordinary GAN training by growing the image resolution gradually. Instead of asking the generator to synthesize $256\times256$ histology patches from the start, training begins at a coarse resolution where global color and texture structure are easier to model. Higher-resolution layers are then introduced step by step until the target patch size is reached. This staged procedure is intended to stabilize synthesis and reduce the risk that the generator learns only a narrow set of repeated images. In this benchmark, class-specific generators are trained for minority patch classes, and generated patches are added until each minority class reaches the training-set head-count target. Synthetic images are used only as extra patch-classification training examples; they are not converted into synthetic WSI bags.
+
+\subsection{Representation and Architecture-Level Methods}
+Representation-level methods try to make rare classes more separable in feature space rather than only changing sampling or per-example loss weights. This family is especially relevant for computational pathology, where WSI labels supervise bags of many unlabeled instances and class imbalance can occur both across slides and within a positive slide \citep{juyal2024scMil}.
+
+\subsubsection{SC-MIL}
+SC-MIL extends supervised contrastive learning to MIL by applying the contrastive objective to bag representations instead of assigning noisy slide labels to individual patches \citep{juyal2024scMil}. The motivation is that a slide label usually does not describe every patch in a bag. A cancer-type label can be correct for the slide while many instances contain background, normal tissue, artifacts, or weakly informative morphology. Applying contrastive learning directly to instances would therefore treat many patches as positives or negatives using labels they do not truly carry. SC-MIL avoids that mismatch by contrasting the aggregated slide-level representation.
+
+The attention-MIL backbone first maps bag $B_i$ to an embedding $\mathbf{b}_i=\mathbf{b}(B_i)$. A projection head $g$ then produces normalized contrastive features $\mathbf{r}_i=g(\mathbf{b}_i)$. In the contrastive view, each bag in a minibatch is an anchor. Bags with the same cancer-type label are positives because their slide-level representations should become closer, while bags from other classes act as negatives because their representations should remain separated. For anchor $i$, bags of the same class form the positive set $P(i)$, and the supervised contrastive term is
+\begin{equation}
+  \mathcal{L}_{\mathrm{SCL}} =
+  -\frac{1}{\sum_i |P(i)|}
+  \sum_i \sum_{p\in P(i)}
+  \log
+  \frac{\exp(\mathbf{r}_i^\top\mathbf{r}_p/\tau)}
+       {\sum_{a\ne i}\exp(\mathbf{r}_i^\top\mathbf{r}_a/\tau)}.
+  \label{eq:scl}
+\end{equation}
+\noindent The numerator rewards similarity to same-class bags. The denominator compares that similarity against all other bags in the minibatch, so the loss favors representations where class clusters are compact and mutually separated. The temperature $\tau$ controls how sharply these similarities are weighted; this benchmark uses $\tau=1.0$.
+
+SC-MIL does not rely on contrastive learning alone. The contrastive term shapes the representation space, while CE trains the final class predictor. The tested variant combines them through a linear curriculum:
+\begin{equation}
+  \mathcal{L}_t =
+  \beta_t\mathcal{L}_{\mathrm{SCL}} +
+  (1-\beta_t)\mathcal{L}_{\mathrm{CE}},
+  \qquad
+  \beta_t = 1-\mathrm{progress}_t.
+  \label{eq:scmil}
+\end{equation}
+\noindent Early training therefore emphasizes class-structured bag embeddings, when the classifier head is still unstable. As training progresses, $\beta_t$ decreases and more weight moves to CE, so the learned representation is tied back to the actual slide-level classification objective. Activation diagnostics count positive pairs during training to confirm that the contrastive component is active.
 
 \section{Evaluation}
 Both benchmarks use seeds 0, 1, and 2. Macro F1 is the primary ranking metric within each benchmark because it weights classes equally and penalizes failure on rare classes. Balanced accuracy, accuracy, classwise precision/recall/F1, head/body/tail summaries, negative log likelihood, multiclass Brier score, and expected calibration error are also computed where probabilities are available. Patch and WSI-bag methods are never ranked against each other, because they answer related but different questions with different input units and supervision.
