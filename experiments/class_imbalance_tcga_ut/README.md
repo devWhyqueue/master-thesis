@@ -42,8 +42,16 @@ sbatch scripts/hydra/run_aggregate.sbatch
 `run_patch_train_array.sbatch` covers the six non-ProGAN patch methods (`array=0-17`).
 ProGAN is submitted separately: one SLURM array task per `(seed, tail class)` on
 `gpu-5h` with `--constraint=80gb|40gb|h100`, capped at 35 concurrent GPUs (Hydra account
-limit), then a dependent three-task array trains `patch_progan_aug` after all GAN
-jobs finish. Reuse completed class folders when counts still match the manifest.
+limit), then a dependent three-task array trains `patch_progan_aug` on `gpu-2d` after all
+GAN jobs finish. Classifier training writes `checkpoint_latest.pt` each epoch and
+supports `--resume` (used by the train array sbatch). Reuse completed class folders when
+counts still match the manifest.
+
+To rerun classifier training only (GAN artifacts already on disk):
+
+```bash
+sbatch scripts/hydra/run_patch_progan_train_array.sbatch
+```
 
 For an end-to-end smoke run:
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=tcga-ut-progan-train
-#SBATCH --partition=gpu-5h
+#SBATCH --partition=gpu-2d
 #SBATCH --constraint=80gb|40gb|h100
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=8
@@ -15,4 +15,5 @@ bash scripts/hydra/run_python.sh -m scripts.patch.train \
   --method patch_progan_aug \
   --seed "$seed" \
   --skip-synthetic-generation \
+  --resume \
   "$@"

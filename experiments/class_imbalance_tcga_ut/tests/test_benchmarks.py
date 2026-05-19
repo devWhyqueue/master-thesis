@@ -17,7 +17,12 @@ from scripts.mil.bag_losses import (
     _supervised_contrastive_loss,
 )
 from scripts.mil.bags import AttentionMil
-from scripts.patch.artifacts import save_patch_checkpoint, seed_patch_run
+from scripts.patch.artifacts import (
+    load_training_checkpoint,
+    save_patch_checkpoint,
+    save_training_checkpoint,
+    seed_patch_run,
+)
 from scripts.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
 from scripts.patch.models import PatchClassifier
 from scripts.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
@@ -144,6 +149,26 @@ def test_scholz_patch_loader_uses_weighted_sampler(tmp_path: Path) -> None:
 
     loader = patch_loader(dataset, labels, "patch_ce_soft_f1_balanced", 2, 0, 0)
     assert isinstance(loader.sampler, WeightedRandomSampler)
+
+
+def test_training_checkpoint_resumes_from_next_epoch(tmp_path: Path) -> None:
+    model = PatchClassifier(4, 2, 0.0)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
+    save_training_checkpoint(
+        tmp_path, "patch_ce", 1, model, optimizer, ["A", "B"], epoch=7, epochs=30
+    )
+    resumed_model = PatchClassifier(4, 2, 0.0)
+    resumed_optimizer = torch.optim.AdamW(resumed_model.parameters(), lr=0.01)
+    next_epoch, class_names = load_training_checkpoint(
+        tmp_path / "checkpoint_latest.pt",
+        resumed_model,
+        resumed_optimizer,
+        torch.device("cpu"),
+    )
+    assert next_epoch == 8
+    assert class_names == ["A", "B"]
+    for first, second in zip(model.parameters(), resumed_model.parameters(), strict=True):
+        assert torch.allclose(first, second)
 
 
 def test_patch_checkpoint_stores_model_state(tmp_path: Path) -> None:

@@ -64,6 +64,20 @@ def save_patch_checkpoint(
     class_names: list[str],
 ) -> None:
     """Save enough patch state to reproduce evaluation logits."""
+    payload = _checkpoint_payload(method, seed, model, class_names)
+    torch.save(payload, result_dir / "checkpoint.pt")
+    torch.save(model.state_dict(), result_dir / "model.pt")
+
+
+def _checkpoint_payload(
+    method: str,
+    seed: int,
+    model: PatchClassifier,
+    class_names: list[str],
+    epoch: int | None = None,
+    epochs: int | None = None,
+    optimizer: torch.optim.Optimizer | None = None,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "benchmark": "patch",
         "class_names": class_names,
@@ -72,8 +86,57 @@ def save_patch_checkpoint(
         "model_state_dict": model.state_dict(),
         "seed": seed,
     }
-    torch.save(payload, result_dir / "checkpoint.pt")
-    torch.save(model.state_dict(), result_dir / "model.pt")
+    if epoch is not None:
+        payload["epoch"] = epoch
+    if epochs is not None:
+        payload["epochs"] = epochs
+    if optimizer is not None:
+        payload["optimizer_state_dict"] = optimizer.state_dict()
+    return payload
+
+
+def save_training_checkpoint(
+    result_dir: Path,
+    method: str,
+    seed: int,
+    model: PatchClassifier,
+    optimizer: torch.optim.Optimizer,
+    class_names: list[str],
+    epoch: int,
+    epochs: int,
+) -> None:
+    """Save resumable training state after each epoch."""
+    payload = _checkpoint_payload(
+        method, seed, model, class_names, epoch, epochs, optimizer
+    )
+    torch.save(payload, result_dir / "checkpoint_latest.pt")
+
+
+def load_training_checkpoint(
+    path: Path,
+    model: PatchClassifier,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+) -> tuple[int, list[str]]:
+    """Restore model, optimizer, and the next epoch index from a training checkpoint."""
+    payload = torch.load(path, map_location=device)
+    model.load_state_dict(payload["model_state_dict"])
+    if "optimizer_state_dict" in payload:
+        optimizer.load_state_dict(payload["optimizer_state_dict"])
+    class_names = list(payload["class_names"])
+    next_epoch = int(payload["epoch"]) + 1
+    return next_epoch, class_names
+
+
+def load_patch_checkpoint(
+    path: Path,
+    model: PatchClassifier,
+    device: torch.device,
+) -> list[str]:
+    """Restore model weights for evaluation-only runs."""
+    payload = torch.load(path, map_location=device)
+    model.load_state_dict(payload["model_state_dict"])
+    return list(payload["class_names"])
 
 
 def evaluate_patch_dataset(

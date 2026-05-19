@@ -13,7 +13,10 @@ from scripts.common import ensure_dirs, load_config, write_json, write_progress
 from scripts.patch.artifacts import (
     copy_synthetic_artifacts,
     evaluate_patch_dataset,
+    load_patch_checkpoint,
+    load_training_checkpoint,
     save_patch_checkpoint,
+    save_training_checkpoint,
     seed_patch_run,
     write_patch_config,
 )
@@ -44,6 +47,21 @@ def parse_args() -> argparse.Namespace:
         "--skip-synthetic-generation",
         action="store_true",
         help="Use an existing merged ProGAN manifest (after parallel GAN jobs).",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue from checkpoint_latest.pt in the result directory.",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Ignore checkpoint_latest.pt and train from scratch.",
+    )
+    parser.add_argument(
+        "--eval-only",
+        action="store_true",
+        help="Run validation and test evaluation from checkpoint_latest.pt or checkpoint.pt.",
     )
     return parser.parse_args()
 
@@ -105,6 +123,32 @@ def _criterion(
     return nn.CrossEntropyLoss()
 
 
+def _resolve_checkpoint_path(result_dir: Path) -> Path | None:
+    latest = result_dir / "checkpoint_latest.pt"
+    if latest.exists():
+        return latest
+    final = result_dir / "checkpoint.pt"
+    return final if final.exists() else None
+
+
+def _write_eval_results(
+    result_dir: Path,
+    model: PatchClassifier,
+    val_set: PatchImageDataset,
+    test_set: PatchImageDataset,
+    class_names: list[str],
+    device: torch.device,
+) -> None:
+    write_json(
+        result_dir / "val_results.json",
+        evaluate_patch_dataset(model, val_set, class_names, device),
+    )
+    write_json(
+        result_dir / "test_results.json",
+        evaluate_patch_dataset(model, test_set, class_names, device),
+    )
+
+
 def _train(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     paths = ensure_dirs(config)
@@ -124,6 +168,7 @@ def _train(args: argparse.Namespace) -> None:
     labels = _labels(train_set)
     settings = config["patch_training"]
     device = _resolve_device(str(settings["device"]))
+    epochs = int(settings["epochs"])
     model = PatchClassifier(
         int(settings["hidden_dim"]), len(class_names), float(settings["dropout"])
     ).to(device)
@@ -132,6 +177,20 @@ def _train(args: argparse.Namespace) -> None:
         lr=float(settings["learning_rate"]),
         weight_decay=float(settings["weight_decay"]),
     )
+    result_dir = paths["patch_results"] / args.method / f"seed={args.seed}"
+    result_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.eval_only:
+        checkpoint_path = _resolve_checkpoint_path(result_dir)
+        if checkpoint_path is None:
+            raise FileNotFoundError(f"No checkpoint found under {result_dir}")
+        class_names = load_patch_checkpoint(checkpoint_path, model, device)
+        _write_eval_results(result_dir, model, val_set, test_set, class_names, device)
+        save_patch_checkpoint(
+            result_dir, args.method, args.seed, model, class_names
+        )
+        return
+
     criterion = _criterion(
         args.method, labels, len(class_names), float(settings["focal_gamma"]), device
     ).to(device)
@@ -144,11 +203,36 @@ def _train(args: argparse.Namespace) -> None:
         int(settings.get("num_workers", 0)),
         original_train_rows if args.method == "patch_progan_aug" else None,
     )
-    result_dir = paths["patch_results"] / args.method / f"seed={args.seed}"
-    result_dir.mkdir(parents=True, exist_ok=True)
     if synthetic_manifest is not None:
         copy_synthetic_artifacts(synthetic_manifest, result_dir)
-    for epoch in range(1, int(settings["epochs"]) + 1):
+
+    start_epoch = 1
+    resume_path = result_dir / "checkpoint_latest.pt"
+    if args.resume and not args.fresh and resume_path.exists():
+        start_epoch, class_names = load_training_checkpoint(
+            resume_path, model, optimizer, device
+        )
+        logger.info(
+            "Resuming %s seed=%s from epoch %s/%s",
+            args.method,
+            args.seed,
+            start_epoch,
+            epochs,
+        )
+        if start_epoch > epochs:
+            logger.info("Training already complete; running evaluation only.")
+            _write_eval_results(
+                result_dir, model, val_set, test_set, class_names, device
+            )
+            save_patch_checkpoint(
+                result_dir, args.method, args.seed, model, class_names
+            )
+            write_patch_config(
+                result_dir, args.method, args.seed, class_names, deterministic
+            )
+            return
+
+    for epoch in range(start_epoch, epochs + 1):
         model.train()
         losses: list[float] = []
         for images, targets in loader:
@@ -165,20 +249,24 @@ def _train(args: argparse.Namespace) -> None:
                 "method": args.method,
                 "seed": args.seed,
                 "epoch": epoch,
-                "epochs": int(settings["epochs"]),
+                "epochs": epochs,
                 "loss": float(np.mean(losses)),
             },
         )
+        save_training_checkpoint(
+            result_dir,
+            args.method,
+            args.seed,
+            model,
+            optimizer,
+            class_names,
+            epoch,
+            epochs,
+        )
+
     save_patch_checkpoint(result_dir, args.method, args.seed, model, class_names)
     write_patch_config(result_dir, args.method, args.seed, class_names, deterministic)
-    write_json(
-        result_dir / "val_results.json",
-        evaluate_patch_dataset(model, val_set, class_names, device),
-    )
-    write_json(
-        result_dir / "test_results.json",
-        evaluate_patch_dataset(model, test_set, class_names, device),
-    )
+    _write_eval_results(result_dir, model, val_set, test_set, class_names, device)
 
 
 def main() -> None:

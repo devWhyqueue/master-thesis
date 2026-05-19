@@ -78,6 +78,7 @@ wsi_bag_methods:
 slurm:
   partition: gpu-2h
   progan_partition: gpu-5h
+  progan_train_partition: gpu-2d
   progan_gpu_constraint: 80gb|40gb|h100
   progan_array_max_parallel: 35
   ntasks_per_node: 8

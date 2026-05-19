@@ -13,7 +13,7 @@ gan_job=$(sbatch --parsable \
 train_job=$(sbatch --parsable \
   --dependency="afterok:${gan_job}" \
   --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
-  --partition="${PROGAN_PARTITION:-gpu-5h}" \
+  --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
   scripts/hydra/run_patch_progan_train_array.sbatch)
 echo "ProGAN GAN array: ${gan_job} (tasks 0-${upper}, max ${parallel} parallel)"
 echo "ProGAN train array: ${train_job} (runs after GAN array completes)"
