@@ -1,8 +1,14 @@
+"""Patch classification losses, including Scholz et al. (MIDL 2024) objectives.
+
+Scholz formulas match https://github.com/daniel-scholz/address-class-imbalance (CC-BY 4.0).
+"""
+
 from __future__ import annotations
 
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 
 class PatchFocalLoss(nn.Module):
@@ -27,53 +33,77 @@ def inverse_frequency_weights(labels: np.ndarray, n_classes: int) -> torch.Tenso
     return torch.tensor(weights * (n_classes / weights.sum()), dtype=torch.float32)
 
 
-def effective_number_weights(
-    labels: np.ndarray, n_classes: int, beta: float
-) -> torch.Tensor:
-    """Build normalized effective-number weights used by class-balanced losses."""
-    counts = np.bincount(labels, minlength=n_classes).astype(np.float64)
-    effective = (1.0 - np.power(beta, np.maximum(counts, 1.0))) / (1.0 - beta)
-    weights = 1.0 / effective
-    return torch.tensor(weights * (n_classes / weights.sum()), dtype=torch.float32)
+class _SoftF1LossWithLogits(nn.Module):
+    """Binary soft F1 loss on per-class probabilities."""
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Return one minus soft F1 for a single binary problem."""
+        pred = torch.sigmoid(pred)
+        tp = (target * pred).sum()
+        fp = ((1 - target) * pred).sum()
+        fn = (target * (1 - pred)).sum()
+        precision = tp / (tp + fp + 1e-16)
+        recall = tp / (tp + fn + 1e-16)
+        soft_f1 = 2 * precision * recall / (precision + recall + 1e-16)
+        return 1 - soft_f1
 
 
-def gaussian_affinity(
-    embeddings: torch.Tensor,
-    prototypes: torch.Tensor,
-    sigma: float,
-) -> torch.Tensor:
-    """Return Mahbub et al.'s Gaussian class affinity matrix."""
-    squared = torch.cdist(embeddings, prototypes, p=2).pow(2)
-    return torch.exp(-squared / sigma)
+class SoftF1LossMulti(nn.Module):
+    """Macro-averaged multiclass soft F1 loss."""
+
+    def __init__(self, num_classes: int) -> None:
+        super().__init__()
+        self.num_classes = num_classes
+        self._binary = _SoftF1LossWithLogits()
+
+    def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Return one minus macro soft F1."""
+        probs = torch.softmax(logits, dim=1)
+        loss = torch.zeros(1, device=logits.device, dtype=logits.dtype)
+        for class_idx in range(self.num_classes):
+            loss = loss + self._binary(labels[:, class_idx], probs[:, class_idx])
+        return loss / self.num_classes
 
 
-def cfal_loss(
-    embeddings: torch.Tensor,
-    targets: torch.Tensor,
-    prototypes: torch.Tensor,
-    class_weights: torch.Tensor,
-    sigma: float,
-    margin: float,
-    gamma: float,
-) -> torch.Tensor:
-    """Compute center-focused affinity loss from Mahbub et al."""
-    affinity = gaussian_affinity(embeddings, prototypes, sigma)
-    own_affinity = affinity.gather(1, targets.unsqueeze(1)).squeeze(1)
-    margins = margin + affinity - own_affinity.unsqueeze(1)
-    margins.scatter_(1, targets.unsqueeze(1), 0.0)
-    max_margin = torch.relu(margins).sum(dim=1)
+class SoftMCCLossMulti(nn.Module):
+    """Multiclass soft MCC loss (with logits)."""
 
-    pairwise = torch.pdist(prototypes, p=2).pow(2)
-    mean_distance = (
-        pairwise.mean()
-        if pairwise.numel()
-        else torch.tensor(0.0, device=embeddings.device)
-    )
-    diversity = (
-        (pairwise - mean_distance).pow(2).mean()
-        if pairwise.numel()
-        else torch.tensor(0.0, device=embeddings.device)
-    )
-    vanilla_affinity = max_margin + diversity
-    modulation = (1.0 - own_affinity).pow(gamma)
-    return (class_weights[targets] * modulation * vanilla_affinity).mean()
+    def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Return one minus multiclass soft MCC."""
+        preds = torch.softmax(logits, dim=1)
+        correct = torch.sum(preds * labels)
+        sample_count = preds.size(0)
+        label_totals = torch.sum(labels, dim=0)
+        pred_totals = torch.sum(preds, dim=0)
+        numerator = correct * sample_count - (label_totals * pred_totals).sum()
+        denominator = (
+            torch.sqrt(sample_count**2 - pred_totals.square().sum())
+            * torch.sqrt(sample_count**2 - label_totals.square().sum())
+            + 1e-8
+        )
+        return 1 - numerator / denominator
+
+
+class ScholzCombinedLoss(nn.Module):
+    """Equal-weight CE + soft F1 or soft MCC (Scholz et al., Sec. 3.1.4)."""
+
+    def __init__(self, num_classes: int, metric: str) -> None:
+        super().__init__()
+        if metric not in {"f1", "mcc"}:
+            raise ValueError(f"Unsupported Scholz metric: {metric}")
+        self.ce = nn.CrossEntropyLoss()
+        self.metric = metric
+        self._soft_f1 = SoftF1LossMulti(num_classes) if metric == "f1" else None
+        self._soft_mcc = SoftMCCLossMulti() if metric == "mcc" else None
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Return CE plus the selected Scholz metric-derived loss."""
+        one_hot = F.one_hot(targets, num_classes=logits.size(1)).float()
+        ce_loss = self.ce(logits, targets)
+        if self.metric == "f1":
+            assert self._soft_f1 is not None
+            metric_loss = self._soft_f1(logits, one_hot)
+        else:
+            assert self._soft_mcc is not None
+            metric_loss = self._soft_mcc(logits, one_hot)
+        return ce_loss + metric_loss

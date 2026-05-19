@@ -10,6 +10,7 @@ import pandas as pd
 
 from scripts.common import ensure_dirs, load_config, write_json
 from scripts.metadata import benchmark_metadata
+from scripts.report.figures import METHOD_LABELS
 
 
 def parse_args() -> argparse.Namespace:
@@ -122,15 +123,18 @@ def _write_latex(frame: pd.DataFrame, path: Path) -> None:
     )
     test = pd.DataFrame([row for _, row in test_rows])
     lines = [
-        "\\begin{tabular}{lcc}",
+        "\\begin{tabular}{lccc}",
         "\\toprule",
-        "Method & Balanced accuracy & Macro F1\\\\",
+        "Method & Accuracy & Balanced accuracy & Macro F1\\\\",
         "\\midrule",
     ]
     for row in test.to_dict("records"):
-        method = str(row["method"]).replace("_", "\\_")
+        method_key = str(row["method"])
+        label = METHOD_LABELS.get(method_key, method_key.replace("_", " "))
         lines.append(
-            f"{method} & {row['balanced_accuracy_mean']:.3f} & {row['macro_f1_mean']:.3f}\\\\"
+            f"{label} & ${row['accuracy_mean']:.3f} \\pm {row['accuracy_std']:.3f}$ & "
+            f"${row['balanced_accuracy_mean']:.3f} \\pm {row['balanced_accuracy_std']:.3f}$ & "
+            f"${row['macro_f1_mean']:.3f} \\pm {row['macro_f1_std']:.3f}$\\\\"
         )
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     path.write_text("\n".join(lines), encoding="utf-8")

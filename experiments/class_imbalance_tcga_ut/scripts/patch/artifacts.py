@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader
 from scripts.common import write_json
 from scripts.metadata import benchmark_metadata
 from scripts.patch.data import PatchImageDataset
-from scripts.patch.losses import gaussian_affinity
 from scripts.patch.models import PatchClassifier
 from scripts.training.support import _metric_payload
 
@@ -63,8 +62,6 @@ def save_patch_checkpoint(
     seed: int,
     model: PatchClassifier,
     class_names: list[str],
-    prototypes: torch.Tensor | None,
-    cfal_settings: dict[str, float] | None,
 ) -> None:
     """Save enough patch state to reproduce evaluation logits."""
     payload: dict[str, Any] = {
@@ -75,21 +72,8 @@ def save_patch_checkpoint(
         "model_state_dict": model.state_dict(),
         "seed": seed,
     }
-    if prototypes is not None:
-        payload["prototypes"] = prototypes.detach().cpu()
-        payload["cfal_settings"] = cfal_settings or {}
     torch.save(payload, result_dir / "checkpoint.pt")
     torch.save(model.state_dict(), result_dir / "model.pt")
-
-
-def cfal_checkpoint_settings(settings: dict[str, Any]) -> dict[str, float]:
-    """Return CFAL hyperparameters stored with patch checkpoints."""
-    return {
-        "beta": float(settings["cfal_beta"]),
-        "gamma": float(settings["cfal_gamma"]),
-        "margin": float(settings["cfal_margin"]),
-        "sigma": float(settings["cfal_sigma"]),
-    }
 
 
 def evaluate_patch_dataset(
@@ -97,8 +81,6 @@ def evaluate_patch_dataset(
     dataset: PatchImageDataset,
     class_names: list[str],
     device: torch.device,
-    prototypes: torch.Tensor | None = None,
-    cfal_sigma: float | None = None,
 ) -> dict[str, object]:
     """Evaluate a patch classifier on one split."""
     loader = DataLoader(dataset, batch_size=256, shuffle=False)
@@ -108,9 +90,7 @@ def evaluate_patch_dataset(
     model.eval()
     with torch.no_grad():
         for images, targets in loader:
-            logits, embeddings = model(images.to(device))
-            if prototypes is not None and cfal_sigma is not None:
-                logits = gaussian_affinity(embeddings, prototypes, cfal_sigma)
+            logits, _ = model(images.to(device))
             probs = torch.softmax(logits, dim=1)
             y_true.extend(targets.numpy().tolist())
             y_pred.extend(logits.argmax(dim=1).cpu().numpy().tolist())

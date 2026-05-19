@@ -8,6 +8,19 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset, RandomSampler, WeightedRandomSampler
 
+BALANCED_SAMPLER_METHODS = frozenset(
+    {
+        "patch_balanced_sampler_ce",
+        "patch_ce_soft_f1_balanced",
+        "patch_ce_soft_mcc_balanced",
+    }
+)
+
+
+def uses_balanced_sampler(method: str) -> bool:
+    """Return whether training should use class-balanced oversampling."""
+    return method in BALANCED_SAMPLER_METHODS
+
 
 class PatchImageDataset(Dataset):
     """Image dataset for controlled TCGA-UT patch manifests."""
@@ -55,7 +68,7 @@ def patch_loader(
             generator=generator,
         )
         return _data_loader(dataset, batch_size, num_workers, sampler=sampler)
-    if method != "patch_balanced_sampler_ce":
+    if not uses_balanced_sampler(method):
         return _data_loader(
             dataset, batch_size, num_workers, shuffle=True, generator=generator
         )

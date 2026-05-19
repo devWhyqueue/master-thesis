@@ -24,10 +24,6 @@ patch_training:
   dropout: 0.1
   image_size: 256
   focal_gamma: 2.0
-  cfal_beta: 0.999
-  cfal_sigma: 130.0
-  cfal_margin: 0.1
-  cfal_gamma: 2.0
   device: auto
   max_train_rows:
   max_eval_rows:
@@ -67,7 +63,8 @@ patch_methods:
   - patch_weighted_ce
   - patch_focal
   - patch_balanced_sampler_ce
-  - patch_cfal
+  - patch_ce_soft_f1_balanced
+  - patch_ce_soft_mcc_balanced
   - patch_progan_aug
 
 wsi_bag_methods:

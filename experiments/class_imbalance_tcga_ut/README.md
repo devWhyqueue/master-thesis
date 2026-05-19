@@ -24,7 +24,8 @@ slide never cross splits.
 ## Benchmarks
 
 Patch methods: `patch_ce`, `patch_weighted_ce`, `patch_focal`,
-`patch_balanced_sampler_ce`, `patch_cfal`, `patch_progan_aug`.
+`patch_balanced_sampler_ce`, `patch_ce_soft_f1_balanced`, `patch_ce_soft_mcc_balanced`,
+`patch_progan_aug`.
 
 WSI-bag methods: `mil_ce`, `mil_weighted_ce`, `mil_focal`,
 `mil_balanced_sampler_ce`, `rankmix_mil`, `sc_mil`.
@@ -38,7 +39,7 @@ sbatch scripts/hydra/run_wsi_train_array.sbatch
 sbatch scripts/hydra/run_aggregate.sbatch
 ```
 
-`run_patch_train_array.sbatch` covers the five non-ProGAN patch methods (`array=0-14`).
+`run_patch_train_array.sbatch` covers the six non-ProGAN patch methods (`array=0-17`).
 ProGAN is submitted separately: one SLURM array task per `(seed, tail class)` on
 `gpu-5h` with `--constraint=80gb|40gb|h100`, capped at 35 concurrent GPUs (Hydra account
 limit), then a dependent three-task array trains `patch_progan_aug` after all GAN
@@ -68,8 +69,7 @@ count. The generator uses ProGAN-style pixel normalization and minibatch standar
 deviation, validates cached generated patches against the current manifest, and
 writes per-class generation counts, per-depth training diagnostics, and Inception
 FID status whenever `torchvision` is available in the runtime environment.
-Patch checkpoints include the class list and, for CFAL, the learned prototypes
-used by affinity-based evaluation.
+Patch checkpoints include the class list and model weights for standard logit evaluation.
 
 ## Main Artifacts
 

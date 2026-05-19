@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -17,8 +18,9 @@ from scripts.mil.bag_losses import (
 )
 from scripts.mil.bags import AttentionMil
 from scripts.patch.artifacts import save_patch_checkpoint, seed_patch_run
-from scripts.patch.losses import cfal_loss
+from scripts.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
 from scripts.patch.models import PatchClassifier
+from scripts.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
 from scripts.progan.core import ProgressiveDiscriminator, ProgressiveGenerator
 from scripts.progan.train import paper_batch_size
 from scripts.common import ensure_dirs
@@ -46,46 +48,111 @@ def test_patch_manifest_uses_fixed_resolution_and_split(tmp_path: Path) -> None:
     assert len(frame) == 2
 
 
-def test_cfal_loss_is_zero_for_perfectly_separated_matching_prototypes() -> None:
-    embeddings = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
-    targets = torch.tensor([0, 1])
-    prototypes = embeddings.clone()
-    weights = torch.ones(2)
-    loss = cfal_loss(embeddings, targets, prototypes, weights, 0.01, 0.1, 2.0)
-    assert torch.isclose(loss, torch.tensor(0.0))
+def test_scholz_combined_loss_decreases_when_predictions_improve() -> None:
+    targets = torch.tensor([0, 1, 2])
+    weak_logits = torch.tensor(
+        [
+            [0.5, 0.3, 0.2],
+            [0.3, 0.5, 0.2],
+            [0.2, 0.3, 0.5],
+        ]
+    )
+    strong_logits = torch.tensor(
+        [
+            [5.0, -5.0, -5.0],
+            [-5.0, 5.0, -5.0],
+            [-5.0, -5.0, 5.0],
+        ]
+    )
+    loss_fn = ScholzCombinedLoss(3, "f1")
+    assert loss_fn(strong_logits, targets).item() < loss_fn(weak_logits, targets).item()
 
 
-def test_patch_seed_reproduces_model_and_prototype_initialization() -> None:
+def test_soft_f1_loss_decreases_when_predictions_improve() -> None:
+    labels = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    weak_logits = torch.tensor(
+        [
+            [0.5, 0.3, 0.2],
+            [0.3, 0.5, 0.2],
+            [0.2, 0.3, 0.5],
+        ]
+    )
+    strong_logits = torch.tensor(
+        [
+            [5.0, -5.0, -5.0],
+            [-5.0, 5.0, -5.0],
+            [-5.0, -5.0, 5.0],
+        ]
+    )
+    loss_fn = SoftF1LossMulti(3)
+    assert loss_fn(strong_logits, labels).item() < loss_fn(weak_logits, labels).item()
+
+
+def test_soft_mcc_loss_decreases_when_predictions_improve() -> None:
+    labels = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    weak_logits = torch.tensor(
+        [
+            [0.5, 0.3, 0.2],
+            [0.3, 0.5, 0.2],
+            [0.2, 0.3, 0.5],
+        ]
+    )
+    strong_logits = torch.tensor(
+        [
+            [5.0, -5.0, -5.0],
+            [-5.0, 5.0, -5.0],
+            [-5.0, -5.0, 5.0],
+        ]
+    )
+    loss_fn = SoftMCCLossMulti()
+    assert loss_fn(strong_logits, labels).item() < loss_fn(weak_logits, labels).item()
+
+
+def test_patch_seed_reproduces_model_initialization() -> None:
     seed_patch_run(7)
     first_model = PatchClassifier(4, 3, 0.0)
-    first_prototypes = torch.randn(3, 4)
     seed_patch_run(7)
     second_model = PatchClassifier(4, 3, 0.0)
-    second_prototypes = torch.randn(3, 4)
     for first, second in zip(
         first_model.parameters(), second_model.parameters(), strict=True
     ):
         assert torch.allclose(first, second)
-    assert torch.allclose(first_prototypes, second_prototypes)
 
 
-def test_cfal_checkpoint_contains_reproducible_prototypes(tmp_path: Path) -> None:
-    model = PatchClassifier(4, 2, 0.0)
-    prototypes = torch.randn(2, 4)
-    save_patch_checkpoint(
-        tmp_path,
-        "patch_cfal",
-        3,
-        model,
-        ["A", "B"],
-        prototypes,
-        {"sigma": 1.0, "margin": 0.1, "gamma": 2.0, "beta": 0.999},
+def test_scholz_methods_use_balanced_sampler() -> None:
+    assert uses_balanced_sampler("patch_ce_soft_f1_balanced")
+    assert uses_balanced_sampler("patch_ce_soft_mcc_balanced")
+    assert not uses_balanced_sampler("patch_ce")
+
+
+def test_scholz_patch_loader_uses_weighted_sampler(tmp_path: Path) -> None:
+    frame = pd.DataFrame(
+        {
+            "cancer_type": ["A", "A", "B"],
+            "image_path": [
+                str(tmp_path / "a0.jpg"),
+                str(tmp_path / "a1.jpg"),
+                str(tmp_path / "b0.jpg"),
+            ],
+        }
     )
+    for path in frame["image_path"]:
+        Path(path).write_bytes(b"x")
+    dataset = PatchImageDataset(frame, {"A": 0, "B": 1}, 8)
+    labels = np.array([0, 0, 1], dtype=np.int64)
+    from torch.utils.data import WeightedRandomSampler
+
+    loader = patch_loader(dataset, labels, "patch_ce_soft_f1_balanced", 2, 0, 0)
+    assert isinstance(loader.sampler, WeightedRandomSampler)
+
+
+def test_patch_checkpoint_stores_model_state(tmp_path: Path) -> None:
+    model = PatchClassifier(4, 2, 0.0)
+    save_patch_checkpoint(tmp_path, "patch_ce_soft_f1_balanced", 3, model, ["A", "B"])
     checkpoint = torch.load(tmp_path / "checkpoint.pt", map_location="cpu")
     assert checkpoint["class_names"] == ["A", "B"]
     assert checkpoint["seed"] == 3
-    assert torch.allclose(checkpoint["prototypes"], prototypes)
-    assert checkpoint["cfal_settings"]["sigma"] == 1.0
+    assert "model_state_dict" in checkpoint
 
 
 def test_sc_mil_reports_positive_pairs() -> None:

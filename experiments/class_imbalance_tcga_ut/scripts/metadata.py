@@ -23,10 +23,15 @@ PATCH_METHOD_METADATA: dict[str, dict[str, Any]] = {
         "taxonomy_category": "data-level sampling",
         "representative_paper": "Class-balanced sampling",
     },
-    "patch_cfal": {
+    "patch_ce_soft_f1_balanced": {
         "role": "representative",
         "taxonomy_category": "algorithm-level losses",
-        "representative_paper": "Mahbub et al.; CFAL",
+        "representative_paper": "Scholz et al.; CE + soft F1 + balanced sampling",
+    },
+    "patch_ce_soft_mcc_balanced": {
+        "role": "representative",
+        "taxonomy_category": "algorithm-level losses",
+        "representative_paper": "Scholz et al.; CE + soft MCC + balanced sampling",
     },
     "patch_progan_aug": {
         "role": "representative",

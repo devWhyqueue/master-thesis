@@ -11,7 +11,6 @@ import torch
 from torch import nn
 from scripts.common import ensure_dirs, load_config, write_json, write_progress
 from scripts.patch.artifacts import (
-    cfal_checkpoint_settings,
     copy_synthetic_artifacts,
     evaluate_patch_dataset,
     save_patch_checkpoint,
@@ -21,8 +20,7 @@ from scripts.patch.artifacts import (
 from scripts.patch.data import PatchImageDataset, patch_loader
 from scripts.patch.losses import (
     PatchFocalLoss,
-    cfal_loss,
-    effective_number_weights,
+    ScholzCombinedLoss,
     inverse_frequency_weights,
 )
 from scripts.patch.models import PatchClassifier
@@ -100,6 +98,10 @@ def _criterion(
         )
     if method == "patch_focal":
         return PatchFocalLoss(gamma)
+    if method == "patch_ce_soft_f1_balanced":
+        return ScholzCombinedLoss(n_classes, "f1")
+    if method == "patch_ce_soft_mcc_balanced":
+        return ScholzCombinedLoss(n_classes, "mcc")
     return nn.CrossEntropyLoss()
 
 
@@ -125,20 +127,14 @@ def _train(args: argparse.Namespace) -> None:
     model = PatchClassifier(
         int(settings["hidden_dim"]), len(class_names), float(settings["dropout"])
     ).to(device)
-    prototypes = nn.Parameter(
-        torch.randn(len(class_names), int(settings["hidden_dim"]), device=device)
-    )
-    params = list(model.parameters()) + (
-        [prototypes] if args.method == "patch_cfal" else []
-    )
     optimizer = torch.optim.AdamW(
-        params,
+        model.parameters(),
         lr=float(settings["learning_rate"]),
         weight_decay=float(settings["weight_decay"]),
     )
     criterion = _criterion(
         args.method, labels, len(class_names), float(settings["focal_gamma"]), device
-    )
+    ).to(device)
     loader = patch_loader(
         train_set,
         labels,
@@ -152,27 +148,13 @@ def _train(args: argparse.Namespace) -> None:
     result_dir.mkdir(parents=True, exist_ok=True)
     if synthetic_manifest is not None:
         copy_synthetic_artifacts(synthetic_manifest, result_dir)
-    class_weights = effective_number_weights(
-        labels, len(class_names), float(settings["cfal_beta"])
-    ).to(device)
     for epoch in range(1, int(settings["epochs"]) + 1):
         model.train()
         losses: list[float] = []
         for images, targets in loader:
-            logits, embeddings = model(images.to(device))
+            logits, _ = model(images.to(device))
             targets = targets.to(device)
-            if args.method == "patch_cfal":
-                loss = cfal_loss(
-                    embeddings,
-                    targets,
-                    prototypes,
-                    class_weights,
-                    float(settings["cfal_sigma"]),
-                    float(settings["cfal_margin"]),
-                    float(settings["cfal_gamma"]),
-                )
-            else:
-                loss = criterion(logits, targets)
+            loss = criterion(logits, targets)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -187,37 +169,15 @@ def _train(args: argparse.Namespace) -> None:
                 "loss": float(np.mean(losses)),
             },
         )
-    save_patch_checkpoint(
-        result_dir,
-        args.method,
-        args.seed,
-        model,
-        class_names,
-        prototypes if args.method == "patch_cfal" else None,
-        cfal_checkpoint_settings(settings) if args.method == "patch_cfal" else None,
-    )
+    save_patch_checkpoint(result_dir, args.method, args.seed, model, class_names)
     write_patch_config(result_dir, args.method, args.seed, class_names, deterministic)
     write_json(
         result_dir / "val_results.json",
-        evaluate_patch_dataset(
-            model,
-            val_set,
-            class_names,
-            device,
-            prototypes if args.method == "patch_cfal" else None,
-            float(settings["cfal_sigma"]) if args.method == "patch_cfal" else None,
-        ),
+        evaluate_patch_dataset(model, val_set, class_names, device),
     )
     write_json(
         result_dir / "test_results.json",
-        evaluate_patch_dataset(
-            model,
-            test_set,
-            class_names,
-            device,
-            prototypes if args.method == "patch_cfal" else None,
-            float(settings["cfal_sigma"]) if args.method == "patch_cfal" else None,
-        ),
+        evaluate_patch_dataset(model, test_set, class_names, device),
     )
 
 
