@@ -11,9 +11,8 @@ set -euo pipefail
 export EXPERIMENT_USE_GPU=1
 seeds=(0 1 2)
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
-bash scripts/hydra/run_python.sh -m scripts.patch.train \
-  --method patch_progan_aug \
-  --seed "$seed" \
+bash scripts/hydra/run_patch_staged_train.sh "$seed" patch_progan_aug \
+  --include-synthetic \
   --skip-synthetic-generation \
   --resume \
   "$@"

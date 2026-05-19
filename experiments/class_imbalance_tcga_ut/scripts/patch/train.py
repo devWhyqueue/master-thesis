@@ -63,13 +63,25 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run validation and test evaluation from checkpoint_latest.pt or checkpoint.pt.",
     )
+    parser.add_argument(
+        "--staged-manifest",
+        default=None,
+        help="Train from a node-local staged manifest (see scripts.staging.patch).",
+    )
     return parser.parse_args()
 
 
 def _load_manifest(
-    paths: dict[str, Path], seed: int, smoke: bool, config: dict
+    paths: dict[str, Path],
+    seed: int,
+    smoke: bool,
+    config: dict,
+    staged_manifest: str | None = None,
 ) -> pd.DataFrame:
-    frame = pd.read_csv(paths["data"] / f"patch_manifest_seed={seed}.csv")
+    manifest_path = staged_manifest or str(
+        paths["data"] / f"patch_manifest_seed={seed}.csv"
+    )
+    frame = pd.read_csv(manifest_path)
     training = config["patch_training"]
     if not smoke:
         return frame
@@ -153,7 +165,9 @@ def _train(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     paths = ensure_dirs(config)
     deterministic = seed_patch_run(args.seed)
-    frame = _load_manifest(paths, args.seed, args.smoke, config)
+    frame = _load_manifest(
+        paths, args.seed, args.smoke, config, staged_manifest=args.staged_manifest
+    )
     original_train_rows = int((frame["split"] == "train").sum())
     synthetic_manifest: Path | None = None
     if args.method == "patch_progan_aug":
@@ -186,9 +200,7 @@ def _train(args: argparse.Namespace) -> None:
             raise FileNotFoundError(f"No checkpoint found under {result_dir}")
         class_names = load_patch_checkpoint(checkpoint_path, model, device)
         _write_eval_results(result_dir, model, val_set, test_set, class_names, device)
-        save_patch_checkpoint(
-            result_dir, args.method, args.seed, model, class_names
-        )
+        save_patch_checkpoint(result_dir, args.method, args.seed, model, class_names)
         return
 
     criterion = _criterion(

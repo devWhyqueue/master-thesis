@@ -39,6 +39,19 @@ sbatch scripts/hydra/run_wsi_train_array.sbatch
 sbatch scripts/hydra/run_aggregate.sbatch
 ```
 
+### Patch I/O on Hydra
+
+Patch GPU jobs stage images to node-local `$SLURM_TMPDIR` before training (see
+`CLUSTER.md`). Each job runs `scripts.staging.patch`, then trains from the staged
+manifest. If `paths.patch_sqfs` exists on the cluster, staging mounts that SquashFS via
+`squashfuse`; otherwise it hardlinks/copies the manifest images into `$SLURM_TMPDIR`.
+
+One-time SquashFS build (recommended for repeated patch runs):
+
+```bash
+sbatch scripts/hydra/build_patch_sqfs.sbatch
+```
+
 `run_patch_train_array.sbatch` covers the six non-ProGAN patch methods (`array=0-17`).
 ProGAN is submitted separately: one SLURM array task per `(seed, tail class)` on
 `gpu-5h` with `--constraint=80gb|40gb|h100`, capped at 35 concurrent GPUs (Hydra account

@@ -12,4 +12,4 @@ methods=(patch_ce patch_weighted_ce patch_focal patch_balanced_sampler_ce patch_
 seeds=(0 1 2)
 method=${methods[$((SLURM_ARRAY_TASK_ID / 3))]}
 seed=${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}
-bash scripts/hydra/run_python.sh -m scripts.patch.train --method "$method" --seed "$seed"
+bash scripts/hydra/run_patch_staged_train.sh "$seed" "$method"

@@ -24,6 +24,7 @@ from scripts.patch.artifacts import (
     seed_patch_run,
 )
 from scripts.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
+from scripts.staging.io import stage_destination
 from scripts.patch.models import PatchClassifier
 from scripts.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
 from scripts.progan.core import ProgressiveDiscriminator, ProgressiveGenerator
@@ -149,6 +150,16 @@ def test_scholz_patch_loader_uses_weighted_sampler(tmp_path: Path) -> None:
 
     loader = patch_loader(dataset, labels, "patch_ce_soft_f1_balanced", 2, 0, 0)
     assert isinstance(loader.sampler, WeightedRandomSampler)
+
+
+def test_stage_destination_preserves_raw_layout(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    source = raw_root / "A" / "0" / "slide" / "1.jpg"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"x")
+    stage_dir = tmp_path / "stage"
+    destination = stage_destination(source, stage_dir, raw_root)
+    assert destination == stage_dir / "raw" / "A" / "0" / "slide" / "1.jpg"
 
 
 def test_training_checkpoint_resumes_from_next_epoch(tmp_path: Path) -> None:
