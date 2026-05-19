@@ -33,9 +33,16 @@ Submit the benchmarks independently:
 
 ```bash
 sbatch scripts/hydra/run_patch_train_array.sbatch
+bash scripts/hydra/submit_patch_progan.sh
 sbatch scripts/hydra/run_wsi_train_array.sbatch
 sbatch scripts/hydra/run_aggregate.sbatch
 ```
+
+`run_patch_train_array.sbatch` covers the five non-ProGAN patch methods (`array=0-14`).
+ProGAN is submitted separately: one SLURM array task per `(seed, tail class)` on
+`gpu-5h` with `--constraint=80gb|40gb|h100`, capped at 35 concurrent GPUs (Hydra account
+limit), then a dependent three-task array trains `patch_progan_aug` after all GAN
+jobs finish. Reuse completed class folders when counts still match the manifest.
 
 For an end-to-end smoke run:
 
@@ -57,8 +64,12 @@ not feasible on the cluster allocation, set one profiled fixed cap in
 ProGAN is trained for every training class below the head-class patch count,
 generators grow progressively to 256 px using the paper's depth-dependent batch
 schedule, and synthetic patches raise those classes to the training-set head
-count. The synthetic summary records per-class generated counts and Inception
-FID whenever `torchvision` is available in the runtime environment.
+count. The generator uses ProGAN-style pixel normalization and minibatch standard
+deviation, validates cached generated patches against the current manifest, and
+writes per-class generation counts, per-depth training diagnostics, and Inception
+FID status whenever `torchvision` is available in the runtime environment.
+Patch checkpoints include the class list and, for CFAL, the learned prototypes
+used by affinity-based evaluation.
 
 ## Main Artifacts
 

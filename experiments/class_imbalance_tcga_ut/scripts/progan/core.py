@@ -48,6 +48,35 @@ class ProgressivePatchDataset(Dataset):
         return torch.from_numpy(array).permute(2, 0, 1)
 
 
+class PixelNorm(nn.Module):
+    """Normalize generator activations across channels."""
+
+    def __init__(self, epsilon: float = 1e-8) -> None:
+        super().__init__()
+        self.epsilon = epsilon
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa
+        """Apply per-pixel feature-vector normalization."""
+        denominator = torch.sqrt(
+            torch.mean(x.pow(2), dim=1, keepdim=True) + self.epsilon
+        )
+        return x / denominator
+
+
+class MinibatchStdDev(nn.Module):
+    """Append ProGAN minibatch standard deviation as one feature channel."""
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa
+        """Append one constant channel with batch-level feature variation."""
+        if len(x) == 1:
+            stddev = torch.zeros(1, 1, x.shape[2], x.shape[3], device=x.device)
+            return torch.cat([x, stddev], dim=1)
+        deviation = torch.sqrt(x.var(dim=0, unbiased=False) + 1e-8)
+        mean_deviation = deviation.mean().view(1, 1, 1, 1)
+        stddev = mean_deviation.repeat(len(x), 1, x.shape[2], x.shape[3])
+        return torch.cat([x, stddev], dim=1)
+
+
 class GeneratorBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
@@ -55,8 +84,10 @@ class GeneratorBlock(nn.Module):
             nn.Upsample(scale_factor=2, mode="nearest"),
             nn.Conv2d(in_channels, out_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
+            PixelNorm(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
+            PixelNorm(),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa
@@ -72,8 +103,10 @@ class ProgressiveGenerator(nn.Module):
         self.initial = nn.Sequential(
             nn.ConvTranspose2d(latent_dim, base_channels, 4),
             nn.LeakyReLU(0.2, inplace=True),
+            PixelNorm(),
             nn.Conv2d(base_channels, base_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
+            PixelNorm(),
         )
         channels = [max(base_channels // (2**idx), 32) for idx in range(max_depth)]
         self.blocks = nn.ModuleList(
@@ -125,8 +158,9 @@ class ProgressiveDiscriminator(nn.Module):
             DiscriminatorBlock(channels[idx], channels[idx - 1])
             for idx in range(1, max_depth)
         )
+        self.minibatch_stddev = MinibatchStdDev()
         self.final = nn.Sequential(
-            nn.Conv2d(channels[0], channels[0], 3, padding=1),
+            nn.Conv2d(channels[0] + 1, channels[0], 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(channels[0], 1, 4),
             nn.Flatten(),
@@ -135,11 +169,12 @@ class ProgressiveDiscriminator(nn.Module):
     def forward(self, images: torch.Tensor, depth: int, alpha: float) -> torch.Tensor:  # noqa
         """Score images at one active progressive depth."""
         if depth == 1:
-            return self.final(self.from_rgb[0](images)).squeeze(1)
+            x = self.minibatch_stddev(self.from_rgb[0](images))
+            return self.final(x).squeeze(1)
         x = self.blocks[depth - 2](self.from_rgb[depth - 1](images))
         downsampled = nn.functional.avg_pool2d(images, 2)
         previous = self.from_rgb[depth - 2](downsampled)
         x = alpha * x + (1.0 - alpha) * previous
         for block_idx in range(depth - 3, -1, -1):
             x = self.blocks[block_idx](x)
-        return self.final(x).squeeze(1)
+        return self.final(self.minibatch_stddev(x)).squeeze(1)

@@ -9,21 +9,28 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
-
 from scripts.common import ensure_dirs, load_config, write_json, write_progress
-from scripts.metadata import benchmark_metadata
+from scripts.patch.artifacts import (
+    cfal_checkpoint_settings,
+    copy_synthetic_artifacts,
+    evaluate_patch_dataset,
+    save_patch_checkpoint,
+    seed_patch_run,
+    write_patch_config,
+)
 from scripts.patch.data import PatchImageDataset, patch_loader
 from scripts.patch.losses import (
     PatchFocalLoss,
     cfal_loss,
     effective_number_weights,
-    gaussian_affinity,
     inverse_frequency_weights,
 )
 from scripts.patch.models import PatchClassifier
-from scripts.patch.synthetic import generate_patch_gan_manifest
-from scripts.training.support import _metric_payload, _resolve_device
+from scripts.progan.manifest import (
+    generate_patch_gan_manifest,
+    merge_patch_gan_manifest,
+)
+from scripts.training.support import _resolve_device
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +42,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument(
+        "--skip-synthetic-generation",
+        action="store_true",
+        help="Use an existing merged ProGAN manifest (after parallel GAN jobs).",
+    )
     return parser.parse_args()
 
 
@@ -91,39 +103,21 @@ def _criterion(
     return nn.CrossEntropyLoss()
 
 
-def _evaluate(
-    model: PatchClassifier,
-    dataset: PatchImageDataset,
-    class_names: list[str],
-    device: torch.device,
-    prototypes: torch.Tensor | None = None,
-    cfal_sigma: float | None = None,
-) -> dict[str, object]:
-    loader = DataLoader(dataset, batch_size=256, shuffle=False)
-    y_true: list[int] = []
-    y_pred: list[int] = []
-    probabilities: list[list[float]] = []
-    model.eval()
-    with torch.no_grad():
-        for images, targets in loader:
-            logits, embeddings = model(images.to(device))
-            if prototypes is not None and cfal_sigma is not None:
-                logits = gaussian_affinity(embeddings, prototypes, cfal_sigma)
-            probs = torch.softmax(logits, dim=1)
-            y_true.extend(targets.numpy().tolist())
-            y_pred.extend(logits.argmax(dim=1).cpu().numpy().tolist())
-            probabilities.extend(probs.cpu().numpy().tolist())
-    return _metric_payload(y_true, y_pred, probabilities, class_names)
-
-
 def _train(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     paths = ensure_dirs(config)
+    deterministic = seed_patch_run(args.seed)
     frame = _load_manifest(paths, args.seed, args.smoke, config)
     original_train_rows = int((frame["split"] == "train").sum())
+    synthetic_manifest: Path | None = None
     if args.method == "patch_progan_aug":
-        manifest = generate_patch_gan_manifest(config, args.seed, args.smoke)
-        frame = pd.concat([frame, pd.read_csv(manifest)], ignore_index=True)
+        synthetic_manifest = (
+            merge_patch_gan_manifest
+            if args.skip_synthetic_generation
+            else generate_patch_gan_manifest
+        )(config, args.seed, args.smoke)
+    if synthetic_manifest is not None:
+        frame = pd.concat([frame, pd.read_csv(synthetic_manifest)], ignore_index=True)
     train_set, val_set, test_set, class_names = _split_datasets(frame, config)
     labels = _labels(train_set)
     settings = config["patch_training"]
@@ -156,6 +150,8 @@ def _train(args: argparse.Namespace) -> None:
     )
     result_dir = paths["patch_results"] / args.method / f"seed={args.seed}"
     result_dir.mkdir(parents=True, exist_ok=True)
+    if synthetic_manifest is not None:
+        copy_synthetic_artifacts(synthetic_manifest, result_dir)
     class_weights = effective_number_weights(
         labels, len(class_names), float(settings["cfal_beta"])
     ).to(device)
@@ -191,19 +187,19 @@ def _train(args: argparse.Namespace) -> None:
                 "loss": float(np.mean(losses)),
             },
         )
-    torch.save(model.state_dict(), result_dir / "model.pt")
-    write_json(
-        result_dir / "config.json",
-        {
-            "benchmark": "patch",
-            "method": args.method,
-            "seed": args.seed,
-            "method_metadata": benchmark_metadata("patch", args.method),
-        },
+    save_patch_checkpoint(
+        result_dir,
+        args.method,
+        args.seed,
+        model,
+        class_names,
+        prototypes if args.method == "patch_cfal" else None,
+        cfal_checkpoint_settings(settings) if args.method == "patch_cfal" else None,
     )
+    write_patch_config(result_dir, args.method, args.seed, class_names, deterministic)
     write_json(
         result_dir / "val_results.json",
-        _evaluate(
+        evaluate_patch_dataset(
             model,
             val_set,
             class_names,
@@ -214,7 +210,7 @@ def _train(args: argparse.Namespace) -> None:
     )
     write_json(
         result_dir / "test_results.json",
-        _evaluate(
+        evaluate_patch_dataset(
             model,
             test_set,
             class_names,

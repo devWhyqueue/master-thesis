@@ -22,24 +22,27 @@ def paper_batch_size(depth: int) -> int:
 
 def train_class_progan(
     image_paths: list[Path], settings: ProGanSettings, device: torch.device, seed: int
-) -> ProgressiveGenerator:
+) -> tuple[ProgressiveGenerator, list[dict[str, object]]]:
     """Train one class-specific ProGAN with progressive resolution growth."""
     torch.manual_seed(seed)
     generator, discriminator, opt_g, opt_d = _build_models(settings, device)
     criterion = nn.BCEWithLogitsLoss()
+    diagnostics: list[dict[str, object]] = []
     for depth in range(1, settings.max_depth + 1):
-        _train_depth(
-            image_paths,
-            settings,
-            device,
-            depth,
-            generator,
-            discriminator,
-            criterion,
-            opt_d,
-            opt_g,
+        diagnostics.append(
+            _train_depth(
+                image_paths,
+                settings,
+                device,
+                depth,
+                generator,
+                discriminator,
+                criterion,
+                opt_d,
+                opt_g,
+            )
         )
-    return generator
+    return generator, diagnostics
 
 
 def _build_models(
@@ -77,12 +80,14 @@ def _train_depth(
     criterion: nn.Module,
     opt_d: torch.optim.Optimizer,
     opt_g: torch.optim.Optimizer,
-) -> None:
+) -> dict[str, object]:
     loader = _depth_loader(image_paths, depth)
+    discriminator_losses: list[float] = []
+    generator_losses: list[float] = []
     for epoch in range(settings.epochs_per_depth):
         alpha = _fade_alpha(epoch, settings.epochs_per_depth, settings.fade_in_fraction)
         for real in loader:
-            _train_step(
+            loss_d, loss_g = _train_step(
                 generator,
                 discriminator,
                 real.to(device),
@@ -93,6 +98,16 @@ def _train_depth(
                 opt_g,
                 settings,
             )
+            discriminator_losses.append(loss_d)
+            generator_losses.append(loss_g)
+    return _depth_diagnostics(
+        image_paths,
+        depth,
+        settings.epochs_per_depth,
+        loader.batch_size,
+        discriminator_losses,
+        generator_losses,
+    )
 
 
 def _depth_loader(image_paths: list[Path], depth: int) -> DataLoader:
@@ -119,7 +134,7 @@ def _train_step(
     opt_d: torch.optim.Optimizer,
     opt_g: torch.optim.Optimizer,
     settings: ProGanSettings,
-) -> None:
+) -> tuple[float, float]:
     batch_size = len(real)
     device = real.device
     noise = torch.randn(batch_size, settings.latent_dim, 1, 1, device=device)
@@ -142,6 +157,33 @@ def _train_step(
     opt_g.zero_grad()
     loss_g.backward()
     opt_g.step()
+    return float(loss_d.detach().cpu().item()), float(loss_g.detach().cpu().item())
+
+
+def _depth_diagnostics(
+    image_paths: list[Path],
+    depth: int,
+    epochs: int,
+    batch_size: int | None,
+    discriminator_losses: list[float],
+    generator_losses: list[float],
+) -> dict[str, object]:
+    """Return training diagnostics for one progressive depth."""
+    return {
+        "batch_size": int(batch_size or 0),
+        "depth": depth,
+        "discriminator_loss_mean": _mean_loss(discriminator_losses),
+        "epochs": epochs,
+        "generator_loss_mean": _mean_loss(generator_losses),
+        "n_real_images": len(image_paths),
+        "resolution": 2 ** (depth + 1),
+        "steps": len(discriminator_losses),
+    }
+
+
+def _mean_loss(values: list[float]) -> float | None:
+    """Return a stable mean for optional loss traces."""
+    return sum(values) / len(values) if values else None
 
 
 def write_generated_images(

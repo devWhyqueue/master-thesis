@@ -1,0 +1,19 @@
+#!/bin/bash
+# Submit parallel ProGAN GAN jobs, then classifier training after they finish.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+export EXPERIMENT_USE_GPU=1
+upper="${PROGAN_ARRAY_UPPER:-92}"
+parallel="${PROGAN_ARRAY_MAX_PARALLEL:-35}"
+gan_job=$(sbatch --parsable \
+  --array="0-${upper}%${parallel}" \
+  --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+  --partition="${PROGAN_PARTITION:-gpu-5h}" \
+  scripts/hydra/run_patch_progan_gan_array.sbatch)
+train_job=$(sbatch --parsable \
+  --dependency="afterok:${gan_job}" \
+  --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+  --partition="${PROGAN_PARTITION:-gpu-5h}" \
+  scripts/hydra/run_patch_progan_train_array.sbatch)
+echo "ProGAN GAN array: ${gan_job} (tasks 0-${upper}, max ${parallel} parallel)"
+echo "ProGAN train array: ${train_job} (runs after GAN array completes)"
