@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hydra Cluster"
+  short_description: "TU Berlin Hydra SLURM workflow guidance"
+  default_prompt: "Use $hydra-cluster to prepare, inspect, or troubleshoot TU Berlin Hydra SLURM jobs safely."

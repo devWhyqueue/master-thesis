@@ -4,7 +4,7 @@
 
 # Cluster
 
-- Read `CLUSTER.md` before using the TU Berlin Hydra cluster. It contains the SSH shortcut, SLURM workflow, storage rules, and dataset safety notes.
+- Use the project-local `hydra-cluster` skill before working with the TU Berlin Hydra cluster. The skill refers to `CLUSTER.md`, which contains the SSH shortcut, SLURM workflow, storage rules, and dataset safety notes.
 
 # Code
 
