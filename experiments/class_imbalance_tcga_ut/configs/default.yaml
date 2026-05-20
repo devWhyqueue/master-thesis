@@ -22,7 +22,7 @@ data:
 patch_training:
   seeds: [0, 1, 2]
   batch_size: 128
-  num_workers: 4
+  num_workers: 8
   epochs: 30
   learning_rate: 0.001
   weight_decay: 0.0001
@@ -85,7 +85,7 @@ slurm:
   partition: gpu-2h
   progan_partition: gpu-5h
   progan_train_partition: gpu-2d
-  progan_gpu_constraint: 80gb|40gb|h100
+  progan_gpu_constraint: h100|h200|blackwell
   progan_array_max_parallel: 35
   ntasks_per_node: 8
   container: ./environment.sif

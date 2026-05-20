@@ -142,7 +142,7 @@ case "$command" in
     submit_with_args patch-progan-train \
       --job-name=tcga-ut-progan-train \
       --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
       --array=0-2 \
@@ -231,7 +231,7 @@ case "$command" in
       --export=ALL,HYDRA_JOB=patch-progan-gan \
       "${gan_deps[@]}" \
       --array="0-${upper}%${parallel}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
       --partition="${PROGAN_PARTITION:-gpu-5h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
@@ -253,7 +253,7 @@ case "$command" in
     train_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=patch-progan-train \
       --dependency="afterok:${sqfs_job}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
       --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
@@ -295,7 +295,7 @@ case "$command" in
       --export=ALL,HYDRA_JOB=patch-progan-gan \
       --dependency="afterok:${real_sqfs_job}" \
       --array="0-${upper}%${parallel}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
       --partition="${PROGAN_PARTITION:-gpu-5h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
@@ -327,7 +327,7 @@ case "$command" in
     train_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=patch-progan-train \
       --dependency="afterok:${real_sqfs_job}:${synth_sqfs_job}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-80gb|40gb|h100}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
       --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \

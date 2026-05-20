@@ -34,34 +34,56 @@ case "$job" in
 
   build-patch-sqfs)
     export PATCH_SQFS_OUTPUT="${PATCH_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"
-    export PATCH_SQFS_INPUT="${PATCH_SQFS_INPUT:-${SLURM_TMPDIR:-/tmp}/patch_sqfs_input}"
+    export PATCH_SQFS_FILE_LIST="${PATCH_SQFS_FILE_LIST:-${SLURM_TMPDIR:-/tmp}/patch_sqfs_files.txt}"
     if [ -e "$PATCH_SQFS_OUTPUT" ]; then
       echo "Refusing to overwrite existing SquashFS image: $PATCH_SQFS_OUTPUT" >&2
       exit 1
     fi
-    bash scripts/hydra/run_python.sh -m scripts.prep.export_patch_sqfs_input
-    if ! command -v squash-dataset >/dev/null 2>&1; then
-      echo "squash-dataset not found on PATH" >&2
+    if ! command -v mksquashfs >/dev/null 2>&1; then
+      echo "mksquashfs not found on PATH" >&2
       exit 1
     fi
-    squash-dataset "$PATCH_SQFS_INPUT" "$PATCH_SQFS_OUTPUT"
+    if ! command -v tar >/dev/null 2>&1; then
+      echo "tar not found on PATH" >&2
+      exit 1
+    fi
+    raw_root="$(bash scripts/hydra/run_python.sh -m scripts.prep.export_patch_sqfs_input --file-list "$PATCH_SQFS_FILE_LIST")"
+    tar -C "$raw_root" -cf - -T "$PATCH_SQFS_FILE_LIST" | mksquashfs - "$PATCH_SQFS_OUTPUT" \
+      -tar \
+      -noappend \
+      -comp "${PATCH_SQFS_COMP:-lz4}" \
+      -no-xattrs \
+      -no-duplicates \
+      -processors "${PATCH_SQFS_PROCESSORS:-${SLURM_NTASKS:-4}}" \
+      -no-progress
     echo "Wrote SquashFS image: $PATCH_SQFS_OUTPUT"
     ;;
 
   build-synthetic-sqfs)
     seed="$(seed_from_array)"
-    export PATCH_SYNTHETIC_SQFS_INPUT="${SLURM_TMPDIR:-/tmp}/tcga_ut_synthetic_seed=${seed}"
     export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+    export PATCH_SYNTHETIC_SQFS_FILE_LIST="${PATCH_SYNTHETIC_SQFS_FILE_LIST:-${SLURM_TMPDIR:-/tmp}/tcga_ut_synthetic_seed=${seed}.txt}"
     if [ -e "$PATCH_SYNTHETIC_SQFS_OUTPUT" ]; then
       echo "Refusing to overwrite existing SquashFS image: $PATCH_SYNTHETIC_SQFS_OUTPUT" >&2
       exit 1
     fi
-    bash scripts/hydra/run_python.sh -m scripts.prep.export_synthetic_sqfs_input --seed "$seed"
-    if ! command -v squash-dataset >/dev/null 2>&1; then
-      echo "squash-dataset not found on PATH" >&2
+    if ! command -v mksquashfs >/dev/null 2>&1; then
+      echo "mksquashfs not found on PATH" >&2
       exit 1
     fi
-    squash-dataset "$PATCH_SYNTHETIC_SQFS_INPUT" "$PATCH_SYNTHETIC_SQFS_OUTPUT"
+    if ! command -v tar >/dev/null 2>&1; then
+      echo "tar not found on PATH" >&2
+      exit 1
+    fi
+    image_root="$(bash scripts/hydra/run_python.sh -m scripts.prep.export_synthetic_sqfs_input --seed "$seed" --file-list "$PATCH_SYNTHETIC_SQFS_FILE_LIST")"
+    tar -C "$image_root" -cf - -T "$PATCH_SYNTHETIC_SQFS_FILE_LIST" | mksquashfs - "$PATCH_SYNTHETIC_SQFS_OUTPUT" \
+      -tar \
+      -noappend \
+      -comp "${PATCH_SQFS_COMP:-lz4}" \
+      -no-xattrs \
+      -no-duplicates \
+      -processors "${PATCH_SQFS_PROCESSORS:-${SLURM_NTASKS:-4}}" \
+      -no-progress
     echo "Wrote synthetic SquashFS for seed=${seed}: ${PATCH_SYNTHETIC_SQFS_OUTPUT}"
     ;;
 

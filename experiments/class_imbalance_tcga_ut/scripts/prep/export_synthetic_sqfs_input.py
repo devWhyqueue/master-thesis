@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -22,6 +23,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument(
+        "--file-list",
+        type=Path,
+        help="Write synthetic patch paths relative to the seed image root.",
+    )
     return parser.parse_args()
 
 
@@ -45,8 +51,7 @@ def _link_into_tree(source: Path, export_root: Path, image_root: Path) -> bool:
     return True
 
 
-def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
-    """Hardlink one seed's synthetic JPEG tree for SquashFS packaging."""
+def _synthetic_manifest(config: dict, seed: int) -> tuple[dict[str, Path], Path, Path]:
     paths = ensure_dirs(config)
     image_root = synthetic_output_root(paths["root"], seed)
     manifest_path = image_root / "synthetic_patch_manifest.csv"
@@ -54,12 +59,17 @@ def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
         raise FileNotFoundError(
             f"Expected synthetic manifest for seed={seed}: {manifest_path}"
         )
-    export_root = _export_root(seed)
-    if export_root.exists():
-        shutil.rmtree(export_root)
-    export_root.mkdir(parents=True, exist_ok=True)
+    return paths, image_root, manifest_path
+
+
+def _unique_synthetic_paths(manifest_path: Path) -> list[str]:
     frame = pd.read_csv(manifest_path)
-    unique_paths = sorted(frame["image_path"].astype(str).unique())
+    return sorted(frame["image_path"].astype(str).unique())
+
+
+def _link_synthetic_paths(
+    unique_paths: list[str], export_root: Path, image_root: Path
+) -> int:
     workers = int(os.environ.get("PATCH_SQFS_EXPORT_WORKERS", "16"))
     linked = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -70,6 +80,18 @@ def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
         for future in as_completed(futures):
             if future.result():
                 linked += 1
+    return linked
+
+
+def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
+    """Hardlink one seed's synthetic JPEG tree for SquashFS packaging."""
+    paths, image_root, manifest_path = _synthetic_manifest(config, seed)
+    export_root = _export_root(seed)
+    if export_root.exists():
+        shutil.rmtree(export_root)
+    export_root.mkdir(parents=True, exist_ok=True)
+    unique_paths = _unique_synthetic_paths(manifest_path)
+    linked = _link_synthetic_paths(unique_paths, export_root, image_root)
     write_json(
         paths["data"] / f"synthetic_sqfs_export_report_seed={seed}.json",
         {
@@ -89,13 +111,57 @@ def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
     return export_root
 
 
+def _relative_synthetic_paths(image_root: Path, manifest_path: Path) -> list[str]:
+    relative_paths = []
+    for source_text in _unique_synthetic_paths(manifest_path):
+        source = Path(source_text)
+        try:
+            relative_paths.append(source.relative_to(image_root).as_posix())
+        except ValueError as error:
+            raise ValueError(
+                f"Synthetic patch path is not under image_root: {source}"
+            ) from error
+    return sorted(relative_paths)
+
+
+def write_synthetic_sqfs_file_list(config: dict, seed: int, output_path: Path) -> Path:
+    """Write unique synthetic patch paths relative to the seed image root."""
+    paths, image_root, manifest_path = _synthetic_manifest(config, seed)
+    relative_paths = _relative_synthetic_paths(image_root, manifest_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(relative_paths) + "\n", encoding="utf-8")
+    write_json(
+        paths["data"] / f"synthetic_sqfs_export_report_seed={seed}.json",
+        {
+            "seed": seed,
+            "export_mode": "file_list",
+            "file_list": str(output_path),
+            "image_root": str(image_root),
+            "n_unique_images": len(relative_paths),
+        },
+    )
+    logger.info(
+        "Wrote %s synthetic paths for seed=%s to %s",
+        len(relative_paths),
+        seed,
+        output_path,
+    )
+    return image_root
+
+
 def main() -> None:
     """Export synthetic patch images for one seed."""
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     args = parse_args()
-    export_synthetic_sqfs_input(load_config(args.config), args.seed)
+    config = load_config(args.config)
+    if args.file_list is not None:
+        sys.stdout.write(
+            f"{write_synthetic_sqfs_file_list(config, args.seed, args.file_list)}\n"
+        )
+    else:
+        export_synthetic_sqfs_input(config, args.seed)
 
 
 if __name__ == "__main__":
