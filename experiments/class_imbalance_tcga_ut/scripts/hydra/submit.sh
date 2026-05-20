@@ -41,6 +41,25 @@ submit_job() {
   sbatch --export="ALL,HYDRA_JOB=${hydra_job}" "$@" "$script"
 }
 
+require_absent() {
+  local path="$1"
+  if [ -e "$path" ]; then
+    echo "Refusing to submit because target already exists: $path" >&2
+    exit 1
+  fi
+}
+
+require_real_patch_sqfs_absent() {
+  require_absent "${PATCH_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"
+}
+
+require_synthetic_sqfs_absent() {
+  local seed
+  for seed in 0 1 2; do
+    require_absent "${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+  done
+}
+
 submit_with_args() {
   local hydra_job="$1"
   shift
@@ -96,6 +115,7 @@ case "$command" in
     ;;
 
   build-patch-sqfs)
+    require_real_patch_sqfs_absent
     submit_job build-patch-sqfs \
       --job-name=tcga-ut-patch-sqfs \
       --partition="${PATCH_SQFS_PARTITION:-cpu-2h}" \
@@ -200,6 +220,7 @@ case "$command" in
     ;;
 
   progan)
+    require_synthetic_sqfs_absent
     upper="${PROGAN_ARRAY_UPPER:-92}"
     parallel="${PROGAN_ARRAY_MAX_PARALLEL:-35}"
     gan_deps=()
@@ -247,6 +268,8 @@ case "$command" in
     ;;
 
   progan-resubmit)
+    require_real_patch_sqfs_absent
+    require_synthetic_sqfs_absent
     manifest_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=patch-manifests \
       --partition=cpu-2h \

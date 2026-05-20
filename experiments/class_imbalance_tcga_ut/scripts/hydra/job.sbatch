@@ -35,6 +35,10 @@ case "$job" in
   build-patch-sqfs)
     export PATCH_SQFS_OUTPUT="${PATCH_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"
     export PATCH_SQFS_INPUT="${PATCH_SQFS_INPUT:-${SLURM_TMPDIR:-/tmp}/patch_sqfs_input}"
+    if [ -e "$PATCH_SQFS_OUTPUT" ]; then
+      echo "Refusing to overwrite existing SquashFS image: $PATCH_SQFS_OUTPUT" >&2
+      exit 1
+    fi
     bash scripts/hydra/run_python.sh -m scripts.prep.export_patch_sqfs_input
     if ! command -v squash-dataset >/dev/null 2>&1; then
       echo "squash-dataset not found on PATH" >&2
@@ -48,6 +52,10 @@ case "$job" in
     seed="$(seed_from_array)"
     export PATCH_SYNTHETIC_SQFS_INPUT="${SLURM_TMPDIR:-/tmp}/tcga_ut_synthetic_seed=${seed}"
     export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+    if [ -e "$PATCH_SYNTHETIC_SQFS_OUTPUT" ]; then
+      echo "Refusing to overwrite existing SquashFS image: $PATCH_SYNTHETIC_SQFS_OUTPUT" >&2
+      exit 1
+    fi
     bash scripts/hydra/run_python.sh -m scripts.prep.export_synthetic_sqfs_input --seed "$seed"
     if ! command -v squash-dataset >/dev/null 2>&1; then
       echo "squash-dataset not found on PATH" >&2
