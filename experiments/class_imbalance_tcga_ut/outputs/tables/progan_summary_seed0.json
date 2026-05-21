@@ -1,0 +1,2594 @@
+{
+  "counts_by_class": {
+    "Adrenocortical_carcinoma": 13120,
+    "Bladder_Urothelial_Carcinoma": 9610,
+    "Brain_Lower_Grade_Glioma": 170,
+    "Breast_invasive_carcinoma": 500,
+    "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 12190,
+    "Cholangiocarcinoma": 15940,
+    "Colon_adenocarcinoma": 12160,
+    "Esophageal_carcinoma": 14240,
+    "Head_and_Neck_squamous_cell_carcinoma": 9670,
+    "Kidney_Chromophobe": 14860,
+    "Kidney_renal_clear_cell_carcinoma": 8430,
+    "Kidney_renal_papillary_cell_carcinoma": 11850,
+    "Liver_hepatocellular_carcinoma": 10780,
+    "Lung_adenocarcinoma": 6240,
+    "Lung_squamous_cell_carcinoma": 6740,
+    "Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma": 16000,
+    "Mesothelioma": 15100,
+    "Ovarian_serous_cystadenocarcinoma": 14860,
+    "Pancreatic_adenocarcinoma": 13760,
+    "Pheochromocytoma_and_Paraganglioma": 15670,
+    "Prostate_adenocarcinoma": 9720,
+    "Rectum_adenocarcinoma": 15250,
+    "Sarcoma": 7200,
+    "Skin_Cutaneous_Melanoma": 9570,
+    "Stomach_adenocarcinoma": 10940,
+    "Testicular_Germ_Cell_Tumors": 12390,
+    "Thymoma": 14080,
+    "Thyroid_carcinoma": 8660,
+    "Uterine_Carcinosarcoma": 15140,
+    "Uterine_Corpus_Endometrial_Carcinoma": 7840,
+    "Uveal_Melanoma": 15440
+  },
+  "image_root": "/home/yannik.qu/master-thesis/experiments/class_imbalance_tcga_ut/synthetic_patch_images/seed=0",
+  "n_patches": 348120,
+  "per_class": [
+    {
+      "balance_target": 16600,
+      "class_name": "Adrenocortical_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 219.75958578465807
+      },
+      "generated_patches": 13120,
+      "real_train_patches": 3480,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.32088357452065225,
+          "epochs": 25,
+          "generator_loss_mean": 22.33082495251205,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.404860545769334,
+          "epochs": 25,
+          "generator_loss_mean": 0.8198617429658771,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.5078231145255268,
+          "epochs": 25,
+          "generator_loss_mean": 0.9635138816847649,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.3713180863857268,
+          "epochs": 25,
+          "generator_loss_mean": 0.796523506953381,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.69476957025734,
+          "epochs": 25,
+          "generator_loss_mean": 1.7825875874215518,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.256211867205784,
+          "epochs": 25,
+          "generator_loss_mean": 1.0205073894620644,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.6435671111260477,
+          "epochs": 25,
+          "generator_loss_mean": 2.893167219616819,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Bladder_Urothelial_Carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 177.9638036300758
+      },
+      "generated_patches": 9610,
+      "real_train_patches": 6990,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.6519900623807553,
+          "epochs": 25,
+          "generator_loss_mean": 7.551582402782515,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3824098415672779,
+          "epochs": 25,
+          "generator_loss_mean": 0.9318715677410364,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3775949360989035,
+          "epochs": 25,
+          "generator_loss_mean": 1.122619637644384,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.7172156826872378,
+          "epochs": 25,
+          "generator_loss_mean": 1.8576370619034577,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.3014948313194328,
+          "epochs": 25,
+          "generator_loss_mean": 0.9443935634081572,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.9593256222148466,
+          "epochs": 25,
+          "generator_loss_mean": 1.8635012104271311,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4436744043549109,
+          "epochs": 25,
+          "generator_loss_mean": 4.1085876451582655,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Brain_Lower_Grade_Glioma",
+      "fid": {
+        "status": "computed",
+        "value": 167.38657124254166
+      },
+      "generated_patches": 170,
+      "real_train_patches": 16430,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.9097849791984481,
+          "epochs": 25,
+          "generator_loss_mean": 3.2224078688398006,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.4037088985741137,
+          "epochs": 25,
+          "generator_loss_mean": 0.7953520415723324,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.9305634757355075,
+          "epochs": 25,
+          "generator_loss_mean": 1.2418982509008065,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.3921211003512144,
+          "epochs": 25,
+          "generator_loss_mean": 0.8038022196089151,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1270335880408129,
+          "epochs": 25,
+          "generator_loss_mean": 1.378924540270052,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8262629632778226,
+          "epochs": 25,
+          "generator_loss_mean": 2.1589424459142843,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.42862618883276665,
+          "epochs": 25,
+          "generator_loss_mean": 4.288906852683203,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Breast_invasive_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 145.86656234092578
+      },
+      "generated_patches": 500,
+      "real_train_patches": 16100,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.6818181101280788,
+          "epochs": 25,
+          "generator_loss_mean": 5.110881984531879,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.4107851514965295,
+          "epochs": 25,
+          "generator_loss_mean": 0.8721804583445192,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3960271720960735,
+          "epochs": 25,
+          "generator_loss_mean": 0.7356723622791469,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.3536178629286588,
+          "epochs": 25,
+          "generator_loss_mean": 0.9889588007112979,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1933281612198334,
+          "epochs": 25,
+          "generator_loss_mean": 1.1969187664416518,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.6275067967793317,
+          "epochs": 25,
+          "generator_loss_mean": 3.1710633218123268,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.3444944382830109,
+          "epochs": 25,
+          "generator_loss_mean": 5.054524164835276,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 146.04845160596324
+      },
+      "generated_patches": 12190,
+      "real_train_patches": 4410,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.05280360741628556,
+          "epochs": 25,
+          "generator_loss_mean": 9.582327416092157,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.1234737138978028,
+          "epochs": 25,
+          "generator_loss_mean": 3.7189787977933886,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.462672553975135,
+          "epochs": 25,
+          "generator_loss_mean": 1.5962557958140189,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.378444988001138,
+          "epochs": 25,
+          "generator_loss_mean": 0.7604303795529995,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1285652226659022,
+          "epochs": 25,
+          "generator_loss_mean": 1.4142654092815792,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.9072872935317627,
+          "epochs": 25,
+          "generator_loss_mean": 1.944721214621893,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4818974244012059,
+          "epochs": 25,
+          "generator_loss_mean": 3.756754700630218,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Cholangiocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 232.2025417557876
+      },
+      "generated_patches": 15940,
+      "real_train_patches": 660,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.11561850141247057,
+          "epochs": 25,
+          "generator_loss_mean": 11.031872306737032,
+          "n_real_images": 660,
+          "resolution": 4,
+          "steps": 275
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 0.3815143428082626,
+          "epochs": 25,
+          "generator_loss_mean": 9.01569009737535,
+          "n_real_images": 660,
+          "resolution": 8,
+          "steps": 275
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.1426569376131963,
+          "epochs": 25,
+          "generator_loss_mean": 2.0475527536301388,
+          "n_real_images": 660,
+          "resolution": 16,
+          "steps": 525
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.2483135111292913,
+          "epochs": 25,
+          "generator_loss_mean": 1.3934387504699683,
+          "n_real_images": 660,
+          "resolution": 32,
+          "steps": 1050
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2936266243186865,
+          "epochs": 25,
+          "generator_loss_mean": 0.9783798689830653,
+          "n_real_images": 660,
+          "resolution": 64,
+          "steps": 4125
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.2281307923613172,
+          "epochs": 25,
+          "generator_loss_mean": 1.1284298958358439,
+          "n_real_images": 660,
+          "resolution": 128,
+          "steps": 8250
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.52496927179937,
+          "epochs": 25,
+          "generator_loss_mean": 3.775041406932668,
+          "n_real_images": 660,
+          "resolution": 256,
+          "steps": 16500
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Colon_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 166.0682049598082
+      },
+      "generated_patches": 12160,
+      "real_train_patches": 4440,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.07238310888397337,
+          "epochs": 25,
+          "generator_loss_mean": 11.913309984505176,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.1550900168778753,
+          "epochs": 25,
+          "generator_loss_mean": 2.491923847720027,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3010084564238786,
+          "epochs": 25,
+          "generator_loss_mean": 0.943625930827111,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.05009516609367,
+          "epochs": 25,
+          "generator_loss_mean": 1.6012218992016278,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 0.5478823799203656,
+          "epochs": 25,
+          "generator_loss_mean": 3.507960861271131,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.34169836235343254,
+          "epochs": 25,
+          "generator_loss_mean": 4.86689928639586,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.30142647548783813,
+          "epochs": 25,
+          "generator_loss_mean": 5.365530116845418,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Esophageal_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 127.91174323914993
+      },
+      "generated_patches": 14240,
+      "real_train_patches": 2360,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.05765540879679975,
+          "epochs": 25,
+          "generator_loss_mean": 9.411956604719162,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.1923900286814553,
+          "epochs": 25,
+          "generator_loss_mean": 3.0727605759352445,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3793266356363894,
+          "epochs": 25,
+          "generator_loss_mean": 0.8666055189142935,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.748463602429256,
+          "epochs": 25,
+          "generator_loss_mean": 1.0386223118909417,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.280519295984559,
+          "epochs": 25,
+          "generator_loss_mean": 1.0016135959889516,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8756976931495387,
+          "epochs": 25,
+          "generator_loss_mean": 2.0452217654118114,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.44245572961345375,
+          "epochs": 25,
+          "generator_loss_mean": 3.610430010889499,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Head_and_Neck_squamous_cell_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 188.6532458516911
+      },
+      "generated_patches": 9670,
+      "real_train_patches": 6930,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.6182527782581582,
+          "epochs": 25,
+          "generator_loss_mean": 9.40978364340961,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.405892828628421,
+          "epochs": 25,
+          "generator_loss_mean": 0.8444519927352667,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3727537596225738,
+          "epochs": 25,
+          "generator_loss_mean": 0.8024698789836839,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 2.1487974005425348,
+          "epochs": 25,
+          "generator_loss_mean": 1.1540838975776568,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2756111618461727,
+          "epochs": 25,
+          "generator_loss_mean": 0.9937335067900858,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.1547530289227688,
+          "epochs": 25,
+          "generator_loss_mean": 1.2731762356597482,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.5622607190768998,
+          "epochs": 25,
+          "generator_loss_mean": 3.382232724821112,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Kidney_Chromophobe",
+      "fid": {
+        "status": "computed",
+        "value": 207.73807368353738
+      },
+      "generated_patches": 14860,
+      "real_train_patches": 1740,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.5556470767045227,
+          "epochs": 25,
+          "generator_loss_mean": 4.922952201190804,
+          "n_real_images": 1740,
+          "resolution": 4,
+          "steps": 700
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3932238598167896,
+          "epochs": 25,
+          "generator_loss_mean": 0.9428130737798555,
+          "n_real_images": 1740,
+          "resolution": 8,
+          "steps": 700
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.4157335966283624,
+          "epochs": 25,
+          "generator_loss_mean": 0.7507743860802782,
+          "n_real_images": 1740,
+          "resolution": 16,
+          "steps": 1375
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.5154976575965182,
+          "epochs": 25,
+          "generator_loss_mean": 0.8881124687979671,
+          "n_real_images": 1740,
+          "resolution": 32,
+          "steps": 2725
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2436632934575793,
+          "epochs": 25,
+          "generator_loss_mean": 1.0797570161033294,
+          "n_real_images": 1740,
+          "resolution": 64,
+          "steps": 10875
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.6488478487375635,
+          "epochs": 25,
+          "generator_loss_mean": 2.920447660487398,
+          "n_real_images": 1740,
+          "resolution": 128,
+          "steps": 21750
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.34055281187562225,
+          "epochs": 25,
+          "generator_loss_mean": 4.957028155725253,
+          "n_real_images": 1740,
+          "resolution": 256,
+          "steps": 43500
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Kidney_renal_clear_cell_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 208.6040220215225
+      },
+      "generated_patches": 8430,
+      "real_train_patches": 8170,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.940569141922897,
+          "epochs": 25,
+          "generator_loss_mean": 3.5371631442755462,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3996535354852677,
+          "epochs": 25,
+          "generator_loss_mean": 0.795059744566679,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.5062880649138242,
+          "epochs": 25,
+          "generator_loss_mean": 1.0099353262013755,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.261952667448204,
+          "epochs": 25,
+          "generator_loss_mean": 1.0925649336685819,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.0682445845827169,
+          "epochs": 25,
+          "generator_loss_mean": 1.5645947335698294,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.44468677711790283,
+          "epochs": 25,
+          "generator_loss_mean": 4.094418416194057,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.321615041811461,
+          "epochs": 25,
+          "generator_loss_mean": 5.54530795969174,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Kidney_renal_papillary_cell_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 132.57706651482118
+      },
+      "generated_patches": 11850,
+      "real_train_patches": 4750,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.056252429733253846,
+          "epochs": 25,
+          "generator_loss_mean": 10.196476577371358,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.2595895328073052,
+          "epochs": 25,
+          "generator_loss_mean": 1.9470700939744712,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.268464419413358,
+          "epochs": 25,
+          "generator_loss_mean": 1.1297643915563822,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 4.789856828791089,
+          "epochs": 25,
+          "generator_loss_mean": 1.973737724561962,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.3207954501116184,
+          "epochs": 25,
+          "generator_loss_mean": 0.8894486491094176,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.9690814050104813,
+          "epochs": 25,
+          "generator_loss_mean": 1.7587904325017254,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.45839344264032306,
+          "epochs": 25,
+          "generator_loss_mean": 3.813191667589945,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Liver_hepatocellular_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 160.64937787927443
+      },
+      "generated_patches": 10780,
+      "real_train_patches": 5820,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.09502770699833618,
+          "epochs": 25,
+          "generator_loss_mean": 9.788494823127985,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3408462201990188,
+          "epochs": 25,
+          "generator_loss_mean": 1.106266526398249,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3798896025819705,
+          "epochs": 25,
+          "generator_loss_mean": 1.009834209624678,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 5.735426767920822,
+          "epochs": 25,
+          "generator_loss_mean": 4.135447035338929,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.186725520997265,
+          "epochs": 25,
+          "generator_loss_mean": 1.2946893387748788,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.1801604562575176,
+          "epochs": 25,
+          "generator_loss_mean": 1.2453037494798904,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4743265481814959,
+          "epochs": 25,
+          "generator_loss_mean": 3.8325320089224646,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Lung_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 266.36965833764975
+      },
+      "generated_patches": 6240,
+      "real_train_patches": 10360,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.05615693985070209,
+          "epochs": 25,
+          "generator_loss_mean": 28.269980288520454,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.0645389023182321,
+          "epochs": 25,
+          "generator_loss_mean": 3.7657453482039274,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.2312591076083481,
+          "epochs": 25,
+          "generator_loss_mean": 1.1350743993744254,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 0.953344058515504,
+          "epochs": 25,
+          "generator_loss_mean": 1.9788913558609784,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 0.43210932078764247,
+          "epochs": 25,
+          "generator_loss_mean": 4.344883798321243,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.3967151831495568,
+          "epochs": 25,
+          "generator_loss_mean": 4.599922119120763,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4052482231831196,
+          "epochs": 25,
+          "generator_loss_mean": 4.5958988991726475,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Lung_squamous_cell_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 103.03252610779248
+      },
+      "generated_patches": 6740,
+      "real_train_patches": 9860,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.6299865908753054,
+          "epochs": 25,
+          "generator_loss_mean": 6.472042210376822,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3834403935074806,
+          "epochs": 25,
+          "generator_loss_mean": 0.873634507805109,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.4385790405981242,
+          "epochs": 25,
+          "generator_loss_mean": 1.3451608759626783,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 3.2143200062401593,
+          "epochs": 25,
+          "generator_loss_mean": 2.481311155845483,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.3250479015737073,
+          "epochs": 25,
+          "generator_loss_mean": 0.9770266719083017,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.346333895405114,
+          "epochs": 25,
+          "generator_loss_mean": 0.8261848086479688,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.6158553750567455,
+          "epochs": 25,
+          "generator_loss_mean": 2.981570651241209,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma",
+      "fid": {
+        "status": "computed",
+        "value": 315.9393189309074
+      },
+      "generated_patches": 16000,
+      "real_train_patches": 600,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.14315623758756554,
+          "epochs": 25,
+          "generator_loss_mean": 7.500420979142189,
+          "n_real_images": 600,
+          "resolution": 4,
+          "steps": 250
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 0.7735856100258034,
+          "epochs": 25,
+          "generator_loss_mean": 6.220816069364548,
+          "n_real_images": 600,
+          "resolution": 8,
+          "steps": 250
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3415273512664594,
+          "epochs": 25,
+          "generator_loss_mean": 1.0894059858880063,
+          "n_real_images": 600,
+          "resolution": 16,
+          "steps": 475
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.3059406761276096,
+          "epochs": 25,
+          "generator_loss_mean": 0.9686650896072387,
+          "n_real_images": 600,
+          "resolution": 32,
+          "steps": 950
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.446065039773005,
+          "epochs": 25,
+          "generator_loss_mean": 1.2066341657193953,
+          "n_real_images": 600,
+          "resolution": 64,
+          "steps": 3750
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.9572940328901264,
+          "epochs": 25,
+          "generator_loss_mean": 2.7036666665287474,
+          "n_real_images": 600,
+          "resolution": 128,
+          "steps": 7500
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 1.3062702558589168,
+          "epochs": 25,
+          "generator_loss_mean": 0.9258260340078502,
+          "n_real_images": 600,
+          "resolution": 256,
+          "steps": 15000
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Mesothelioma",
+      "fid": {
+        "status": "computed",
+        "value": 249.0925122605709
+      },
+      "generated_patches": 15100,
+      "real_train_patches": 1500,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.09404095337088317,
+          "epochs": 25,
+          "generator_loss_mean": 9.067824368476868,
+          "n_real_images": 1500,
+          "resolution": 4,
+          "steps": 600
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 0.9099271923227829,
+          "epochs": 25,
+          "generator_loss_mean": 5.046503669818242,
+          "n_real_images": 1500,
+          "resolution": 8,
+          "steps": 600
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.5186355593103043,
+          "epochs": 25,
+          "generator_loss_mean": 1.147481401901795,
+          "n_real_images": 1500,
+          "resolution": 16,
+          "steps": 1175
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.372250404915911,
+          "epochs": 25,
+          "generator_loss_mean": 0.8137446986233935,
+          "n_real_images": 1500,
+          "resolution": 32,
+          "steps": 2350
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1043190102973612,
+          "epochs": 25,
+          "generator_loss_mean": 1.4786901980690161,
+          "n_real_images": 1500,
+          "resolution": 64,
+          "steps": 9375
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.9336590205528401,
+          "epochs": 25,
+          "generator_loss_mean": 1.8880254834535575,
+          "n_real_images": 1500,
+          "resolution": 128,
+          "steps": 18750
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4678637133916845,
+          "epochs": 25,
+          "generator_loss_mean": 3.8819052716705578,
+          "n_real_images": 1500,
+          "resolution": 256,
+          "steps": 37500
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Ovarian_serous_cystadenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 144.85316016332007
+      },
+      "generated_patches": 14860,
+      "real_train_patches": 1740,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.14657102983739737,
+          "epochs": 25,
+          "generator_loss_mean": 10.263528543731995,
+          "n_real_images": 1740,
+          "resolution": 4,
+          "steps": 700
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.2977824157503035,
+          "epochs": 25,
+          "generator_loss_mean": 2.004973718928439,
+          "n_real_images": 1740,
+          "resolution": 8,
+          "steps": 700
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3996062941767953,
+          "epochs": 25,
+          "generator_loss_mean": 0.8454960786507211,
+          "n_real_images": 1740,
+          "resolution": 16,
+          "steps": 1375
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.5228959479873334,
+          "epochs": 25,
+          "generator_loss_mean": 1.1133952556932594,
+          "n_real_images": 1740,
+          "resolution": 32,
+          "steps": 2725
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1964330431185664,
+          "epochs": 25,
+          "generator_loss_mean": 1.2485084874344796,
+          "n_real_images": 1740,
+          "resolution": 64,
+          "steps": 10875
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.9184675249759557,
+          "epochs": 25,
+          "generator_loss_mean": 1.9218508699039167,
+          "n_real_images": 1740,
+          "resolution": 128,
+          "steps": 21750
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4906306031992385,
+          "epochs": 25,
+          "generator_loss_mean": 3.7089488593663593,
+          "n_real_images": 1740,
+          "resolution": 256,
+          "steps": 43500
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Pancreatic_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 181.06481031102027
+      },
+      "generated_patches": 13760,
+      "real_train_patches": 2840,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.5484995178688769,
+          "epochs": 25,
+          "generator_loss_mean": 8.51996793344617,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3971048575639724,
+          "epochs": 25,
+          "generator_loss_mean": 0.8157745833881199,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.4762544027197508,
+          "epochs": 25,
+          "generator_loss_mean": 2.5852341407580464,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.7519228517442662,
+          "epochs": 25,
+          "generator_loss_mean": 1.98413037687249,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.3162939040867787,
+          "epochs": 25,
+          "generator_loss_mean": 0.9189188132583513,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.043515309043314,
+          "epochs": 25,
+          "generator_loss_mean": 1.5915430664443406,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4557057109197767,
+          "epochs": 25,
+          "generator_loss_mean": 3.9494042417679567,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Pheochromocytoma_and_Paraganglioma",
+      "fid": {
+        "status": "computed",
+        "value": 301.3148347415755
+      },
+      "generated_patches": 15670,
+      "real_train_patches": 930,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.12716491166118066,
+          "epochs": 25,
+          "generator_loss_mean": 10.159543158054351,
+          "n_real_images": 930,
+          "resolution": 4,
+          "steps": 375
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.0166317707033523,
+          "epochs": 25,
+          "generator_loss_mean": 3.636063406864802,
+          "n_real_images": 930,
+          "resolution": 8,
+          "steps": 375
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.367152664899826,
+          "epochs": 25,
+          "generator_loss_mean": 0.8513803518321366,
+          "n_real_images": 930,
+          "resolution": 16,
+          "steps": 750
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.5021774281889706,
+          "epochs": 25,
+          "generator_loss_mean": 0.9528371163866491,
+          "n_real_images": 930,
+          "resolution": 32,
+          "steps": 1475
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.8679721654410766,
+          "epochs": 25,
+          "generator_loss_mean": 1.231621311223885,
+          "n_real_images": 930,
+          "resolution": 64,
+          "steps": 5825
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.2306706483570349,
+          "epochs": 25,
+          "generator_loss_mean": 1.5098367030236295,
+          "n_real_images": 930,
+          "resolution": 128,
+          "steps": 11625
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 1.443541701046189,
+          "epochs": 25,
+          "generator_loss_mean": 0.8193086480015095,
+          "n_real_images": 930,
+          "resolution": 256,
+          "steps": 23250
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Prostate_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 125.61557046200232
+      },
+      "generated_patches": 9720,
+      "real_train_patches": 6880,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.7373316376995354,
+          "epochs": 25,
+          "generator_loss_mean": 5.555311403647065,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3955794252455234,
+          "epochs": 25,
+          "generator_loss_mean": 0.8240668442845345,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.8993231756426394,
+          "epochs": 25,
+          "generator_loss_mean": 1.6554328788584696,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.2287936151819303,
+          "epochs": 25,
+          "generator_loss_mean": 1.2244727368326858,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2831353081626002,
+          "epochs": 25,
+          "generator_loss_mean": 0.9914292387235583,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.7490863334812131,
+          "epochs": 25,
+          "generator_loss_mean": 2.5310920639392727,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.366780663091347,
+          "epochs": 25,
+          "generator_loss_mean": 4.361218138541756,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Rectum_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 178.51351676636853
+      },
+      "generated_patches": 15250,
+      "real_train_patches": 1350,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.1108804241705035,
+          "epochs": 25,
+          "generator_loss_mean": 9.28247025890784,
+          "n_real_images": 1350,
+          "resolution": 4,
+          "steps": 550
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.2578530599537772,
+          "epochs": 25,
+          "generator_loss_mean": 1.8945495913787322,
+          "n_real_images": 1350,
+          "resolution": 8,
+          "steps": 550
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3844135771483876,
+          "epochs": 25,
+          "generator_loss_mean": 0.9537812285766352,
+          "n_real_images": 1350,
+          "resolution": 16,
+          "steps": 1075
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.7247326576289008,
+          "epochs": 25,
+          "generator_loss_mean": 1.249605352060431,
+          "n_real_images": 1350,
+          "resolution": 32,
+          "steps": 2125
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1461715081722073,
+          "epochs": 25,
+          "generator_loss_mean": 1.2460545815344717,
+          "n_real_images": 1350,
+          "resolution": 64,
+          "steps": 8450
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8950714403404716,
+          "epochs": 25,
+          "generator_loss_mean": 2.00925288179753,
+          "n_real_images": 1350,
+          "resolution": 128,
+          "steps": 16875
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.37914497824388627,
+          "epochs": 25,
+          "generator_loss_mean": 4.21987401586922,
+          "n_real_images": 1350,
+          "resolution": 256,
+          "steps": 33750
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Sarcoma",
+      "fid": {
+        "status": "computed",
+        "value": 270.08339305904883
+      },
+      "generated_patches": 7200,
+      "real_train_patches": 9400,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.33297071611214163,
+          "epochs": 25,
+          "generator_loss_mean": 10.417992253135889,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3333803707646439,
+          "epochs": 25,
+          "generator_loss_mean": 1.4148196114227176,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.4064313125237822,
+          "epochs": 25,
+          "generator_loss_mean": 0.9658987450157293,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.577740576127544,
+          "epochs": 25,
+          "generator_loss_mean": 1.2176274721802829,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1689136878708086,
+          "epochs": 25,
+          "generator_loss_mean": 1.2431001563017743,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8207702483610149,
+          "epochs": 25,
+          "generator_loss_mean": 2.2737333571523717,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.4062699618068861,
+          "epochs": 25,
+          "generator_loss_mean": 4.415994818710455,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Skin_Cutaneous_Melanoma",
+      "fid": {
+        "status": "computed",
+        "value": 266.8703853476413
+      },
+      "generated_patches": 9570,
+      "real_train_patches": 7030,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.1531347753052296,
+          "epochs": 25,
+          "generator_loss_mean": 10.887931836880744,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.411103747561574,
+          "epochs": 25,
+          "generator_loss_mean": 0.92146724563092,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3937892813235522,
+          "epochs": 25,
+          "generator_loss_mean": 0.773411256596446,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.4655634066648782,
+          "epochs": 25,
+          "generator_loss_mean": 1.138474480009884,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.277065983426728,
+          "epochs": 25,
+          "generator_loss_mean": 1.0132479792358209,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8157924013999969,
+          "epochs": 25,
+          "generator_loss_mean": 2.3296862512893615,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.39830063486136524,
+          "epochs": 25,
+          "generator_loss_mean": 4.609334150852524,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Stomach_adenocarcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 141.6024070289974
+      },
+      "generated_patches": 10940,
+      "real_train_patches": 5660,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.5510377036635328,
+          "epochs": 25,
+          "generator_loss_mean": 5.796365270614624,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3997832629084588,
+          "epochs": 25,
+          "generator_loss_mean": 0.8085563236288726,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 2.6684108972386458,
+          "epochs": 25,
+          "generator_loss_mean": 1.3135638246166434,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.2769210040103645,
+          "epochs": 25,
+          "generator_loss_mean": 0.9969017858806365,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.3081715239060576,
+          "epochs": 25,
+          "generator_loss_mean": 0.9314411054882658,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8442897797228397,
+          "epochs": 25,
+          "generator_loss_mean": 2.209199849558569,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.40372981048759116,
+          "epochs": 25,
+          "generator_loss_mean": 4.251091608460071,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Testicular_Germ_Cell_Tumors",
+      "fid": {
+        "status": "computed",
+        "value": 275.2407507702419
+      },
+      "generated_patches": 12390,
+      "real_train_patches": 4210,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.3625277693790667,
+          "epochs": 25,
+          "generator_loss_mean": 7.3058661445602775,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.4074059692770242,
+          "epochs": 25,
+          "generator_loss_mean": 0.7873743963986635,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.396553908802406,
+          "epochs": 25,
+          "generator_loss_mean": 2.124100061083451,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.2232666926807725,
+          "epochs": 25,
+          "generator_loss_mean": 1.2032667275940185,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.200438319031091,
+          "epochs": 25,
+          "generator_loss_mean": 1.1742763411946664,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.5055348026305971,
+          "epochs": 25,
+          "generator_loss_mean": 3.6656716297676284,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.412164010976597,
+          "epochs": 25,
+          "generator_loss_mean": 4.612983724749639,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Thymoma",
+      "fid": {
+        "status": "computed",
+        "value": 143.92602112311766
+      },
+      "generated_patches": 14080,
+      "real_train_patches": 2520,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.6999640618093349,
+          "epochs": 25,
+          "generator_loss_mean": 10.163379130233078,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.4001516050100327,
+          "epochs": 25,
+          "generator_loss_mean": 0.8306158712878823,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3667152589559555,
+          "epochs": 25,
+          "generator_loss_mean": 0.9251325999596156,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.9870189701806522,
+          "epochs": 25,
+          "generator_loss_mean": 1.6208302940450898,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2935266308486097,
+          "epochs": 25,
+          "generator_loss_mean": 0.9639682580795125,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.1873947539017535,
+          "epochs": 25,
+          "generator_loss_mean": 1.193265504509073,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.9712765801331125,
+          "epochs": 25,
+          "generator_loss_mean": 1.619836958128046,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Thyroid_carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 203.54505578291344
+      },
+      "generated_patches": 8660,
+      "real_train_patches": 7940,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.08158392866735084,
+          "epochs": 25,
+          "generator_loss_mean": 10.981641385480762,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.301592839024961,
+          "epochs": 25,
+          "generator_loss_mean": 1.281758799813688,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3424170906469226,
+          "epochs": 25,
+          "generator_loss_mean": 0.8781967615708709,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.735901894485578,
+          "epochs": 25,
+          "generator_loss_mean": 2.2754340726489937,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2824584556178888,
+          "epochs": 25,
+          "generator_loss_mean": 0.971002258348708,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.8530201732462547,
+          "epochs": 25,
+          "generator_loss_mean": 2.1868002296163387,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.3624690914688149,
+          "epochs": 25,
+          "generator_loss_mean": 4.571312756393089,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Uterine_Carcinosarcoma",
+      "fid": {
+        "status": "computed",
+        "value": 161.78085588832113
+      },
+      "generated_patches": 15140,
+      "real_train_patches": 1460,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.4523909848398003,
+          "epochs": 25,
+          "generator_loss_mean": 5.6825018405914305,
+          "n_real_images": 1460,
+          "resolution": 4,
+          "steps": 575
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.3750923490524292,
+          "epochs": 25,
+          "generator_loss_mean": 0.9759370787765669,
+          "n_real_images": 1460,
+          "resolution": 8,
+          "steps": 575
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3562899981374326,
+          "epochs": 25,
+          "generator_loss_mean": 0.8736379517679629,
+          "n_real_images": 1460,
+          "resolution": 16,
+          "steps": 1150
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 4.121226306745539,
+          "epochs": 25,
+          "generator_loss_mean": 1.130240783644043,
+          "n_real_images": 1460,
+          "resolution": 32,
+          "steps": 2300
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.3434218824856903,
+          "epochs": 25,
+          "generator_loss_mean": 0.8421985790133476,
+          "n_real_images": 1460,
+          "resolution": 64,
+          "steps": 9125
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.321981966776799,
+          "epochs": 25,
+          "generator_loss_mean": 0.8850525416763865,
+          "n_real_images": 1460,
+          "resolution": 128,
+          "steps": 18250
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.891485084188819,
+          "epochs": 25,
+          "generator_loss_mean": 1.9642462891184522,
+          "n_real_images": 1460,
+          "resolution": 256,
+          "steps": 36500
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Uterine_Corpus_Endometrial_Carcinoma",
+      "fid": {
+        "status": "computed",
+        "value": 164.27484867700912
+      },
+      "generated_patches": 7840,
+      "real_train_patches": 8760,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.06323050484869781,
+          "epochs": 25,
+          "generator_loss_mean": 9.45093638241291,
+          "n_real_images": 2048,
+          "resolution": 4,
+          "steps": 800
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 1.062229458500785,
+          "epochs": 25,
+          "generator_loss_mean": 3.136625627912581,
+          "n_real_images": 2048,
+          "resolution": 8,
+          "steps": 800
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.2755665035918355,
+          "epochs": 25,
+          "generator_loss_mean": 1.1313199339038693,
+          "n_real_images": 2048,
+          "resolution": 16,
+          "steps": 1600
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.3085176251037047,
+          "epochs": 25,
+          "generator_loss_mean": 0.9371981347416295,
+          "n_real_images": 2048,
+          "resolution": 32,
+          "steps": 3200
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.1164136993387366,
+          "epochs": 25,
+          "generator_loss_mean": 1.3638991278574395,
+          "n_real_images": 2048,
+          "resolution": 64,
+          "steps": 12800
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 0.5748958309838079,
+          "epochs": 25,
+          "generator_loss_mean": 3.3896090716432496,
+          "n_real_images": 2048,
+          "resolution": 128,
+          "steps": 25600
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.3272278957435812,
+          "epochs": 25,
+          "generator_loss_mean": 5.102366177974584,
+          "n_real_images": 2048,
+          "resolution": 256,
+          "steps": 51200
+        }
+      ]
+    },
+    {
+      "balance_target": 16600,
+      "class_name": "Uveal_Melanoma",
+      "fid": {
+        "status": "computed",
+        "value": 255.93611975063834
+      },
+      "generated_patches": 15440,
+      "real_train_patches": 1160,
+      "training": [
+        {
+          "batch_size": 64,
+          "depth": 1,
+          "discriminator_loss_mean": 0.06720910619847832,
+          "epochs": 25,
+          "generator_loss_mean": 8.927210683320698,
+          "n_real_images": 1160,
+          "resolution": 4,
+          "steps": 475
+        },
+        {
+          "batch_size": 64,
+          "depth": 2,
+          "discriminator_loss_mean": 0.9998905356203289,
+          "epochs": 25,
+          "generator_loss_mean": 3.887216361070934,
+          "n_real_images": 1160,
+          "resolution": 8,
+          "steps": 475
+        },
+        {
+          "batch_size": 32,
+          "depth": 3,
+          "discriminator_loss_mean": 1.3774049640346218,
+          "epochs": 25,
+          "generator_loss_mean": 0.7989938867736507,
+          "n_real_images": 1160,
+          "resolution": 16,
+          "steps": 925
+        },
+        {
+          "batch_size": 16,
+          "depth": 4,
+          "discriminator_loss_mean": 1.3793600394627819,
+          "epochs": 25,
+          "generator_loss_mean": 0.7718315963385857,
+          "n_real_images": 1160,
+          "resolution": 32,
+          "steps": 1825
+        },
+        {
+          "batch_size": 4,
+          "depth": 5,
+          "discriminator_loss_mean": 1.2304606027086546,
+          "epochs": 25,
+          "generator_loss_mean": 1.3254330262696241,
+          "n_real_images": 1160,
+          "resolution": 64,
+          "steps": 7250
+        },
+        {
+          "batch_size": 2,
+          "depth": 6,
+          "discriminator_loss_mean": 1.2780969635032375,
+          "epochs": 25,
+          "generator_loss_mean": 0.9961836472710761,
+          "n_real_images": 1160,
+          "resolution": 128,
+          "steps": 14500
+        },
+        {
+          "batch_size": 1,
+          "depth": 7,
+          "discriminator_loss_mean": 0.9010823654435908,
+          "epochs": 25,
+          "generator_loss_mean": 1.7520514388273682,
+          "n_real_images": 1160,
+          "resolution": 256,
+          "steps": 29000
+        }
+      ]
+    }
+  ],
+  "seed": 0,
+  "settings": {
+    "balance_target": "max_train_class_count",
+    "base_channels": 512,
+    "beta1": 0.5,
+    "epochs_per_depth": 25,
+    "fade_in_fraction": 0.5,
+    "image_size": 256,
+    "latent_dim": 128,
+    "learning_rate": 0.0002,
+    "max_classes": null,
+    "max_real_patches_per_class": 2048
+  }
+}

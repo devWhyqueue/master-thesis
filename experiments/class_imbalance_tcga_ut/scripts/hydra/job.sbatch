@@ -180,8 +180,17 @@ case "$job" in
   aggregate)
     bash scripts/hydra/run_python.sh -m scripts.report.aggregate --benchmark patch
     bash scripts/hydra/run_python.sh -m scripts.report.aggregate --benchmark wsi_bag
+    bash scripts/hydra/run_python.sh -m scripts.report.calibration_table
+    bash scripts/hydra/run_python.sh -m scripts.report.progan_diagnostics --seed 0
     bash scripts/hydra/run_python.sh -m scripts.report.figures --benchmark patch
     bash scripts/hydra/run_python.sh -m scripts.report.figures --benchmark wsi_bag
+    ;;
+
+  progan-diagnostics)
+    # shellcheck source=scripts/hydra/mount_real_patch_sqfs.sh
+    source scripts/hydra/mount_real_patch_sqfs.sh direct
+    trap cleanup_real_patch_sqfs EXIT
+    bash scripts/hydra/run_python.sh -m scripts.report.progan_diagnostics --seed 0 "$@"
     ;;
 
   all)

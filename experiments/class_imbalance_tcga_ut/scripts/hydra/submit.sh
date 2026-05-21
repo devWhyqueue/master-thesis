@@ -26,6 +26,7 @@ Commands:
   wsi-profile              Profile WSI bags
   wsi-train                Submit WSI-bag benchmark array
   aggregate                Aggregate tables and figures
+  progan-diagnostics       Build ProGAN quality diagnostics for the paper
   all                      Run the full pipeline in one GPU job
   smoke                    Run a short smoke job
 
@@ -221,6 +222,17 @@ case "$command" in
       --ntasks-per-node=2 \
       --output=logs/aggregate-%j.out \
       --error=logs/aggregate-%j.err \
+      "$@"
+    ;;
+
+  progan-diagnostics)
+    submit_job progan-diagnostics \
+      --job-name=tcga-ut-progan-diag \
+      --partition=cpu-2h \
+      --gpus-per-node=0 \
+      --ntasks-per-node=4 \
+      --output=logs/progan-diagnostics-%j.out \
+      --error=logs/progan-diagnostics-%j.err \
       "$@"
     ;;
 

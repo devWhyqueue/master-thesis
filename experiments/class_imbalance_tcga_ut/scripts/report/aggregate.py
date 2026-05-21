@@ -12,6 +12,17 @@ from scripts.common import ensure_dirs, load_config, write_json
 from scripts.metadata import benchmark_metadata
 from scripts.report.figures import METHOD_LABELS
 
+SUMMARY_METRICS = (
+    "accuracy",
+    "balanced_accuracy",
+    "macro_precision",
+    "macro_recall",
+    "macro_f1",
+    "negative_log_likelihood",
+    "brier_score",
+    "expected_calibration_error",
+)
+
 
 def parse_args() -> argparse.Namespace:
     """Parse result-aggregation arguments."""
@@ -68,14 +79,7 @@ def _collect(
                         "seed": seed,
                         "split": split,
                         **{
-                            key: result[key]
-                            for key in [
-                                "accuracy",
-                                "balanced_accuracy",
-                                "macro_precision",
-                                "macro_recall",
-                                "macro_f1",
-                            ]
+                            key: result[key] for key in SUMMARY_METRICS if key in result
                         },
                     }
                 )
@@ -102,12 +106,16 @@ def _aggregate(summary: pd.DataFrame) -> pd.DataFrame:
         role=("role", "first"),
         taxonomy_category=("taxonomy_category", "first"),
         representative_paper=("representative_paper", "first"),
-        accuracy_mean=("accuracy", "mean"),
-        accuracy_std=("accuracy", "std"),
-        balanced_accuracy_mean=("balanced_accuracy", "mean"),
-        balanced_accuracy_std=("balanced_accuracy", "std"),
-        macro_f1_mean=("macro_f1", "mean"),
-        macro_f1_std=("macro_f1", "std"),
+        **{
+            f"{metric}_mean": (metric, "mean")
+            for metric in SUMMARY_METRICS
+            if metric in summary.columns
+        },
+        **{
+            f"{metric}_std": (metric, "std")
+            for metric in SUMMARY_METRICS
+            if metric in summary.columns
+        },
     )
     rows = sorted(
         grouped.iterrows(),

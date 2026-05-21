@@ -12,6 +12,11 @@ import pandas as pd
 from matplotlib.axes import Axes
 
 from scripts.common import ensure_dirs, load_config
+from scripts.report.figures_metrics import (
+    benchmark_title,
+    plot_macro_f1_by_seed,
+    plot_macro_f1_delta,
+)
 
 METHOD_LABELS = {
     "patch_ce": "CE",
@@ -47,31 +52,6 @@ def _methods(config: dict, benchmark: str) -> list[str]:
 
 def _method_label(method: str) -> str:
     return METHOD_LABELS.get(method, method.replace("_", " "))
-
-
-def plot_metric_summary(
-    summary: pd.DataFrame, path: Path, split: str, benchmark: str
-) -> None:
-    """Plot macro-F1 summary for one benchmark."""
-    selected = cast(pd.DataFrame, summary[summary["split"] == split])
-    rows = sorted(selected.iterrows(), key=lambda item: float(item[1]["macro_f1_mean"]))
-    frame = pd.DataFrame([row for _, row in rows])
-    if frame.empty:
-        return
-    fig, ax = plt.subplots(figsize=(8, 5.5))
-    ax.barh(
-        [_method_label(method) for method in frame["method"]],
-        frame["macro_f1_mean"],
-        xerr=frame["macro_f1_std"],
-        color="#4f7cac",
-        capsize=3,
-    )
-    ax.set_xlabel("Macro F1")
-    ax.set_title(f"{benchmark.replace('_', ' ').title()} benchmark ({split})")
-    ax.grid(axis="x", alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(path, dpi=300)
-    plt.close(fig)
 
 
 def _classwise_rows(method: str, seed: int, result: dict) -> list[dict[str, object]]:
@@ -142,7 +122,7 @@ def _plot_tier_heatmap(pivot: pd.DataFrame, path: Path, benchmark: str) -> None:
         np.arange(len(pivot.index)),
         labels=[_method_label(method) for method in pivot.index],
     )
-    ax.set_title(f"{benchmark.replace('_', ' ').title()} mean recall by support tier")
+    ax.set_title(f"{benchmark_title(benchmark)} mean recall by support tier")
     _write_values(ax, values)
     fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04).set_label("Mean recall")
     fig.tight_layout()
@@ -177,18 +157,31 @@ def main() -> None:
     args = parse_args()
     config = load_config(args.config)
     paths = ensure_dirs(config)
-    stem = f"result_summary_{args.benchmark}"
-    summary_path = paths["tables"] / f"{stem}.csv"
-    if summary_path.exists():
-        plot_metric_summary(
-            pd.read_csv(summary_path),
-            paths["figures"] / f"method_macro_f1_{args.benchmark}_{args.split}.png",
+    methods = _methods(config, args.benchmark)
+    archive = paths["tables"] / f"result_details_{args.benchmark}.jsonl.gz"
+    if args.benchmark == "patch":
+        plot_macro_f1_delta(
+            archive,
+            methods,
+            paths["figures"]
+            / f"method_macro_f1_delta_{args.benchmark}_{args.split}.png",
             args.split,
             args.benchmark,
+            METHOD_LABELS,
+        )
+    else:
+        plot_macro_f1_by_seed(
+            archive,
+            methods,
+            paths["figures"]
+            / f"method_macro_f1_by_seed_{args.benchmark}_{args.split}.png",
+            args.split,
+            args.benchmark,
+            METHOD_LABELS,
         )
     plot_classwise_recall(
-        paths["tables"] / f"result_details_{args.benchmark}.jsonl.gz",
-        _methods(config, args.benchmark),
+        archive,
+        methods,
         paths["figures"] / f"classwise_recall_{args.benchmark}_{args.split}.png",
         args.split,
         args.benchmark,

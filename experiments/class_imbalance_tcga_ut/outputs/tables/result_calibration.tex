@@ -1,0 +1,20 @@
+\begin{tabular}{llccc}
+\toprule
+Regime & Method & NLL & Brier & ECE\\
+\midrule
+Patch & CE + soft MCC (balanced) & $1.952 \pm 0.092$ & $0.296 \pm 0.012$ & $0.140 \pm 0.006$\\
+Patch & CE + soft F1 (balanced) & $2.202 \pm 0.089$ & $0.301 \pm 0.008$ & $0.144 \pm 0.004$\\
+Patch & Weighted CE & $1.716 \pm 0.003$ & $0.302 \pm 0.007$ & $0.140 \pm 0.003$\\
+Patch & CE & $1.808 \pm 0.087$ & $0.299 \pm 0.005$ & $0.141 \pm 0.003$\\
+Patch & Balanced sampler & $1.807 \pm 0.105$ & $0.302 \pm 0.009$ & $0.141 \pm 0.004$\\
+Patch & ProGAN augmentation & $2.337 \pm 0.118$ & $0.314 \pm 0.006$ & $0.151 \pm 0.003$\\
+Patch & Focal & $1.156 \pm 0.043$ & $0.282 \pm 0.006$ & $0.118 \pm 0.002$\\
+\addlinespace
+WSI bag & RankMix & $0.407 \pm 0.041$ & $0.156 \pm 0.015$ & $0.022 \pm 0.003$\\
+WSI bag & MIL CE & $1.034 \pm 0.051$ & $0.195 \pm 0.009$ & $0.089 \pm 0.003$\\
+WSI bag & Balanced MIL & $1.100 \pm 0.050$ & $0.201 \pm 0.009$ & $0.091 \pm 0.003$\\
+WSI bag & SC-MIL & $0.958 \pm 0.104$ & $0.205 \pm 0.013$ & $0.092 \pm 0.005$\\
+WSI bag & Weighted MIL & $1.124 \pm 0.028$ & $0.210 \pm 0.011$ & $0.096 \pm 0.005$\\
+WSI bag & Focal MIL & $0.763 \pm 0.064$ & $0.200 \pm 0.007$ & $0.078 \pm 0.006$\\
+\bottomrule
+\end{tabular}
