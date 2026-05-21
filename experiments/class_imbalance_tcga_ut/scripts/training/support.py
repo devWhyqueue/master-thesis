@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import cast
 
 import numpy as np
@@ -5,7 +6,12 @@ import torch
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
 from sklearn.metrics import precision_recall_fscore_support
 
+from scripts.common import ensure_dirs, load_config
 from scripts.mil.metrics import extra_metrics
+from scripts.training.support_tiers import (
+    load_dataset_slide_counts,
+    tier_support_for_classes,
+)
 
 
 def _resolve_device(configured: str) -> torch.device:
@@ -19,6 +25,7 @@ def _metric_payload(
     y_pred: list[int],
     probabilities: list[list[float]],
     class_names: list[str],
+    tier_support: np.ndarray | None = None,
 ) -> dict[str, object]:
     labels = list(range(len(class_names)))
     precision, recall, f1, support = precision_recall_fscore_support(
@@ -29,6 +36,11 @@ def _metric_payload(
     f1 = cast(np.ndarray, f1)
     support = cast(np.ndarray, support)
     present = cast(np.ndarray, support > 0)
+    resolved_tier_support = tier_support
+    if resolved_tier_support is None:
+        resolved_tier_support = _default_dataset_tier_support(class_names)
+    if resolved_tier_support is None:
+        resolved_tier_support = support
     payload = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
@@ -47,7 +59,28 @@ def _metric_payload(
     }
     payload.update(
         extra_metrics(
-            y_true, probabilities, precision, recall, f1, support, len(class_names)
+            y_true,
+            probabilities,
+            precision,
+            recall,
+            f1,
+            support,
+            len(class_names),
+            resolved_tier_support,
         )
     )
     return payload
+
+
+def _default_dataset_tier_support(class_names: list[str]) -> np.ndarray | None:
+    paths = ensure_dirs(load_config(None))
+    return dataset_tier_support(class_names, paths["tables"] / "class_distribution.csv")
+
+
+def dataset_tier_support(
+    class_names: list[str], table_path: Path
+) -> np.ndarray | None:
+    """Return dataset slide counts for tier assignment when available."""
+    if not table_path.exists():
+        return None
+    return tier_support_for_classes(class_names, load_dataset_slide_counts(table_path))

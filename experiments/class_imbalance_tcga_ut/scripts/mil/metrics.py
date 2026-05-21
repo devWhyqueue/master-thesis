@@ -11,17 +11,24 @@ def extra_metrics(
     f1: np.ndarray,
     support: np.ndarray,
     n_classes: int,
+    tier_support: np.ndarray | None = None,
 ) -> dict[str, object]:
     """Build support-tier and probability-quality metrics."""
-    payload = _tier_metrics(precision, recall, f1, support)
+    payload = _tier_metrics(
+        precision, recall, f1, support, tier_support or support
+    )
     payload.update(_calibration_metrics(y_true, probabilities, n_classes))
     return payload
 
 
 def _tier_metrics(
-    precision: np.ndarray, recall: np.ndarray, f1: np.ndarray, support: np.ndarray
+    precision: np.ndarray,
+    recall: np.ndarray,
+    f1: np.ndarray,
+    support: np.ndarray,
+    tier_support: np.ndarray,
 ) -> dict[str, object]:
-    order = np.argsort(support)
+    order = np.argsort(tier_support)
     tiers = {
         "tail": order[:8],
         "body": order[8:-8] if len(order) > 16 else order,

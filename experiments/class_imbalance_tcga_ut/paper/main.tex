@@ -4,6 +4,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
+\usepackage{tabularx}
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage[authoryear,round]{natbib}
@@ -43,7 +44,7 @@ This structure makes TCGA-UT well suited for an imbalance study because the imba
   \caption{Dataset summary used by the shared patch and WSI-bag benchmarks.}
   \label{tab:dataset-summary}
   \small
-  \begin{tabular}{ll}
+  \begin{tabularx}{\linewidth}{@{}lX@{}}
     \toprule
     Property & Value\\
     \midrule
@@ -54,10 +55,10 @@ This structure makes TCGA-UT well suited for an imbalance study because the imba
     Smallest class & Diffuse large B-cell lymphoma (DLBC), 28 slides\\
     Slide-level imbalance ratio & 28.3\\
     Shared split size per seed & 6116 train, 1310 validation, 1310 test slides\\
-    Controlled patch input & Resolution level 0, up to 30 deterministic patches per slide; one frozen Virchow2 embedding per patch\\
-    WSI-bag input & Full frozen Virchow2 feature bags from the same slide identities\\
+    Controlled patch input & Resolution level~0; up to 30 deterministic patches per slide; one frozen Virchow2 embedding per patch (Section~\ref{sec:shared-splits})\\
+    WSI-bag input & Uncapped frozen Virchow2 feature bags from the same slide identities\\
     \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
 \begin{figure}[ht]
@@ -68,7 +69,7 @@ This structure makes TCGA-UT well suited for an imbalance study because the imba
 \end{figure}
 
 \subsection{Data Units and Terminology}
-Several data units are involved in the benchmark, and the distinction matters for method comparison. A \emph{slide} or \emph{WSI} is one diagnostic histopathology image associated with one cancer-type label. A \emph{tumor region} is a pathologist-selected area of a slide from which TCGA-UT crops groups of patches. A \emph{patch} is one $256\times256$ RGB crop selected by the controlled manifest. A \emph{patch embedding} is the frozen Virchow2 vector computed from that crop and consumed by the patch-level linear classifier. A \emph{feature chunk} is a saved frozen-feature representation associated with a slide or slide subset. A \emph{WSI bag} is the collection of frozen patch-feature instances used by the attention-MIL model for one slide-level prediction. \emph{Head}, \emph{body}, and \emph{tail} classes refer to relative support tiers on the held-out test split when reporting aggregate class-group metrics. A \emph{slide-disjoint split} means that all patches and features from one slide stay in exactly one of train, validation, or test.
+Several data units are involved in the benchmark, and the distinction matters for method comparison. A \emph{slide} or \emph{WSI} is one diagnostic histopathology image associated with one cancer-type label. A \emph{tumor region} is a pathologist-selected area of a slide from which TCGA-UT crops groups of patches. A \emph{patch} is one $256\times256$ RGB crop selected by the controlled manifest. A \emph{patch embedding} is the frozen Virchow2 vector computed from that crop and consumed by the patch-level linear classifier. A \emph{feature chunk} is a saved frozen-feature representation associated with a slide or slide subset. A \emph{WSI bag} is the collection of frozen patch-feature instances used by the attention-MIL model for one slide-level prediction. \emph{Head}, \emph{body}, and \emph{tail} classes refer to fixed support tiers derived from the full TCGA-UT slide distribution when reporting aggregate class-group metrics on the held-out test split. A \emph{slide-disjoint split} means that all patches and features from one slide stay in exactly one of train, validation, or test.
 
 \begin{table}[ht]
   \centering
@@ -86,7 +87,7 @@ Several data units are involved in the benchmark, and the distinction matters fo
     \emph{Cancer type} & The 32-way class label used for patch and slide-level classification.\\
     \emph{Feature chunk} & Frozen Virchow2 feature representation used to assemble slide-level feature bags.\\
     \emph{WSI bag} & Set of patch-feature instances for one slide, consumed by the MIL model.\\
-    \emph{Head/body/tail class} & Support tier on the held-out test split; see Section~\ref{sec:training-protocol}.\\
+    \emph{Head/body/tail class} & Fixed support tier from the full TCGA-UT slide distribution; see Section~\ref{sec:training-protocol}.\\
     \emph{Slide-disjoint split} & Split rule preventing any slide's patches or features from crossing train, validation, and test.\\
     \bottomrule
   \end{tabular}
@@ -119,6 +120,7 @@ Several data units are involved in the benchmark, and the distinction matters fo
 \end{figure}
 
 \subsection{Shared Splits and Benchmark Inputs}
+\label{sec:shared-splits}
 For each seed, slides are split into 6116 training, 1310 validation, and 1310 test slides. The same slide-level assignments are reused by both benchmarks so that no patches from the same slide can appear in different splits. This is the main leakage-control mechanism: the patch benchmark and the WSI-bag benchmark see different input units, but they inherit the same train/validation/test slide partition.
 
 The patch benchmark derives a deterministic controlled patch manifest from the shared slide split. It uses resolution level 0 and samples up to 30 patches per slide with a fixed rule before method-specific training begins. The cap is a compromise between data coverage and slide-level control: it uses the empirical median number of raw JPG patches per slide at resolution level 0 (median 30, mean 31.1, range 10--80) while preventing slides with many extracted tumor-region patches from dominating the patch-level loss. At this resolution, 8686 of 8736 slides have at least 30 raw patches, so the cap retains the typical per-slide patch evidence while limiting only the larger slide folders. Each selected patch is encoded once with a frozen Virchow2 model (`hf-hub:paige-ai/Virchow2` via \texttt{timm}), and all patch methods train the same lightweight classifier head on these embeddings \citep{zimmermann2024virchow2,vorontsov2024virchow}. The encoder output is concatenated as $\mathrm{concat}(\mathrm{CLS}, \mathrm{mean}(\mathrm{patch\ tokens}))$, yielding 2560-dimensional float16 vectors that are cast to float32 before classifier training. This design isolates imbalance mechanisms from both patch-selection policy and end-to-end image-backbone learning. The WSI-bag benchmark uses full frozen Virchow2 feature bags built from the same slide identities, rather than applying an additional instance cap.
@@ -343,12 +345,12 @@ The patch classifier head is a two-layer MLP on frozen 2560-dimensional Virchow2
 
 RankMix uses balanced slide-bag sampling during student training. Mixed bags are formed within each minibatch by pairing bags with a random permutation and mixing their teacher-ranked representative subsequences with $\lambda\sim\mathrm{Beta}(1,1)$. The student is reinitialized after teacher preparation and trained for the same 30-epoch budget as the other MIL methods.
 
-Head, body, and tail summaries in the evaluation artifacts are computed from per-class support on the held-out test split rather than from training-slide counts. Classes are sorted by test support; the eight lowest-support classes form the tail tier, the eight highest-support classes form the head tier, and the remaining sixteen classes form the body tier. Expected calibration error uses ten equal-width confidence bins on the maximum predicted probability.
+Head, body, and tail summaries group classes by support in the full TCGA-UT slide distribution rather than by held-out test counts. Cancer types are sorted by dataset slide count; the eight lowest-support classes form the tail tier, the eight highest-support classes form the head tier, and the remaining sixteen classes form the body tier. Tier-wise precision, recall, and F1 on validation and test splits then aggregate only over the predefined classes in each tier. Expected calibration error uses ten equal-width confidence bins on the maximum predicted probability.
 
 \section{Evaluation}
 Both benchmarks use seeds 0, 1, and 2. Macro F1 is the primary ranking metric within each benchmark because it weights classes equally and penalizes failure on rare classes. Balanced accuracy, accuracy, classwise precision/recall/F1, and head/body/tail summaries are reported in the main result tables using the tier definitions in Section~\ref{sec:training-protocol}. Negative log likelihood (NLL), multiclass Brier score, and expected calibration error (ECE) are computed on held-out softmax probabilities and summarized in Table~\ref{tab:calibration}. Patch and WSI-bag methods are never ranked against each other, because they answer related but different questions with different input units and supervision.
 
-All reported tables use the held-out test split and show mean $\pm$ standard deviation over seeds. Separate validation summaries are retained as artifacts for model-selection checks. The completed sweep contains no missing planned results for either benchmark.
+All reported tables use the held-out test split and show mean $\pm$ standard deviation over seeds. Table~\ref{tab:paired-deltas} additionally reports paired seed-wise differences for the headline comparisons against each regime's CE baseline; bracketed values list deltas in seed order 0--2 without formal significance testing. Separate validation summaries are retained as artifacts for model-selection checks. The completed sweep contains no missing planned results for either benchmark.
 
 \section{Results}
 Both benchmarks share slide-disjoint splits and the Virchow2 feature family, but they answer different prediction questions under different per-slide evidence budgets. The patch benchmark treats each selected crop as an independent labeled example and caps slides at 30 deterministic patches; the WSI-bag benchmark predicts one slide label from an uncapped attention-weighted aggregation over all feature instances on that slide. Patch metrics therefore characterize patch-level classification only and must not be read as slide-level diagnostics; WSI-bag metrics characterize slide-level MIL only. Absolute scores and method orderings are not comparable across the two tables.
@@ -362,7 +364,7 @@ Both benchmarks share slide-disjoint splits and the Virchow2 feature family, but
   \input{../outputs/tables/result_summary_patch.tex}
 \end{table}
 
-The patch benchmark compresses into a narrow performance band once patches are represented with frozen Virchow2 embeddings (Table~\ref{tab:patch-results}). The Scholz-style CE plus soft-MCC objective with balanced sampling ranks highest by macro F1 ($0.782 \pm 0.007$) and balanced accuracy ($0.782 \pm 0.008$). The closely related CE plus soft-F1 variant reaches nearly the same macro F1 ($0.782 \pm 0.004$) and balanced accuracy ($0.782 \pm 0.004$). Relative to plain CE ($0.776 \pm 0.002$ macro F1, $0.770 \pm 0.003$ balanced accuracy), the hybrid objectives provide small but consistent improvements over CE in the frozen-embedding patch regime: macro F1 increases by only about $0.006$ points, with overlapping seed variability and no paired significance testing, but the direction aligns with the design goal of optimizing class-balanced evaluation signals on top of balanced exposure. The same methods do not improve probability quality on the same scale (Table~\ref{tab:calibration}): CE plus soft F1 raises NLL to $2.20 \pm 0.09$ and CE plus soft MCC to $1.95 \pm 0.09$, compared with $1.81 \pm 0.09$ for plain CE, while expected calibration error remains near $0.14$ for both hybrid objectives and the baseline.
+The patch benchmark compresses into a narrow performance band once patches are represented with frozen Virchow2 embeddings (Table~\ref{tab:patch-results}). The Scholz-style CE plus soft-MCC objective with balanced sampling ranks highest by macro F1 ($0.782 \pm 0.007$) and balanced accuracy ($0.782 \pm 0.008$). The closely related CE plus soft-F1 variant reaches nearly the same macro F1 ($0.782 \pm 0.004$) and balanced accuracy ($0.782 \pm 0.004$). Relative to plain CE ($0.776 \pm 0.002$ macro F1, $0.770 \pm 0.003$ balanced accuracy), the hybrid objectives provide small but consistent improvements over CE in the frozen-embedding patch regime (Table~\ref{tab:paired-deltas}): paired seed-wise macro-F1 deltas are positive for both Scholz-style variants in all three seeds, with mean gains of about $+0.006$--$+0.007$ points. The same methods do not improve probability quality on the same scale (Table~\ref{tab:calibration}): CE plus soft F1 raises NLL to $2.20 \pm 0.09$ and CE plus soft MCC to $1.95 \pm 0.09$, compared with $1.81 \pm 0.09$ for plain CE, while expected calibration error remains near $0.14$ for both hybrid objectives and the baseline.
 
 The simpler patch interventions separate more clearly in this embedding regime. Class-weighted CE and balanced sampling remain competitive with CE, with macro F1 values of $0.776 \pm 0.012$ and $0.775 \pm 0.008$, respectively. ProGAN augmentation does not outperform the CE baseline: it reaches macro F1 $0.774 \pm 0.008$ and balanced accuracy $0.767 \pm 0.011$, which is within the spread of the non-generative methods rather than above them. This negative result is not explained by a lack of synthetic volume alone. For seed~0, ProGAN adds 348{,}120 generated training patches across 31 classes below the head-class patch count (Table~\ref{tab:progan-diagnostics}) on top of the same real controlled training set as plain CE. Quality diagnostics show high Inception FID (median 178.5) and non-trivial Virchow2 nearest-neighbor distances (median 47.9 in $L_2$ on 2560-dimensional embeddings), indicating that the generated patches are neither near-exact copies of real training patches nor close to the real feature manifold used at classification time (Figure~\ref{fig:progan-examples}). Focal loss is the weakest patch method ($0.766 \pm 0.003$ macro F1, $0.760 \pm 0.002$ balanced accuracy), indicating that down-weighting easy examples is not helpful once the representation already separates most cancer types well. Accuracy remains high for all methods ($\approx 0.83$), so the ranking is driven mainly by class-balanced metrics rather than by overall prevalence-sensitive performance.
 
@@ -408,9 +410,33 @@ The classwise-recall plot (Figure~\ref{fig:patch-classwise-recall}) shows that r
 
 The WSI-bag benchmark evaluates one slide-level prediction per diagnostic slide by aggregating uncapped feature bags from the shared split. Although the median bag size in the frozen feature export is also about 30 instances, larger slides contribute up to 70 instances to MIL whereas the patch benchmark never uses more than 30 deterministic crops from the same slide, and MIL additionally learns instance weighting rather than treating each crop as an independently labeled patch. WSI-bag performance may therefore benefit from both extra morphological evidence on large slides and slide-native aggregation mechanisms that the patch classifier does not exercise. Table~\ref{tab:wsi-results} should be read as a within-regime slide-level leaderboard, not as confirmation or refutation of the patch-level ranking.
 
-RankMix shows the clearest WSI-bag benefit, especially in balanced accuracy, while macro-F1 gains remain modest (Table~\ref{tab:wsi-results}). Relative to plain MIL CE, balanced accuracy improves from $0.836 \pm 0.020$ to $0.863 \pm 0.008$, whereas macro F1 moves from $0.840 \pm 0.020$ to $0.848 \pm 0.017$ with overlapping standard deviations across seeds. RankMix also improves probability calibration (Table~\ref{tab:calibration}), lowering NLL from $1.03 \pm 0.05$ to $0.41 \pm 0.04$, Brier score from $0.195 \pm 0.009$ to $0.156 \pm 0.015$, and ECE from $0.089 \pm 0.003$ to $0.022 \pm 0.003$. The larger balanced-accuracy shift is consistent with RankMix directly augmenting representative instance subsequences in the MIL regime.
+RankMix shows the clearest WSI-bag benefit, especially in balanced accuracy, while macro-F1 gains remain modest (Table~\ref{tab:wsi-results}). Relative to plain MIL CE, balanced accuracy improves from $0.836 \pm 0.020$ to $0.863 \pm 0.008$, whereas macro F1 moves from $0.840 \pm 0.020$ to $0.848 \pm 0.017$ with overlapping standard deviations across seeds. Paired seed-wise comparisons (Table~\ref{tab:paired-deltas}) show positive RankMix deltas in all three seeds for both metrics, with the largest balanced-accuracy shift in seed~0 ($+0.045$). RankMix also improves probability calibration (Table~\ref{tab:calibration}), lowering NLL from $1.03 \pm 0.05$ to $0.41 \pm 0.04$, Brier score from $0.195 \pm 0.009$ to $0.156 \pm 0.015$, and ECE from $0.089 \pm 0.003$ to $0.022 \pm 0.003$. The larger balanced-accuracy shift is consistent with RankMix directly augmenting representative instance subsequences in the MIL regime.
 
 The remaining WSI methods cluster closely. Balanced-sampling MIL and SC-MIL produce similar balanced accuracy ($0.837$), but both trail RankMix in macro F1. SC-MIL performs well on validation but does not exceed plain MIL CE on the test macro-F1 average. Weighted MIL CE and focal MIL do not improve over plain MIL CE in this configuration, with focal MIL giving the lowest WSI macro F1. Activation diagnostics confirm that the advanced WSI objectives were active: RankMix generated about 1.10 million mixed examples per seed, and SC-MIL constructed about 1.06 million positive pairs per seed.
+
+\subsection{Paired Seed Comparisons}
+\begin{table}[htbp]
+  \centering
+  \caption{Paired test-split differences against the within-regime CE baseline on seeds 0--2. Each cell reports mean $\pm$ SD across seeds; bracketed values list seed-ordered paired deltas. No formal $p$-values are computed.}
+  \label{tab:paired-deltas}
+  \small
+  \input{../outputs/tables/result_paired_deltas_test.tex}
+\end{table}
+
+Table~\ref{tab:paired-deltas} makes the headline gains explicit at seed resolution rather than only through aggregate means. Both patch hybrid objectives remain above plain CE on macro F1 in every seed, and RankMix remains above plain MIL CE on both metrics in every seed, even though the absolute shifts are modest and would require formal paired testing to treat as significant.
+
+\subsection{Probability Calibration}
+\begin{table}[htbp]
+  \centering
+  \caption{Held-out test calibration metrics over three seeds. Lower is better for negative log likelihood (NLL), multiclass Brier score, and expected calibration error (ECE). Values are not comparable across regimes because patch and WSI-bag models operate on different input units.}
+  \label{tab:calibration}
+  \small
+  \input{../outputs/tables/result_calibration.tex}
+\end{table}
+
+Table~\ref{tab:calibration} makes the discrimination--calibration tradeoff explicit. On patches, focal loss yields the lowest ECE ($0.013 \pm 0.003$) but the weakest macro F1, whereas the Scholz-style hybrid objectives that rank highest on macro F1 increase NLL without a matching ECE gain over plain CE. ProGAN augmentation further degrades both NLL and ECE relative to the CE baseline. On WSI bags, RankMix is the only method that improves both class-balanced discrimination and calibration relative to plain MIL CE; the remaining MIL variants cluster near the baseline on Brier score and ECE while trailing RankMix on both metrics.
+
+All WSI-bag calibration scores are computed from the same held-out test slides, hard slide labels, and raw softmax outputs of the final-epoch model. Every method uses the same evaluation routine: no temperature scaling, no validation-fit calibration, and no method-specific post-processing. An audit over stored test-result files confirms that all six WSI methods share identical test label sequences within each seed, that reported probabilities sum to one, and that stored NLL, Brier, and ECE values match recomputation from the saved probability matrix. The RankMix gap is therefore not an evaluation artifact: plain MIL CE is strongly overconfident (mean maximum predicted probability $\approx 0.98$ versus $\approx 0.91$ for RankMix), whereas RankMix's soft mixing targets affect training only and not the held-out evaluation forward pass.
 
 \begin{figure}[ht]
   \centering
@@ -426,17 +452,7 @@ The remaining WSI methods cluster closely. Balanced-sampling MIL and SC-MIL prod
   \label{fig:wsi-classwise-recall}
 \end{figure}
 
-\subsection{Probability Calibration}
-\begin{table}[ht]
-  \centering
-  \caption{Held-out test calibration metrics over three seeds. Lower is better for negative log likelihood (NLL), multiclass Brier score, and expected calibration error (ECE). Values are not comparable across regimes because patch and WSI-bag models operate on different input units.}
-  \label{tab:calibration}
-  \small
-  \input{../outputs/tables/result_calibration.tex}
-\end{table}
-
-Table~\ref{tab:calibration} makes the discrimination--calibration tradeoff explicit. On patches, focal loss yields the best calibration scores (NLL $1.16 \pm 0.04$, ECE $0.118 \pm 0.002$) but the weakest macro F1, whereas the Scholz-style hybrid objectives that rank highest on macro F1 increase NLL without a matching ECE gain over plain CE. ProGAN augmentation further degrades both NLL and ECE relative to the CE baseline. On WSI bags, RankMix is the only method that improves both class-balanced discrimination and calibration relative to plain MIL CE; the remaining MIL variants cluster near the baseline on Brier score and ECE while trailing RankMix on both metrics.
-
+\clearpage
 \section{Discussion}
 The two benchmarks support different but compatible conclusions. In the patch benchmark, a strong frozen encoder compresses the performance spread: most methods cluster near macro F1 $0.77$--$0.78$, and the Scholz-style hybrid objectives provide small but consistent improvements over plain CE rather than large separations. ProGAN augmentation does not deliver the same advantage in this regime even though it adds large numbers of synthetic tail-class patches; the accompanying quality diagnostics suggest a combination of high Inception FID and substantial Virchow2 embedding-space separation from real training patches, rather than a simple failure to increase tail-class exposure. Focal loss is also unhelpful here, consistent with the interpretation that difficulty reweighting is redundant when the representation has already absorbed much of the class-separation problem. In the WSI-bag benchmark, RankMix shows the clearest benefit, especially in balanced accuracy, while macro-F1 gains remain modest; a WSI-native feature-mixing mechanism can still help over plain MIL CE even though the bags already use Virchow2 features.
 
@@ -451,6 +467,7 @@ Several limitations remain. TCGA-UT patch labels come from pathologist-selected 
 \section{Conclusion}
 TCGA-UT supports a cleaner imbalance study when patch-level and WSI-bag supervision are evaluated separately with regime-appropriate inputs. On controlled patch classification with frozen Virchow2 embeddings, Scholz-style CE plus soft F1 or soft MCC with balanced sampling provide small but consistent improvements over plain CE, whereas ProGAN augmentation and focal loss do not improve over that baseline. On WSI bags, RankMix shows the clearest benefit, especially in balanced accuracy, while macro-F1 gains remain modest. These two result sets are complementary rather than mutually confirming: patch-level metrics do not directly establish slide-level utility, WSI-bag metrics may benefit from uncapped per-slide evidence and MIL aggregation beyond the 30-patch controlled manifest, and methods should not be ranked across regimes. The practical implication is that imbalance mitigation should be matched to the supervision unit and to the learning stage that still limits performance; otherwise, an intervention can appear ineffective because the representation already absorbs the problem it was designed to solve, or because it was tested in the wrong regime.
 
+\clearpage
 \bibliographystyle{apalike}
 \bibliography{references}
 

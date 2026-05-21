@@ -42,6 +42,7 @@ from scripts.progan.manifest import (
     progan_settings as _settings,
 )
 from scripts.progan.storage import generated_counts_match as _generated_counts_match
+from scripts.training.support_tiers import class_tier_labels
 from scripts.prep.patch_manifest import build_patch_manifest
 
 
@@ -363,3 +364,15 @@ def test_progan_balances_to_head_patch_count() -> None:
         }
     )
     assert _balance_target(frame, settings) == 3
+
+
+def test_support_tiers_use_dataset_slide_counts() -> None:
+    class_names = [f"class_{index}" for index in range(32)]
+    slide_counts = {name: index + 1 for index, name in enumerate(class_names)}
+    labels = class_tier_labels(class_names, slide_counts)
+    assert labels["class_0"] == "tail"
+    assert labels["class_7"] == "tail"
+    assert labels["class_8"] == "body"
+    assert labels["class_23"] == "body"
+    assert labels["class_24"] == "head"
+    assert labels["class_31"] == "head"

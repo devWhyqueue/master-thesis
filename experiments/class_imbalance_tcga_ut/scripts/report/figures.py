@@ -17,6 +17,7 @@ from scripts.report.figures_metrics import (
     plot_macro_f1_by_seed,
     plot_macro_f1_delta,
 )
+from scripts.training.support_tiers import load_class_tier_labels
 
 METHOD_LABELS = {
     "patch_ce": "CE",
@@ -86,23 +87,16 @@ def _load_archive(path: Path, methods: list[str], split: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _tier_pivot(frame: pd.DataFrame, methods: list[str]) -> pd.DataFrame:
-    """Aggregate classwise recalls into support tiers."""
-    support = cast(pd.Series, frame.groupby("class_name")["support"].mean())
-    ordered = [
-        name
-        for name, _ in sorted(
-            ((str(name), float(value)) for name, value in support.to_dict().items()),
-            key=lambda item: item[1],
-        )
-    ]
+def _tier_pivot(
+    frame: pd.DataFrame, methods: list[str], tier_labels: dict[str, str]
+) -> pd.DataFrame:
+    """Aggregate classwise recalls into predefined support tiers."""
     grouped = cast(
         pd.DataFrame,
         frame.groupby(["method", "class_name"], as_index=False)["recall"].mean(),
     )
-    tail, head = set(ordered[:8]), set(ordered[-8:])
     grouped["tier"] = grouped["class_name"].map(
-        lambda name: "Tail" if name in tail else "Head" if name in head else "Body"
+        lambda name: tier_labels[str(name)].capitalize()
     )
     return grouped.pivot_table(
         index="method", columns="tier", values="recall", aggfunc="mean"
@@ -134,9 +128,17 @@ def plot_classwise_recall(
     archive: Path, methods: list[str], path: Path, split: str, benchmark: str
 ) -> None:
     """Plot mean recall by support tier for one benchmark."""
-    if archive.exists():
-        frame = _load_archive(archive, methods, split)
-        _plot_tier_heatmap(_tier_pivot(frame, methods), path, benchmark)
+    if not archive.exists():
+        return
+    frame = _load_archive(archive, methods, split)
+    class_names = sorted(frame["class_name"].astype(str).unique().tolist())
+    paths = ensure_dirs(load_config(None))
+    tier_labels = load_class_tier_labels(
+        class_names, paths["tables"] / "class_distribution.csv"
+    )
+    if tier_labels is None:
+        return
+    _plot_tier_heatmap(_tier_pivot(frame, methods, tier_labels), path, benchmark)
 
 
 def _write_values(ax: Axes, values: np.ndarray) -> None:
