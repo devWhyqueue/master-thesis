@@ -39,6 +39,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 - In methods prose, distinguish what is varied, what is held constant, and what each design choice is meant to isolate.
 - Maintain academic restraint. Avoid hype, marketing language, and unsupported novelty claims.
 - Make transitions explicit when moving between motivation, prior work, method, result, limitation, and implication.
+- Format numbers with a decimal point for fractional values and a comma as the thousands separator, e.g., `0.72` and `2,152`. In LaTeX documents that use `siunitx`, prefer `\num{...}` with a matching document-level setup so generated tables and prose remain consistent.
 - Preserve reader orientation in long sections with short signposting paragraphs rather than excessive headings.
 - Treat each revision as a standalone final artifact, not as a change log. Avoid meta-revision language such as "revised", "earlier", "previous", "new", "old", or "now" unless the document explicitly needs historical comparison. Describe the current claim, evidence, and interpretation directly.
 - When revising, improve argument flow, specificity, and citation placement without changing the author's intended contribution.

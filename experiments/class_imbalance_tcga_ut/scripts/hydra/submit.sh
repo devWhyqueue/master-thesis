@@ -59,7 +59,7 @@ require_real_patch_sqfs_absent() {
 require_synthetic_sqfs_absent() {
   local seed
   for seed in 0 1 2; do
-    require_absent "${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+    require_absent "${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-${seed}.sqfs}"
   done
 }
 

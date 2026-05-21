@@ -61,7 +61,7 @@ case "$job" in
 
   build-synthetic-sqfs)
     seed="$(seed_from_array)"
-    export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+    export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-${seed}.sqfs}"
     export PATCH_SYNTHETIC_SQFS_FILE_LIST="${PATCH_SYNTHETIC_SQFS_FILE_LIST:-${SLURM_TMPDIR:-/tmp}/tcga_ut_synthetic_seed=${seed}.txt}"
     if [ -e "$PATCH_SYNTHETIC_SQFS_OUTPUT" ]; then
       echo "Refusing to overwrite existing SquashFS image: $PATCH_SYNTHETIC_SQFS_OUTPUT" >&2

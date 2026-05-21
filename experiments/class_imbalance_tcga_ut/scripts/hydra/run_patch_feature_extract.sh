@@ -6,7 +6,7 @@ shift
 
 include_synthetic="${PATCH_FEATURE_INCLUDE_SYNTHETIC:-1}"
 export PATCH_STAGE_DIR="${PATCH_STAGE_DIR:-${SLURM_TMPDIR:-/tmp}/tcga_ut_patch_feature_seed=${seed}}"
-export SYNTH_SQFS="${PATCH_SYNTHETIC_SQFS:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+export SYNTH_SQFS="${PATCH_SYNTHETIC_SQFS:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-${seed}.sqfs}"
 
 cleanup_patch_feature_mounts() {
   cleanup_real_patch_sqfs

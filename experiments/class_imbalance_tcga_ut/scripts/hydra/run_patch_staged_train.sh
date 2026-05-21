@@ -12,7 +12,7 @@ fi
 export PATCH_STAGE_DIR="${SLURM_TMPDIR:-/tmp}/tcga_ut_patch_seed=${seed}"
 mkdir -p "${PATCH_STAGE_DIR}"
 export PATCH_SQFS_STAGE_DIR="${PATCH_STAGE_DIR}"
-SYNTH_SQFS="${PATCH_SYNTHETIC_SQFS:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed=${seed}.sqfs}"
+SYNTH_SQFS="${PATCH_SYNTHETIC_SQFS:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-${seed}.sqfs}"
 
 cleanup_sqfs_mounts() {
   cleanup_real_patch_sqfs
