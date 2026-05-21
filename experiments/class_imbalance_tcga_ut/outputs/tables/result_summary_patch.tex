@@ -2,10 +2,12 @@
 \toprule
 Method & Accuracy & Balanced accuracy & Macro F1\\
 \midrule
-CE & $0.412 \pm 0.011$ & $0.310 \pm 0.003$ & $0.314 \pm 0.004$\\
-Focal & $0.402 \pm 0.010$ & $0.307 \pm 0.011$ & $0.310 \pm 0.011$\\
-ProGAN augmentation & $0.407 \pm 0.012$ & $0.306 \pm 0.021$ & $0.299 \pm 0.021$\\
-Balanced sampler & $0.354 \pm 0.011$ & $0.333 \pm 0.013$ & $0.293 \pm 0.006$\\
-Weighted CE & $0.333 \pm 0.033$ & $0.330 \pm 0.016$ & $0.285 \pm 0.018$\\
+ProGAN augmentation & $0.540 \pm 0.002$ & $0.441 \pm 0.003$ & $0.446 \pm 0.003$\\
+Focal & $0.419 \pm 0.006$ & $0.318 \pm 0.004$ & $0.323 \pm 0.001$\\
+CE & $0.424 \pm 0.022$ & $0.313 \pm 0.021$ & $0.319 \pm 0.019$\\
+Balanced sampler & $0.365 \pm 0.010$ & $0.356 \pm 0.011$ & $0.307 \pm 0.012$\\
+CE + soft F1 (balanced) & $0.356 \pm 0.022$ & $0.349 \pm 0.023$ & $0.298 \pm 0.018$\\
+CE + soft MCC (balanced) & $0.352 \pm 0.026$ & $0.347 \pm 0.008$ & $0.296 \pm 0.009$\\
+Weighted CE & $0.347 \pm 0.013$ & $0.340 \pm 0.013$ & $0.289 \pm 0.014$\\
 \bottomrule
 \end{tabular}

@@ -17,6 +17,8 @@ Commands:
   prepare                  Build manifests, splits, patch manifests, and exploration output
   build-patch-sqfs         Build the controlled real-patch SquashFS image
   patch-train              Submit non-ProGAN patch benchmark array
+  patch-feature-extract    Extract real+synthetic Virchow2 patch feature caches
+  patch-feature-train      Train patch-level methods on Virchow2 feature caches
   progan                   Submit GAN, synthetic SquashFS, and ProGAN classifier jobs
   progan-resubmit          Regenerate manifests and SquashFS images, then submit ProGAN
   patch-progan-train       Train ProGAN classifier only from existing GAN artifacts
@@ -31,7 +33,7 @@ Environment overrides:
   EXPERIMENT_CONTAINER, PROGAN_ARRAY_UPPER, PROGAN_ARRAY_MAX_PARALLEL,
   PROGAN_GPU_CONSTRAINT, PROGAN_PARTITION, PROGAN_TRAIN_PARTITION,
   PROGAN_SYNTH_SQFS_PARTITION, PATCH_PARTITION, PATCH_SQFS_PARTITION,
-  WSI_PARTITION
+  PATCH_FEATURE_PARTITION, PATCH_FEATURE_CONSTRAINT, WSI_PARTITION
 USAGE
 }
 
@@ -148,6 +150,31 @@ case "$command" in
       --array=0-2 \
       --output=logs/progan-train-%A-%a.out \
       --error=logs/progan-train-%A-%a.err \
+      "$@"
+    ;;
+
+  patch-feature-extract)
+    submit_with_args patch-feature-extract \
+      --job-name=tcga-ut-patch-feat \
+      --partition="${PATCH_FEATURE_PARTITION:-gpu-2d}" \
+      --constraint="${PATCH_FEATURE_CONSTRAINT:-h100|h200|blackwell}" \
+      --gpus-per-node=1 \
+      --ntasks-per-node=8 \
+      --array=0-2 \
+      --output=logs/patch-feature-extract-%A-%a.out \
+      --error=logs/patch-feature-extract-%A-%a.err \
+      "$@"
+    ;;
+
+  patch-feature-train)
+    submit_with_args patch-feature-train \
+      --job-name=tcga-ut-patch-feat-train \
+      --partition="${PATCH_FEATURE_TRAIN_PARTITION:-gpu-2h}" \
+      --gpus-per-node=1 \
+      --ntasks-per-node=8 \
+      --array=0-20 \
+      --output=logs/patch-feature-train-%A-%a.out \
+      --error=logs/patch-feature-train-%A-%a.err \
       "$@"
     ;;
 

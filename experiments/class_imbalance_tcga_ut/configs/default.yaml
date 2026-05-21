@@ -34,6 +34,26 @@ patch_training:
   max_train_rows:
   max_eval_rows:
 
+patch_feature_extraction:
+  batch_size: 64
+  device: auto
+  include_synthetic: true
+  model_name: hf-hub:paige-ai/Virchow2
+  dtype: float16
+
+patch_feature_training:
+  seeds: [0, 1, 2]
+  batch_size: 256
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  hidden_dim: 512
+  dropout: 0.1
+  focal_gamma: 2.0
+  device: auto
+  max_train_rows:
+  max_eval_rows:
+
 wsi_training:
   seeds: [0, 1, 2]
   bag_batch_size: 32
@@ -72,6 +92,15 @@ patch_methods:
   - patch_ce_soft_f1_balanced
   - patch_ce_soft_mcc_balanced
   - patch_progan_aug
+
+patch_feature_methods:
+  - patch_feature_ce
+  - patch_feature_weighted_ce
+  - patch_feature_focal
+  - patch_feature_balanced_sampler_ce
+  - patch_feature_ce_soft_f1_balanced
+  - patch_feature_ce_soft_mcc_balanced
+  - patch_feature_progan_aug
 
 wsi_bag_methods:
   - mil_ce

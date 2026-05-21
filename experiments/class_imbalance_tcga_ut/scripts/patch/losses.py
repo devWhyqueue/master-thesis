@@ -61,7 +61,7 @@ class SoftF1LossMulti(nn.Module):
         probs = torch.softmax(logits, dim=1)
         loss = torch.zeros(1, device=logits.device, dtype=logits.dtype)
         for class_idx in range(self.num_classes):
-            loss = loss + self._binary(labels[:, class_idx], probs[:, class_idx])
+            loss = loss + self._binary(logits[:, class_idx], labels[:, class_idx])
         return loss / self.num_classes
 
 

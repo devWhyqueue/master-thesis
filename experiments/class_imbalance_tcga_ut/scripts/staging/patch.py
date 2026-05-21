@@ -67,6 +67,7 @@ def combined_training_frame(
 ) -> pd.DataFrame:
     """Build the patch frame used for staging (optionally with synthetic train rows)."""
     frame = load_seed_manifest(paths, seed)
+    frame["is_synthetic"] = False
     if not include_synthetic:
         return frame
     synthetic_path = _synthetic_manifest_path(config, seed)
@@ -76,6 +77,7 @@ def combined_training_frame(
         )
     synthetic = pd.read_csv(synthetic_path)
     synthetic["split"] = "train"
+    synthetic["is_synthetic"] = True
     return pd.concat([frame, synthetic], ignore_index=True)
 
 
@@ -118,69 +120,93 @@ def stage_patch_manifest(
 ) -> Path:
     """Stage manifest images to fast local storage and write a local manifest CSV."""
     paths = ensure_dirs(config)
-    settings, raw_root = _staging_settings(config), _raw_root(config)
+    raw_root = _raw_root(config)
     target_dir = stage_dir or stage_root(seed)
     target_dir.mkdir(parents=True, exist_ok=True)
     frame = combined_training_frame(paths, config, seed, include_synthetic)
     sqfs = _sqfs_path(config)
     synthetic_sqfs = _synthetic_sqfs_path(config, seed) if include_synthetic else None
-    synthetic_root = (
-        synthetic_output_root(paths["root"], seed) if include_synthetic else None
+    staged_frame, mode = _stage_frame(
+        config, paths, frame, target_dir, raw_root, sqfs, seed, include_synthetic
     )
-    copy_workers = int(settings.get("copy_workers", 8))
-    use_sqfs = bool(settings.get("prefer_sqfs", True)) and sqfs is not None
-    mount_point = target_dir / "sqfs_mount"
-    pre_mount = os.environ.get("PATCH_SQFS_MOUNT")
-    host_mount = (
-        bool(pre_mount)
-        and Path(pre_mount).is_dir()
-        and any(Path(pre_mount).iterdir())
-    )
-    try:
-        if use_sqfs and sqfs is not None:
-            if host_mount:
-                staged_frame, mode = _stage_with_sqfs(
-                    frame,
-                    target_dir,
-                    raw_root,
-                    sqfs,
-                    copy_workers,
-                    mount=Path(pre_mount),
-                    synthetic_root=synthetic_root,
-                )
-            else:
-                try:
-                    staged_frame, mode = _stage_with_sqfs(
-                        frame,
-                        target_dir,
-                        raw_root,
-                        sqfs,
-                        copy_workers,
-                        synthetic_root=synthetic_root,
-                    )
-                except FileNotFoundError:
-                    logger.warning(
-                        "squashfuse not available; falling back to image copy"
-                    )
-                    staged_frame, mode = _stage_with_copy(
-                        frame, target_dir, raw_root, copy_workers, sqfs
-                    )
-        else:
-            staged_frame, mode = _stage_with_copy(
-                frame, target_dir, raw_root, copy_workers, sqfs
-            )
-    except (OSError, subprocess.CalledProcessError):
-        _unmount_sqfs(mount_point)
-        raise
     return _write_staged_manifest(
         target_dir, staged_frame, seed, mode, include_synthetic, sqfs, synthetic_sqfs
     )
 
 
-def cleanup_stage_mount(seed: int) -> None:
-    """Unmount SquashFS when used for this job."""
-    stage_dir = Path(os.environ.get("PATCH_STAGE_DIR", stage_root(seed)))
-    _unmount_sqfs(stage_dir / "sqfs_mount")
+def _stage_frame(
+    config: dict,
+    paths: dict[str, Path],
+    frame: pd.DataFrame,
+    target_dir: Path,
+    raw_root: Path,
+    sqfs: Path | None,
+    seed: int,
+    include_synthetic: bool,
+) -> tuple[pd.DataFrame, str]:
+    settings = _staging_settings(config)
+    synthetic_root = _synthetic_root(paths, seed, include_synthetic)
+    copy_workers = int(settings.get("copy_workers", 8))
+    mount_point = target_dir / "sqfs_mount"
+    try:
+        return _stage_frame_inner(
+            frame, target_dir, raw_root, sqfs, copy_workers, settings, synthetic_root
+        )
+    except (OSError, subprocess.CalledProcessError):
+        _unmount_sqfs(mount_point)
+        raise
+
+
+def _synthetic_root(
+    paths: dict[str, Path], seed: int, include_synthetic: bool
+) -> Path | None:
+    if not include_synthetic:
+        return None
+    return synthetic_output_root(paths["root"], seed)
+
+
+def _stage_frame_inner(
+    frame: pd.DataFrame,
+    target_dir: Path,
+    raw_root: Path,
+    sqfs: Path | None,
+    copy_workers: int,
+    settings: dict,
+    synthetic_root: Path | None,
+) -> tuple[pd.DataFrame, str]:
+    use_sqfs = bool(settings.get("prefer_sqfs", True)) and sqfs is not None
+    if not use_sqfs or sqfs is None:
+        return _stage_with_copy(frame, target_dir, raw_root, copy_workers, sqfs)
+    pre_mount = os.environ.get("PATCH_SQFS_MOUNT")
+    if _is_live_mount(pre_mount):
+        return _stage_with_sqfs(
+            frame,
+            target_dir,
+            raw_root,
+            sqfs,
+            copy_workers,
+            mount=Path(str(pre_mount)),
+            synthetic_root=synthetic_root,
+        )
+    try:
+        return _stage_with_sqfs(
+            frame,
+            target_dir,
+            raw_root,
+            sqfs,
+            copy_workers,
+            synthetic_root=synthetic_root,
+        )
+    except FileNotFoundError:
+        logger.warning("squashfuse not available; falling back to image copy")
+        return _stage_with_copy(frame, target_dir, raw_root, copy_workers, sqfs)
+
+
+def _is_live_mount(path_text: str | None) -> bool:
+    if not path_text:
+        return False
+    path = Path(path_text)
+    return path.is_dir() and any(path.iterdir())
 
 
 def parse_args() -> argparse.Namespace:

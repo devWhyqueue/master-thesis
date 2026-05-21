@@ -143,6 +143,21 @@ case "$job" in
       "$@"
     ;;
 
+  patch-feature-extract)
+    export EXPERIMENT_USE_GPU=1
+    seed="$(seed_from_array)"
+    bash scripts/hydra/run_patch_feature_extract.sh "$seed" "$@"
+    ;;
+
+  patch-feature-train)
+    export EXPERIMENT_USE_GPU=1
+    methods=(patch_feature_ce patch_feature_weighted_ce patch_feature_focal patch_feature_balanced_sampler_ce patch_feature_ce_soft_f1_balanced patch_feature_ce_soft_mcc_balanced patch_feature_progan_aug)
+    seeds=(0 1 2)
+    method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
+    seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"
+    bash scripts/hydra/run_python.sh -m scripts.train_patch_features --method "$method" --seed "$seed" "$@"
+    ;;
+
   wsi-cache)
     seed="$(seed_from_array)"
     bash scripts/hydra/run_python.sh -m scripts.prep.wsi_bag_cache --seed "$seed"

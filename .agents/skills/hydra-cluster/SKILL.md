@@ -29,6 +29,19 @@ Use this skill for TU Berlin Hydra cluster work. Hydra here means the ML-group H
 
 ## Inspection And Troubleshooting
 
+### Remote SSH from local or WSL
+
+When checking the queue from a **local machine** (PowerShell, WSL, or macOS), run SLURM through a **login shell**. Plain `ssh hydra "squeue ..."` often uses a non-login shell where `squeue`, `sacct`, and `scontrol` are not on `PATH`, which produces a misleading `command not found`. SLURM is installed on Hydra; the session environment is wrong, not the cluster.
+
+```bash
+ssh hydra 'bash -lc "squeue -u $USER"'
+ssh hydra 'bash -lc "sacct -j <job-id> --format=JobID,JobName,Elapsed -n | tail -30"'
+```
+
+From **PowerShell**, wrap the remote command in single quotes and avoid unescaped `$(...)` or `2>/dev/null` in the `ssh` argument (PowerShell parses those locally).
+
+### SLURM commands on Hydra
+
 Useful Hydra-side SLURM commands:
 
 ```bash
