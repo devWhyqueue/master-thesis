@@ -15,7 +15,11 @@ def extra_metrics(
 ) -> dict[str, object]:
     """Build support-tier and probability-quality metrics."""
     payload = _tier_metrics(
-        precision, recall, f1, support, tier_support or support
+        precision,
+        recall,
+        f1,
+        support,
+        tier_support if tier_support is not None else support,
     )
     payload.update(_calibration_metrics(y_true, probabilities, n_classes))
     return payload

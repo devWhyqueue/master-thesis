@@ -7,6 +7,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 EXPERIMENT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +17,7 @@ from scripts.mil.bag_losses import (
     _mix_ranked_bags,
     _supervised_contrastive_loss,
 )
-from scripts.mil.bags import AttentionMil
+from scripts.mil.bags import AttentionMil, _feature_to_bag
 from scripts.patch.artifacts import (
     load_training_checkpoint,
     save_patch_checkpoint,
@@ -44,6 +45,9 @@ from scripts.progan.manifest import (
 from scripts.progan.storage import generated_counts_match as _generated_counts_match
 from scripts.training.support_tiers import class_tier_labels
 from scripts.prep.patch_manifest import build_patch_manifest
+from scripts.tuning.aggregate import _select_all
+from scripts.tuning.grid import task_count, task_for_array_index, validate_tuning_params
+from scripts.tuning.paths import tuning_result_dir
 
 
 def test_patch_manifest_uses_fixed_resolution_and_split(tmp_path: Path) -> None:
@@ -218,6 +222,16 @@ def test_rankmix_preserves_ranked_feature_order_before_mixing() -> None:
     assert torch.allclose(mixed, expected)
 
 
+def test_wsi_bag_cap_uses_evenly_spaced_instances(tmp_path: Path) -> None:
+    path = tmp_path / "features.pt"
+    features = torch.arange(50, dtype=torch.float32).reshape(50, 1)
+    torch.save(features, path)
+    bag = _feature_to_bag(str(path), max_instances=30)
+    expected_indices = torch.linspace(0, 49, 30).long()
+    assert bag.shape == (30, 1)
+    assert torch.equal(bag.squeeze(1), features[expected_indices].squeeze(1))
+
+
 def test_progan_matches_paper_batch_schedule_and_progressive_shape() -> None:
     assert [paper_batch_size(depth) for depth in range(1, 8)] == [
         64,
@@ -376,3 +390,64 @@ def test_support_tiers_use_dataset_slide_counts() -> None:
     assert labels["class_23"] == "body"
     assert labels["class_24"] == "head"
     assert labels["class_31"] == "head"
+
+
+def test_tuning_grid_expands_expected_array_sizes() -> None:
+    assert task_count("patch_feature") == 57
+    assert task_count("wsi_bag") == 57
+    first_variant, first_seed = task_for_array_index("patch_feature", 0)
+    last_variant, last_seed = task_for_array_index("wsi_bag", 56)
+    assert first_variant.method == "patch_feature_weighted_ce"
+    assert first_seed == 0
+    assert last_variant.method == "sc_mil"
+    assert last_seed == 2
+
+
+def test_tuning_validation_rejects_unsupported_parameters() -> None:
+    validate_tuning_params("patch_feature", "patch_feature_focal", {"focal_gamma": 1.5})
+    with pytest.raises(ValueError, match="Unsupported tuning parameter"):
+        validate_tuning_params(
+            "patch_feature", "patch_feature_focal", {"rankmix_alpha": 0.5}
+        )
+
+
+def test_tuning_result_paths_do_not_overwrite_fixed_outputs(tmp_path: Path) -> None:
+    paths = {
+        "root": tmp_path,
+        "results": tmp_path / "outputs" / "results",
+        "wsi_results": tmp_path / "outputs" / "results_wsi_bag",
+    }
+    fixed_patch = paths["results"] / "patch_feature" / "patch_feature_focal" / "seed=1"
+    fixed_wsi = paths["wsi_results"] / "mil_focal" / "seed=1"
+    tuned_patch = tuning_result_dir(
+        paths, "patch_feature", "patch_feature_focal", "focal_gamma=1", 1
+    )
+    tuned_wsi = tuning_result_dir(paths, "wsi_bag", "mil_focal", "focal_gamma=1", 1)
+    assert fixed_patch != tuned_patch
+    assert fixed_wsi != tuned_wsi
+    assert "outputs/tuning/patch_feature" in tuned_patch.as_posix()
+    assert "outputs/tuning/wsi_bag" in tuned_wsi.as_posix()
+
+
+def test_tuning_selection_requires_complete_seed_sets() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "benchmark": "patch_feature",
+                "method": "patch_feature_focal",
+                "variant": "focal_gamma=1",
+                "params": '{"focal_gamma":1}',
+                "method_label": "Focal",
+                "baseline_test_macro_f1": 0.4,
+                "fixed_test_macro_f1": 0.3,
+                "fixed_test_balanced_accuracy": 0.4,
+                "val_macro_f1": 0.5,
+                "val_balanced_accuracy": 0.6,
+                "test_macro_f1": 0.45,
+                "test_balanced_accuracy": 0.5,
+                "test_accuracy": 0.7,
+            }
+        ]
+    )
+    with pytest.raises(ValueError, match="Incomplete tuning results"):
+        _select_all(frame, allow_incomplete=False)

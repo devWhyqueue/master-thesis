@@ -63,7 +63,7 @@ wsi_training:
   hidden_dim: 256
   dropout: 0.1
   focal_gamma: 2.0
-  max_instances_per_bag:
+  max_instances_per_bag: 30
   rankmix_teacher_epochs: 30
   rankmix_alpha: 1.0
   sc_mil_temperature: 1.0

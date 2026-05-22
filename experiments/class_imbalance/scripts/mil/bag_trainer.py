@@ -31,13 +31,14 @@ def _train_bag_method(
     config: dict,
     seed: int,
     result_dir: Path,
+    smoke: bool = False,
 ) -> dict[str, dict[str, object]]:
     """Train one WSI-bag benchmark method."""
     torch.manual_seed(seed)
     training = config["wsi_training"]
     device = _resolve_device(training["device"])
     train_dataset, val_dataset, test_dataset = _split_bag_datasets(
-        frame, class_names, training, config, seed
+        frame, class_names, training, config, seed, smoke
     )
     labels = train_dataset.labels.cpu().numpy()
     model = _build_model(train_dataset, class_names, training, device)
@@ -99,6 +100,7 @@ def _split_bag_datasets(
     training: dict,
     config: dict,
     seed: int,
+    smoke: bool = False,
 ) -> tuple[BagFeatureDataset, BagFeatureDataset, BagFeatureDataset]:
     class_to_idx = {name: idx for idx, name in enumerate(class_names)}
     max_instances = training.get("max_instances_per_bag")
@@ -108,7 +110,7 @@ def _split_bag_datasets(
             cast(pd.DataFrame, frame[frame["split"] == split]),
             class_to_idx,
             max_instances,
-            cache_dir if _cache_exists(cache_dir, split) else None,
+            cache_dir if _cache_exists(cache_dir, split) and not smoke else None,
             split,
         )
         for split in ["train", "val", "test"]
@@ -146,6 +148,7 @@ def _loader(
     method: str,
     batch_size: int,
     seed: int,
+    sampler_power: float = 1.0,
 ) -> DataLoader:
     generator = torch.Generator().manual_seed(seed)
     if method not in {"mil_balanced_sampler_ce", "sc_mil", "rankmix_mil"}:
@@ -157,7 +160,9 @@ def _loader(
             collate_fn=bag_collate,
         )
     counts = np.bincount(labels)
-    sample_weights = [float(1.0 / counts[int(label)]) for label in labels]
+    sample_weights = [
+        float((1.0 / counts[int(label)]) ** sampler_power) for label in labels
+    ]
     sampler = WeightedRandomSampler(sample_weights, len(labels), True, generator)
     return DataLoader(
         dataset, batch_size=batch_size, sampler=sampler, collate_fn=bag_collate
@@ -176,8 +181,19 @@ def _run_training(
     result_dir: Path,
     teacher: AttentionMil | None = None,
 ) -> dict[str, int]:
-    loader = _loader(dataset, labels, method, int(training["bag_batch_size"]), seed)
-    weights = class_weights(labels, int(len(np.unique(labels)))).to(device)
+    loader = _loader(
+        dataset,
+        labels,
+        method,
+        int(training["bag_batch_size"]),
+        seed,
+        float(training.get("sampler_power", 1.0)),
+    )
+    weights = class_weights(
+        labels,
+        int(len(np.unique(labels))),
+        power=float(training.get("weight_power", 1.0)),
+    ).to(device)
     totals = {"mixed_examples": 0, "positive_pairs": 0}
     epochs = int(training["epochs"])
     total_steps = max(1, epochs * len(loader))

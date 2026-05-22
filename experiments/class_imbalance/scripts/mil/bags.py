@@ -142,12 +142,12 @@ class AttentionMil(nn.Module):
 
 
 def class_weights(
-    labels: np.ndarray, n_classes: int, beta: float = 0.999
+    labels: np.ndarray, n_classes: int, beta: float = 0.999, power: float = 1.0
 ) -> torch.Tensor:
     """Compute effective-number class weights."""
     counts = np.bincount(labels, minlength=n_classes).astype(np.float64)
     effective = (1.0 - np.power(beta, np.maximum(counts, 1.0))) / (1.0 - beta)
-    weights = 1.0 / effective
+    weights = np.power(1.0 / effective, power)
     return torch.tensor(weights * (n_classes / weights.sum()), dtype=torch.float32)
 
 

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config, write_json, write_progress
 from scripts.mil.bag_trainer import _train_bag_method
 from scripts.mil.metadata import BAG_METHODS, method_metadata
+from scripts.tuning.grid import validate_tuning_params
+from scripts.tuning.paths import tuning_result_dir
 from scripts.training.split import _slice_split_rows
 
 logger = logging.getLogger(__name__)
@@ -21,6 +25,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--tuning-id", default=None)
+    parser.add_argument("--tuning-params", default=None)
     return parser.parse_args()
 
 
@@ -31,9 +37,12 @@ def _train_selected_method(
     config: dict,
     seed: int,
     result_dir: Path,
+    smoke: bool = False,
 ) -> dict[str, dict[str, object]]:
     if method in BAG_METHODS:
-        return _train_bag_method(method, frame, class_names, config, seed, result_dir)
+        return _train_bag_method(
+            method, frame, class_names, config, seed, result_dir, smoke
+        )
     raise ValueError(f"Unknown WSI-bag benchmark method: {method}")
 
 
@@ -57,19 +66,37 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     args = parse_args()
-    config = load_config(args.config)
+    _run(args)
+
+
+def _run(args: argparse.Namespace) -> None:
+    config, tuning_params = _load_config_with_tuning(args)
     paths = ensure_dirs(config)
+    result_dir = _result_dir(paths, args.method, args.seed, args.tuning_id)
+    result_dir.mkdir(parents=True, exist_ok=True)
     frame = _load_split(paths, args.seed, args.smoke, config)
     class_names = sorted(frame["cancer_type"].unique().tolist())
-    result_dir = paths["wsi_results"] / args.method / f"seed={args.seed}"
-    result_dir.mkdir(parents=True, exist_ok=True)
     _write_status(result_dir, args.method, args.seed, "started")
     results = _train_selected_method(
-        args.method, frame, class_names, config, args.seed, result_dir
+        args.method, frame, class_names, config, args.seed, result_dir, args.smoke
     )
-    _write_outputs(result_dir, args.method, args.seed, args.smoke, results)
+    _write_outputs(
+        result_dir,
+        args.method,
+        args.seed,
+        args.smoke,
+        results,
+        args.tuning_id,
+        tuning_params,
+    )
     _write_status(result_dir, args.method, args.seed, "completed")
     logger.info(f"Wrote results to {result_dir}")
+
+
+def _load_config_with_tuning(args: argparse.Namespace) -> tuple[dict, dict[str, float]]:
+    config = load_config(args.config)
+    tuning_params = _load_tuning_params(args.method, args.tuning_params)
+    return _with_tuning_params(config, tuning_params), tuning_params
 
 
 def _write_outputs(
@@ -78,6 +105,8 @@ def _write_outputs(
     seed: int,
     smoke: bool,
     results: dict[str, dict[str, object]],
+    tuning_id: str | None,
+    tuning_params: dict[str, float],
 ) -> None:
     """Write config and split-level result payloads."""
     write_json(
@@ -87,6 +116,8 @@ def _write_outputs(
             "method_metadata": method_metadata(method),
             "seed": seed,
             "smoke": smoke,
+            "tuning_id": tuning_id,
+            "tuning_params": tuning_params,
         },
     )
     write_json(result_dir / "val_results.json", results["val"])
@@ -104,6 +135,33 @@ def _write_status(result_dir: Path, method: str, seed: int, status: str) -> None
         },
     )
     logger.info("progress method=%s seed=%s status=%s", method, seed, status)
+
+
+def _load_tuning_params(method: str, raw: str | None) -> dict[str, float]:
+    if raw is None:
+        return {}
+    payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        raise ValueError("--tuning-params must be a JSON object")
+    validate_tuning_params("wsi_bag", method, payload)
+    return {str(key): float(value) for key, value in payload.items()}
+
+
+def _with_tuning_params(
+    config: dict[str, Any], params: dict[str, float]
+) -> dict[str, Any]:
+    copied = dict(config)
+    copied["wsi_training"] = dict(config["wsi_training"])
+    copied["wsi_training"].update(params)
+    return copied
+
+
+def _result_dir(
+    paths: dict[str, Path], method: str, seed: int, tuning_id: str | None
+) -> Path:
+    if tuning_id is None:
+        return paths["wsi_results"] / method / f"seed={seed}"
+    return tuning_result_dir(paths, "wsi_bag", method, tuning_id, seed)
 
 
 if __name__ == "__main__":

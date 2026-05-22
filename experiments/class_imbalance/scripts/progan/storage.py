@@ -53,7 +53,7 @@ def fid_payload(
     generated: list[dict[str, object]],
     device: torch.device,
 ) -> dict[str, object]:
-    """Compute or describe FID for one generated class."""
+    """Compute FID for one generated class."""
     generated_paths = [Path(str(row["image_path"])) for row in generated]
     value = fid_for_paths(image_paths, generated_paths, device)
     return {

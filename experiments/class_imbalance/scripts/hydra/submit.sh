@@ -19,12 +19,15 @@ Commands:
   patch-train              Submit non-ProGAN patch benchmark array
   patch-feature-extract    Extract real+synthetic Virchow2 patch feature caches
   patch-feature-train      Train patch-level methods on Virchow2 feature caches
+  patch-feature-tune       Submit patch-feature validation-tuning array
   progan                   Submit GAN, synthetic SquashFS, and ProGAN classifier jobs
   progan-resubmit          Regenerate manifests and SquashFS images, then submit ProGAN
   patch-progan-train       Train ProGAN classifier only from existing GAN artifacts
   wsi-cache                Build WSI bag cache array
   wsi-profile              Profile WSI bags
   wsi-train                Submit WSI-bag benchmark array
+  wsi-tune                 Submit WSI-bag validation-tuning array
+  tuning-aggregate         Aggregate validation-tuning tables and figures
   aggregate                Aggregate tables and figures
   progan-diagnostics       Build ProGAN quality diagnostics for the paper
   all                      Run the full pipeline in one GPU job
@@ -35,6 +38,7 @@ Environment overrides:
   PROGAN_GPU_CONSTRAINT, PROGAN_PARTITION, PROGAN_TRAIN_PARTITION,
   PROGAN_SYNTH_SQFS_PARTITION, PATCH_PARTITION, PATCH_SQFS_PARTITION,
   PATCH_FEATURE_PARTITION, PATCH_FEATURE_CONSTRAINT, WSI_PARTITION
+  PATCH_TUNE_PARTITION, WSI_TUNE_PARTITION, TUNING_AGGREGATE_PARTITION
 USAGE
 }
 
@@ -179,6 +183,18 @@ case "$command" in
       "$@"
     ;;
 
+  patch-feature-tune)
+    submit_with_args patch-feature-tune \
+      --job-name=tcga-ut-patch-tune \
+      --partition="${PATCH_TUNE_PARTITION:-gpu-2h}" \
+      --gpus-per-node=1 \
+      --ntasks-per-node=8 \
+      --array=0-56 \
+      --output=logs/patch-tune-%A-%a.out \
+      --error=logs/patch-tune-%A-%a.err \
+      "$@"
+    ;;
+
   wsi-cache)
     submit_job wsi-cache \
       --job-name=tcga-ut-wsi-cache \
@@ -211,6 +227,29 @@ case "$command" in
       --array=0-17 \
       --output=logs/wsi-%A-%a.out \
       --error=logs/wsi-%A-%a.err \
+      "$@"
+    ;;
+
+  wsi-tune)
+    submit_with_args wsi-tune \
+      --job-name=tcga-ut-wsi-tune \
+      --partition="${WSI_TUNE_PARTITION:-gpu-2h}" \
+      --gpus-per-node=1 \
+      --ntasks-per-node=8 \
+      --array=0-56 \
+      --output=logs/wsi-tune-%A-%a.out \
+      --error=logs/wsi-tune-%A-%a.err \
+      "$@"
+    ;;
+
+  tuning-aggregate)
+    submit_with_args tuning-aggregate \
+      --job-name=tcga-ut-tune-agg \
+      --partition="${TUNING_AGGREGATE_PARTITION:-gpu-9m}" \
+      --gpus-per-node=1 \
+      --ntasks-per-node=2 \
+      --output=logs/tuning-aggregate-%j.out \
+      --error=logs/tuning-aggregate-%j.err \
       "$@"
     ;;
 

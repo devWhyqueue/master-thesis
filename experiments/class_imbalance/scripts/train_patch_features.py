@@ -1,11 +1,15 @@
 from __future__ import annotations
+
 import argparse
+import json
 from pathlib import Path
 from typing import cast
+
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler
+
 from scripts.common import ensure_dirs, load_config, write_json
 from scripts.patch.artifacts import seed_patch_run
 from scripts.patch.data import uses_balanced_sampler
@@ -14,30 +18,17 @@ from scripts.patch.losses import (
     ScholzCombinedLoss,
     inverse_frequency_weights,
 )
+from scripts.patch_feature.training import (
+    PatchFeatureDataset,
+    build_patch_feature_model,
+    evaluate_patch_feature_model,
+    select_patch_feature_rows,
+    split_patch_feature_datasets,
+)
 from scripts.patch_feature_cache import patch_feature_cache_dir
-from scripts.training.support import _metric_payload, _resolve_device
-
-
-class PatchFeatureDataset(Dataset):
-    """Frozen patch-feature dataset backed by one memmap array."""
-
-    def __init__(
-        self, frame: pd.DataFrame, features_path: Path, class_to_idx: dict[str, int]
-    ) -> None:
-        self.rows = frame.reset_index(drop=True)
-        self.features = np.load(features_path, mmap_mode="r")
-        self.indices = self.rows["feature_index"].to_numpy(dtype=np.int64)
-        self.labels = torch.tensor(
-            [class_to_idx[str(name)] for name in self.rows["cancer_type"]],
-            dtype=torch.long,
-        )
-
-    def __len__(self) -> int:
-        return len(self.rows)
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        feature = np.asarray(self.features[int(self.indices[idx])], dtype=np.float32)
-        return torch.from_numpy(feature.copy()), int(self.labels[idx].item())
+from scripts.training.support import _resolve_device
+from scripts.tuning.grid import validate_tuning_params
+from scripts.tuning.paths import tuning_result_dir
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,33 +38,68 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--tuning-id", default=None)
+    parser.add_argument("--tuning-params", default=None)
     return parser.parse_args()
 
 
 def main() -> None:
     """Train one patch-level method on frozen Virchow2 features."""
     args = parse_args()
+    _run(args)
+
+
+def _run(args: argparse.Namespace) -> None:
     config = load_config(args.config)
+    tuning_params = _load_tuning_params(args.method, args.tuning_params)
     seed_patch_run(args.seed)
     paths = ensure_dirs(config)
     cache_dir = patch_feature_cache_dir(config, args.seed)
-    frame = _select_rows(
+    frame = select_patch_feature_rows(
         pd.read_csv(cache_dir / "manifest.csv"), args.method, args.smoke, config
     )
     class_names = sorted(frame["cancer_type"].unique().tolist())
-    datasets = _split_datasets(frame, cache_dir / "features.npy", class_names)
-    model = _fit_model(args.method, datasets[0], class_names, config, args.seed)
+    datasets = split_patch_feature_datasets(
+        frame, cache_dir / "features.npy", class_names
+    )
+    model = _fit_model(
+        args.method, datasets[0], class_names, config, args.seed, tuning_params
+    )
     device = _resolve_device(str(config["patch_feature_training"]["device"]))
-    result_dir = paths["results"] / "patch_feature" / args.method / f"seed={args.seed}"
+    result_dir = _result_dir(paths, args.method, args.seed, args.tuning_id)
+    _write_outputs(
+        result_dir, args, tuning_params, model, datasets, class_names, device
+    )
+
+
+def _write_outputs(
+    result_dir: Path,
+    args: argparse.Namespace,
+    tuning_params: dict[str, float],
+    model: torch.nn.Module,
+    datasets: tuple[PatchFeatureDataset, PatchFeatureDataset, PatchFeatureDataset],
+    class_names: list[str],
+    device: torch.device,
+) -> None:
     result_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), result_dir / "model.pt")
     write_json(
+        result_dir / "config.json",
+        {
+            "method": args.method,
+            "seed": args.seed,
+            "smoke": args.smoke,
+            "tuning_id": args.tuning_id,
+            "tuning_params": tuning_params,
+        },
+    )
+    write_json(
         result_dir / "val_results.json",
-        _evaluate(model, datasets[1], class_names, device),
+        evaluate_patch_feature_model(model, datasets[1], class_names, device),
     )
     write_json(
         result_dir / "test_results.json",
-        _evaluate(model, datasets[2], class_names, device),
+        evaluate_patch_feature_model(model, datasets[2], class_names, device),
     )
 
 
@@ -83,74 +109,33 @@ def _fit_model(
     class_names: list[str],
     config: dict,
     seed: int,
+    tuning_params: dict[str, float],
 ) -> torch.nn.Module:
     settings = config["patch_feature_training"]
     device = _resolve_device(str(settings["device"]))
-    model = _build_model(train_set, settings, len(class_names), device)
+    model = build_patch_feature_model(train_set, settings, len(class_names), device)
     labels = train_set.labels.cpu().numpy()
-    criterion = _criterion(method, labels, len(class_names), settings, device)
+    criterion = _criterion(
+        method, labels, len(class_names), settings, device, tuning_params
+    )
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=float(settings["learning_rate"]),
         weight_decay=float(settings["weight_decay"]),
     )
     _train(
-        model, train_set, labels, criterion, optimizer, method, settings, device, seed
+        model,
+        train_set,
+        labels,
+        criterion,
+        optimizer,
+        method,
+        settings,
+        device,
+        seed,
+        tuning_params,
     )
     return model
-
-
-def _select_rows(
-    frame: pd.DataFrame, method: str, smoke: bool, config: dict
-) -> pd.DataFrame:
-    if method != "patch_feature_progan_aug":
-        frame = cast(pd.DataFrame, frame[~frame["is_synthetic"].astype(bool)])
-    if smoke:
-        parts = [part.head(8) for _, part in frame.groupby("split", sort=False)]
-        return pd.concat(parts, ignore_index=True)
-    settings = config["patch_feature_training"]
-    return _slice(frame, settings.get("max_train_rows"), settings.get("max_eval_rows"))
-
-
-def _slice(
-    frame: pd.DataFrame, max_train: int | None, max_eval: int | None
-) -> pd.DataFrame:
-    rows = []
-    for split, max_rows in [
-        ("train", max_train),
-        ("val", max_eval),
-        ("test", max_eval),
-    ]:
-        part = cast(pd.DataFrame, frame[frame["split"] == split])
-        rows.append(part.head(int(max_rows)) if max_rows else part)
-    return pd.concat(rows, ignore_index=True)
-
-
-def _split_datasets(
-    frame: pd.DataFrame, features_path: Path, class_names: list[str]
-) -> tuple[PatchFeatureDataset, PatchFeatureDataset, PatchFeatureDataset]:
-    class_to_idx = {name: idx for idx, name in enumerate(class_names)}
-    return tuple(
-        PatchFeatureDataset(
-            cast(pd.DataFrame, frame[frame["split"] == split]),
-            features_path,
-            class_to_idx,
-        )
-        for split in ["train", "val", "test"]
-    )  # type: ignore[return-value]
-
-
-def _build_model(
-    dataset: PatchFeatureDataset, settings: dict, n_classes: int, device: torch.device
-) -> torch.nn.Module:
-    sample, _ = dataset[0]
-    model = torch.nn.Sequential(
-        torch.nn.Linear(int(sample.numel()), int(settings["hidden_dim"])),
-        torch.nn.ReLU(),
-        torch.nn.Dropout(float(settings["dropout"])),
-        torch.nn.Linear(int(settings["hidden_dim"]), n_classes),
-    )
-    return model.to(device)
 
 
 def _criterion(
@@ -159,17 +144,29 @@ def _criterion(
     n_classes: int,
     settings: dict,
     device: torch.device,
+    tuning_params: dict[str, float],
 ) -> torch.nn.Module:
     if method == "patch_feature_weighted_ce":
         return torch.nn.CrossEntropyLoss(
-            weight=inverse_frequency_weights(labels, n_classes).to(device)
+            weight=inverse_frequency_weights(
+                labels, n_classes, float(tuning_params.get("weight_power", 1.0))
+            ).to(device)
         )
     if method == "patch_feature_focal":
-        return PatchFocalLoss(float(settings["focal_gamma"]))
+        gamma = _tuned_or_default(tuning_params, "focal_gamma", settings["focal_gamma"])
+        return PatchFocalLoss(gamma)
     if method == "patch_feature_ce_soft_f1_balanced":
-        return ScholzCombinedLoss(n_classes, "f1")
+        return ScholzCombinedLoss(
+            n_classes,
+            "f1",
+            float(tuning_params.get("metric_loss_weight", 1.0)),
+        )
     if method == "patch_feature_ce_soft_mcc_balanced":
-        return ScholzCombinedLoss(n_classes, "mcc")
+        return ScholzCombinedLoss(
+            n_classes,
+            "mcc",
+            float(tuning_params.get("metric_loss_weight", 1.0)),
+        )
     return torch.nn.CrossEntropyLoss()
 
 
@@ -183,8 +180,16 @@ def _train(
     settings: dict,
     device: torch.device,
     seed: int,
+    tuning_params: dict[str, float],
 ) -> None:
-    loader = _loader(dataset, labels, method, int(settings["batch_size"]), seed)
+    loader = _loader(
+        dataset,
+        labels,
+        method,
+        int(settings["batch_size"]),
+        seed,
+        float(tuning_params.get("sampler_power", 1.0)),
+    )
     for _ in range(1, int(settings["epochs"]) + 1):
         model.train()
         for features, targets in loader:
@@ -200,6 +205,7 @@ def _loader(
     method: str,
     batch_size: int,
     seed: int,
+    sampler_power: float = 1.0,
 ) -> DataLoader:
     generator = torch.Generator().manual_seed(seed)
     if not uses_balanced_sampler(method.replace("patch_feature", "patch", 1)):
@@ -207,30 +213,37 @@ def _loader(
             dataset, batch_size=batch_size, shuffle=True, generator=generator
         )
     counts = np.bincount(labels)
-    sample_weights = [float(1.0 / counts[int(label)]) for label in labels]
+    sample_weights = [
+        float((1.0 / counts[int(label)]) ** sampler_power) for label in labels
+    ]
     sampler = WeightedRandomSampler(sample_weights, len(labels), True, generator)
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler)
 
 
-def _evaluate(
-    model: torch.nn.Module,
-    dataset: PatchFeatureDataset,
-    class_names: list[str],
-    device: torch.device,
-) -> dict[str, object]:
-    loader = DataLoader(dataset, batch_size=512, shuffle=False)
-    y_true: list[int] = []
-    y_pred: list[int] = []
-    probabilities: list[list[float]] = []
-    model.eval()
-    with torch.no_grad():
-        for features, targets in loader:
-            logits = model(features.to(device))
-            probs = torch.softmax(logits, dim=1)
-            y_true.extend(targets.numpy().tolist())
-            y_pred.extend(logits.argmax(dim=1).cpu().numpy().tolist())
-            probabilities.extend(probs.cpu().numpy().tolist())
-    return _metric_payload(y_true, y_pred, probabilities, class_names)
+def _load_tuning_params(method: str, raw: str | None) -> dict[str, float]:
+    if raw is None:
+        return {}
+    payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        raise ValueError("--tuning-params must be a JSON object")
+    validate_tuning_params("patch_feature", method, payload)
+    return {str(key): float(value) for key, value in payload.items()}
+
+
+def _tuned_or_default(
+    tuning_params: dict[str, float], key: str, default: object
+) -> float:
+    if key in tuning_params:
+        return tuning_params[key]
+    return float(cast(float | int | str, default))
+
+
+def _result_dir(
+    paths: dict[str, Path], method: str, seed: int, tuning_id: str | None
+) -> Path:
+    if tuning_id is None:
+        return paths["results"] / "patch_feature" / method / f"seed={seed}"
+    return tuning_result_dir(paths, "patch_feature", method, tuning_id, seed)
 
 
 if __name__ == "__main__":

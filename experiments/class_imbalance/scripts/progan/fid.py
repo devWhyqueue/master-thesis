@@ -14,7 +14,7 @@ from scipy import linalg
 def fid_for_paths(
     real_paths: list[Path], generated_paths: list[Path], device: torch.device
 ) -> float | None:
-    """Compute Inception FID when torchvision is available."""
+    """Compute Inception FID from real and generated image paths."""
     if len(real_paths) < 2 or len(generated_paths) < 2:
         return None
     models = _torchvision_models()

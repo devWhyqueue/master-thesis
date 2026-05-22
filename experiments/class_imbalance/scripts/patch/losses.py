@@ -26,10 +26,12 @@ class PatchFocalLoss(nn.Module):
         return (-((1 - pt) ** self.gamma) * log_pt).mean()
 
 
-def inverse_frequency_weights(labels: np.ndarray, n_classes: int) -> torch.Tensor:
+def inverse_frequency_weights(
+    labels: np.ndarray, n_classes: int, power: float = 1.0
+) -> torch.Tensor:
     """Build normalized inverse-frequency class weights."""
     counts = np.bincount(labels, minlength=n_classes).astype(np.float64)
-    weights = 1.0 / np.maximum(counts, 1.0)
+    weights = np.power(1.0 / np.maximum(counts, 1.0), power)
     return torch.tensor(weights * (n_classes / weights.sum()), dtype=torch.float32)
 
 
@@ -87,12 +89,15 @@ class SoftMCCLossMulti(nn.Module):
 class ScholzCombinedLoss(nn.Module):
     """Equal-weight CE + soft F1 or soft MCC (Scholz et al., Sec. 3.1.4)."""
 
-    def __init__(self, num_classes: int, metric: str) -> None:
+    def __init__(
+        self, num_classes: int, metric: str, metric_loss_weight: float = 1.0
+    ) -> None:
         super().__init__()
         if metric not in {"f1", "mcc"}:
             raise ValueError(f"Unsupported Scholz metric: {metric}")
         self.ce = nn.CrossEntropyLoss()
         self.metric = metric
+        self.metric_loss_weight = metric_loss_weight
         self._soft_f1 = SoftF1LossMulti(num_classes) if metric == "f1" else None
         self._soft_mcc = SoftMCCLossMulti() if metric == "mcc" else None
 
@@ -106,4 +111,4 @@ class ScholzCombinedLoss(nn.Module):
         else:
             assert self._soft_mcc is not None
             metric_loss = self._soft_mcc(logits, one_hot)
-        return ce_loss + metric_loss
+        return ce_loss + self.metric_loss_weight * metric_loss

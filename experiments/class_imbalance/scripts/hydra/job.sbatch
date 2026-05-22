@@ -158,6 +158,14 @@ case "$job" in
     bash scripts/hydra/run_python.sh -m scripts.train_patch_features --method "$method" --seed "$seed" "$@"
     ;;
 
+  patch-feature-tune)
+    export EXPERIMENT_USE_GPU=1
+    bash scripts/hydra/run_python.sh -m scripts.tuning.run \
+      --benchmark patch_feature \
+      --array-task-id "${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID required}" \
+      "$@"
+    ;;
+
   wsi-cache)
     seed="$(seed_from_array)"
     bash scripts/hydra/run_python.sh -m scripts.prep.wsi_bag_cache --seed "$seed"
@@ -175,6 +183,19 @@ case "$job" in
     method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
     seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"
     bash scripts/hydra/run_python.sh -m scripts.training.train --method "$method" --seed "$seed" "$@"
+    ;;
+
+  wsi-tune)
+    export EXPERIMENT_USE_GPU=1
+    bash scripts/hydra/run_python.sh -m scripts.tuning.run \
+      --benchmark wsi_bag \
+      --array-task-id "${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID required}" \
+      "$@"
+    ;;
+
+  tuning-aggregate)
+    export EXPERIMENT_USE_GPU=1
+    bash scripts/hydra/run_python.sh -m scripts.tuning.aggregate "$@"
     ;;
 
   aggregate)

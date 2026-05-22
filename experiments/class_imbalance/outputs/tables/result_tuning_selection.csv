@@ -1,0 +1,13 @@
+benchmark,regime,method,method_label,selected_params,baseline_method,baseline_test_macro_f1,fixed_test_macro_f1,tuned_val_macro_f1,tuned_test_macro_f1,tuned_test_balanced_accuracy,tuned_delta_macro_f1
+patch_feature,Patch,patch_feature_ce,CE,fixed baseline,patch_feature_ce,0.77585,0.77585,,0.77585,0.769965,0.0
+patch_feature,Patch,patch_feature_weighted_ce,Weighted CE,"{""weight_power"":0.75}",patch_feature_ce,0.77585,0.775865,0.793134,0.779032,0.777582,0.003182
+patch_feature,Patch,patch_feature_focal,Focal,"{""focal_gamma"":1}",patch_feature_ce,0.77585,0.76589,0.781009,0.773397,0.769514,-0.002453
+patch_feature,Patch,patch_feature_balanced_sampler_ce,Balanced sampler,"{""sampler_power"":0.75}",patch_feature_ce,0.77585,0.775355,0.792132,0.779566,0.773597,0.003716
+patch_feature,Patch,patch_feature_ce_soft_f1_balanced,CE + soft F1 (balanced),"{""metric_loss_weight"":2}",patch_feature_ce,0.77585,0.781771,0.796541,0.782343,0.780154,0.006493
+patch_feature,Patch,patch_feature_ce_soft_mcc_balanced,CE + soft MCC (balanced),"{""metric_loss_weight"":1}",patch_feature_ce,0.77585,0.782303,0.795229,0.782303,0.782025,0.006453
+wsi_bag,WSI bag,mil_ce,MIL CE,fixed baseline,mil_ce,0.839681,0.839681,,0.839681,0.835767,0.0
+wsi_bag,WSI bag,mil_weighted_ce,MIL weighted CE,"{""weight_power"":0.25}",mil_ce,0.839681,0.829125,0.848426,0.834809,0.836048,-0.004872
+wsi_bag,WSI bag,mil_focal,MIL focal,"{""focal_gamma"":1}",mil_ce,0.839681,0.827298,0.839269,0.828196,0.823983,-0.011485
+wsi_bag,WSI bag,mil_balanced_sampler_ce,MIL balanced sampler,"{""sampler_power"":0.75}",mil_ce,0.839681,0.835618,0.844308,0.838693,0.841703,-0.000988
+wsi_bag,WSI bag,rankmix_mil,RankMix,"{""rankmix_alpha"":2}",mil_ce,0.839681,0.848177,0.853722,0.856348,0.865655,0.016668
+wsi_bag,WSI bag,sc_mil,SC-MIL,"{""sc_mil_temperature"":0.1}",mil_ce,0.839681,0.833151,0.847598,0.838009,0.837999,-0.001672
