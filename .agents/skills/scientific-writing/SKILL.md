@@ -53,6 +53,9 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 - Keep figures compact enough to fit within `\textwidth` without overfull boxes.
 - Keep figures readable at paper scale; prefer visual summaries that reveal the main pattern over plots that expose every raw detail.
 - Use tables for comparisons, taxonomies, ablations, terminology mappings, and practical checklists.
+- Wrap every tabular in a `table` float and title it with `\caption{...}` plus a matching `\label{tab:...}` when the document uses references. Do not use manual ``Table~X:'' headings, `\textbf{...}` title rows, or `figure` floats for standalone tables.
+- Place table `\caption` after the tabular body unless the surrounding document already places table captions above consistently.
+- Generated table fragments included via `\input` should contain only the tabular body; keep `\caption` and `\label` in the parent document.
 - Include formulas when they clarify a definition, objective, metric, loss, calibration measure, or evaluation protocol.
 - Give every figure and table a short explanatory caption that states what the reader should learn from it.
 - When prose resumes immediately after a displayed formula, figure, table, or list environment, use `\noindent` so the continuation does not start with a paragraph indent.
@@ -61,7 +64,8 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 
 - Ensure included `.tex` files contain body content only.
 - Ensure headings are separated by useful prose.
-- Ensure every new figure or table has a caption and label when the document convention expects labels.
+- Ensure every new figure or table has a `\caption` and label when the document convention expects labels.
+- Ensure tables use `\caption` inside a `table` float rather than manual titles or figure captions.
 - Ensure formulas define symbols close to first use.
 - Ensure any TikZ diagram fits the page, avoids overlapping text, and has readable labels.
 - Ensure prose after displays or lists uses `\noindent` when it continues the same discussion.
