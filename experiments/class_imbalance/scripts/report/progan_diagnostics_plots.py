@@ -117,7 +117,7 @@ def _plot_class_examples(
     image_root: Path,
     raw_root: Path,
     examples_per_class: int,
-) -> None:
+) -> str:
     real_frame = cast(
         pd.DataFrame,
         manifest[
@@ -156,30 +156,42 @@ def _plot_class_examples(
         for axis in (synthetic_ax, real_ax):
             axis.axis("off")
     class_metrics = frame.loc[frame["class_name"] == class_name].iloc[0]
-    axes[row_idx, 0].text(
-        -0.05,
-        0.5,
-        (
-            f"{pretty_class_name(class_name)}\n"
-            f"FID={class_metrics['inception_fid']:.0f}\n"
-            f"Virchow NN={class_metrics['virchow_mean_nn_distance']:.2f}"
-        ),
-        transform=axes[row_idx, 0].transAxes,
-        fontsize=8,
-        va="center",
-        ha="right",
+    row_label = (
+        f"{pretty_class_name(class_name)}; "
+        f"FID={class_metrics['inception_fid']:.0f}; "
+        f"Virchow NN={class_metrics['virchow_mean_nn_distance']:.2f}"
     )
+    return row_label
 
 
-def _save_example_figure(fig: Figure, seed: int, output_path: Path) -> None:
+def _save_example_figure(
+    fig: Figure, axes: np.ndarray, row_labels: list[str], seed: int, output_path: Path
+) -> None:
     fig.suptitle(
         "ProGAN synthetic patches and nearest real training neighbors (seed "
         f"{seed}, Virchow2 embedding space)",
         fontsize=10,
     )
-    fig.tight_layout()
+    fig.tight_layout(rect=(0.0, 0.04, 1.0, 0.95), h_pad=2.0)
+    _add_row_labels(fig, axes, row_labels)
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
+
+
+def _add_row_labels(fig: Figure, axes: np.ndarray, row_labels: list[str]) -> None:
+    for row_idx, label in enumerate(row_labels):
+        row_axes = axes[row_idx]
+        left = min(axis.get_position().x0 for axis in row_axes)
+        right = max(axis.get_position().x1 for axis in row_axes)
+        bottom = min(axis.get_position().y0 for axis in row_axes)
+        fig.text(
+            (left + right) / 2,
+            bottom - 0.012,
+            label,
+            ha="center",
+            va="top",
+            fontsize=8,
+        )
 
 
 def _example_axes(
@@ -188,7 +200,7 @@ def _example_axes(
     fig, axes = plt.subplots(
         len(example_classes),
         examples_per_class * 2,
-        figsize=(examples_per_class * 2.4, len(example_classes) * 2.2),
+        figsize=(examples_per_class * 2.05, len(example_classes) * 1.95),
     )
     if len(example_classes) == 1:
         axes = np.expand_dims(axes, axis=0)
@@ -213,17 +225,20 @@ def plot_examples(
 
     fig, axes = _example_axes(example_classes, examples_per_class)
 
+    row_labels = []
     for row_idx, class_name in enumerate(example_classes):
-        _plot_class_examples(
-            axes,
-            row_idx,
-            class_name,
-            manifest,
-            features,
-            frame,
-            image_root,
-            raw_root,
-            examples_per_class,
+        row_labels.append(
+            _plot_class_examples(
+                axes,
+                row_idx,
+                class_name,
+                manifest,
+                features,
+                frame,
+                image_root,
+                raw_root,
+                examples_per_class,
+            )
         )
 
-    _save_example_figure(fig, seed, output_path)
+    _save_example_figure(fig, axes, row_labels, seed, output_path)

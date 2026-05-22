@@ -34,17 +34,19 @@ def parse_args() -> argparse.Namespace:
 
 def _settings(
     config: dict[str, Any], benchmark: str
-) -> tuple[list[str], list[int], str]:
+) -> tuple[list[str], list[int], str, str | None]:
     if benchmark == "patch":
         return (
-            list(config["patch_methods"]),
-            list(config["patch_training"]["seeds"]),
-            "patch_results",
+            list(config["patch_feature_methods"]),
+            list(config["patch_feature_training"]["seeds"]),
+            "results",
+            "patch_feature",
         )
     return (
         list(config["wsi_bag_methods"]),
         list(config["wsi_training"]["seeds"]),
         "wsi_results",
+        None,
     )
 
 
@@ -59,13 +61,16 @@ def _read(path: Path, split: str) -> dict[str, Any] | None:
 def _collect(
     config: dict[str, Any], paths: dict[str, Path], benchmark: str
 ) -> tuple[pd.DataFrame, list[dict[str, Any]], list[dict[str, Any]]]:
-    methods, seeds, result_key = _settings(config, benchmark)
     rows: list[dict[str, Any]] = []
     details: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
+    methods, seeds, result_key, result_subdir = _settings(config, benchmark)
     for method in methods:
         for seed in seeds:
-            result_dir = paths[result_key] / method / f"seed={seed}"
+            result_base = paths[result_key]
+            if result_subdir is not None:
+                result_base = result_base / result_subdir
+            result_dir = result_base / method / f"seed={seed}"
             for split in ["val", "test"]:
                 result = _read(result_dir, split)
                 if result is None:
@@ -96,7 +101,41 @@ def _collect(
                         },
                     }
                 )
+    if not rows:
+        details = _read_existing_details(paths, benchmark)
+        rows = _summary_rows_from_details(details)
+        if rows:
+            missing = []
     return pd.DataFrame(rows), details, missing
+
+
+def _read_existing_details(
+    paths: dict[str, Path], benchmark: str
+) -> list[dict[str, Any]]:
+    path = paths["tables"] / f"result_details_{benchmark}.jsonl.gz"
+    if not path.exists():
+        return []
+    details = []
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        for line in handle:
+            details.append(json.loads(line))
+    return details
+
+
+def _summary_rows_from_details(details: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for payload in details:
+        result = payload["result"]
+        rows.append(
+            {
+                "method": payload["method"],
+                **payload["method_metadata"],
+                "seed": payload["seed"],
+                "split": payload["split"],
+                **{key: result[key] for key in SUMMARY_METRICS if key in result},
+            }
+        )
+    return rows
 
 
 def _aggregate(summary: pd.DataFrame) -> pd.DataFrame:
@@ -140,12 +179,18 @@ def _write_latex(frame: pd.DataFrame, path: Path) -> None:
         method_key = str(row["method"])
         label = METHOD_LABELS.get(method_key, method_key.replace("_", " "))
         lines.append(
-            f"{label} & ${row['accuracy_mean']:.3f} \\pm {row['accuracy_std']:.3f}$ & "
-            f"${row['balanced_accuracy_mean']:.3f} \\pm {row['balanced_accuracy_std']:.3f}$ & "
-            f"${row['macro_f1_mean']:.3f} \\pm {row['macro_f1_std']:.3f}$\\\\"
+            f"{label} & {_format_mean_std(row, 'accuracy')} & "
+            f"{_format_mean_std(row, 'balanced_accuracy')} & "
+            f"{_format_mean_std(row, 'macro_f1')}\\\\"
         )
     lines.extend(["\\bottomrule", "\\end{tabular}", ""])
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _format_mean_std(row: dict[str, Any], metric: str) -> str:
+    mean = float(row[f"{metric}_mean"])
+    std = float(row[f"{metric}_std"])
+    return rf"$\num{{{mean:.3f}}} \pm \num{{{std:.3f}}}$"
 
 
 def main() -> None:

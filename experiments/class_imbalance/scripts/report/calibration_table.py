@@ -78,8 +78,8 @@ def _format_metric(row: pd.Series, metric: str) -> str:
     mean = float(row[f"{metric}_mean"])
     std = float(row[f"{metric}_std"])
     if pd.isna(std):
-        return f"${mean:.3f}$"
-    return f"${mean:.3f} \\pm {std:.3f}$"
+        return rf"$\num{{{mean:.3f}}}$"
+    return rf"$\num{{{mean:.3f}}} \pm \num{{{std:.3f}}}$"
 
 
 def write_calibration_latex(frame: pd.DataFrame, path: Path) -> None:

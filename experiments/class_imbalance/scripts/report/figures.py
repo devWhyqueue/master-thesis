@@ -27,6 +27,13 @@ METHOD_LABELS = {
     "patch_ce_soft_f1_balanced": "CE + soft F1 (balanced)",
     "patch_ce_soft_mcc_balanced": "CE + soft MCC (balanced)",
     "patch_progan_aug": "ProGAN augmentation",
+    "patch_feature_ce": "CE",
+    "patch_feature_weighted_ce": "Weighted CE",
+    "patch_feature_focal": "Focal",
+    "patch_feature_balanced_sampler_ce": "Balanced sampler",
+    "patch_feature_ce_soft_f1_balanced": "CE + soft F1 (balanced)",
+    "patch_feature_ce_soft_mcc_balanced": "CE + soft MCC (balanced)",
+    "patch_feature_progan_aug": "ProGAN augmentation",
     "mil_ce": "MIL CE",
     "mil_weighted_ce": "Weighted MIL",
     "mil_focal": "Focal MIL",
@@ -47,7 +54,9 @@ def parse_args() -> argparse.Namespace:
 
 def _methods(config: dict, benchmark: str) -> list[str]:
     return list(
-        config["patch_methods"] if benchmark == "patch" else config["wsi_bag_methods"]
+        config["patch_feature_methods"]
+        if benchmark == "patch"
+        else config["wsi_bag_methods"]
     )
 
 
@@ -108,7 +117,7 @@ def _plot_tier_heatmap(pivot: pd.DataFrame, path: Path, benchmark: str) -> None:
     columns = [column for column in ["Tail", "Body", "Head"] if column in pivot.columns]
     values = pivot[columns].to_numpy()
     fig, ax = plt.subplots(figsize=(7.4, 5.6))
-    image = ax.imshow(values, cmap="YlGnBu", vmin=0.0, vmax=1.0, aspect="auto")
+    image = ax.imshow(values, cmap="plasma", vmin=0.0, vmax=1.0, aspect="auto")
     ax.set_xticks(
         np.arange(len(columns)), labels=[f"{column} recall" for column in columns]
     )
@@ -125,16 +134,20 @@ def _plot_tier_heatmap(pivot: pd.DataFrame, path: Path, benchmark: str) -> None:
 
 
 def plot_classwise_recall(
-    archive: Path, methods: list[str], path: Path, split: str, benchmark: str
+    archive: Path,
+    methods: list[str],
+    path: Path,
+    split: str,
+    benchmark: str,
+    tables_path: Path,
 ) -> None:
     """Plot mean recall by support tier for one benchmark."""
     if not archive.exists():
         return
     frame = _load_archive(archive, methods, split)
     class_names = sorted(frame["class_name"].astype(str).unique().tolist())
-    paths = ensure_dirs(load_config(None))
     tier_labels = load_class_tier_labels(
-        class_names, paths["tables"] / "class_distribution.csv"
+        class_names, tables_path / "class_distribution.csv"
     )
     if tier_labels is None:
         return
@@ -144,13 +157,15 @@ def plot_classwise_recall(
 def _write_values(ax: Axes, values: np.ndarray) -> None:
     for row_idx in range(values.shape[0]):
         for col_idx in range(values.shape[1]):
+            value = values[row_idx, col_idx]
             ax.text(
                 col_idx,
                 row_idx,
-                f"{values[row_idx, col_idx]:.2f}",
+                f"{value:.2f}",
                 ha="center",
                 va="center",
                 fontsize=8,
+                color="white" if value < 0.72 else "black",
             )
 
 
@@ -187,6 +202,7 @@ def main() -> None:
         paths["figures"] / f"classwise_recall_{args.benchmark}_{args.split}.png",
         args.split,
         args.benchmark,
+        paths["tables"],
     )
 
 

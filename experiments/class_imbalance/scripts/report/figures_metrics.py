@@ -5,10 +5,9 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
-BASELINE_METHOD = {"patch": "patch_ce", "wsi_bag": "mil_ce"}
+BASELINE_METHOD = {"patch": "patch_feature_ce", "wsi_bag": "mil_ce"}
 BASELINE_LABEL = {"patch": "CE", "wsi_bag": "MIL CE"}
 
 
@@ -17,9 +16,7 @@ def benchmark_title(benchmark: str) -> str:
     return "Patch benchmark" if benchmark == "patch" else "WSI-bag benchmark"
 
 
-def _load_macro_f1_table(
-    archive: Path, methods: list[str], split: str
-) -> pd.DataFrame:
+def _load_macro_f1_table(archive: Path, methods: list[str], split: str) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     with gzip.open(archive, "rt", encoding="utf-8") as handle:
         for line in handle:
@@ -46,9 +43,7 @@ def plot_macro_f1_delta(
     """Plot per-seed macro-F1 change relative to the regime baseline."""
     frame = _load_macro_f1_table(archive, methods, split)
     baseline_key = BASELINE_METHOD[benchmark]
-    baseline = frame.loc[frame["method"] == baseline_key].set_index("seed")[
-        "macro_f1"
-    ]
+    baseline = frame.loc[frame["method"] == baseline_key].set_index("seed")["macro_f1"]
     rows: list[dict[str, object]] = []
     for method in methods:
         if method == baseline_key:
@@ -75,14 +70,31 @@ def plot_macro_f1_delta(
         capsize=3,
     )
     ax.axvline(0.0, color="#333333", linewidth=0.9)
-    ax.set_xlabel(
-        rf"$\Delta$ macro F1 vs. {BASELINE_LABEL[benchmark]} baseline"
-    )
+    ax.set_xlabel(rf"$\Delta$ macro F1 vs. {BASELINE_LABEL[benchmark]} baseline")
     ax.set_title(f"{benchmark_title(benchmark)} ({split})")
     ax.grid(axis="x", alpha=0.25)
+    _annotate_delta_bars(ax, table["delta_mean"].tolist())
     fig.tight_layout()
     fig.savefig(path, dpi=300)
     plt.close(fig)
+
+
+def _annotate_delta_bars(ax: plt.Axes, values: list[float]) -> None:
+    x_min, x_max = ax.get_xlim()
+    offset = (x_max - x_min) * 0.015
+    for row_idx, value in enumerate(values):
+        ha = "left" if value >= 0 else "right"
+        x = value + offset if value >= 0 else value - offset
+        ax.text(
+            x,
+            row_idx,
+            f"{value:+.3f}",
+            va="center",
+            ha=ha,
+            fontsize=8,
+            zorder=5,
+            bbox={"facecolor": "white", "edgecolor": "none", "pad": 0.4},
+        )
 
 
 def plot_macro_f1_by_seed(

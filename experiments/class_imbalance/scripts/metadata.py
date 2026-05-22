@@ -40,6 +40,16 @@ PATCH_METHOD_METADATA: dict[str, dict[str, Any]] = {
     },
 }
 
+PATCH_FEATURE_METHOD_ALIASES = {
+    "patch_feature_ce": "patch_ce",
+    "patch_feature_weighted_ce": "patch_weighted_ce",
+    "patch_feature_focal": "patch_focal",
+    "patch_feature_balanced_sampler_ce": "patch_balanced_sampler_ce",
+    "patch_feature_ce_soft_f1_balanced": "patch_ce_soft_f1_balanced",
+    "patch_feature_ce_soft_mcc_balanced": "patch_ce_soft_mcc_balanced",
+    "patch_feature_progan_aug": "patch_progan_aug",
+}
+
 WSI_METHOD_METADATA: dict[str, dict[str, Any]] = {
     "mil_ce": {
         "role": "baseline",
@@ -77,4 +87,5 @@ WSI_METHOD_METADATA: dict[str, dict[str, Any]] = {
 def benchmark_metadata(benchmark: str, method: str) -> dict[str, Any]:
     """Return stable metadata for one benchmark method."""
     tables = {"patch": PATCH_METHOD_METADATA, "wsi_bag": WSI_METHOD_METADATA}
-    return tables[benchmark][method]
+    key = PATCH_FEATURE_METHOD_ALIASES.get(method, method)
+    return tables[benchmark][key]

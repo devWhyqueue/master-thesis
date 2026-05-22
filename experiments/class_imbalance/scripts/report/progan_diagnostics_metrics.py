@@ -122,12 +122,12 @@ def build_metrics_frame(
 def _format_metric_row(row: dict[str, Any]) -> str:
     fid_value = row["inception_fid"]
     nn_value = row["virchow_mean_nn_distance"]
-    fid_text = "--" if pd.isna(fid_value) else f"{float(fid_value):.1f}"
-    nn_text = "--" if pd.isna(nn_value) else f"{float(nn_value):.2f}"
+    fid_text = "--" if pd.isna(fid_value) else rf"\num{{{float(fid_value):.1f}}}"
+    nn_text = "--" if pd.isna(nn_value) else rf"\num{{{float(nn_value):.2f}}}"
     return (
         f"{pretty_class_name(str(row['class_name']))} & "
-        f"{int(row['real_train_patches'])} & "
-        f"{int(row['generated_patches'])} & "
+        rf"\num{{{int(row['real_train_patches'])}}} & "
+        rf"\num{{{int(row['generated_patches'])}}} & "
         f"{fid_text} & {nn_text}\\\\"
     )
 
@@ -138,12 +138,12 @@ def _latex_summary_footer(
     return [
         "\\midrule",
         f"All augmented classes ({len(frame)} total) & "
-        f"{int(frame['real_train_patches'].sum())} & "
-        f"{int(frame['generated_patches'].sum())} & "
-        f"{float(fid.median()):.1f} median & "
-        f"{float(nn.median()):.2f} median\\\\",
+        rf"\num{{{int(frame['real_train_patches'].sum())}}} & "
+        rf"\num{{{int(frame['generated_patches'].sum())}}} & "
+        rf"\num{{{float(fid.median()):.1f}}} median & "
+        rf"\num{{{float(nn.median()):.2f}}} median\\",
         "\\bottomrule",
-        "\\end{tabular}",
+        "\\end{tabularx}",
         "",
     ]
 
@@ -153,7 +153,7 @@ def write_summary_latex(frame: pd.DataFrame, path: Path) -> None:
     fid = frame["inception_fid"].dropna()
     nn = frame["virchow_mean_nn_distance"].dropna()
     lines = [
-        "\\begin{tabular}{lrrrr}",
+        "\\begin{tabularx}{\\linewidth}{@{}>{\\raggedright\\arraybackslash}Xrrrr@{}}",
         "\\toprule",
         "Class & Real train & Generated & Inception FID & Virchow2 mean NN\\\\",
         "\\midrule",

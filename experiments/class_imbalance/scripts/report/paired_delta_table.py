@@ -26,14 +26,14 @@ class PairedComparison:
 PAIRED_COMPARISONS = (
     PairedComparison(
         "patch",
-        "patch_ce_soft_mcc_balanced",
-        "patch_ce",
+        "patch_feature_ce_soft_mcc_balanced",
+        "patch_feature_ce",
         r"CE + soft MCC $-$ CE",
     ),
     PairedComparison(
         "patch",
-        "patch_ce_soft_f1_balanced",
-        "patch_ce",
+        "patch_feature_ce_soft_f1_balanced",
+        "patch_feature_ce",
         r"CE + soft F1 $-$ CE",
     ),
     PairedComparison("wsi_bag", "rankmix_mil", "mil_ce", r"RankMix $-$ MIL CE"),
@@ -76,14 +76,10 @@ def _format_delta_cell(values: pd.Series) -> str:
     seed_values = ", ".join(f"{value:+.3f}" for value in values)
     mean = float(values.mean())
     std = float(values.std(ddof=0))
-    return (
-        f"${mean:+.3f} \\pm {std:.3f}$ {{\\scriptsize $[{seed_values}]$}}"
-    )
+    return f"${mean:+.3f} \\pm {std:.3f}$ {{\\scriptsize $[{seed_values}]$}}"
 
 
-def build_paired_delta_table(
-    paths: dict[str, Path], split: str
-) -> pd.DataFrame:
+def build_paired_delta_table(paths: dict[str, Path], split: str) -> pd.DataFrame:
     """Build paired seed-difference rows for the headline comparisons."""
     cache: dict[str, pd.DataFrame] = {}
     rows: list[dict[str, str]] = []
@@ -96,9 +92,7 @@ def build_paired_delta_table(
             values = _paired_metric_values(frame, comparison, metric, split)
             row[f"{metric}_mean"] = float(values.mean())
             row[f"{metric}_std"] = float(values.std(ddof=0))
-            row[f"{metric}_seed_values"] = ",".join(
-                f"{value:+.6f}" for value in values
-            )
+            row[f"{metric}_seed_values"] = ",".join(f"{value:+.6f}" for value in values)
             row[metric] = _format_delta_cell(values)
         rows.append(row)
     return pd.DataFrame(rows)
