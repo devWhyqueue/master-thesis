@@ -8,12 +8,26 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+def _tuning_table_column_spec() -> str:
+    return (
+        "@{}"
+        ">{\\raggedright\\arraybackslash}p{0.08\\linewidth}"
+        ">{\\raggedright\\arraybackslash}p{0.20\\linewidth}"
+        ">{\\raggedright\\arraybackslash}X"
+        ">{\\centering\\arraybackslash}p{0.09\\linewidth}"
+        ">{\\centering\\arraybackslash}p{0.08\\linewidth}"
+        ">{\\centering\\arraybackslash}p{0.09\\linewidth}"
+        ">{\\centering\\arraybackslash}p{0.10\\linewidth}"
+        "@{}"
+    )
+
+
 def write_latex_table(frame: pd.DataFrame, path: Path) -> None:
     """Write the validation-tuning selection table for the report."""
     lines = [
-        "\\begin{tabularx}{\\linewidth}{@{}llXcccc@{}}",
+        f"\\begin{{tabularx}}{{\\linewidth}}{{{_tuning_table_column_spec()}}}",
         "\\toprule",
-        "Regime & Method & Selected parameters & Fixed test F1 & Val F1 & Tuned test F1 & Tuned bal. acc.\\\\",
+        "Regime & Method & Selected params & Fixed F1 & Val F1 & Tuned F1 & Bal.\\ acc.\\\\",
         "\\midrule",
     ]
     lines.extend(_latex_rows(frame))

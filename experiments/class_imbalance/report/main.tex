@@ -567,13 +567,15 @@ The fixed-protocol results do not by themselves distinguish a genuinely ineffect
 
 \begin{table}[htbp]
   \centering
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{3.5pt}
+  \renewcommand{\arraystretch}{1.12}
   \IfFileExists{../outputs/tables/result_tuning_selection.tex}{%
     \input{../outputs/tables/result_tuning_selection.tex}%
   }{%
     \emph{Validation-tuning results are pending.}%
   }
-  \caption{Validation-selected tuning robustness check. Configurations are selected only from validation macro F1 averaged over seeds 0--2; held-out test metrics are reported after selection and do not influence the choice.}
+  \caption{Validation-selected tuning robustness check. Configurations are selected only from validation macro F1 averaged over seeds 0--2; held-out test metrics are reported after selection and do not influence the choice. ``Fixed F1'' and ``Tuned F1'' are held-out test macro F1; ``Bal.\ acc.'' is held-out test balanced accuracy.}
   \label{tab:tuning-selection}
 \end{table}
 
@@ -615,13 +617,40 @@ All WSI-bag calibration scores are computed from the same held-out test slides, 
   \label{fig:wsi-classwise-recall}
 \end{figure}
 
+\subsection{Classwise Difficulty and Support}
+The classwise recall summaries show that errors are uneven across cancer types, but support tiers alone do not reveal whether rare classes are always the hard classes. A post-hoc difficulty analysis therefore uses the CE baseline in each regime as the reference error pattern and compares each class's full-dataset slide support with its seed-averaged held-out recall. Difficulty is operationalized as the false-negative rate, $1-\mathrm{recall}$, so the analysis asks whether classes with lower slide support are also the classes with higher baseline error.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \input{../outputs/tables/classwise_difficulty_hardest_test.tex}
+  \caption{Hardest classes under each regime's CE baseline, averaged over seeds 0--2 on the held-out test split. Support rank is computed from full TCGA-UT slide counts, with rank 1 indicating the lowest-support class. Difficulty rank orders classes by baseline error rate, $1-\mathrm{recall}$.}
+  \label{tab:classwise-difficulty}
+\end{table}
+
+Table~\ref{tab:classwise-difficulty} and Figures~\ref{fig:patch-classwise-difficulty}--\ref{fig:wsi-classwise-difficulty} make the support--difficulty mismatch explicit. Rectum adenocarcinoma is the hardest class in both regimes despite being the fifth-lowest-support class rather than the rarest class. Conversely, the rarest class, diffuse large B-cell lymphoma, does not appear among the five hardest classes in either regime. The rank association between dataset slide support and CE-baseline recall is positive but modest: Spearman $\rho=\num{0.334}$ for patches and $\rho=\num{0.301}$ for WSI bags. These descriptive correlations support a constrained interpretation: class frequency contributes to difficulty, but it does not fully determine which class boundaries remain hard in the frozen Virchow2 feature space.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.90\linewidth]{classwise_difficulty_patch_test.png}
+  \caption{Patch CE-baseline class error rate versus full-dataset class-support rank. The hardest patch classes are not simply ordered by rarity, indicating that exposure-based corrections address only part of the error pattern.}
+  \label{fig:patch-classwise-difficulty}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.90\linewidth]{classwise_difficulty_wsi_bag_test.png}
+  \caption{WSI-bag CE-baseline class error rate versus full-dataset class-support rank. The same high-error classes remain visible at slide level, showing that class difficulty is not reducible to class frequency.}
+  \label{fig:wsi-classwise-difficulty}
+\end{figure}
+
 \clearpage
 \section{Discussion}
 The two benchmarks support different but compatible conclusions. In the patch benchmark, a strong frozen encoder compresses the performance spread: most methods cluster near macro F1 $\num{0.77}$--$\num{0.78}$, and the Scholz-style hybrid objectives provide small but consistent improvements over plain CE rather than large separations. ProGAN augmentation does not deliver the same advantage in this regime even though it adds large numbers of synthetic tail-class patches; the accompanying quality diagnostics suggest a combination of high Inception FID and substantial Virchow2 embedding-space separation from real training patches, rather than a simple failure to increase tail-class exposure. Focal loss is also unhelpful here, consistent with the interpretation that difficulty reweighting is redundant when the representation has already absorbed much of the class-separation problem. In the WSI-bag benchmark, RankMix shows the clearest benefit, especially in balanced accuracy, while macro-F1 gains remain modest; a WSI-native feature-mixing mechanism can still help over plain MIL CE even though the bags already use Virchow2 features.
 
 These readings should be interpreted within the benchmark's deliberate scope. The study is a controlled comparison rather than a full reproduction of every original paper: hyperparameters follow fixed configuration values and cited defaults rather than method-specific validation tuning, and both regimes use frozen Virchow2 features rather than end-to-end encoder adaptation. Rankings therefore describe how imbalance mechanisms behave when patch and slide classification are already supported by a strong pathology foundation model, not every published implementation under its preferred training recipe. The ProGAN adaptation likewise keeps the progressive-generator mechanism from Ruiz-Casado-style histology augmentation but applies it to multiclass TCGA-UT rather than reproducing the full GAN-family comparison from the source work.
 
-The native long tail also means that class frequency is only one part of the difficulty signal. Some cancer types may be hard because few slides are available, while others may remain difficult because their frozen-feature distributions overlap with visually related classes. This distinction helps explain why pure exposure corrections have limited room to improve the patch benchmark: balanced sampling and class-weighted CE increase the influence of observed minority examples, but they do not add new within-class diversity or change the separability of the Virchow2 feature space. The same reasoning motivates reporting classwise recall and calibration alongside aggregate scores, because a method can improve average class exposure without resolving the hardest class-level decision boundaries.
+The native long tail also means that class frequency is only one part of the difficulty signal. The classwise difficulty analysis shows this directly: several low-support classes are hard, but the hardest classes are not exactly the rarest classes, and support explains only a modest share of the classwise recall ordering. This distinction helps explain why pure exposure corrections have limited room to improve the patch benchmark. Balanced sampling and class-weighted CE increase the influence of observed minority examples, but they do not add new within-class diversity or change the separability of visually related classes in the Virchow2 feature space. The same reasoning motivates reporting classwise recall, difficulty, and calibration alongside aggregate scores, because a method can improve average class exposure without resolving the hardest class-level decision boundaries.
 
 Holding the encoder fixed within each benchmark therefore changes what an imbalance intervention can accomplish. On patches, the bottleneck shifts from learning stain and tissue morphology to calibrating decision boundaries under a long-tailed label distribution. Under that bottleneck, objectives that approximate macro F1 or MCC on balanced minibatches are better matched to the evaluation target than image-space synthesis or focal down-weighting of easy examples, but they can do so at the cost of worse likelihood scores without clear ECE improvements over CE. On slides, the bottleneck instead includes instance selection and bag aggregation, so RankMix can still add value by mixing informative subsequences even when the underlying features are strong, and in this benchmark it improves calibration as well as balanced accuracy.
 
