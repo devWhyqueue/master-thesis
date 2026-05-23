@@ -6,8 +6,10 @@ from typing import cast
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
+from scripts.patch.data import uses_balanced_sampler
+from scripts.patch_feature.cfal import CfalPrototypeClassifier
 from scripts.training.support import _metric_payload
 
 
@@ -89,12 +91,40 @@ def evaluate_patch_feature_model(
     model.eval()
     with torch.no_grad():
         for features, targets in loader:
-            logits = model(features.to(device))
+            scores = model(features.to(device))
+            logits = (
+                torch.log(scores.clamp(min=1e-8))
+                if isinstance(model, CfalPrototypeClassifier)
+                else scores
+            )
             probs = torch.softmax(logits, dim=1)
             y_true.extend(targets.numpy().tolist())
             y_pred.extend(logits.argmax(dim=1).cpu().numpy().tolist())
             probabilities.extend(probs.cpu().numpy().tolist())
     return _metric_payload(y_true, y_pred, probabilities, class_names)
+
+
+def patch_feature_train_loader(
+    dataset: PatchFeatureDataset,
+    labels: np.ndarray,
+    method: str,
+    batch_size: int,
+    seed: int,
+    sampler_power: float = 1.0,
+) -> DataLoader:
+    """Build the training loader for one patch-feature method."""
+    generator = torch.Generator().manual_seed(seed)
+    patch_method = method.replace("patch_feature", "patch", 1)
+    if not uses_balanced_sampler(patch_method):
+        return DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, generator=generator
+        )
+    counts = np.bincount(labels)
+    sample_weights = [
+        float((1.0 / counts[int(label)]) ** sampler_power) for label in labels
+    ]
+    sampler = WeightedRandomSampler(sample_weights, len(labels), True, generator)
+    return DataLoader(dataset, batch_size=batch_size, sampler=sampler)
 
 
 def _slice(

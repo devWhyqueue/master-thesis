@@ -36,6 +36,12 @@ PAIRED_COMPARISONS = (
         "patch_feature_ce",
         r"CE + soft F1 $-$ CE",
     ),
+    PairedComparison(
+        "patch",
+        "patch_feature_cfal",
+        "patch_feature_ce",
+        r"CFAL $-$ CE",
+    ),
     PairedComparison("wsi_bag", "rankmix_mil", "mil_ce", r"RankMix $-$ MIL CE"),
     PairedComparison("wsi_bag", "mde_mil", "mil_ce", r"MDE-MIL $-$ MIL CE"),
 )

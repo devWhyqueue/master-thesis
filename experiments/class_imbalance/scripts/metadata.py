@@ -38,6 +38,11 @@ PATCH_METHOD_METADATA: dict[str, dict[str, Any]] = {
         "taxonomy_category": "synthetic generation",
         "representative_paper": "Ruiz-Casado et al.; ProGAN augmentation adaptation",
     },
+    "patch_cfal": {
+        "role": "representative",
+        "taxonomy_category": "algorithm-level losses",
+        "representative_paper": "Mahbub et al.; CFAL (prototype affinity)",
+    },
 }
 
 PATCH_FEATURE_METHOD_ALIASES = {
@@ -48,6 +53,7 @@ PATCH_FEATURE_METHOD_ALIASES = {
     "patch_feature_ce_soft_f1_balanced": "patch_ce_soft_f1_balanced",
     "patch_feature_ce_soft_mcc_balanced": "patch_ce_soft_mcc_balanced",
     "patch_feature_progan_aug": "patch_progan_aug",
+    "patch_feature_cfal": "patch_cfal",
 }
 
 WSI_METHOD_METADATA: dict[str, dict[str, Any]] = {

@@ -8,20 +8,20 @@ from typing import cast
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from scripts.common import ensure_dirs, load_config, write_json
 from scripts.patch.artifacts import seed_patch_run
-from scripts.patch.data import uses_balanced_sampler
 from scripts.patch.losses import (
     PatchFocalLoss,
     ScholzCombinedLoss,
     inverse_frequency_weights,
 )
+from scripts.patch_feature.cfal import train_cfal_model
 from scripts.patch_feature.training import (
     PatchFeatureDataset,
     build_patch_feature_model,
     evaluate_patch_feature_model,
+    patch_feature_train_loader,
     select_patch_feature_rows,
     split_patch_feature_datasets,
 )
@@ -113,8 +113,12 @@ def _fit_model(
 ) -> torch.nn.Module:
     settings = config["patch_feature_training"]
     device = _resolve_device(str(settings["device"]))
-    model = build_patch_feature_model(train_set, settings, len(class_names), device)
+    if method == "patch_feature_cfal":
+        return train_cfal_model(
+            train_set, len(class_names), settings, device, seed, tuning_params
+        )
     labels = train_set.labels.cpu().numpy()
+    model = build_patch_feature_model(train_set, settings, len(class_names), device)
     criterion = _criterion(
         method, labels, len(class_names), settings, device, tuning_params
     )
@@ -182,7 +186,7 @@ def _train(
     seed: int,
     tuning_params: dict[str, float],
 ) -> None:
-    loader = _loader(
+    loader = patch_feature_train_loader(
         dataset,
         labels,
         method,
@@ -197,27 +201,6 @@ def _train(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-
-def _loader(
-    dataset: PatchFeatureDataset,
-    labels: np.ndarray,
-    method: str,
-    batch_size: int,
-    seed: int,
-    sampler_power: float = 1.0,
-) -> DataLoader:
-    generator = torch.Generator().manual_seed(seed)
-    if not uses_balanced_sampler(method.replace("patch_feature", "patch", 1)):
-        return DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, generator=generator
-        )
-    counts = np.bincount(labels)
-    sample_weights = [
-        float((1.0 / counts[int(label)]) ** sampler_power) for label in labels
-    ]
-    sampler = WeightedRandomSampler(sample_weights, len(labels), True, generator)
-    return DataLoader(dataset, batch_size=batch_size, sampler=sampler)
 
 
 def _load_tuning_params(method: str, raw: str | None) -> dict[str, float]:

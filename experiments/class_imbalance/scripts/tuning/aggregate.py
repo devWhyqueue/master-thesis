@@ -182,9 +182,12 @@ def _fixed_summary(paths: dict[str, Path], benchmark: str) -> pd.DataFrame:
 
 def _fixed_metric(frame: pd.DataFrame, method: str, metric: str) -> float:
     lookup = PATCH_FEATURE_METHOD_ALIASES.get(method, method)
-    matches = frame[(frame["split"] == "test") & (frame["method"] == lookup)]
+    candidates = [method, lookup]
+    matches = frame[(frame["split"] == "test") & (frame["method"].isin(candidates))]
     if matches.empty:
-        raise KeyError(f"No fixed-protocol test row for method {method!r} (lookup={lookup!r})")
+        raise KeyError(
+            f"No fixed-protocol test row for method {method!r} (lookup={lookup!r})"
+        )
     return float(matches.iloc[0][f"{metric}_mean"])
 
 

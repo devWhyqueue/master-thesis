@@ -32,13 +32,19 @@ from scripts.patch.data import PatchImageDataset, patch_loader, uses_balanced_sa
 from scripts.staging.io import stage_destination
 from scripts.patch.models import PatchClassifier
 from scripts.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
+from scripts.patch_feature.cfal import (
+    build_cfal_loss,
+    build_cfal_model,
+    effective_number,
+    gaussian_affinity,
+)
 from scripts.progan.core import (
     ProgressiveDiscriminator,
     ProgressiveGenerator,
     ProGanSettings,
 )
 from scripts.progan.train import paper_batch_size
-from scripts.common import ensure_dirs
+from scripts.common import ensure_dirs, load_config
 from scripts.progan.manifest import (
     _class_image_paths,
     balance_target as _balance_target,
@@ -524,13 +530,71 @@ def test_support_tiers_use_dataset_slide_counts() -> None:
     assert labels["class_31"] == "head"
 
 
+def test_cfal_effective_number_increases_with_class_count() -> None:
+    assert effective_number(10, 0.999) < effective_number(100, 0.999)
+
+
+def test_cfal_affinity_increases_near_correct_prototype() -> None:
+    prototypes = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+    near = torch.tensor([[0.99, 0.14]])
+    far = torch.tensor([[0.14, 0.99]])
+    near_aff = gaussian_affinity(near, prototypes, sigma=1.0)[0, 0]
+    far_aff = gaussian_affinity(far, prototypes, sigma=1.0)[0, 0]
+    assert near_aff.item() > far_aff.item()
+
+
+def test_cfal_normalized_affinity_is_not_flat_across_classes() -> None:
+    embeddings = torch.randn(4, 16)
+    prototypes = torch.randn(8, 16)
+    affinities = gaussian_affinity(embeddings, prototypes, sigma=1.0)
+    spread = affinities.max(dim=1).values - affinities.min(dim=1).values
+    assert spread.mean().item() > 0.05
+
+
+def test_cfal_training_step_runs_without_nan() -> None:
+    features = torch.randn(8, 32)
+    targets = torch.tensor([0, 0, 1, 1, 2, 2, 2, 2])
+    settings = {
+        "hidden_dim": 16,
+        "dropout": 0.0,
+        "cfal_lambda": 0.1,
+        "cfal_sigma": 1.0,
+        "cfal_gamma": 2.0,
+        "cfal_beta": 0.999,
+    }
+
+    class _Dataset:
+        def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+            return features[idx], int(targets[idx].item())
+
+        def __len__(self) -> int:
+            return len(features)
+
+    device = torch.device("cpu")
+    model = build_cfal_model(_Dataset(), settings, 3, device, {})
+    loss_fn = build_cfal_loss(targets.numpy(), settings, device, {})
+    loss = loss_fn(model, features, targets)
+    loss.backward()
+    assert torch.isfinite(loss).item()
+
+
+def test_cfal_is_registered_patch_feature_method() -> None:
+    config_path = EXPERIMENT_ROOT / "configs" / "default.yaml"
+    config = load_config(config_path)
+    assert "patch_feature_cfal" in config["patch_feature_methods"]
+
+
 def test_tuning_grid_expands_expected_array_sizes() -> None:
-    assert task_count("patch_feature") == 57
+    assert task_count("patch_feature") == 69
     assert task_count("wsi_bag") == 66
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
+    cfal_variant, cfal_seed = task_for_array_index("patch_feature", 57)
     last_variant, last_seed = task_for_array_index("wsi_bag", 65)
     assert first_variant.method == "patch_feature_weighted_ce"
     assert first_seed == 0
+    assert cfal_variant.method == "patch_feature_cfal"
+    assert cfal_variant.params == {"cfal_gamma": 0.5}
+    assert cfal_seed == 0
     assert last_variant.method == "mde_mil"
     assert last_variant.params == {"mde_mil_consistency_weight": 0.3}
     assert last_seed == 2
@@ -538,6 +602,7 @@ def test_tuning_grid_expands_expected_array_sizes() -> None:
 
 def test_tuning_validation_rejects_unsupported_parameters() -> None:
     validate_tuning_params("patch_feature", "patch_feature_focal", {"focal_gamma": 1.5})
+    validate_tuning_params("patch_feature", "patch_feature_cfal", {"cfal_gamma": 2.0})
     validate_tuning_params(
         "wsi_bag", "mde_mil", {"mde_mil_consistency_weight": 0.25}
     )
@@ -559,10 +624,14 @@ def test_tuning_result_paths_do_not_overwrite_fixed_outputs(tmp_path: Path) -> N
         paths, "patch_feature", "patch_feature_focal", "focal_gamma=1", 1
     )
     tuned_wsi = tuning_result_dir(paths, "wsi_bag", "mil_focal", "focal_gamma=1", 1)
+    tuned_cfal = tuning_result_dir(
+        paths, "patch_feature", "patch_feature_cfal", "cfal_gamma=2", 0
+    )
     assert fixed_patch != tuned_patch
     assert fixed_wsi != tuned_wsi
     assert "outputs/tuning/patch_feature" in tuned_patch.as_posix()
     assert "outputs/tuning/wsi_bag" in tuned_wsi.as_posix()
+    assert "patch_feature_cfal/cfal_gamma=2/seed=0" in tuned_cfal.as_posix()
 
 
 def test_tuning_selection_requires_complete_seed_sets() -> None:
