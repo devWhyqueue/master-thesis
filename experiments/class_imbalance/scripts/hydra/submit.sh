@@ -224,7 +224,7 @@ case "$command" in
       --partition="${WSI_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-17 \
+      --array=0-20 \
       --output=logs/wsi-%A-%a.out \
       --error=logs/wsi-%A-%a.err \
       "$@"
@@ -236,7 +236,7 @@ case "$command" in
       --partition="${WSI_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-56 \
+      --array=0-65 \
       --output=logs/wsi-tune-%A-%a.out \
       --error=logs/wsi-tune-%A-%a.err \
       "$@"

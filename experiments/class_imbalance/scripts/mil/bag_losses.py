@@ -5,7 +5,7 @@ from typing import cast
 import torch
 from torch import nn
 
-from scripts.mil.bags import AttentionMil
+from scripts.mil.bags import AttentionMil, DualExpertMil
 
 
 def bag_loss(
@@ -17,8 +17,16 @@ def bag_loss(
     progress: float,
     config: dict,
     teacher: AttentionMil | None = None,
+    bags_b: list[torch.Tensor] | None = None,
+    targets_b: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """Compute a WSI-bag loss and return activation diagnostics."""
+    if method == "mde_mil":
+        if bags_b is None or targets_b is None:
+            raise ValueError("MDE-MIL requires balanced and unbalanced batches.")
+        return _mde_mil_loss(
+            cast(DualExpertMil, model), bags, targets, bags_b, targets_b, config
+        )
     attention_model = cast(AttentionMil, model)
     logits, embeddings, _ = attention_model.forward_bags(bags)
     if method == "rankmix_mil":
@@ -29,6 +37,33 @@ def bag_loss(
             attention_model, embeddings, targets, loss, progress, config
         )
     return loss, {}
+
+
+def _mde_mil_loss(
+    model: DualExpertMil,
+    bags_u: list[torch.Tensor],
+    targets_u: torch.Tensor,
+    bags_b: list[torch.Tensor],
+    targets_b: torch.Tensor,
+    config: dict,
+) -> tuple[torch.Tensor, dict[str, int]]:
+    embeddings_u = model.aggregate(bags_u)
+    embeddings_b = model.aggregate(bags_b)
+    logits_u = model.logits_u(embeddings_u)
+    logits_b = model.logits_b(embeddings_b)
+    logits_u_cross = model.logits_b(embeddings_u)
+    logits_b_cross = model.logits_u(embeddings_b)
+    loss_cls = nn.functional.cross_entropy(logits_u, targets_u) + nn.functional.cross_entropy(
+        logits_b, targets_b
+    )
+    lambda_con = float(config["mde_mil_consistency_weight"])
+    loss_con = nn.functional.mse_loss(logits_u, logits_u_cross) + nn.functional.mse_loss(
+        logits_b, logits_b_cross
+    )
+    return loss_cls + lambda_con * loss_con, {
+        "branch_u_batches": 1,
+        "branch_b_batches": 1,
+    }
 
 
 def _base_bag_loss(

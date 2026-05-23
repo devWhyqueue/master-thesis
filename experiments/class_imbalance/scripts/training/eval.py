@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from scripts.mil.bags import AttentionMil, BagFeatureDataset, bag_collate
+from scripts.mil.bags import AttentionMil, BagFeatureDataset, DualExpertMil, bag_collate
 from scripts.training.support import _metric_payload
 
 
@@ -46,6 +46,8 @@ def _evaluate_bags(
 
 
 def _bag_logits(model: nn.Module, bags: list[torch.Tensor]) -> torch.Tensor:
+    if isinstance(model, DualExpertMil):
+        return model.forward_ensemble(bags)
     if isinstance(model, AttentionMil):
         return model.forward_bags(bags)[0]
     raise TypeError(f"Unsupported bag model: {type(model).__name__}")

@@ -178,7 +178,7 @@ case "$job" in
 
   wsi-train)
     export EXPERIMENT_USE_GPU=1
-    methods=(mil_ce mil_weighted_ce mil_focal mil_balanced_sampler_ce rankmix_mil sc_mil)
+    methods=(mil_ce mil_weighted_ce mil_focal mil_balanced_sampler_ce rankmix_mil sc_mil mde_mil)
     seeds=(0 1 2)
     method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
     seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"

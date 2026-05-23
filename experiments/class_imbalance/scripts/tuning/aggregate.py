@@ -8,6 +8,7 @@ from typing import Any, cast
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
+from scripts.metadata import PATCH_FEATURE_METHOD_ALIASES
 from scripts.report.figures import METHOD_LABELS
 from scripts.tuning.grid import TuningVariant, grid_for_benchmark
 from scripts.tuning.reporting import (
@@ -180,8 +181,11 @@ def _fixed_summary(paths: dict[str, Path], benchmark: str) -> pd.DataFrame:
 
 
 def _fixed_metric(frame: pd.DataFrame, method: str, metric: str) -> float:
-    row = frame[(frame["split"] == "test") & (frame["method"] == method)].iloc[0]
-    return float(row[f"{metric}_mean"])
+    lookup = PATCH_FEATURE_METHOD_ALIASES.get(method, method)
+    matches = frame[(frame["split"] == "test") & (frame["method"] == lookup)]
+    if matches.empty:
+        raise KeyError(f"No fixed-protocol test row for method {method!r} (lookup={lookup!r})")
+    return float(matches.iloc[0][f"{metric}_mean"])
 
 
 def _read_result(path: Path) -> dict[str, Any] | None:

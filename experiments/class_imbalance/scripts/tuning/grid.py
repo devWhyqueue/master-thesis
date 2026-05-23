@@ -27,6 +27,7 @@ WSI_BAG_SPECS = (
     ("mil_balanced_sampler_ce", "sampler_power", [0.5, 0.75, 1.0]),
     ("rankmix_mil", "rankmix_alpha", [0.2, 0.5, 1.0, 2.0]),
     ("sc_mil", "sc_mil_temperature", [0.05, 0.1, 0.2, 0.5]),
+    ("mde_mil", "mde_mil_consistency_weight", [0.1, 0.25, 0.3]),
 )
 
 

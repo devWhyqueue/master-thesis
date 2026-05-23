@@ -15,9 +15,13 @@ sys.path.insert(0, str(EXPERIMENT_ROOT))
 
 from scripts.mil.bag_losses import (
     _mix_ranked_bags,
+    _mde_mil_loss,
     _supervised_contrastive_loss,
+    bag_loss,
 )
-from scripts.mil.bags import AttentionMil, _feature_to_bag
+from scripts.mil.bags import AttentionMil, BagFeatureDataset, DualExpertMil, _feature_to_bag
+from scripts.mil.bag_trainer import _loader, _run_mde_training
+from scripts.mil.metadata import BAG_METHODS
 from scripts.patch.artifacts import (
     load_training_checkpoint,
     save_patch_checkpoint,
@@ -45,6 +49,7 @@ from scripts.progan.manifest import (
 from scripts.progan.storage import generated_counts_match as _generated_counts_match
 from scripts.training.support_tiers import class_tier_labels
 from scripts.prep.patch_manifest import build_patch_manifest
+from scripts.report.paired_delta_table import build_paired_delta_table
 from scripts.tuning.aggregate import _select_all
 from scripts.tuning.grid import task_count, task_for_array_index, validate_tuning_params
 from scripts.tuning.paths import tuning_result_dir
@@ -222,6 +227,133 @@ def test_rankmix_preserves_ranked_feature_order_before_mixing() -> None:
     assert torch.allclose(mixed, expected)
 
 
+def test_mde_mil_is_registered_bag_method() -> None:
+    assert "mde_mil" in BAG_METHODS
+
+
+def test_dual_expert_ensemble_averages_expert_logits() -> None:
+    model = DualExpertMil(4, 8, 3, 0.0)
+    bags = [torch.randn(5, 4), torch.randn(3, 4)]
+    embeddings = model.aggregate(bags)
+    expected = (model.logits_u(embeddings) + model.logits_b(embeddings)) * 0.5
+    assert torch.allclose(model.forward_ensemble(bags), expected)
+
+
+def test_mde_consistency_term_is_zero_when_experts_match() -> None:
+    model = DualExpertMil(4, 8, 3, 0.0)
+    model.expert_b.load_state_dict(model.expert_u.state_dict())
+    embeddings_u = model.aggregate([torch.randn(4, 4)])
+    embeddings_b = model.aggregate([torch.randn(3, 4)])
+    assert torch.allclose(model.logits_u(embeddings_u), model.logits_b(embeddings_u))
+    assert torch.allclose(model.logits_b(embeddings_b), model.logits_u(embeddings_b))
+    loss_con = torch.nn.functional.mse_loss(
+        model.logits_u(embeddings_u), model.logits_b(embeddings_u)
+    ) + torch.nn.functional.mse_loss(
+        model.logits_b(embeddings_b), model.logits_u(embeddings_b)
+    )
+    assert loss_con.item() == 0.0
+
+
+def test_mde_consistency_term_increases_when_experts_differ() -> None:
+    model = DualExpertMil(4, 8, 3, 0.0)
+    embeddings = model.aggregate([torch.randn(4, 4)])
+    matched = torch.nn.functional.mse_loss(
+        model.logits_u(embeddings), model.logits_b(embeddings)
+    )
+    with torch.no_grad():
+        model.expert_b[0].weight.add_(0.5)
+    mismatched = torch.nn.functional.mse_loss(
+        model.logits_u(embeddings), model.logits_b(embeddings)
+    )
+    assert mismatched > matched
+
+
+def test_mde_dual_loaders_have_equal_batch_counts(tmp_path: Path) -> None:
+    paths = []
+    for index in range(8):
+        path = tmp_path / f"bag_{index}.pt"
+        torch.save(torch.randn(4, 3), path)
+        paths.append(str(path))
+    frame = pd.DataFrame(
+        {
+            "feature_path": paths,
+            "cancer_type": ["A", "A", "A", "A", "B", "B", "B", "B"],
+        }
+    )
+    dataset = BagFeatureDataset(frame, {"A": 0, "B": 1}, max_instances=None)
+    labels = dataset.labels.cpu().numpy()
+    loader_u = _loader(dataset, labels, "mil_ce", batch_size=2, seed=0, balanced=False)
+    loader_b = _loader(
+        dataset, labels, "mil_balanced_sampler_ce", batch_size=2, seed=0, balanced=True
+    )
+    assert len(loader_u) == len(loader_b)
+
+
+def test_mde_mil_bag_loss_runs_one_step() -> None:
+    model = DualExpertMil(4, 8, 3, 0.0)
+    bags_u = [torch.randn(3, 4), torch.randn(2, 4)]
+    bags_b = [torch.randn(4, 4), torch.randn(5, 4)]
+    targets_u = torch.tensor([0, 1])
+    targets_b = torch.tensor([1, 0])
+    weights = torch.ones(3)
+    config = {"mde_mil_consistency_weight": 0.25}
+    loss, diagnostics = bag_loss(
+        "mde_mil",
+        model,
+        bags_u,
+        targets_u,
+        weights,
+        0.5,
+        config,
+        bags_b=bags_b,
+        targets_b=targets_b,
+    )
+    assert torch.isfinite(loss)
+    assert diagnostics["branch_u_batches"] == 1
+    assert diagnostics["branch_b_batches"] == 1
+    loss.backward()
+
+
+def test_mde_training_runs_one_epoch(tmp_path: Path) -> None:
+    paths = []
+    for index in range(6):
+        path = tmp_path / f"bag_{index}.pt"
+        torch.save(torch.randn(4, 3), path)
+        paths.append(str(path))
+    frame = pd.DataFrame(
+        {
+            "feature_path": paths,
+            "cancer_type": ["A", "A", "A", "B", "B", "B"],
+            "split": ["train"] * 6,
+        }
+    )
+    dataset = BagFeatureDataset(frame[frame["split"] == "train"], {"A": 0, "B": 1}, None)
+    labels = dataset.labels.cpu().numpy()
+    model = DualExpertMil(3, 8, 2, 0.0)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    training = {
+        "bag_batch_size": 2,
+        "epochs": 1,
+        "sampler_power": 1.0,
+        "weight_power": 1.0,
+        "mde_mil_consistency_weight": 0.25,
+    }
+    diagnostics = _run_mde_training(
+        model,
+        dataset,
+        labels,
+        training,
+        optimizer,
+        torch.device("cpu"),
+        0,
+        tmp_path,
+    )
+    assert diagnostics["branch_u_batches"] == len(
+        _loader(dataset, labels, "mil_ce", 2, 0, balanced=False)
+    )
+    assert diagnostics["branch_b_batches"] == diagnostics["branch_u_batches"]
+
+
 def test_wsi_bag_cap_uses_evenly_spaced_instances(tmp_path: Path) -> None:
     path = tmp_path / "features.pt"
     features = torch.arange(50, dtype=torch.float32).reshape(50, 1)
@@ -394,17 +526,21 @@ def test_support_tiers_use_dataset_slide_counts() -> None:
 
 def test_tuning_grid_expands_expected_array_sizes() -> None:
     assert task_count("patch_feature") == 57
-    assert task_count("wsi_bag") == 57
+    assert task_count("wsi_bag") == 66
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
-    last_variant, last_seed = task_for_array_index("wsi_bag", 56)
+    last_variant, last_seed = task_for_array_index("wsi_bag", 65)
     assert first_variant.method == "patch_feature_weighted_ce"
     assert first_seed == 0
-    assert last_variant.method == "sc_mil"
+    assert last_variant.method == "mde_mil"
+    assert last_variant.params == {"mde_mil_consistency_weight": 0.3}
     assert last_seed == 2
 
 
 def test_tuning_validation_rejects_unsupported_parameters() -> None:
     validate_tuning_params("patch_feature", "patch_feature_focal", {"focal_gamma": 1.5})
+    validate_tuning_params(
+        "wsi_bag", "mde_mil", {"mde_mil_consistency_weight": 0.25}
+    )
     with pytest.raises(ValueError, match="Unsupported tuning parameter"):
         validate_tuning_params(
             "patch_feature", "patch_feature_focal", {"rankmix_alpha": 0.5}
@@ -451,3 +587,49 @@ def test_tuning_selection_requires_complete_seed_sets() -> None:
     )
     with pytest.raises(ValueError, match="Incomplete tuning results"):
         _select_all(frame, allow_incomplete=False)
+
+
+def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> None:
+    tables = tmp_path / "tables"
+    tables.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "method": "mil_ce",
+                "seed": 0,
+                "split": "test",
+                "macro_f1": 0.80,
+                "balanced_accuracy": 0.78,
+            },
+            {
+                "method": "mde_mil",
+                "seed": 0,
+                "split": "test",
+                "macro_f1": 0.82,
+                "balanced_accuracy": 0.79,
+            },
+            {
+                "method": "rankmix_mil",
+                "seed": 0,
+                "split": "test",
+                "macro_f1": 0.81,
+                "balanced_accuracy": 0.80,
+            },
+        ]
+    ).to_csv(tables / "result_summary_wsi_bag_by_seed.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "method": "patch_ce",
+                "seed": 0,
+                "split": "test",
+                "macro_f1": 0.70,
+                "balanced_accuracy": 0.68,
+            },
+        ]
+    ).to_csv(tables / "result_summary_patch_by_seed.csv", index=False)
+    frame = build_paired_delta_table({"tables": tables}, "test")
+    labels = frame["comparison"].tolist()
+    assert r"MDE-MIL $-$ MIL CE" in labels
+    assert r"RankMix $-$ MIL CE" in labels
+    assert not any("soft MCC" in label for label in labels)

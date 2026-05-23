@@ -81,6 +81,11 @@ WSI_METHOD_METADATA: dict[str, dict[str, Any]] = {
         "taxonomy_category": "representation and architecture",
         "representative_paper": "Juyal et al.; SC-MIL",
     },
+    "mde_mil": {
+        "role": "representative",
+        "taxonomy_category": "hybrid approaches",
+        "representative_paper": "Ling et al.; MDE-MIL (ensemble, no distillation)",
+    },
 }
 
 

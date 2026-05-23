@@ -2,16 +2,17 @@
 \toprule
 Regime & Method & Selected params & Fixed F1 & Val F1 & Tuned F1 & Bal.\ acc.\\
 \midrule
-Patch & CE & fixed baseline & \num{0.776} & -- & \num{0.776} & \num{0.770}\\
-Patch & Weighted CE & weight\_power=0.75 & \num{0.776} & \num{0.793} & \num{0.779} & \num{0.778}\\
-Patch & Focal & focal\_gamma=1 & \num{0.766} & \num{0.781} & \num{0.773} & \num{0.770}\\
+Patch & CE & fixed baseline & \num{0.776} & -- & \num{0.776} & --\\
 Patch & Balanced sampler & sampler\_power=0.75 & \num{0.775} & \num{0.792} & \num{0.780} & \num{0.774}\\
 Patch & CE + soft F1 (balanced) & metric\_loss\_weight=2 & \num{0.782} & \num{0.797} & \num{0.782} & \num{0.780}\\
 Patch & CE + soft MCC (balanced) & metric\_loss\_weight=1 & \num{0.782} & \num{0.795} & \num{0.782} & \num{0.782}\\
-WSI bag & MIL CE & fixed baseline & \num{0.840} & -- & \num{0.840} & \num{0.836}\\
-WSI bag & MIL weighted CE & weight\_power=0.25 & \num{0.829} & \num{0.848} & \num{0.835} & \num{0.836}\\
-WSI bag & MIL focal & focal\_gamma=1 & \num{0.827} & \num{0.839} & \num{0.828} & \num{0.824}\\
-WSI bag & MIL balanced sampler & sampler\_power=0.75 & \num{0.836} & \num{0.844} & \num{0.839} & \num{0.842}\\
+Patch & Focal & focal\_gamma=1 & \num{0.766} & \num{0.781} & \num{0.773} & \num{0.770}\\
+Patch & Weighted CE & weight\_power=0.75 & \num{0.776} & \num{0.793} & \num{0.779} & \num{0.778}\\
+WSI bag & MIL CE & fixed baseline & \num{0.840} & -- & \num{0.840} & --\\
+WSI bag & MDE-MIL (ensemble) & mde\_mil\_consistency\_weight=0.3 & \num{0.849} & \num{0.869} & \num{0.866} & \num{0.857}\\
+WSI bag & Balanced MIL & sampler\_power=0.75 & \num{0.836} & \num{0.844} & \num{0.839} & \num{0.842}\\
+WSI bag & Focal MIL & focal\_gamma=1 & \num{0.827} & \num{0.839} & \num{0.828} & \num{0.824}\\
+WSI bag & Weighted MIL & weight\_power=0.25 & \num{0.829} & \num{0.848} & \num{0.835} & \num{0.836}\\
 WSI bag & RankMix & rankmix\_alpha=2 & \num{0.848} & \num{0.854} & \num{0.856} & \num{0.866}\\
 WSI bag & SC-MIL & sc\_mil\_temperature=0.1 & \num{0.833} & \num{0.848} & \num{0.838} & \num{0.838}\\
 \bottomrule

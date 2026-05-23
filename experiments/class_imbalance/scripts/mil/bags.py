@@ -141,6 +141,52 @@ class AttentionMil(nn.Module):
         return nn.functional.normalize(self.projector(embeddings), dim=1)
 
 
+def _expert_head(hidden_dim: int, output_dim: int, dropout: float) -> nn.Sequential:
+    return nn.Sequential(
+        nn.Linear(hidden_dim, hidden_dim),
+        nn.ReLU(),
+        nn.Dropout(dropout),
+        nn.Linear(hidden_dim, output_dim),
+    )
+
+
+class DualExpertMil(nn.Module):
+    """Shared attention MIL aggregator with dual distribution-specific experts."""
+
+    def __init__(
+        self, input_dim: int, hidden_dim: int, output_dim: int, dropout: float
+    ) -> None:
+        super().__init__()
+        self.instance_encoder = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        )
+        self.attention = nn.Linear(hidden_dim, 1)
+        self.expert_u = _expert_head(hidden_dim, output_dim, dropout)
+        self.expert_b = _expert_head(hidden_dim, output_dim, dropout)
+
+    def aggregate(self, bags: list[torch.Tensor]) -> torch.Tensor:
+        """Pool instance features into one embedding per bag."""
+        embeddings: list[torch.Tensor] = []
+        for bag in bags:
+            encoded = self.instance_encoder(bag)
+            weights = torch.softmax(self.attention(encoded).squeeze(1), dim=0)
+            embeddings.append(torch.sum(encoded * weights.unsqueeze(1), dim=0))
+        return torch.stack(embeddings)
+
+    def logits_u(self, bag_embeddings: torch.Tensor) -> torch.Tensor:
+        return self.expert_u(bag_embeddings)
+
+    def logits_b(self, bag_embeddings: torch.Tensor) -> torch.Tensor:
+        return self.expert_b(bag_embeddings)
+
+    def forward_ensemble(self, bags: list[torch.Tensor]) -> torch.Tensor:
+        """Return mean expert logits for held-out evaluation."""
+        embeddings = self.aggregate(bags)
+        return (self.logits_u(embeddings) + self.logits_b(embeddings)) * 0.5
+
+
 def class_weights(
     labels: np.ndarray, n_classes: int, beta: float = 0.999, power: float = 1.0
 ) -> torch.Tensor:

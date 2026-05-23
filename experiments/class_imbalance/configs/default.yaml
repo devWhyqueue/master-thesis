@@ -67,6 +67,7 @@ wsi_training:
   rankmix_teacher_epochs: 30
   rankmix_alpha: 1.0
   sc_mil_temperature: 1.0
+  mde_mil_consistency_weight: 0.25
   device: auto
   max_train_rows:
   max_eval_rows:
@@ -109,6 +110,7 @@ wsi_bag_methods:
   - mil_balanced_sampler_ce
   - rankmix_mil
   - sc_mil
+  - mde_mil
 
 slurm:
   partition: gpu-2h

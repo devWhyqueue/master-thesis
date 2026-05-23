@@ -14,6 +14,7 @@ from scripts.mil.bag_losses import bag_loss
 from scripts.mil.bags import (
     AttentionMil,
     BagFeatureDataset,
+    DualExpertMil,
     bag_collate,
     class_weights,
     infer_input_dim,
@@ -22,6 +23,10 @@ from scripts.mil.rankmix_teacher import load_rankmix_teacher, train_rankmix_teac
 from scripts.training.eval import _save_and_evaluate_bags
 from scripts.training.split import _progress_payload, _write_training_progress
 from scripts.training.support import _resolve_device
+
+BALANCED_SAMPLER_METHODS = frozenset(
+    {"mil_balanced_sampler_ce", "sc_mil", "rankmix_mil"}
+)
 
 
 def _train_bag_method(
@@ -41,7 +46,8 @@ def _train_bag_method(
         frame, class_names, training, config, seed, smoke
     )
     labels = train_dataset.labels.cpu().numpy()
-    model = _build_model(train_dataset, class_names, training, device)
+    build_model = _build_mde_model if method == "mde_mil" else _build_model
+    model = build_model(train_dataset, class_names, training, device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=float(training["learning_rate"]),
@@ -142,6 +148,21 @@ def _build_model(
     return cast(AttentionMil, model.to(device))
 
 
+def _build_mde_model(
+    dataset: BagFeatureDataset,
+    class_names: list[str],
+    training: dict,
+    device: torch.device,
+) -> DualExpertMil:
+    model = DualExpertMil(
+        infer_input_dim(dataset),
+        int(training["hidden_dim"]),
+        len(class_names),
+        float(training["dropout"]),
+    )
+    return cast(DualExpertMil, model.to(device))
+
+
 def _loader(
     dataset: BagFeatureDataset,
     labels: np.ndarray,
@@ -149,9 +170,14 @@ def _loader(
     batch_size: int,
     seed: int,
     sampler_power: float = 1.0,
+    *,
+    balanced: bool | None = None,
 ) -> DataLoader:
     generator = torch.Generator().manual_seed(seed)
-    if method not in {"mil_balanced_sampler_ce", "sc_mil", "rankmix_mil"}:
+    use_balanced = (
+        method in BALANCED_SAMPLER_METHODS if balanced is None else balanced
+    )
+    if not use_balanced:
         return DataLoader(
             dataset,
             batch_size=batch_size,
@@ -181,6 +207,17 @@ def _run_training(
     result_dir: Path,
     teacher: AttentionMil | None = None,
 ) -> dict[str, int]:
+    if method == "mde_mil":
+        return _run_mde_training(
+            model,
+            dataset,
+            labels,
+            training,
+            optimizer,
+            device,
+            seed,
+            result_dir,
+        )
     loader = _loader(
         dataset,
         labels,
@@ -222,6 +259,71 @@ def _run_training(
         _write_training_progress(
             result_dir,
             _progress_payload(method, seed, device, "running", epoch, epochs),
+            float(np.mean(losses)),
+        )
+    return totals
+
+
+def _run_mde_training(
+    model: nn.Module,
+    dataset: BagFeatureDataset,
+    labels: np.ndarray,
+    training: dict,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    seed: int,
+    result_dir: Path,
+) -> dict[str, int]:
+    batch_size = int(training["bag_batch_size"])
+    sampler_power = float(training.get("sampler_power", 1.0))
+    loader_u = _loader(
+        dataset, labels, "mil_ce", batch_size, seed, sampler_power, balanced=False
+    )
+    loader_b = _loader(
+        dataset,
+        labels,
+        "mil_balanced_sampler_ce",
+        batch_size,
+        seed,
+        sampler_power,
+        balanced=True,
+    )
+    weights = class_weights(
+        labels,
+        int(len(np.unique(labels))),
+        power=float(training.get("weight_power", 1.0)),
+    ).to(device)
+    totals = {"branch_u_batches": 0, "branch_b_batches": 0}
+    epochs = int(training["epochs"])
+    total_steps = max(1, epochs * len(loader_u))
+    step = 0
+    for epoch in range(1, epochs + 1):
+        model.train()
+        losses: list[float] = []
+        for (bags_u, targets_u), (bags_b, targets_b) in zip(
+            loader_u, loader_b, strict=True
+        ):
+            step += 1
+            loss, diagnostics = bag_loss(
+                "mde_mil",
+                model,
+                [bag.to(device) for bag in bags_u],
+                targets_u.to(device),
+                weights,
+                step / total_steps,
+                training,
+                bags_b=[bag.to(device) for bag in bags_b],
+                targets_b=targets_b.to(device),
+            )
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            losses.append(float(loss.detach().cpu().item()))
+            for key, value in diagnostics.items():
+                totals[key] = totals.get(key, 0) + int(value)
+        _write_training_progress(
+            result_dir,
+            _progress_payload("mde_mil", seed, device, "running", epoch, epochs),
             float(np.mean(losses)),
         )
     return totals

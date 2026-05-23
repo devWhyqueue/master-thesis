@@ -37,6 +37,7 @@ PAIRED_COMPARISONS = (
         r"CE + soft F1 $-$ CE",
     ),
     PairedComparison("wsi_bag", "rankmix_mil", "mil_ce", r"RankMix $-$ MIL CE"),
+    PairedComparison("wsi_bag", "mde_mil", "mil_ce", r"MDE-MIL $-$ MIL CE"),
 )
 
 
@@ -58,17 +59,23 @@ def _paired_metric_values(
     comparison: PairedComparison,
     metric: str,
     split: str,
-) -> pd.Series:
+) -> pd.Series | None:
     selected = frame[frame["split"] == split]
     rows: list[float] = []
     for seed in sorted(selected["seed"].unique()):
-        method_row = selected[
+        method_rows = selected[
             (selected["method"] == comparison.method) & (selected["seed"] == seed)
-        ].iloc[0]
-        baseline_row = selected[
+        ]
+        baseline_rows = selected[
             (selected["method"] == comparison.baseline) & (selected["seed"] == seed)
-        ].iloc[0]
-        rows.append(float(method_row[metric]) - float(baseline_row[metric]))
+        ]
+        if method_rows.empty or baseline_rows.empty:
+            continue
+        rows.append(
+            float(method_rows.iloc[0][metric]) - float(baseline_rows.iloc[0][metric])
+        )
+    if not rows:
+        return None
     return pd.Series(rows, dtype=float)
 
 
@@ -87,9 +94,17 @@ def build_paired_delta_table(paths: dict[str, Path], split: str) -> pd.DataFrame
         if comparison.benchmark not in cache:
             cache[comparison.benchmark] = _load_by_seed(paths, comparison.benchmark)
         frame = cache[comparison.benchmark]
-        row: dict[str, str] = {"comparison": comparison.label}
+        metric_values: dict[str, pd.Series] = {}
         for metric in METRICS:
             values = _paired_metric_values(frame, comparison, metric, split)
+            if values is None:
+                metric_values = {}
+                break
+            metric_values[metric] = values
+        if not metric_values:
+            continue
+        row: dict[str, str] = {"comparison": comparison.label}
+        for metric, values in metric_values.items():
             row[f"{metric}_mean"] = float(values.mean())
             row[f"{metric}_std"] = float(values.std(ddof=0))
             row[f"{metric}_seed_values"] = ",".join(f"{value:+.6f}" for value in values)

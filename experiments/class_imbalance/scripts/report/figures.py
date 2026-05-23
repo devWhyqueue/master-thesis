@@ -40,6 +40,7 @@ METHOD_LABELS = {
     "mil_balanced_sampler_ce": "Balanced MIL",
     "rankmix_mil": "RankMix",
     "sc_mil": "SC-MIL",
+    "mde_mil": "MDE-MIL (ensemble)",
 }
 
 
