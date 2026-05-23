@@ -21,6 +21,7 @@ PATCH_FEATURE_SPECS = (
         [0.25, 0.5, 1.0, 2.0],
     ),
     ("patch_feature_cfal", "cfal_gamma", [0.5, 1.0, 2.0, 5.0]),
+    ("patch_feature_divide_conquer", "dnc_k_clusters", [5, 10, 15, 20]),
 )
 WSI_BAG_SPECS = (
     ("mil_weighted_ce", "weight_power", [0.25, 0.5, 0.75, 1.0]),

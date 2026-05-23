@@ -9,7 +9,7 @@ from typing import Any, cast
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
-from scripts.report.figures import METHOD_LABELS
+from scripts.report.figures import latex_method_label
 
 CALIBRATION_METRICS = (
     "negative_log_likelihood",
@@ -71,7 +71,7 @@ def _aggregate_details(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFr
 
 
 def _method_label(method: str) -> str:
-    return METHOD_LABELS.get(method, method.replace("_", " "))
+    return latex_method_label(method)
 
 
 def _format_metric(row: pd.Series, metric: str) -> str:

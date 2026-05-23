@@ -151,7 +151,7 @@ case "$job" in
 
   patch-feature-train)
     export EXPERIMENT_USE_GPU=1
-    methods=(patch_feature_ce patch_feature_weighted_ce patch_feature_focal patch_feature_balanced_sampler_ce patch_feature_ce_soft_f1_balanced patch_feature_ce_soft_mcc_balanced patch_feature_progan_aug patch_feature_cfal)
+    methods=(patch_feature_ce patch_feature_weighted_ce patch_feature_focal patch_feature_balanced_sampler_ce patch_feature_ce_soft_f1_balanced patch_feature_ce_soft_mcc_balanced patch_feature_progan_aug patch_feature_cfal patch_feature_divide_conquer)
     seeds=(0 1 2)
     method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
     seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"

@@ -1,5 +1,6 @@
 benchmark,regime,method,method_label,selected_params,baseline_method,baseline_test_macro_f1,fixed_test_macro_f1,tuned_val_macro_f1,tuned_test_macro_f1,tuned_test_balanced_accuracy,tuned_delta_macro_f1
 patch_feature,Patch,patch_feature_ce,CE,fixed baseline,patch_feature_ce,0.7758497994114378,0.7758497994114378,,0.7758497994114378,,0.0
 patch_feature,Patch,patch_feature_cfal,CFAL,"{""cfal_gamma"":2.0}",patch_feature_ce,0.7758497994114378,0.8069099160336575,0.8186537470881753,0.8075597113627863,0.7997194855711052,0.031709911951348424
+patch_feature,Patch,patch_feature_divide_conquer,D\&C,"{""dnc_k_clusters"":10}",patch_feature_ce,0.7758497994114378,0.7519538268243692,0.7631662835521732,0.7485664169566509,0.7372719128844799,-0.027283382454786897
 wsi_bag,WSI bag,mil_ce,MIL CE,fixed baseline,mil_ce,0.839680733170148,0.839680733170148,,0.839680733170148,,0.0
 wsi_bag,WSI bag,mde_mil,MDE-MIL (ensemble),"{""mde_mil_consistency_weight"":0.3}",mil_ce,0.839680733170148,0.8493458468368846,0.8690868694090027,0.8655644926111474,0.8565467353504458,0.02588375944099941

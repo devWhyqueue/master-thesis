@@ -38,6 +38,13 @@ from scripts.patch_feature.cfal import (
     effective_number,
     gaussian_affinity,
 )
+from scripts.patch_feature.divide_conquer import (
+    DivideConquerModel,
+    build_divide_conquer_model,
+    cluster_sample_binary_indices,
+    hard_class_names,
+)
+from scripts.patch_feature.training import PatchFeatureDataset
 from scripts.progan.core import (
     ProgressiveDiscriminator,
     ProgressiveGenerator,
@@ -582,19 +589,94 @@ def test_cfal_is_registered_patch_feature_method() -> None:
     config_path = EXPERIMENT_ROOT / "configs" / "default.yaml"
     config = load_config(config_path)
     assert "patch_feature_cfal" in config["patch_feature_methods"]
+    assert "patch_feature_divide_conquer" in config["patch_feature_methods"]
+
+
+def _synthetic_patch_dataset(
+    tmp_path: Path, class_names: list[str], rows_per_class: int = 12
+) -> PatchFeatureDataset:
+    feature_count = len(class_names) * rows_per_class
+    features = np.random.default_rng(0).standard_normal((feature_count, 16)).astype(
+        np.float32
+    )
+    features_path = tmp_path / "features.npy"
+    np.save(features_path, features)
+    rows = []
+    feature_index = 0
+    for class_name in class_names:
+        for _ in range(rows_per_class):
+            rows.append(
+                {
+                    "feature_index": feature_index,
+                    "cancer_type": class_name,
+                    "split": "train",
+                    "is_synthetic": False,
+                }
+            )
+            feature_index += 1
+    frame = pd.DataFrame(rows)
+    return PatchFeatureDataset(frame, features_path, {name: idx for idx, name in enumerate(class_names)})
+
+
+def test_divide_conquer_cluster_sampling_balances_majority_side(
+    tmp_path: Path,
+) -> None:
+    class_names = [f"class_{index}" for index in range(8)]
+    dataset = _synthetic_patch_dataset(tmp_path, class_names, rows_per_class=20)
+    positive_idx = np.arange(0, 10, dtype=np.int64)
+    negative_idx = np.arange(10, 160, dtype=np.int64)
+    pos, neg, stats = cluster_sample_binary_indices(
+        dataset,
+        positive_idx,
+        negative_idx,
+        k_clusters=5,
+        n_bins=5,
+        seed=0,
+    )
+    assert len(pos) == 10
+    assert len(neg) == 10
+    assert stats["negative_after"] == 10
+
+
+def test_divide_conquer_forward_and_training_step_runs_without_nan(
+    tmp_path: Path,
+) -> None:
+    class_names = hard_class_names()[:5] + [f"extra_{index}" for index in range(27)]
+    dataset = _synthetic_patch_dataset(tmp_path, class_names, rows_per_class=4)
+    settings = {
+        "hidden_dim": 16,
+        "dropout": 0.0,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0,
+        "batch_size": 8,
+        "epochs": 2,
+        "dnc_k_clusters": 3,
+        "dnc_zscore_bins": 3,
+        "dnc_expert_epochs": 1,
+    }
+    device = torch.device("cpu")
+    model = build_divide_conquer_model(dataset, settings, len(class_names), device)
+    sample, _ = dataset[0]
+    logits = model(sample.unsqueeze(0))
+    assert logits.shape == (1, len(class_names))
+    assert torch.isfinite(logits).all().item()
 
 
 def test_tuning_grid_expands_expected_array_sizes() -> None:
-    assert task_count("patch_feature") == 69
+    assert task_count("patch_feature") == 81
     assert task_count("wsi_bag") == 66
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
     cfal_variant, cfal_seed = task_for_array_index("patch_feature", 57)
+    dnc_variant, dnc_seed = task_for_array_index("patch_feature", 69)
     last_variant, last_seed = task_for_array_index("wsi_bag", 65)
     assert first_variant.method == "patch_feature_weighted_ce"
     assert first_seed == 0
     assert cfal_variant.method == "patch_feature_cfal"
     assert cfal_variant.params == {"cfal_gamma": 0.5}
     assert cfal_seed == 0
+    assert dnc_variant.method == "patch_feature_divide_conquer"
+    assert dnc_variant.params == {"dnc_k_clusters": 5.0}
+    assert dnc_seed == 0
     assert last_variant.method == "mde_mil"
     assert last_variant.params == {"mde_mil_consistency_weight": 0.3}
     assert last_seed == 2

@@ -28,6 +28,7 @@ METHOD_LABELS = {
     "patch_ce_soft_mcc_balanced": "CE + soft MCC (balanced)",
     "patch_progan_aug": "ProGAN augmentation",
     "patch_cfal": "CFAL",
+    "patch_dnc": "D&C",
     "patch_feature_ce": "CE",
     "patch_feature_weighted_ce": "Weighted CE",
     "patch_feature_focal": "Focal",
@@ -36,6 +37,7 @@ METHOD_LABELS = {
     "patch_feature_ce_soft_mcc_balanced": "CE + soft MCC (balanced)",
     "patch_feature_progan_aug": "ProGAN augmentation",
     "patch_feature_cfal": "CFAL",
+    "patch_feature_divide_conquer": "D&C",
     "mil_ce": "MIL CE",
     "mil_weighted_ce": "Weighted MIL",
     "mil_focal": "Focal MIL",
@@ -65,6 +67,11 @@ def _methods(config: dict, benchmark: str) -> list[str]:
 
 def _method_label(method: str) -> str:
     return METHOD_LABELS.get(method, method.replace("_", " "))
+
+
+def latex_method_label(method: str) -> str:
+    """Return a method label with characters escaped for LaTeX tables."""
+    return _method_label(method).replace("&", r"\&")
 
 
 def _classwise_rows(method: str, seed: int, result: dict) -> list[dict[str, object]]:

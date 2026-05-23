@@ -10,7 +10,7 @@ import pandas as pd
 
 from scripts.common import ensure_dirs, load_config, write_json
 from scripts.metadata import benchmark_metadata
-from scripts.report.figures import METHOD_LABELS
+from scripts.report.figures import METHOD_LABELS, latex_method_label
 
 SUMMARY_METRICS = (
     "accuracy",
@@ -177,7 +177,7 @@ def _write_latex(frame: pd.DataFrame, path: Path) -> None:
     ]
     for row in test.to_dict("records"):
         method_key = str(row["method"])
-        label = METHOD_LABELS.get(method_key, method_key.replace("_", " "))
+        label = latex_method_label(method_key)
         lines.append(
             f"{label} & {_format_mean_std(row, 'accuracy')} & "
             f"{_format_mean_std(row, 'balanced_accuracy')} & "

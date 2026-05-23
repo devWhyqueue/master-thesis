@@ -16,7 +16,7 @@ from scripts.patch.losses import (
     ScholzCombinedLoss,
     inverse_frequency_weights,
 )
-from scripts.patch_feature.cfal import train_cfal_model
+from scripts.patch_feature.specialized_trainers import fit_special_patch_method
 from scripts.patch_feature.training import (
     PatchFeatureDataset,
     build_patch_feature_model,
@@ -62,13 +62,20 @@ def _run(args: argparse.Namespace) -> None:
     datasets = split_patch_feature_datasets(
         frame, cache_dir / "features.npy", class_names
     )
-    model = _fit_model(
+    model, diagnostics = _fit_model(
         args.method, datasets[0], class_names, config, args.seed, tuning_params
     )
     device = _resolve_device(str(config["patch_feature_training"]["device"]))
     result_dir = _result_dir(paths, args.method, args.seed, args.tuning_id)
     _write_outputs(
-        result_dir, args, tuning_params, model, datasets, class_names, device
+        result_dir,
+        args,
+        tuning_params,
+        model,
+        datasets,
+        class_names,
+        device,
+        diagnostics,
     )
 
 
@@ -80,6 +87,7 @@ def _write_outputs(
     datasets: tuple[PatchFeatureDataset, PatchFeatureDataset, PatchFeatureDataset],
     class_names: list[str],
     device: torch.device,
+    diagnostics: dict[str, object] | None = None,
 ) -> None:
     result_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), result_dir / "model.pt")
@@ -93,14 +101,13 @@ def _write_outputs(
             "tuning_params": tuning_params,
         },
     )
-    write_json(
-        result_dir / "val_results.json",
-        evaluate_patch_feature_model(model, datasets[1], class_names, device),
-    )
-    write_json(
-        result_dir / "test_results.json",
-        evaluate_patch_feature_model(model, datasets[2], class_names, device),
-    )
+    if diagnostics is not None:
+        write_json(result_dir / "activation_diagnostics.json", diagnostics)
+    for split_name, dataset in zip(("val", "test"), datasets[1:], strict=True):
+        write_json(
+            result_dir / f"{split_name}_results.json",
+            evaluate_patch_feature_model(model, dataset, class_names, device),
+        )
 
 
 def _fit_model(
@@ -110,13 +117,14 @@ def _fit_model(
     config: dict,
     seed: int,
     tuning_params: dict[str, float],
-) -> torch.nn.Module:
+) -> tuple[torch.nn.Module, dict[str, object] | None]:
     settings = config["patch_feature_training"]
     device = _resolve_device(str(settings["device"]))
-    if method == "patch_feature_cfal":
-        return train_cfal_model(
-            train_set, len(class_names), settings, device, seed, tuning_params
-        )
+    special = fit_special_patch_method(
+        method, train_set, class_names, settings, device, seed, tuning_params
+    )
+    if special is not None:
+        return special
     labels = train_set.labels.cpu().numpy()
     model = build_patch_feature_model(train_set, settings, len(class_names), device)
     criterion = _criterion(
@@ -139,7 +147,7 @@ def _fit_model(
         seed,
         tuning_params,
     )
-    return model
+    return model, None
 
 
 def _criterion(

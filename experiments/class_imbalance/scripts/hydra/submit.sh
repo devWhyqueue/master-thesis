@@ -177,7 +177,7 @@ case "$command" in
       --partition="${PATCH_FEATURE_TRAIN_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-23 \
+      --array=0-26 \
       --output=logs/patch-feature-train-%A-%a.out \
       --error=logs/patch-feature-train-%A-%a.err \
       "$@"
@@ -189,7 +189,7 @@ case "$command" in
       --partition="${PATCH_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-68 \
+      --array=0-80 \
       --output=logs/patch-tune-%A-%a.out \
       --error=logs/patch-tune-%A-%a.err \
       "$@"

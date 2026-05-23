@@ -43,6 +43,11 @@ PATCH_METHOD_METADATA: dict[str, dict[str, Any]] = {
         "taxonomy_category": "algorithm-level losses",
         "representative_paper": "Mahbub et al.; CFAL (prototype affinity)",
     },
+    "patch_dnc": {
+        "role": "representative",
+        "taxonomy_category": "representation and architecture",
+        "representative_paper": "Nouyed et al.; Divide-and-Conquer",
+    },
 }
 
 PATCH_FEATURE_METHOD_ALIASES = {
@@ -54,6 +59,7 @@ PATCH_FEATURE_METHOD_ALIASES = {
     "patch_feature_ce_soft_mcc_balanced": "patch_ce_soft_mcc_balanced",
     "patch_feature_progan_aug": "patch_progan_aug",
     "patch_feature_cfal": "patch_cfal",
+    "patch_feature_divide_conquer": "patch_dnc",
 }
 
 WSI_METHOD_METADATA: dict[str, dict[str, Any]] = {

@@ -9,7 +9,7 @@ import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
 from scripts.metadata import PATCH_FEATURE_METHOD_ALIASES
-from scripts.report.figures import METHOD_LABELS
+from scripts.report.figures import METHOD_LABELS, latex_method_label
 from scripts.tuning.grid import TuningVariant, grid_for_benchmark
 from scripts.tuning.reporting import (
     write_delta_figure,
@@ -202,7 +202,7 @@ def _prefixed_metrics(prefix: str, result: dict[str, Any]) -> dict[str, float]:
 
 
 def _method_label(method: str) -> str:
-    return METHOD_LABELS.get(method, method.replace("_", " "))
+    return latex_method_label(method)
 
 
 if __name__ == "__main__":
