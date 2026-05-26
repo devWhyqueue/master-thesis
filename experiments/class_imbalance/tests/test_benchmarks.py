@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # ruff: noqa: E402
 
+import json
 from pathlib import Path
 import sys
 
@@ -64,7 +65,13 @@ from scripts.training.support_tiers import class_tier_labels
 from scripts.prep.patch_manifest import build_patch_manifest
 from scripts.report.paired_delta_table import build_paired_delta_table
 from scripts.tuning.aggregate import _select_all
-from scripts.tuning.grid import task_count, task_for_array_index, validate_tuning_params
+from scripts.tuning.grid import (
+    PATCH_FEATURE_SPECS,
+    WSI_BAG_SPECS,
+    task_count,
+    task_for_array_index,
+    validate_tuning_params,
+)
 from scripts.tuning.paths import tuning_result_dir
 
 
@@ -761,6 +768,57 @@ def test_tuning_selection_requires_complete_seed_sets() -> None:
     )
     with pytest.raises(ValueError, match="Incomplete tuning results"):
         _select_all(frame, allow_incomplete=False)
+
+
+def test_temperature_scaling_lowers_synthetic_overconfidence_nll() -> None:
+    rng = np.random.default_rng(0)
+    n_classes = 4
+    logits = rng.normal(size=(200, n_classes))
+    labels = rng.integers(0, n_classes, size=200)
+    overconfident = np.exp(logits * 4.0)
+    overconfident /= overconfident.sum(axis=1, keepdims=True)
+    from scripts.report.calibration_utils import (
+        apply_temperature,
+        fit_temperature,
+        negative_log_likelihood,
+        probabilities_to_logits,
+    )
+
+    raw_logits = probabilities_to_logits(overconfident)
+    fit = fit_temperature(raw_logits, labels)
+    calibrated = apply_temperature(raw_logits, float(fit.temperature))
+    assert float(fit.temperature) > 1.0
+    assert negative_log_likelihood(calibrated, labels) < negative_log_likelihood(
+        overconfident, labels
+    )
+
+
+def test_tuning_selection_table_lists_all_tuned_methods() -> None:
+    """Report Table 8 must list every validation-selected tuned method."""
+    csv_path = EXPERIMENT_ROOT / "outputs" / "tables" / "result_tuning_selection.csv"
+    frame = pd.read_csv(csv_path)
+    patch_methods = set(frame.loc[frame["benchmark"] == "patch_feature", "method"])
+    wsi_methods = set(frame.loc[frame["benchmark"] == "wsi_bag", "method"])
+    assert patch_methods == {spec[0] for spec in PATCH_FEATURE_SPECS} | {
+        "patch_feature_ce"
+    }
+    assert wsi_methods == {spec[0] for spec in WSI_BAG_SPECS} | {"mil_ce"}
+
+
+def test_calibration_posthoc_table_lists_all_benchmark_methods() -> None:
+    """Post-hoc calibration table must cover every fixed-protocol method."""
+    config = load_config(EXPERIMENT_ROOT / "configs" / "default.yaml")
+    csv_path = EXPERIMENT_ROOT / "outputs" / "tables" / "result_calibration_posthoc.csv"
+    missing_path = (
+        EXPERIMENT_ROOT / "outputs" / "tables" / "result_calibration_posthoc_missing.json"
+    )
+    frame = pd.read_csv(csv_path)
+    missing_payload = json.loads(missing_path.read_text(encoding="utf-8"))
+    assert missing_payload["missing"] == []
+    patch_methods = set(frame.loc[frame["benchmark"] == "patch", "method"])
+    wsi_methods = set(frame.loc[frame["benchmark"] == "wsi_bag", "method"])
+    assert patch_methods == set(config["patch_feature_methods"])
+    assert wsi_methods == set(config["wsi_bag_methods"])
 
 
 def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> None:
