@@ -23,12 +23,9 @@ pyrightconfig.json
 *.toc
 .latex-build/
 
-# TCGA-UT experiment run outputs (keep summary tables/figures separately)
-experiments/class_imbalance_tcga_ut/outputs/archive/
-experiments/class_imbalance_tcga_ut/outputs/results/
-experiments/class_imbalance_tcga_ut/outputs/results_patch/
-experiments/class_imbalance_tcga_ut/outputs/results_wsi_bag/
-experiments/class_imbalance_tcga_ut/outputs/synthetic_features/
-experiments/class_imbalance_tcga_ut/outputs/synthetic_images/
-experiments/class_imbalance_tcga_ut/outputs/synthetic_patch_images/
-experiments/class_imbalance_tcga_ut/outputs/tables/result_details*.jsonl.gz
+# Keep curated summaries/figures, ignore regenerated experiment dumps.
+experiments/class_imbalance/outputs/*
+!experiments/class_imbalance/outputs/figures/
+!experiments/class_imbalance/outputs/tables/
+!experiments/class_imbalance/outputs/figures/.gitkeep
+!experiments/class_imbalance/outputs/tables/.gitkeep
