@@ -8,13 +8,13 @@ class-imbalance mitigation in computational pathology.
 
 - `papers/`: PDFs and the main bibliography file `papers/sources.bib`
 - `docs/`: thesis-related reference material and notes
-- `experiments/class_imbalance_tcga_ut/`: native TCGA-UT class-imbalance
-  experiment, paper draft, Hydra scripts, and generated paper tables/figures
+- `experiments/class_imbalance/`: native TCGA-UT class-imbalance experiment,
+  paper draft, Hydra scripts, and generated paper tables/figures
 - `.agents/skills/`: repo-local agent skills for thesis workflows
 - `code/TCGA-UT/`: external or supporting code used during the thesis work
 
 The active experiment package is
-[`experiments/class_imbalance_tcga_ut/`](./experiments/class_imbalance_tcga_ut/).
+[`experiments/class_imbalance/`](./experiments/class_imbalance/).
 It evaluates baselines and representative imbalance methods on frozen Virchow2
 WSI feature bags, including an image-GAN-to-Virchow2 synthetic feature bridge.
 
@@ -51,10 +51,10 @@ uv run bib pdf-sync papers/sources.bib --pdf-dir papers --in-place
 ## Experiment
 
 See
-[`experiments/class_imbalance_tcga_ut/README.md`](./experiments/class_imbalance_tcga_ut/README.md)
+[`experiments/class_imbalance/README.md`](./experiments/class_imbalance/README.md)
 for the concise Hydra runbook. The latest paper draft is:
 
-- `experiments/class_imbalance_tcga_ut/paper/main.pdf`
+- `experiments/class_imbalance/report/main.pdf`
 
 ## Development
 

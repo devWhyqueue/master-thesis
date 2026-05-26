@@ -215,6 +215,10 @@ ssh -L 8888:headxyz:8888 -o ServerAliveInterval=60 hydra
 
 Open the `127.0.0.1:8888` URL with the token from the job log.
 
+## Git On Hydra
+
+Keep the repo at `~/master-thesis` (clone: `git clone --depth 1 https://github.com/devWhyqueue/master-thesis.git ~/master-thesis`). Sync code with `git pull --ff-only`; gitignored artifacts under `experiments/<name>/` stay on disk. Run Hydra jobs from the relevant `experiments/<name>/` directory (see that experiment's README).
+
 ## Agent Safety Checklist
 
 - Before running anything expensive, confirm whether the shell is on the login node or inside a SLURM allocation.

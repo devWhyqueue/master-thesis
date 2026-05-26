@@ -12,8 +12,8 @@ job="${HYDRA_JOB:?Set HYDRA_JOB to the job name to run.}"
 
 if [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -f "${SLURM_SUBMIT_DIR}/configs/default.yaml" ]; then
   ROOT="${SLURM_SUBMIT_DIR}"
-elif [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -f "${SLURM_SUBMIT_DIR}/experiments/class_imbalance_tcga_ut/configs/default.yaml" ]; then
-  ROOT="${SLURM_SUBMIT_DIR}/experiments/class_imbalance_tcga_ut"
+elif [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -f "${SLURM_SUBMIT_DIR}/experiments/class_imbalance/configs/default.yaml" ]; then
+  ROOT="${SLURM_SUBMIT_DIR}/experiments/class_imbalance"
 else
   ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fi
