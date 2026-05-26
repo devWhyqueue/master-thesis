@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import cast
 
 import numpy as np
-import pandas as pd
 import torch
 from sklearn.cluster import KMeans
 from torch.utils.data import Dataset
@@ -43,32 +42,25 @@ class BinarySubproblemDataset(Dataset):
         return features, int(self.labels[idx].item())
 
 
-def hard_class_names(top_k: int = 5, available: set[str] | None = None) -> list[str]:
-    """Return the hardest patch classes from the CE difficulty table."""
-    table_path = (
-        EXPERIMENT_ROOT / "outputs" / "tables" / "classwise_difficulty_test.csv"
+def dnc_class_partitions(class_names: list[str]) -> dict[str, frozenset[str]]:
+    """Return fixed, disjoint D&C groups derived only from dataset support."""
+    slide_counts_path = (
+        EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv"
     )
-    if not table_path.exists():
+    tier_labels = load_class_tier_labels(class_names, slide_counts_path)
+    if tier_labels is None:
         raise FileNotFoundError(
-            "Missing classwise difficulty table; run CE baseline analysis first: "
-            f"{table_path}"
+            f"Missing class distribution table: {slide_counts_path}"
         )
-    frame = pd.read_csv(table_path)
-    patch_rows = cast(
-        pd.DataFrame,
-        frame[
-            (frame["benchmark"] == "patch") & (frame["method"] == "patch_feature_ce")
-        ],
-    ).sort_values("difficulty_rank")
-    names = patch_rows["class_name"].head(top_k).astype(str).tolist()
-    if available is not None:
-        names = [name for name in names if name in available]
-        if len(names) < top_k:
-            in_data = patch_rows[patch_rows["class_name"].astype(str).isin(available)]
-            names = in_data["class_name"].head(top_k).astype(str).tolist()
-    if len(names) < 1:
-        raise ValueError("No hard classes available for the current patch subset")
-    return names[:top_k]
+    partitions = {
+        tier: frozenset(name for name, label in tier_labels.items() if label == tier)
+        for tier in ("tail", "body", "head")
+    }
+    if any(not group for group in partitions.values()):
+        raise ValueError("D&C requires non-empty tail, body, and head support tiers")
+    if set().union(*partitions.values()) != set(class_names):
+        raise ValueError("D&C support tiers must cover every patch class exactly once")
+    return partitions
 
 
 def cluster_sample_binary_indices(
@@ -128,26 +120,20 @@ def build_sampled_subproblem_datasets(
 def _subproblem_specs(
     class_names: list[str],
 ) -> tuple[tuple[SubproblemSpec, SubproblemSpec, SubproblemSpec], dict[str, object]]:
-    slide_counts_path = (
-        EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv"
-    )
-    tier_labels = load_class_tier_labels(class_names, slide_counts_path)
-    if tier_labels is None:
-        raise FileNotFoundError(
-            f"Missing class distribution table: {slide_counts_path}"
-        )
-    hard = set(hard_class_names(available=set(class_names)))
-    head = {name for name, tier in tier_labels.items() if tier == "head"}
-    tail = {name for name, tier in tier_labels.items() if tier == "tail"}
-    non_hard = set(class_names) - hard
+    partitions = dnc_class_partitions(class_names)
+    tail = partitions["tail"]
+    body = partitions["body"]
+    head = partitions["head"]
+    non_tail = body | head
     specs = (
-        SubproblemSpec("hard_vs_tail", frozenset(hard), frozenset(tail)),
-        SubproblemSpec("hard_vs_head", frozenset(hard), frozenset(head)),
-        SubproblemSpec("hard_vs_rest", frozenset(hard), frozenset(non_hard)),
+        SubproblemSpec("tail_vs_body", tail, body),
+        SubproblemSpec("tail_vs_head", tail, head),
+        SubproblemSpec("tail_vs_rest", tail, non_tail),
     )
     diagnostics: dict[str, object] = {
-        "hard_classes": sorted(hard),
+        "partition_basis": "fixed_dataset_slide_support_tiers",
         "head_classes": sorted(head),
+        "body_classes": sorted(body),
         "tail_classes": sorted(tail),
         "subproblems": {},
     }
@@ -162,15 +148,11 @@ def _sampled_binary_dataset(
     seed: int,
     subproblem_stats: dict[str, object],
 ) -> BinarySubproblemDataset:
-    pos_idx = np.flatnonzero(
-        train_set.rows["cancer_type"].astype(str).isin(list(spec.positive_classes))
-    )
-    neg_idx = np.flatnonzero(
-        train_set.rows["cancer_type"].astype(str).isin(list(spec.negative_classes))
-    )
-    pos_idx, neg_idx, used_fallback = _binary_indices_or_fallback(
-        train_set, pos_idx, neg_idx, seed
-    )
+    class_column = train_set.rows["cancer_type"].astype(str)
+    pos_idx = np.flatnonzero(class_column.isin(list(spec.positive_classes)))
+    neg_idx = np.flatnonzero(class_column.isin(list(spec.negative_classes)))
+    if len(pos_idx) == 0 or len(neg_idx) == 0:
+        raise ValueError(f"D&C subproblem {spec.name} requires examples on both sides")
     pos_idx, neg_idx, stats = cluster_sample_binary_indices(
         train_set,
         pos_idx,
@@ -185,8 +167,6 @@ def _sampled_binary_dataset(
     )
     order = np.random.default_rng(seed).permutation(len(indices))
     subproblem_stats[spec.name] = stats
-    if used_fallback:
-        subproblem_stats[f"{spec.name}_fallback"] = "random_split"
     return BinarySubproblemDataset(train_set, indices[order], positive_mask[order])
 
 
@@ -200,13 +180,13 @@ def _sample_majority_indices(
     fit_cap: int,
 ) -> np.ndarray:
     majority_features = _features_at_indices(dataset, majority_idx)
-    fit_features = (
-        majority_features
-        if len(majority_features) <= fit_cap
-        else majority_features[
-            np.random.default_rng(seed).choice(len(majority_features), fit_cap, False)
-        ]
-    )
+    if len(majority_features) <= fit_cap:
+        fit_features = majority_features
+    else:
+        selected = np.random.default_rng(seed).choice(
+            len(majority_features), fit_cap, False
+        )
+        fit_features = majority_features[selected]
     k_actual = max(1, min(k_clusters, len(fit_features)))
     kmeans = KMeans(n_clusters=k_actual, random_state=seed, n_init="auto")
     kmeans.fit(_l2_normalize(fit_features))
@@ -246,20 +226,6 @@ def _stratified_pick(
         if extra > 0:
             selected.extend(rng.choice(pool, extra, replace=False).tolist())
     return np.array(selected[:minority], dtype=np.int64)
-
-
-def _binary_indices_or_fallback(
-    train_set: PatchFeatureDataset,
-    positive_idx: np.ndarray,
-    negative_idx: np.ndarray,
-    seed: int,
-) -> tuple[np.ndarray, np.ndarray, bool]:
-    if len(positive_idx) > 0 and len(negative_idx) > 0:
-        return positive_idx, negative_idx, False
-    all_idx = np.arange(len(train_set))
-    order = np.random.default_rng(seed).permutation(len(all_idx))
-    mid = max(1, len(all_idx) // 2)
-    return all_idx[order[:mid]], all_idx[order[mid:]], True
 
 
 def _l2_normalize(features: np.ndarray) -> np.ndarray:

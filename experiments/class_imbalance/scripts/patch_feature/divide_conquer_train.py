@@ -47,9 +47,9 @@ class DivideConquerModel(nn.Module):
         dropout: float,
     ) -> None:
         super().__init__()
-        self.expert_hard_tail = BinaryExpert(input_dim, hidden_dim, dropout)
-        self.expert_hard_head = BinaryExpert(input_dim, hidden_dim, dropout)
-        self.expert_hard_rest = BinaryExpert(input_dim, hidden_dim, dropout)
+        self.expert_tail_body = BinaryExpert(input_dim, hidden_dim, dropout)
+        self.expert_tail_head = BinaryExpert(input_dim, hidden_dim, dropout)
+        self.expert_tail_rest = BinaryExpert(input_dim, hidden_dim, dropout)
         self.fusion = nn.Sequential(
             nn.Dropout(dropout),
             nn.Linear(hidden_dim * 3, n_classes),
@@ -59,9 +59,9 @@ class DivideConquerModel(nn.Module):
         """Concatenate the three frozen or trainable expert embeddings."""
         return torch.cat(
             [
-                self.expert_hard_tail.encode(features),
-                self.expert_hard_head.encode(features),
-                self.expert_hard_rest.encode(features),
+                self.expert_tail_body.encode(features),
+                self.expert_tail_head.encode(features),
+                self.expert_tail_rest.encode(features),
             ],
             dim=-1,
         )
@@ -73,9 +73,9 @@ class DivideConquerModel(nn.Module):
     def freeze_experts(self) -> None:
         """Stop gradient updates for all binary expert trunks."""
         for expert in (
-            self.expert_hard_tail,
-            self.expert_hard_head,
-            self.expert_hard_rest,
+            self.expert_tail_body,
+            self.expert_tail_head,
+            self.expert_tail_rest,
         ):
             for param in expert.parameters():
                 param.requires_grad_(False)
@@ -142,9 +142,9 @@ def _train_experts(
 ) -> None:
     bce = nn.BCEWithLogitsLoss()
     experts = (
-        model.expert_hard_tail,
-        model.expert_hard_head,
-        model.expert_hard_rest,
+        model.expert_tail_body,
+        model.expert_tail_head,
+        model.expert_tail_rest,
     )
     params = [param for expert in experts for param in expert.parameters()]
     optimizer = torch.optim.AdamW(

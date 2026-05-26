@@ -42,7 +42,7 @@ from scripts.patch_feature.divide_conquer import (
     DivideConquerModel,
     build_divide_conquer_model,
     cluster_sample_binary_indices,
-    hard_class_names,
+    dnc_class_partitions,
 )
 from scripts.patch_feature.training import PatchFeatureDataset
 from scripts.progan.core import (
@@ -641,7 +641,13 @@ def test_divide_conquer_cluster_sampling_balances_majority_side(
 def test_divide_conquer_forward_and_training_step_runs_without_nan(
     tmp_path: Path,
 ) -> None:
-    class_names = hard_class_names()[:5] + [f"extra_{index}" for index in range(27)]
+    class_names = (
+        pd.read_csv(EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv")[
+            "cancer_type"
+        ]
+        .astype(str)
+        .tolist()
+    )
     dataset = _synthetic_patch_dataset(tmp_path, class_names, rows_per_class=4)
     settings = {
         "hidden_dim": 16,
@@ -660,6 +666,23 @@ def test_divide_conquer_forward_and_training_step_runs_without_nan(
     logits = model(sample.unsqueeze(0))
     assert logits.shape == (1, len(class_names))
     assert torch.isfinite(logits).all().item()
+
+
+def test_divide_conquer_support_partitions_are_disjoint_and_complete() -> None:
+    class_names = (
+        pd.read_csv(EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv")[
+            "cancer_type"
+        ]
+        .astype(str)
+        .tolist()
+    )
+    partitions = dnc_class_partitions(class_names)
+    assert len(partitions["tail"]) == 8
+    assert len(partitions["head"]) == 8
+    assert not (partitions["tail"] & partitions["body"])
+    assert not (partitions["tail"] & partitions["head"])
+    assert not (partitions["body"] & partitions["head"])
+    assert set().union(*partitions.values()) == set(class_names)
 
 
 def test_tuning_grid_expands_expected_array_sizes() -> None:
