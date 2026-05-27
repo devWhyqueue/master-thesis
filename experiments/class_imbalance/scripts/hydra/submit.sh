@@ -189,7 +189,7 @@ case "$command" in
       --partition="${PATCH_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-80 \
+      --array=0-92 \
       --output=logs/patch-tune-%A-%a.out \
       --error=logs/patch-tune-%A-%a.err \
       "$@"
@@ -236,7 +236,7 @@ case "$command" in
       --partition="${WSI_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-65 \
+      --array=0-95 \
       --output=logs/wsi-tune-%A-%a.out \
       --error=logs/wsi-tune-%A-%a.err \
       "$@"

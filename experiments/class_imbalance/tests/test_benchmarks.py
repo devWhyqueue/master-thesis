@@ -693,12 +693,12 @@ def test_divide_conquer_support_partitions_are_disjoint_and_complete() -> None:
 
 
 def test_tuning_grid_expands_expected_array_sizes() -> None:
-    assert task_count("patch_feature") == 81
-    assert task_count("wsi_bag") == 66
+    assert task_count("patch_feature") == 93
+    assert task_count("wsi_bag") == 96
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
-    cfal_variant, cfal_seed = task_for_array_index("patch_feature", 57)
-    dnc_variant, dnc_seed = task_for_array_index("patch_feature", 69)
-    last_variant, last_seed = task_for_array_index("wsi_bag", 65)
+    cfal_variant, cfal_seed = task_for_array_index("patch_feature", 69)
+    dnc_variant, dnc_seed = task_for_array_index("patch_feature", 81)
+    last_variant, last_seed = task_for_array_index("wsi_bag", 95)
     assert first_variant.method == "patch_feature_weighted_ce"
     assert first_seed == 0
     assert cfal_variant.method == "patch_feature_cfal"
@@ -708,7 +708,7 @@ def test_tuning_grid_expands_expected_array_sizes() -> None:
     assert dnc_variant.params == {"dnc_k_clusters": 5.0}
     assert dnc_seed == 0
     assert last_variant.method == "mde_mil"
-    assert last_variant.params == {"mde_mil_consistency_weight": 0.3}
+    assert last_variant.params == {"mde_mil_consistency_weight": 4.0}
     assert last_seed == 2
 
 
