@@ -88,7 +88,6 @@ def _report_commands(python: str) -> list[list[str]]:
             "temperature",
         ],
         [python, "-m", "scripts.report.paired_delta_table"],
-        [python, "-m", "scripts.report.progan_diagnostics", "--seed", "0"],
         [python, "-m", "scripts.report.figures", "--benchmark", "patch"],
         [python, "-m", "scripts.report.figures", "--benchmark", "wsi_bag"],
         [python, "-m", "scripts.analysis.classwise_difficulty"],

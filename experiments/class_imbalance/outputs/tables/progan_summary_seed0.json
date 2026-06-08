@@ -32,7 +32,7 @@
     "Uterine_Corpus_Endometrial_Carcinoma": 7840,
     "Uveal_Melanoma": 15440
   },
-  "image_root": "/home/yannik.qu/master-thesis/experiments/class_imbalance/synthetic_patch_images/seed=0",
+  "image_root": "/home/yannik.qu/master-thesis/experiments/class_imbalance_tcga_ut/synthetic_patch_images/seed=0",
   "n_patches": 348120,
   "per_class": [
     {
