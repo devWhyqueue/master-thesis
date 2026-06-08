@@ -693,7 +693,7 @@ def test_divide_conquer_support_partitions_are_disjoint_and_complete() -> None:
 
 
 def test_tuning_grid_expands_expected_array_sizes() -> None:
-    assert task_count("patch_feature") == 93
+    assert task_count("patch_feature") == 102
     assert task_count("wsi_bag") == 96
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
     cfal_variant, cfal_seed = task_for_array_index("patch_feature", 69)
@@ -746,7 +746,7 @@ def test_tuning_result_paths_do_not_overwrite_fixed_outputs(tmp_path: Path) -> N
     assert "patch_feature_cfal/cfal_gamma=2/seed=0" in tuned_cfal.as_posix()
 
 
-def test_tuning_selection_requires_complete_seed_sets() -> None:
+def test_tuning_selection_requires_complete_seed_sets(tmp_path: Path) -> None:
     frame = pd.DataFrame(
         [
             {
@@ -755,9 +755,6 @@ def test_tuning_selection_requires_complete_seed_sets() -> None:
                 "variant": "focal_gamma=1",
                 "params": '{"focal_gamma":1}',
                 "method_label": "Focal",
-                "baseline_test_macro_f1": 0.4,
-                "fixed_test_macro_f1": 0.3,
-                "fixed_test_balanced_accuracy": 0.4,
                 "val_macro_f1": 0.5,
                 "val_balanced_accuracy": 0.6,
                 "test_macro_f1": 0.45,
@@ -766,8 +763,23 @@ def test_tuning_selection_requires_complete_seed_sets() -> None:
             }
         ]
     )
+    tables = tmp_path / "outputs" / "tables"
+    tables.mkdir(parents=True)
+    summary = pd.DataFrame(
+        [
+            {
+                "method": "patch_feature_ce",
+                "split": "test",
+                "macro_f1_mean": 0.4,
+                "balanced_accuracy_mean": 0.39,
+            }
+        ]
+    )
+    summary.to_csv(tables / "result_summary_patch.csv", index=False)
+    summary.to_csv(tables / "result_summary_wsi_bag.csv", index=False)
+    paths = {"root": tmp_path, "tables": tables}
     with pytest.raises(ValueError, match="Incomplete tuning results"):
-        _select_all(frame, allow_incomplete=False)
+        _select_all(frame, allow_incomplete=False, paths=paths)
 
 
 def test_temperature_scaling_lowers_synthetic_overconfidence_nll() -> None:

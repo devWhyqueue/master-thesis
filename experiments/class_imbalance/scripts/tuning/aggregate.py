@@ -9,13 +9,13 @@ import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
 from scripts.metadata import PATCH_FEATURE_METHOD_ALIASES
-from scripts.report.figures import METHOD_LABELS, latex_method_label
+from scripts.report.figures import latex_method_label
 from scripts.tuning.grid import TuningVariant, grid_for_benchmark
-from scripts.tuning.reporting import (
-    write_delta_figure,
-    write_empty_outputs,
-    write_latex_table,
+from scripts.tuning.selected_reports import (
+    materialize_selected_results,
+    regenerate_selected_reports,
 )
+from scripts.tuning.reporting import write_empty_outputs, write_latex_table
 
 
 METRICS = ("accuracy", "balanced_accuracy", "macro_f1")
@@ -29,6 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None)
     parser.add_argument("--allow-incomplete", action="store_true")
+    parser.add_argument(
+        "--skip-regenerate",
+        action="store_true",
+        help="Only select configurations and materialize results.",
+    )
     return parser.parse_args()
 
 
@@ -40,10 +45,17 @@ def main() -> None:
     if frame.empty:
         write_empty_outputs(paths)
         return
-    selected = _select_all(frame, args.allow_incomplete)
+    selected = _select_all(frame, args.allow_incomplete, paths)
     selected.to_csv(paths["tables"] / "result_tuning_selection.csv", index=False)
     write_latex_table(selected, paths["tables"] / "result_tuning_selection.tex")
-    write_delta_figure(selected, paths["figures"] / "tuned_macro_f1_delta_test.png")
+    missing = materialize_selected_results(paths, selected)
+    if missing and not args.allow_incomplete:
+        raise FileNotFoundError(
+            f"Missing materialized selected results: {missing[:3]} "
+            f"({len(missing)} total)"
+        )
+    if not args.skip_regenerate:
+        regenerate_selected_reports(args.config)
 
 
 def _collect_all(paths: dict[str, Path]) -> pd.DataFrame:
@@ -95,7 +107,15 @@ def _variant_rows(
     return rows
 
 
-def _select_all(frame: pd.DataFrame, allow_incomplete: bool) -> pd.DataFrame:
+def _select_all(
+    frame: pd.DataFrame, allow_incomplete: bool, paths: dict[str, Path] | None = None
+) -> pd.DataFrame:
+    if paths is None:
+        raise ValueError("paths is required to build baseline rows")
+    fixed_summaries = {
+        benchmark: _fixed_summary(paths, benchmark)
+        for benchmark in ("patch_feature", "wsi_bag")
+    }
     selected_rows = []
     for key, group in frame.groupby(["benchmark", "method", "variant"], sort=False):
         benchmark, method, variant = cast(tuple[str, str, str], key)
@@ -107,9 +127,6 @@ def _select_all(frame: pd.DataFrame, allow_incomplete: bool) -> pd.DataFrame:
         ["benchmark", "method", "variant", "params"], as_index=False
     ).agg(
         method_label=("method_label", "first"),
-        baseline_test_macro_f1=("baseline_test_macro_f1", "first"),
-        fixed_test_macro_f1=("fixed_test_macro_f1", "first"),
-        fixed_test_balanced_accuracy=("fixed_test_balanced_accuracy", "first"),
         val_macro_f1_mean=("val_macro_f1", "mean"),
         val_balanced_accuracy_mean=("val_balanced_accuracy", "mean"),
         test_macro_f1_mean=("test_macro_f1", "mean"),
@@ -126,52 +143,51 @@ def _select_all(frame: pd.DataFrame, allow_incomplete: bool) -> pd.DataFrame:
             ),
         )
         selected_rows.append(_selection_row(benchmark, method, winner))
-    return _with_baseline_rows(pd.DataFrame(selected_rows))
+    return _with_baseline_rows(pd.DataFrame(selected_rows), fixed_summaries)
 
 
 def _selection_row(benchmark: str, method: str, row: pd.Series) -> dict[str, Any]:
-    baseline = BASELINE_METHOD[benchmark]
-    baseline_macro_f1 = float(row["baseline_test_macro_f1"])
     return {
         "benchmark": benchmark,
         "regime": REGIME_LABEL[benchmark],
         "method": method,
         "method_label": row["method_label"],
+        "variant": row["variant"],
         "selected_params": row["params"],
-        "baseline_method": baseline,
-        "baseline_test_macro_f1": baseline_macro_f1,
-        "fixed_test_macro_f1": row["fixed_test_macro_f1"],
-        "tuned_val_macro_f1": row["val_macro_f1_mean"],
-        "tuned_test_macro_f1": row["test_macro_f1_mean"],
-        "tuned_test_balanced_accuracy": row["test_balanced_accuracy_mean"],
-        "tuned_delta_macro_f1": row["test_macro_f1_mean"] - baseline_macro_f1,
+        "val_macro_f1": row["val_macro_f1_mean"],
+        "test_macro_f1": row["test_macro_f1_mean"],
+        "test_balanced_accuracy": row["test_balanced_accuracy_mean"],
     }
 
 
-def _with_baseline_rows(frame: pd.DataFrame) -> pd.DataFrame:
+def _with_baseline_rows(
+    frame: pd.DataFrame, fixed_summaries: dict[str, pd.DataFrame]
+) -> pd.DataFrame:
     rows = []
     for benchmark in ("patch_feature", "wsi_bag"):
         part = frame[frame["benchmark"] == benchmark]
         if part.empty:
             continue
-        baseline_macro_f1 = float(part.iloc[0]["baseline_test_macro_f1"])
+        baseline_method = BASELINE_METHOD[benchmark]
+        fixed = fixed_summaries[benchmark]
         rows.append(
             {
                 "benchmark": benchmark,
                 "regime": REGIME_LABEL[benchmark],
-                "method": BASELINE_METHOD[benchmark],
-                "method_label": _method_label(BASELINE_METHOD[benchmark]),
-                "selected_params": "fixed baseline",
-                "baseline_method": BASELINE_METHOD[benchmark],
-                "baseline_test_macro_f1": baseline_macro_f1,
-                "fixed_test_macro_f1": baseline_macro_f1,
-                "tuned_val_macro_f1": pd.NA,
-                "tuned_test_macro_f1": baseline_macro_f1,
-                "tuned_test_balanced_accuracy": pd.NA,
-                "tuned_delta_macro_f1": 0.0,
+                "method": baseline_method,
+                "method_label": _method_label(baseline_method),
+                "variant": "",
+                "selected_params": "{}",
+                "val_macro_f1": pd.NA,
+                "test_macro_f1": _fixed_metric(fixed, baseline_method, "macro_f1"),
+                "test_balanced_accuracy": _fixed_metric(
+                    fixed, baseline_method, "balanced_accuracy"
+                ),
             }
         )
-        rows.extend(dict(row) for _, row in part.iterrows())
+        rows.extend(
+            dict(row) for _, row in part.iterrows() if row["method"] != baseline_method
+        )
     return pd.DataFrame(rows)
 
 

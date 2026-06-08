@@ -56,7 +56,12 @@ def _run(args: argparse.Namespace) -> None:
     paths = ensure_dirs(config)
     cache_dir = patch_feature_cache_dir(config, args.seed)
     frame = select_patch_feature_rows(
-        pd.read_csv(cache_dir / "manifest.csv"), args.method, args.smoke, config
+        pd.read_csv(cache_dir / "manifest.csv"),
+        args.method,
+        args.smoke,
+        config,
+        seed=args.seed,
+        tuning_params=tuning_params,
     )
     class_names = sorted(frame["cancer_type"].unique().tolist())
     datasets = split_patch_feature_datasets(
