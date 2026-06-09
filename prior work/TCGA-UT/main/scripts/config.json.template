@@ -1,0 +1,11 @@
+{
+  "working_dir": "/PATH/TO/WORKING_DIR",
+  "environment_sif": "/PATH/TO/environment.sif",
+  "dataset_path": "/PATH/TO/dataset",
+  "balanced_dataset_csv": "/PATH/TO/balanced_dataset.csv",
+  "imbalanced_dataset_dir": "/PATH/TO/imbalanced_dataset_dir",
+  "feature_path": "/home/space/datasets/patho_ds/tcga-ut-balanced/virchow_v2/",
+  "results_dir": "/PATH/TO/results",
+  "class_names_path": "/PATH/TO/class_names.json",
+  "visualization_dir": "/PATH/TO/visualization"
+}

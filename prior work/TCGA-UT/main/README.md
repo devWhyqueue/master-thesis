@@ -26,7 +26,20 @@ To do this, run the Python script `sample_TCGA_UT_balanced.py`. It takes as argu
 - `--store-slide-ids` (flag): A flag that tells the script to store a JSON-file with a list of slide-ids that have already been sampled.
 - `--seed` (default=0): The seed for the random sampling of slide ids selected from each class.  
 
-The bash script found in `scripts/run_balanced_sampling.sh` can be used to run this on a slurm cluster. Fields that need to be adapted to your working directory structure are marked as `#TODO`
+To manage job paths and parameters centrally, copy `scripts/config.json.template` to `scripts/config.json` and adjust the paths to your workspace directory structure.
+
+To run a task on a SLURM cluster:
+```bash
+python scripts/run.py sample-balanced
+```
+To run a task locally (on Windows or local machine), add the `--local` flag and optionally `--no-container` to run directly without Apptainer:
+```bash
+python scripts/run.py --local --no-container sample-balanced
+```
+You can also run a dry-run to print the exact commands and SLURM submission scripts that would be executed without running them:
+```bash
+python scripts/run.py --dry-run sample-balanced
+```
 
 ### 2. Sample an imbalanced version of TCGA-UT
 Once you sample a balanced version TCGA-UT and have stored the corresponding CSV, you can use it to sample an imbalanced version, which again will be stored in a CSV. This is done with the Python script `sample_TCGA_UT_imbalanced.py`. It takes the arguments:
@@ -44,7 +57,14 @@ Once you sample a balanced version TCGA-UT and have stored the corresponding CSV
 - `--sample-balanced-validation` (Flag): This flag tells the script to sample a balanced validation set. Given the same seed, this will always be the same set, independent of the parameter.
 - `--n-slides-per-class`: Number of slides per class in the balanced validation data set.  
 
-The bash script found in `scripts/run_imbalanced_sampling_arr.sh` can be used to sample multiple imbalanced data sets for a range of parameters. It relies on the script `scripts/run_imbalanced_sampling.sh`, which can be used to sample an imbalanced data set for a single parameter. Fields needed to fill in are marked as `#TODO`
+To run a single imbalanced sampling task:
+```bash
+python scripts/run.py sample-imbalanced --parameter 1.0
+```
+To run a sweep over all 14 parameters (0.0 to 1.3) concurrently via SLURM:
+```bash
+python scripts/run.py sample-imbalanced --sweep
+```
 
 ### Training and Testing
 You can train a few different models on the previously sampled imbalanced data sets. This is done with the Python script `train.py`. It takes as arguments:
@@ -68,9 +88,16 @@ You can train a few different models on the previously sampled imbalanced data s
 - `--device`: Device.
 - `--seed`: The seed for the random initialization and random sampling in batch balancing.
 - `--visualize` (Flag): Whether or not to store visualizations of the validation result.
-- `--class-names-path`: A JSON-File indicating the order in which the classes should be displayed in the visualizations.
+- `--class-names-path`: A JSON-File indicating the order in which the classes should be displayed in the civilizations.
 
-The bash script `scripts/run_training_arr.sh` runs the training of an MLP on imbalanced datasets for a range of parameters. It relies on the script `scripts/run_training.sh`, which can be used to train an MLP on a single imbalanced data set for a single parameter. Fields needed to fill in are marked as `#TODO`. Similar scripts exist for the training of KNN- and NCC-based models.
+To run model training (for `mlp`, `knn`, or `ncc`):
+```bash
+python scripts/run.py train mlp --parameter 1.0 --seed 0
+```
+To run a sweep over the hyperparameter sweep configurations via SLURM:
+```bash
+python scripts/run.py train mlp --sweep
+```
 
 ### Visualization
 Several different visualization methods have been implemented. The below explains for each one how it can be used.
@@ -82,14 +109,22 @@ Requires the argument `--method` to be set to `difference_confusion_matrix`. It 
 Requires the argument `--method` to be set to `scatter_accuracies_of_two_parameters`. It takes the first two paths stored in `--results-paths` and gathers results from directories one level below these two results paths. Specifically it loads results over all seeds from the folders that match `{--parameter-name}={--parameters[i]}` where i is either 0 or 1, for each results path. Then it calculates the average recall per class and plots a scatter plot comparing the recalls for each class over the two parameters. For the coloring of the dots to work, it expects the class names in the results paths to be stored in order of ascending class size.  
 
 ----
-The bash script `scripts/run_visualizations.sh` plots all of the above plots and fields that need to be filled in are marked as `#TODO`.
+To run standard visualizations (Confusion Matrix, Difference Confusion Matrix, Scatter plot of Recalls):
+```bash
+python scripts/run.py visualize standard
+```
+
 #### Point Plot to Compare Methods
 Requires the argument `--method` to be set to `point_plot_compare_methods`. It takes all of the paths stored in `--results-paths` and gathers results from directories one level below these results paths. Specifically it loads results over all seeds from the folders that match `{--parameter-name}={--parameters[i]}` where i is either running from 0 to the number of results paths, or is just 0, if only one parameter was passed. Then it calculates the average recall per class and plots a point plot comparing the recalls for each class over the different results paths. For the coloring of the dots to work, it expects the class names in the results paths to be stored in order of ascending class size. Optionally, one can pass labels for each method in the `--methods` argument.  
 
 ----
-The bash script `scripts/run_visualizations_point_plot.sh` plots the point plot and fields that need to be filled in are marked as `#TODO`.
+To run point plot comparison visualizations:
+```bash
+python scripts/run.py visualize point-plot
+```
+
 #### Bar Plot for the Number of Slides per Class
-Requires the argument `--method` to be set to `number_of_slides_per_class_bar`. It plots a bar plot with the number slides per class for the CSV-based dataset found in `--dataset-path`.  
+Requires the argument `--method` to be set to `number_of_slides_per_class_bar`. It plots a bar plot with the number slides per class for the CSV-based dataset found in `--dataset-path`.
 
 
 ## Not Up-to-date and Unused Files
