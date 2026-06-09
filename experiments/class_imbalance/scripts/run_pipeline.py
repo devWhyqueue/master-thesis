@@ -25,14 +25,14 @@ def _run(args: list[str]) -> None:
 
 
 def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
-    _run([python, "-m", "scripts.prep.check_env"])
-    _run([python, "-m", "scripts.prep.manifest", "--config", config_path])
+    _run([python, "-m", "scripts.data.prep.check_env"])
+    _run([python, "-m", "scripts.data.prep.manifest.feature", "--config", config_path])
     for seed in seeds:
         _run(
             [
                 python,
                 "-m",
-                "scripts.prep.splits",
+                "scripts.data.prep.manifest.splits",
                 "--config",
                 config_path,
                 "--seed",
@@ -43,7 +43,7 @@ def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
             [
                 python,
                 "-m",
-                "scripts.prep.patch_manifest",
+                "scripts.data.prep.manifest.patch",
                 "--config",
                 config_path,
                 "--seed",
@@ -54,7 +54,7 @@ def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
         [
             python,
             "-m",
-            "scripts.prep.explore",
+            "scripts.data.prep.explore",
             "--config",
             config_path,
             "--seed",
@@ -70,7 +70,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
             cmd = [
                 python,
                 "-m",
-                "scripts.patch.train",
+                "scripts.modeling.patch.train",
                 "--config",
                 config_path,
                 "--method",
@@ -85,7 +85,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
         [
             python,
             "-m",
-            "scripts.report.aggregate",
+            "scripts.analysis.report.aggregate",
             "--config",
             config_path,
             "--benchmark",
@@ -96,7 +96,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
         [
             python,
             "-m",
-            "scripts.report.figures",
+            "scripts.analysis.report.figures",
             "--config",
             config_path,
             "--benchmark",
@@ -112,7 +112,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
             cmd = [
                 python,
                 "-m",
-                "scripts.training.train",
+                "scripts.modeling.training.train",
                 "--config",
                 config_path,
                 "--method",
@@ -127,7 +127,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
         [
             python,
             "-m",
-            "scripts.report.aggregate",
+            "scripts.analysis.report.aggregate",
             "--config",
             config_path,
             "--benchmark",
@@ -138,7 +138,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
         [
             python,
             "-m",
-            "scripts.report.figures",
+            "scripts.analysis.report.figures",
             "--config",
             config_path,
             "--benchmark",

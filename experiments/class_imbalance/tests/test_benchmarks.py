@@ -14,67 +14,67 @@ import torch
 EXPERIMENT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EXPERIMENT_ROOT))
 
-from scripts.mil.bag_losses import (
+from scripts.modeling.mil.bag.losses import (
     _mix_ranked_bags,
     _mde_mil_loss,
     _supervised_contrastive_loss,
     bag_loss,
 )
-from scripts.mil.bags import AttentionMil, BagFeatureDataset, DualExpertMil, _feature_to_bag
-from scripts.mil.bag_trainer import _loader, _run_mde_training
-from scripts.mil.metadata import BAG_METHODS
-from scripts.patch.artifacts import (
+from scripts.modeling.mil.bag.dataset import AttentionMil, BagFeatureDataset, DualExpertMil, _feature_to_bag
+from scripts.modeling.mil.bag.trainer import _loader, _run_mde_training
+from scripts.modeling.mil.metadata import BAG_METHODS
+from scripts.modeling.patch.artifacts import (
     load_training_checkpoint,
     save_patch_checkpoint,
     save_training_checkpoint,
     seed_patch_run,
 )
-from scripts.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
-from scripts.staging.io import stage_destination
-from scripts.patch.models import PatchClassifier
-from scripts.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
-from scripts.patch_feature.cfal import (
+from scripts.modeling.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
+from scripts.data.staging.io import stage_destination
+from scripts.modeling.patch.models import PatchClassifier
+from scripts.modeling.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
+from scripts.modeling.patch_feature.cfal import (
     build_cfal_loss,
     build_cfal_model,
     effective_number,
     gaussian_affinity,
 )
-from scripts.patch_feature.divide_conquer import (
+from scripts.modeling.patch_feature.divide_conquer import (
     DivideConquerModel,
     build_divide_conquer_model,
     cluster_sample_binary_indices,
     dnc_class_partitions,
 )
-from scripts.patch_feature.training import PatchFeatureDataset
-from scripts.prep.manifest import tcga_case_id
-from scripts.progan.core import (
+from scripts.modeling.patch_feature.training import PatchFeatureDataset
+from scripts.data.prep.manifest.feature import tcga_case_id
+from scripts.data.progan.core import (
     ProgressiveDiscriminator,
     ProgressiveGenerator,
     ProGanSettings,
 )
-from scripts.progan.train import paper_batch_size
+from scripts.data.progan.train import paper_batch_size
 from scripts.common import ensure_dirs, load_config
-from scripts.progan.manifest import (
+from scripts.data.progan.manifest import (
     _class_image_paths,
     balance_target as _balance_target,
     decode_progan_array_task,
     progan_array_upper_bound,
     progan_settings as _settings,
 )
-from scripts.progan.storage import generated_counts_match as _generated_counts_match
-from scripts.training.support_tiers import class_tier_labels
-from scripts.prep.patch_manifest import build_patch_manifest
-from scripts.prep.splits import _build_assignments, _validate_assignments
-from scripts.report.paired_delta_table import build_paired_delta_table
-from scripts.tuning.aggregate import _select_all
-from scripts.tuning.grid import (
+from scripts.data.progan.storage import generated_counts_match as _generated_counts_match
+from scripts.modeling.training.support_tiers import class_tier_labels
+from scripts.data.prep.manifest.patch import build_patch_manifest
+from scripts.data.prep.manifest.splits import _build_assignments, _validate_assignments
+from scripts.analysis.report.paired_delta_table import build_paired_delta_table
+from scripts.analysis.tuning.aggregate import _select_all
+from scripts.analysis.tuning.grid import (
     PATCH_FEATURE_SPECS,
     WSI_BAG_SPECS,
     task_count,
     task_for_array_index,
     validate_tuning_params,
 )
-from scripts.tuning.paths import tuning_result_dir
+from scripts.analysis.tuning.paths import tuning_result_dir
 
 
 def test_patch_manifest_uses_fixed_resolution_and_split(tmp_path: Path) -> None:
@@ -839,7 +839,7 @@ def test_temperature_scaling_lowers_synthetic_overconfidence_nll() -> None:
     labels = rng.integers(0, n_classes, size=200)
     overconfident = np.exp(logits * 4.0)
     overconfident /= overconfident.sum(axis=1, keepdims=True)
-    from scripts.report.calibration_utils import (
+    from scripts.analysis.report.calibration.utils import (
         apply_temperature,
         fit_temperature,
         negative_log_likelihood,

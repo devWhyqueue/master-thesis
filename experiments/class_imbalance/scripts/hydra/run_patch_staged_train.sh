@@ -63,11 +63,11 @@ if [ "$include_synthetic" = 1 ]; then
 fi
 echo "Staging patch images under ${PATCH_STAGE_DIR}"
 STAGED_MANIFEST="$(
-  bash scripts/hydra/run_python.sh -m scripts.staging.patch "${stage_args[@]}"
+  bash scripts/hydra/run_python.sh -m scripts.data.staging.patch "${stage_args[@]}"
 )"
 export PATCH_STAGED_MANIFEST="$STAGED_MANIFEST"
 echo "Training with staged manifest: ${PATCH_STAGED_MANIFEST}"
-bash scripts/hydra/run_python.sh -m scripts.patch.train \
+bash scripts/hydra/run_python.sh -m scripts.modeling.patch.train \
   --method "$method" \
   --seed "$seed" \
   --staged-manifest "$STAGED_MANIFEST" \

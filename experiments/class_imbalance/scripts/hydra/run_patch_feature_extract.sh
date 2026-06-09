@@ -39,4 +39,4 @@ if [ "$include_synthetic" = 1 ]; then
   args+=(--include-synthetic)
 fi
 
-bash scripts/hydra/run_python.sh -m scripts.patch_feature_cache "${args[@]}" "$@"
+bash scripts/hydra/run_python.sh -m scripts.modeling.patch_feature.patch_feature_cache "${args[@]}" "$@"
