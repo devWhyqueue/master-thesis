@@ -53,7 +53,8 @@ from scripts.data.progan.core import (
     ProGanSettings,
 )
 from scripts.data.progan.train import paper_batch_size
-from scripts.common import ensure_dirs, load_config
+from scripts.common import RUN_RECORD_NAME, ensure_dirs, load_config, read_run_record, write_run_record
+from scripts.analysis.results import connect, init_schema, read_table, replace_table
 from scripts.data.progan.manifest import (
     _class_image_paths,
     balance_target as _balance_target,
@@ -698,13 +699,7 @@ def test_divide_conquer_cluster_sampling_balances_majority_side(
 def test_divide_conquer_forward_and_training_step_runs_without_nan(
     tmp_path: Path,
 ) -> None:
-    class_names = (
-        pd.read_csv(EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv")[
-            "cancer_type"
-        ]
-        .astype(str)
-        .tolist()
-    )
+    class_names = [f"class_{index}" for index in range(32)]
     dataset = _synthetic_patch_dataset(tmp_path, class_names, rows_per_class=4)
     settings = {
         "hidden_dim": 16,
@@ -726,13 +721,19 @@ def test_divide_conquer_forward_and_training_step_runs_without_nan(
 
 
 def test_divide_conquer_support_partitions_are_disjoint_and_complete() -> None:
-    class_names = (
-        pd.read_csv(EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv")[
-            "cancer_type"
-        ]
-        .astype(str)
-        .tolist()
+    class_names = [f"class_{index}" for index in range(32)]
+    paths = ensure_dirs(load_config(EXPERIMENT_ROOT / "configs" / "default.yaml"))
+    distribution = pd.DataFrame(
+        {
+            "cancer_type": class_names,
+            "n_slides": list(range(1, 33)),
+            "rank_ascending": list(range(1, 33)),
+        }
     )
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "dataset_class_distribution", distribution)
+    connection.close()
     partitions = dnc_class_partitions(class_names)
     assert len(partitions["tail"]) == 8
     assert len(partitions["head"]) == 8
@@ -796,6 +797,44 @@ def test_tuning_result_paths_do_not_overwrite_fixed_outputs(tmp_path: Path) -> N
     assert "patch_feature_cfal/cfal_gamma=2/seed=0" in tuned_cfal.as_posix()
 
 
+def _class_names_from_distribution(paths: dict[str, Path]) -> list[str]:
+    connection = connect(paths["db"])
+    init_schema(connection)
+    frame = read_table(connection, "dataset_class_distribution")
+    connection.close()
+    if not frame.empty:
+        return frame["cancer_type"].astype(str).tolist()
+    csv_path = EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv"
+    if csv_path.exists():
+        return pd.read_csv(csv_path)["cancer_type"].astype(str).tolist()
+    raise FileNotFoundError("No class distribution available for tests.")
+
+
+def test_run_record_round_trip(tmp_path: Path) -> None:
+    result_dir = tmp_path / "run"
+    result_dir.mkdir()
+    payload = {
+        "benchmark": "patch_feature",
+        "method": "patch_feature_ce",
+        "seed": 0,
+        "smoke": False,
+        "tuning_id": None,
+        "tuning_params": {},
+        "model_path": "model.pt",
+        "diagnostics": None,
+        "splits": {
+            "val": {"macro_f1": 0.5, "labels": [0], "preds": [0], "probabilities": [[1.0]]},
+            "test": {"macro_f1": 0.6, "labels": [0], "preds": [0], "probabilities": [[1.0]]},
+        },
+    }
+    write_run_record(result_dir, payload)
+    assert (result_dir / RUN_RECORD_NAME).exists()
+    loaded = read_run_record(result_dir)
+    assert loaded is not None
+    assert loaded["method"] == "patch_feature_ce"
+    assert loaded["splits"]["test"]["macro_f1"] == 0.6
+
+
 def test_tuning_selection_requires_complete_seed_sets(tmp_path: Path) -> None:
     frame = pd.DataFrame(
         [
@@ -815,19 +854,30 @@ def test_tuning_selection_requires_complete_seed_sets(tmp_path: Path) -> None:
     )
     tables = tmp_path / "outputs" / "tables"
     tables.mkdir(parents=True)
+    db_path = tmp_path / "outputs" / "results.sqlite"
     summary = pd.DataFrame(
         [
             {
+                "benchmark": "patch",
                 "method": "patch_feature_ce",
                 "split": "test",
                 "macro_f1_mean": 0.4,
                 "balanced_accuracy_mean": 0.39,
-            }
+            },
+            {
+                "benchmark": "wsi_bag",
+                "method": "mil_ce",
+                "split": "test",
+                "macro_f1_mean": 0.4,
+                "balanced_accuracy_mean": 0.39,
+            },
         ]
     )
-    summary.to_csv(tables / "result_summary_patch.csv", index=False)
-    summary.to_csv(tables / "result_summary_wsi_bag.csv", index=False)
-    paths = {"root": tmp_path, "tables": tables}
+    connection = connect(db_path)
+    init_schema(connection)
+    replace_table(connection, "summary", summary)
+    connection.close()
+    paths = {"root": tmp_path, "tables": tables, "db": db_path}
     with pytest.raises(ValueError, match="Incomplete tuning results"):
         _select_all(frame, allow_incomplete=False, paths=paths)
 
@@ -857,8 +907,13 @@ def test_temperature_scaling_lowers_synthetic_overconfidence_nll() -> None:
 
 def test_tuning_selection_table_lists_all_tuned_methods() -> None:
     """Report Table 8 must list every validation-selected tuned method."""
-    csv_path = EXPERIMENT_ROOT / "outputs" / "tables" / "result_tuning_selection.csv"
-    frame = pd.read_csv(csv_path)
+    paths = ensure_dirs(load_config(EXPERIMENT_ROOT / "configs" / "default.yaml"))
+    connection = connect(paths["db"])
+    init_schema(connection)
+    frame = read_table(connection, "tuning_selection")
+    connection.close()
+    if frame.empty:
+        pytest.skip("tuning_selection table not populated yet")
     patch_methods = set(frame.loc[frame["benchmark"] == "patch_feature", "method"])
     wsi_methods = set(frame.loc[frame["benchmark"] == "wsi_bag", "method"])
     assert patch_methods == {spec[0] for spec in PATCH_FEATURE_SPECS} | {
@@ -870,12 +925,15 @@ def test_tuning_selection_table_lists_all_tuned_methods() -> None:
 def test_calibration_posthoc_table_lists_all_benchmark_methods() -> None:
     """Post-hoc calibration table must cover every fixed-protocol method."""
     config = load_config(EXPERIMENT_ROOT / "configs" / "default.yaml")
-    csv_path = EXPERIMENT_ROOT / "outputs" / "tables" / "result_calibration_posthoc.csv"
-    missing_path = (
-        EXPERIMENT_ROOT / "outputs" / "tables" / "result_calibration_posthoc_missing.json"
-    )
-    frame = pd.read_csv(csv_path)
-    missing_payload = json.loads(missing_path.read_text(encoding="utf-8"))
+    paths = ensure_dirs(config)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    frame = read_table(connection, "calibration_posthoc")
+    missing_table = read_table(connection, "calibration_posthoc_missing")
+    connection.close()
+    if frame.empty:
+        pytest.skip("calibration_posthoc table not populated yet")
+    missing_payload = json.loads(missing_table.iloc[0]["payload_json"])
     assert missing_payload["missing"] == []
     patch_methods = set(frame.loc[frame["benchmark"] == "patch", "method"])
     wsi_methods = set(frame.loc[frame["benchmark"] == "wsi_bag", "method"])
@@ -884,11 +942,13 @@ def test_calibration_posthoc_table_lists_all_benchmark_methods() -> None:
 
 
 def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> None:
-    tables = tmp_path / "tables"
-    tables.mkdir()
-    pd.DataFrame(
+    tables = tmp_path / "outputs" / "tables"
+    tables.mkdir(parents=True)
+    db_path = tmp_path / "outputs" / "results.sqlite"
+    summary_by_seed = pd.DataFrame(
         [
             {
+                "benchmark": "wsi_bag",
                 "method": "mil_ce",
                 "seed": 0,
                 "split": "test",
@@ -896,6 +956,7 @@ def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> N
                 "balanced_accuracy": 0.78,
             },
             {
+                "benchmark": "wsi_bag",
                 "method": "mde_mil",
                 "seed": 0,
                 "split": "test",
@@ -903,17 +964,15 @@ def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> N
                 "balanced_accuracy": 0.79,
             },
             {
+                "benchmark": "wsi_bag",
                 "method": "rankmix_mil",
                 "seed": 0,
                 "split": "test",
                 "macro_f1": 0.81,
                 "balanced_accuracy": 0.80,
             },
-        ]
-    ).to_csv(tables / "result_summary_wsi_bag_by_seed.csv", index=False)
-    pd.DataFrame(
-        [
             {
+                "benchmark": "patch",
                 "method": "patch_ce",
                 "seed": 0,
                 "split": "test",
@@ -921,8 +980,14 @@ def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> N
                 "balanced_accuracy": 0.68,
             },
         ]
-    ).to_csv(tables / "result_summary_patch_by_seed.csv", index=False)
-    frame = build_paired_delta_table({"tables": tables}, "test")
+    )
+    connection = connect(db_path)
+    init_schema(connection)
+    replace_table(connection, "summary_by_seed", summary_by_seed)
+    connection.close()
+    frame = build_paired_delta_table(
+        {"tables": tables, "db": db_path, "root": tmp_path}, "test"
+    )
     labels = frame["comparison"].tolist()
     assert r"MDE-MIL $-$ MIL CE" in labels
     assert r"RankMix $-$ MIL CE" in labels

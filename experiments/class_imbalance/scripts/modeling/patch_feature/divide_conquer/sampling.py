@@ -10,9 +10,13 @@ import torch
 from sklearn.cluster import KMeans
 from torch.utils.data import Dataset
 
-from scripts.common import EXPERIMENT_ROOT
+from scripts.common import EXPERIMENT_ROOT, ensure_dirs, load_config
+from scripts.analysis.results import connect, init_schema, load_class_distribution
 from scripts.modeling.patch_feature.training import PatchFeatureDataset
-from scripts.modeling.training.support_tiers import load_class_tier_labels
+from scripts.modeling.training.support_tiers import (
+    class_tier_labels,
+    load_class_tier_labels,
+)
 
 
 @dataclass(frozen=True)
@@ -44,13 +48,10 @@ class BinarySubproblemDataset(Dataset):
 
 def dnc_class_partitions(class_names: list[str]) -> dict[str, frozenset[str]]:
     """Return fixed, disjoint D&C groups derived only from dataset support."""
-    slide_counts_path = (
-        EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv"
-    )
-    tier_labels = load_class_tier_labels(class_names, slide_counts_path)
+    tier_labels = _tier_labels_for_classes(class_names)
     if tier_labels is None:
         raise FileNotFoundError(
-            f"Missing class distribution table: {slide_counts_path}"
+            "Missing dataset class distribution required for D&C partitions."
         )
     partitions = {
         tier: frozenset(name for name, label in tier_labels.items() if label == tier)
@@ -61,6 +62,27 @@ def dnc_class_partitions(class_names: list[str]) -> dict[str, frozenset[str]]:
     if set().union(*partitions.values()) != set(class_names):
         raise ValueError("D&C support tiers must cover every patch class exactly once")
     return partitions
+
+
+def _tier_labels_for_classes(class_names: list[str]) -> dict[str, str] | None:
+    paths = ensure_dirs(load_config(None))
+    connection = connect(paths["db"])
+    init_schema(connection)
+    distribution = load_class_distribution(connection, paths)
+    connection.close()
+    if not distribution.empty:
+        slide_counts = dict(
+            zip(
+                distribution["cancer_type"].astype(str),
+                distribution["n_slides"].astype(int),
+                strict=True,
+            )
+        )
+        return class_tier_labels(class_names, slide_counts)
+    slide_counts_path = (
+        EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv"
+    )
+    return load_class_tier_labels(class_names, slide_counts_path)
 
 
 def cluster_sample_binary_indices(

@@ -6,7 +6,7 @@ When working on the `bib` skill:
 - After every code change to `bib`, run this command from the repo root before making the next change:
 
 ```bash
-uv run python /mnt/c/Users/Yannik/.codex/skills/clean-code/run.py --minimal --scope bib
+uv run python /mnt/c/Users/Yannik/.codex/skills/clean-code/run.py --scope bib
 ```
 
 - Treat a failing clean-code run as a blocker. Fix the reported issue, then rerun the same command immediately.

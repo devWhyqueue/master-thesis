@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import argparse
-import gzip
-import json
 from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import (
+    connect,
+    init_schema,
+    load_eval_details,
+    load_summary,
+    replace_table,
+)
 from scripts.analysis.report.figures.labels import latex_method_label
 
 CALIBRATION_METRICS = (
@@ -29,13 +34,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _read_details(path: Path, benchmark: str) -> pd.DataFrame:
+def _collect_details(paths: dict[str, Path], config: dict[str, Any]) -> pd.DataFrame:
+    connection = connect(paths["db"])
+    init_schema(connection)
     rows: list[dict[str, Any]] = []
-    with gzip.open(path, "rt", encoding="utf-8") as handle:
-        for line in handle:
-            payload = json.loads(line)
-            if payload["split"] != "test":
-                continue
+    for benchmark, methods_key, seeds_key in (
+        ("patch", "patch_feature_methods", "patch_feature_training"),
+        ("wsi_bag", "wsi_bag_methods", "wsi_training"),
+    ):
+        methods = list(config[methods_key])
+        seeds = list(config[seeds_key]["seeds"])
+        for payload in load_eval_details(connection, benchmark, methods, seeds, "test"):
             result = payload["result"]
             rows.append(
                 {
@@ -44,6 +53,7 @@ def _read_details(path: Path, benchmark: str) -> pd.DataFrame:
                     **{metric: result[metric] for metric in CALIBRATION_METRICS},
                 }
             )
+    connection.close()
     return pd.DataFrame(rows)
 
 
@@ -52,15 +62,21 @@ def _aggregate_details(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFr
         **{f"{metric}_mean": (metric, "mean") for metric in CALIBRATION_METRICS},
         **{f"{metric}_std": (metric, "std") for metric in CALIBRATION_METRICS},
     )
+    connection = connect(paths["db"])
+    init_schema(connection)
     rank_frames = []
     for benchmark in ("patch", "wsi_bag"):
-        summary_path = paths["tables"] / f"result_summary_{benchmark}.csv"
-        summary = pd.read_csv(summary_path)
+        summary = load_summary(connection, benchmark, "test")
+        if summary.empty:
+            continue
         test = cast(
             pd.DataFrame,
-            summary[summary["split"] == "test"][["method", "macro_f1_mean"]],
+            summary[["method", "macro_f1_mean"]],
         )
         rank_frames.append(test.assign(benchmark=benchmark))
+    connection.close()
+    if not rank_frames:
+        return grouped
     ranks = pd.concat(rank_frames, ignore_index=True)
     merged = grouped.merge(ranks, on=["benchmark", "method"], how="left")
     rows = sorted(
@@ -113,12 +129,11 @@ def main() -> None:
     args = parse_args()
     config = load_config(args.config)
     paths = ensure_dirs(config)
-    frames = [
-        _read_details(paths["tables"] / "result_details_patch.jsonl.gz", "patch"),
-        _read_details(paths["tables"] / "result_details_wsi_bag.jsonl.gz", "wsi_bag"),
-    ]
-    aggregate = _aggregate_details(pd.concat(frames, ignore_index=True), paths)
-    aggregate.to_csv(paths["tables"] / "result_calibration.csv", index=False)
+    aggregate = _aggregate_details(_collect_details(paths, config), paths)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "calibration", aggregate)
+    connection.close()
     write_calibration_latex(aggregate, paths["tables"] / "result_calibration.tex")
 
 

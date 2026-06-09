@@ -4,9 +4,9 @@ import argparse
 from pathlib import Path
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import connect, init_schema, replace_table
 from scripts.analysis.report.progan_diagnostics.metrics import (
     build_metrics_frame,
-    write_summary_json,
     write_summary_latex,
 )
 from scripts.analysis.report.progan_diagnostics.plots import (
@@ -39,9 +39,13 @@ def main() -> None:
     paths = ensure_dirs(config)
     cache_dir = _patch_feature_cache_dir(config, args.seed)
     frame = build_metrics_frame(paths, args.seed, cache_dir)
+    stored = frame.copy()
+    stored.insert(0, "seed", args.seed)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "progan_diagnostics", stored)
+    connection.close()
     stem = f"progan_diagnostics_seed{args.seed}"
-    frame.to_csv(paths["tables"] / f"{stem}.csv", index=False)
-    write_summary_json(frame, paths["tables"] / f"{stem}.json", args.seed)
     write_summary_latex(frame, paths["tables"] / f"{stem}.tex")
     plot_examples(
         paths,

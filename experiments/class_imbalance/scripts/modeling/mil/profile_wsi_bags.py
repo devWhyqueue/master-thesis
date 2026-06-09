@@ -12,6 +12,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import connect, init_schema, replace_table
 from scripts.modeling.mil.bag.dataset import (
     AttentionMil,
     BagFeatureDataset,
@@ -41,10 +42,16 @@ def main() -> None:
     paths = ensure_dirs(config)
     frame = pd.read_csv(paths["data"] / f"manifest_splits_seed={args.seed}.csv")
     payload = _profile_payload(frame, config, args.seed)
-    path = paths["tables"] / f"wsi_bag_profile_seed={args.seed}.json"
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(
+        connection,
+        "wsi_bag_profile",
+        pd.DataFrame(
+            [{"seed": args.seed, "payload_json": json.dumps(payload, sort_keys=True)}]
+        ),
     )
+    connection.close()
 
 
 def _profile_payload(frame: pd.DataFrame, config: dict, seed: int) -> dict[str, object]:

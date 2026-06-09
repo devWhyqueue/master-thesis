@@ -6,6 +6,8 @@ from typing import Any
 
 import pandas as pd
 
+from scripts.analysis.results import connect, init_schema, replace_table
+
 
 def _provenance_table_column_spec() -> str:
     return (
@@ -46,9 +48,11 @@ def write_empty_outputs(paths: dict[str, Path]) -> None:
         "test_macro_f1",
         "test_balanced_accuracy",
     ]
-    pd.DataFrame(columns=pd.Index(columns)).to_csv(
-        paths["tables"] / "result_tuning_selection.csv", index=False
-    )
+    empty = pd.DataFrame(columns=pd.Index(columns))
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "tuning_selection", empty)
+    connection.close()
     (paths["tables"] / "result_tuning_selection.tex").write_text(
         "\\emph{Validation-selected configurations are pending.}\n", encoding="utf-8"
     )

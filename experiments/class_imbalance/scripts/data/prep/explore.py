@@ -11,7 +11,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_json
+import json
+
+from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import connect, init_schema, replace_table
 
 ABBREVIATIONS = {
     "Brain_Lower_Grade_Glioma": "LGG",
@@ -37,16 +40,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def save_class_distribution(
-    slide_manifest: pd.DataFrame, figures_dir: Path, tables_dir: Path
-) -> dict[str, Any]:
+    slide_manifest: pd.DataFrame, figures_dir: Path
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Write class distribution tables and plots, then return summary stats."""
     counts = slide_manifest["cancer_type"].value_counts().sort_values()
     counts_df = counts.to_frame(name="n_slides").rename_axis("cancer_type")
-    counts_df.reset_index().assign(rank_ascending=range(1, len(counts_df) + 1)).to_csv(
-        tables_dir / "class_distribution.csv", index=False
+    distribution = counts_df.reset_index().assign(
+        rank_ascending=range(1, len(counts_df) + 1)
     )
     _write_distribution_outputs(counts, figures_dir)
-    return _distribution_stats(counts)
+    return distribution, _distribution_stats(counts)
 
 
 def _write_distribution_outputs(counts: pd.Series, figures_dir: Path) -> None:
@@ -148,31 +151,31 @@ def _add_split_statistics(
     if split_path.exists():
         split_manifest = pd.read_csv(split_path)
         split_counts = split_manifest.groupby(["split", "cancer_type"])
-        split_counts.size().to_frame("n_slides").reset_index().to_csv(
-            paths["tables"] / f"split_distribution_seed={seed}.csv", index=False
-        )
+        split_distribution = split_counts.size().to_frame("n_slides").reset_index()
+        split_distribution["seed"] = seed
+        stats["split_distribution"] = split_distribution
         stats["split_slide_counts"] = split_manifest["split"].value_counts().to_dict()
         return stats
-    cached_path = paths["tables"] / f"split_distribution_seed={seed}.csv"
-    if cached_path.exists():
-        split_distribution = pd.read_csv(cached_path)
-        stats["split_slide_counts"] = (
-            split_distribution.groupby("split")["n_slides"].sum().to_dict()
-        )
     return stats
 
 
 def _read_counts(paths: dict[str, Path]) -> pd.Series:
+    connection = connect(paths["db"])
+    init_schema(connection)
+    distribution = pd.read_sql('SELECT * FROM "dataset_class_distribution"', connection)
+    connection.close()
+    if not distribution.empty:
+        counts = cast(pd.Series, distribution.set_index("cancer_type")["n_slides"])
+        return cast(pd.Series, counts.sort_values())
     counts_path = paths["tables"] / "class_distribution.csv"
-    if not counts_path.exists():
-        raise FileNotFoundError(
-            "Neither data/slide_manifest.csv nor outputs/tables/class_distribution.csv "
-            "is available."
+    if counts_path.exists():
+        counts = cast(
+            pd.Series, pd.read_csv(counts_path).set_index("cancer_type")["n_slides"]
         )
-    counts = cast(
-        pd.Series, pd.read_csv(counts_path).set_index("cancer_type")["n_slides"]
+        return cast(pd.Series, counts.sort_values())
+    raise FileNotFoundError(
+        "Neither data/slide_manifest.csv nor dataset class distribution is available."
     )
-    return cast(pd.Series, counts.sort_values())
 
 
 def main() -> None:
@@ -183,15 +186,34 @@ def main() -> None:
     slide_manifest_path = paths["data"] / "slide_manifest.csv"
     if slide_manifest_path.exists():
         slide_manifest = pd.read_csv(slide_manifest_path)
-        stats = save_class_distribution(
-            slide_manifest, paths["figures"], paths["tables"]
-        )
+        distribution, stats = save_class_distribution(slide_manifest, paths["figures"])
     else:
         counts = _read_counts(paths)
         _write_distribution_outputs(counts, paths["figures"])
+        distribution = counts.to_frame(name="n_slides").rename_axis("cancer_type")
+        distribution = distribution.reset_index().assign(
+            rank_ascending=range(1, len(distribution) + 1)
+        )
         stats = _distribution_stats(counts)
     stats = _add_split_statistics(stats, paths, args.seed)
-    write_json(paths["tables"] / "dataset_stats.json", stats)
+    _publish_dataset_tables(paths, distribution, stats)
+
+
+def _publish_dataset_tables(
+    paths: dict[str, Path], distribution: pd.DataFrame, stats: dict[str, Any]
+) -> None:
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "dataset_class_distribution", distribution)
+    split_distribution = stats.pop("split_distribution", None)
+    if isinstance(split_distribution, pd.DataFrame):
+        replace_table(connection, "dataset_split_distribution", split_distribution)
+    replace_table(
+        connection,
+        "dataset_stats",
+        pd.DataFrame([{"payload_json": json.dumps(stats, sort_keys=True)}]),
+    )
+    connection.close()
 
 
 if __name__ == "__main__":

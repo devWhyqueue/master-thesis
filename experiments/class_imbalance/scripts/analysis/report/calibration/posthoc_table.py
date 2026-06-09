@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +8,14 @@ import numpy as np
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import (
+    connect,
+    init_schema,
+    load_split_payload,
+    load_summary,
+    replace_table,
+    write_json_table,
+)
 from scripts.analysis.report.calibration.utils import (
     calibrated_probabilities,
     fit_temperature,
@@ -35,27 +42,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _settings(
-    config: dict[str, Any], benchmark: str
-) -> tuple[list[str], list[int], Path]:
+def _settings(config: dict[str, Any], benchmark: str) -> tuple[list[str], list[int]]:
     if benchmark == "patch":
         return (
             list(config["patch_feature_methods"]),
             list(config["patch_feature_training"]["seeds"]),
-            Path("results") / "patch_feature",
         )
     return (
         list(config["wsi_bag_methods"]),
         list(config["wsi_training"]["seeds"]),
-        Path("results_wsi_bag"),
     )
-
-
-def _load_split(result_dir: Path, split: str) -> dict[str, Any] | None:
-    path = result_dir / f"{split}_results.json"
-    if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _arrays(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, int]:
@@ -70,14 +66,18 @@ def _collect(
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     rows: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
+    connection = connect(paths["db"])
+    init_schema(connection)
     for benchmark in ("patch", "wsi_bag"):
-        methods, seeds, relative_root = _settings(config, benchmark)
-        root = paths["root"] / "outputs" / relative_root
+        methods, seeds = _settings(config, benchmark)
         for method in methods:
             for seed in seeds:
-                result_dir = root / method / f"seed={seed}"
-                val_payload = _load_split(result_dir, "val")
-                test_payload = _load_split(result_dir, "test")
+                val_payload = load_split_payload(
+                    connection, benchmark, method, seed, "val"
+                )
+                test_payload = load_split_payload(
+                    connection, benchmark, method, seed, "test"
+                )
                 if val_payload is None or test_payload is None:
                     missing.append(
                         {"benchmark": benchmark, "method": method, "seed": seed}
@@ -99,6 +99,7 @@ def _collect(
                         **metrics,
                     }
                 )
+    connection.close()
     return pd.DataFrame(rows), missing
 
 
@@ -107,11 +108,18 @@ def _aggregate(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFrame:
         **{f"{metric}_mean": (metric, "mean") for metric in CALIBRATION_METRICS},
         **{f"{metric}_std": (metric, "std") for metric in CALIBRATION_METRICS},
     )
+    connection = connect(paths["db"])
+    init_schema(connection)
     ranks = []
     for benchmark in ("patch", "wsi_bag"):
-        summary = pd.read_csv(paths["tables"] / f"result_summary_{benchmark}.csv")
-        test = summary[summary["split"] == "test"][["method", "macro_f1_mean"]]
+        summary = load_summary(connection, benchmark, "test")
+        if summary.empty:
+            continue
+        test = summary[["method", "macro_f1_mean"]]
         ranks.append(test.assign(benchmark=benchmark))
+    connection.close()
+    if not ranks:
+        return grouped
     rank_frame = pd.concat(ranks, ignore_index=True)
     merged = grouped.merge(rank_frame, on=["benchmark", "method"], how="left")
     rows = sorted(
@@ -166,12 +174,12 @@ def main() -> None:
             "No calibration rows collected; missing val/test result files."
         )
     aggregate = _aggregate(frame, paths)
-    aggregate.to_csv(paths["tables"] / "result_calibration_posthoc.csv", index=False)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "calibration_posthoc", aggregate)
+    write_json_table(connection, "calibration_posthoc_missing", {"missing": missing})
+    connection.close()
     write_latex(aggregate, paths["tables"] / "result_calibration_posthoc.tex")
-    (paths["tables"] / "result_calibration_posthoc_missing.json").write_text(
-        json.dumps({"missing": missing}, indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 if __name__ == "__main__":

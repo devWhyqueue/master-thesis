@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from scripts.common import ensure_dirs, load_config, write_json
+from scripts.common import ensure_dirs, load_config, write_run_record
+from scripts.metadata import benchmark_metadata
 from scripts.modeling.patch.artifacts import seed_patch_run
 from scripts.modeling.patch.losses import (
     PatchFocalLoss,
@@ -96,23 +97,25 @@ def _write_outputs(
 ) -> None:
     result_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), result_dir / "model.pt")
-    write_json(
-        result_dir / "config.json",
+    splits = {
+        split_name: evaluate_patch_feature_model(model, dataset, class_names, device)
+        for split_name, dataset in zip(("val", "test"), datasets[1:], strict=True)
+    }
+    write_run_record(
+        result_dir,
         {
+            "benchmark": "patch_feature",
             "method": args.method,
             "seed": args.seed,
             "smoke": args.smoke,
             "tuning_id": args.tuning_id,
             "tuning_params": tuning_params,
+            "model_path": "model.pt",
+            "method_metadata": benchmark_metadata("patch", args.method),
+            "diagnostics": diagnostics,
+            "splits": splits,
         },
     )
-    if diagnostics is not None:
-        write_json(result_dir / "activation_diagnostics.json", diagnostics)
-    for split_name, dataset in zip(("val", "test"), datasets[1:], strict=True):
-        write_json(
-            result_dir / f"{split_name}_results.json",
-            evaluate_patch_feature_model(model, dataset, class_names, device),
-        )
 
 
 def _fit_model(

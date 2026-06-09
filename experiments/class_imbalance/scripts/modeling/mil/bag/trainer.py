@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
-from scripts.common import output_root, write_json
+from scripts.common import output_root
 from scripts.modeling.mil.bag.losses import bag_loss
 from scripts.modeling.mil.bag.dataset import (
     AttentionMil,
@@ -40,7 +40,7 @@ def _train_bag_method(
     seed: int,
     result_dir: Path,
     smoke: bool = False,
-) -> dict[str, dict[str, object]]:
+) -> tuple[dict[str, dict[str, object]], dict[str, int]]:
     """Train one WSI-bag benchmark method."""
     torch.manual_seed(seed)
     training = config["wsi_training"]
@@ -97,10 +97,10 @@ def _train_bag_method(
         result_dir,
         teacher,
     )
-    write_json(result_dir / "activation_diagnostics.json", diagnostics)
-    return _save_and_evaluate_bags(
+    results = _save_and_evaluate_bags(
         model, val_dataset, test_dataset, class_names, device, result_dir
     )
+    return results, diagnostics
 
 
 def _split_bag_datasets(

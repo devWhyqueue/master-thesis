@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import gzip
-import json
 from pathlib import Path
 from typing import Any, Iterable, cast
 
@@ -10,7 +8,14 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import pandas as pd
 
-from scripts.common import EXPERIMENT_ROOT
+from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import (
+    connect,
+    init_schema,
+    load_class_distribution,
+    load_eval_details,
+    replace_table,
+)
 
 BASELINES = {"patch": "patch_feature_ce", "wsi_bag": "mil_ce"}
 BENCHMARK_LABELS = {"patch": "Patch", "wsi_bag": "WSI-bag"}
@@ -20,7 +25,7 @@ LABEL_OFFSETS = {"Cholangiocarcinoma": (5, 12), "Uterine_Carcinosarcoma": (8, -1
 def parse_args() -> argparse.Namespace:
     """Parse classwise difficulty analysis arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--outputs", default=str(EXPERIMENT_ROOT / "outputs"))
+    parser.add_argument("--config", default=None)
     parser.add_argument("--split", default="test", choices=["val", "test"])
     parser.add_argument("--top-k", type=int, default=5)
     return parser.parse_args()
@@ -29,61 +34,59 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Compute classwise difficulty artifacts for the CE baselines."""
     args = parse_args()
-    outputs = Path(args.outputs)
-    tables = outputs / "tables"
-    figures = outputs / "figures"
-    frame = _difficulty_frame(tables, args.split)
+    config = load_config(args.config)
+    paths = ensure_dirs(config)
+    frame = _difficulty_frame(paths, config, args.split)
     correlations = _correlation_frame(frame)
-    frame.to_csv(tables / f"classwise_difficulty_{args.split}.csv", index=False)
-    correlations.to_csv(
-        tables / f"classwise_difficulty_correlations_{args.split}.csv", index=False
-    )
+    connection = connect(paths["db"])
+    init_schema(connection)
+    stored = frame.copy()
+    stored["split"] = args.split
+    replace_table(connection, "classwise_difficulty", stored)
+    replace_table(connection, "classwise_difficulty_correlations", correlations)
+    connection.close()
     _write_hardest_table(
         _hardest_classes(frame, args.top_k),
-        tables / f"classwise_difficulty_hardest_{args.split}.tex",
+        paths["tables"] / f"classwise_difficulty_hardest_{args.split}.tex",
     )
     for benchmark in BASELINES:
         _plot_benchmark(
             cast(pd.DataFrame, frame.loc[frame["benchmark"] == benchmark]),
-            figures / f"classwise_difficulty_{benchmark}_{args.split}.png",
+            paths["figures"] / f"classwise_difficulty_{benchmark}_{args.split}.png",
             benchmark,
         )
 
 
-def _difficulty_frame(tables: Path, split: str) -> pd.DataFrame:
-    class_support = _read_class_support(tables / "class_distribution.csv")
+def _difficulty_frame(paths: dict[str, Path], config: dict, split: str) -> pd.DataFrame:
+    connection = connect(paths["db"])
+    init_schema(connection)
+    class_support = _read_class_support(load_class_distribution(connection, paths))
     rows = []
     for benchmark, method in BASELINES.items():
-        archive = tables / f"result_details_{benchmark}.jsonl.gz"
-        rows.extend(_archive_rows(archive, benchmark, method, split, class_support))
-    frame = pd.DataFrame(rows)
-    grouped = _aggregate_classes(frame)
+        methods = (
+            list(config["patch_feature_methods"])
+            if benchmark == "patch"
+            else list(config["wsi_bag_methods"])
+        )
+        seeds = (
+            list(config["patch_feature_training"]["seeds"])
+            if benchmark == "patch"
+            else list(config["wsi_training"]["seeds"])
+        )
+        for payload in load_eval_details(connection, benchmark, methods, seeds, split):
+            if payload["method"] != method:
+                continue
+            rows.extend(_result_rows(payload, benchmark, class_support))
+    connection.close()
+    grouped = _aggregate_classes(pd.DataFrame(rows))
     return _add_ranks(grouped)
 
 
-def _read_class_support(path: Path) -> pd.DataFrame:
-    frame = pd.read_csv(path)
+def _read_class_support(frame: pd.DataFrame) -> pd.DataFrame:
     renamed = frame.rename(
         columns={"cancer_type": "class_name", "n_slides": "dataset_support"}
     )[["class_name", "dataset_support", "rank_ascending"]]
     return cast(pd.DataFrame, renamed)
-
-
-def _archive_rows(
-    path: Path,
-    benchmark: str,
-    method: str,
-    split: str,
-    class_support: pd.DataFrame,
-) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    support = class_support.set_index("class_name")
-    with gzip.open(path, "rt", encoding="utf-8") as handle:
-        for line in handle:
-            payload = json.loads(line)
-            if payload["method"] == method and payload["split"] == split:
-                rows.extend(_result_rows(payload, benchmark, support))
-    return rows
 
 
 def _result_rows(
@@ -98,14 +101,15 @@ def _result_rows(
         result["support_per_class"],
         strict=False,
     )
+    indexed = support.set_index("class_name")
     return [
         {
             "benchmark": benchmark,
             "method": payload["method"],
             "seed": int(payload["seed"]),
             "class_name": class_name,
-            "dataset_support": int(support.loc[class_name, "dataset_support"]),
-            "support_rank_ascending": int(support.loc[class_name, "rank_ascending"]),
+            "dataset_support": int(indexed.loc[class_name, "dataset_support"]),
+            "support_rank_ascending": int(indexed.loc[class_name, "rank_ascending"]),
             "test_support": int(test_support),
             "precision": float(precision),
             "recall": float(recall),
@@ -239,8 +243,7 @@ def _label_hard_cases(ax: Axes, frame: pd.DataFrame) -> None:
 
 
 def _short_label(name: str) -> str:
-    words = name.replace("_", " ").split()
-    return " ".join(words[:3])
+    return " ".join(name.replace("_", " ").split()[:3])
 
 
 if __name__ == "__main__":

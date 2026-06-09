@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
+from scripts.common import ensure_dirs, load_config, read_run_record
+from scripts.analysis.results import connect, init_schema, load_summary, replace_table
 from scripts.metadata import PATCH_FEATURE_METHOD_ALIASES
 from scripts.analysis.report.figures.labels import latex_method_label
 from scripts.analysis.tuning.grid import TuningVariant, grid_for_benchmark
@@ -46,7 +46,10 @@ def main() -> None:
         write_empty_outputs(paths)
         return
     selected = _select_all(frame, args.allow_incomplete, paths)
-    selected.to_csv(paths["tables"] / "result_tuning_selection.csv", index=False)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "tuning_selection", selected)
+    connection.close()
     write_latex_table(selected, paths["tables"] / "result_tuning_selection.tex")
     missing = materialize_selected_results(paths, selected)
     if missing and not args.allow_incomplete:
@@ -81,8 +84,12 @@ def _variant_rows(
             / variant.variant
             / f"seed={seed}"
         )
-        val = _read_result(result_dir / "val_results.json")
-        test = _read_result(result_dir / "test_results.json")
+        record = read_run_record(result_dir)
+        if record is None:
+            continue
+        splits = record.get("splits", {})
+        val = splits.get("val")
+        test = splits.get("test")
         if val is None or test is None:
             continue
         rows.append(
@@ -192,8 +199,11 @@ def _with_baseline_rows(
 
 
 def _fixed_summary(paths: dict[str, Path], benchmark: str) -> pd.DataFrame:
-    stem = SUMMARY_STEM[benchmark]
-    return pd.read_csv(paths["tables"] / f"result_summary_{stem}.csv")
+    connection = connect(paths["db"])
+    init_schema(connection)
+    frame = load_summary(connection, SUMMARY_STEM[benchmark], "test")
+    connection.close()
+    return frame
 
 
 def _fixed_metric(frame: pd.DataFrame, method: str, metric: str) -> float:
@@ -205,12 +215,6 @@ def _fixed_metric(frame: pd.DataFrame, method: str, metric: str) -> float:
             f"No fixed-protocol test row for method {method!r} (lookup={lookup!r})"
         )
     return float(matches.iloc[0][f"{metric}_mean"])
-
-
-def _read_result(path: Path) -> dict[str, Any] | None:
-    if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _prefixed_metrics(prefix: str, result: dict[str, Any]) -> dict[str, float]:

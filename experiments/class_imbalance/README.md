@@ -5,9 +5,9 @@ Controlled class-imbalance benchmarks on TCGA-UT with two native input regimes:
 - a **patch-level benchmark** on labeled histopathology patches,
 - a **WSI-bag benchmark** on frozen Virchow2 feature bags.
 
-The paper source is `paper/main.tex`; benchmark outputs are stored separately under
-`outputs/tables/`, `outputs/figures/`, `outputs/results_patch/`, and
-`outputs/results_wsi_bag/`.
+The paper source is `report/main.tex`. After a Hydra run, benchmark data lives in
+`outputs/results.sqlite`; paper-facing tables and figures are under
+`outputs/tables/*.tex` and `outputs/figures/*.png`.
 
 ## Hydra Workflow
 

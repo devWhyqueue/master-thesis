@@ -7,6 +7,12 @@ from pathlib import Path
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import (
+    connect,
+    init_schema,
+    load_summary_by_seed,
+    replace_table,
+)
 
 METRICS = ("macro_f1", "balanced_accuracy")
 METRIC_HEADERS = {
@@ -62,8 +68,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def _load_by_seed(paths: dict[str, Path], benchmark: str) -> pd.DataFrame:
-    path = paths["tables"] / f"result_summary_{benchmark}_by_seed.csv"
-    return pd.read_csv(path)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    frame = load_summary_by_seed(connection, benchmark)
+    connection.close()
+    return frame
 
 
 def _paired_metric_values(
@@ -147,8 +156,13 @@ def main() -> None:
     config = load_config(args.config)
     paths = ensure_dirs(config)
     frame = build_paired_delta_table(paths, args.split)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    stored = frame.copy()
+    stored["split"] = args.split
+    replace_table(connection, "paired_deltas", stored)
+    connection.close()
     stem = f"result_paired_deltas_{args.split}"
-    frame.to_csv(paths["tables"] / f"{stem}.csv", index=False)
     _write_latex(frame, paths["tables"] / f"{stem}.tex")
 
 

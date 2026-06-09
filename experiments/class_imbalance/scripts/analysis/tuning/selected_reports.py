@@ -8,16 +8,17 @@ from typing import Any
 
 import pandas as pd
 
-from scripts.common import EXPERIMENT_ROOT, ensure_dirs, load_config, write_json
+from scripts.common import (
+    EXPERIMENT_ROOT,
+    RUN_RECORD_NAME,
+    ensure_dirs,
+    load_config,
+    write_json,
+)
 from scripts.analysis.tuning.grid import SEEDS
 from scripts.analysis.tuning.paths import tuning_result_dir
 
-COPIED_FILES = (
-    "val_results.json",
-    "test_results.json",
-    "config.json",
-    "activation_diagnostics.json",
-)
+COPIED_FILES = (RUN_RECORD_NAME, "model.pt")
 BASELINE_METHOD = {"patch_feature": "patch_feature_ce", "wsi_bag": "mil_ce"}
 
 
@@ -62,7 +63,7 @@ def regenerate_selected_reports(config_path: str | Path | None = None) -> None:
     config = load_config(config_path)
     paths = ensure_dirs(config)
     python = sys.executable
-    commands = _report_commands(python)
+    commands = _report_commands(python, config_path)
     for command in commands:
         subprocess.run(command, cwd=EXPERIMENT_ROOT, check=True)
     write_json(
@@ -71,18 +72,53 @@ def regenerate_selected_reports(config_path: str | Path | None = None) -> None:
     )
 
 
-def _report_commands(python: str) -> list[list[str]]:
+def _report_commands(python: str, config_path: str | Path | None) -> list[list[str]]:
+    config_arg = ["--config", str(config_path)] if config_path else []
     return [
-        [python, "-m", "scripts.analysis.report.recompute_tier_metrics"],
-        [python, "-m", "scripts.analysis.report.aggregate", "--benchmark", "patch"],
-        [python, "-m", "scripts.analysis.report.aggregate", "--benchmark", "wsi_bag"],
-        [python, "-m", "scripts.analysis.report.calibration.table"],
-        [python, "-m", "scripts.analysis.report.calibration.posthoc_table"],
-        [python, "-m", "scripts.analysis.report.paired_delta_table"],
-        [python, "-m", "scripts.analysis.report.figures", "--benchmark", "patch"],
-        [python, "-m", "scripts.analysis.report.figures", "--benchmark", "wsi_bag"],
-        [python, "-m", "scripts.analysis.classwise_difficulty"],
-        [python, "-m", "scripts.analysis.report.calibration.audit"],
+        [python, "-m", "scripts.analysis.report.build_db", *config_arg],
+        [python, "-m", "scripts.analysis.report.recompute_tier_metrics", *config_arg],
+        [
+            python,
+            "-m",
+            "scripts.analysis.report.aggregate",
+            *config_arg,
+            "--benchmark",
+            "patch",
+        ],
+        [
+            python,
+            "-m",
+            "scripts.analysis.report.aggregate",
+            *config_arg,
+            "--benchmark",
+            "wsi_bag",
+        ],
+        [python, "-m", "scripts.analysis.report.calibration.table", *config_arg],
+        [
+            python,
+            "-m",
+            "scripts.analysis.report.calibration.posthoc_table",
+            *config_arg,
+        ],
+        [python, "-m", "scripts.analysis.report.paired_delta_table", *config_arg],
+        [
+            python,
+            "-m",
+            "scripts.analysis.report.figures",
+            *config_arg,
+            "--benchmark",
+            "patch",
+        ],
+        [
+            python,
+            "-m",
+            "scripts.analysis.report.figures",
+            *config_arg,
+            "--benchmark",
+            "wsi_bag",
+        ],
+        [python, "-m", "scripts.analysis.classwise_difficulty", *config_arg],
+        [python, "-m", "scripts.analysis.report.calibration.audit", *config_arg],
     ]
 
 
@@ -95,7 +131,7 @@ def _ensure_baseline_present(
 ) -> None:
     for seed in seeds:
         result_dir = dst_root / f"seed={seed}"
-        if (result_dir / "test_results.json").exists():
+        if (result_dir / RUN_RECORD_NAME).exists():
             continue
         missing.append(
             {
@@ -109,7 +145,7 @@ def _ensure_baseline_present(
 
 
 def _copy_run(source: Path, destination: Path) -> bool:
-    if not (source / "test_results.json").exists():
+    if not (source / RUN_RECORD_NAME).exists():
         return False
     destination.mkdir(parents=True, exist_ok=True)
     for name in COPIED_FILES:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import json
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +12,12 @@ import numpy as np
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import (
+    connect,
+    init_schema,
+    load_split_payload,
+    replace_table,
+)
 from scripts.analysis.report.calibration.utils import (
     calibrated_probabilities,
     fit_dirichlet,
@@ -29,7 +34,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_CALIBRATORS = ("temperature",)
 ALL_CALIBRATORS = ("temperature", "vector", "dirichlet")
 PATCH_METHODS = ("patch_feature_ce", "patch_feature_cfal")
-RESULT_SUBDIR = "patch_feature"
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,12 +61,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def _load_split(
-    result_root: Path, method: str, seed: int, split: str
+    connection,
+    method: str,
+    seed: int,
+    split: str,
 ) -> dict[str, Any]:
-    path = result_root / method / f"seed={seed}" / f"{split}_results.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Missing result file: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload = load_split_payload(connection, "patch", method, seed, split)
+    if payload is None:
+        raise FileNotFoundError(
+            f"Missing patch-feature result for method={method} seed={seed} split={split}"
+        )
+    return payload
 
 
 def _arrays(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, int]:
@@ -148,14 +157,14 @@ def _write_latex_table(frame: pd.DataFrame, path: Path) -> None:
 
 
 def _rows_for_method(
-    result_root: Path,
+    connection,
     method: str,
     seed: int,
     calibrators: list[str],
 ) -> tuple[list[dict[str, object]], tuple[np.ndarray, np.ndarray]]:
     """Return calibration metric rows and raw test probabilities for one method."""
-    val_payload = _load_split(result_root, method, seed, "val")
-    test_payload = _load_split(result_root, method, seed, "test")
+    val_payload = _load_split(connection, method, seed, "val")
+    test_payload = _load_split(connection, method, seed, "test")
     val_labels, val_probs, n_classes = _arrays(val_payload)
     test_labels, test_probs, _ = _arrays(test_payload)
     val_logits = probabilities_to_logits(val_probs)
@@ -190,14 +199,14 @@ def _rows_for_method(
 
 
 def _collect_rows(
-    result_root: Path, methods: list[str], seed: int, calibrators: list[str]
+    connection, methods: list[str], seed: int, calibrators: list[str]
 ) -> tuple[pd.DataFrame, dict[str, tuple[np.ndarray, np.ndarray]]]:
     """Build the calibration table and reliability-diagram inputs."""
     rows: list[dict[str, object]] = []
     reliability_inputs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for method in methods:
         method_rows, reliability_inputs[method] = _rows_for_method(
-            result_root, method, seed, calibrators
+            connection, method, seed, calibrators
         )
         rows.extend(method_rows)
     return pd.DataFrame(rows), reliability_inputs
@@ -212,7 +221,10 @@ def _publish_artifacts(
     """Write CSV, LaTeX, and reliability-diagram outputs."""
     paths["tables"].mkdir(parents=True, exist_ok=True)
     paths["figures"].mkdir(parents=True, exist_ok=True)
-    frame.to_csv(paths["tables"] / "result_posthoc_calibration.csv", index=False)
+    connection = connect(paths["db"])
+    init_schema(connection)
+    replace_table(connection, "posthoc_calibration", frame)
+    connection.close()
     test_rows = frame[(frame["seed"] == seed) & (frame["split"] == "test")]
     _write_latex_table(
         test_rows, paths["tables"] / "result_posthoc_calibration_test.tex"
@@ -228,14 +240,16 @@ def main() -> None:
     """Fit post-hoc calibrators and write report artifacts."""
     args = parse_args()
     paths = ensure_dirs(load_config(args.config))
+    connection = connect(paths["db"])
+    init_schema(connection)
     frame, reliability_inputs = _collect_rows(
-        paths["results"] / RESULT_SUBDIR,
+        connection,
         list(args.methods),
         args.seed,
         list(args.calibrators),
     )
+    connection.close()
     _publish_artifacts(frame, reliability_inputs, paths, args.seed)
-    logger.info(frame.to_string(index=False))
 
 
 if __name__ == "__main__":

@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from scripts.common import ensure_dirs, load_config, write_json, write_progress
+from scripts.common import ensure_dirs, load_config, write_progress, write_run_record
+from scripts.metadata import benchmark_metadata
 from scripts.modeling.patch.artifacts import (
     copy_synthetic_artifacts,
     evaluate_patch_dataset,
@@ -18,7 +19,6 @@ from scripts.modeling.patch.artifacts import (
     save_patch_checkpoint,
     save_training_checkpoint,
     seed_patch_run,
-    write_patch_config,
 )
 from scripts.modeling.patch.data import PatchImageDataset, patch_loader
 from scripts.modeling.patch.losses import (
@@ -143,21 +143,36 @@ def _resolve_checkpoint_path(result_dir: Path) -> Path | None:
     return final if final.exists() else None
 
 
-def _write_eval_results(
+def _write_run_record(
     result_dir: Path,
+    method: str,
+    seed: int,
+    class_names: list[str],
+    deterministic: dict[str, object],
     model: PatchClassifier,
     val_set: PatchImageDataset,
     test_set: PatchImageDataset,
-    class_names: list[str],
     device: torch.device,
 ) -> None:
-    write_json(
-        result_dir / "val_results.json",
-        evaluate_patch_dataset(model, val_set, class_names, device),
-    )
-    write_json(
-        result_dir / "test_results.json",
-        evaluate_patch_dataset(model, test_set, class_names, device),
+    write_run_record(
+        result_dir,
+        {
+            "benchmark": "patch_image",
+            "method": method,
+            "seed": seed,
+            "smoke": False,
+            "tuning_id": None,
+            "tuning_params": {},
+            "model_path": "model.pt",
+            "method_metadata": benchmark_metadata("patch", method),
+            "class_names": class_names,
+            "deterministic": deterministic,
+            "diagnostics": None,
+            "splits": {
+                "val": evaluate_patch_dataset(model, val_set, class_names, device),
+                "test": evaluate_patch_dataset(model, test_set, class_names, device),
+            },
+        },
     )
 
 
@@ -199,7 +214,17 @@ def _train(args: argparse.Namespace) -> None:
         if checkpoint_path is None:
             raise FileNotFoundError(f"No checkpoint found under {result_dir}")
         class_names = load_patch_checkpoint(checkpoint_path, model, device)
-        _write_eval_results(result_dir, model, val_set, test_set, class_names, device)
+        _write_run_record(
+            result_dir,
+            args.method,
+            args.seed,
+            class_names,
+            deterministic,
+            model,
+            val_set,
+            test_set,
+            device,
+        )
         save_patch_checkpoint(result_dir, args.method, args.seed, model, class_names)
         return
 
@@ -233,14 +258,19 @@ def _train(args: argparse.Namespace) -> None:
         )
         if start_epoch > epochs:
             logger.info("Training already complete; running evaluation only.")
-            _write_eval_results(
-                result_dir, model, val_set, test_set, class_names, device
+            _write_run_record(
+                result_dir,
+                args.method,
+                args.seed,
+                class_names,
+                deterministic,
+                model,
+                val_set,
+                test_set,
+                device,
             )
             save_patch_checkpoint(
                 result_dir, args.method, args.seed, model, class_names
-            )
-            write_patch_config(
-                result_dir, args.method, args.seed, class_names, deterministic
             )
             return
 
@@ -277,8 +307,17 @@ def _train(args: argparse.Namespace) -> None:
         )
 
     save_patch_checkpoint(result_dir, args.method, args.seed, model, class_names)
-    write_patch_config(result_dir, args.method, args.seed, class_names, deterministic)
-    _write_eval_results(result_dir, model, val_set, test_set, class_names, device)
+    _write_run_record(
+        result_dir,
+        args.method,
+        args.seed,
+        class_names,
+        deterministic,
+        model,
+        val_set,
+        test_set,
+        device,
+    )
 
 
 def main() -> None:

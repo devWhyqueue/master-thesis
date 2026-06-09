@@ -85,6 +85,15 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
         [
             python,
             "-m",
+            "scripts.analysis.report.build_db",
+            "--config",
+            config_path,
+        ]
+    )
+    _run(
+        [
+            python,
+            "-m",
             "scripts.analysis.report.aggregate",
             "--config",
             config_path,
@@ -123,6 +132,15 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
             if smoke:
                 cmd.append("--smoke")
             _run(cmd)
+    _run(
+        [
+            python,
+            "-m",
+            "scripts.analysis.report.build_db",
+            "--config",
+            config_path,
+        ]
+    )
     _run(
         [
             python,

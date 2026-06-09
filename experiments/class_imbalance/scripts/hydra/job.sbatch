@@ -211,6 +211,7 @@ case "$job" in
     ;;
 
   aggregate)
+    bash scripts/hydra/run_python.sh -m scripts.analysis.report.build_db
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.recompute_tier_metrics
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.aggregate --benchmark patch
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.aggregate --benchmark wsi_bag

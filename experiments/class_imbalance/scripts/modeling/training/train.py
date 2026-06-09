@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_json, write_progress
+from scripts.common import ensure_dirs, load_config, write_progress, write_run_record
 from scripts.modeling.mil.bag.trainer import _train_bag_method
 from scripts.modeling.mil.metadata import BAG_METHODS, method_metadata
 from scripts.analysis.tuning.grid import validate_tuning_params
@@ -38,7 +38,7 @@ def _train_selected_method(
     seed: int,
     result_dir: Path,
     smoke: bool = False,
-) -> dict[str, dict[str, object]]:
+) -> tuple[dict[str, dict[str, object]], dict[str, int] | None]:
     if method in BAG_METHODS:
         return _train_bag_method(
             method, frame, class_names, config, seed, result_dir, smoke
@@ -77,7 +77,7 @@ def _run(args: argparse.Namespace) -> None:
     frame = _load_split(paths, args.seed, args.smoke, config)
     class_names = sorted(frame["cancer_type"].unique().tolist())
     _write_status(result_dir, args.method, args.seed, "started")
-    results = _train_selected_method(
+    results, diagnostics = _train_selected_method(
         args.method, frame, class_names, config, args.seed, result_dir, args.smoke
     )
     _write_outputs(
@@ -88,6 +88,7 @@ def _run(args: argparse.Namespace) -> None:
         results,
         args.tuning_id,
         tuning_params,
+        diagnostics,
     )
     _write_status(result_dir, args.method, args.seed, "completed")
     logger.info(f"Wrote results to {result_dir}")
@@ -107,21 +108,24 @@ def _write_outputs(
     results: dict[str, dict[str, object]],
     tuning_id: str | None,
     tuning_params: dict[str, float],
+    diagnostics: dict[str, int] | None,
 ) -> None:
-    """Write config and split-level result payloads."""
-    write_json(
-        result_dir / "config.json",
+    """Write the consolidated per-run record."""
+    write_run_record(
+        result_dir,
         {
+            "benchmark": "wsi_bag",
             "method": method,
-            "method_metadata": method_metadata(method),
             "seed": seed,
             "smoke": smoke,
             "tuning_id": tuning_id,
             "tuning_params": tuning_params,
+            "model_path": "model.pt",
+            "method_metadata": method_metadata(method),
+            "diagnostics": diagnostics,
+            "splits": results,
         },
     )
-    write_json(result_dir / "val_results.json", results["val"])
-    write_json(result_dir / "test_results.json", results["test"])
 
 
 def _write_status(result_dir: Path, method: str, seed: int, status: str) -> None:
