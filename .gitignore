@@ -23,12 +23,5 @@ pyrightconfig.json
 *.toc
 .latex-build/
 
-# Keep curated summaries/figures, ignore regenerated experiment dumps.
-experiments/class_imbalance/outputs/*
-!experiments/class_imbalance/outputs/figures/
-!experiments/class_imbalance/outputs/tables/
-!experiments/class_imbalance/outputs/figures/.gitkeep
-!experiments/class_imbalance/outputs/tables/.gitkeep
-
 # Built on Hydra; do not commit.
 experiments/class_imbalance/environment.sif

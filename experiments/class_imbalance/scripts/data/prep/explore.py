@@ -51,7 +51,6 @@ def save_class_distribution(
 
 def _write_distribution_outputs(counts: pd.Series, figures_dir: Path) -> None:
     _plot_class_distribution(counts, figures_dir)
-    _plot_long_tail_profile(counts, figures_dir)
 
 
 def _plot_class_distribution(counts: pd.Series, figures_dir: Path) -> None:
@@ -130,51 +129,6 @@ def _annotate_extremes(ax: Axes, descending: pd.Series) -> None:
 def _count_label(labels: list[str], counts: np.ndarray, idx: int) -> str:
     label = ABBREVIATIONS.get(labels[idx], labels[idx].replace("_", " ")[:32])
     return f"{label}: {int(counts[idx])}"
-
-
-def _plot_long_tail_profile(counts: pd.Series, figures_dir: Path) -> None:
-    tier_frame = _support_tier_frame(counts)
-    fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    bars = ax.bar(
-        tier_frame["tier"],
-        tier_frame["slides"],
-        color=[
-            TIER_COLORS["tail"],
-            TIER_COLORS["body"],
-            "#6aa56f",
-            TIER_COLORS["head"],
-        ],
-    )
-    ax.set_ylabel("Slides")
-    ax.set_xlabel("Class-support tier")
-    ax.set_title("Slide mass by support tier")
-    labels = [
-        f"{int(slides)} slides\n{int(classes)} classes"
-        for slides, classes in zip(
-            tier_frame["slides"], tier_frame["classes"], strict=False
-        )
-    ]
-    ax.bar_label(bars, labels=labels, padding=3, fontsize=8)
-    ax.margins(y=0.18)
-    ax.grid(axis="y", alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(figures_dir / "long_tail_profile.png", dpi=300)
-    plt.close(fig)
-
-
-def _support_tier_frame(counts: pd.Series) -> pd.DataFrame:
-    tier = pd.cut(
-        counts,
-        bins=[0, 100, 250, 500, float("inf")],
-        labels=["<100", "100-249", "250-499", ">=500"],
-        right=False,
-    )
-    frame = pd.DataFrame({"slides": counts, "tier": tier})
-    grouped = frame.groupby("tier", observed=False).agg(
-        slides=("slides", "sum"),
-        classes=("slides", "size"),
-    )
-    return cast(pd.DataFrame, grouped.reset_index())
 
 
 def _distribution_stats(counts: pd.Series) -> dict[str, Any]:

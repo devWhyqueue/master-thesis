@@ -216,7 +216,6 @@ case "$job" in
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.aggregate --benchmark wsi_bag
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.calibration.table
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.calibration.posthoc_table
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.calibration.posthoc --seed 0 --calibrators temperature
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.paired_delta_table
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.progan_diagnostics --seed 0
     bash scripts/hydra/run_python.sh -m scripts.analysis.report.figures --benchmark patch

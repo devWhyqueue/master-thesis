@@ -16,7 +16,6 @@ from scripts.analysis.report.figures.labels import METHOD_LABELS, method_label
 from scripts.analysis.report.figures.metrics import (
     benchmark_title,
     plot_macro_f1_by_seed,
-    plot_macro_f1_delta,
 )
 from scripts.modeling.training.support_tiers import load_class_tier_labels
 
@@ -154,17 +153,7 @@ def main() -> None:
     paths = ensure_dirs(config)
     methods = _methods(config, args.benchmark)
     archive = paths["tables"] / f"result_details_{args.benchmark}.jsonl.gz"
-    if args.benchmark == "patch":
-        plot_macro_f1_delta(
-            archive,
-            methods,
-            paths["figures"]
-            / f"method_macro_f1_delta_{args.benchmark}_{args.split}.png",
-            args.split,
-            args.benchmark,
-            METHOD_LABELS,
-        )
-    else:
+    if args.benchmark == "wsi_bag":
         plot_macro_f1_by_seed(
             archive,
             methods,

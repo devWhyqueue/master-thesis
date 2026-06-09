@@ -1,3 +1,0 @@
-benchmark,method,n_classes,support_vs_recall_spearman,support_vs_error_spearman,support_rank_vs_difficulty_rank_spearman
-patch,patch_feature_ce,32,0.33394428152492667,-0.33394428152492667,0.33394428152492667
-wsi_bag,mil_ce,32,0.30131964809384165,-0.30131964809384165,0.30131964809384165

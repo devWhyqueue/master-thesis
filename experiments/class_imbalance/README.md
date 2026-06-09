@@ -55,15 +55,3 @@ schedule, and synthetic patches raise those classes to the training-set head cou
 The default configuration leaves `max_instances_per_bag` unset. If full bags are
 not feasible on the cluster allocation, set one profiled fixed cap in
 `configs/default.yaml` and report that cap in the paper.
-
-## Main Artifacts
-
-- `outputs/tables/result_summary_patch.csv`
-- `outputs/tables/result_summary_wsi_bag.csv`
-- `outputs/figures/method_macro_f1_patch_test.png`
-- `outputs/figures/method_macro_f1_wsi_bag_test.png`
-- `outputs/results_patch/<method>/seed=<seed>/`
-- `outputs/results_wsi_bag/<method>/seed=<seed>/`
-
-Runtime outputs such as generated synthetic patches, detailed result folders,
-`data/`, and `logs/` remain scratch artifacts.
