@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from scripts.common import ensure_dirs, load_config, write_json
+from scripts.prep.manifest import tcga_case_id
 
 logger = logging.getLogger(__name__)
 
@@ -21,21 +22,21 @@ def parse_args() -> argparse.Namespace:
 
 
 def assign_class_splits(
-    slides: list[str], seed: int, val_fraction: float, test_fraction: float
+    units: list[str], seed: int, val_fraction: float, test_fraction: float
 ) -> dict[str, str]:
-    """Assign per-class slide IDs to train/val/test."""
+    """Assign per-class split units to train/val/test."""
     rng = np.random.default_rng(seed)
-    shuffled = list(slides)
+    shuffled = list(units)
     rng.shuffle(shuffled)
-    n_slides = len(shuffled)
-    if n_slides == 1:
+    n_units = len(shuffled)
+    if n_units == 1:
         return {shuffled[0]: "train"}
-    if n_slides == 2:
+    if n_units == 2:
         return {shuffled[0]: "train", shuffled[1]: "test"}
 
-    n_test = max(1, int(round(n_slides * test_fraction)))
-    n_val = max(1, int(round(n_slides * val_fraction)))
-    if n_test + n_val >= n_slides:
+    n_test = max(1, int(round(n_units * test_fraction)))
+    n_val = max(1, int(round(n_units * val_fraction)))
+    if n_test + n_val >= n_units:
         n_test = 1
         n_val = 1
 
@@ -49,30 +50,48 @@ def assign_class_splits(
     return assignments
 
 
+def _with_case_ids(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy containing TCGA participant identifiers."""
+    with_cases = frame.copy()
+    if "case_id" not in with_cases.columns:
+        with_cases["case_id"] = with_cases["slide_id"].map(
+            lambda slide_id: tcga_case_id(str(slide_id))
+        )
+    return with_cases
+
+
 def _build_assignments(
     slide_manifest: pd.DataFrame, seed: int, data_config: dict
 ) -> dict[str, str]:
-    """Build slide-level split assignments class by class."""
+    """Build case-level split assignments class by class."""
     assignments: dict[str, str] = {}
-    for _, class_df in slide_manifest.groupby("cancer_type"):
-        class_assignments = assign_class_splits(
-            class_df["slide_id"].tolist(),
+    manifest = _with_case_ids(slide_manifest)
+    for _, class_df in manifest.groupby("cancer_type"):
+        case_assignments = assign_class_splits(
+            sorted(class_df["case_id"].astype(str).unique()),
             seed=seed,
             val_fraction=float(data_config["validation_fraction"]),
             test_fraction=float(data_config["test_fraction"]),
         )
-        assignments.update(class_assignments)
+        for _, slide in class_df.iterrows():
+            assignments[str(slide["slide_id"])] = case_assignments[
+                str(slide["case_id"])
+            ]
     return assignments
 
 
 def _validate_assignments(split_manifest: pd.DataFrame) -> None:
-    """Fail fast if any rows did not receive a split."""
-    if not bool(split_manifest["split"].isna().any()):
-        return
-    missing = split_manifest.loc[split_manifest["split"].isna(), "slide_id"].unique()[
-        :10
-    ]
-    raise RuntimeError(f"Missing split assignments for slides: {missing}")
+    """Fail fast if split assignments are missing or case-leaking."""
+    if bool(split_manifest["split"].isna().any()):
+        missing = split_manifest.loc[
+            split_manifest["split"].isna(), "slide_id"
+        ].unique()[:10]
+        raise RuntimeError(f"Missing split assignments for slides: {missing}")
+    case_split_counts = split_manifest.groupby("case_id")["split"].nunique()
+    leaking_cases = case_split_counts[case_split_counts > 1]
+    if not leaking_cases.empty:
+        examples = leaking_cases.index.astype(str).tolist()[:10]
+        raise RuntimeError(f"Case-disjoint split violation for cases: {examples}")
 
 
 def _map_slide_assignments(
@@ -130,7 +149,11 @@ def _write_split_outputs(
         paths["data"] / f"split_report_seed={seed}.json",
         {
             "seed": seed,
+            "split_unit": "case_id",
             "n_slides_by_split": slide_splits["split"].value_counts().to_dict(),
+            "n_cases_by_split": slide_splits.groupby("split")["case_id"]
+            .nunique()
+            .to_dict(),
             "n_rows_by_split": split_manifest["split"].value_counts().to_dict(),
             "balanced_test_rows": int(split_manifest["balanced_test"].sum()),
         },
@@ -147,6 +170,8 @@ def main() -> None:
     data_config = config["data"]
     manifest = pd.read_csv(paths["data"] / "manifest.csv")
     slide_manifest = pd.read_csv(paths["data"] / "slide_manifest.csv")
+    manifest = _with_case_ids(manifest)
+    slide_manifest = _with_case_ids(slide_manifest)
     assignments = _build_assignments(slide_manifest, args.seed, data_config)
     split_manifest = manifest.copy()
     split_manifest["split"] = _map_slide_assignments(split_manifest, assignments)

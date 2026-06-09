@@ -46,6 +46,7 @@ from scripts.patch_feature.divide_conquer import (
     dnc_class_partitions,
 )
 from scripts.patch_feature.training import PatchFeatureDataset
+from scripts.prep.manifest import tcga_case_id
 from scripts.progan.core import (
     ProgressiveDiscriminator,
     ProgressiveGenerator,
@@ -63,6 +64,7 @@ from scripts.progan.manifest import (
 from scripts.progan.storage import generated_counts_match as _generated_counts_match
 from scripts.training.support_tiers import class_tier_labels
 from scripts.prep.patch_manifest import build_patch_manifest
+from scripts.prep.splits import _build_assignments, _validate_assignments
 from scripts.report.paired_delta_table import build_paired_delta_table
 from scripts.tuning.aggregate import _select_all
 from scripts.tuning.grid import (
@@ -87,6 +89,54 @@ def test_patch_manifest_uses_fixed_resolution_and_split(tmp_path: Path) -> None:
     assert frame["split"].tolist() == ["train", "train"]
     assert frame["resolution"].tolist() == ["0", "0"]
     assert len(frame) == 2
+
+
+def test_tcga_case_id_uses_participant_barcode() -> None:
+    slide_id = "TCGA-AB-1234-01Z-00-DX1"
+    assert tcga_case_id(slide_id) == "TCGA-AB-1234"
+    assert tcga_case_id("slide-1") == "slide-1"
+
+
+def test_split_assignments_keep_cases_disjoint() -> None:
+    slide_manifest = pd.DataFrame(
+        [
+            {
+                "slide_id": "TCGA-AA-0001-01Z-00-DX1",
+                "cancer_type": "A",
+            },
+            {
+                "slide_id": "TCGA-AA-0001-01Z-00-DX2",
+                "cancer_type": "A",
+            },
+            {
+                "slide_id": "TCGA-AA-0002-01Z-00-DX1",
+                "cancer_type": "A",
+            },
+            {
+                "slide_id": "TCGA-AA-0003-01Z-00-DX1",
+                "cancer_type": "A",
+            },
+        ]
+    )
+    assignments = _build_assignments(
+        slide_manifest,
+        seed=0,
+        data_config={"validation_fraction": 0.25, "test_fraction": 0.25},
+    )
+    assert assignments["TCGA-AA-0001-01Z-00-DX1"] == assignments[
+        "TCGA-AA-0001-01Z-00-DX2"
+    ]
+
+
+def test_split_validation_rejects_case_leakage() -> None:
+    split_manifest = pd.DataFrame(
+        [
+            {"slide_id": "slide-1", "case_id": "case-1", "split": "train"},
+            {"slide_id": "slide-2", "case_id": "case-1", "split": "test"},
+        ]
+    )
+    with pytest.raises(RuntimeError, match="Case-disjoint split violation"):
+        _validate_assignments(split_manifest)
 
 
 def test_scholz_combined_loss_decreases_when_predictions_improve() -> None:

@@ -37,8 +37,9 @@ Environment overrides:
   EXPERIMENT_CONTAINER, PROGAN_ARRAY_UPPER, PROGAN_ARRAY_MAX_PARALLEL,
   PROGAN_GPU_CONSTRAINT, PROGAN_PARTITION, PROGAN_TRAIN_PARTITION,
   PROGAN_SYNTH_SQFS_PARTITION, PATCH_PARTITION, PATCH_SQFS_PARTITION,
-  PATCH_FEATURE_PARTITION, PATCH_FEATURE_CONSTRAINT, WSI_PARTITION
-  PATCH_TUNE_PARTITION, WSI_TUNE_PARTITION, TUNING_AGGREGATE_PARTITION
+  PATCH_FEATURE_PARTITION, PATCH_FEATURE_CONSTRAINT, WSI_PARTITION,
+  PATCH_TUNE_PARTITION, WSI_TUNE_PARTITION, TUNING_AGGREGATE_PARTITION,
+  PATCH_SYNTHETIC_SQFS_TEMPLATE
 USAGE
 }
 
@@ -63,8 +64,18 @@ require_real_patch_sqfs_absent() {
 require_synthetic_sqfs_absent() {
   local seed
   for seed in 0 1 2; do
-    require_absent "${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-${seed}.sqfs}"
+    require_absent "$(synthetic_sqfs_path "$seed")"
   done
+}
+
+synthetic_sqfs_path() {
+  local seed="$1"
+  local template="${PATCH_SYNTHETIC_SQFS_TEMPLATE:-}"
+  if [ -n "$template" ]; then
+    printf "%s" "${template//\{seed\}/${seed}}"
+    return
+  fi
+  printf "/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-%s.sqfs" "$seed"
 }
 
 submit_with_args() {

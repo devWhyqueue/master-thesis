@@ -29,10 +29,10 @@ builds, smoke runs, WSI profiling, and ProGAN reruns.
 bash scripts/hydra/submit.sh --help
 ```
 
-Preparation builds one slide-level split manifest per seed and derives the
-controlled patch manifests from those slide assignments, so patches from one
-slide never cross splits. See `CLUSTER.md` before changing Hydra storage or
-submission behavior.
+Preparation builds one participant-level split manifest per seed and derives the
+controlled patch manifests from those case assignments, so patches and features
+from slides belonging to the same TCGA participant never cross splits. See
+`CLUSTER.md` before changing Hydra storage or submission behavior.
 
 ## Benchmarks
 

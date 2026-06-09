@@ -76,6 +76,14 @@ def _build_manifest_rows(
     return rows, unmatched_features, matched_slide_ids
 
 
+def tcga_case_id(slide_id: str) -> str:
+    """Return the participant barcode encoded in a TCGA slide identifier."""
+    parts = slide_id.split("-")
+    if len(parts) >= 3 and parts[0] == "TCGA":
+        return "-".join(parts[:3])
+    return slide_id
+
+
 def _manifest_row(
     feature_id: str, slide_id: str, class_name: str, feature_path: Path
 ) -> dict[str, str]:
@@ -83,6 +91,7 @@ def _manifest_row(
     return {
         "feature_id": feature_id,
         "slide_id": slide_id,
+        "case_id": tcga_case_id(slide_id),
         "cancer_type": class_name,
         "feature_path": str(feature_path),
     }
@@ -90,12 +99,13 @@ def _manifest_row(
 
 def _slide_manifest(manifest: pd.DataFrame) -> pd.DataFrame:
     """Aggregate chunk-level rows to slide-level manifest."""
-    grouped = manifest.groupby(["slide_id", "cancer_type"], as_index=False).agg(
-        n_feature_chunks=("feature_id", "count")
-    )
+    grouped = manifest.groupby(
+        ["slide_id", "case_id", "cancer_type"], as_index=False
+    ).agg(n_feature_chunks=("feature_id", "count"))
     rows = [
         {
             "slide_id": str(row["slide_id"]),
+            "case_id": str(row["case_id"]),
             "cancer_type": str(row["cancer_type"]),
             "n_feature_chunks": int(row["n_feature_chunks"]),
         }
@@ -136,7 +146,13 @@ def _manifest_report(
 
 def _validate_manifest(manifest: pd.DataFrame) -> None:
     """Validate required columns and referenced feature files."""
-    required_columns = {"feature_id", "slide_id", "cancer_type", "feature_path"}
+    required_columns = {
+        "feature_id",
+        "slide_id",
+        "case_id",
+        "cancer_type",
+        "feature_path",
+    }
     missing_columns = required_columns.difference(manifest.columns)
     if missing_columns:
         raise RuntimeError(f"Manifest is missing columns: {sorted(missing_columns)}")

@@ -27,6 +27,16 @@ seed_from_array() {
   printf "%s" "${seeds[${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID required}]}"
 }
 
+synthetic_sqfs_path() {
+  local seed="$1"
+  local template="${PATCH_SYNTHETIC_SQFS_TEMPLATE:-}"
+  if [ -n "$template" ]; then
+    printf "%s" "${template//\{seed\}/${seed}}"
+    return
+  fi
+  printf "/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-%s.sqfs" "$seed"
+}
+
 case "$job" in
   build-container)
     apptainer build --force environment.sif configs/environment.def
@@ -61,7 +71,7 @@ case "$job" in
 
   build-synthetic-sqfs)
     seed="$(seed_from_array)"
-    export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-/home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-${seed}.sqfs}"
+    export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-$(synthetic_sqfs_path "$seed")}"
     export PATCH_SYNTHETIC_SQFS_FILE_LIST="${PATCH_SYNTHETIC_SQFS_FILE_LIST:-${SLURM_TMPDIR:-/tmp}/tcga_ut_synthetic_seed=${seed}.txt}"
     if [ -e "$PATCH_SYNTHETIC_SQFS_OUTPUT" ]; then
       echo "Refusing to overwrite existing SquashFS image: $PATCH_SYNTHETIC_SQFS_OUTPUT" >&2
@@ -136,6 +146,7 @@ case "$job" in
   patch-progan-train)
     export EXPERIMENT_USE_GPU=1
     seed="$(seed_from_array)"
+    export PATCH_SYNTHETIC_SQFS="${PATCH_SYNTHETIC_SQFS:-$(synthetic_sqfs_path "$seed")}"
     bash scripts/hydra/run_patch_staged_train.sh "$seed" patch_progan_aug \
       --include-synthetic \
       --skip-synthetic-generation \
@@ -146,6 +157,7 @@ case "$job" in
   patch-feature-extract)
     export EXPERIMENT_USE_GPU=1
     seed="$(seed_from_array)"
+    export PATCH_SYNTHETIC_SQFS="${PATCH_SYNTHETIC_SQFS:-$(synthetic_sqfs_path "$seed")}"
     bash scripts/hydra/run_patch_feature_extract.sh "$seed" "$@"
     ;;
 
