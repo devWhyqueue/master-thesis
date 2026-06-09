@@ -4,7 +4,7 @@ To investigate how different mitigation strategies help handle highly imbalanced
 ## Usage
 ### 1. Sample a balanced version of TCGA-UT 
 To be able to sample an imbalanced version in a highly controlled manner, we first sample a balanced version of TCGA-UT, i.e., a version where all classes have the same number of slides and patches. 
-To do this, run the Python script `sample_TCGA_UT_balanced.py`. It takes as arguments: 
+To do this, run the module `tcga_ut_imbalanced.cli.sample_balanced`. It takes as arguments: 
 - `--dataset-path`: The top-level path where TCGA-UT is stored. The directory at this path should have the following structure:
 ```
 --datset-path
@@ -26,23 +26,23 @@ To do this, run the Python script `sample_TCGA_UT_balanced.py`. It takes as argu
 - `--store-slide-ids` (flag): A flag that tells the script to store a JSON-file with a list of slide-ids that have already been sampled.
 - `--seed` (default=0): The seed for the random sampling of slide ids selected from each class.  
 
-To manage job paths and parameters centrally, copy `scripts/config.json.template` to `scripts/config.json` and adjust the paths to your workspace directory structure.
+To manage job paths and parameters centrally, copy `hydra/config.json.template` to `hydra/config.json` and adjust the paths to your workspace directory structure.
 
 To run a task on a SLURM cluster:
 ```bash
-python scripts/run.py sample-balanced
+python hydra/run.py sample-balanced
 ```
 To run a task locally (on Windows or local machine), add the `--local` flag and optionally `--no-container` to run directly without Apptainer:
 ```bash
-python scripts/run.py --local --no-container sample-balanced
+python hydra/run.py --local --no-container sample-balanced
 ```
 You can also run a dry-run to print the exact commands and SLURM submission scripts that would be executed without running them:
 ```bash
-python scripts/run.py --dry-run sample-balanced
+python hydra/run.py --dry-run sample-balanced
 ```
 
 ### 2. Sample an imbalanced version of TCGA-UT
-Once you sample a balanced version TCGA-UT and have stored the corresponding CSV, you can use it to sample an imbalanced version, which again will be stored in a CSV. This is done with the Python script `sample_TCGA_UT_imbalanced.py`. It takes the arguments:
+Once you sample a balanced version TCGA-UT and have stored the corresponding CSV, you can use it to sample an imbalanced version, which again will be stored in a CSV. This is done with the module `tcga_ut_imbalanced.cli.sample_imbalanced`. It takes the arguments:
 - `--balanced-dataset-path`: The path to the CSV containing the balanced version of TCGA-UT.
 - `--file-save-path`: The output directory where the imbalanced data set should be stored.
 - `--parameter`: The parameter that controls the degree of imbalance.
@@ -59,15 +59,15 @@ Once you sample a balanced version TCGA-UT and have stored the corresponding CSV
 
 To run a single imbalanced sampling task:
 ```bash
-python scripts/run.py sample-imbalanced --parameter 1.0
+python hydra/run.py sample-imbalanced --parameter 1.0
 ```
 To run a sweep over all 14 parameters (0.0 to 1.3) concurrently via SLURM:
 ```bash
-python scripts/run.py sample-imbalanced --sweep
+python hydra/run.py sample-imbalanced --sweep
 ```
 
 ### Training and Testing
-You can train a few different models on the previously sampled imbalanced data sets. This is done with the Python script `train.py`. It takes as arguments:
+You can train a few different models on the previously sampled imbalanced data sets. This is done with the module `tcga_ut_imbalanced.cli.train`. It takes as arguments:
 - `--dataset-structure-path`: The path to the (imbalanced) CSV file containing the data set.
 - `--validation-dataset-structure-path`: A validation set CSV file, as previously generated along with imbalanced data set.
 - `--feature-path`: The path to the foundation model features of the patches.
@@ -92,11 +92,11 @@ You can train a few different models on the previously sampled imbalanced data s
 
 To run model training (for `mlp`, `knn`, or `ncc`):
 ```bash
-python scripts/run.py train mlp --parameter 1.0 --seed 0
+python hydra/run.py train mlp --parameter 1.0 --seed 0
 ```
 To run a sweep over the hyperparameter sweep configurations via SLURM:
 ```bash
-python scripts/run.py train mlp --sweep
+python hydra/run.py train mlp --sweep
 ```
 
 ### Visualization
@@ -111,7 +111,7 @@ Requires the argument `--method` to be set to `scatter_accuracies_of_two_paramet
 ----
 To run standard visualizations (Confusion Matrix, Difference Confusion Matrix, Scatter plot of Recalls):
 ```bash
-python scripts/run.py visualize standard
+python hydra/run.py visualize standard
 ```
 
 #### Point Plot to Compare Methods
@@ -120,17 +120,12 @@ Requires the argument `--method` to be set to `point_plot_compare_methods`. It t
 ----
 To run point plot comparison visualizations:
 ```bash
-python scripts/run.py visualize point-plot
+python hydra/run.py visualize point-plot
 ```
 
 #### Bar Plot for the Number of Slides per Class
 Requires the argument `--method` to be set to `number_of_slides_per_class_bar`. It plots a bar plot with the number slides per class for the CSV-based dataset found in `--dataset-path`.
 
 
-## Not Up-to-date and Unused Files
-The following files are currently not updated to reflect the most recent version of the code:
-- `test.py`
-
-The following files are currently unused and can be removed in a future version:
-- `split.py`
-- `test_sample_TCGA_UT_balanced.py`
+## Package Structure
+The active code is organized in the `tcga_ut_imbalanced` package. Command-line modules live in `tcga_ut_imbalanced.cli`; reusable dataset, model, loss, training, evaluation, and plotting code lives in the corresponding subpackages.
