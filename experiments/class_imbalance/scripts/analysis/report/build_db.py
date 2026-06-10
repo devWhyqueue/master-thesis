@@ -15,7 +15,6 @@ from scripts.analysis.results import (
     discover_result_dirs,
     ingest_run_record,
     init_schema,
-    read_table,
     replace_table,
 )
 
@@ -73,7 +72,8 @@ def _ingest_progan_diagnostics(
     ):
         frame = pd.read_csv(diagnostics_path)
         seed = int(diagnostics_path.stem.replace("progan_diagnostics_seed", ""))
-        frame.insert(0, "seed", seed)
+        if "seed" not in frame.columns:
+            frame.insert(0, "seed", seed)
         replace_table(connection, "progan_diagnostics", frame)
         return
 
@@ -96,8 +96,6 @@ def ingest_reference_tables(
     connection: sqlite3.Connection, paths: dict[str, Path]
 ) -> None:
     """Load dataset and diagnostic reference artifacts into the database."""
-    if not read_table(connection, "dataset_class_distribution").empty:
-        return
     _ingest_class_distribution(connection, paths)
     _ingest_split_distribution(connection, paths)
     _ingest_dataset_stats(connection, paths)

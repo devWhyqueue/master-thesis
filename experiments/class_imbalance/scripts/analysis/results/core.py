@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 
 SUMMARY_METRICS = (
     "accuracy",
@@ -96,7 +97,7 @@ def read_table(connection: sqlite3.Connection, table_name: str) -> pd.DataFrame:
     """Read one table, returning an empty frame when it is missing."""
     try:
         return pd.read_sql(f'SELECT * FROM "{table_name}"', connection)
-    except pd.errors.DatabaseError:
+    except PandasDatabaseError:
         return pd.DataFrame()
 
 
