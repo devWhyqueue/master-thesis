@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from pathlib import Path
 from typing import cast
 
@@ -143,6 +144,13 @@ def _resolve_checkpoint_path(result_dir: Path) -> Path | None:
     return final if final.exists() else None
 
 
+def _num_workers(settings: dict[str, object]) -> int:
+    override = os.environ.get("PATCH_TRAINING_NUM_WORKERS")
+    if override is None:
+        return int(settings.get("num_workers", 0))
+    return int(override)
+
+
 def _write_run_record(
     result_dir: Path,
     method: str,
@@ -237,7 +245,7 @@ def _train(args: argparse.Namespace) -> None:
         args.method,
         int(settings["batch_size"]),
         args.seed,
-        int(settings.get("num_workers", 0)),
+        _num_workers(settings),
         original_train_rows if args.method == "patch_progan_aug" else None,
     )
     if synthetic_manifest is not None:

@@ -1,0 +1,12 @@
+{
+  "imbalance_ratio": 28.285714285714285,
+  "max_slides_per_class": 792,
+  "min_slides_per_class": 28,
+  "n_classes": 32,
+  "n_slides": 8736,
+  "split_slide_counts": {
+    "test": 1308,
+    "train": 6091,
+    "val": 1337
+  }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -84,6 +85,7 @@ def _data_loader(
     shuffle: bool | None = None,
     generator: torch.Generator | None = None,
 ) -> DataLoader:
+    persistent_workers = os.environ.get("PATCH_TRAINING_PERSISTENT_WORKERS", "1") != "0"
     return DataLoader(
         dataset,
         batch_size=batch_size,
@@ -92,7 +94,7 @@ def _data_loader(
         generator=generator,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=num_workers > 0,
+        persistent_workers=num_workers > 0 and persistent_workers,
     )
 
 

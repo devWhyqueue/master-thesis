@@ -2,22 +2,22 @@
 \toprule
 Regime & Method & NLL & Brier & ECE\\
 \midrule
-Patch & CFAL & $\num{2.861} \pm \num{0.018}$ & $\num{0.915} \pm \num{0.002}$ & $\num{0.798} \pm \num{0.002}$\\
-Patch & CE + soft F1 (balanced) & $\num{2.517} \pm \num{0.154}$ & $\num{0.298} \pm \num{0.011}$ & $\num{0.145} \pm \num{0.006}$\\
-Patch & CE + soft MCC (balanced) & $\num{1.952} \pm \num{0.092}$ & $\num{0.296} \pm \num{0.012}$ & $\num{0.140} \pm \num{0.006}$\\
-Patch & Balanced sampler & $\num{1.833} \pm \num{0.074}$ & $\num{0.299} \pm \num{0.012}$ & $\num{0.140} \pm \num{0.006}$\\
-Patch & Weighted CE & $\num{1.802} \pm \num{0.076}$ & $\num{0.299} \pm \num{0.007}$ & $\num{0.140} \pm \num{0.003}$\\
-Patch & CE & $\num{1.808} \pm \num{0.087}$ & $\num{0.299} \pm \num{0.005}$ & $\num{0.141} \pm \num{0.003}$\\
-Patch & ProGAN augmentation & $\num{2.158} \pm \num{0.096}$ & $\num{0.309} \pm \num{0.002}$ & $\num{0.147} \pm \num{0.001}$\\
-Patch & Focal & $\num{1.406} \pm \num{0.095}$ & $\num{0.290} \pm \num{0.013}$ & $\num{0.130} \pm \num{0.006}$\\
-Patch & D\&C & $\num{0.884} \pm \num{0.035}$ & $\num{0.287} \pm \num{0.007}$ & $\num{0.079} \pm \num{0.003}$\\
+Patch & CFAL & $\num{2.849} \pm \num{0.008}$ & $\num{0.914} \pm \num{0.001}$ & $\num{0.787} \pm \num{0.008}$\\
+Patch & CE + soft F1 (balanced) & $\num{2.894} \pm \num{0.116}$ & $\num{0.312} \pm \num{0.011}$ & $\num{0.152} \pm \num{0.005}$\\
+Patch & CE + soft MCC (balanced) & $\num{2.340} \pm \num{0.116}$ & $\num{0.323} \pm \num{0.012}$ & $\num{0.155} \pm \num{0.007}$\\
+Patch & Balanced sampler & $\num{1.967} \pm \num{0.139}$ & $\num{0.313} \pm \num{0.019}$ & $\num{0.147} \pm \num{0.009}$\\
+Patch & Focal & $\num{1.519} \pm \num{0.089}$ & $\num{0.301} \pm \num{0.018}$ & $\num{0.136} \pm \num{0.008}$\\
+Patch & Weighted CE & $\num{1.943} \pm \num{0.085}$ & $\num{0.319} \pm \num{0.016}$ & $\num{0.149} \pm \num{0.007}$\\
+Patch & CE & $\num{2.006} \pm \num{0.081}$ & $\num{0.314} \pm \num{0.018}$ & $\num{0.148} \pm \num{0.008}$\\
+Patch & ProGAN augmentation & $\num{2.602} \pm \num{0.093}$ & $\num{0.331} \pm \num{0.011}$ & $\num{0.159} \pm \num{0.006}$\\
+Patch & D\&C & $\num{0.925} \pm \num{0.023}$ & $\num{0.297} \pm \num{0.016}$ & $\num{0.087} \pm \num{0.007}$\\
 \addlinespace
-WSI bag & MDE-MIL (ensemble) & $\num{0.413} \pm \num{0.040}$ & $\num{0.148} \pm \num{0.012}$ & $\num{0.031} \pm \num{0.003}$\\
-WSI bag & RankMix & $\num{0.437} \pm \num{0.010}$ & $\num{0.151} \pm \num{0.003}$ & $\num{0.034} \pm \num{0.005}$\\
-WSI bag & MIL CE & $\num{1.034} \pm \num{0.051}$ & $\num{0.195} \pm \num{0.009}$ & $\num{0.089} \pm \num{0.003}$\\
-WSI bag & Balanced MIL & $\num{1.152} \pm \num{0.063}$ & $\num{0.206} \pm \num{0.006}$ & $\num{0.096} \pm \num{0.002}$\\
-WSI bag & SC-MIL & $\num{0.991} \pm \num{0.141}$ & $\num{0.204} \pm \num{0.013}$ & $\num{0.091} \pm \num{0.007}$\\
-WSI bag & Weighted MIL & $\num{1.094} \pm \num{0.042}$ & $\num{0.202} \pm \num{0.012}$ & $\num{0.093} \pm \num{0.006}$\\
-WSI bag & Focal MIL & $\num{0.893} \pm \num{0.098}$ & $\num{0.205} \pm \num{0.007}$ & $\num{0.089} \pm \num{0.004}$\\
+WSI bag & MDE-MIL (ensemble) & $\num{0.477} \pm \num{0.013}$ & $\num{0.165} \pm \num{0.008}$ & $\num{0.036} \pm \num{0.005}$\\
+WSI bag & RankMix & $\num{0.581} \pm \num{0.022}$ & $\num{0.169} \pm \num{0.013}$ & $\num{0.047} \pm \num{0.004}$\\
+WSI bag & SC-MIL & $\num{0.992} \pm \num{0.091}$ & $\num{0.203} \pm \num{0.011}$ & $\num{0.091} \pm \num{0.006}$\\
+WSI bag & Weighted MIL & $\num{1.224} \pm \num{0.144}$ & $\num{0.212} \pm \num{0.012}$ & $\num{0.099} \pm \num{0.006}$\\
+WSI bag & Focal MIL & $\num{0.973} \pm \num{0.099}$ & $\num{0.206} \pm \num{0.020}$ & $\num{0.090} \pm \num{0.009}$\\
+WSI bag & Balanced MIL & $\num{1.264} \pm \num{0.165}$ & $\num{0.223} \pm \num{0.010}$ & $\num{0.102} \pm \num{0.005}$\\
+WSI bag & MIL CE & $\num{1.231} \pm \num{0.074}$ & $\num{0.223} \pm \num{0.011}$ & $\num{0.103} \pm \num{0.005}$\\
 \bottomrule
 \end{tabular}
