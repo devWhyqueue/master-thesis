@@ -3,7 +3,6 @@ from typing import cast
 
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.metrics import (
     balanced_accuracy_score,
     confusion_matrix,
@@ -103,9 +102,9 @@ def _predict_mlp(
     probabilities = np.empty((0, n_classes))
     with torch.no_grad():
         mlp.eval()
+        dtype = next(mlp.parameters()).dtype
         for batch in dl_test:
-            first_layer = cast(nn.Linear, mlp.model[0])
-            output = mlp(batch["features"].to(first_layer.weight.dtype)).squeeze()
+            output = mlp(batch["features"].to(dtype)).squeeze()
             output = output.unsqueeze(0) if output.ndim == 1 else output
             probs = torch.softmax(output, dim=-1).detach().cpu().numpy()
             predictions = np.concatenate(
