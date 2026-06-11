@@ -13,7 +13,7 @@ from scripts.analysis.results import (
     connect,
     init_schema,
     load_class_distribution,
-    load_eval_details,
+    load_split_payload,
     replace_table,
 )
 
@@ -63,19 +63,16 @@ def _difficulty_frame(paths: dict[str, Path], config: dict, split: str) -> pd.Da
     class_support = _read_class_support(load_class_distribution(connection, paths))
     rows = []
     for benchmark, method in BASELINES.items():
-        methods = (
-            list(config["patch_feature_methods"])
-            if benchmark == "patch"
-            else list(config["wsi_bag_methods"])
-        )
         seeds = (
             list(config["patch_feature_training"]["seeds"])
             if benchmark == "patch"
             else list(config["wsi_training"]["seeds"])
         )
-        for payload in load_eval_details(connection, benchmark, methods, seeds, split):
-            if payload["method"] != method:
+        for seed in seeds:
+            result = load_split_payload(connection, benchmark, method, seed, split)
+            if result is None:
                 continue
+            payload = {"method": method, "seed": seed, "result": result}
             rows.extend(_result_rows(payload, benchmark, class_support))
     connection.close()
     grouped = _aggregate_classes(pd.DataFrame(rows))

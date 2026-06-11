@@ -25,9 +25,11 @@ def ingest_run_record(
     record = read_run_record(result_dir)
     if record is None:
         return False
+    resolved_benchmark = _record_value(record, "benchmark", benchmark)
+    resolved_method = _record_value(record, "method", method)
     run_id = run_id_for_record(
-        str(record.get("benchmark", benchmark)),
-        str(record.get("method", method)),
+        resolved_benchmark,
+        resolved_method,
         int(record.get("seed", seed)),
         record.get("tuning_id") or tuning_id,
     )
@@ -55,6 +57,8 @@ def _insert_run_row(
     seed: int,
     tuning_id: str | None,
 ) -> None:
+    resolved_benchmark = _record_value(record, "benchmark", benchmark)
+    resolved_method = _record_value(record, "method", method)
     connection.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
     connection.execute(
         """
@@ -66,8 +70,8 @@ def _insert_run_row(
         (
             run_id,
             str(result_dir),
-            str(record.get("benchmark", benchmark)),
-            str(record.get("method", method)),
+            resolved_benchmark,
+            resolved_method,
             int(record.get("seed", seed)),
             record.get("tuning_id") or tuning_id,
             json.dumps(record.get("tuning_params", {}), sort_keys=True),
@@ -78,6 +82,11 @@ def _insert_run_row(
             else None,
         ),
     )
+
+
+def _record_value(record: dict[str, Any], key: str, fallback: str) -> str:
+    value = str(record.get(key) or "")
+    return fallback if value in {"", "unknown"} else value
 
 
 def _insert_diagnostics(

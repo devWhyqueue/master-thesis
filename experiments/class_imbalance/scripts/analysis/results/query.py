@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
-from scripts.analysis.results.core import SUMMARY_METRICS, read_table, run_id_for_record
+from scripts.analysis.results.core import SUMMARY_METRICS, read_table
 
 
 def load_runs_frame(
@@ -23,15 +23,19 @@ def load_runs_frame(
     if frame.empty:
         return frame
     storage_benchmark = "patch_feature" if benchmark == "patch" else benchmark
-    selected = frame[
-        (frame["benchmark"] == storage_benchmark)
-        & (frame["method"].isin(methods))
-        & (frame["seed"].isin(seeds))
-    ]
+    selected = cast(
+        pd.DataFrame,
+        frame[
+            (frame["benchmark"] == storage_benchmark)
+            & (frame["method"].isin(methods))
+            & (frame["seed"].isin(seeds))
+        ],
+    )
     if report_only:
-        selected = selected[
-            selected["tuning_id"].isna() | (selected["tuning_id"] == "")
-        ]
+        selected = cast(
+            pd.DataFrame,
+            selected[selected["tuning_id"].isna() | (selected["tuning_id"] == "")],
+        )
     return selected.reset_index(drop=True)
 
 
@@ -81,7 +85,9 @@ def _detail_row(row: dict[str, Any], split: str) -> dict[str, Any]:
     }
 
 
-def _attach_arrays(payload: dict[str, Any], array_row: pd.Series) -> dict[str, Any]:
+def _attach_arrays(
+    payload: dict[str, Any], array_row: dict[str, Any]
+) -> dict[str, Any]:
     for field, column in (
         ("labels", "labels_json"),
         ("preds", "preds_json"),
@@ -105,29 +111,88 @@ def load_split_payload(
 ) -> dict[str, Any] | None:
     """Reconstruct one split payload including arrays for calibration."""
     storage_benchmark = "patch_feature" if benchmark == "patch" else benchmark
-    run_id = run_id_for_record(storage_benchmark, method, seed, tuning_id)
-    eval_results = read_table(connection, "eval_results")
-    if eval_results.empty:
+    run_id = _lookup_run_id(
+        connection, storage_benchmark, method, seed, tuning_id=tuning_id
+    )
+    if run_id is None:
         return None
-    rows = eval_results[
-        (eval_results["run_id"] == run_id) & (eval_results["split"] == split)
-    ]
-    if rows.empty:
+    row = _split_result_row(connection, run_id, split)
+    if row is None:
         return None
-    row = rows.iloc[0].to_dict()
+    payload = _payload_from_result_row(row)
+    array_row = _split_array_row(connection, run_id, split)
+    if array_row is None:
+        return payload
+    return _attach_arrays(payload, array_row)
+
+
+def _split_result_row(
+    connection: sqlite3.Connection, run_id: str, split: str
+) -> dict[str, Any] | None:
+    cursor = connection.execute(
+        "SELECT * FROM eval_results WHERE run_id = ? AND split = ?",
+        (run_id, split),
+    )
+    return _fetch_mapping(cursor)
+
+
+def _split_array_row(
+    connection: sqlite3.Connection, run_id: str, split: str
+) -> dict[str, Any] | None:
+    cursor = connection.execute(
+        "SELECT * FROM eval_arrays WHERE run_id = ? AND split = ?",
+        (run_id, split),
+    )
+    return _fetch_mapping(cursor)
+
+
+def _fetch_mapping(cursor: sqlite3.Cursor) -> dict[str, Any] | None:
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columns = [description[0] for description in cursor.description]
+    return dict(zip(columns, row, strict=True))
+
+
+def _payload_from_result_row(row: dict[str, Any]) -> dict[str, Any]:
     payload = json.loads(row["extended_json"]) if row.get("extended_json") else {}
     for metric in SUMMARY_METRICS:
         if row.get(metric) is not None:
             payload[metric] = row[metric]
-    eval_arrays = read_table(connection, "eval_arrays")
-    if eval_arrays.empty:
-        return payload
-    array_rows = eval_arrays[
-        (eval_arrays["run_id"] == run_id) & (eval_arrays["split"] == split)
-    ]
-    if array_rows.empty:
-        return payload
-    return _attach_arrays(payload, array_rows.iloc[0])
+    return payload
+
+
+def _lookup_run_id(
+    connection: sqlite3.Connection,
+    benchmark: str,
+    method: str,
+    seed: int,
+    *,
+    tuning_id: str | None,
+) -> str | None:
+    if tuning_id is None:
+        cursor = connection.execute(
+            """
+            SELECT run_id FROM runs
+            WHERE benchmark = ? AND method = ? AND seed = ?
+              AND (tuning_id IS NULL OR tuning_id = '')
+            LIMIT 1
+            """,
+            (benchmark, method, seed),
+        )
+    else:
+        cursor = connection.execute(
+            """
+            SELECT run_id FROM runs
+            WHERE benchmark = ? AND method = ? AND seed = ? AND tuning_id = ?
+            LIMIT 1
+            """,
+            (benchmark, method, seed, tuning_id),
+        )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return str(row[0])
 
 
 def load_class_distribution(
@@ -162,7 +227,7 @@ def _filter_summary(
 ) -> pd.DataFrame:
     if frame.empty:
         return frame
-    selected = frame[frame["benchmark"] == benchmark]
+    selected = cast(pd.DataFrame, frame[frame["benchmark"] == benchmark])
     if split is not None:
-        selected = selected[selected["split"] == split]
+        selected = cast(pd.DataFrame, selected[selected["split"] == split])
     return selected.reset_index(drop=True)

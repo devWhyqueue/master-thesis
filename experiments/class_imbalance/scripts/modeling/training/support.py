@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import cast
 
 import numpy as np
@@ -7,11 +6,9 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_m
 from sklearn.metrics import precision_recall_fscore_support
 
 from scripts.common import ensure_dirs, load_config
+from scripts.analysis.results import connect, init_schema, load_class_distribution
 from scripts.modeling.mil.metrics import extra_metrics
-from scripts.modeling.training.support_tiers import (
-    load_dataset_slide_counts,
-    tier_support_for_classes,
-)
+from scripts.modeling.training.support_tiers import tier_support_for_classes
 
 
 def _resolve_device(configured: str) -> torch.device:
@@ -74,11 +71,17 @@ def _metric_payload(
 
 def _default_dataset_tier_support(class_names: list[str]) -> np.ndarray | None:
     paths = ensure_dirs(load_config(None))
-    return dataset_tier_support(class_names, paths["tables"] / "class_distribution.csv")
-
-
-def dataset_tier_support(class_names: list[str], table_path: Path) -> np.ndarray | None:
-    """Return dataset slide counts for tier assignment when available."""
-    if not table_path.exists():
+    connection = connect(paths["db"])
+    init_schema(connection)
+    distribution = load_class_distribution(connection, paths)
+    connection.close()
+    if distribution.empty:
         return None
-    return tier_support_for_classes(class_names, load_dataset_slide_counts(table_path))
+    slide_counts = dict(
+        zip(
+            distribution["cancer_type"].astype(str),
+            distribution["n_slides"].astype(int),
+            strict=True,
+        )
+    )
+    return tier_support_for_classes(class_names, slide_counts)
