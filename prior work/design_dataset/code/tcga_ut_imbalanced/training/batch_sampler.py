@@ -5,7 +5,13 @@ from torch.utils.data import Sampler
 
 
 class BatchBalancingSampler(Sampler[int]):
-    def __init__(self, labels: np.ndarray, n_classes: int, seed: int = 0) -> None:
+    def __init__(
+        self,
+        labels: np.ndarray,
+        n_classes: int,
+        seed: int = 0,
+        sampler_power: float = 1.0,
+    ) -> None:
         self.labels = labels
         self.n_classes = n_classes
         self.seed = seed
@@ -15,7 +21,9 @@ class BatchBalancingSampler(Sampler[int]):
         ]
         self.generator = np.random.default_rng(seed)
         self._len = len(labels)
-        self.p = np.ones(self.n_classes) / self.n_classes
+        counts = np.bincount(labels, minlength=n_classes)
+        class_weights = np.power(1.0 / np.maximum(counts, 1), sampler_power)
+        self.p = class_weights / class_weights.sum()
 
     def __len__(self) -> int:
         return self._len

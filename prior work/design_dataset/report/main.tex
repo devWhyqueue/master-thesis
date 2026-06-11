@@ -51,7 +51,7 @@ All 32 TCGA-UT cancer types are retained. Let $C=32$ and let $\mathcal{D}_{\math
 \end{equation}
 \noindent The first constraint keeps every class represented and prevents oversampling beyond available slides. The second preserves the full training split size. The third makes the benchmark a 32-class TCGA-UT study throughout.
 
-After slide selection, the input evidence is capped in the same way as in the companion benchmark. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}. The cap prevents slides with more extracted tumor patches from dominating the training objective while keeping the input budget aligned across regimes.
+After slide selection, the input evidence is capped in the same way as in the companion benchmark. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}. Features are read from the shared cls\_patchmean Virchow2 store ($\mathrm{concat}(\mathrm{CLS}, \mathrm{mean}(\mathrm{patch\ tokens}))$, \num{2560}-dimensional vectors) used by the companion WSI-bag benchmark. The cap prevents slides with more extracted tumor patches from dominating the training objective while keeping the input budget aligned across regimes.
 
 \subsection{Power-Law Training Support}
 For an ordered class list $(c_1,\ldots,c_C)$, the intended share for rank $i$ under imbalance parameter $\lambda$ is
@@ -83,6 +83,7 @@ The method taxonomy follows the companion benchmark, but this report uses it to 
     \midrule
     Patch & Baseline and losses & CE, weighted CE, focal loss & Frequency weighting and hard-example emphasis.\\
     Patch & Metric losses & CE + soft F1, CE + soft MCC & Macro-metric losses with balanced minibatch exposure.\\
+    Patch & Specialized & CFAL, divide-and-conquer & Prototype-affinity and expert fusion objectives.\\
     WSI bag & Baseline and losses & MIL CE, weighted CE, focal loss & Slide-level analogues of standard losses.\\
     WSI bag & MIL-specific & Balanced sampling, RankMix, SC-MIL, MDE-MIL & Bag-level sampling, augmentation, contrastive structure, and expert training.\\
     \bottomrule
@@ -101,7 +102,7 @@ Let $y$ be the class label, $\mathbf{z}\in\mathbb{R}^C$ the logits, and $p_y$ th
 
 \section{Evaluation Protocol}
 \label{sec:evaluation}
-Each constructed split is indexed by seed and imbalance parameter $\lambda$. The main reporting points are $\lambda=0.0$, $\lambda=1.0$, and $\lambda=1.3$. Methods use the validation-selected hyperparameters from the companion benchmark and are evaluated on the fixed test split. Macro F1 is the primary discrimination metric because it weights cancer types equally. Balanced accuracy and accuracy are reported as complementary discrimination metrics. Calibration is summarized with negative log-likelihood, multiclass Brier score, and expected calibration error. For each trained model, a scalar temperature is fitted on the validation probabilities and applied to the corresponding test probabilities, so raw and temperature-scaled calibration can be compared without changing discrimination metrics.
+Each constructed split is indexed by seed, class-order regime, and imbalance parameter $\lambda$. The main reporting points are $\lambda=0.0$, $\lambda=1.0$, and $\lambda=1.3$. For every method and every constructed regime (class order $\times$ $\lambda$), hyperparameters are selected by validation macro F1 across three seeds; ties are broken by validation balanced accuracy. Baseline CE and MIL CE use fixed protocol settings. Selected configurations are evaluated on the fixed test split. Macro F1 is the primary discrimination metric because it weights cancer types equally. Balanced accuracy and accuracy are reported as complementary discrimination metrics. Calibration is summarized with negative log-likelihood, multiclass Brier score, and expected calibration error. For each trained model, a scalar temperature is fitted on the validation probabilities and applied to the corresponding test probabilities, so raw and temperature-scaled calibration can be compared without changing discrimination metrics.
 
 The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the case-disjoint splits, frozen Virchow2 representation family, and 30-instance evidence budget, but they differ in prediction unit and aggregation mechanism.
 

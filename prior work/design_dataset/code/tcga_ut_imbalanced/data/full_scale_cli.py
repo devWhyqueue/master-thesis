@@ -1,6 +1,13 @@
+"""CLI entry point for full-scale constructed sampling."""
+
 import argparse
+import json
 import logging
 
+from tcga_ut_imbalanced.data.feature_store import (
+    DEFAULT_FEATURE_DIR,
+    verify_feature_store,
+)
 from tcga_ut_imbalanced.data.full_scale_sampling import (
     attach_splits,
     class_order,
@@ -14,18 +21,21 @@ from tcga_ut_imbalanced.data.full_scale_sampling import (
 logger = logging.getLogger(__name__)
 
 
-def get_args() -> argparse.Namespace:
-    """Parse full-scale constructed-split arguments."""
-    parser = argparse.ArgumentParser()
-    _add_input_args(parser)
-    _add_construction_args(parser)
-    return parser.parse_args()
-
-
 def main() -> None:
     """Create full-scale constructed TCGA-UT manifests."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    args = get_args()
+    args = _parse_args()
+    if args.verify_features:
+        report = verify_feature_store(args.feature_dir or DEFAULT_FEATURE_DIR)
+        logger.info(json.dumps(report, indent=2))
+        if not report["dim_matches"]:
+            raise SystemExit("Feature dimension mismatch.")
+        return
+    output_dir = _run_sampling(args)
+    logger.info("Stored constructed manifests in %s.", output_dir)
+
+
+def _run_sampling(args: argparse.Namespace) -> str:
     manifest = attach_splits(
         load_manifest(args.slide_manifest_path),
         args.split_assignment_path,
@@ -35,18 +45,23 @@ def main() -> None:
     splits = split_frames(args, manifest)
     frames, targets = constructed_payload(args, splits, ordered_classes)
     output_dir = output_dir_for_args(args)
-    write_constructed_outputs(frames, targets, ordered_classes, output_dir, vars(args))
-    logger.info("Stored constructed manifests in %s.", output_dir)
+    write_constructed_outputs(
+        frames,
+        targets,
+        ordered_classes,
+        output_dir,
+        vars(args),
+        feature_dir=args.feature_dir,
+    )
+    return output_dir
 
 
-def _add_input_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--slide-manifest-path", required=True)
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--slide-manifest-path")
     parser.add_argument("--split-assignment-path", default=None)
-    parser.add_argument("--file-save-path", required=True)
-
-
-def _add_construction_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--parameter", type=float, required=True)
+    parser.add_argument("--file-save-path")
+    parser.add_argument("--parameter", type=float)
     parser.add_argument("--class-order-file", default=None)
     parser.add_argument("--class-order-name", default="native_prevalence")
     parser.add_argument("--split-column", default="split")
@@ -60,6 +75,23 @@ def _add_construction_args(parser: argparse.ArgumentParser) -> None:
         default="redistribute",
         choices=["redistribute", "replacement"],
     )
+    parser.add_argument("--feature-dir", default=DEFAULT_FEATURE_DIR)
+    parser.add_argument("--verify-features", action="store_true")
+    args = parser.parse_args()
+    if args.verify_features:
+        return args
+    missing = [
+        name
+        for name, value in (
+            ("slide-manifest-path", args.slide_manifest_path),
+            ("file-save-path", args.file_save_path),
+            ("parameter", args.parameter),
+        )
+        if value is None
+    ]
+    if missing:
+        parser.error(f"Missing required arguments: {', '.join(missing)}")
+    return args
 
 
 if __name__ == "__main__":

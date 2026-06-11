@@ -1,6 +1,8 @@
 import argparse
 import json
+import logging
 import os
+import time
 from typing import cast
 
 import numpy as np
@@ -9,11 +11,15 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from tcga_ut_imbalanced.data.dataset import TCGAUTDatasetImbalanced
+from tcga_ut_imbalanced.evaluation.tuning_params import parse_tuning_params
 from tcga_ut_imbalanced.losses.factory import LossFactory
 from tcga_ut_imbalanced.models.mlp import MLP
 from tcga_ut_imbalanced.plotting.plots import plot_extended_confusion_matrix
 from tcga_ut_imbalanced.training.batch_sampler import BatchBalancingSampler
 from tcga_ut_imbalanced.training.loops import train
+from tcga_ut_imbalanced.training.patch_feature_adapter import build_specialized_model
+
+logger = logging.getLogger(__name__)
 
 
 def make_dataloader(
@@ -40,16 +46,20 @@ def build_mlp(
     dl_val: DataLoader | None,
 ) -> nn.Module:
     """Build and train an MLP model."""
+    tuning_params = _load_tuning_params(args)
+    if args.training_method in {"cfal", "divide_conquer"}:
+        return build_specialized_model(
+            args.training_method, args, dataset_train, device, tuning_params
+        )
     model = MLP(
         dataset_train.get_feature_dim(),
         args.n_nodes_per_layer,
         dataset_train.get_n_classes(),
+        dropout=float(args.dropout),
     )
     model.to(device)
-    criterion = _criterion(args, dataset_train)
-    optimizer = torch.optim.SGD(
-        model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
-    )
+    criterion = _criterion(args, dataset_train, tuning_params)
+    optimizer = _optimizer(args, model)
     _train_mlp(args, model, criterion, optimizer, dl_train, dl_val)
     return model
 
@@ -92,16 +102,52 @@ def save_validation_plot(
     )
 
 
+def training_base_path(args: argparse.Namespace) -> str:
+    """Return the output directory for one training run."""
+    timestamp = time.time_ns() // 1_000_000
+    return (
+        os.path.join(args.results_save_path, str(timestamp))
+        if args.store_timestamp
+        else args.results_save_path
+    )
+
+
+def _optimizer(args: argparse.Namespace, model: MLP) -> torch.optim.Optimizer:
+    if args.optimizer == "sgd":
+        return torch.optim.SGD(
+            model.parameters(),
+            lr=args.learning_rate,
+            weight_decay=args.weight_decay,
+        )
+    return torch.optim.AdamW(
+        model.parameters(),
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
+
+
+def _load_tuning_params(args: argparse.Namespace) -> dict[str, float]:
+    return parse_tuning_params("patch", args.training_method, args.tuning_params)
+
+
 def _criterion(
-    args: argparse.Namespace, dataset_train: TCGAUTDatasetImbalanced
+    args: argparse.Namespace,
+    dataset_train: TCGAUTDatasetImbalanced,
+    tuning_params: dict[str, float],
 ) -> nn.Module:
+    gamma = tuning_params.get("focal_gamma", args.gamma)
+    metric_weight = float(
+        tuning_params.get("metric_loss_weight", args.metric_loss_weight) or 0.0
+    )
+    weight_power = float(tuning_params.get("weight_power", 1.0))
     return LossFactory.build(
         args.loss,
-        args.gamma,
+        gamma,
         args.alpha,
         dataset_train.get_n_classes(),
         dataset_train.get_class_sizes(),
-        args.metric_loss_weight,
+        metric_weight,
+        weight_power,
     )
 
 

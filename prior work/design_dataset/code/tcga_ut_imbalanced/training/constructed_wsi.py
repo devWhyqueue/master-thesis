@@ -10,10 +10,11 @@ import pandas as pd
 import torch
 from torch import nn
 
+from tcga_ut_imbalanced.evaluation.tuning_params import parse_tuning_params
 from tcga_ut_imbalanced.training.constructed_wsi_data import (
     ConstructedBagDataset,
     OPTIONAL_ARGS,
-    write_json,
+    write_training_outputs,
 )
 
 _DEFAULT_CLASS_IMBALANCE_ROOT = (
@@ -50,6 +51,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--class-order-name", required=True)
     parser.add_argument("--parameter", type=float, required=True)
+    parser.add_argument("--tuning-id", default=None)
+    parser.add_argument("--tuning-params", default=None)
     parser.add_argument("--device", default="auto")
     for name, value_type, default in OPTIONAL_ARGS:
         parser.add_argument(name, type=value_type, default=default)
@@ -71,7 +74,7 @@ def main() -> None:
         args.seed,
         output_dir,
     )
-    _write_outputs(output_dir, args, class_names, results, diagnostics)
+    write_training_outputs(output_dir, args, class_names, results, diagnostics)
 
 
 def _load_manifest(path: str) -> pd.DataFrame:
@@ -85,7 +88,8 @@ def _load_manifest(path: str) -> pd.DataFrame:
 
 
 def _training_config(args: argparse.Namespace) -> dict[str, object]:
-    return {
+    tuning = parse_tuning_params("wsi", args.method, args.tuning_params)
+    config = {
         "device": args.device,
         "epochs": args.epochs,
         "bag_batch_size": args.bag_batch_size,
@@ -102,7 +106,21 @@ def _training_config(args: argparse.Namespace) -> dict[str, object]:
         "sampler_power": args.sampler_power,
         "weight_power": args.weight_power,
         "max_bags_per_class": args.max_bags_per_class or None,
+        "bag_cache_dir": args.bag_cache_dir or None,
     }
+    if "weight_power" in tuning:
+        config["weight_power"] = tuning["weight_power"]
+    if "focal_gamma" in tuning:
+        config["focal_gamma"] = tuning["focal_gamma"]
+    if "sampler_power" in tuning:
+        config["sampler_power"] = tuning["sampler_power"]
+    if "rankmix_alpha" in tuning:
+        config["rankmix_alpha"] = tuning["rankmix_alpha"]
+    if "sc_mil_temperature" in tuning:
+        config["sc_mil_temperature"] = tuning["sc_mil_temperature"]
+    if "mde_mil_consistency_weight" in tuning:
+        config["mde_mil_consistency_weight"] = tuning["mde_mil_consistency_weight"]
+    return config
 
 
 def _train_method(
@@ -116,11 +134,13 @@ def _train_method(
     torch.manual_seed(seed)
     training = config["wsi_training"]
     device = _training_support._resolve_device(str(training["device"]))
+    bag_cache_dir = cast(str, training.get("bag_cache_dir", "")) or None
     train_dataset, val_dataset, test_dataset = _split_datasets(
         frame,
         class_names,
         cast(int, training["max_instances_per_bag"]),
         cast(int | None, training["max_bags_per_class"]),
+        bag_cache_dir,
     )
     labels = cast(np.ndarray, train_dataset.labels.cpu().numpy())
     build_model = (
@@ -186,58 +206,21 @@ def _split_datasets(
     class_names: list[str],
     max_instances: int | None,
     max_bags_per_class: int | None,
+    bag_cache_dir: str | None = None,
 ) -> tuple[ConstructedBagDataset, ConstructedBagDataset, ConstructedBagDataset]:
     class_to_idx = {name: idx for idx, name in enumerate(class_names)}
+    cache_dir = bag_cache_dir or None
     return tuple(
         ConstructedBagDataset(
             cast(pd.DataFrame, frame[frame["split"] == split]),
             class_to_idx,
             max_instances,
             max_bags_per_class,
+            cache_dir,
+            split,
         )
         for split in ("train", "val", "test")
     )  # type: ignore[return-value]
-
-
-def _write_outputs(
-    output_dir: Path,
-    args: argparse.Namespace,
-    class_names: list[str],
-    results: dict[str, dict[str, object]],
-    diagnostics: dict[str, int],
-) -> None:
-    write_json(output_dir / "validation_results.json", results["val"])
-    write_json(output_dir / "test_results.json", results["test"])
-    write_json(output_dir / "args.json", _args_payload(args, class_names, diagnostics))
-    write_json(output_dir / "run.json", _run_payload(args, results, diagnostics))
-
-
-def _args_payload(
-    args: argparse.Namespace, class_names: list[str], diagnostics: dict[str, int]
-) -> dict[str, object]:
-    return {
-        **vars(args),
-        "class_names": class_names,
-        "diagnostics": diagnostics,
-        "benchmark": "wsi_bag",
-    }
-
-
-def _run_payload(
-    args: argparse.Namespace,
-    results: dict[str, dict[str, object]],
-    diagnostics: dict[str, int],
-) -> dict[str, object]:
-    return {
-        "benchmark": "wsi_bag",
-        "method": args.method,
-        "seed": args.seed,
-        "smoke": False,
-        "tuning_params": {},
-        "model_path": "model.pt",
-        "diagnostics": diagnostics,
-        "splits": results,
-    }
 
 
 if __name__ == "__main__":

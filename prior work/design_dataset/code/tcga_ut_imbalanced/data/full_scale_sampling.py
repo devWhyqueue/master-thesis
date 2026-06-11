@@ -1,6 +1,7 @@
-import ast
 import argparse
+import ast
 import json
+import logging
 import os
 from typing import cast
 
@@ -12,8 +13,11 @@ from tcga_ut_imbalanced.data.full_scale_rows import (
     rows_for_slides,
     slide_frame,
 )
+from tcga_ut_imbalanced.data.feature_store import expand_splits_for_wsi_manifest
 from tcga_ut_imbalanced.data.full_scale_targets import power_law_counts, target_counts
 from tcga_ut_imbalanced.data.sampling import patch_sort_key
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["power_law_counts"]
 
@@ -101,14 +105,14 @@ def write_constructed_outputs(
     ordered_classes: list[str],
     output_dir: str,
     metadata: dict[str, object],
+    feature_dir: str | None = None,
 ) -> None:
     """Write constructed manifests and provenance files."""
     os.makedirs(output_dir, exist_ok=True)
     for split, frame in frame_by_split.items():
         frame.to_csv(os.path.join(output_dir, f"{split}.csv"), index=False)
-    _combined_manifest(frame_by_split).to_csv(
-        os.path.join(output_dir, "manifest_splits.csv"), index=False
-    )
+    manifest = _wsi_manifest(frame_by_split, feature_dir)
+    manifest.to_csv(os.path.join(output_dir, "manifest_splits.csv"), index=False)
     _write_json(os.path.join(output_dir, "class_order.json"), ordered_classes)
     _write_json(os.path.join(output_dir, "target_counts.json"), targets)
     _write_json(os.path.join(output_dir, "args.json"), metadata)
@@ -186,7 +190,11 @@ def output_dir_for_args(args: argparse.Namespace) -> str:
     return os.path.join(args.file_save_path, name)
 
 
-def _combined_manifest(frame_by_split: dict[str, pd.DataFrame]) -> pd.DataFrame:
+def _wsi_manifest(
+    frame_by_split: dict[str, pd.DataFrame], feature_dir: str | None
+) -> pd.DataFrame:
+    if feature_dir:
+        return expand_splits_for_wsi_manifest(frame_by_split, feature_dir)
     frames = []
     for split, frame in frame_by_split.items():
         tagged = frame.copy()

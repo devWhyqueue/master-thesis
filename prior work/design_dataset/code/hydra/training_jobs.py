@@ -37,9 +37,14 @@ def _mlp_cmd(
         + _train_base_with_test(config, ds, val, test, out)
         + _method_args(args.method)
         + [
+            f"--training-method={args.method}",
             "--device=cpu",
+            "--optimizer=adamw",
             "--learning-rate=0.001",
-            "--n-epochs=50",
+            "--weight-decay=0.0001",
+            "--n-epochs=30",
+            "--batch-size=256",
+            "--dropout=0.1",
             f"--seed={seed}",
             "--visualize",
             f"--class-names-path={_class_names_path(args, config, parameter, seed)}",
@@ -163,11 +168,6 @@ def _method_args(method: str) -> list[str]:
             "--batch-balancing",
         ],
         "focal": ["--loss=focal_loss", "--alpha=uniform", "--gamma=2.0"],
-        "weighted_focal": [
-            "--loss=focal_loss",
-            "--alpha=inverse_class_frequency",
-            "--gamma=2.0",
-        ],
         "ce_soft_f1": [
             "--loss=ce_soft_f1",
             "--alpha=uniform",
@@ -178,6 +178,8 @@ def _method_args(method: str) -> list[str]:
             "--alpha=uniform",
             "--batch-balancing",
         ],
+        "cfal": [],
+        "divide_conquer": [],
     }
     if method not in methods:
         raise ValueError(f"Unknown training method: {method}")

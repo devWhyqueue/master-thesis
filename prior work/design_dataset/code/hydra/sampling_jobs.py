@@ -90,6 +90,9 @@ def _sample_full_scale_cmd(
         cmd.append(f"--split-assignment-path={split_path}")
     if args.class_order_file is not None:
         cmd.append(f"--class-order-file={args.class_order_file}")
+    feature_dir = config.get("feature_path", "")
+    if feature_dir:
+        cmd.append(f"--feature-dir={feature_dir}")
     return cmd
 
 

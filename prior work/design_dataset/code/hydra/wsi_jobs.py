@@ -59,6 +59,7 @@ def _wsi_cmd(
             f"--epochs={args.epochs}",
             "--bag-batch-size=32",
             "--max-instances-per-bag=30",
+            f"--bag-cache-dir={stem}/wsi_bag_cache",
         ]
         + _smoke_args(args)
         + _method_args(method)

@@ -3,23 +3,23 @@ import json
 import logging
 import os
 import pickle
-import time
 from dataclasses import dataclass
-
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from tcga_ut_imbalanced.data.dataset import TCGAUTDatasetImbalanced
-from tcga_ut_imbalanced.evaluation.metrics import test_model
 from tcga_ut_imbalanced.cli.train_support import (
     build_mlp,
     make_dataloader,
     save_validation_plot,
+    training_base_path,
     validation_class_order,
 )
+from tcga_ut_imbalanced.data.dataset import TCGAUTDatasetImbalanced
+from tcga_ut_imbalanced.evaluation.metrics import test_model
+from tcga_ut_imbalanced.evaluation.tuning_params import parse_tuning_params
 from tcga_ut_imbalanced.models.sklearn import SKLearnModel
 from tcga_ut_imbalanced.training.batch_sampler import BatchBalancingSampler
 
@@ -42,9 +42,8 @@ def run_training(args: argparse.Namespace) -> None:
     context = _build_context(args)
     model = _fit_model(args, context)
     logger.info("Finished model training")
-    base_path = _base_path(args)
-    results = _evaluate(args, context, model, base_path)
-    _save_outputs(args, model, results, base_path)
+    output_path = training_base_path(args)
+    evaluate_and_save(args, context, model, output_path)
     logger.info("Done.")
 
 
@@ -109,8 +108,15 @@ def _sampler(
 ) -> BatchBalancingSampler | None:
     if not args.batch_balancing:
         return None
+    tuning_params = parse_tuning_params(
+        "patch", args.training_method, args.tuning_params
+    )
+    sampler_power = float(tuning_params.get("sampler_power", 1.0))
     return BatchBalancingSampler(
-        dataset.get_int_targets(), dataset.get_n_classes(), seed=args.seed
+        dataset.get_int_targets(),
+        dataset.get_n_classes(),
+        seed=args.seed,
+        sampler_power=sampler_power,
     )
 
 
@@ -152,36 +158,42 @@ def _sklearn_features(
     )
 
 
-def _base_path(args: argparse.Namespace) -> str:
-    timestamp = time.time_ns() // 1_000_000
-    return (
-        os.path.join(args.results_save_path, str(timestamp))
-        if args.store_timestamp
-        else args.results_save_path
-    )
-
-
-def _evaluate(
+def evaluate_and_save(
     args: argparse.Namespace,
     context: _TrainContext,
     model: nn.Module | SKLearnModel,
-    base_path: str,
-) -> dict[str, dict[str, object]]:
-    results = {}
+    output_path: str,
+) -> None:
+    """Evaluate on validation and test splits and persist artifacts."""
+    results: dict[str, dict[str, object]] = {}
     for split, dataset, loader in _evaluation_splits(context):
-        result = _evaluate_split(args, context.train_ds, dataset, loader, model)
-        _log_result(split, result)
+        class_order = validation_class_order(args, context.train_ds, dataset)
+        result = test_model(
+            model, loader, model_type=args.model, class_order=class_order
+        )
+        logger.info(
+            "%s accuracy=%s, balanced accuracy=%s, macro F1=%s",
+            split.capitalize(),
+            result["accuracy"],
+            result["balanced_accuracy"],
+            result["macro_f1"],
+        )
         if split == "validation" and args.visualize:
-            class_order = validation_class_order(args, context.train_ds, dataset)
-            save_validation_plot(base_path, dataset, class_order, result)
+            save_validation_plot(output_path, dataset, class_order, result)
         results[split] = result
-    return results
+    os.makedirs(output_path, exist_ok=True)
+    _save_model(model, output_path)
+    for split, result in results.items():
+        with open(os.path.join(output_path, f"{split}_results.json"), "w") as file:
+            json.dump(_json_ready(result), file)
+    with open(os.path.join(output_path, "args.json"), "w") as file:
+        json.dump(vars(args), file)
 
 
 def _evaluation_splits(
     context: _TrainContext,
 ) -> list[tuple[str, TCGAUTDatasetImbalanced, DataLoader]]:
-    splits = []
+    splits: list[tuple[str, TCGAUTDatasetImbalanced, DataLoader]] = []
     if context.val_ds is not None and context.val_loader is not None:
         splits.append(("validation", context.val_ds, context.val_loader))
     if context.test_ds is not None and context.test_loader is not None:
@@ -189,56 +201,12 @@ def _evaluation_splits(
     return splits
 
 
-def _evaluate_split(
-    args: argparse.Namespace,
-    train_ds: TCGAUTDatasetImbalanced,
-    dataset: TCGAUTDatasetImbalanced,
-    loader: DataLoader,
-    model: nn.Module | SKLearnModel,
-) -> dict[str, object]:
-    class_order = validation_class_order(args, train_ds, dataset)
-    return test_model(model, loader, model_type=args.model, class_order=class_order)
-
-
-def _log_result(split: str, result: dict[str, object]) -> None:
-    logger.info(
-        "%s accuracy=%s, balanced accuracy=%s, macro F1=%s",
-        split.capitalize(),
-        result["accuracy"],
-        result["balanced_accuracy"],
-        result["macro_f1"],
-    )
-
-
-def _save_outputs(
-    args: argparse.Namespace,
-    model: nn.Module | SKLearnModel,
-    results: dict[str, dict[str, object]],
-    base_path: str,
-) -> None:
-    logger.info("Saving...")
-    os.makedirs(base_path, exist_ok=True)
-    _save_model(args, model, base_path)
-    for split, result in results.items():
-        _save_json(
-            os.path.join(base_path, f"{split}_results.json"), _json_ready(result)
-        )
-    _save_json(os.path.join(base_path, "args.json"), vars(args))
-
-
-def _save_model(
-    args: argparse.Namespace, model: nn.Module | SKLearnModel, base_path: str
-) -> None:
+def _save_model(model: nn.Module | SKLearnModel, output_path: str) -> None:
     if isinstance(model, nn.Module):
-        torch.save(model.state_dict(), os.path.join(base_path, "model.pt"))
+        torch.save(model.state_dict(), os.path.join(output_path, "model.pt"))
         return
-    with open(os.path.join(base_path, "model.pkl"), "wb") as file:
+    with open(os.path.join(output_path, "model.pkl"), "wb") as file:
         pickle.dump(model.model, file)
-
-
-def _save_json(path: str, data: dict[str, object]) -> None:
-    with open(path, "w") as file:
-        json.dump(data, file)
 
 
 def _json_ready(result: dict[str, object]) -> dict[str, object]:

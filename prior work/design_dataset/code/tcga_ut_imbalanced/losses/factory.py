@@ -15,9 +15,10 @@ class LossFactory:
         n_classes: int | None = None,
         class_counts: np.ndarray | None = None,
         metric_loss_weight: float = 1.0,
+        weight_power: float = 1.0,
     ) -> nn.Module:
         """Build a configured loss module."""
-        weights = _class_weights(alpha, n_classes, class_counts)
+        weights = _class_weights(alpha, n_classes, class_counts, weight_power)
         if loss_type == "cross_entropy":
             return nn.CrossEntropyLoss(weight=weights)
         if loss_type == "focal_loss":
@@ -39,13 +40,15 @@ def _class_weights(
     alpha: str | None,
     n_classes: int | None,
     class_counts: np.ndarray | None,
+    weight_power: float = 1.0,
 ) -> torch.Tensor | None:
     if alpha == "uniform":
         valid_n_classes = _validate_n_classes(n_classes)
-        return _rescale(torch.ones(valid_n_classes, dtype=torch.double))
+        return _rescale(torch.ones(valid_n_classes, dtype=torch.float32))
     if alpha == "inverse_class_frequency":
         valid_class_counts = _validate_class_counts(class_counts)
-        return _rescale(torch.tensor(1.0 / valid_class_counts))
+        weights = np.power(1.0 / np.maximum(valid_class_counts, 1.0), weight_power)
+        return _rescale(torch.tensor(weights, dtype=torch.float32))
     if alpha is None:
         return None
     raise ValueError(f"Unknown alpha type: {alpha}")

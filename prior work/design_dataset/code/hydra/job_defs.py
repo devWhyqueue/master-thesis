@@ -100,11 +100,12 @@ def _submit_slurm(job: Job, config: dict[str, str], dry_run: bool) -> None:
 
 def _slurm_script(job: Job, working_dir: str) -> str:
     command = " ".join(shlex.quote(part) for part in job.cmd)
+    workdir = shlex.quote(working_dir) if working_dir else '""'
     return (
         f"#!/bin/bash\n#SBATCH --job-name={job.name}\n"
         f"#SBATCH --partition={job.partition}\n"
         f"#SBATCH --gpus-per-node={job.gpus_per_node}\n"
         f"#SBATCH --ntasks-per-node=8\n"
-        f"#SBATCH --output={job.log_path}\n#SBATCH -D {working_dir}\n\n"
+        f"#SBATCH --output={job.log_path}\n#SBATCH -D {workdir}\n\n"
         f"{command}\n"
     )

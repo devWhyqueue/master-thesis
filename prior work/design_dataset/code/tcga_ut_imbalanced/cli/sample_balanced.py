@@ -7,7 +7,7 @@ from tcga_ut_imbalanced.data.sampling import (
     get_dataset_structure,
     sample_balanced_from_dataset_structure,
 )
-from tcga_ut_imbalanced.data.utils import convert_dataset_structure_to_dataframe
+from tcga_ut_imbalanced.data.sampling import convert_dataset_structure_to_dataframe
 
 logger = logging.getLogger(__name__)
 
