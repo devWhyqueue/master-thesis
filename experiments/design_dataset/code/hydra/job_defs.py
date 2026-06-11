@@ -41,10 +41,12 @@ def execute(job: Job, config: dict[str, str], local: bool, dry_run: bool) -> Non
 
 
 def pythonpath_env(config: dict[str, str]) -> str:
-    """Return PYTHONPATH for the shared common_code package and design_dataset."""
+    """Return PYTHONPATH for shared code, class_imbalance scripts, and design_dataset."""
     working = Path(config.get("working_dir", ".")).resolve()
-    common = working.parent.parent / "shared"
-    return f"{common}{os.pathsep}{working}"
+    experiments_root = working.parent.parent
+    common = experiments_root / "shared"
+    class_imbalance = experiments_root / "class_imbalance"
+    return f"{common}{os.pathsep}{class_imbalance}{os.pathsep}{working}"
 
 
 def prefix(
