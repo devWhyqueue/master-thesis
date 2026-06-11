@@ -60,14 +60,24 @@ def build_sklearn_model(
 
 def _build_context(args: argparse.Namespace) -> _TrainContext:
     device = torch.device(args.device)
-    train_ds = _dataset(args.dataset_structure_path, args, device)
+    train_ds = _dataset(args.dataset_structure_path, args, device, args.dataset_split)
     val_ds = (
-        _dataset(args.validation_dataset_structure_path, args, device)
+        _dataset(
+            args.validation_dataset_structure_path,
+            args,
+            device,
+            args.validation_dataset_split,
+        )
         if args.validation_dataset_structure_path
         else None
     )
     test_ds = (
-        _dataset(args.test_dataset_structure_path, args, device)
+        _dataset(
+            args.test_dataset_structure_path,
+            args,
+            device,
+            args.test_dataset_split,
+        )
         if args.test_dataset_structure_path
         else None
     )
@@ -90,7 +100,10 @@ def _build_context(args: argparse.Namespace) -> _TrainContext:
 
 
 def _dataset(
-    path: str, args: argparse.Namespace, device: torch.device
+    path: str,
+    args: argparse.Namespace,
+    device: torch.device,
+    split_name: str | None = None,
 ) -> TCGAUTDatasetImbalanced:
     return TCGAUTDatasetImbalanced(
         path,
@@ -100,6 +113,7 @@ def _dataset(
         args.preload_features,
         device,
         args.feature_cache_path,
+        split_name=split_name,
     )
 
 

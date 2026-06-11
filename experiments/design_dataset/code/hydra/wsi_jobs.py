@@ -45,7 +45,7 @@ def _wsi_cmd(
         f"order={args.class_order_name}/param={parameter}/seed={seed}"
     )
     return (
-        prefix(config, args)
+        prefix(config, args, gpu=True)
         + [
             "-m",
             "tcga_ut_imbalanced.training.constructed_wsi",

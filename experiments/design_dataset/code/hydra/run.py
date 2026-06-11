@@ -83,6 +83,14 @@ def _add_wsi_cache_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--class-order-name", default="native_prevalence")
 
 
+def _add_patch_cache_args(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser("patch-cache")
+    parser.add_argument("--sweep", action="store_true")
+    parser.add_argument("--parameter", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--class-order-name", default="native_prevalence")
+
+
 def _add_tune_args(subparsers: argparse._SubParsersAction) -> None:
     subparsers.add_parser("tune")
     subparsers.add_parser("tune-wsi")
@@ -115,6 +123,7 @@ def create_parser() -> argparse.ArgumentParser:
     _add_train_args(subparsers)
     _add_train_wsi_args(subparsers)
     _add_wsi_cache_args(subparsers)
+    _add_patch_cache_args(subparsers)
     _add_tune_args(subparsers)
     _add_tune_aggregate_args(subparsers)
     _add_visualize_args(subparsers)

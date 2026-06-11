@@ -4,19 +4,22 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
+from pathlib import Path
 
-from common_code.tuning.registry import patch_feature_method_flags, wsi_method_flags
+from common_code.tuning.registry import patch_feature_method_flags
 from tcga_ut_imbalanced.evaluation.tuning_grid import task_for_index
 
 logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse tuning runner CLI arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", required=True, choices=["patch", "wsi"])
-    parser.add_argument("--array-task-id", type=int, required=True)
+    parser.add_argument("--array-task-id", type=int, default=None)
     parser.add_argument("--config", required=True)
     parser.add_argument("--constructed-dataset-dir", required=True)
     parser.add_argument("--results-dir", required=True)
@@ -26,13 +29,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run one tuning task or skip it when outputs already exist."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = parse_args()
-    task = task_for_index(args.benchmark, args.array_task_id)
+    task_index = _resolve_array_task_id(args)
+    task = task_for_index(args.benchmark, task_index)
+    out = _output_dir(args, task)
+    if _output_complete(out):
+        logger.info("Skipping completed task: %s", out)
+        return
     cmd = (
-        _patch_command(args, task)
+        _patch_command(args, task, out)
         if args.benchmark == "patch"
-        else _wsi_command(args, task)
+        else _wsi_command(args, task, out)
     )
     if args.dry_run:
         logger.info(" ".join(cmd))
@@ -40,25 +49,51 @@ def main() -> None:
     subprocess.run(cmd, check=True)
 
 
-def _patch_command(args: argparse.Namespace, task) -> list[str]:
+def _resolve_array_task_id(args: argparse.Namespace) -> int:
+    if args.array_task_id is not None:
+        return args.array_task_id
+    env_value = os.environ.get("SLURM_ARRAY_TASK_ID")
+    if env_value is not None:
+        return int(env_value)
+    raise ValueError(
+        "Missing task index: pass --array-task-id or run inside a SLURM array job."
+    )
+
+
+def _output_dir(args: argparse.Namespace, task) -> str:
+    benchmark = "patch" if args.benchmark == "patch" else "wsi"
+    return (
+        f"{args.results_dir}/tuning/{benchmark}/"
+        f"{task.regime.label}/{task.variant.method}/{task.variant.variant}/"
+        f"seed={task.seed}"
+    )
+
+
+def _output_complete(out: str) -> bool:
+    out_path = Path(out)
+    return (out_path / "validation_results.json").exists() and (
+        out_path / "test_results.json"
+    ).exists()
+
+
+def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
     stem = _constructed_stem(
         args.constructed_dataset_dir,
         task.regime.class_order_name,
         task.regime.parameter,
         task.seed,
     )
-    out = (
-        f"{args.results_dir}/tuning/patch/"
-        f"{task.regime.label}/{task.variant.method}/{task.variant.variant}/"
-        f"seed={task.seed}"
-    )
+    manifest = f"{stem}/manifest_splits.csv"
     cmd = [
         sys.executable,
         "-m",
         "tcga_ut_imbalanced.cli.train",
-        f"--dataset-structure-path={stem}/train.csv",
-        f"--validation-dataset-structure-path={stem}/validation.csv",
-        f"--test-dataset-structure-path={stem}/test.csv",
+        f"--dataset-structure-path={manifest}",
+        "--dataset-split=train",
+        f"--validation-dataset-structure-path={manifest}",
+        "--validation-dataset-split=validation",
+        f"--test-dataset-structure-path={manifest}",
+        "--test-dataset-split=test",
         f"--feature-path={args.feature_path}",
         "--preload-features",
         f"--results-save-path={out}",
@@ -77,20 +112,18 @@ def _patch_command(args: argparse.Namespace, task) -> list[str]:
         f"--class-names-path={stem}/class_order.json",
     ]
     cmd.extend(patch_feature_method_flags(task.variant.method))
+    cache_path = Path(stem) / "patch_feature_cache.pt"
+    if cache_path.is_file():
+        cmd.append(f"--feature-cache-path={cache_path}")
     return cmd
 
 
-def _wsi_command(args: argparse.Namespace, task) -> list[str]:
+def _wsi_command(args: argparse.Namespace, task, out: str) -> list[str]:
     stem = _constructed_stem(
         args.constructed_dataset_dir,
         task.regime.class_order_name,
         task.regime.parameter,
         task.seed,
-    )
-    out = (
-        f"{args.results_dir}/tuning/wsi/"
-        f"{task.regime.label}/{task.variant.method}/{task.variant.variant}/"
-        f"seed={task.seed}"
     )
     cmd = [
         sys.executable,

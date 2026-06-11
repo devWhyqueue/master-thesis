@@ -41,12 +41,12 @@ def train_single_epoch(
     seen = 0
     for batch in dataloader:
         correct, seen = _train_batch(model, criterion, optimizer, batch, correct, seen)
-        logger.info(
-            "Epoch %s, Inputs encoutered %s, Training Accuracy = %.5f",
-            epoch,
-            seen,
-            correct / seen,
-        )
+    logger.info(
+        "Epoch %s finished, samples=%s, training accuracy=%.5f",
+        epoch,
+        seen,
+        correct / seen if seen else 0.0,
+    )
     if dl_val is not None:
         _log_validation(model, dl_val)
 

@@ -17,6 +17,9 @@ class Job:
     log_path: str
     partition: str = "cpu-2h"
     gpus_per_node: int = 0
+    array_spec: str | None = None
+    cpus_per_task: int = 4
+    time_limit: str | None = None
 
 
 def load_config(config_path: str) -> dict[str, str]:
@@ -32,7 +35,7 @@ def load_config(config_path: str) -> dict[str, str]:
 def execute(job: Job, config: dict[str, str], local: bool, dry_run: bool) -> None:
     """Execute one job locally or submit it to SLURM."""
     if local:
-        _run_local(job.cmd, dry_run)
+        _run_local(job, config, dry_run)
         return
     _submit_slurm(job, config, dry_run)
 
@@ -44,22 +47,33 @@ def pythonpath_env(config: dict[str, str]) -> str:
     return f"{common}{os.pathsep}{working}"
 
 
-def prefix(config: dict[str, str], args: argparse.Namespace) -> list[str]:
+def prefix(
+    config: dict[str, str],
+    args: argparse.Namespace,
+    *,
+    gpu: bool = False,
+) -> list[str]:
     """Build the Python execution prefix."""
     pythonpath = pythonpath_env(config)
     if args.local and args.no_container:
         os.environ["PYTHONPATH"] = pythonpath
         return ["python3"]
-    return [
+    os.environ["APPTAINERENV_PYTHONPATH"] = pythonpath
+    command = [
         "apptainer",
         "run",
-        "-B",
-        "/home/space:/home/space:rw",
-        "--env",
-        f"PYTHONPATH={pythonpath}",
-        config.get("environment_sif", ""),
-        "python3",
     ]
+    if gpu:
+        command.append("--nv")
+    command.extend(
+        [
+            "-B",
+            "/home/space:/home/space:rw",
+            config.get("environment_sif", ""),
+            "python3",
+        ]
+    )
+    return command
 
 
 def parameters(args: argparse.Namespace) -> list[float]:
@@ -73,7 +87,7 @@ def parameters(args: argparse.Namespace) -> list[float]:
 
 def train_base(config: dict[str, str], ds: str, val: str, out: str) -> list[str]:
     """Build common training command arguments."""
-    args = [
+    cmd = [
         "-m",
         "tcga_ut_imbalanced.cli.train",
         f"--dataset-structure-path={ds}",
@@ -84,8 +98,8 @@ def train_base(config: dict[str, str], ds: str, val: str, out: str) -> list[str]
     ]
     cache_path = config.get("feature_cache_path", "")
     if cache_path:
-        args.append(f"--feature-cache-path={cache_path}")
-    return args
+        cmd.append(f"--feature-cache-path={cache_path}")
+    return cmd
 
 
 def train_csvs(imbalanced_dir: str, parameter: float) -> tuple[str, str]:
@@ -94,16 +108,17 @@ def train_csvs(imbalanced_dir: str, parameter: float) -> tuple[str, str]:
     return f"{stem}/imbalanced_dataset.csv", f"{stem}/validation_dataset.csv"
 
 
-def _run_local(cmd: list[str], dry_run: bool) -> None:
+def _run_local(job: Job, config: dict[str, str], dry_run: bool) -> None:
     if dry_run:
-        logging.info("Dry-run (lokal): %s", " ".join(cmd))
+        logging.info("Dry-run (lokal): %s", " ".join(job.cmd))
         return
-    logging.info("Führe lokal aus: %s", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    os.environ["APPTAINERENV_PYTHONPATH"] = pythonpath_env(config)
+    logging.info("Führe lokal aus: %s", " ".join(job.cmd))
+    subprocess.run(job.cmd, check=True)
 
 
 def _submit_slurm(job: Job, config: dict[str, str], dry_run: bool) -> None:
-    script = _slurm_script(job, config.get("working_dir", ""))
+    script = _slurm_script(job, config)
     if dry_run:
         logging.info("Dry-run (SLURM %s):\n%s", job.name, script)
         return
@@ -111,14 +126,31 @@ def _submit_slurm(job: Job, config: dict[str, str], dry_run: bool) -> None:
     subprocess.run(["sbatch"], input=script, text=True, check=True)
 
 
-def _slurm_script(job: Job, working_dir: str) -> str:
+def _slurm_script(job: Job, config: dict[str, str]) -> str:
     command = " ".join(shlex.quote(part) for part in job.cmd)
+    working_dir = config.get("working_dir", "")
     workdir = shlex.quote(working_dir) if working_dir else '""'
-    return (
-        f"#!/bin/bash\n#SBATCH --job-name={job.name}\n"
-        f"#SBATCH --partition={job.partition}\n"
-        f"#SBATCH --gpus-per-node={job.gpus_per_node}\n"
-        f"#SBATCH --ntasks-per-node=8\n"
-        f"#SBATCH --output={job.log_path}\n#SBATCH -D {workdir}\n\n"
-        f"{command}\n"
+    pythonpath = shlex.quote(pythonpath_env(config))
+    lines = [
+        "#!/bin/bash",
+        f"#SBATCH --job-name={job.name}",
+        f"#SBATCH --partition={job.partition}",
+        f"#SBATCH --gpus-per-node={job.gpus_per_node}",
+        "#SBATCH --ntasks-per-node=1",
+        f"#SBATCH --cpus-per-task={job.cpus_per_task}",
+        f"#SBATCH --output={job.log_path}",
+        f"#SBATCH -D {workdir}",
+    ]
+    if job.time_limit:
+        lines.append(f"#SBATCH --time={job.time_limit}")
+    if job.array_spec:
+        lines.append(f"#SBATCH --array={job.array_spec}")
+    lines.extend(
+        [
+            "",
+            f"export APPTAINERENV_PYTHONPATH={pythonpath}",
+            command,
+            "",
+        ]
     )
+    return "\n".join(lines)

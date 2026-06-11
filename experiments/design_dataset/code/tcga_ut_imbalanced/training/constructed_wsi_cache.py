@@ -37,17 +37,31 @@ def main() -> None:
         split_frame = cast(pd.DataFrame, frame[frame["split"] == split])
         if split_frame.empty:
             continue
+        if _split_cache_exists(cache_dir, split):
+            logger.info("Skipping existing cache for split=%s in %s", split, cache_dir)
+            continue
         _write_split_cache(split_frame, cache_dir, split)
+
+
+def _split_cache_exists(cache_dir: Path, split: str) -> bool:
+    return (
+        (cache_dir / f"{split}_features.npy").exists()
+        and (cache_dir / f"{split}_offsets.npy").exists()
+        and (cache_dir / f"{split}_meta.json").exists()
+    )
 
 
 def _write_split_cache(frame: pd.DataFrame, cache_dir: Path, split: str) -> None:
     bags = bag_rows(frame)
-    lengths = []
+    loaded: list[np.ndarray] = []
     feature_dim = 0
-    for _, row in bags.iterrows():
-        bag = load_bag_rows(row)
-        lengths.append(int(len(bag)))
+    for index, (_, row) in enumerate(bags.iterrows(), start=1):
+        bag = load_bag_rows(row).numpy().astype(np.float32, copy=False)
+        loaded.append(bag)
         feature_dim = int(bag.shape[-1])
+        if index % 1000 == 0:
+            logger.info("loaded split=%s bags=%s", split, index)
+    lengths = [int(len(bag)) for bag in loaded]
     offsets = np.concatenate([[0], np.cumsum(np.asarray(lengths, dtype=np.int64))])
     features = np.lib.format.open_memmap(
         cache_dir / f"{split}_features.npy",
@@ -56,8 +70,7 @@ def _write_split_cache(frame: pd.DataFrame, cache_dir: Path, split: str) -> None
         shape=(int(offsets[-1]), feature_dim),
     )
     cursor = 0
-    for index, (_, row) in enumerate(bags.iterrows(), start=1):
-        bag = load_bag_rows(row).numpy().astype(np.float32, copy=False)
+    for index, bag in enumerate(loaded, start=1):
         features[cursor : cursor + len(bag)] = bag
         cursor += len(bag)
         if index % 1000 == 0:

@@ -1,3 +1,4 @@
+from patch_cache_jobs import patch_cache
 from sampling_jobs import sample_balanced, sample_full_scale, sample_imbalanced
 from training_jobs import train
 from tuning_jobs import tune, tune_aggregate, tune_wsi
@@ -15,6 +16,7 @@ COMMAND_HANDLERS = {
     "train": train,
     "train-wsi": train_wsi,
     "wsi-cache": wsi_cache,
+    "patch-cache": patch_cache,
     "tune": tune,
     "tune-wsi": tune_wsi,
     "tune-aggregate": tune_aggregate,

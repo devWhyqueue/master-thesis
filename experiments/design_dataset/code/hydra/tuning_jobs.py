@@ -5,30 +5,38 @@ from tcga_ut_imbalanced.evaluation.tuning_grid import task_count
 
 
 def tune(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
-    """Build patch validation-tuning jobs."""
+    """Build patch validation-tuning jobs as one SLURM array."""
+    count = task_count("patch")
+    throttle = config.get("tune_array_throttle", "50")
     return [
         Job(
-            _tune_cmd(args, config, "patch", index),
+            _tune_cmd(args, config, "patch"),
             "tune_patch",
-            "logs/tuning/tune_patch%j.out",
+            "logs/tuning/tune_patch_%A_%a.out",
             partition=config.get("tune_partition", "cpu-2h"),
+            array_spec=f"0-{count - 1}%{throttle}",
+            cpus_per_task=int(config.get("cpus_per_task", "4")),
+            time_limit=config.get("tune_time_limit"),
         )
-        for index in range(task_count("patch"))
     ]
 
 
 def tune_wsi(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
-    """Build WSI validation-tuning jobs."""
+    """Build WSI validation-tuning jobs as one SLURM array."""
+    count = task_count("wsi")
+    throttle = config.get("wsi_tune_array_throttle", "20")
     partition = config.get("wsi_partition", "gpu-2h")
     return [
         Job(
-            _tune_cmd(args, config, "wsi", index),
+            _tune_cmd(args, config, "wsi", gpu=True),
             "tune_wsi",
-            "logs/tuning/tune_wsi%j.out",
+            "logs/tuning/tune_wsi_%A_%a.out",
             partition=partition,
             gpus_per_node=1,
+            array_spec=f"0-{count - 1}%{throttle}",
+            cpus_per_task=int(config.get("cpus_per_task", "4")),
+            time_limit=config.get("wsi_time_limit"),
         )
-        for index in range(task_count("wsi"))
     ]
 
 
@@ -51,16 +59,15 @@ def _tune_cmd(
     args: argparse.Namespace,
     config: dict[str, str],
     benchmark: str,
-    array_index: int,
+    *,
+    gpu: bool = False,
 ) -> list[str]:
-    cmd = prefix(config, args) + [
+    return prefix(config, args, gpu=gpu) + [
         "-m",
         "tcga_ut_imbalanced.evaluation.tuning_run",
         f"--benchmark={benchmark}",
-        f"--array-task-id={array_index}",
         f"--config={args.config}",
         f"--constructed-dataset-dir={config.get('constructed_dataset_dir', '')}",
         f"--results-dir={config.get('results_dir', '')}",
         f"--feature-path={config.get('feature_path', '')}",
     ]
-    return cmd

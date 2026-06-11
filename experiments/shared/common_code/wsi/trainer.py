@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import cast
 
@@ -189,6 +190,8 @@ def _loader(
             shuffle=True,
             generator=generator,
             collate_fn=bag_collate,
+            num_workers=int(os.environ.get("DATALOADER_NUM_WORKERS", "2")),
+            pin_memory=torch.cuda.is_available(),
         )
     counts = np.bincount(labels)
     sample_weights = [
@@ -196,7 +199,12 @@ def _loader(
     ]
     sampler = WeightedRandomSampler(sample_weights, len(labels), True, generator)
     return DataLoader(
-        dataset, batch_size=batch_size, sampler=sampler, collate_fn=bag_collate
+        dataset,
+        batch_size=batch_size,
+        sampler=sampler,
+        collate_fn=bag_collate,
+        num_workers=int(os.environ.get("DATALOADER_NUM_WORKERS", "2")),
+        pin_memory=torch.cuda.is_available(),
     )
 
 

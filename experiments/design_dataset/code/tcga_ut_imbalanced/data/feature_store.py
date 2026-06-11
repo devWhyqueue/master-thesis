@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
@@ -19,6 +20,12 @@ DEFAULT_FEATURE_DIR = (
 )
 DEFAULT_SUFFIX_PATTERN = "_[0-9]+$"
 PATCHES_PER_CHUNK = 30
+
+
+@lru_cache(maxsize=512)
+def _ordered_patch_indices(patch_ids: tuple[str, ...]) -> dict[str, int]:
+    ordered = sorted(patch_ids, key=patch_sort_key)
+    return {patch: index for index, patch in enumerate(ordered)}
 
 
 class SlideFeatureStore:
@@ -51,8 +58,7 @@ class SlideFeatureStore:
 
     def patch_index(self, patch_ids: list[str], patch_id: str) -> int:
         """Return the row index for one patch after deterministic sorting."""
-        ordered = sorted(patch_ids, key=patch_sort_key)
-        return ordered.index(patch_id)
+        return _ordered_patch_indices(tuple(patch_ids))[patch_id]
 
     def load_patch_feature(
         self, slide_id: str, patch_ids: list[str], patch_id: str
@@ -62,6 +68,7 @@ class SlideFeatureStore:
         return load_feature_row(path, index)
 
 
+@lru_cache(maxsize=512)
 def load_slide_features(path: str) -> torch.Tensor:
     """Load a feature tensor and normalize to (n_instances, dim)."""
     tensor = torch.load(path, map_location="cpu")
@@ -71,7 +78,7 @@ def load_slide_features(path: str) -> torch.Tensor:
     if features.ndim == 1:
         return features.unsqueeze(0)
     if features.ndim > 2:
-        features = features.reshape(-1, features.shape[-1])
+        return features.reshape(-1, features.shape[-1])
     return features
 
 
@@ -216,6 +223,26 @@ def patch_id_for_row(row: pd.Series) -> str:
     return str(row["slide_id"])
 
 
+def feature_for_manifest_row(
+    row: pd.Series,
+    row_feature_cache: dict[tuple[str, int], torch.Tensor] | None,
+    feature_cache: dict[str, torch.Tensor] | None,
+) -> torch.Tensor:
+    """Resolve one manifest row to a feature vector."""
+    path = str(row["feature_path"])
+    index = row.get("feature_index")
+    if index is not None and pd.notna(index):
+        row_index = int(index)
+        if row_feature_cache is not None:
+            cached = row_feature_cache.get((path, row_index))
+            if cached is not None:
+                return cached
+        return load_feature_row(path, row_index)
+    if feature_cache is not None and path in feature_cache:
+        return feature_cache[path]
+    return load_feature_row(path)
+
+
 def load_feature_cache(path: str | None) -> dict[str, torch.Tensor] | None:
     """Load a precomputed feature cache keyed by feature path."""
     if path is None:
@@ -224,6 +251,26 @@ def load_feature_cache(path: str | None) -> dict[str, torch.Tensor] | None:
     feature_paths = [str(feature_path) for feature_path in payload["feature_paths"]]
     features = cast(torch.Tensor, payload["features"])
     return dict(zip(feature_paths, features, strict=True))
+
+
+def load_row_feature_cache(
+    path: str | None,
+) -> dict[tuple[str, int], torch.Tensor] | None:
+    """Load a row-level cache keyed by (feature_path, feature_index)."""
+    if path is None or not Path(path).is_file():
+        return None
+    payload = torch.load(path, map_location="cpu")
+    paths = payload.get("feature_paths")
+    indices = payload.get("feature_indices")
+    features = payload.get("features")
+    if paths is None or indices is None or features is None:
+        return None
+    stacked = cast(torch.Tensor, features)
+    pairs = zip(paths, indices, strict=True)
+    return {
+        (str(feature_path), int(feature_index)): stacked[row_index]
+        for row_index, (feature_path, feature_index) in enumerate(pairs)
+    }
 
 
 def _build_slide_chunk_paths(

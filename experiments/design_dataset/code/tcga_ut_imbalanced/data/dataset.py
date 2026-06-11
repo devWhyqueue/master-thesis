@@ -11,8 +11,10 @@ import torch
 from torch.utils.data import Dataset
 
 from tcga_ut_imbalanced.data.feature_store import (
+    feature_for_manifest_row,
     load_feature_cache,
     load_feature_row,
+    load_row_feature_cache,
     maybe_feature_store,
     patch_id_for_row,
     patch_row,
@@ -32,6 +34,7 @@ class TCGAUTDatasetImbalanced(Dataset):
         preload_features: bool = False,
         device: str | torch.device = "cpu",
         feature_cache_path: str | None = None,
+        split_name: str | None = None,
     ) -> None:
         super().__init__()
         self.dataset_path = dataset_path
@@ -41,7 +44,9 @@ class TCGAUTDatasetImbalanced(Dataset):
         self.preload_features = preload_features
         self.device = device
         self.feature_cache = load_feature_cache(feature_cache_path)
+        self.row_feature_cache = load_row_feature_cache(feature_cache_path)
         self.feature_store = maybe_feature_store(feature_path)
+        self.split_name = split_name
         self.dataset_original = self._load_dataset_structure()
         self.dataset = self._flatten_dataset()
         self.args = self._load_args()
@@ -110,6 +115,9 @@ class TCGAUTDatasetImbalanced(Dataset):
 
     def _load_dataset_structure(self) -> pd.DataFrame:
         dataset_original = pd.read_csv(self.dataset_path)
+        if self.split_name is not None and "split" in dataset_original.columns:
+            mask = dataset_original["split"] == self.split_name
+            dataset_original = dataset_original.loc[mask].copy()
         if "patch_ids" in dataset_original.columns and isinstance(
             dataset_original["patch_ids"].iloc[0], str
         ):
@@ -145,7 +153,12 @@ class TCGAUTDatasetImbalanced(Dataset):
     def _preload_features(self) -> pd.DataFrame:
         if "feature_path" in self.dataset.columns:
             dataset = self.dataset.copy()
-            dataset["features"] = dataset.apply(self._feature_from_row_columns, axis=1)
+            dataset["features"] = dataset.apply(
+                lambda row: feature_for_manifest_row(
+                    row, self.row_feature_cache, self.feature_cache
+                ),
+                axis=1,
+            )
             return dataset
         features = []
         class_names = list(dict.fromkeys(self.dataset["cancer_type"].to_list()))
@@ -180,7 +193,9 @@ class TCGAUTDatasetImbalanced(Dataset):
             ]
             return [
                 {
-                    "features": self._feature_from_row_columns(row),
+                    "features": feature_for_manifest_row(
+                        row, self.row_feature_cache, self.feature_cache
+                    ),
                     "patch_id": patch_id_for_row(row),
                     "slide_id": slide_id,
                 }
@@ -223,18 +238,11 @@ class TCGAUTDatasetImbalanced(Dataset):
         if "features" in row and row["features"] is not None:
             return cast(torch.Tensor, row["features"])
         if "feature_path" in row or "feature_index" in row:
-            return self._feature_from_row_columns(row)
+            return feature_for_manifest_row(
+                row, self.row_feature_cache, self.feature_cache
+            )
         features = self.load_features([str(row["slide_id"])], [str(row["cancer_type"])])
         feature = [
             item["features"] for item in features if item["patch_id"] == row["patch_id"]
         ][0]
         return cast(torch.Tensor, feature)
-
-    def _feature_from_row_columns(self, row: pd.Series) -> torch.Tensor:
-        path = str(row["feature_path"])
-        index = row.get("feature_index")
-        if index is not None and pd.notna(index):
-            return load_feature_row(path, int(index))
-        if self.feature_cache is not None and path in self.feature_cache:
-            return self.feature_cache[path]
-        return load_feature_row(path)

@@ -54,6 +54,19 @@ for order in "${ORDERS[@]}"; do
   done
 done
 
+echo "=== Phase 3b: patch feature cache (27 constructed splits) ==="
+for order in "${ORDERS[@]}"; do
+  for param in "${PARAMS[@]}"; do
+    for seed in "${SEEDS[@]}"; do
+      echo "patch-cache order=${order} param=${param} seed=${seed}"
+      ${PYTHON} patch-cache \
+        --parameter="${param}" \
+        --seed="${seed}" \
+        --class-order-name="${order}"
+    done
+  done
+done
+
 echo "=== Phase 4: validation tuning (patch + WSI) ==="
 ${PYTHON} tune
 ${PYTHON} tune-wsi

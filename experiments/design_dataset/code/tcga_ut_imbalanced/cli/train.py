@@ -46,8 +46,11 @@ def main() -> None:
 
 def _add_dataset_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dataset-structure-path", type=str, required=True)
+    parser.add_argument("--dataset-split", type=str, default=None)
     parser.add_argument("--validation-dataset-structure-path", type=str, default=None)
+    parser.add_argument("--validation-dataset-split", type=str, default=None)
     parser.add_argument("--test-dataset-structure-path", type=str, default=None)
+    parser.add_argument("--test-dataset-split", type=str, default=None)
     parser.add_argument("--feature-path", type=str, required=True)
     parser.add_argument("--feature-cache-path", type=str, default=None)
     parser.add_argument("--args-path", type=str, default=None)

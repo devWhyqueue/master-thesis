@@ -5,6 +5,7 @@ import os
 import time
 from typing import cast
 
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -29,12 +30,17 @@ def make_dataloader(
     shuffle: bool = False,
 ) -> DataLoader:
     """Create a standard torch dataloader."""
+    num_workers = int(os.environ.get("DATALOADER_NUM_WORKERS", "2"))
+    pin_memory = torch.cuda.is_available()
     return DataLoader(
         dataset,
         batch_size=batch_size,
         sampler=sampler,
         shuffle=shuffle,
         drop_last=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=num_workers > 0,
     )
 
 
