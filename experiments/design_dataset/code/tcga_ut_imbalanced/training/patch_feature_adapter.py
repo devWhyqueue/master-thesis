@@ -26,6 +26,7 @@ class PreloadedPatchFeatureDataset(Dataset):
             for feature in frame["features"].tolist()
         ]
         self.labels = torch.tensor(source.get_int_targets(), dtype=torch.long)
+        self.rows = frame[["cancer_type"]].reset_index(drop=True)
 
     def __len__(self) -> int:
         return len(self.features)
