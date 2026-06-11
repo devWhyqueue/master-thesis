@@ -61,12 +61,14 @@ def _train_batch(
 ) -> tuple[int, int]:
     optimizer.zero_grad()
     first_layer = cast(nn.Linear, model.model[0])
-    output = model(batch["features"].to(first_layer.weight.dtype)).squeeze()
-    loss = criterion(output, batch["target"])
+    output = model(batch["features"].to(first_layer.weight.dtype))
+    output = output.unsqueeze(0) if output.ndim == 1 else output
+    targets = batch["target"].to(output.device)
+    loss = criterion(output, targets)
     loss.backward()
     optimizer.step()
     predictions = torch.argmax(output, dim=-1).detach().cpu().numpy()
-    labels = batch["target"].detach().cpu().numpy()
+    labels = targets.detach().cpu().numpy()
     return correct + int(np.sum(predictions == labels)), seen + len(batch["target"])
 
 

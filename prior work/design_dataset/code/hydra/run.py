@@ -16,6 +16,15 @@ def _add_imbalanced_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--parameter", type=float, default=1.0)
 
 
+def _add_full_scale_args(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser("sample-full-scale")
+    parser.add_argument("--sweep", action="store_true")
+    parser.add_argument("--parameter", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--class-order-name", default="native_prevalence")
+    parser.add_argument("--class-order-file", default=None)
+
+
 def _add_train_args(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("train")
     parser.add_argument("model", choices=["mlp", "knn", "ncc"])
@@ -23,11 +32,42 @@ def _add_train_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--parameter", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--k", type=int, default=9)
+    parser.add_argument("--method", default="ce")
+    parser.add_argument("--constructed", action="store_true")
+    parser.add_argument("--class-order-name", default="native_prevalence")
+
+
+def _add_train_wsi_args(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser("train-wsi")
+    parser.add_argument("--sweep", action="store_true")
+    parser.add_argument("--parameter", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--max-bags-per-class", type=int, default=0)
+    parser.add_argument(
+        "--method",
+        default="all",
+        choices=[
+            "all",
+            "mil_ce",
+            "mil_weighted_ce",
+            "mil_balanced_sampler_ce",
+            "mil_focal",
+            "rankmix_mil",
+            "sc_mil",
+            "mde_mil",
+        ],
+    )
+    parser.add_argument("--class-order-name", default="native_prevalence")
 
 
 def _add_visualize_args(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("visualize")
     parser.add_argument("type", choices=["standard", "point-plot"])
+
+
+def _add_report_args(subparsers: argparse._SubParsersAction) -> None:
+    subparsers.add_parser("report")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -40,8 +80,11 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_balanced_args(subparsers)
     _add_imbalanced_args(subparsers)
+    _add_full_scale_args(subparsers)
     _add_train_args(subparsers)
+    _add_train_wsi_args(subparsers)
     _add_visualize_args(subparsers)
+    _add_report_args(subparsers)
     return parser
 
 

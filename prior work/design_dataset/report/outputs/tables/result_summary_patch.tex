@@ -1,0 +1,24 @@
+\begin{tabular}{llll}
+\toprule
+Method & Accuracy & Balanced accuracy & Macro F1\\
+\midrule
+balanced\_sampler (native\_prevalence, $\lambda=0.0$) & \num{0.875} $\pm$ \num{0.010} & \num{0.857} $\pm$ \num{0.010} & \num{0.832} $\pm$ \num{0.011}\\
+balanced\_sampler (native\_prevalence, $\lambda=1.0$) & \num{0.873} $\pm$ \num{0.016} & \num{0.852} $\pm$ \num{0.011} & \num{0.830} $\pm$ \num{0.016}\\
+balanced\_sampler (native\_prevalence, $\lambda=1.3$) & \num{0.875} $\pm$ \num{0.008} & \num{0.855} $\pm$ \num{0.006} & \num{0.834} $\pm$ \num{0.004}\\
+ce (native\_prevalence, $\lambda=0.0$) & \num{0.877} $\pm$ \num{0.012} & \num{0.857} $\pm$ \num{0.010} & \num{0.834} $\pm$ \num{0.015}\\
+ce (native\_prevalence, $\lambda=1.0$) & \num{0.879} $\pm$ \num{0.007} & \num{0.834} $\pm$ \num{0.002} & \num{0.828} $\pm$ \num{0.006}\\
+ce (native\_prevalence, $\lambda=1.3$) & \num{0.871} $\pm$ \num{0.010} & \num{0.814} $\pm$ \num{0.004} & \num{0.819} $\pm$ \num{0.005}\\
+ce\_soft\_f1 (native\_prevalence, $\lambda=0.0$) & \num{0.879} $\pm$ \num{0.010} & \num{0.860} $\pm$ \num{0.011} & \num{0.838} $\pm$ \num{0.013}\\
+ce\_soft\_f1 (native\_prevalence, $\lambda=1.0$) & \num{0.876} $\pm$ \num{0.014} & \num{0.853} $\pm$ \num{0.009} & \num{0.833} $\pm$ \num{0.015}\\
+ce\_soft\_f1 (native\_prevalence, $\lambda=1.3$) & \num{0.877} $\pm$ \num{0.007} & \num{0.854} $\pm$ \num{0.006} & \num{0.836} $\pm$ \num{0.003}\\
+ce\_soft\_mcc (native\_prevalence, $\lambda=0.0$) & \num{0.879} $\pm$ \num{0.009} & \num{0.860} $\pm$ \num{0.010} & \num{0.837} $\pm$ \num{0.012}\\
+ce\_soft\_mcc (native\_prevalence, $\lambda=1.0$) & \num{0.877} $\pm$ \num{0.013} & \num{0.854} $\pm$ \num{0.008} & \num{0.834} $\pm$ \num{0.013}\\
+ce\_soft\_mcc (native\_prevalence, $\lambda=1.3$) & \num{0.877} $\pm$ \num{0.007} & \num{0.854} $\pm$ \num{0.006} & \num{0.836} $\pm$ \num{0.003}\\
+focal (native\_prevalence, $\lambda=0.0$) & \num{0.875} $\pm$ \num{0.012} & \num{0.852} $\pm$ \num{0.009} & \num{0.834} $\pm$ \num{0.013}\\
+focal (native\_prevalence, $\lambda=1.0$) & \num{0.877} $\pm$ \num{0.007} & \num{0.832} $\pm$ \num{0.001} & \num{0.829} $\pm$ \num{0.002}\\
+focal (native\_prevalence, $\lambda=1.3$) & \num{0.870} $\pm$ \num{0.010} & \num{0.813} $\pm$ \num{0.006} & \num{0.819} $\pm$ \num{0.005}\\
+weighted\_ce (native\_prevalence, $\lambda=0.0$) & \num{0.877} $\pm$ \num{0.012} & \num{0.857} $\pm$ \num{0.010} & \num{0.834} $\pm$ \num{0.015}\\
+weighted\_ce (native\_prevalence, $\lambda=1.0$) & \num{0.877} $\pm$ \num{0.009} & \num{0.855} $\pm$ \num{0.008} & \num{0.832} $\pm$ \num{0.009}\\
+weighted\_ce (native\_prevalence, $\lambda=1.3$) & \num{0.874} $\pm$ \num{0.010} & \num{0.854} $\pm$ \num{0.004} & \num{0.832} $\pm$ \num{0.003}\\
+\bottomrule
+\end{tabular}

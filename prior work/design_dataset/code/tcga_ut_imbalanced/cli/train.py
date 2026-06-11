@@ -47,7 +47,9 @@ def main() -> None:
 def _add_dataset_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dataset-structure-path", type=str, required=True)
     parser.add_argument("--validation-dataset-structure-path", type=str, default=None)
+    parser.add_argument("--test-dataset-structure-path", type=str, default=None)
     parser.add_argument("--feature-path", type=str, required=True)
+    parser.add_argument("--feature-cache-path", type=str, default=None)
     parser.add_argument("--args-path", type=str, default=None)
     parser.add_argument("--preload-features", action="store_true")
 
@@ -62,9 +64,12 @@ def _add_model_args(parser: argparse.ArgumentParser) -> None:
 
 def _add_training_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--loss", default="cross_entropy", choices=["cross_entropy", "focal_loss"]
+        "--loss",
+        default="cross_entropy",
+        choices=["cross_entropy", "focal_loss", "ce_soft_f1", "ce_soft_mcc"],
     )
     parser.add_argument("--gamma", default=2.0, type=positive_float)
+    parser.add_argument("--metric-loss-weight", default=1.0, type=positive_float)
     parser.add_argument(
         "--alpha", default="uniform", choices=["uniform", "inverse_class_frequency"]
     )
@@ -73,10 +78,6 @@ def _add_training_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--n-epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--batch-balancing", action="store_true")
-    parser.add_argument(
-        "--training-method", default="single_example", choices=["single_example", "oko"]
-    )
-    parser.add_argument("--oko-k", type=positive_int, default=1)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--seed", type=int, default=0)
 

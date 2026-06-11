@@ -1,0 +1,244 @@
+import argparse
+import importlib
+import os
+import sys
+from pathlib import Path
+from typing import Any, cast
+
+import numpy as np
+import pandas as pd
+import torch
+from torch import nn
+
+from tcga_ut_imbalanced.training.constructed_wsi_data import (
+    ConstructedBagDataset,
+    OPTIONAL_ARGS,
+    write_json,
+)
+
+_DEFAULT_CLASS_IMBALANCE_ROOT = (
+    "/home/yannik.qu/master-thesis/experiments/class_imbalance"
+)
+_LOCAL_CLASS_IMBALANCE_ROOT = "/mnt/d/Git/master-thesis/experiments/class_imbalance"
+_class_imbalance_root = os.environ.get("CLASS_IMBALANCE_ROOT")
+if _class_imbalance_root is None and Path(_LOCAL_CLASS_IMBALANCE_ROOT).exists():
+    _class_imbalance_root = _LOCAL_CLASS_IMBALANCE_ROOT
+sys.path.insert(0, _class_imbalance_root or _DEFAULT_CLASS_IMBALANCE_ROOT)
+
+_mil_trainer = importlib.import_module("scripts.modeling.mil.bag.trainer")
+_rankmix_teacher = importlib.import_module("scripts.modeling.mil.rankmix_teacher")
+_mil_eval = importlib.import_module("scripts.modeling.training.eval")
+_training_support = importlib.import_module("scripts.modeling.training.support")
+
+METHODS = (
+    "mil_ce",
+    "mil_weighted_ce",
+    "mil_balanced_sampler_ce",
+    "mil_focal",
+    "rankmix_mil",
+    "sc_mil",
+    "mde_mil",
+)
+
+
+def get_args() -> argparse.Namespace:
+    """Parse constructed WSI-bag training arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--manifest-path", required=True)
+    parser.add_argument("--results-save-path", required=True)
+    parser.add_argument("--method", required=True, choices=METHODS)
+    parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--class-order-name", required=True)
+    parser.add_argument("--parameter", type=float, required=True)
+    parser.add_argument("--device", default="auto")
+    for name, value_type, default in OPTIONAL_ARGS:
+        parser.add_argument(name, type=value_type, default=default)
+    return parser.parse_args()
+
+
+def main() -> None:
+    """Train one constructed WSI-bag method."""
+    args = get_args()
+    output_dir = Path(args.results_save_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame = _load_manifest(args.manifest_path)
+    class_names = sorted(str(name) for name in frame["cancer_type"].unique().tolist())
+    results, diagnostics = _train_method(
+        args.method,
+        frame,
+        class_names,
+        {"wsi_training": _training_config(args)},
+        args.seed,
+        output_dir,
+    )
+    _write_outputs(output_dir, args, class_names, results, diagnostics)
+
+
+def _load_manifest(path: str) -> pd.DataFrame:
+    frame = pd.read_csv(path)
+    required = {"split", "feature_path", "cancer_type"}
+    if not required.issubset(frame.columns):
+        raise ValueError(f"Manifest requires columns {sorted(required)}.")
+    frame = frame.copy()
+    frame["split"] = frame["split"].replace({"validation": "val"})
+    return frame
+
+
+def _training_config(args: argparse.Namespace) -> dict[str, object]:
+    return {
+        "device": args.device,
+        "epochs": args.epochs,
+        "bag_batch_size": args.bag_batch_size,
+        "learning_rate": args.learning_rate,
+        "weight_decay": args.weight_decay,
+        "hidden_dim": args.hidden_dim,
+        "dropout": args.dropout,
+        "focal_gamma": args.focal_gamma,
+        "max_instances_per_bag": args.max_instances_per_bag,
+        "rankmix_teacher_epochs": args.rankmix_teacher_epochs,
+        "rankmix_alpha": args.rankmix_alpha,
+        "sc_mil_temperature": args.sc_mil_temperature,
+        "mde_mil_consistency_weight": args.mde_mil_consistency_weight,
+        "sampler_power": args.sampler_power,
+        "weight_power": args.weight_power,
+        "max_bags_per_class": args.max_bags_per_class or None,
+    }
+
+
+def _train_method(
+    method: str,
+    frame: pd.DataFrame,
+    class_names: list[str],
+    config: dict[str, Any],
+    seed: int,
+    result_dir: Path,
+) -> tuple[dict[str, dict[str, object]], dict[str, int]]:
+    torch.manual_seed(seed)
+    training = config["wsi_training"]
+    device = _training_support._resolve_device(str(training["device"]))
+    train_dataset, val_dataset, test_dataset = _split_datasets(
+        frame,
+        class_names,
+        cast(int, training["max_instances_per_bag"]),
+        cast(int | None, training["max_bags_per_class"]),
+    )
+    labels = cast(np.ndarray, train_dataset.labels.cpu().numpy())
+    build_model = (
+        _mil_trainer._build_mde_model
+        if method == "mde_mil"
+        else _mil_trainer._build_model
+    )
+    model = build_model(train_dataset, class_names, training, device)
+    optimizer = _optimizer(model, training)
+    teacher = None
+    if method == "rankmix_mil":
+        teacher = _rankmix_teacher.load_rankmix_teacher(
+            result_dir,
+            _mil_trainer._build_model,
+            train_dataset,
+            class_names,
+            training,
+            device,
+            seed,
+        )
+        if teacher is None:
+            teacher = _rankmix_teacher.train_rankmix_teacher(
+                model,
+                train_dataset,
+                labels,
+                training,
+                optimizer,
+                device,
+                seed,
+                result_dir,
+                _mil_trainer._loader,
+            )
+        model = _mil_trainer._build_model(train_dataset, class_names, training, device)
+        optimizer = _optimizer(model, training)
+    diagnostics = _mil_trainer._run_training(
+        method,
+        cast(nn.Module, model),
+        train_dataset,
+        labels,
+        training,
+        optimizer,
+        device,
+        seed,
+        result_dir,
+        teacher,
+    )
+    results = _mil_eval._save_and_evaluate_bags(
+        model, val_dataset, test_dataset, class_names, device, result_dir
+    )
+    return results, diagnostics
+
+
+def _optimizer(model: nn.Module, training: dict[str, object]) -> torch.optim.Optimizer:
+    return torch.optim.AdamW(
+        model.parameters(),
+        lr=float(cast(float, training["learning_rate"])),
+        weight_decay=float(cast(float, training["weight_decay"])),
+    )
+
+
+def _split_datasets(
+    frame: pd.DataFrame,
+    class_names: list[str],
+    max_instances: int | None,
+    max_bags_per_class: int | None,
+) -> tuple[ConstructedBagDataset, ConstructedBagDataset, ConstructedBagDataset]:
+    class_to_idx = {name: idx for idx, name in enumerate(class_names)}
+    return tuple(
+        ConstructedBagDataset(
+            cast(pd.DataFrame, frame[frame["split"] == split]),
+            class_to_idx,
+            max_instances,
+            max_bags_per_class,
+        )
+        for split in ("train", "val", "test")
+    )  # type: ignore[return-value]
+
+
+def _write_outputs(
+    output_dir: Path,
+    args: argparse.Namespace,
+    class_names: list[str],
+    results: dict[str, dict[str, object]],
+    diagnostics: dict[str, int],
+) -> None:
+    write_json(output_dir / "validation_results.json", results["val"])
+    write_json(output_dir / "test_results.json", results["test"])
+    write_json(output_dir / "args.json", _args_payload(args, class_names, diagnostics))
+    write_json(output_dir / "run.json", _run_payload(args, results, diagnostics))
+
+
+def _args_payload(
+    args: argparse.Namespace, class_names: list[str], diagnostics: dict[str, int]
+) -> dict[str, object]:
+    return {
+        **vars(args),
+        "class_names": class_names,
+        "diagnostics": diagnostics,
+        "benchmark": "wsi_bag",
+    }
+
+
+def _run_payload(
+    args: argparse.Namespace,
+    results: dict[str, dict[str, object]],
+    diagnostics: dict[str, int],
+) -> dict[str, object]:
+    return {
+        "benchmark": "wsi_bag",
+        "method": args.method,
+        "seed": args.seed,
+        "smoke": False,
+        "tuning_params": {},
+        "model_path": "model.pt",
+        "diagnostics": diagnostics,
+        "splits": results,
+    }
+
+
+if __name__ == "__main__":
+    main()

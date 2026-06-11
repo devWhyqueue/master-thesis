@@ -31,8 +31,10 @@ class _TrainContext:
     device: torch.device
     train_ds: TCGAUTDatasetImbalanced
     val_ds: TCGAUTDatasetImbalanced | None
+    test_ds: TCGAUTDatasetImbalanced | None
     train_loader: DataLoader
     val_loader: DataLoader | None
+    test_loader: DataLoader | None
 
 
 def run_training(args: argparse.Namespace) -> None:
@@ -41,8 +43,8 @@ def run_training(args: argparse.Namespace) -> None:
     model = _fit_model(args, context)
     logger.info("Finished model training")
     base_path = _base_path(args)
-    result = _validate(args, context, model, base_path)
-    _save_outputs(args, model, result, base_path)
+    results = _evaluate(args, context, model, base_path)
+    _save_outputs(args, model, results, base_path)
     logger.info("Done.")
 
 
@@ -65,6 +67,11 @@ def _build_context(args: argparse.Namespace) -> _TrainContext:
         if args.validation_dataset_structure_path
         else None
     )
+    test_ds = (
+        _dataset(args.test_dataset_structure_path, args, device)
+        if args.test_dataset_structure_path
+        else None
+    )
     train_loader = make_dataloader(
         train_ds, args.batch_size, _sampler(args, train_ds), not args.batch_balancing
     )
@@ -73,14 +80,27 @@ def _build_context(args: argparse.Namespace) -> _TrainContext:
         if val_ds is not None
         else None
     )
-    return _TrainContext(device, train_ds, val_ds, train_loader, val_loader)
+    test_loader = (
+        make_dataloader(test_ds, len(test_ds), shuffle=False)
+        if test_ds is not None
+        else None
+    )
+    return _TrainContext(
+        device, train_ds, val_ds, test_ds, train_loader, val_loader, test_loader
+    )
 
 
 def _dataset(
     path: str, args: argparse.Namespace, device: torch.device
 ) -> TCGAUTDatasetImbalanced:
     return TCGAUTDatasetImbalanced(
-        path, args.feature_path, None, args.args_path, args.preload_features, device
+        path,
+        args.feature_path,
+        None,
+        args.args_path,
+        args.preload_features,
+        device,
+        args.feature_cache_path,
     )
 
 
@@ -141,40 +161,67 @@ def _base_path(args: argparse.Namespace) -> str:
     )
 
 
-def _validate(
+def _evaluate(
     args: argparse.Namespace,
     context: _TrainContext,
     model: nn.Module | SKLearnModel,
     base_path: str,
-) -> dict[str, object] | None:
-    if context.val_ds is None or context.val_loader is None:
-        return None
-    class_order = validation_class_order(args, context.train_ds, context.val_ds)
-    result = test_model(
-        model, context.val_loader, model_type=args.model, class_order=class_order
-    )
+) -> dict[str, dict[str, object]]:
+    results = {}
+    for split, dataset, loader in _evaluation_splits(context):
+        result = _evaluate_split(args, context.train_ds, dataset, loader, model)
+        _log_result(split, result)
+        if split == "validation" and args.visualize:
+            class_order = validation_class_order(args, context.train_ds, dataset)
+            save_validation_plot(base_path, dataset, class_order, result)
+        results[split] = result
+    return results
+
+
+def _evaluation_splits(
+    context: _TrainContext,
+) -> list[tuple[str, TCGAUTDatasetImbalanced, DataLoader]]:
+    splits = []
+    if context.val_ds is not None and context.val_loader is not None:
+        splits.append(("validation", context.val_ds, context.val_loader))
+    if context.test_ds is not None and context.test_loader is not None:
+        splits.append(("test", context.test_ds, context.test_loader))
+    return splits
+
+
+def _evaluate_split(
+    args: argparse.Namespace,
+    train_ds: TCGAUTDatasetImbalanced,
+    dataset: TCGAUTDatasetImbalanced,
+    loader: DataLoader,
+    model: nn.Module | SKLearnModel,
+) -> dict[str, object]:
+    class_order = validation_class_order(args, train_ds, dataset)
+    return test_model(model, loader, model_type=args.model, class_order=class_order)
+
+
+def _log_result(split: str, result: dict[str, object]) -> None:
     logger.info(
-        "Validation accuracy=%s, balanced accuracy=%s",
+        "%s accuracy=%s, balanced accuracy=%s, macro F1=%s",
+        split.capitalize(),
         result["accuracy"],
         result["balanced_accuracy"],
+        result["macro_f1"],
     )
-    if args.visualize:
-        save_validation_plot(base_path, context.val_ds, class_order, result)
-    return result
 
 
 def _save_outputs(
     args: argparse.Namespace,
     model: nn.Module | SKLearnModel,
-    result: dict[str, object] | None,
+    results: dict[str, dict[str, object]],
     base_path: str,
 ) -> None:
     logger.info("Saving...")
     os.makedirs(base_path, exist_ok=True)
     _save_model(args, model, base_path)
-    if result is not None:
+    for split, result in results.items():
         _save_json(
-            os.path.join(base_path, "validation_results.json"), _json_ready(result)
+            os.path.join(base_path, f"{split}_results.json"), _json_ready(result)
         )
     _save_json(os.path.join(base_path, "args.json"), vars(args))
 

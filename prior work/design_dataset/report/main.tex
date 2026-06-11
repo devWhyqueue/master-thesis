@@ -1,0 +1,228 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[authoryear,round]{natbib}
+\usepackage{siunitx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\sisetup{group-separator={,}, group-minimum-digits=4}
+
+\graphicspath{{outputs/figures/}{../../experiments/class_imbalance/outputs/figures/}}
+
+\title{Controlled Class-Imbalance Construction for TCGA-UT}
+\author{Yannik Queisler}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Class imbalance in computational pathology is not only a question of how many examples a class contributes. A class may perform poorly because it is rare, because its frozen foundation-model features overlap with other classes, or because both effects coincide. The companion TCGA-UT imbalance benchmark established the dataset, the mitigation taxonomy, and patch-level and WSI-bag evaluations under the native TCGA-UT long tail. This report defines a controlled counterpart: artificial full-scale TCGA-UT training distributions that keep all 32 cancer types, preserve fixed validation and test splits, and vary only the training support assigned to each class. Power-law training distributions are generated under native-prevalence, easy-to-difficult, and difficult-to-easy class orders, using frozen Virchow2 patch features and WSI-bag features with the same 30-instance evidence budget as the companion benchmark. The design separates imbalance severity from the identity of the classes assigned to the head and tail of the training distribution. Discrimination and calibration are evaluated for patch-feature and WSI-bag mitigation methods in their native regimes, including post-hoc temperature scaling fitted on validation predictions.
+\end{abstract}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\clearpage
+
+\section{Introduction}
+The companion TCGA-UT imbalance benchmark compared class-imbalance mitigation methods in their native input regimes: labeled patch-feature classification and weakly supervised WSI-bag classification. It also showed that class frequency alone is an incomplete explanation for poor classwise performance. Some low-support cancer types remain separable under a frozen pathology foundation model, whereas other classes are difficult even when their support is not the smallest. This report turns that observation into an experimental design question: how should mitigation methods be interpreted when class frequency and inherent class difficulty can be varied deliberately?
+
+TCGA-UT is a useful test bed for this question because it provides both slide labels and patch-level evidence derived from diagnostic whole-slide images in The Cancer Genome Atlas \citep{tomczak2015reviewThe,komura2022universalEncoding}. The native dataset already has a long-tailed slide distribution over 32 cancer types. Native imbalance is realistic, but it entangles prevalence with many other factors: tumor morphology, tissue diversity, slide acquisition, and the representation geometry induced by the frozen encoder. A controlled construction complements the native benchmark by imposing known training-support profiles while holding validation and test data fixed.
+
+The goal is not to introduce a new mitigation method. Instead, the report evaluates representative methods from the companion taxonomy under constructed training distributions. Patch-level methods include cross-entropy, class weighting, balanced sampling, focal loss, and Scholz-style metric losses \citep{scholz2024imbalanceAware}. WSI-bag methods include MIL cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
+
+\section{Dataset Construction}
+\label{sec:dataset-construction}
+The construction starts from the same TCGA-UT case-disjoint split protocol as the companion benchmark. For each seed, the validation and test splits are kept fixed, and artificial imbalance is applied only to the training split. The split assignment is patient-disjoint: all slides and feature rows associated with one TCGA participant remain in exactly one of train, validation, or test. This isolates the effect of training support: model selection and held-out evaluation remain comparable across imbalance parameters and mitigation methods without patient leakage.
+
+\subsection{Full-Scale Training Pool}
+All 32 TCGA-UT cancer types are retained. Let $C=32$ and let $\mathcal{D}_{\mathrm{train}}$ denote the seed-specific training slide pool. For class $c$, let $a_c$ be the number of available training slides before artificial resampling. The constructed training split must satisfy three constraints:
+\begin{equation}
+  1 \le n_c \le a_c,\qquad
+  \sum_{c=1}^{C} n_c = |\mathcal{D}_{\mathrm{train}}|,\qquad
+  c \in \{1,\ldots,C\}.
+  \label{eq:full-scale-constraints}
+\end{equation}
+\noindent The first constraint keeps every class represented and prevents oversampling beyond available slides. The second preserves the full training split size. The third makes the benchmark a 32-class TCGA-UT study throughout.
+
+After slide selection, the input evidence is capped in the same way as in the companion benchmark. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}. The cap prevents slides with more extracted tumor patches from dominating the training objective while keeping the input budget aligned across regimes.
+
+\subsection{Power-Law Training Support}
+For an ordered class list $(c_1,\ldots,c_C)$, the intended share for rank $i$ under imbalance parameter $\lambda$ is
+\begin{equation}
+  p_i(\lambda) =
+  \frac{i^{-\lambda}}{\sum_{j=1}^{C} j^{-\lambda}}.
+  \label{eq:power-law}
+\end{equation}
+\noindent When $\lambda=0$, the intended distribution is uniform over ranks. As $\lambda$ increases, early-ranked classes receive more training support and late-ranked classes receive less. Raw targets $|\mathcal{D}_{\mathrm{train}}|p_i(\lambda)$ are converted to integer counts by flooring and assigning residual slides by largest fractional remainder.
+
+The target distribution is then projected onto the feasible set in Equation~\eqref{eq:full-scale-constraints}. Each class receives one guaranteed slide. Remaining slides are allocated according to Equation~\eqref{eq:power-law}; classes whose requested support exceeds their available training support are capped, and the unused mass is redistributed over the uncapped classes using the same power-law ranks. This cap-and-redistribute procedure keeps the constructed split full-scale without dropping any cancer type.
+
+\subsection{Class Order}
+\label{sec:class-orders}
+The same imbalance severity can have different consequences depending on which classes become frequent. This report therefore uses three class-order regimes. In the \emph{native-prevalence order}, classes are ranked by their TCGA-UT slide support, so the constructed head and tail follow the realistic direction of the native TCGA-UT long tail. In the \emph{easy-to-difficult order}, classes are ranked by decreasing full-support baseline recall from the companion benchmark, averaged across the patch-feature CE and WSI-bag MIL-CE baselines. In the \emph{difficult-to-easy order}, that ranking is reversed. The difficulty orders deliberately couple support with inherent class separability in opposite directions: the first assigns more support to classes that were already easier under balanced/full-support training, whereas the second assigns more support to classes that were difficult despite the frozen Virchow2 representation.
+
+The construction therefore separates support magnitude from the held-out evaluation distribution while also varying the semantic identity of head and tail classes. Frequency is imposed by $\lambda$ and rank; validation and test cases are unchanged. The companion report's class-difficulty analysis remains the interpretive background: if a class performs poorly when it is assigned high training support, scarcity is not the only plausible explanation.
+
+\section{Methods}
+\label{sec:methods}
+The method taxonomy follows the companion benchmark, but this report uses it to study controlled training distributions rather than only the native TCGA-UT distribution. Cross-entropy is the no-mitigation reference. Data-level methods change minibatch exposure through balanced sampling or feature-space bag augmentation. Algorithm-level methods change the per-example loss through class weighting, focal loss, metric-derived objectives, or prototype-affinity objectives. WSI-specific methods change how slide bags are represented or mixed.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}p{0.12\linewidth}p{0.20\linewidth}p{0.30\linewidth}X@{}}
+    \toprule
+    Regime & Family & Methods & Controlled question\\
+    \midrule
+    Patch & Baseline and losses & CE, weighted CE, focal loss & Frequency weighting and hard-example emphasis.\\
+    Patch & Metric losses & CE + soft F1, CE + soft MCC & Macro-metric losses with balanced minibatch exposure.\\
+    WSI bag & Baseline and losses & MIL CE, weighted CE, focal loss & Slide-level analogues of standard losses.\\
+    WSI bag & MIL-specific & Balanced sampling, RankMix, SC-MIL, MDE-MIL & Bag-level sampling, augmentation, contrastive structure, and expert training.\\
+    \bottomrule
+  \end{tabularx}
+  \caption{Method groups evaluated under constructed TCGA-UT training distributions. Patch and WSI-bag methods are compared only within their own input regime.}
+  \label{tab:method-groups}
+\end{table}
+
+Let $y$ be the class label, $\mathbf{z}\in\mathbb{R}^C$ the logits, and $p_y$ the softmax probability of the true class. Cross-entropy optimizes $-\log p_y$. Weighted cross-entropy multiplies this term by a normalized inverse-frequency weight. Focal loss uses
+\begin{equation}
+  \mathcal{L}_{\mathrm{focal}}(\mathbf{z},y)
+  = -(1-p_y)^\gamma \log p_y,
+  \label{eq:focal}
+\end{equation}
+\noindent so confidently classified examples contribute less to the gradient. The soft-F1 and soft-MCC variants add differentiable approximations of macro evaluation metrics to CE, following the imbalance-aware medical-image objectives of \citet{scholz2024imbalanceAware}. RankMix, SC-MIL, and MDE-MIL are retained as WSI-bag methods because their mechanisms operate on bags rather than isolated patch embeddings \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}.
+
+\section{Evaluation Protocol}
+\label{sec:evaluation}
+Each constructed split is indexed by seed and imbalance parameter $\lambda$. The main reporting points are $\lambda=0.0$, $\lambda=1.0$, and $\lambda=1.3$. Methods use the validation-selected hyperparameters from the companion benchmark and are evaluated on the fixed test split. Macro F1 is the primary discrimination metric because it weights cancer types equally. Balanced accuracy and accuracy are reported as complementary discrimination metrics. Calibration is summarized with negative log-likelihood, multiclass Brier score, and expected calibration error. For each trained model, a scalar temperature is fitted on the validation probabilities and applied to the corresponding test probabilities, so raw and temperature-scaled calibration can be compared without changing discrimination metrics.
+
+The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the case-disjoint splits, frozen Virchow2 representation family, and 30-instance evidence budget, but they differ in prediction unit and aggregation mechanism.
+
+\section{Results}
+\label{sec:results}
+The result analysis asks how methods behave as the native-prevalence support profile is strengthened. Table~\ref{tab:constructed-split-summary} and Figure~\ref{fig:constructed-support} show the imposed support profile. Tables~\ref{tab:patch-results} and~\ref{tab:wsi-results} then compare mitigation methods within the patch-feature and WSI-bag regimes.
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/constructed_split_summary.tex}{%
+    \input{outputs/tables/constructed_split_summary.tex}%
+  }{%
+    \begin{tabular}{llll}
+      \toprule
+      Order & $\lambda$ & Training slides & Minimum class support\\
+      \midrule
+      \multicolumn{4}{c}{Generated split summary unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{Constructed training-support summaries by class-order regime and imbalance severity.}
+  \label{tab:constructed-split-summary}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \IfFileExists{outputs/figures/constructed_support_by_rank.png}{%
+    \includegraphics[width=0.86\linewidth]{constructed_support_by_rank.png}%
+  }{%
+    \fbox{\parbox{0.80\linewidth}{\centering Constructed support figure unavailable.}}%
+  }
+  \caption{Constructed training support by class rank for the main imbalance settings.}
+  \label{fig:constructed-support}
+\end{figure}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/result_summary_patch.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/result_summary_patch.tex}}%
+  }{%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & Accuracy & Balanced accuracy & Macro F1\\
+      \midrule
+      \multicolumn{4}{c}{Patch result table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{Patch-feature test results for validation-selected configurations under constructed training distributions.}
+  \label{tab:patch-results}
+\end{table}
+
+At the patch-feature level, the constructed imbalance mainly affects balanced accuracy rather than overall accuracy. Plain CE remains accurate under all three settings, but its balanced accuracy falls from \num{0.857} at $\lambda=0.0$ to \num{0.814} at $\lambda=1.3$, and macro F1 falls from \num{0.834} to \num{0.819}. Focal loss follows nearly the same pattern, indicating that hard-example emphasis alone does not correct the constructed support skew in this frozen-feature setting. In contrast, class weighting, balanced sampling, and CE combined with soft-F1 or soft-MCC keep balanced accuracy near \num{0.854}--\num{0.855} at $\lambda=1.3$. The metric-loss variants give the highest patch macro F1 at the strongest reported imbalance (\num{0.836}), but the differences between the successful frequency-aware patch methods are small.
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/result_summary_wsi_bag.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/result_summary_wsi_bag.tex}}%
+  }{%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & Accuracy & Balanced accuracy & Macro F1\\
+      \midrule
+      \multicolumn{4}{c}{WSI-bag result table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{WSI-bag test results for validation-selected configurations under constructed training distributions.}
+  \label{tab:wsi-results}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/result_calibration_patch.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_patch.tex}}%
+  }{%
+    \begin{tabular}{lccccccc}
+      \toprule
+      Method & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
+      \midrule
+      \multicolumn{8}{c}{Patch calibration table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{Patch-feature calibration before and after validation-fitted temperature scaling.}
+  \label{tab:patch-calibration}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/result_calibration_wsi_bag.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_wsi_bag.tex}}%
+  }{%
+    \begin{tabular}{lccccccc}
+      \toprule
+      Method & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
+      \midrule
+      \multicolumn{8}{c}{WSI-bag calibration table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{WSI-bag calibration before and after validation-fitted temperature scaling.}
+  \label{tab:wsi-calibration}
+\end{table}
+
+The WSI-bag regime shows a stronger separation between method families. MIL CE declines with increasing imbalance, from \num{0.823} macro F1 at $\lambda=0.0$ to \num{0.802} at $\lambda=1.3$. Weighted MIL improves over CE at $\lambda=0.0$ and $\lambda=1.0$, but it also declines at $\lambda=1.3$. Balanced sampling and focal MIL are comparatively stable at the strongest imbalance, but neither dominates the baseline across all severities. The strongest WSI-bag method is MDE-MIL: it reaches the highest macro F1 at every reported $\lambda$ (\num{0.859}, \num{0.858}, and \num{0.842}) and also the highest balanced accuracy at $\lambda=0.0$. RankMix is the closest competitor, with balanced accuracy \num{0.866} at $\lambda=0.0$ and \num{0.844} at $\lambda=1.3$. These results mirror the companion benchmark's conclusion that WSI-specific mechanisms can matter beyond simple class reweighting, because the bag-level task includes instance aggregation as well as class-frequency imbalance.
+
+\section{Discussion}
+\label{sec:discussion}
+The controlled construction gives frequency a known experimental role. Under native-prevalence ordering, increasing $\lambda$ strengthens the same head-to-tail direction present in TCGA-UT while preserving the validation and test distributions. The CE baselines in both regimes lose balanced performance as $\lambda$ increases, showing that the constructed support profile is strong enough to change class-balanced discrimination even though the frozen Virchow2 features remain informative.
+
+Patch-feature mitigation behaves mostly like a correction of class exposure or loss contribution. At $\lambda=1.3$, class weighting, balanced sampling, and the two CE-plus-metric objectives recover roughly four balanced-accuracy points relative to CE, while focal loss remains close to CE. This suggests that the main patch-level failure mode under constructed prevalence skew is not simply an abundance of easy examples, but the unequal contribution of class supports to the optimization objective. The successful patch methods do not create large separations from each other, which is consistent with the companion report's observation that a strong frozen encoder compresses many patch-level method differences.
+
+WSI-bag mitigation does not reduce to the same pattern. MDE-MIL and RankMix remain ahead of plain MIL CE under constructed imbalance, whereas balanced sampling and focal MIL provide smaller and less uniform gains. This points to an aggregation-specific component of the imbalance problem: slide-level prediction depends on which feature instances are emphasized inside each bag, not only on how often each class appears in minibatches. MDE-MIL's advantage across all reported $\lambda$ values suggests that coupling distribution-specific experts is useful when the training distribution is deliberately skewed, while RankMix remains competitive by augmenting informative bag subsequences.
+
+These findings should still be interpreted within the native-prevalence construction reported here. The companion benchmark showed that class frequency is not the whole story; the present experiment shows that even when frequency is controlled directly, the best mitigation mechanism depends on prediction unit. Patch classifiers benefit from straightforward frequency-aware objectives, whereas WSI-bag classifiers benefit more from methods that alter bag representation or bag-level training dynamics.
+
+\section{Conclusion}
+This report defines a full-scale controlled TCGA-UT imbalance benchmark that keeps all 32 cancer types, preserves patient-disjoint validation and test splits, and varies only the training support profile. Under native-prevalence ordering, increasing imbalance lowers the balanced performance of CE baselines in both patch-feature and WSI-bag regimes. Patch-level class weighting, balanced sampling, and CE plus soft-F1 or soft-MCC largely recover this loss, while focal loss does not. At slide level, MDE-MIL and RankMix are the strongest methods, indicating that WSI-bag imbalance mitigation must account for aggregation and bag composition rather than only class frequency. The resulting analyses connect directly to the companion native long-tail benchmark while asking a more controlled question: when mitigation helps, is it correcting scarcity, changing the aggregation problem, or redistributing performance across the class spectrum?
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

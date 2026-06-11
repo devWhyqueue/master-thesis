@@ -22,6 +22,7 @@ class TCGAUTDatasetImbalanced(Dataset):
         args_path: str | None = None,
         preload_features: bool = False,
         device: str | torch.device = "cpu",
+        feature_cache_path: str | None = None,
     ) -> None:
         super().__init__()
         self.dataset_path = dataset_path
@@ -30,6 +31,7 @@ class TCGAUTDatasetImbalanced(Dataset):
         self.args_path = args_path
         self.preload_features = preload_features
         self.device = device
+        self.feature_cache = _load_feature_cache(feature_cache_path)
         self.dataset_original = self._load_dataset_structure()
         self.dataset = self._flatten_dataset()
         self.args = self._load_args()
@@ -98,7 +100,9 @@ class TCGAUTDatasetImbalanced(Dataset):
 
     def _load_dataset_structure(self) -> pd.DataFrame:
         dataset_original = pd.read_csv(self.dataset_path)
-        if isinstance(dataset_original["patch_ids"].iloc[0], str):
+        if "patch_ids" in dataset_original.columns and isinstance(
+            dataset_original["patch_ids"].iloc[0], str
+        ):
             dataset_original["patch_ids"] = dataset_original["patch_ids"].apply(
                 ast.literal_eval
             )
@@ -108,6 +112,8 @@ class TCGAUTDatasetImbalanced(Dataset):
         return dataset_original
 
     def _flatten_dataset(self) -> pd.DataFrame:
+        if "patch_ids" not in self.dataset_original.columns:
+            return _row_level_dataset(self.dataset_original)
         rows = []
         for _, row in self.dataset_original.iterrows():
             for patch_id in cast(Sequence[str], row["patch_ids"]):
@@ -127,6 +133,10 @@ class TCGAUTDatasetImbalanced(Dataset):
             return json.load(file)
 
     def _preload_features(self) -> pd.DataFrame:
+        if "feature_path" in self.dataset.columns:
+            dataset = self.dataset.copy()
+            dataset["features"] = dataset["feature_path"].apply(self._cached_feature)
+            return dataset
         features = []
         class_names = list(dict.fromkeys(self.dataset["cancer_type"].to_list()))
         for class_name in class_names:
@@ -153,6 +163,19 @@ class TCGAUTDatasetImbalanced(Dataset):
     def _load_slide_features(
         self, slide_id: str, target: str
     ) -> list[dict[str, object]]:
+        if "feature_path" in self.dataset_original.columns:
+            rows = self.dataset_original[
+                (self.dataset_original["slide_id"] == slide_id)
+                & (self.dataset_original["cancer_type"] == target)
+            ]
+            return [
+                {
+                    "features": _load_feature_tensor(str(row["feature_path"])),
+                    "patch_id": _patch_id_for_row(row),
+                    "slide_id": slide_id,
+                }
+                for _, row in rows.iterrows()
+            ]
         tensor = torch.load(os.path.join(self.feature_path, target, f"{slide_id}.pt"))
         patch_ids = self._patch_ids_for_slide(slide_id)
         indices = self._feature_indices(target, slide_id, patch_ids)
@@ -175,12 +198,52 @@ class TCGAUTDatasetImbalanced(Dataset):
         return [str(patch_id) for patch_id in patch_ids]
 
     def _feature_for_row(self, row: pd.Series) -> torch.Tensor:
+        if "feature_path" in row:
+            return self._cached_feature(str(row["feature_path"]))
         features = self.load_features([str(row["slide_id"])], [str(row["cancer_type"])])
         feature = [
             item["features"] for item in features if item["patch_id"] == row["patch_id"]
         ][0]
         return cast(torch.Tensor, feature)
 
+    def _cached_feature(self, path: str) -> torch.Tensor:
+        if self.feature_cache is None:
+            return _load_feature_tensor(path)
+        return self.feature_cache[path]
+
 
 def _patch_row(cancer_type: str, slide_id: str, patch_id: str) -> dict[str, str]:
     return {"cancer_type": cancer_type, "slide_id": slide_id, "patch_id": patch_id}
+
+
+def _row_level_dataset(frame: pd.DataFrame) -> pd.DataFrame:
+    dataset = frame.copy()
+    if "patch_id" not in dataset.columns:
+        dataset["patch_id"] = dataset.apply(_patch_id_for_row, axis=1)
+    return cast(pd.DataFrame, dataset)
+
+
+def _patch_id_for_row(row: pd.Series) -> str:
+    for column in ["patch_id", "feature_id", "image_path", "feature_path"]:
+        value = row.get(column)
+        if value is not None and pd.notna(value):
+            return os.path.splitext(os.path.basename(str(row[column])))[0]
+    return str(row["slide_id"])
+
+
+def _load_feature_tensor(path: str) -> torch.Tensor:
+    feature = torch.load(path, map_location="cpu")
+    if not isinstance(feature, torch.Tensor):
+        raise TypeError(f"Expected tensor feature at {path}.")
+    if feature.ndim > 1:
+        feature = feature.float().mean(dim=0)
+    return feature.squeeze()
+
+
+def _load_feature_cache(path: str | None) -> dict[str, torch.Tensor] | None:
+    if path is None:
+        return None
+    payload = torch.load(path, map_location="cpu")
+    feature_paths = [str(feature_path) for feature_path in payload["feature_paths"]]
+    features = cast(torch.Tensor, payload["features"])
+    return dict(zip(feature_paths, features, strict=True))

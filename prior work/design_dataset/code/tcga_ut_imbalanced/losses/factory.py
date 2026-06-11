@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from tcga_ut_imbalanced.losses.focal import FocalLoss
-from tcga_ut_imbalanced.losses.oko_hard import OKOHardLoss
+from tcga_ut_imbalanced.losses.metric import CrossEntropyMetricLoss
 
 
 class LossFactory:
@@ -14,6 +14,7 @@ class LossFactory:
         alpha: str | None = None,
         n_classes: int | None = None,
         class_counts: np.ndarray | None = None,
+        metric_loss_weight: float = 1.0,
     ) -> nn.Module:
         """Build a configured loss module."""
         weights = _class_weights(alpha, n_classes, class_counts)
@@ -23,8 +24,14 @@ class LossFactory:
             if gamma is None or gamma < 0:
                 raise ValueError(f"Invalid gamma: {gamma}")
             return FocalLoss(gamma=gamma, alpha=weights)
-        if loss_type == "oko_hard_loss":
-            return OKOHardLoss()
+        if loss_type == "ce_soft_f1":
+            return CrossEntropyMetricLoss(
+                _validate_n_classes(n_classes), "f1", metric_loss_weight
+            )
+        if loss_type == "ce_soft_mcc":
+            return CrossEntropyMetricLoss(
+                _validate_n_classes(n_classes), "mcc", metric_loss_weight
+            )
         raise ValueError(f"Unknown loss type: {loss_type}")
 
 

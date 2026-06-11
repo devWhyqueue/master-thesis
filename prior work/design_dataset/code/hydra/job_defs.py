@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import shlex
 import subprocess
 from dataclasses import dataclass
 
@@ -12,6 +13,8 @@ class Job:
     cmd: list[str]
     name: str
     log_path: str
+    partition: str = "cpu-2h"
+    gpus_per_node: int = 0
 
 
 def load_config(config_path: str) -> dict[str, str]:
@@ -57,7 +60,7 @@ def parameters(args: argparse.Namespace) -> list[float]:
 
 def train_base(config: dict[str, str], ds: str, val: str, out: str) -> list[str]:
     """Build common training command arguments."""
-    return [
+    args = [
         "-m",
         "tcga_ut_imbalanced.cli.train",
         f"--dataset-structure-path={ds}",
@@ -66,6 +69,10 @@ def train_base(config: dict[str, str], ds: str, val: str, out: str) -> list[str]
         "--preload-features",
         f"--results-save-path={out}",
     ]
+    cache_path = config.get("feature_cache_path", "")
+    if cache_path:
+        args.append(f"--feature-cache-path={cache_path}")
+    return args
 
 
 def train_csvs(imbalanced_dir: str, parameter: float) -> tuple[str, str]:
@@ -92,9 +99,12 @@ def _submit_slurm(job: Job, config: dict[str, str], dry_run: bool) -> None:
 
 
 def _slurm_script(job: Job, working_dir: str) -> str:
+    command = " ".join(shlex.quote(part) for part in job.cmd)
     return (
         f"#!/bin/bash\n#SBATCH --job-name={job.name}\n"
-        f"#SBATCH --partition=cpu-2h\n#SBATCH --ntasks-per-node=8\n"
+        f"#SBATCH --partition={job.partition}\n"
+        f"#SBATCH --gpus-per-node={job.gpus_per_node}\n"
+        f"#SBATCH --ntasks-per-node=8\n"
         f"#SBATCH --output={job.log_path}\n#SBATCH -D {working_dir}\n\n"
-        f"{' '.join(job.cmd)}\n"
+        f"{command}\n"
     )

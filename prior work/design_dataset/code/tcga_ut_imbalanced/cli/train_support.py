@@ -14,7 +14,6 @@ from tcga_ut_imbalanced.models.mlp import MLP
 from tcga_ut_imbalanced.plotting.plots import plot_extended_confusion_matrix
 from tcga_ut_imbalanced.training.batch_sampler import BatchBalancingSampler
 from tcga_ut_imbalanced.training.loops import train
-from tcga_ut_imbalanced.training.oko import train_oko
 
 
 def make_dataloader(
@@ -51,7 +50,7 @@ def build_mlp(
     optimizer = torch.optim.SGD(
         model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
     )
-    _train_mlp(args, model, dataset_train, criterion, optimizer, dl_train, dl_val)
+    _train_mlp(args, model, criterion, optimizer, dl_train, dl_val)
     return model
 
 
@@ -96,36 +95,22 @@ def save_validation_plot(
 def _criterion(
     args: argparse.Namespace, dataset_train: TCGAUTDatasetImbalanced
 ) -> nn.Module:
-    if args.training_method == "oko":
-        return LossFactory.build("oko_hard_loss")
     return LossFactory.build(
         args.loss,
         args.gamma,
         args.alpha,
         dataset_train.get_n_classes(),
         dataset_train.get_class_sizes(),
+        args.metric_loss_weight,
     )
 
 
 def _train_mlp(
     args: argparse.Namespace,
     model: MLP,
-    dataset: TCGAUTDatasetImbalanced,
     criterion: nn.Module,
     optimizer: torch.optim.Optimizer,
     dl_train: DataLoader,
     dl_val: DataLoader | None,
 ) -> None:
-    if args.training_method == "oko":
-        train_oko(
-            model,
-            dataset,
-            args.n_epochs,
-            criterion,
-            optimizer,
-            dl_val,
-            args.oko_k,
-            args.seed,
-        )
-        return
     train(model, dl_train, args.n_epochs, criterion, optimizer, dl_val)

@@ -30,21 +30,19 @@ def _mlp_cmd(
     parameter: float,
     seed: int,
 ) -> list[str]:
-    ds, val = train_csvs(config.get("imbalanced_dataset_dir", ""), parameter)
-    out = f"{config.get('results_dir', '')}/param={parameter}/seed={seed}"
+    ds, val, test = _training_csvs(args, config, parameter, seed)
+    out = _training_output(args, config, parameter, seed)
     return (
         prefix(config, args)
-        + train_base(config, ds, val, out)
+        + _train_base_with_test(config, ds, val, test, out)
+        + _method_args(args.method)
         + [
-            '--device="cpu"',
+            "--device=cpu",
             "--learning-rate=0.001",
             "--n-epochs=50",
-            '--loss="cross_entropy"',
-            '--alpha="uniform"',
-            "--batch-balancing",
             f"--seed={seed}",
             "--visualize",
-            f"--class-names-path={config.get('class_names_path', '')}",
+            f"--class-names-path={_class_names_path(args, config, parameter, seed)}",
         ]
     )
 
@@ -70,8 +68,8 @@ def _knn_cmd(
         prefix(config, args)
         + train_base(config, bal_csv, val_csv, out)
         + [
-            '--device="cpu"',
-            '--model="knn"',
+            "--device=cpu",
+            "--model=knn",
             f"--k={neighbors}",
             "--visualize",
             f"--class-names-path={config.get('class_names_path', '')}",
@@ -99,9 +97,101 @@ def _ncc_cmd(
         prefix(config, args)
         + train_base(config, ds, val, out)
         + [
-            '--device="cpu"',
-            '--model="ncc"',
+            "--device=cpu",
+            "--model=ncc",
             "--visualize",
             f"--class-names-path={config.get('class_names_path', '')}",
         ]
     )
+
+
+def _training_csvs(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+) -> tuple[str, str, str]:
+    if not args.constructed:
+        ds, val = train_csvs(config.get("imbalanced_dataset_dir", ""), parameter)
+        return ds, val, ""
+    stem = _constructed_stem(args, config, parameter, seed)
+    return f"{stem}/train.csv", f"{stem}/validation.csv", f"{stem}/test.csv"
+
+
+def _training_output(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+) -> str:
+    method_root = f"{config.get('results_dir', '')}/results_{args.method}"
+    if not args.constructed:
+        return f"{method_root}/param={parameter}/seed={seed}"
+    return f"{method_root}/order={args.class_order_name}/param={parameter}/seed={seed}"
+
+
+def _constructed_stem(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+) -> str:
+    name = (
+        f"constructed_order={args.class_order_name}_parameter={parameter}_seed={seed}"
+    )
+    return f"{config.get('constructed_dataset_dir', '')}/{name}"
+
+
+def _class_names_path(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+) -> str:
+    if not args.constructed:
+        return config.get("class_names_path", "")
+    return f"{_constructed_stem(args, config, parameter, seed)}/class_order.json"
+
+
+def _method_args(method: str) -> list[str]:
+    methods = {
+        "ce": ["--loss=cross_entropy", "--alpha=uniform"],
+        "weighted_ce": ["--loss=cross_entropy", "--alpha=inverse_class_frequency"],
+        "balanced_sampler": [
+            "--loss=cross_entropy",
+            "--alpha=uniform",
+            "--batch-balancing",
+        ],
+        "focal": ["--loss=focal_loss", "--alpha=uniform", "--gamma=2.0"],
+        "weighted_focal": [
+            "--loss=focal_loss",
+            "--alpha=inverse_class_frequency",
+            "--gamma=2.0",
+        ],
+        "ce_soft_f1": [
+            "--loss=ce_soft_f1",
+            "--alpha=uniform",
+            "--batch-balancing",
+        ],
+        "ce_soft_mcc": [
+            "--loss=ce_soft_mcc",
+            "--alpha=uniform",
+            "--batch-balancing",
+        ],
+    }
+    if method not in methods:
+        raise ValueError(f"Unknown training method: {method}")
+    return methods[method]
+
+
+def _train_base_with_test(
+    config: dict[str, str],
+    dataset_path: str,
+    validation_path: str,
+    test_path: str,
+    output_path: str,
+) -> list[str]:
+    args = train_base(config, dataset_path, validation_path, output_path)
+    if test_path:
+        args.append(f"--test-dataset-structure-path={test_path}")
+    return args

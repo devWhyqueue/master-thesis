@@ -7,6 +7,7 @@ import torch.nn as nn
 from sklearn.metrics import (
     balanced_accuracy_score,
     confusion_matrix,
+    log_loss,
     precision_recall_fscore_support,
 )
 from torch.utils.data import DataLoader
@@ -25,26 +26,57 @@ def test_model(
     class_order: np.ndarray | list[int] | None = None,
 ) -> dict[str, object]:
     """Evaluate a model and return aggregate metrics and predictions."""
-    predictions, labels = _predict(model, dl_test, model_type)
-    precision, recall, conf_mat = _classification_arrays(
+    predictions, labels, probabilities = _predict(model, dl_test, model_type)
+    precision, recall, f1, support, conf_mat = _classification_arrays(
         labels, predictions, class_order
     )
+    payload: dict[str, object] = _summary_metrics(
+        labels, predictions, probabilities, precision, recall, f1, support
+    )
+    payload.update(
+        {
+            "confusion_matrix": conf_mat,
+            "precision_per_class": precision,
+            "recall_per_class": recall,
+            "f1_per_class": f1,
+            "support_per_class": support,
+            "class_order": class_order,
+            "class_names": _class_names(dl_test, class_order),
+            "preds": predictions,
+            "labels": labels,
+            "probabilities": probabilities,
+        }
+    )
+    return payload
+
+
+def _summary_metrics(
+    labels: np.ndarray,
+    predictions: np.ndarray,
+    probabilities: np.ndarray,
+    precision: np.ndarray,
+    recall: np.ndarray,
+    f1: np.ndarray,
+    support: np.ndarray,
+) -> dict[str, object]:
+    present = support > 0
     return {
         "accuracy": float(np.sum(predictions == labels) / len(labels)),
         "balanced_accuracy": float(balanced_accuracy_score(labels, predictions)),
-        "confusion_matrix": conf_mat,
-        "precision_per_class": precision,
-        "recall_per_class": recall,
-        "class_order": class_order,
-        "class_names": _class_names(dl_test, class_order),
-        "preds": predictions,
-        "labels": labels,
+        "macro_precision": float(np.mean(precision[present])),
+        "macro_recall": float(np.mean(recall[present])),
+        "macro_f1": float(np.mean(f1[present])),
+        "negative_log_likelihood": _negative_log_likelihood(labels, probabilities),
+        "brier_score": _brier_score(labels, probabilities),
+        "expected_calibration_error": _expected_calibration_error(
+            labels, probabilities
+        ),
     }
 
 
 def _predict(
     model: object, dl_test: DataLoader, model_type: str
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     if model_type == "mlp":
         return _predict_mlp(model, dl_test)
     if model_type in ("knn", "ncc"):
@@ -52,54 +84,71 @@ def _predict(
     raise ValueError(f"Unknown model type: {model_type}")
 
 
-def _predict_mlp(model: object, dl_test: DataLoader) -> tuple[np.ndarray, np.ndarray]:
+def _predict_mlp(
+    model: object, dl_test: DataLoader
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     mlp = cast(MLP, model)
     predictions = np.array([])
     labels = np.array([])
+    n_classes = _n_classes(dl_test)
+    probabilities = np.empty((0, n_classes))
     with torch.no_grad():
         mlp.eval()
         for batch in dl_test:
             first_layer = cast(nn.Linear, mlp.model[0])
             output = mlp(batch["features"].to(first_layer.weight.dtype)).squeeze()
+            output = output.unsqueeze(0) if output.ndim == 1 else output
+            probs = torch.softmax(output, dim=-1).detach().cpu().numpy()
             predictions = np.concatenate(
                 [predictions, torch.argmax(output, dim=-1).detach().cpu().numpy()]
             )
             labels = np.concatenate([labels, batch["target"].detach().cpu().numpy()])
+            probabilities = np.concatenate([probabilities, np.atleast_2d(probs)])
         mlp.train()
-    return predictions, labels
+    return predictions, labels, probabilities
 
 
 def _predict_sklearn(
     model: object, dl_test: DataLoader
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     sklearn_model = cast(SKLearnModel, model)
     predictions = np.array([])
     labels = np.array([])
+    n_classes = _n_classes(dl_test)
+    probabilities = np.empty((0, n_classes))
     for batch in dl_test:
-        output = sklearn_model.predict(
-            batch["features"].squeeze().detach().cpu().numpy()
-        )
+        features = np.atleast_2d(batch["features"].squeeze().detach().cpu().numpy())
+        output = sklearn_model.predict(features)
         logger.info("output: %s", output)
         predictions = np.concatenate([predictions, output])
         labels = np.concatenate([labels, batch["target"].detach().cpu().numpy()])
-    return predictions, labels
+        probabilities = np.concatenate(
+            [
+                probabilities,
+                _sklearn_probabilities(sklearn_model, features, output, n_classes),
+            ]
+        )
+    return predictions, labels, probabilities
 
 
 def _classification_arrays(
     labels: np.ndarray,
     predictions: np.ndarray,
     class_order: np.ndarray | list[int] | None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    precision, recall, _, _ = precision_recall_fscore_support(
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    precision, recall, f1, support = precision_recall_fscore_support(
         labels,
         predictions,
         average=None,
         labels=class_order,
+        zero_division=cast(str, 0),
     )
     conf_mat = confusion_matrix(labels, predictions, labels=class_order)
     return (
         cast(np.ndarray, precision),
         cast(np.ndarray, recall),
+        cast(np.ndarray, f1),
+        cast(np.ndarray, support),
         cast(np.ndarray, conf_mat),
     )
 
@@ -112,3 +161,64 @@ def _class_names(
     if class_order is not None:
         return [int_to_class_map[index] for index in class_order]
     return [int_to_class_map[index] for index in range(dataset.get_n_classes())]
+
+
+def _n_classes(dl_test: DataLoader) -> int:
+    dataset = cast(TCGAUTDatasetImbalanced, dl_test.dataset)
+    return dataset.get_n_classes()
+
+
+def _sklearn_probabilities(
+    model: SKLearnModel,
+    features: np.ndarray,
+    predictions: np.ndarray,
+    n_classes: int,
+) -> np.ndarray:
+    if hasattr(model.model, "predict_proba"):
+        raw = cast(np.ndarray, model.model.predict_proba(features))
+        probs = np.zeros((len(predictions), n_classes))
+        for column, class_index in enumerate(model.model.classes_.astype(int)):
+            probs[:, class_index] = raw[:, column]
+        return probs
+    probs = np.zeros((len(predictions), n_classes))
+    for index, prediction in enumerate(predictions.astype(int)):
+        probs[index, prediction] = 1.0
+    return probs
+
+
+def _negative_log_likelihood(
+    labels: np.ndarray,
+    probabilities: np.ndarray,
+) -> float:
+    return float(
+        log_loss(labels.astype(int), probabilities, labels=_labels(probabilities))
+    )
+
+
+def _brier_score(labels: np.ndarray, probabilities: np.ndarray) -> float:
+    one_hot = np.eye(probabilities.shape[1])[labels.astype(int)]
+    return float(np.mean(np.sum((probabilities - one_hot) ** 2, axis=1)))
+
+
+def _expected_calibration_error(
+    labels: np.ndarray,
+    probabilities: np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    confidences = probabilities.max(axis=1)
+    predictions = probabilities.argmax(axis=1)
+    correct = predictions == labels.astype(int)
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    for lower, upper in zip(edges[:-1], edges[1:]):
+        mask = (confidences > lower) & (confidences <= upper)
+        if not bool(mask.any()):
+            continue
+        accuracy = float(correct[mask].mean())
+        confidence = float(confidences[mask].mean())
+        ece += float(mask.mean()) * abs(accuracy - confidence)
+    return ece
+
+
+def _labels(probabilities: np.ndarray) -> list[int]:
+    return list(range(probabilities.shape[1]))

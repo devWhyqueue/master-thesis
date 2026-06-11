@@ -28,6 +28,19 @@ def sample_imbalanced(args: argparse.Namespace, config: dict[str, str]) -> list[
     ]
 
 
+def sample_full_scale(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
+    """Build full-scale constructed sampling jobs."""
+    return [
+        Job(
+            _sample_full_scale_cmd(args, config, parameter, seed),
+            "sample_full",
+            "logs/sampling/sample_full_scale%j.out",
+        )
+        for parameter in parameters(args)
+        for seed in ([0, 1, 2] if args.sweep else [args.seed])
+    ]
+
+
 def _sample_imbalanced_cmd(
     args: argparse.Namespace,
     config: dict[str, str],
@@ -52,6 +65,38 @@ def _sample_imbalanced_cmd(
     ]
 
 
+def _sample_full_scale_cmd(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+) -> list[str]:
+    cmd = prefix(config, args) + [
+        "-m",
+        "tcga_ut_imbalanced.data.full_scale_cli",
+        f"--slide-manifest-path={_seed_path(config.get('slide_manifest_csv', ''), seed)}",
+        f"--file-save-path={config.get('constructed_dataset_dir', '')}",
+        f"--parameter={parameter}",
+        f"--seed={seed}",
+        f"--class-order-name={args.class_order_name}",
+        "--n-patches-per-slide=30",
+        f"--train-name={config.get('train_split_name', 'train')}",
+        f"--validation-name={config.get('validation_split_name', 'validation')}",
+        f"--test-name={config.get('test_split_name', 'test')}",
+        f"--overflow-strategy={config.get('overflow_strategy', 'redistribute')}",
+    ]
+    split_path = _seed_path(config.get("split_assignment_csv", ""), seed)
+    if split_path:
+        cmd.append(f"--split-assignment-path={split_path}")
+    if args.class_order_file is not None:
+        cmd.append(f"--class-order-file={args.class_order_file}")
+    return cmd
+
+
 def _imbalanced_csv(imbalanced_dir: str, parameter: float) -> str:
     stem = f"TCGA-UT_imbalanced_parameter={parameter}_dataset_size=500_seed=0"
     return f"{imbalanced_dir}/{stem}/imbalanced_dataset.csv"
+
+
+def _seed_path(path: str, seed: int) -> str:
+    return path.format(seed=seed) if path else path
