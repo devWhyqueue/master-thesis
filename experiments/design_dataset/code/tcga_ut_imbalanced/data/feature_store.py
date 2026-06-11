@@ -216,7 +216,7 @@ def row_level_dataset(frame: pd.DataFrame) -> pd.DataFrame:
 
 def patch_id_for_row(row: pd.Series) -> str:
     """Infer a patch identifier from common manifest columns."""
-    for column in ["patch_id", "feature_id", "image_path", "feature_path"]:
+    for column in ["patch_id", "feature_id", "feature_index", "image_path", "feature_path"]:
         value = row.get(column)
         if value is not None and pd.notna(value):
             return os.path.splitext(os.path.basename(str(row[column])))[0]
@@ -230,9 +230,9 @@ def feature_for_manifest_row(
 ) -> torch.Tensor:
     """Resolve one manifest row to a feature vector."""
     path = str(row["feature_path"])
-    index = row.get("feature_index")
-    if index is not None and pd.notna(index):
-        row_index = int(index)
+    index_value = row.get("feature_index")
+    if index_value is not None and pd.notna(index_value):
+        row_index = int(index_value)
         if row_feature_cache is not None:
             cached = row_feature_cache.get((path, row_index))
             if cached is not None:
@@ -240,7 +240,10 @@ def feature_for_manifest_row(
         return load_feature_row(path, row_index)
     if feature_cache is not None and path in feature_cache:
         return feature_cache[path]
-    return load_feature_row(path)
+    features = load_slide_features(path)
+    if features.shape[0] == 1:
+        return features[0].squeeze()
+    return features[0].squeeze()
 
 
 def load_feature_cache(path: str | None) -> dict[str, torch.Tensor] | None:

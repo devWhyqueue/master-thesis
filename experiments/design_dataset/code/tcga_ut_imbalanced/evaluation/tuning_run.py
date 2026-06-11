@@ -83,17 +83,13 @@ def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
         task.regime.parameter,
         task.seed,
     )
-    manifest = f"{stem}/manifest_splits.csv"
     cmd = [
         sys.executable,
         "-m",
         "tcga_ut_imbalanced.cli.train",
-        f"--dataset-structure-path={manifest}",
-        "--dataset-split=train",
-        f"--validation-dataset-structure-path={manifest}",
-        "--validation-dataset-split=validation",
-        f"--test-dataset-structure-path={manifest}",
-        "--test-dataset-split=test",
+        f"--dataset-structure-path={stem}/train.csv",
+        f"--validation-dataset-structure-path={stem}/validation.csv",
+        f"--test-dataset-structure-path={stem}/test.csv",
         f"--feature-path={args.feature_path}",
         "--preload-features",
         f"--results-save-path={out}",
