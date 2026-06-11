@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 experiment_root="$(cd "${script_dir}/../.." && pwd)"
 repo_root="$(cd "${experiment_root}/.." && pwd)"
-export PYTHONPATH="${repo_root}/common_code:${experiment_root}:${PYTHONPATH:-}"
+export PYTHONPATH="${repo_root}/shared:${experiment_root}:${PYTHONPATH:-}"
 
 container="${EXPERIMENT_CONTAINER:-}"
 if [ "$container" = "" ] && [ -f environment.sif ]; then

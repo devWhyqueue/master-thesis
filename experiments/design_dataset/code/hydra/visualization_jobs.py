@@ -2,6 +2,16 @@ import argparse
 
 from job_defs import Job, prefix
 
+_STANDARD_METHOD = "patch_feature_balanced_sampler_ce"
+
+_POINT_PLOT_SPECS: tuple[tuple[str, float, str], ...] = (
+    ("patch_feature_weighted_ce", 1.0, "Weighted Cross Entropy"),
+    ("patch_feature_balanced_sampler_ce", 1.0, "Batch Balancing"),
+    ("patch_feature_focal", 1.0, "Weighted Focal Loss"),
+    ("patch_feature_ce", 1.0, "Cross Entropy"),
+    ("patch_feature_ce", 0.0, "Balanced"),
+)
+
 
 def visualize(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
     """Build visualization jobs."""
@@ -13,8 +23,18 @@ def visualize(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
     return [Job(cmd, "viz", "logs/viz/viz%j.out")]
 
 
+def _class_order(args: argparse.Namespace) -> str:
+    return getattr(args, "class_order_name", "native_prevalence")
+
+
+def _method_root(results_dir: str, method: str, class_order: str) -> str:
+    return f"{results_dir}/results_{method}/order={class_order}"
+
+
 def _standard_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[str]:
     res_dir = config.get("results_dir", "")
+    class_order = _class_order(args)
+    base = _method_root(res_dir, _STANDARD_METHOD, class_order)
     return prefix(config, args) + [
         "-m",
         "tcga_ut_imbalanced.cli.visualize",
@@ -23,8 +43,8 @@ def _standard_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[str]
         "difference_confusion_matrix",
         "confusion_matrix",
         "--results-paths",
-        f"{res_dir}/results_batch_balancing/",
-        f"{res_dir}/results_batch_balancing/",
+        base,
+        base,
         "--parameters",
         "1.0",
         "0.0",
@@ -37,34 +57,25 @@ def _standard_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[str]
 
 def _point_plot_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[str]:
     res_dir = config.get("results_dir", "")
+    class_order = _class_order(args)
+    paths = [
+        _method_root(res_dir, method, class_order) for method, _, _ in _POINT_PLOT_SPECS
+    ]
+    parameters = [str(param) for _, param, _ in _POINT_PLOT_SPECS]
+    methods = [label for _, _, label in _POINT_PLOT_SPECS]
     return prefix(config, args) + [
         "-m",
         "tcga_ut_imbalanced.cli.visualize",
         "--plot-types",
         "point_plot_compare_methods",
         "--results-paths",
-        f"{res_dir}/results_cross_entropy_inverse_class_frequency",
-        f"{res_dir}/results_batch_balancing/",
-        f"{res_dir}/results_focal_loss_inverse_class_frequency/",
-        f"{res_dir}/results_focal_loss_uniform/",
-        f"{res_dir}/results_original_class_size_order/",
-        f"{res_dir}/results_original_class_size_order/",
+        *paths,
         "--parameters",
-        "1.0",
-        "1.0",
-        "1.0",
-        "1.0",
-        "1.0",
-        "0.0",
+        *parameters,
         "--parameter-name",
         "param",
         "--methods",
-        "Weighted Cross Entropy",
-        "Batch Balancing",
-        "Weighted Focal Loss",
-        "Unweighted Focal Loss",
-        "Vanilla",
-        "Balanced",
+        *methods,
         "--visualization-save-path",
         f"{config.get('visualization_dir', '')}/",
     ]

@@ -5,7 +5,7 @@ from pathlib import Path
 
 _EXPERIMENTS_ROOT = Path(__file__).resolve().parents[3]
 _CODE_ROOT = Path(__file__).resolve().parents[1]
-for _path in (_EXPERIMENTS_ROOT / "common_code", _CODE_ROOT):
+for _path in (_EXPERIMENTS_ROOT / "shared", _CODE_ROOT):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
@@ -72,6 +72,7 @@ def _add_train_wsi_args(subparsers: argparse._SubParsersAction) -> None:
 def _add_visualize_args(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("visualize")
     parser.add_argument("type", choices=["standard", "point-plot"])
+    parser.add_argument("--class-order-name", default="native_prevalence")
 
 
 def _add_wsi_cache_args(subparsers: argparse._SubParsersAction) -> None:

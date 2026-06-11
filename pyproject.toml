@@ -44,7 +44,7 @@ include-package-data = false
 "" = ".agents/skills/bib/src"
 
 [tool.setuptools.packages.find]
-where = [".agents/skills/bib/src"]
+where = [".agents/skills/bib/src", "experiments/shared"]
 
 [tool.pytest.ini_options]
 addopts = "-s"

@@ -38,9 +38,9 @@ def execute(job: Job, config: dict[str, str], local: bool, dry_run: bool) -> Non
 
 
 def pythonpath_env(config: dict[str, str]) -> str:
-    """Return PYTHONPATH for common_code and the design_dataset package."""
+    """Return PYTHONPATH for the shared common_code package and design_dataset."""
     working = Path(config.get("working_dir", ".")).resolve()
-    common = working.parent.parent / "common_code"
+    common = working.parent.parent / "shared"
     return f"{common}{os.pathsep}{working}"
 
 
