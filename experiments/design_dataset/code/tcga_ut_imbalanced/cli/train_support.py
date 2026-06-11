@@ -47,7 +47,7 @@ def build_mlp(
 ) -> nn.Module:
     """Build and train an MLP model."""
     tuning_params = _load_tuning_params(args)
-    if args.training_method in {"cfal", "divide_conquer"}:
+    if args.training_method in {"patch_feature_cfal", "patch_feature_divide_conquer"}:
         return build_specialized_model(
             args.training_method, args, dataset_train, device, tuning_params
         )

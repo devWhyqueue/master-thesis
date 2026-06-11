@@ -1,5 +1,6 @@
 import argparse
 
+from common_code.tuning.registry import PATCH_FEATURE_METHOD_FLAGS
 from job_defs import Job, parameters, prefix, train_base, train_csvs
 
 
@@ -159,31 +160,9 @@ def _class_names_path(
 
 
 def _method_args(method: str) -> list[str]:
-    methods = {
-        "ce": ["--loss=cross_entropy", "--alpha=uniform"],
-        "weighted_ce": ["--loss=cross_entropy", "--alpha=inverse_class_frequency"],
-        "balanced_sampler": [
-            "--loss=cross_entropy",
-            "--alpha=uniform",
-            "--batch-balancing",
-        ],
-        "focal": ["--loss=focal_loss", "--alpha=uniform", "--gamma=2.0"],
-        "ce_soft_f1": [
-            "--loss=ce_soft_f1",
-            "--alpha=uniform",
-            "--batch-balancing",
-        ],
-        "ce_soft_mcc": [
-            "--loss=ce_soft_mcc",
-            "--alpha=uniform",
-            "--batch-balancing",
-        ],
-        "cfal": [],
-        "divide_conquer": [],
-    }
-    if method not in methods:
+    if method not in PATCH_FEATURE_METHOD_FLAGS:
         raise ValueError(f"Unknown training method: {method}")
-    return methods[method]
+    return PATCH_FEATURE_METHOD_FLAGS[method]
 
 
 def _train_base_with_test(

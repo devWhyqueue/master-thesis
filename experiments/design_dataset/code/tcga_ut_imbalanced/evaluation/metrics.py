@@ -7,10 +7,15 @@ import torch.nn as nn
 from sklearn.metrics import (
     balanced_accuracy_score,
     confusion_matrix,
-    log_loss,
     precision_recall_fscore_support,
 )
 from torch.utils.data import DataLoader
+
+from common_code.metrics.calibration import (
+    brier_score,
+    expected_calibration_error,
+    negative_log_likelihood,
+)
 
 from tcga_ut_imbalanced.models.mlp import MLP
 from tcga_ut_imbalanced.models.sklearn import SKLearnModel
@@ -66,10 +71,14 @@ def _summary_metrics(
         "macro_precision": float(np.mean(precision[present])),
         "macro_recall": float(np.mean(recall[present])),
         "macro_f1": float(np.mean(f1[present])),
-        "negative_log_likelihood": _negative_log_likelihood(labels, probabilities),
-        "brier_score": _brier_score(labels, probabilities),
-        "expected_calibration_error": _expected_calibration_error(
-            labels, probabilities
+        "negative_log_likelihood": negative_log_likelihood(
+            labels.astype(int).tolist(), probabilities.tolist(), probabilities.shape[1]
+        ),
+        "brier_score": brier_score(
+            labels.astype(int).tolist(), probabilities.tolist(), probabilities.shape[1]
+        ),
+        "expected_calibration_error": expected_calibration_error(
+            labels.astype(int).tolist(), probabilities.tolist()
         ),
     }
 
@@ -184,40 +193,6 @@ def _sklearn_probabilities(
     for index, prediction in enumerate(predictions.astype(int)):
         probs[index, prediction] = 1.0
     return probs
-
-
-def _negative_log_likelihood(
-    labels: np.ndarray,
-    probabilities: np.ndarray,
-) -> float:
-    return float(
-        log_loss(labels.astype(int), probabilities, labels=_labels(probabilities))
-    )
-
-
-def _brier_score(labels: np.ndarray, probabilities: np.ndarray) -> float:
-    one_hot = np.eye(probabilities.shape[1])[labels.astype(int)]
-    return float(np.mean(np.sum((probabilities - one_hot) ** 2, axis=1)))
-
-
-def _expected_calibration_error(
-    labels: np.ndarray,
-    probabilities: np.ndarray,
-    n_bins: int = 10,
-) -> float:
-    confidences = probabilities.max(axis=1)
-    predictions = probabilities.argmax(axis=1)
-    correct = predictions == labels.astype(int)
-    edges = np.linspace(0.0, 1.0, n_bins + 1)
-    ece = 0.0
-    for lower, upper in zip(edges[:-1], edges[1:]):
-        mask = (confidences > lower) & (confidences <= upper)
-        if not bool(mask.any()):
-            continue
-        accuracy = float(correct[mask].mean())
-        confidence = float(confidences[mask].mean())
-        ece += float(mask.mean()) * abs(accuracy - confidence)
-    return ece
 
 
 def _labels(probabilities: np.ndarray) -> list[int]:

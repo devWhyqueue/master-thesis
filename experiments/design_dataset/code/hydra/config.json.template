@@ -13,7 +13,6 @@
   "constructed_dataset_dir": "/PATH/TO/constructed_dataset_dir",
   "feature_path": "/home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw",
   "feature_cache_path": "",
-  "class_imbalance_root": "/home/yannik.qu/master-thesis/experiments/class_imbalance",
   "wsi_partition": "gpu-2h",
   "tune_partition": "cpu-2h",
   "results_dir": "/PATH/TO/results",

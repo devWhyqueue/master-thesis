@@ -63,7 +63,4 @@ def _tune_cmd(
         f"--results-dir={config.get('results_dir', '')}",
         f"--feature-path={config.get('feature_path', '')}",
     ]
-    root = config.get("class_imbalance_root", "")
-    if root:
-        cmd.append(f"--class-imbalance-root={root}")
     return cmd

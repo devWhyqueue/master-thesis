@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import subprocess
 import sys
 
+from common_code.tuning.registry import patch_feature_method_flags, wsi_method_flags
 from tcga_ut_imbalanced.evaluation.tuning_grid import task_for_index
 
 logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse validation-tuning runner arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", required=True, choices=["patch", "wsi"])
     parser.add_argument("--array-task-id", type=int, required=True)
@@ -22,13 +21,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--constructed-dataset-dir", required=True)
     parser.add_argument("--results-dir", required=True)
     parser.add_argument("--feature-path", required=True)
-    parser.add_argument("--class-imbalance-root", default="")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
-    """Dispatch one tuning task to the patch or WSI trainer."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = parse_args()
     task = task_for_index(args.benchmark, args.array_task_id)
@@ -40,10 +37,7 @@ def main() -> None:
     if args.dry_run:
         logger.info(" ".join(cmd))
         return
-    env = os.environ.copy()
-    if args.class_imbalance_root:
-        env["CLASS_IMBALANCE_ROOT"] = args.class_imbalance_root
-    subprocess.run(cmd, check=True, env=env)
+    subprocess.run(cmd, check=True)
 
 
 def _patch_command(args: argparse.Namespace, task) -> list[str]:
@@ -82,7 +76,7 @@ def _patch_command(args: argparse.Namespace, task) -> list[str]:
         "--dropout=0.1",
         f"--class-names-path={stem}/class_order.json",
     ]
-    cmd.extend(_patch_method_flags(task.variant.method))
+    cmd.extend(patch_feature_method_flags(task.variant.method))
     return cmd
 
 
@@ -118,30 +112,6 @@ def _wsi_command(args: argparse.Namespace, task) -> list[str]:
     ]
     cmd.extend(_wsi_tuning_flags(task.variant.params))
     return cmd
-
-
-def _patch_method_flags(method: str) -> list[str]:
-    flags = {
-        "ce": ["--loss=cross_entropy", "--alpha=uniform"],
-        "weighted_ce": ["--loss=cross_entropy", "--alpha=inverse_class_frequency"],
-        "balanced_sampler": [
-            "--loss=cross_entropy",
-            "--alpha=uniform",
-            "--batch-balancing",
-        ],
-        "focal": ["--loss=focal_loss", "--alpha=uniform", "--gamma=2.0"],
-        "ce_soft_f1": [
-            "--loss=ce_soft_f1",
-            "--alpha=uniform",
-            "--batch-balancing",
-        ],
-        "ce_soft_mcc": [
-            "--loss=ce_soft_mcc",
-            "--alpha=uniform",
-            "--batch-balancing",
-        ],
-    }
-    return flags.get(method, [])
 
 
 def _wsi_tuning_flags(params: dict[str, float]) -> list[str]:

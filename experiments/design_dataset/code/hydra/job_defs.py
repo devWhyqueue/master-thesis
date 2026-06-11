@@ -1,9 +1,11 @@
 import argparse
 import json
 import logging
+import os
 import shlex
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -35,15 +37,26 @@ def execute(job: Job, config: dict[str, str], local: bool, dry_run: bool) -> Non
     _submit_slurm(job, config, dry_run)
 
 
+def pythonpath_env(config: dict[str, str]) -> str:
+    """Return PYTHONPATH for common_code and the design_dataset package."""
+    working = Path(config.get("working_dir", ".")).resolve()
+    common = working.parent.parent / "common_code"
+    return f"{common}{os.pathsep}{working}"
+
+
 def prefix(config: dict[str, str], args: argparse.Namespace) -> list[str]:
     """Build the Python execution prefix."""
+    pythonpath = pythonpath_env(config)
     if args.local and args.no_container:
+        os.environ["PYTHONPATH"] = pythonpath
         return ["python3"]
     return [
         "apptainer",
         "run",
         "-B",
         "/home/space:/home/space:rw",
+        "--env",
+        f"PYTHONPATH={pythonpath}",
         config.get("environment_sif", ""),
         "python3",
     ]

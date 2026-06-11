@@ -79,7 +79,7 @@ def _add_training_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--n-epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--optimizer", default="adamw", choices=["adamw", "sgd"])
-    parser.add_argument("--training-method", default="ce")
+    parser.add_argument("--training-method", default="patch_feature_ce")
     parser.add_argument("--tuning-id", default=None)
     parser.add_argument("--tuning-params", default=None)
     parser.add_argument("--cfal-lambda", type=float, default=0.1)

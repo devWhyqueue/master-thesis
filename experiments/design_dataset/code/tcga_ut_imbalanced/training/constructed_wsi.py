@@ -1,7 +1,4 @@
 import argparse
-import importlib
-import os
-import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -10,26 +7,16 @@ import pandas as pd
 import torch
 from torch import nn
 
+from common_code.metrics.payload import resolve_device
+from common_code.wsi import trainer as mil_trainer
+from common_code.wsi.eval import _save_and_evaluate_bags
+from common_code.wsi.rankmix_teacher import load_rankmix_teacher, train_rankmix_teacher
 from tcga_ut_imbalanced.evaluation.tuning_params import parse_tuning_params
 from tcga_ut_imbalanced.training.constructed_wsi_data import (
     ConstructedBagDataset,
     OPTIONAL_ARGS,
     write_training_outputs,
 )
-
-_DEFAULT_CLASS_IMBALANCE_ROOT = (
-    "/home/yannik.qu/master-thesis/experiments/class_imbalance"
-)
-_LOCAL_CLASS_IMBALANCE_ROOT = "/mnt/d/Git/master-thesis/experiments/class_imbalance"
-_class_imbalance_root = os.environ.get("CLASS_IMBALANCE_ROOT")
-if _class_imbalance_root is None and Path(_LOCAL_CLASS_IMBALANCE_ROOT).exists():
-    _class_imbalance_root = _LOCAL_CLASS_IMBALANCE_ROOT
-sys.path.insert(0, _class_imbalance_root or _DEFAULT_CLASS_IMBALANCE_ROOT)
-
-_mil_trainer = importlib.import_module("scripts.modeling.mil.bag.trainer")
-_rankmix_teacher = importlib.import_module("scripts.modeling.mil.rankmix_teacher")
-_mil_eval = importlib.import_module("scripts.modeling.training.eval")
-_training_support = importlib.import_module("scripts.modeling.training.support")
 
 METHODS = (
     "mil_ce",
@@ -43,7 +30,6 @@ METHODS = (
 
 
 def get_args() -> argparse.Namespace:
-    """Parse constructed WSI-bag training arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest-path", required=True)
     parser.add_argument("--results-save-path", required=True)
@@ -60,7 +46,6 @@ def get_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Train one constructed WSI-bag method."""
     args = get_args()
     output_dir = Path(args.results_save_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -108,18 +93,7 @@ def _training_config(args: argparse.Namespace) -> dict[str, object]:
         "max_bags_per_class": args.max_bags_per_class or None,
         "bag_cache_dir": args.bag_cache_dir or None,
     }
-    if "weight_power" in tuning:
-        config["weight_power"] = tuning["weight_power"]
-    if "focal_gamma" in tuning:
-        config["focal_gamma"] = tuning["focal_gamma"]
-    if "sampler_power" in tuning:
-        config["sampler_power"] = tuning["sampler_power"]
-    if "rankmix_alpha" in tuning:
-        config["rankmix_alpha"] = tuning["rankmix_alpha"]
-    if "sc_mil_temperature" in tuning:
-        config["sc_mil_temperature"] = tuning["sc_mil_temperature"]
-    if "mde_mil_consistency_weight" in tuning:
-        config["mde_mil_consistency_weight"] = tuning["mde_mil_consistency_weight"]
+    config.update({key: tuning[key] for key in tuning})
     return config
 
 
@@ -133,7 +107,7 @@ def _train_method(
 ) -> tuple[dict[str, dict[str, object]], dict[str, int]]:
     torch.manual_seed(seed)
     training = config["wsi_training"]
-    device = _training_support._resolve_device(str(training["device"]))
+    device = resolve_device(str(training["device"]))
     bag_cache_dir = cast(str, training.get("bag_cache_dir", "")) or None
     train_dataset, val_dataset, test_dataset = _split_datasets(
         frame,
@@ -144,17 +118,17 @@ def _train_method(
     )
     labels = cast(np.ndarray, train_dataset.labels.cpu().numpy())
     build_model = (
-        _mil_trainer._build_mde_model
+        mil_trainer._build_mde_model
         if method == "mde_mil"
-        else _mil_trainer._build_model
+        else mil_trainer._build_model
     )
     model = build_model(train_dataset, class_names, training, device)
     optimizer = _optimizer(model, training)
     teacher = None
     if method == "rankmix_mil":
-        teacher = _rankmix_teacher.load_rankmix_teacher(
+        teacher = load_rankmix_teacher(
             result_dir,
-            _mil_trainer._build_model,
+            mil_trainer._build_model,
             train_dataset,
             class_names,
             training,
@@ -162,7 +136,7 @@ def _train_method(
             seed,
         )
         if teacher is None:
-            teacher = _rankmix_teacher.train_rankmix_teacher(
+            teacher = train_rankmix_teacher(
                 model,
                 train_dataset,
                 labels,
@@ -171,11 +145,11 @@ def _train_method(
                 device,
                 seed,
                 result_dir,
-                _mil_trainer._loader,
+                mil_trainer._loader,
             )
-        model = _mil_trainer._build_model(train_dataset, class_names, training, device)
+        model = mil_trainer._build_model(train_dataset, class_names, training, device)
         optimizer = _optimizer(model, training)
-    diagnostics = _mil_trainer._run_training(
+    diagnostics = mil_trainer._run_training(
         method,
         cast(nn.Module, model),
         train_dataset,
@@ -187,7 +161,7 @@ def _train_method(
         result_dir,
         teacher,
     )
-    results = _mil_eval._save_and_evaluate_bags(
+    results = _save_and_evaluate_bags(
         model, val_dataset, test_dataset, class_names, device, result_dir
     )
     return results, diagnostics

@@ -32,7 +32,7 @@ def _add_train_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--parameter", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--k", type=int, default=9)
-    parser.add_argument("--method", default="ce")
+    parser.add_argument("--method", default="patch_feature_ce")
     parser.add_argument("--constructed", action="store_true")
     parser.add_argument("--class-order-name", default="native_prevalence")
 
