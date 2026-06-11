@@ -3,8 +3,8 @@ import logging
 import sys
 from pathlib import Path
 
-_EXPERIMENTS_ROOT = Path(__file__).resolve().parents[2]
-_CODE_ROOT = Path(__file__).resolve().parent.parent
+_EXPERIMENTS_ROOT = Path(__file__).resolve().parents[3]
+_CODE_ROOT = Path(__file__).resolve().parents[1]
 for _path in (_EXPERIMENTS_ROOT / "common_code", _CODE_ROOT):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
