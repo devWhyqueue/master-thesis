@@ -8,9 +8,23 @@ import numpy as np
 import pandas as pd
 
 
-def summary_path(paths: dict[str, Path], seed: int) -> Path:
-    """Return the stored ProGAN summary JSON for one benchmark seed."""
+_REFERENCE_FINAL_DEPTH_EPOCHS = 25
+
+
+def summary_path(paths: dict[str, Path], seed: int, variant: int | None = None) -> Path:
+    """Return the stored ProGAN summary JSON for one benchmark seed.
+
+    If variant is given, looks in the per-variant subdirectory.  Defaults to the
+    reference variant (25 epochs) when the new layout is present, with fallback to
+    the legacy seed-level location for backward compatibility.
+    """
+    ref = variant if variant is not None else _REFERENCE_FINAL_DEPTH_EPOCHS
     candidates = [
+        paths["root"]
+        / "synthetic_patch_images"
+        / f"seed={seed}"
+        / f"epochs={ref}"
+        / "synthetic_patch_summary.json",
         paths["patch_results"]
         / "patch_progan_aug"
         / f"seed={seed}"
@@ -61,11 +75,21 @@ def _feature_cache_frame(cache_dir: Path) -> tuple[pd.DataFrame, np.memmap]:
 
 
 def _class_feature_groups(
-    manifest: pd.DataFrame, features: np.memmap, class_name: str
+    manifest: pd.DataFrame,
+    features: np.memmap,
+    class_name: str,
+    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
 ) -> tuple[np.ndarray, np.ndarray]:
     frame = cast(pd.DataFrame, manifest[manifest["cancer_type"] == class_name])
     real = frame[~frame["is_synthetic"].astype(bool)]
-    synthetic = frame[frame["is_synthetic"].astype(bool)]
+    synthetic_all = frame[frame["is_synthetic"].astype(bool)]
+    if "final_depth_epochs" in synthetic_all.columns:
+        synthetic = cast(
+            pd.DataFrame,
+            synthetic_all[synthetic_all["final_depth_epochs"].astype(int) == variant],
+        )
+    else:
+        synthetic = synthetic_all
     real_idx = np.asarray(real["feature_index"], dtype=np.int64)
     synthetic_idx = np.asarray(synthetic["feature_index"], dtype=np.int64)
     real_features = np.asarray(features[real_idx], dtype=np.float32)
@@ -98,10 +122,16 @@ def _mean_nearest_neighbor_distance(
 
 
 def build_metrics_frame(
-    paths: dict[str, Path], seed: int, cache_dir: Path | None
+    paths: dict[str, Path],
+    seed: int,
+    cache_dir: Path | None,
+    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
 ) -> pd.DataFrame:
-    """Combine stored ProGAN summaries with Virchow2 nearest-neighbor distances."""
-    summary = load_summary(summary_path(paths, seed))
+    """Combine stored ProGAN summaries with Virchow2 nearest-neighbor distances.
+
+    variant selects which epoch snapshot to report; defaults to the reference (25 epochs).
+    """
+    summary = load_summary(summary_path(paths, seed, variant))
     frame = pd.DataFrame(_summary_rows(summary, seed))
     if cache_dir is None or not (cache_dir / "manifest.csv").exists():
         frame["virchow_mean_nn_distance"] = np.nan
@@ -110,7 +140,7 @@ def build_metrics_frame(
     distances = []
     for class_name in frame["class_name"]:
         real_features, synthetic_features = _class_feature_groups(
-            manifest, features, str(class_name)
+            manifest, features, str(class_name), variant=variant
         )
         distances.append(
             _mean_nearest_neighbor_distance(real_features, synthetic_features)

@@ -363,8 +363,9 @@ ProGAN modifies ordinary GAN training by growing the image resolution gradually.
     Setting & Value\\
     \midrule
     Resolution stages & $4\times4$ to $256\times256$ (seven stages)\\
-    Epochs per stage & 25\\
-    Fade-in fraction for new layers & \num{0.5}\\
+    Epochs per stage (depths 1--6) & 25\\
+    Final-depth (256$\times$256) refinement epochs & 25 (reference); validation selects from $\{10,25,50\}$\\
+    Fade-in fraction for new layers & \num{0.5} (pinned to the reference 25-epoch schedule)\\
     Latent dimension & 128\\
     Base channel width & 512\\
     Optimizer & Adam, learning rate $2\times10^{-4}$, $\beta_1=\num{0.5}$\\
@@ -373,11 +374,11 @@ ProGAN modifies ordinary GAN training by growing the image resolution gradually.
     Synthetic count per tail class & Head-class train count minus class train count\\
     \bottomrule
   \end{tabular}
-  \caption{ProGAN generator training settings. Generator-side hyperparameters are fixed to the cited recipe; retraining the GAN for every sweep point would dominate compute. Downstream augmentation amount is instead tuned via the synthetic-fraction control in Table~\ref{tab:tuning-grid}.}
+  \caption{ProGAN generator training settings. Depths 1--6 use 25 epochs each. For the final depth, one long run trains to 50 epochs and the generator is snapshotted at epochs 10, 25, and 50; validation selects the snapshot with the best mean macro F1 over seeds. This reuses the single GAN training run for all three sweep points at roughly 2$\times$ the previous final-depth cost. Synthetic fraction is fixed at 1 (every tail class is balanced to the head-class count).}
   \label{tab:progan-generator}
 \end{table}
 
-\noindent When a class has more than \num{2048} real training patches, at most \num{2048} are drawn uniformly at random with a deterministic per-class seed for ProGAN training only; the downstream classifier still uses the full real training set together with the generated patches. Inception FID is computed for every augmented class between the generated images and the real training subset used for that class-specific generator, but no generated samples are filtered by FID or other quality thresholds. Real and synthetic RGB patches are embedded with the same frozen Virchow2 encoder before classifier training. Validation selects the fraction of generated training patches retained before classifier training (Table~\ref{tab:tuning-grid}). Synthetic images are used only as extra patch-classification training examples; they are not converted into synthetic WSI bags.
+\noindent When a class has more than \num{2048} real training patches, at most \num{2048} are drawn uniformly at random with a deterministic per-class seed for ProGAN training only; the downstream classifier still uses the full real training set together with the generated patches. Inception FID is computed for every augmented class between the generated images and the real training subset used for that class-specific generator, but no generated samples are filtered by FID or other quality thresholds. Real and synthetic RGB patches are embedded with the same frozen Virchow2 encoder before classifier training. The synthetic fraction is fixed at 1 so each tail class is balanced to the training-set head count; validation instead selects the number of final-depth (256$\times$256) refinement epochs from the grid in Table~\ref{tab:tuning-grid}. Synthetic images are used only as extra patch-classification training examples; they are not converted into synthetic WSI bags.
 
 \subsection{Representation and Architecture-Level Methods}
 Representation-level methods try to make rare classes more separable in feature space rather than only changing sampling or per-example loss weights. This family is especially relevant for computational pathology, where WSI labels supervise bags of many unlabeled instances and class imbalance can occur both across slides and within a positive slide \citep{juyal2024scMil}.
@@ -450,7 +451,7 @@ At validation and test time, each slide bag is evaluated once in natural order w
 
 \subsection{Training Protocol and Reproducibility}
 \label{sec:training-protocol}
-Each method is evaluated under one shared training budget per benchmark (Table~\ref{tab:training-protocol}). Cross-entropy baselines use cited defaults without an imbalance-specific sweep. All other methods vary one imbalance-specific control on validation; the configuration with the highest mean validation macro F1 over seeds 0--2 is selected, with balanced accuracy as a tie-breaker. The test split never informs selection. Table~\ref{tab:tuning-grid} lists the reference default and validation grid for each control, and Table~\ref{tab:tuning-selection} records the selected values. Generator-side ProGAN settings (Table~\ref{tab:progan-generator}) are fixed because retraining the GAN per sweep point would dominate compute; only the downstream synthetic fraction is swept.
+Each method is evaluated under one shared training budget per benchmark (Table~\ref{tab:training-protocol}). Cross-entropy baselines use cited defaults without an imbalance-specific sweep. All other methods vary one imbalance-specific control on validation; the configuration with the highest mean validation macro F1 over seeds 0--2 is selected, with balanced accuracy as a tie-breaker. The test split never informs selection. Table~\ref{tab:tuning-grid} lists the reference default and validation grid for each control, and Table~\ref{tab:tuning-selection} records the selected values. ProGAN sweeps the number of final-depth (256$\times$256) refinement epochs (Table~\ref{tab:progan-generator}); one long run produces snapshots at epochs 10, 25, and 50 so all sweep points share a single GAN training cost. The synthetic fraction is fixed at 1 (balance each tail class to the head-class count).
 
 \begin{table}[ht]
   \centering
@@ -489,7 +490,7 @@ Each method is evaluated under one shared training budget per benchmark (Table~\
     Patch & CE + soft MCC & Metric-loss weight $=1$ & $\{0.25,0.5,1,2\}$\\
     Patch & CFAL & $\gamma=2$ & $\gamma\in\{0.5,1,2,5\}$\\
     Patch & D\&C & $k=10$ & $k\in\{5,10,15,20\}$\\
-    Patch & ProGAN augmentation & Synthetic fraction $=1$ & $\{0.25,0.5,1\}$\\
+    Patch & ProGAN augmentation & Final-depth epochs $=25$ & $\{10,25,50\}$\\
     WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32\}$\\
     WSI bag & SC-MIL & $\tau=1$ & $\tau\in\{0.05,0.1,0.2,0.5\}$\\
     WSI bag & MDE-MIL & $\lambda_{\mathrm{con}}=0.25$ & $\lambda_{\mathrm{con}}\in\{0.1,0.25,0.3,0.5,1,2,4\}$\\
@@ -724,7 +725,7 @@ Holding the encoder fixed within each benchmark therefore changes what an imbala
 
 These results should be read within each benchmark's prediction unit. Patch accuracy does not directly imply slide-level deployment quality, and WSI-bag gains may reflect aggregation behavior absent from the patch classifier. The shared split, encoder family, and 30-instance slide budget link the two benchmarks descriptively, but the evidence for each method comes from the table corresponding to its evaluated input.
 
-Several limitations apply. TCGA-UT patch labels come from pathologist-selected tumor regions; they are useful patch-level class labels but not dense annotations. The two benchmarks share case-disjoint splits but differ in prediction unit and per-slide evidence budget, so their result tables are non-transferable. The validation sweep varies one imbalance-specific control per method and does not exhaust architecture, training schedule, multiple interacting hyperparameters, or ProGAN generator-side choices.
+Several limitations apply. TCGA-UT patch labels come from pathologist-selected tumor regions; they are useful patch-level class labels but not dense annotations. The two benchmarks share case-disjoint splits but differ in prediction unit and per-slide evidence budget, so their result tables are non-transferable. The validation sweep varies one imbalance-specific control per method and does not exhaust architecture, training schedule, multiple interacting hyperparameters, or remaining ProGAN generator-side choices beyond the final-depth refinement epochs (latent dimension, base channels, learning rate).
 
 \section{Conclusion}
 TCGA-UT provides a native long-tailed setting for comparing representative imbalance interventions on frozen Virchow2 patch and WSI-bag representations. After validation-selected tuning on case-disjoint splits, CFAL reaches the highest patch-level mean macro F1, clearly above plain CE and the CE plus soft F1 or soft MCC hybrids with balanced sampling, whereas ProGAN augmentation and focal loss remain close to the CE baseline. On WSI bags, RankMix has the highest mean balanced accuracy and MDE-MIL the highest mean macro F1, with MDE-MIL also giving the best raw probability scores (lowest NLL, Brier, and ECE); these WSI gaps are small relative to seed variation, so they should be read as the highest means in this benchmark rather than as established differences. The practical implication is that imbalance mitigation should be evaluated in the native input regime and alongside classwise recall and calibration, not only by aggregate discrimination.

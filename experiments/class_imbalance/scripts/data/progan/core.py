@@ -22,6 +22,7 @@ class ProGanSettings:
     max_classes: int | None
     fade_in_fraction: float
     base_channels: int
+    final_depth_epoch_grid: tuple[int, ...] = (10, 25, 50)
 
     @property
     def max_depth(self) -> int:

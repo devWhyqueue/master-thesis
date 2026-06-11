@@ -30,7 +30,7 @@ from scripts.modeling.patch.losses import (
 from scripts.modeling.patch.models import PatchClassifier
 from scripts.data.progan.manifest import (
     generate_patch_gan_manifest,
-    merge_patch_gan_manifest,
+    merge_patch_gan_manifest_reference,
 )
 from scripts.modeling.training.support import _resolve_device
 
@@ -194,11 +194,15 @@ def _train(args: argparse.Namespace) -> None:
     original_train_rows = int((frame["split"] == "train").sum())
     synthetic_manifest: Path | None = None
     if args.method == "patch_progan_aug":
-        synthetic_manifest = (
-            merge_patch_gan_manifest
-            if args.skip_synthetic_generation
-            else generate_patch_gan_manifest
-        )(config, args.seed, args.smoke)
+        if args.skip_synthetic_generation:
+            synthetic_manifest = merge_patch_gan_manifest_reference(
+                config, args.seed, args.smoke
+            )
+        else:
+            generate_patch_gan_manifest(config, args.seed, args.smoke)
+            synthetic_manifest = merge_patch_gan_manifest_reference(
+                config, args.seed, args.smoke
+            )
     if synthetic_manifest is not None:
         frame = pd.concat([frame, pd.read_csv(synthetic_manifest)], ignore_index=True)
     train_set, val_set, test_set, class_names = _split_datasets(frame, config)

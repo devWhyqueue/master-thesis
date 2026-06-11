@@ -45,14 +45,14 @@ from scripts.modeling.patch_feature.divide_conquer import (
     cluster_sample_binary_indices,
     dnc_class_partitions,
 )
-from scripts.modeling.patch_feature.training import PatchFeatureDataset
+from scripts.modeling.patch_feature.training import PatchFeatureDataset, _select_progan_variant
 from scripts.data.prep.manifest.feature import tcga_case_id
 from scripts.data.progan.core import (
     ProgressiveDiscriminator,
     ProgressiveGenerator,
     ProGanSettings,
 )
-from scripts.data.progan.train import paper_batch_size
+from scripts.data.progan.train import paper_batch_size, train_class_progan
 from scripts.common import RUN_RECORD_NAME, ensure_dirs, load_config, read_run_record, write_run_record
 from scripts.analysis.results import connect, init_schema, read_table, replace_table
 from scripts.data.progan.manifest import (
@@ -939,6 +939,76 @@ def test_calibration_posthoc_table_lists_all_benchmark_methods() -> None:
     wsi_methods = set(frame.loc[frame["benchmark"] == "wsi_bag", "method"])
     assert patch_methods == set(config["patch_feature_methods"])
     assert wsi_methods == set(config["wsi_bag_methods"])
+
+
+def test_progan_snapshot_writer_produces_one_generator_per_grid_epoch(
+    tmp_path: Path,
+) -> None:
+    """train_class_progan returns a dict of generators keyed by final-depth epoch."""
+    from PIL import Image as PILImage
+
+    image_dir = tmp_path / "patches"
+    image_dir.mkdir()
+    for index in range(4):
+        path = image_dir / f"{index}.jpg"
+        PILImage.fromarray(
+            np.zeros((8, 8, 3), dtype=np.uint8)
+        ).save(path)
+    image_paths = list(image_dir.glob("*.jpg"))
+
+    settings = ProGanSettings(
+        image_size=8,
+        latent_dim=4,
+        epochs_per_depth=1,
+        learning_rate=0.001,
+        beta1=0.5,
+        max_real_patches_per_class=8,
+        balance_target="max_train_class_count",
+        max_classes=None,
+        fade_in_fraction=0.5,
+        base_channels=32,
+        final_depth_epoch_grid=(1, 2, 3),
+    )
+    snapshots, diagnostics = train_class_progan(
+        image_paths, settings, torch.device("cpu"), seed=0
+    )
+    assert set(snapshots.keys()) == {1, 2, 3}
+    for epoch, generator in snapshots.items():
+        noise = torch.randn(1, settings.latent_dim, 1, 1)
+        out = generator(noise, depth=settings.max_depth, alpha=1.0)
+        assert out.shape == (1, 3, settings.image_size, settings.image_size), (
+            f"snapshot epoch={epoch} output shape mismatch"
+        )
+    assert len(diagnostics) == settings.max_depth
+
+
+def test_select_progan_variant_keeps_real_and_filters_by_epoch() -> None:
+    """_select_progan_variant keeps all real rows and only the matching epoch variant."""
+    real_rows = [
+        {"is_synthetic": False, "split": "train", "final_depth_epochs": np.nan, "cancer_type": "A"}
+    ] * 5
+    rows_10 = [
+        {"is_synthetic": True, "split": "train", "final_depth_epochs": 10, "cancer_type": "A"}
+    ] * 3
+    rows_25 = [
+        {"is_synthetic": True, "split": "train", "final_depth_epochs": 25, "cancer_type": "A"}
+    ] * 4
+    rows_50 = [
+        {"is_synthetic": True, "split": "train", "final_depth_epochs": 50, "cancer_type": "A"}
+    ] * 2
+    frame = pd.DataFrame(real_rows + rows_10 + rows_25 + rows_50)
+
+    result_25 = _select_progan_variant(frame, final_depth_epochs=25)
+    assert (~result_25["is_synthetic"].astype(bool)).sum() == 5
+    synthetic_25 = result_25[result_25["is_synthetic"].astype(bool)]
+    assert len(synthetic_25) == 4
+    assert (synthetic_25["final_depth_epochs"] == 25).all()
+
+    result_10 = _select_progan_variant(frame, final_depth_epochs=10)
+    assert len(result_10[result_10["is_synthetic"].astype(bool)]) == 3
+
+    result_50 = _select_progan_variant(frame, final_depth_epochs=50)
+    assert len(result_50[result_50["is_synthetic"].astype(bool)]) == 2
 
 
 def test_paired_delta_table_skips_missing_patch_comparisons(tmp_path: Path) -> None:

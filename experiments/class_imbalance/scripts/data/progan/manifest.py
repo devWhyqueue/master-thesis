@@ -20,16 +20,25 @@ from scripts.data.progan.storage import (
     load_diagnostics,
     save_class_diagnostics,
     synthetic_output_root,
-    write_manifest,
+    variant_output_root,
+    write_combined_manifest,
+    write_variant_manifest,
 )
 from scripts.data.progan.train import train_class_progan, write_generated_images
 from scripts.data.staging.io import resolve_raw_image_path
 from scripts.modeling.training.support import _resolve_device
 
 
+_REFERENCE_FINAL_DEPTH_EPOCHS = 25
+"""Default final-depth epoch count used by the image-level patch_progan_aug path."""
+
+
 def progan_settings(config: dict, smoke: bool = False) -> ProGanSettings:
     """Build ProGAN settings from experiment config."""
     raw = dict(config["patch_synthetic_progan"])
+    grid: tuple[int, ...] = tuple(
+        int(v) for v in raw.get("final_depth_epoch_grid", (10, 25, 50))
+    )
     if smoke:
         raw["image_size"] = 8
         raw["epochs_per_depth"] = 1
@@ -37,6 +46,7 @@ def progan_settings(config: dict, smoke: bool = False) -> ProGanSettings:
             int(raw["max_real_patches_per_class"]), 16
         )
         raw["max_classes"] = 1
+        grid = (1, 2, 3)
     return ProGanSettings(
         image_size=int(raw["image_size"]),
         latent_dim=int(raw["latent_dim"]),
@@ -48,6 +58,7 @@ def progan_settings(config: dict, smoke: bool = False) -> ProGanSettings:
         max_classes=raw.get("max_classes"),
         fade_in_fraction=float(raw["fade_in_fraction"]),
         base_channels=int(raw["base_channels"]),
+        final_depth_epoch_grid=grid,
     )
 
 
@@ -96,9 +107,15 @@ def expected_generated_counts(
 
 
 def output_root_for_seed(config: dict, seed: int) -> Path:
-    """Return the synthetic output directory for one seed."""
+    """Return the seed-level synthetic output directory (parent of per-variant dirs)."""
     paths = ensure_dirs(config)
     return synthetic_output_root(paths["root"], seed)
+
+
+def _variant_root_for_seed(config: dict, seed: int, variant: int) -> Path:
+    """Return the per-variant synthetic output directory for one seed."""
+    paths = ensure_dirs(config)
+    return variant_output_root(paths["root"], seed, variant)
 
 
 def progan_array_upper_bound(config: dict, smoke: bool = False) -> int:
@@ -151,86 +168,142 @@ def _class_image_paths(
 def _train_and_write_class(
     train_frame: pd.DataFrame,
     settings: ProGanSettings,
-    output_root: Path,
+    seed_root: Path,
     class_name: str,
     seed: int,
     raw_root: Path,
-) -> dict[str, object]:
+) -> dict[int, dict[str, object]]:
+    """Train one class GAN, write one synthetic directory per grid variant.
+
+    Returns a mapping from final_depth_epochs to per-class diagnostics.
+    """
     image_paths = _class_image_paths(
         train_frame, class_name, settings, raw_root, benchmark_seed=seed
     )
     n_real = int((train_frame["cancer_type"] == class_name).sum())
     expected = expected_generated_counts(train_frame, settings)[class_name]
     device = _resolve_device("auto")
-    generator, training = train_class_progan(image_paths, settings, device, seed)
-    generated = write_generated_images(
-        generator, output_root / class_name, class_name, settings, device, expected
-    )
-    diagnostics = {
-        "balance_target": balance_target(train_frame, settings),
-        "class_name": class_name,
-        "fid": fid_payload(image_paths, generated, device),
-        "generated_patches": expected,
-        "real_train_patches": n_real,
-        "training": training,
-    }
-    save_class_diagnostics(output_root, diagnostics)
-    return diagnostics
+    snapshots, training = train_class_progan(image_paths, settings, device, seed)
+    per_variant: dict[int, dict[str, object]] = {}
+    for variant, generator in snapshots.items():
+        variant_dir = seed_root / f"epochs={variant}"
+        generated = write_generated_images(
+            generator, variant_dir / class_name, class_name, settings, device, expected
+        )
+        diag: dict[str, object] = {
+            "balance_target": balance_target(train_frame, settings),
+            "class_name": class_name,
+            "final_depth_epochs": variant,
+            "fid": fid_payload(image_paths, generated, device),
+            "generated_patches": expected,
+            "real_train_patches": n_real,
+            "training": training,
+        }
+        save_class_diagnostics(variant_dir, diag)
+        per_variant[variant] = diag
+    return per_variant
+
+
+def _all_variants_complete(
+    seed_root: Path, settings: ProGanSettings, expected: dict[str, int]
+) -> bool:
+    """Return True if every variant directory has the expected patch count for every class."""
+    for variant in settings.final_depth_epoch_grid:
+        variant_dir = seed_root / f"epochs={variant}"
+        for class_name, count in expected.items():
+            if not class_is_complete(variant_dir / class_name, count):
+                return False
+    return True
 
 
 def generate_class_progan(
     config: dict, seed: int, class_name: str, smoke: bool = False
-) -> dict[str, object]:
-    """Train one class-specific ProGAN and write synthetic patches for that class."""
+) -> dict[int, dict[str, object]]:
+    """Train one class-specific ProGAN and write synthetic patches for each grid variant."""
     settings = progan_settings(config, smoke)
     train_frame = train_frame_for_seed(config, seed)
-    output_root = output_root_for_seed(config, seed)
-    class_dir = output_root / class_name
+    seed_root = output_root_for_seed(config, seed)
     expected = expected_generated_counts(train_frame, settings).get(class_name, 0)
-    diag_path = diagnostics_path(output_root, class_name)
-    if class_is_complete(class_dir, expected) and diag_path.exists():
-        return load_class_diagnostics(diag_path)
-    if class_dir.exists():
-        shutil.rmtree(class_dir)
+    # Check if all variant directories are already complete.
+    all_done = all(
+        class_is_complete(seed_root / f"epochs={v}" / class_name, expected)
+        and diagnostics_path(seed_root / f"epochs={v}", class_name).exists()
+        for v in settings.final_depth_epoch_grid
+    )
+    if all_done:
+        return {
+            v: load_class_diagnostics(diagnostics_path(seed_root / f"epochs={v}", class_name))
+            for v in settings.final_depth_epoch_grid
+        }
+    # Remove any partial variant directories for this class before retraining.
+    for v in settings.final_depth_epoch_grid:
+        class_dir = seed_root / f"epochs={v}" / class_name
+        if class_dir.exists():
+            shutil.rmtree(class_dir)
     raw_root = Path(config["paths"]["raw_root"])
     return _train_and_write_class(
-        train_frame, settings, output_root, class_name, seed, raw_root
+        train_frame, settings, seed_root, class_name, seed, raw_root
     )
 
 
 def merge_patch_gan_manifest(config: dict, seed: int, smoke: bool = False) -> Path:
-    """Merge per-class synthetic outputs into one manifest for patch training."""
+    """Merge per-class synthetic outputs into per-variant and combined manifests.
+
+    Returns the path to the combined manifest (all variants, final_depth_epochs tagged)
+    which is used by Virchow2 feature extraction.  A per-variant manifest is also written
+    for the image-level patch_progan_aug path (reference variant).
+    """
     settings = progan_settings(config, smoke)
     train_frame = train_frame_for_seed(config, seed)
     expected = expected_generated_counts(train_frame, settings)
-    output_root = output_root_for_seed(config, seed)
-    missing = {
-        class_name: count
-        for class_name, count in expected.items()
-        if not class_is_complete(output_root / class_name, count)
-    }
-    if missing:
-        missing_text = ", ".join(f"{name}={count}" for name, count in missing.items())
-        raise RuntimeError(f"ProGAN classes incomplete for seed={seed}: {missing_text}")
-    rows = collect_rows(output_root)
-    if not smoke and expected and not rows:
-        raise RuntimeError("ProGAN augmentation produced no synthetic patches.")
-    return write_manifest(
-        output_root, rows, load_diagnostics(output_root), seed, settings
-    )
+    seed_root = output_root_for_seed(config, seed)
+
+    for variant in settings.final_depth_epoch_grid:
+        variant_dir = seed_root / f"epochs={variant}"
+        missing = {
+            class_name: count
+            for class_name, count in expected.items()
+            if not class_is_complete(variant_dir / class_name, count)
+        }
+        if missing:
+            missing_text = ", ".join(f"{name}={count}" for name, count in missing.items())
+            raise RuntimeError(
+                f"ProGAN classes incomplete for seed={seed} epochs={variant}: {missing_text}"
+            )
+        rows = collect_rows(variant_dir)
+        if not smoke and expected and not rows:
+            raise RuntimeError(
+                f"ProGAN augmentation produced no synthetic patches for seed={seed} epochs={variant}."
+            )
+        write_variant_manifest(
+            variant_dir, rows, load_diagnostics(variant_dir), seed, variant, settings
+        )
+
+    return write_combined_manifest(seed_root, settings)
+
+
+def merge_patch_gan_manifest_reference(
+    config: dict, seed: int, smoke: bool = False
+) -> Path:
+    """Return the reference-variant manifest for the image-level patch_progan_aug path."""
+    settings = progan_settings(config, smoke)
+    ref = _REFERENCE_FINAL_DEPTH_EPOCHS
+    if ref not in settings.final_depth_epoch_grid:
+        ref = max(settings.final_depth_epoch_grid)
+    seed_root = output_root_for_seed(config, seed)
+    return seed_root / f"epochs={ref}" / "synthetic_patch_manifest.csv"
 
 
 def generate_patch_gan_manifest(config: dict, seed: int, smoke: bool = False) -> Path:
-    """Train all class-specific GANs sequentially and write the manifest."""
+    """Train all class-specific GANs sequentially and write the combined manifest."""
     settings = progan_settings(config, smoke)
     train_frame = train_frame_for_seed(config, seed)
-    output_root = output_root_for_seed(config, seed)
+    seed_root = output_root_for_seed(config, seed)
     expected = expected_generated_counts(train_frame, settings)
-    rows = collect_rows(output_root)
-    if rows and generated_counts_match(rows, expected):
-        return write_manifest(
-            output_root, rows, load_diagnostics(output_root), seed, settings
-        )
+
+    if _all_variants_complete(seed_root, settings, expected):
+        return merge_patch_gan_manifest(config, seed, smoke)
+
     for class_name in tail_classes(train_frame, settings):
         generate_class_progan(config, seed, class_name, smoke)
     return merge_patch_gan_manifest(config, seed, smoke)

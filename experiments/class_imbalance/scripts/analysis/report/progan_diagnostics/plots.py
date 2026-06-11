@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 from PIL import Image
 
 from scripts.analysis.report.progan_diagnostics.metrics import (
+    _REFERENCE_FINAL_DEPTH_EPOCHS,
     load_summary,
     pretty_class_name,
     summary_path,
@@ -24,11 +25,21 @@ def _feature_cache_frame(cache_dir: Path) -> tuple[pd.DataFrame, np.memmap]:
 
 
 def _class_feature_groups(
-    manifest: pd.DataFrame, features: np.memmap, class_name: str
+    manifest: pd.DataFrame,
+    features: np.memmap,
+    class_name: str,
+    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
 ) -> tuple[np.ndarray, np.ndarray]:
     frame = cast(pd.DataFrame, manifest[manifest["cancer_type"] == class_name])
     real = frame[~frame["is_synthetic"].astype(bool)]
-    synthetic = frame[frame["is_synthetic"].astype(bool)]
+    synthetic_all = frame[frame["is_synthetic"].astype(bool)]
+    if "final_depth_epochs" in synthetic_all.columns:
+        synthetic = cast(
+            pd.DataFrame,
+            synthetic_all[synthetic_all["final_depth_epochs"].astype(int) == variant],
+        )
+    else:
+        synthetic = synthetic_all
     real_idx = np.asarray(real["feature_index"], dtype=np.int64)
     synthetic_idx = np.asarray(synthetic["feature_index"], dtype=np.int64)
     real_features = np.asarray(features[real_idx], dtype=np.float32)
@@ -42,12 +53,16 @@ def _nearest_real_index(real_features: np.ndarray, synthetic_vector: np.ndarray)
 
 
 def _synthetic_image_root(
-    paths: dict[str, Path], seed: int, summary: dict[str, Any]
+    paths: dict[str, Path],
+    seed: int,
+    summary: dict[str, Any],
+    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
 ) -> Path:
     candidates = [
+        Path(str(summary["image_root"])),
+        paths["root"] / "synthetic_patch_images" / f"seed={seed}" / f"epochs={variant}",
         paths["root"] / "outputs" / "synthetic_patch_images" / f"seed={seed}",
         paths["root"] / "synthetic_patch_images" / f"seed={seed}",
-        Path(str(summary["image_root"])),
     ]
     for path in candidates:
         if path.exists():
@@ -117,6 +132,7 @@ def _plot_class_examples(
     image_root: Path,
     raw_root: Path,
     examples_per_class: int,
+    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
 ) -> str:
     real_frame = cast(
         pd.DataFrame,
@@ -125,14 +141,21 @@ def _plot_class_examples(
             & (~manifest["is_synthetic"].astype(bool))
         ],
     )
-    synthetic_frame = cast(
+    synthetic_all = cast(
         pd.DataFrame,
         manifest[
             (manifest["cancer_type"] == class_name)
             & (manifest["is_synthetic"].astype(bool))
         ],
     )
-    real_features, _ = _class_feature_groups(manifest, features, class_name)
+    if "final_depth_epochs" in synthetic_all.columns:
+        synthetic_frame = cast(
+            pd.DataFrame,
+            synthetic_all[synthetic_all["final_depth_epochs"].astype(int) == variant],
+        )
+    else:
+        synthetic_frame = synthetic_all
+    real_features, _ = _class_feature_groups(manifest, features, class_name, variant=variant)
     for col_idx, (_, synthetic_row) in enumerate(
         synthetic_frame.head(examples_per_class).iterrows()
     ):
@@ -216,11 +239,12 @@ def plot_examples(
     example_classes: list[str],
     examples_per_class: int,
     output_path: Path,
+    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
 ) -> None:
     """Plot synthetic patches beside nearest real training neighbors."""
     manifest, features = _feature_cache_frame(cache_dir)
-    summary = load_summary(summary_path(paths, seed))
-    image_root = _synthetic_image_root(paths, seed, summary)
+    summary = load_summary(summary_path(paths, seed, variant))
+    image_root = _synthetic_image_root(paths, seed, summary, variant)
     raw_root = Path(str(config["paths"]["raw_root"]))
 
     fig, axes = _example_axes(example_classes, examples_per_class)
@@ -238,6 +262,7 @@ def plot_examples(
                 image_root,
                 raw_root,
                 examples_per_class,
+                variant=variant,
             )
         )
 

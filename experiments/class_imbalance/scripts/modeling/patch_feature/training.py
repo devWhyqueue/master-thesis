@@ -49,8 +49,8 @@ def select_patch_feature_rows(
     if method != "patch_feature_progan_aug":
         frame = cast(pd.DataFrame, frame[~frame["is_synthetic"].astype(bool)])
     else:
-        frame = _subsample_progan_synthetic(
-            frame, float(params.get("synthetic_fraction", 1.0)), seed
+        frame = _select_progan_variant(
+            frame, int(params.get("final_depth_epochs", 25))
         )
     if smoke:
         parts = [part.head(8) for _, part in frame.groupby("split", sort=False)]
@@ -138,27 +138,19 @@ def patch_feature_train_loader(
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler)
 
 
-def _subsample_progan_synthetic(
-    frame: pd.DataFrame, synthetic_fraction: float, seed: int
+def _select_progan_variant(
+    frame: pd.DataFrame, final_depth_epochs: int
 ) -> pd.DataFrame:
-    """Keep all real rows and deterministically subsample synthetic train rows."""
-    if synthetic_fraction >= 1.0:
-        return frame
-    if synthetic_fraction <= 0.0:
-        raise ValueError("synthetic_fraction must be positive")
+    """Keep all real rows and only synthetic rows for the requested epoch variant."""
     real = cast(pd.DataFrame, frame[~frame["is_synthetic"].astype(bool)])
     synthetic = cast(pd.DataFrame, frame[frame["is_synthetic"].astype(bool)])
     if synthetic.empty:
         return real
-    train = cast(pd.DataFrame, synthetic[synthetic["split"] == "train"])
-    if train.empty:
-        return pd.concat([real, synthetic], ignore_index=True)
-    sample_count = max(1, int(round(len(train) * synthetic_fraction)))
-    rng = np.random.default_rng(seed)
-    keep = train.sample(
-        n=min(sample_count, len(train)), random_state=rng, replace=False
+    variant = cast(
+        pd.DataFrame,
+        synthetic[synthetic["final_depth_epochs"].astype(int) == final_depth_epochs],
     )
-    return pd.concat([real, keep], ignore_index=True)
+    return pd.concat([real, variant], ignore_index=True)
 
 
 def _slice(
