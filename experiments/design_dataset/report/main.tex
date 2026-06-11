@@ -223,6 +223,7 @@ These findings should still be interpreted within the native-prevalence construc
 \section{Conclusion}
 This report defines a full-scale controlled TCGA-UT imbalance benchmark that keeps all 32 cancer types, preserves patient-disjoint validation and test splits, and varies only the training support profile. Under native-prevalence ordering, increasing imbalance lowers the balanced performance of CE baselines in both patch-feature and WSI-bag regimes. Patch-level class weighting, balanced sampling, and CE plus soft-F1 or soft-MCC largely recover this loss, while focal loss does not. At slide level, MDE-MIL and RankMix are the strongest methods, indicating that WSI-bag imbalance mitigation must account for aggregation and bag composition rather than only class frequency. The resulting analyses connect directly to the companion native long-tail benchmark while asking a more controlled question: when mitigation helps, is it correcting scarcity, changing the aggregation problem, or redistributing performance across the class spectrum?
 
+\clearpage
 \bibliographystyle{plainnat}
 \bibliography{references}
 

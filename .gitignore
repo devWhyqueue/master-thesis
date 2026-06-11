@@ -9,6 +9,7 @@ pyrightconfig.json
 .env
 .ruff_cache/
 *.sqlite*
+.claude/
 
 # LaTeX build outputs
 *.aux
