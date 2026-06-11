@@ -20,6 +20,7 @@ class Job:
     array_spec: str | None = None
     cpus_per_task: int = 4
     time_limit: str | None = None
+    mem: str | None = None
 
 
 def load_config(config_path: str) -> dict[str, str]:
@@ -145,6 +146,8 @@ def _slurm_script(job: Job, config: dict[str, str]) -> str:
     ]
     if job.time_limit:
         lines.append(f"#SBATCH --time={job.time_limit}")
+    if job.mem:
+        lines.append(f"#SBATCH --mem={job.mem}")
     if job.array_spec:
         lines.append(f"#SBATCH --array={job.array_spec}")
     lines.extend(

@@ -17,6 +17,7 @@ def tune(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
             array_spec=f"0-{count - 1}%{throttle}",
             cpus_per_task=int(config.get("cpus_per_task", "4")),
             time_limit=config.get("tune_time_limit"),
+            mem=config.get("tune_mem", "32G"),
         )
     ]
 
