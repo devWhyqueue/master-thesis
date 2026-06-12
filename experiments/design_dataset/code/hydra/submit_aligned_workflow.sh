@@ -9,31 +9,24 @@ export PYTHONPATH="${CODE_DIR}:${PYTHONPATH:-}"
 CONFIG="${1:-config.json}"
 PYTHON="python3 run.py --config=${CONFIG}"
 
-ORDERS=(native_prevalence easy_to_difficult difficult_to_easy)
-PARAMS=(0.0 1.0 1.3)
+ORDERS=(native_prevalence)
+PARAMS=(0.8 1.1 1.3)
 SEEDS=(0 1 2)
-REPORT_ROOT="/home/yannik.qu/master-thesis/prior work/design_dataset/report/outputs"
-CLASS_ORDER_DIR="${REPORT_ROOT}/class_orders"
 
 echo "=== Cancel obsolete prior-work jobs ==="
 scancel --name=wsi_train -u "$USER" 2>/dev/null || true
 scancel --name=constructed-report -u "$USER" 2>/dev/null || true
 scancel --name=construc -u "$USER" 2>/dev/null || true
 
-echo "=== Phase 1: constructed sampling (27 regimes x 3 seeds) ==="
+echo "=== Phase 1: constructed sampling (9 regimes: native x 3 params x 3 seeds) ==="
 for order in "${ORDERS[@]}"; do
-  extra=()
-  if [[ "${order}" != "native_prevalence" ]]; then
-    extra=(--class-order-file="${CLASS_ORDER_DIR}/${order}.json")
-  fi
   for param in "${PARAMS[@]}"; do
     for seed in "${SEEDS[@]}"; do
       echo "sample-full-scale order=${order} param=${param} seed=${seed}"
       ${PYTHON} sample-full-scale \
         --parameter="${param}" \
         --seed="${seed}" \
-        --class-order-name="${order}" \
-        ${extra[@]+"${extra[@]}"}
+        --class-order-name="${order}"
     done
   done
 done
@@ -41,7 +34,7 @@ done
 echo "=== Phase 2: verify cls_patchmean features ==="
 ${PYTHON} verify-features
 
-echo "=== Phase 3: WSI bag cache (27 constructed splits) ==="
+echo "=== Phase 3: WSI bag cache (9 constructed splits) ==="
 for order in "${ORDERS[@]}"; do
   for param in "${PARAMS[@]}"; do
     for seed in "${SEEDS[@]}"; do
@@ -54,7 +47,7 @@ for order in "${ORDERS[@]}"; do
   done
 done
 
-echo "=== Phase 3b: patch feature cache (27 constructed splits) ==="
+echo "=== Phase 3b: patch feature cache (9 constructed splits) ==="
 for order in "${ORDERS[@]}"; do
   for param in "${PARAMS[@]}"; do
     for seed in "${SEEDS[@]}"; do

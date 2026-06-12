@@ -75,6 +75,7 @@ def _parse_args() -> argparse.Namespace:
         default="redistribute",
         choices=["redistribute", "replacement"],
     )
+    parser.add_argument("--pool-size", type=int, default=None)
     parser.add_argument("--feature-dir", default=DEFAULT_FEATURE_DIR)
     parser.add_argument("--verify-features", action="store_true")
     args = parser.parse_args()

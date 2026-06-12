@@ -1,13 +1,6 @@
+import _bootstrap  # noqa: F401 - side-effect: sets sys.path for shared/code roots
 import argparse
 import logging
-import sys
-from pathlib import Path
-
-_EXPERIMENTS_ROOT = Path(__file__).resolve().parents[3]
-_CODE_ROOT = Path(__file__).resolve().parents[1]
-for _path in (_EXPERIMENTS_ROOT / "shared", _CODE_ROOT):
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
 
 from jobs import COMMAND_HANDLERS, execute, load_config
 
@@ -29,6 +22,7 @@ def _add_full_scale_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--sweep", action="store_true")
     parser.add_argument("--parameter", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--pool-size", type=int, default=None)
     parser.add_argument("--class-order-name", default="native_prevalence")
     parser.add_argument("--class-order-file", default=None)
 

@@ -66,12 +66,14 @@ def construct_training_split(
     parameter: float,
     seed: int,
     overflow_strategy: str = "redistribute",
+    total: int | None = None,
 ) -> pd.DataFrame:
-    """Sample a full-size constructed training split."""
+    """Sample a constructed training split."""
     slides = slide_frame(train_frame)
     available = cast(pd.Series, slides.groupby("cancer_type")["slide_id"].nunique())
+    pool = len(slides) if total is None else min(total, len(slides))
     targets = target_counts(
-        available, ordered_classes, parameter, len(slides), overflow_strategy
+        available, ordered_classes, parameter, pool, overflow_strategy
     )
     rng = np.random.default_rng(seed)
     parts = [
@@ -157,28 +159,40 @@ def constructed_payload(
     ordered_classes: list[str],
 ) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
     """Return capped split frames and target class counts."""
+    full = int(splits[args.train_name]["slide_id"].nunique())
+    pool = (
+        full if getattr(args, "pool_size", None) is None else min(args.pool_size, full)
+    )
     train = construct_training_split(
         splits[args.train_name],
         ordered_classes,
         args.parameter,
         args.seed,
         args.overflow_strategy,
+        total=pool,
     )
-    frames = {
-        "train": cap_patches(train, args.n_patches_per_slide),
-        "validation": cap_patches(
-            splits[args.validation_name], args.n_patches_per_slide
-        ),
-        "test": cap_patches(splits[args.test_name], args.n_patches_per_slide),
-    }
+    frames = _cap_all_splits(args, splits, train)
     targets = target_counts(
         _available_training_slides(args, splits),
         ordered_classes,
         args.parameter,
-        int(splits[args.train_name]["slide_id"].nunique()),
+        pool,
         args.overflow_strategy,
     )
     return frames, targets
+
+
+def _cap_all_splits(
+    args: argparse.Namespace,
+    splits: dict[str, pd.DataFrame],
+    train: pd.DataFrame,
+) -> dict[str, pd.DataFrame]:
+    n = args.n_patches_per_slide
+    return {
+        "train": cap_patches(train, n),
+        "validation": cap_patches(splits[args.validation_name], n),
+        "test": cap_patches(splits[args.test_name], n),
+    }
 
 
 def output_dir_for_args(args: argparse.Namespace) -> str:

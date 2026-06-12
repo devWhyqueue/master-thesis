@@ -85,6 +85,9 @@ def _sample_full_scale_cmd(
         f"--test-name={config.get('test_split_name', 'test')}",
         f"--overflow-strategy={config.get('overflow_strategy', 'redistribute')}",
     ]
+    pool_size = config.get("full_scale_pool_size")
+    if pool_size is not None:
+        cmd.append(f"--pool-size={pool_size}")
     split_path = _seed_path(config.get("split_assignment_csv", ""), seed)
     if split_path:
         cmd.append(f"--split-assignment-path={split_path}")
