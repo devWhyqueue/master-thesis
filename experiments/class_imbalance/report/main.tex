@@ -340,6 +340,38 @@ Hard MCC replaces $\widehat{Y}$ by one-hot argmax predictions, which again block
 \end{equation}
 \noindent This variant is also evaluated only in the patch benchmark and is trained with class-balanced oversampling. The soft-F1 and soft-MCC variants therefore ask a focused question: once tail classes are regularly presented to the optimizer, does adding a differentiable version of a class-balanced evaluation metric improve the controlled patch classifier beyond CE and simple balanced sampling?
 
+\subsubsection{Odd-K-Out (OKO) Set Learning}
+Standard cross-entropy optimizes each example independently, which has two relevant consequences in a long-tailed setting. First, the gradient signal for a tail class arrives only when that class is sampled, so rare examples can be overwhelmed by frequent ones. Second, hard-label cross-entropy encourages logit values to diverge without bound, which is a known driver of overconfidence and poor calibration \citep{guo2017calibration}. OKO \citep{muttenthaler2024setLearning} addresses both problems simultaneously by replacing per-example cross-entropy with a set-level objective. Calibration is inherently a property of a model's output distribution over a collection of examples, and training on sets is a natural way to expose the model to that distributional structure during learning.
+
+\paragraph{Set construction.}
+A training set $S$ of size $k+2$ is constructed as follows. A pair class $y'$ is sampled uniformly from $[C]$, equalizing class frequency in expectation regardless of the training distribution---analogous to balanced sampling but applied at the set level rather than the sample level. Two examples $x'_1,x'_2$ are drawn from the class $y'$, and $k$ distinct odd classes $y'_3,\ldots,y'_{k+2}$ are sampled without replacement from $[C]\setminus\{y'\}$. One representative example $x'_{j}$ is drawn from each odd class $y'_j$. The resulting set $S=(x'_1,\ldots,x'_{k+2})$ therefore always contains exactly one matched pair and $k$ distractors from different classes.
+
+\paragraph{Set-aggregated loss.}
+For a model $f_\theta$ parameterized by $\theta$, OKO defines the aggregated logit vector as the sum of individual per-example outputs over the set members:
+\begin{equation}
+  f_\theta(S) = \sum_{i=1}^{k+2} f_\theta(x'_i).
+  \label{eq:oko-aggregate}
+\end{equation}
+\noindent Prediction on the aggregated logits uses ordinary softmax. The pair class $y'$ appears twice in the set and its two logit contributions therefore reinforce each other, raising the aggregate score for $y'$ relative to any single odd class. This pooling effectively averages the raw logit values across set members, which limits how extreme the aggregate can be---an implicit logit regularization that the paper links to improved calibration even when training with hard labels.
+
+The main training loss predicts the pair class from the aggregated logits:
+\begin{equation}
+  \ell_{\mathrm{OKO}} = -\log\,\mathrm{softmax}(f_\theta(S))_{y'}.
+  \label{eq:oko-hard-loss}
+\end{equation}
+
+Following the main-text configuration of the original paper, the implementation also trains an auxiliary classification head $g_\theta$ that shares the trunk with $f_\theta$ and predicts the first odd class $y'_3$:
+\begin{equation}
+  \ell_{\mathrm{aux}} = -\log\,\mathrm{softmax}(g_\theta(S))_{y'_3}.
+  \label{eq:oko-aux-loss}
+\end{equation}
+\noindent The total per-set loss is $\ell_{\mathrm{OKO}}+\ell_{\mathrm{aux}}$. The auxiliary head is discarded at inference, and single-example evaluation proceeds exactly as for any other classifier: the model accepts one patch feature vector and returns the logits from the main head. There is no inference overhead or architecture change at test time.
+
+\paragraph{Taxonomy and scope.}
+OKO belongs in the hybrid sampling--loss category because the set construction couples a balanced class-sampling policy with a modified training objective; neither component is meaningful on its own. Balanced sampling via uniform pair-class selection ensures that all $C$ classes contribute equally to the gradient signal in expectation, which directly addresses the data-level imbalance problem. The aggregated set-level loss then introduces an implicit regularization on logit magnitude. Together these are not separable in the same way that standard cross-entropy and a WeightedRandomSampler are separable. In this benchmark OKO is evaluated in the patch feature regime only; the set-construction mechanism does not extend naturally to the attention-MIL bag encoder used in the WSI-bag benchmark.
+
+The number of odd classes $k$ controls set size and therefore the degree of logit averaging. The paper's ablation experiments show that accuracy and calibration are insensitive to the specific value of $k$, and the default of $k=1$ is the computationally cheapest option. The validation sweep covers $k\in\{1,2,3,4\}$ with the default fixed at $k=1$.
+
 \subsection{Synthetic Data Generation}
 Synthetic generation is data-level in spirit but is separated because it introduces new generated samples rather than resampling observed ones. In histopathology, this family is attractive because deleting majority-class tissue wastes data, while naive image-space interpolation often produces unrealistic pathology images \citep{saini2023tacklingClass,ruizcasado2024enhancingHistopathological}. The practical hope is simple: if real minority-class patches are scarce, a generator may learn enough of their stain, texture, and tissue morphology distribution to provide additional plausible training examples.
 
@@ -491,6 +523,7 @@ Each method is evaluated under one shared training budget per benchmark (Table~\
     Patch & CFAL & $\gamma=2$ & $\gamma\in\{0.5,1,2,5\}$\\
     Patch & D\&C & $k=10$ & $k\in\{5,10,15,20\}$\\
     Patch & ProGAN augmentation & Final-depth epochs $=25$ & $\{10,25,50\}$\\
+    Patch & OKO & $k=1$ & $k\in\{1,2,3,4\}$\\
     WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32\}$\\
     WSI bag & SC-MIL & $\tau=1$ & $\tau\in\{0.05,0.1,0.2,0.5\}$\\
     WSI bag & MDE-MIL & $\lambda_{\mathrm{con}}=0.25$ & $\lambda_{\mathrm{con}}\in\{0.1,0.25,0.3,0.5,1,2,4\}$\\

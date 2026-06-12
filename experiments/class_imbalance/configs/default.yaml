@@ -54,6 +54,7 @@ patch_feature_training:
   cfal_sigma: 1.0
   cfal_gamma: 2.0
   cfal_beta: 0.999
+  oko_k: 1
   dnc_k_clusters: 10
   dnc_zscore_bins: 5
   dnc_expert_epochs: 20
@@ -113,6 +114,7 @@ patch_feature_methods:
   - patch_feature_progan_aug
   - patch_feature_cfal
   - patch_feature_divide_conquer
+  - patch_feature_oko
 
 wsi_bag_methods:
   - mil_ce

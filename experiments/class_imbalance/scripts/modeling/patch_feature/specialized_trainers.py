@@ -6,6 +6,7 @@ import torch
 
 from scripts.modeling.patch_feature.cfal import train_cfal_model
 from scripts.modeling.patch_feature.divide_conquer import train_divide_conquer_model
+from scripts.modeling.patch_feature.oko import train_oko_model
 from scripts.modeling.patch_feature.training import PatchFeatureDataset
 
 
@@ -37,4 +38,8 @@ def fit_special_patch_method(
             tuning_params,
         )
         return model, diagnostics
+    if method == "patch_feature_oko":
+        return train_oko_model(
+            train_set, len(class_names), settings, device, seed, tuning_params
+        ), None
     return None

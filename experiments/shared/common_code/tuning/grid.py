@@ -24,6 +24,7 @@ PATCH_FEATURE_SPECS = (
     ("patch_feature_cfal", "cfal_gamma", [0.5, 1.0, 2.0, 5.0]),
     ("patch_feature_divide_conquer", "dnc_k_clusters", [5.0, 10.0, 15.0, 20.0]),
     ("patch_feature_progan_aug", "final_depth_epochs", [10.0, 25.0, 50.0]),
+    ("patch_feature_oko", "oko_k", [1.0, 2.0, 3.0, 4.0]),
 )
 WSI_BAG_SPECS = (
     ("mil_weighted_ce", "weight_power", [0.0, 0.125, 0.25, 0.5, 0.75, 1.0]),
@@ -46,22 +47,27 @@ class TuningVariant:
 
     @property
     def label(self) -> str:
+        """Return a human-readable label of all parameter key=value pairs."""
         return ", ".join(f"{key}={value:g}" for key, value in self.params.items())
 
     @property
     def params_json(self) -> str:
+        """Return the parameter dict as a compact sorted JSON string."""
         return json.dumps(self.params, sort_keys=True, separators=(",", ":"))
 
 
 def patch_feature_grid() -> list[TuningVariant]:
+    """Return all patch-feature validation-tuning variants."""
     return grid_from_specs("patch_feature", PATCH_FEATURE_SPECS)
 
 
 def wsi_bag_grid() -> list[TuningVariant]:
+    """Return all WSI-bag validation-tuning variants."""
     return grid_from_specs("wsi_bag", WSI_BAG_SPECS)
 
 
 def grid_for_benchmark(benchmark: str) -> list[TuningVariant]:
+    """Return the tuning grid for the named benchmark."""
     if benchmark == "patch_feature":
         return patch_feature_grid()
     if benchmark == "wsi_bag":
@@ -70,6 +76,7 @@ def grid_for_benchmark(benchmark: str) -> list[TuningVariant]:
 
 
 def task_for_array_index(benchmark: str, array_index: int) -> tuple[TuningVariant, int]:
+    """Return the tuning variant and seed for a SLURM array task index."""
     grid = grid_for_benchmark(benchmark)
     total = len(grid) * len(SEEDS)
     if array_index < 0 or array_index >= total:
@@ -78,10 +85,12 @@ def task_for_array_index(benchmark: str, array_index: int) -> tuple[TuningVarian
 
 
 def task_count(benchmark: str) -> int:
+    """Return the total number of tuning array tasks for one benchmark."""
     return len(grid_for_benchmark(benchmark)) * len(SEEDS)
 
 
 def validate_tuning_params(benchmark: str, method: str, params: dict[str, Any]) -> None:
+    """Raise ValueError if any tuning parameter key is not in the allowed grid."""
     allowed = {
         (variant.benchmark, variant.method, next(iter(variant.params)))
         for variant in patch_feature_grid() + wsi_bag_grid()
@@ -94,6 +103,7 @@ def validate_tuning_params(benchmark: str, method: str, params: dict[str, Any]) 
 def grid_from_specs(
     benchmark: str, specs: tuple[tuple[str, str, list[float]], ...]
 ) -> list[TuningVariant]:
+    """Build a flat list of TuningVariant from named spec tuples."""
     grid: list[TuningVariant] = []
     for method, key, values in specs:
         for value in values:

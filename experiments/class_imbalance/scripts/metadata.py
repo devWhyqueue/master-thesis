@@ -48,6 +48,11 @@ PATCH_METHOD_METADATA: dict[str, dict[str, Any]] = {
         "taxonomy_category": "representation and architecture",
         "representative_paper": "Nouyed et al.; Divide-and-Conquer",
     },
+    "patch_oko": {
+        "role": "representative",
+        "taxonomy_category": "hybrid sampling-loss",
+        "representative_paper": "Muttenthaler et al.; OKO (odd-k-out set learning)",
+    },
 }
 
 PATCH_FEATURE_METHOD_ALIASES = {
@@ -60,6 +65,7 @@ PATCH_FEATURE_METHOD_ALIASES = {
     "patch_feature_progan_aug": "patch_progan_aug",
     "patch_feature_cfal": "patch_cfal",
     "patch_feature_divide_conquer": "patch_dnc",
+    "patch_feature_oko": "patch_oko",
 }
 
 WSI_METHOD_METADATA: dict[str, dict[str, Any]] = {
