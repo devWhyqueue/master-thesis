@@ -42,4 +42,5 @@ experiments/design_dataset/results/
 experiments/design_dataset/code/config.json
 experiments/design_dataset/code/hydra/config.json
 experiments/design_dataset/code/hydra/logs/
+experiments/design_dataset/report/outputs/tuning_selection.json
 
