@@ -15,9 +15,6 @@ from tcga_ut_imbalanced.plotting.calibration import (
 SPLIT_PATTERN = re.compile(
     r"constructed_order=(?P<order>.+)_parameter=(?P<parameter>[\d.]+)_seed=(?P<seed>\d+)"
 )
-RESULT_PATTERN = re.compile(
-    r"results_(?P<method>.+)/order=(?P<order>.+)/param=(?P<parameter>[\d.]+)/seed=(?P<seed>\d+)"
-)
 METRICS = ("accuracy", "balanced_accuracy", "macro_f1")
 
 
@@ -41,7 +38,7 @@ def main() -> None:
     split_frame = split_summary(Path(args.constructed_dataset_dir))
     write_split_summary(split_frame, tables_dir / "constructed_split_summary.tex")
     plot_support(split_frame, figures_dir / "constructed_support_by_rank.png")
-    result_frame = result_summary(Path(args.results_dir))
+    result_frame = result_summary(Path(args.results_dir), output_dir)
     write_result_tables(result_frame, tables_dir)
     calibration_frame = calibration_summary(Path(args.results_dir))
     write_calibration_tables(calibration_frame, tables_dir)
@@ -59,14 +56,50 @@ def split_summary(root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def result_summary(root: Path) -> pd.DataFrame:
-    """Return one row per saved test result."""
+def result_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
+    """Return test results for tuning-selected winners, one row per (method, regime, seed)."""
+    selection_path = output_dir / "tuning_selection.json"
+    if not selection_path.exists():
+        return pd.DataFrame()
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    if not selection:
+        return pd.DataFrame()
     rows = []
-    for path in sorted(root.glob("results_*/order=*/param=*/seed=*/test_results.json")):
-        match = RESULT_PATTERN.search(str(path.parent))
-        if match is None:
+    for entry in selection:
+        dir_benchmark = entry["benchmark"]  # "patch" or "wsi" — matches directory name
+        method = entry["method"]
+        regime = entry["regime"]  # "order=ORDER/param=PARAM"
+        variant = entry["variant"]
+        order_match = re.match(
+            r"order=(?P<order>.+)/param=(?P<parameter>[\d.]+)", regime
+        )
+        if order_match is None:
             continue
-        rows.append(_result_row(match.groupdict(), path))
+        order = order_match.group("order")
+        parameter = float(order_match.group("parameter"))
+        for seed in range(3):
+            test_path = (
+                results_dir
+                / "tuning"
+                / dir_benchmark
+                / regime
+                / method
+                / variant
+                / f"seed={seed}"
+                / "test_results.json"
+            )
+            if not test_path.exists():
+                continue
+            with open(test_path, encoding="utf-8") as f:
+                payload = json.load(f)
+            rows.append({
+                "method": method,
+                "benchmark": _benchmark(method),
+                "order": order,
+                "parameter": parameter,
+                "seed": seed,
+                **{metric: float(payload[metric]) for metric in METRICS},
+            })
     return pd.DataFrame(rows)
 
 
@@ -188,19 +221,6 @@ def _split_rows(metadata: dict[str, str], counts_path: Path) -> list[dict[str, o
         for rank, (class_name, count) in enumerate(ordered, start=1)
     ]
 
-
-def _result_row(metadata: dict[str, str], path: Path) -> dict[str, object]:
-    with open(path) as file:
-        payload = json.load(file)
-    method = metadata["method"]
-    return {
-        "method": method,
-        "benchmark": _benchmark(method),
-        "order": metadata["order"],
-        "parameter": float(metadata["parameter"]),
-        "seed": int(metadata["seed"]),
-        **{metric: float(payload[metric]) for metric in METRICS},
-    }
 
 
 def _benchmark(method: str) -> str:
