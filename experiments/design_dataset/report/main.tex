@@ -117,6 +117,8 @@ Each constructed split is indexed by seed and imbalance parameter $\lambda \in \
 
 The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the case-disjoint splits, frozen Virchow2 representation family, and 30-instance evidence budget, but they differ in prediction unit and aggregation mechanism.
 
+Calibration is evaluated alongside discrimination using negative log likelihood (NLL), multiclass Brier score \citep{brier1950verification}, and expected calibration error \citep[ECE;][]{naeini2015obtaining,guo2017calibration}; full metric definitions and the temperature-scaling rationale follow the companion class-imbalance benchmark. For each method and seed, a single temperature is fit by minimizing NLL on the validation split and applied unchanged to the test score matrix before softmax \citep{guo2017calibration}. Tables~\ref{tab:calibration-patch} and~\ref{tab:calibration-wsi} report both raw and temperature-scaled scores for each constructed regime.
+
 \section{Results}
 \label{sec:results}
 The result analysis asks how methods respond as imbalance severity increases from $\lambda=0.8$ to $\lambda=1.3$ under the native-prevalence class order. Table~\ref{tab:constructed-split-summary} summarises the realized support profiles; Figure~\ref{fig:constructed-support} shows their per-rank structure. Tables~\ref{tab:patch-results} and~\ref{tab:wsi-results} compare mitigation methods within the patch-feature and WSI-bag regimes.
@@ -188,6 +190,43 @@ Patch-feature results show a consistent, monotone decline as imbalance intensifi
 
 The WSI-bag regime shows a clearer separation between method families and a somewhat more complex imbalance response than the patch regime (Table~\ref{tab:wsi-results}). MDE-MIL achieves the highest balanced accuracy at $\lambda=0.8$ (\num{0.830}) and declines to \num{0.808} and \num{0.799} at $\lambda=1.1$ and $\lambda=1.3$. RankMix is the closest competitor and is notably stable: \num{0.830}, \num{0.818}, \num{0.820} across the three severities, with its performance at $\lambda=1.3$ essentially matching $\lambda=0.8$. SC-MIL follows at \num{0.822}--\num{0.807}--\num{0.787}. Focal MIL declines more steeply: \num{0.816} at $\lambda=0.8$ to \num{0.773} at $\lambda=1.3$. Weighted MIL is the most stable loss-based method (\num{0.799}--\num{0.791}--\num{0.798}), with its $\lambda=1.3$ result close to $\lambda=0.8$. Balanced-sampling MIL occupies the lowest tier (\num{0.793}--\num{0.795}--\num{0.769}), with a more pronounced drop at the strongest imbalance. The ranking of method families---MDE-MIL and RankMix ahead of SC-MIL and focal MIL, ahead of loss-reweighting variants---is broadly maintained across all three severities, with only minor shuffling between focal MIL and MDE-MIL at $\lambda=1.3$. The within-family advantage of bag-composition mechanisms over loss-based variants persists regardless of imbalance severity.
 
+\paragraph{Probability Calibration.}
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/result_calibration_patch.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_patch.tex}}%
+  }{%
+    \begin{tabular}{lccccccc}
+      \toprule
+      Method & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
+      \midrule
+      \multicolumn{8}{c}{Patch calibration table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{Patch-feature calibration metrics for validation-selected configurations under constructed training distributions. NLL, Brier, and ECE are reported before (raw) and after (TS) post-hoc temperature scaling; $T$ is the per-seed mean fitted temperature.}
+  \label{tab:calibration-patch}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/result_calibration_wsi_bag.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_wsi_bag.tex}}%
+  }{%
+    \begin{tabular}{lccccccc}
+      \toprule
+      Method & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
+      \midrule
+      \multicolumn{8}{c}{WSI-bag calibration table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{WSI-bag calibration metrics for validation-selected configurations under constructed training distributions. Columns as in Table~\ref{tab:calibration-patch}.}
+  \label{tab:calibration-wsi}
+\end{table}
+
+\noindent In the patch regime, CFAL's affinity-based outputs are systematically over-confident in raw form---geometric affinity scores are not trained as calibrated likelihoods---and temperature scaling corrects this inversion, bringing CFAL's post-hoc scores in line with or below the CE baseline; loss-reweighting methods (weighted CE, focal loss) show more modest raw over-confidence that temperature scaling further reduces. In the WSI-bag regime, MDE-MIL and RankMix achieve the lowest raw NLL and ECE among WSI methods; after temperature scaling the gap relative to simpler MIL baselines narrows, consistent with the companion benchmark finding that the raw calibration advantage of bag-composition methods is partly a confidence-scale effect rather than a uniform calibration improvement. Calibration rankings are broadly stable across imbalance severities, mirroring the discrimination pattern: the method ordering at $\lambda=0.8$ is preserved at $\lambda=1.3$ for both raw and temperature-scaled scores.
+
 \section{Discussion}
 \label{sec:discussion}
 The controlled construction reveals two complementary patterns. First, method rankings are preserved across imbalance severities: no method that is competitive at mild imbalance ($\lambda=0.8$) falls behind methods it outperformed there as imbalance intensifies to $\lambda=1.3$. Second, balanced accuracy declines monotonically with $\lambda$ for almost all methods, with a total range of three to six percentage points from the mildest to the strongest constructed regime. These two patterns together suggest that the relative utility of mitigation methods is robust to the particular severity chosen within this range, but that absolute performance is sensitive to the support available for rare classes.
@@ -196,10 +235,12 @@ The monotone decline is more pronounced in the patch regime than the WSI-bag reg
 
 In the WSI-bag regime, RankMix and weighted MIL stand out for their stability across $\lambda$: both show less than two percentage points of decline from $\lambda=0.8$ to $\lambda=1.3$, suggesting that their mechanisms---bag-level mixing and inverse-frequency reweighting---respond differently to increasing class sparsity than aggregation-focused methods such as MDE-MIL and SC-MIL, which exhibit steeper declines. The ranking of bag-composition methods over loss-based variants is maintained throughout, indicating that the advantage of WSI-specific aggregation mechanisms is not contingent on the severity of training imbalance.
 
+Calibration analysis complements discrimination: CFAL leads on patch discrimination but requires temperature scaling to produce reliable probability outputs, while MDE-MIL and RankMix improve both discrimination and raw calibration in the WSI-bag regime, though the gap relative to loss-based baselines narrows after a shared post-hoc scaling step.
+
 Taken together, these results extend the companion benchmark in a controlled direction. The companion demonstrated that class frequency alone does not predict classwise difficulty in the native TCGA-UT distribution. The present experiment shows that when frequency is imposed directly via a clean power-law construction, aggregate discrimination declines predictably but modestly with imbalance severity, and the method ranking remains informative across the range tested. The prediction unit---patch versus WSI-bag---continues to be the dominant determinant of absolute performance: WSI-bag methods achieve balanced accuracy twelve to fifteen percentage points higher than their patch-feature counterparts at equivalent imbalance.
 
 \section{Conclusion}
-This report defines a full-scale controlled TCGA-UT imbalance benchmark that keeps all 32 cancer types, preserves patient-disjoint validation and test splits, and varies the training support profile under native-prevalence class ordering at imbalance parameters $\lambda \in \{0.8, 1.1, 1.3\}$. A fixed pool of \num{1528} slides ensures that the power-law construction remains capping-free at all three severities, yielding realized head-to-tail ratios of approximately 15:1, 43:1, and 78:1 that bracket the native TCGA-UT long tail. The primary finding across all three constructed regimes is that method rankings are preserved while balanced accuracy declines monotonically by three to six percentage points from $\lambda=0.8$ to $\lambda=1.3$. At the patch level, CFAL achieves the highest balanced accuracy and shows the most controlled decline; divide-and-conquer is the weakest patch method and suffers the steepest loss. At the WSI-bag level, MDE-MIL and RankMix lead across all severities; RankMix and weighted MIL are the most stable methods under increasing imbalance. The preserved ranking across severities indicates that method selection can be informed by experiments at mild imbalance, while the monotone decline confirms that stronger imbalance meaningfully degrades absolute performance. The prediction unit remains the dominant determinant: WSI-bag methods achieve balanced accuracy roughly fifteen percentage points above patch-feature methods at equivalent imbalance severity.
+This report defines a full-scale controlled TCGA-UT imbalance benchmark that keeps all 32 cancer types, preserves patient-disjoint validation and test splits, and varies the training support profile under native-prevalence class ordering at imbalance parameters $\lambda \in \{0.8, 1.1, 1.3\}$. A fixed pool of \num{1528} slides ensures that the power-law construction remains capping-free at all three severities, yielding realized head-to-tail ratios of approximately 15:1, 43:1, and 78:1 that bracket the native TCGA-UT long tail. The primary finding across all three constructed regimes is that method rankings are preserved while balanced accuracy declines monotonically by three to six percentage points from $\lambda=0.8$ to $\lambda=1.3$. At the patch level, CFAL achieves the highest balanced accuracy and shows the most controlled decline; divide-and-conquer is the weakest patch method and suffers the steepest loss. At the WSI-bag level, MDE-MIL and RankMix lead across all severities; RankMix and weighted MIL are the most stable methods under increasing imbalance. The preserved ranking across severities indicates that method selection can be informed by experiments at mild imbalance, while the monotone decline confirms that stronger imbalance meaningfully degrades absolute performance. The prediction unit remains the dominant determinant: WSI-bag methods achieve balanced accuracy roughly fifteen percentage points above patch-feature methods at equivalent imbalance severity. Temperature scaling corrects CFAL's affinity-based over-confidence and narrows the raw calibration advantage of MDE-MIL and RankMix, confirming that the best discriminator and the best-calibrated method are not always the same, and that a post-hoc step is sufficient to align probability outputs across all methods evaluated.
 
 \clearpage
 \bibliographystyle{plainnat}

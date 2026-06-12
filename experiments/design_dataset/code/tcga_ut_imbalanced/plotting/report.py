@@ -7,6 +7,13 @@ from typing import cast
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from tcga_ut_imbalanced.plotting import (
+    _benchmark,
+    _mean_std,
+    _tex,
+    _write_table,
+    _write_unavailable,
+)
 from tcga_ut_imbalanced.plotting.calibration import (
     calibration_summary,
     write_calibration_tables,
@@ -40,7 +47,7 @@ def main() -> None:
     plot_support(split_frame, figures_dir / "constructed_support_by_rank.png")
     result_frame = result_summary(Path(args.results_dir), output_dir)
     write_result_tables(result_frame, tables_dir)
-    calibration_frame = calibration_summary(Path(args.results_dir))
+    calibration_frame = calibration_summary(Path(args.results_dir), output_dir)
     write_calibration_tables(calibration_frame, tables_dir)
 
 
@@ -64,43 +71,48 @@ def result_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
     selection = json.loads(selection_path.read_text(encoding="utf-8"))
     if not selection:
         return pd.DataFrame()
-    rows = []
+    return pd.DataFrame(_result_runs(results_dir, selection))
+
+
+def _result_runs(results_dir: Path, selection: list[dict]) -> list[dict]:
+    rows: list[dict] = []
     for entry in selection:
-        dir_benchmark = entry["benchmark"]  # "patch" or "wsi" — matches directory name
-        method = entry["method"]
-        regime = entry["regime"]  # "order=ORDER/param=PARAM"
-        variant = entry["variant"]
-        order_match = re.match(
-            r"order=(?P<order>.+)/param=(?P<parameter>[\d.]+)", regime
+        rows.extend(_entry_result_rows(entry, results_dir))
+    return rows
+
+
+def _entry_result_rows(entry: dict, results_dir: Path) -> list[dict]:
+    m = re.match(r"order=(?P<order>.+)/param=(?P<parameter>[\d.]+)", entry["regime"])
+    if m is None:
+        return []
+    order, parameter = m.group("order"), float(m.group("parameter"))
+    rows = []
+    for seed in range(3):
+        test_path = (
+            results_dir
+            / "tuning"
+            / entry["benchmark"]
+            / entry["regime"]
+            / entry["method"]
+            / entry["variant"]
+            / f"seed={seed}"
+            / "test_results.json"
         )
-        if order_match is None:
+        if not test_path.exists():
             continue
-        order = order_match.group("order")
-        parameter = float(order_match.group("parameter"))
-        for seed in range(3):
-            test_path = (
-                results_dir
-                / "tuning"
-                / dir_benchmark
-                / regime
-                / method
-                / variant
-                / f"seed={seed}"
-                / "test_results.json"
-            )
-            if not test_path.exists():
-                continue
-            with open(test_path, encoding="utf-8") as f:
-                payload = json.load(f)
-            rows.append({
-                "method": method,
-                "benchmark": _benchmark(method),
+        with open(test_path, encoding="utf-8") as f:
+            payload = json.load(f)
+        rows.append(
+            {
+                "method": entry["method"],
+                "benchmark": _benchmark(entry["method"]),
                 "order": order,
                 "parameter": parameter,
                 "seed": seed,
                 **{metric: float(payload[metric]) for metric in METRICS},
-            })
-    return pd.DataFrame(rows)
+            }
+        )
+    return rows
 
 
 def write_split_summary(frame: pd.DataFrame, path: Path) -> None:
@@ -220,36 +232,6 @@ def _split_rows(metadata: dict[str, str], counts_path: Path) -> list[dict[str, o
         }
         for rank, (class_name, count) in enumerate(ordered, start=1)
     ]
-
-
-
-def _benchmark(method: str) -> str:
-    wsi_tokens = ("mil", "rankmix", "sc_mil", "mde")
-    return "wsi_bag" if any(token in method for token in wsi_tokens) else "patch"
-
-
-def _mean_std(row: pd.Series, metric: str) -> str:
-    mean = float(row[f"{metric}_mean"])
-    std = row[f"{metric}_std"]
-    std_value = 0.0 if bool(pd.isna(std)) else float(std)
-    return f"\\num{{{mean:.3f}}} $\\pm$ \\num{{{std_value:.3f}}}"
-
-
-def _tex(value: object) -> str:
-    return str(value).replace("_", "\\_")
-
-
-def _write_unavailable(path: Path, header: str) -> None:
-    columns = header.count("&") + 1
-    row = f"\\multicolumn{{{columns}}}{{c}}{{Generated results unavailable.}}\\\\"
-    _write_table(path, header, [row])
-
-
-def _write_table(path: Path, header: str, rows: list[str]) -> None:
-    spec = "l" * (header.count("&") + 1)
-    body = ["\\begin{tabular}{" + spec + "}", "\\toprule", f"{header}\\\\"]
-    body.extend(["\\midrule", *rows, "\\bottomrule", "\\end{tabular}"])
-    path.write_text("\n".join(body) + "\n")
 
 
 if __name__ == "__main__":

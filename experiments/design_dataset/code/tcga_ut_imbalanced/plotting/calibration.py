@@ -6,9 +6,14 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-RESULT_PATTERN = re.compile(
-    r"results_(?P<method>.+)/order=(?P<order>.+)/param=(?P<parameter>[\d.]+)/seed=(?P<seed>\d+)"
+from tcga_ut_imbalanced.plotting import (
+    _benchmark,
+    _mean_std,
+    _tex,
+    _write_table,
+    _write_unavailable,
 )
+
 CALIBRATION_METRICS = (
     "negative_log_likelihood",
     "brier_score",
@@ -16,20 +21,52 @@ CALIBRATION_METRICS = (
 )
 
 
-def calibration_summary(root: Path) -> pd.DataFrame:
+def calibration_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
     """Return raw and temperature-scaled calibration metrics per run."""
+    selection_path = output_dir / "tuning_selection.json"
+    if not selection_path.exists():
+        return pd.DataFrame()
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    if not selection:
+        return pd.DataFrame()
+    return pd.DataFrame(_calibration_runs(results_dir, selection))
+
+
+def _calibration_runs(results_dir: Path, selection: list[dict]) -> list[dict]:
+    rows: list[dict] = []
+    for entry in selection:
+        rows.extend(_entry_calibration_rows(entry, results_dir))
+    return rows
+
+
+def _entry_calibration_rows(entry: dict, results_dir: Path) -> list[dict]:
+    m = re.match(r"order=(?P<order>.+)/param=(?P<parameter>[\d.]+)", entry["regime"])
+    if m is None:
+        return []
+    base = {
+        "method": entry["method"],
+        "order": m.group("order"),
+        "parameter": m.group("parameter"),
+    }
     rows = []
-    for test_path in sorted(
-        root.glob("results_*/order=*/param=*/seed=*/test_results.json")
-    ):
-        match = RESULT_PATTERN.search(str(test_path.parent))
-        validation_path = test_path.parent / "validation_results.json"
-        if match is None or not validation_path.exists():
+    for seed in range(3):
+        run_dir = (
+            results_dir
+            / "tuning"
+            / entry["benchmark"]
+            / entry["regime"]
+            / entry["method"]
+            / entry["variant"]
+            / f"seed={seed}"
+        )
+        val = run_dir / "validation_results.json"
+        test = run_dir / "test_results.json"
+        if not val.exists() or not test.exists():
             continue
-        row = _calibration_row(match.groupdict(), validation_path, test_path)
+        row = _calibration_row({**base, "seed": str(seed)}, val, test)
         if row:
             rows.append(row)
-    return pd.DataFrame(rows)
+    return rows
 
 
 def write_calibration_tables(frame: pd.DataFrame, tables_dir: Path) -> None:
@@ -58,17 +95,14 @@ def write_calibration_table(frame: pd.DataFrame, path: Path) -> None:
 
 
 def _aggregate_calibration(frame: pd.DataFrame) -> pd.DataFrame:
+    raw_agg = {f"{m}_{s}": (m, s) for m in _raw_metrics() for s in ("mean", "std")}
+    scaled_agg = {
+        f"{m}_scaled_{s}": (f"{m}_scaled", s)
+        for m in CALIBRATION_METRICS
+        for s in ("mean", "std")
+    }
     grouped = frame.groupby(["method", "order", "parameter"]).agg(
-        **{f"{metric}_mean": (metric, "mean") for metric in _raw_metrics()},
-        **{f"{metric}_std": (metric, "std") for metric in _raw_metrics()},
-        **{
-            f"{metric}_scaled_mean": (f"{metric}_scaled", "mean")
-            for metric in CALIBRATION_METRICS
-        },
-        **{
-            f"{metric}_scaled_std": (f"{metric}_scaled", "std")
-            for metric in CALIBRATION_METRICS
-        },
+        **raw_agg, **scaled_agg
     )
     return cast(pd.DataFrame, grouped.reset_index())
 
@@ -140,14 +174,14 @@ def _load_result_payload(path: Path) -> dict[str, np.ndarray]:
 
 
 def _fit_temperature(labels: np.ndarray, probabilities: np.ndarray) -> float:
-    log_temperatures = np.linspace(np.log(0.05), np.log(10.0), 160)
+    log_t = np.linspace(np.log(0.05), np.log(10.0), 160)
     losses = [
         _negative_log_likelihood(
-            labels, _temperature_scale(probabilities, float(np.exp(value)))
+            labels, _temperature_scale(probabilities, float(np.exp(v)))
         )
-        for value in log_temperatures
+        for v in log_t
     ]
-    return float(np.exp(log_temperatures[int(np.argmin(losses))]))
+    return float(np.exp(log_t[int(np.argmin(losses))]))
 
 
 def _temperature_scale(probabilities: np.ndarray, temperature: float) -> np.ndarray:
@@ -202,32 +236,3 @@ def _bin_error(
     return float(mask.mean()) * abs(
         float(correct[mask].mean()) - float(confidences[mask].mean())
     )
-
-
-def _benchmark(method: str) -> str:
-    wsi_tokens = ("mil", "rankmix", "sc_mil", "mde")
-    return "wsi_bag" if any(token in method for token in wsi_tokens) else "patch"
-
-
-def _mean_std(row: pd.Series, metric: str) -> str:
-    mean = float(row[f"{metric}_mean"])
-    std = row[f"{metric}_std"]
-    std_value = 0.0 if bool(pd.isna(std)) else float(std)
-    return f"\\num{{{mean:.3f}}} $\\pm$ \\num{{{std_value:.3f}}}"
-
-
-def _tex(value: object) -> str:
-    return str(value).replace("_", "\\_")
-
-
-def _write_unavailable(path: Path, header: str) -> None:
-    columns = header.count("&") + 1
-    row = f"\\multicolumn{{{columns}}}{{c}}{{Generated results unavailable.}}\\\\"
-    _write_table(path, header, [row])
-
-
-def _write_table(path: Path, header: str, rows: list[str]) -> None:
-    spec = "l" * (header.count("&") + 1)
-    body = ["\\begin{tabular}{" + spec + "}", "\\toprule", f"{header}\\\\"]
-    body.extend(["\\midrule", *rows, "\\bottomrule", "\\end{tabular}"])
-    path.write_text("\n".join(body) + "\n")
