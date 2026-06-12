@@ -31,20 +31,27 @@ def main() -> None:
         logger.info("Skipping existing patch feature cache: %s", args.file_save_path)
         return
     manifest = pd.read_csv(args.manifest_path)
+    os.makedirs(os.path.dirname(args.file_save_path) or ".", exist_ok=True)
+    torch.save(_build_payload(manifest), args.file_save_path)
+    logger.info("Stored feature cache in %s.", args.file_save_path)
+
+
+def _build_payload(manifest: pd.DataFrame) -> dict[str, object]:
+    has_index = "feature_index" in manifest.columns
     features = [
-        load_feature_row(str(row["feature_path"]), int(row["feature_index"]))
+        load_feature_row(
+            str(row["feature_path"]),
+            int(row["feature_index"]) if has_index else 0,
+        )
         for _, row in manifest.iterrows()
     ]
-    os.makedirs(os.path.dirname(args.file_save_path) or ".", exist_ok=True)
-    torch.save(
-        {
-            "feature_paths": manifest["feature_path"].astype(str).tolist(),
-            "feature_indices": manifest["feature_index"].astype(int).tolist(),
-            "features": torch.stack(features),
-        },
-        args.file_save_path,
-    )
-    logger.info("Stored feature cache in %s.", args.file_save_path)
+    payload: dict[str, object] = {
+        "feature_paths": manifest["feature_path"].astype(str).tolist(),
+        "features": torch.stack(features),
+    }
+    if has_index:
+        payload["feature_indices"] = manifest["feature_index"].astype(int).tolist()
+    return payload
 
 
 if __name__ == "__main__":
