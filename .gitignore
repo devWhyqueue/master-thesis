@@ -33,9 +33,6 @@ experiments/class_imbalance/**/*.npy
 experiments/class_imbalance/outputs/**/run.json
 experiments/class_imbalance/outputs/**/progress.json
 
-# Prior work local config
-prior work/TCGA-UT/main/scripts/config.json
-
 # Design dataset: large generated artifacts, machine-specific config
 experiments/design_dataset/data/
 experiments/design_dataset/results/
