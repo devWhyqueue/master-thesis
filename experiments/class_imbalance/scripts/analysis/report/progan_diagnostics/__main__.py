@@ -40,7 +40,6 @@ def main() -> None:
     cache_dir = _patch_feature_cache_dir(config, args.seed)
     frame = build_metrics_frame(paths, args.seed, cache_dir)
     stored = frame.copy()
-    stored.insert(0, "seed", args.seed)
     connection = connect(paths["db"])
     init_schema(connection)
     replace_table(connection, "progan_diagnostics", stored)
