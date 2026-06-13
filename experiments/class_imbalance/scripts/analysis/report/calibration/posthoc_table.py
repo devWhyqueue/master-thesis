@@ -83,6 +83,11 @@ def _collect(
                         {"benchmark": benchmark, "method": method, "seed": seed}
                     )
                     continue
+                if "labels" not in val_payload or "labels" not in test_payload:
+                    missing.append(
+                        {"benchmark": benchmark, "method": method, "seed": seed}
+                    )
+                    continue
                 val_labels, val_probs, _ = _arrays(val_payload)
                 test_labels, test_probs, n_classes = _arrays(test_payload)
                 fit = fit_temperature(probabilities_to_logits(val_probs), val_labels)
