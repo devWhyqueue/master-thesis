@@ -75,7 +75,6 @@ def _update_db_split(connection, run_id: str, split: str, payload: dict) -> None
             "labels",
             "preds",
             "probabilities",
-            "class_names",
         }
     }
     connection.execute(
