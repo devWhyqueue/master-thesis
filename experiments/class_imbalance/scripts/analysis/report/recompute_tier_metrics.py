@@ -52,9 +52,9 @@ def _recompute_payload(payload: dict, tier_support: np.ndarray) -> bool:
     f1 = np.asarray(payload["f1_per_class"], dtype=np.float64)
     support = np.asarray(payload["support_per_class"], dtype=np.int64)
     updated = _tier_metrics(precision, recall, f1, support, tier_support)
-    if payload.get("support_tier_metrics") == updated["support_tier_metrics"]:
+    if payload.get("support_tier_metrics") == updated:
         return False
-    payload["support_tier_metrics"] = updated["support_tier_metrics"]
+    payload["support_tier_metrics"] = updated
     return True
 
 
