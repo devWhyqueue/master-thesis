@@ -19,7 +19,7 @@ SUMMARY_METRICS = (
     "expected_calibration_error",
 )
 
-ARRAY_FIELDS = ("labels", "preds", "probabilities", "class_names")
+ARRAY_FIELDS = ("labels", "preds", "probabilities")
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS runs (
