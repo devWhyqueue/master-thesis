@@ -52,6 +52,8 @@ def _method_label(method: str) -> str:
 
 
 def _classwise_rows(method: str, seed: int, result: dict) -> list[dict[str, object]]:
+    if "class_names" not in result or "recall_per_class" not in result:
+        return []
     return [
         {
             "method": method,
