@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -44,6 +45,12 @@ PAIRED_COMPARISONS = (
     ),
     PairedComparison(
         "patch",
+        "patch_feature_oko",
+        "patch_feature_ce",
+        r"OKO $-$ CE",
+    ),
+    PairedComparison(
+        "patch",
         "patch_feature_cfal",
         "patch_feature_ce",
         r"CFAL $-$ CE",
@@ -81,15 +88,21 @@ def _paired_metric_values(
     metric: str,
     split: str,
 ) -> pd.Series | None:
-    selected = frame[frame["split"] == split]
+    selected = cast(pd.DataFrame, frame[frame["split"] == split])
     rows: list[float] = []
-    for seed in sorted(selected["seed"].unique()):
-        method_rows = selected[
-            (selected["method"] == comparison.method) & (selected["seed"] == seed)
-        ]
-        baseline_rows = selected[
-            (selected["method"] == comparison.baseline) & (selected["seed"] == seed)
-        ]
+    for seed in sorted(cast(pd.Series, selected["seed"]).unique()):
+        method_rows = cast(
+            pd.DataFrame,
+            selected[
+                (selected["method"] == comparison.method) & (selected["seed"] == seed)
+            ],
+        )
+        baseline_rows = cast(
+            pd.DataFrame,
+            selected[
+                (selected["method"] == comparison.baseline) & (selected["seed"] == seed)
+            ],
+        )
         if method_rows.empty or baseline_rows.empty:
             continue
         rows.append(
@@ -110,7 +123,7 @@ def _format_delta_cell(values: pd.Series) -> str:
 def build_paired_delta_table(paths: dict[str, Path], split: str) -> pd.DataFrame:
     """Build paired seed-difference rows for the headline comparisons."""
     cache: dict[str, pd.DataFrame] = {}
-    rows: list[dict[str, str]] = []
+    rows: list[dict[str, str | float]] = []
     for comparison in PAIRED_COMPARISONS:
         if comparison.benchmark not in cache:
             cache[comparison.benchmark] = _load_by_seed(paths, comparison.benchmark)
@@ -124,7 +137,7 @@ def build_paired_delta_table(paths: dict[str, Path], split: str) -> pd.DataFrame
             metric_values[metric] = values
         if not metric_values:
             continue
-        row: dict[str, str] = {"comparison": comparison.label}
+        row: dict[str, str | float] = {"comparison": comparison.label}
         for metric, values in metric_values.items():
             row[f"{metric}_mean"] = float(values.mean())
             row[f"{metric}_std"] = float(values.std(ddof=0))
