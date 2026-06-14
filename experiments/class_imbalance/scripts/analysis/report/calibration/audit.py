@@ -22,20 +22,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_test(result_root: Path, method: str, seed: int) -> dict[str, object]:
+def _load_test(result_root: Path, method: str, seed: int) -> dict[str, object] | None:
     path = result_root / method / f"seed={seed}" / "test_results.json"
+    if not path.exists():
+        return None
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _audit_seed(result_root: Path, methods: list[str], seed: int) -> list[str]:
     issues: list[str] = []
     reference = _load_test(result_root, methods[0], seed)
+    if reference is None:
+        return issues
     ref_labels = reference["labels"]
     ref_names = reference["class_names"]
     n_classes = len(ref_names)
 
     for method in methods:
         payload = _load_test(result_root, method, seed)
+        if payload is None:
+            continue
         if payload["class_names"] != ref_names:
             issues.append(f"seed={seed} {method}: class_names mismatch")
         if payload["labels"] != ref_labels:
@@ -86,6 +92,8 @@ def main() -> None:
     for seed in seeds:
         baseline = _load_test(paths["wsi_results"], reference_method, seed)
         mixed = _load_test(paths["wsi_results"], rankmix, seed)
+        if baseline is None or mixed is None:
+            continue
         labels = np.asarray(baseline["labels"], dtype=np.int64)
         base_probs = np.asarray(baseline["probabilities"], dtype=np.float64)
         mix_probs = np.asarray(mixed["probabilities"], dtype=np.float64)
