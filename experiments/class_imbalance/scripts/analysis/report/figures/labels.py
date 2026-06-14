@@ -19,6 +19,7 @@ METHOD_LABELS = {
     "patch_feature_progan_aug": "ProGAN augmentation",
     "patch_feature_cfal": "CFAL",
     "patch_feature_divide_conquer": "D&C",
+    "patch_feature_oko": "OKO",
     "mil_ce": "MIL CE",
     "mil_weighted_ce": "Weighted MIL",
     "mil_focal": "Focal MIL",
