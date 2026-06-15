@@ -21,10 +21,11 @@ class FocalLoss(nn.Module):
         self.reduction = reduction
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Return the mean focal loss over the batch."""
         log_probs = torch.log_softmax(logits, dim=1)
         pt = log_probs.exp().gather(1, targets.unsqueeze(1)).squeeze(1)
         log_pt = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
-        loss = -((1 - pt) ** self.gamma) * log_pt
+        loss = -((1 - pt).clamp(min=1e-6) ** self.gamma) * log_pt
         if self.alpha is not None:
             loss = loss * self.alpha[targets]
         if self.reduction == "mean":

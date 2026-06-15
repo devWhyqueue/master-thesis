@@ -159,8 +159,8 @@ case "$command" in
   patch-progan-train)
     submit_with_args patch-progan-train \
       --job-name=tcga-ut-progan-train \
-      --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
+      --partition="${PROGAN_TRAIN_PARTITION:-gpu-5h}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-40gb|80gb|h100|h200|blackwell}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
       --array=0-2 \
@@ -200,7 +200,7 @@ case "$command" in
       --partition="${PATCH_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-113 \
+      --array=0-107,117-143 \
       --output=logs/patch-tune-%A-%a.out \
       --error=logs/patch-tune-%A-%a.err \
       "$@"
@@ -247,7 +247,7 @@ case "$command" in
       --partition="${WSI_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-95 \
+      --array=0-98 \
       --output=logs/wsi-tune-%A-%a.out \
       --error=logs/wsi-tune-%A-%a.err \
       "$@"
@@ -320,7 +320,7 @@ case "$command" in
       --export=ALL,HYDRA_JOB=patch-progan-gan \
       "${gan_deps[@]}" \
       --array="0-${upper}%${parallel}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-40gb|80gb|h100|h200|blackwell}" \
       --partition="${PROGAN_PARTITION:-gpu-5h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
@@ -328,9 +328,19 @@ case "$command" in
       --output=logs/progan-gan-%A-%a.out \
       --error=logs/progan-gan-%A-%a.err \
       "$script")
+    merge_job=$(sbatch --parsable \
+      --export=ALL,HYDRA_JOB=merge-progan-manifests \
+      --dependency="afterok:${gan_job}" \
+      --partition=cpu-2h \
+      --gpus-per-node=0 \
+      --ntasks-per-node=2 \
+      --job-name=tcga-ut-progan-merge \
+      --output=logs/progan-merge-%j.out \
+      --error=logs/progan-merge-%j.err \
+      "$script")
     sqfs_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=build-synthetic-sqfs \
-      --dependency="afterok:${gan_job}" \
+      --dependency="afterok:${merge_job}" \
       --partition="${PROGAN_SYNTH_SQFS_PARTITION:-cpu-5h}" \
       --gpus-per-node=0 \
       --ntasks-per-node=4 \
@@ -342,8 +352,8 @@ case "$command" in
     train_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=patch-progan-train \
       --dependency="afterok:${sqfs_job}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
-      --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-40gb|80gb|h100|h200|blackwell}" \
+      --partition="${PROGAN_TRAIN_PARTITION:-gpu-5h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
       --array=0-2 \
@@ -352,7 +362,8 @@ case "$command" in
       --error=logs/progan-train-%A-%a.err \
       "$script")
     echo "ProGAN GAN array: ${gan_job} (tasks 0-${upper}, max ${parallel} parallel)"
-    echo "Synthetic SquashFS array: ${sqfs_job} (after GAN, seeds 0-2)"
+    echo "ProGAN merge:     ${merge_job} (after GAN)"
+    echo "Synthetic SquashFS array: ${sqfs_job} (after merge, seeds 0-2)"
     echo "ProGAN train array: ${train_job} (after synthetic SquashFS build)"
     ;;
 
@@ -384,7 +395,7 @@ case "$command" in
       --export=ALL,HYDRA_JOB=patch-progan-gan \
       --dependency="afterok:${real_sqfs_job}" \
       --array="0-${upper}%${parallel}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-40gb|80gb|h100|h200|blackwell}" \
       --partition="${PROGAN_PARTITION:-gpu-5h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
@@ -416,8 +427,8 @@ case "$command" in
     train_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=patch-progan-train \
       --dependency="afterok:${real_sqfs_job}:${synth_sqfs_job}" \
-      --constraint="${PROGAN_GPU_CONSTRAINT:-h100|h200|blackwell}" \
-      --partition="${PROGAN_TRAIN_PARTITION:-gpu-2d}" \
+      --constraint="${PROGAN_GPU_CONSTRAINT:-40gb|80gb|h100|h200|blackwell}" \
+      --partition="${PROGAN_TRAIN_PARTITION:-gpu-5h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
       --array=0-2 \

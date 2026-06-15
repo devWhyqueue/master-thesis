@@ -14,15 +14,16 @@ PATCH_FEATURE_SPECS = (
     (
         "patch_feature_ce_soft_f1_balanced",
         "metric_loss_weight",
-        [0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
+        [0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 256.0],
     ),
     (
         "patch_feature_ce_soft_mcc_balanced",
         "metric_loss_weight",
-        [0.25, 0.5, 1.0, 2.0],
+        [0.25, 0.5, 1.0, 2.0, 8.0, 32.0],
     ),
-    ("patch_feature_cfal", "cfal_gamma", [0.5, 1.0, 2.0, 5.0]),
-    ("patch_feature_divide_conquer", "dnc_k_clusters", [5.0, 10.0, 15.0, 20.0]),
+    ("patch_feature_cfal", "cfal_sigma", [0.25, 1.0, 4.0]),
+    ("patch_feature_divide_conquer", "dnc_zscore_bins", [1.0, 5.0, 20.0]),
+    ("patch_feature_divide_conquer", "dnc_expert_epochs", [5.0, 20.0, 40.0]),
     ("patch_feature_progan_aug", "final_depth_epochs", [10.0, 25.0, 50.0]),
     ("patch_feature_oko", "oko_k", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 12.0, 20.0]),
 )
@@ -30,7 +31,7 @@ WSI_BAG_SPECS = (
     ("mil_weighted_ce", "weight_power", [0.0, 0.125, 0.25, 0.5, 0.75, 1.0]),
     ("mil_focal", "focal_gamma", [0.5, 1.0, 1.5, 2.0]),
     ("mil_balanced_sampler_ce", "sampler_power", [0.5, 0.75, 1.0]),
-    ("rankmix_mil", "rankmix_alpha", [0.2, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0]),
+    ("rankmix_mil", "rankmix_alpha", [0.2, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 128.0]),
     ("sc_mil", "sc_mil_temperature", [0.05, 0.1, 0.2, 0.5]),
     ("mde_mil", "mde_mil_consistency_weight", [0.1, 0.25, 0.3, 0.5, 1.0, 2.0, 4.0]),
 )

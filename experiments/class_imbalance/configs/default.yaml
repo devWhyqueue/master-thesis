@@ -3,7 +3,7 @@ paths:
   raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
   feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
   patch_sqfs: /home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs
-  patch_synthetic_sqfs: /home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-{seed}.sqfs
+  patch_synthetic_sqfs: /home/space/datasets-sqfs/tcga-ut-synthetic-patches-r2-seed-{seed}.sqfs
   outputs: experiments/class_imbalance
 
 staging:
@@ -128,8 +128,8 @@ wsi_bag_methods:
 slurm:
   partition: gpu-2h
   progan_partition: gpu-5h
-  progan_train_partition: gpu-2d
-  progan_gpu_constraint: h100|h200|blackwell
+  progan_train_partition: gpu-5h
+  progan_gpu_constraint: 40gb|80gb|h100|h200|blackwell
   progan_array_max_parallel: 35
   ntasks_per_node: 8
   container: ./environment.sif

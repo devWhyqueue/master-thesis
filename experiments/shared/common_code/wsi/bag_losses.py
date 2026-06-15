@@ -118,7 +118,7 @@ def _focal_loss(
     log_probs = torch.log_softmax(logits, dim=1)
     pt = log_probs.exp().gather(1, targets.unsqueeze(1)).squeeze(1)
     log_pt = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
-    return (-((1 - pt) ** gamma) * log_pt).mean()
+    return (-((1 - pt).clamp(min=1e-6) ** gamma) * log_pt).mean()
 
 
 def _rankmix_batch(
