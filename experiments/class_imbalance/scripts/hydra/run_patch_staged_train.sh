@@ -24,7 +24,6 @@ cleanup_sqfs_mounts() {
 mount_sqfs_image() {
   local sqfs_source="$1"
   local mount_point="$2"
-  local local_sqfs="${PATCH_STAGE_DIR}/$(basename "${sqfs_source}")"
   if [ ! -f "${sqfs_source}" ]; then
     return 1
   fi
@@ -35,8 +34,7 @@ mount_sqfs_image() {
   if [ -n "$(ls -A "${mount_point}" 2>/dev/null)" ]; then
     return 0
   fi
-  cp "${sqfs_source}" "${local_sqfs}"
-  squashfuse "${local_sqfs}" "${mount_point}"
+  squashfuse "${sqfs_source}" "${mount_point}"
 }
 
 trap cleanup_sqfs_mounts EXIT
