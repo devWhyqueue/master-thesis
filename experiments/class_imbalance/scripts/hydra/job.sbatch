@@ -74,8 +74,12 @@ case "$job" in
     export PATCH_SYNTHETIC_SQFS_OUTPUT="${PATCH_SYNTHETIC_SQFS_OUTPUT:-$(synthetic_sqfs_path "$seed")}"
     export PATCH_SYNTHETIC_SQFS_FILE_LIST="${PATCH_SYNTHETIC_SQFS_FILE_LIST:-${SLURM_TMPDIR:-/tmp}/tcga_ut_synthetic_seed=${seed}.txt}"
     if [ -e "$PATCH_SYNTHETIC_SQFS_OUTPUT" ]; then
-      echo "Refusing to overwrite existing SquashFS image: $PATCH_SYNTHETIC_SQFS_OUTPUT" >&2
-      exit 1
+      if unsquashfs -stat "$PATCH_SYNTHETIC_SQFS_OUTPUT" >/dev/null 2>&1; then
+        echo "SquashFS already valid, skipping rebuild: $PATCH_SYNTHETIC_SQFS_OUTPUT"
+        exit 0
+      fi
+      echo "Removing invalid/partial SquashFS before rebuild: $PATCH_SYNTHETIC_SQFS_OUTPUT" >&2
+      rm -f "$PATCH_SYNTHETIC_SQFS_OUTPUT"
     fi
     if ! command -v mksquashfs >/dev/null 2>&1; then
       echo "mksquashfs not found on PATH" >&2
