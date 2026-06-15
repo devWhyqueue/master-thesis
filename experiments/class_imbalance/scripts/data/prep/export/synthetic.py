@@ -28,6 +28,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Write synthetic patch paths relative to the seed image root.",
     )
+    parser.add_argument(
+        "--epoch-ref",
+        type=int,
+        default=None,
+        help="If set, include only images under epochs=EPOCH_REF/ (e.g. 25).",
+    )
     return parser.parse_args()
 
 
@@ -62,9 +68,14 @@ def _synthetic_manifest(config: dict, seed: int) -> tuple[dict[str, Path], Path,
     return paths, image_root, manifest_path
 
 
-def _unique_synthetic_paths(manifest_path: Path) -> list[str]:
+def _unique_synthetic_paths(
+    manifest_path: Path, epoch_ref: int | None = None
+) -> list[str]:
     frame = pd.read_csv(manifest_path)
-    return sorted(frame["image_path"].astype(str).unique())
+    paths = frame["image_path"].astype(str)
+    if epoch_ref is not None:
+        paths = paths[paths.str.contains(f"/epochs={epoch_ref}/", regex=False)]
+    return sorted(set(paths.tolist()))
 
 
 def _link_synthetic_paths(
@@ -83,14 +94,16 @@ def _link_synthetic_paths(
     return linked
 
 
-def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
+def export_synthetic_sqfs_input(
+    config: dict, seed: int, epoch_ref: int | None = None
+) -> Path:
     """Hardlink one seed's synthetic JPEG tree for SquashFS packaging."""
     paths, image_root, manifest_path = _synthetic_manifest(config, seed)
     export_root = _export_root(seed)
     if export_root.exists():
         shutil.rmtree(export_root)
     export_root.mkdir(parents=True, exist_ok=True)
-    unique_paths = _unique_synthetic_paths(manifest_path)
+    unique_paths = _unique_synthetic_paths(manifest_path, epoch_ref)
     linked = _link_synthetic_paths(unique_paths, export_root, image_root)
     write_json(
         paths["data"] / f"synthetic_sqfs_export_report_seed={seed}.json",
@@ -111,9 +124,11 @@ def export_synthetic_sqfs_input(config: dict, seed: int) -> Path:
     return export_root
 
 
-def _relative_synthetic_paths(image_root: Path, manifest_path: Path) -> list[str]:
+def _relative_synthetic_paths(
+    image_root: Path, manifest_path: Path, epoch_ref: int | None = None
+) -> list[str]:
     relative_paths = []
-    for source_text in _unique_synthetic_paths(manifest_path):
+    for source_text in _unique_synthetic_paths(manifest_path, epoch_ref):
         source = Path(source_text)
         try:
             relative_paths.append(source.relative_to(image_root).as_posix())
@@ -124,10 +139,12 @@ def _relative_synthetic_paths(image_root: Path, manifest_path: Path) -> list[str
     return sorted(relative_paths)
 
 
-def write_synthetic_sqfs_file_list(config: dict, seed: int, output_path: Path) -> Path:
+def write_synthetic_sqfs_file_list(
+    config: dict, seed: int, output_path: Path, epoch_ref: int | None = None
+) -> Path:
     """Write unique synthetic patch paths relative to the seed image root."""
     paths, image_root, manifest_path = _synthetic_manifest(config, seed)
-    relative_paths = _relative_synthetic_paths(image_root, manifest_path)
+    relative_paths = _relative_synthetic_paths(image_root, manifest_path, epoch_ref)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(relative_paths) + "\n", encoding="utf-8")
     write_json(
@@ -158,10 +175,10 @@ def main() -> None:
     config = load_config(args.config)
     if args.file_list is not None:
         sys.stdout.write(
-            f"{write_synthetic_sqfs_file_list(config, args.seed, args.file_list)}\n"
+            f"{write_synthetic_sqfs_file_list(config, args.seed, args.file_list, args.epoch_ref)}\n"
         )
     else:
-        export_synthetic_sqfs_input(config, args.seed)
+        export_synthetic_sqfs_input(config, args.seed, args.epoch_ref)
 
 
 if __name__ == "__main__":

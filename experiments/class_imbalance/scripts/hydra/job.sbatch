@@ -85,7 +85,11 @@ case "$job" in
       echo "tar not found on PATH" >&2
       exit 1
     fi
-    image_root="$(bash scripts/hydra/run_python.sh -m scripts.data.prep.export.synthetic --seed "$seed" --file-list "$PATCH_SYNTHETIC_SQFS_FILE_LIST")"
+    epoch_ref_arg=()
+    if [ -n "${PATCH_SYNTHETIC_SQFS_EPOCH_REF:-}" ]; then
+      epoch_ref_arg=(--epoch-ref "${PATCH_SYNTHETIC_SQFS_EPOCH_REF}")
+    fi
+    image_root="$(bash scripts/hydra/run_python.sh -m scripts.data.prep.export.synthetic --seed "$seed" --file-list "$PATCH_SYNTHETIC_SQFS_FILE_LIST" "${epoch_ref_arg[@]}")"
     tar -C "$image_root" -cf - -T "$PATCH_SYNTHETIC_SQFS_FILE_LIST" | mksquashfs - "$PATCH_SYNTHETIC_SQFS_OUTPUT" \
       -tar \
       -noappend \
