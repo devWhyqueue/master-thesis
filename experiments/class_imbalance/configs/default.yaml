@@ -3,7 +3,7 @@ paths:
   raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
   feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
   patch_sqfs: /home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs
-  patch_synthetic_sqfs: /home/space/datasets-sqfs/tcga-ut-synthetic-patches-r2-seed-{seed}.sqfs
+  patch_synthetic_sqfs: /home/space/datasets-sqfs/tcga-ut-synthetic-patches-r3-seed-{seed}.sqfs
   outputs: experiments/class_imbalance
 
 staging:
