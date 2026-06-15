@@ -24,7 +24,7 @@ PATCH_FEATURE_SPECS = (
     ("patch_feature_cfal", "cfal_gamma", [0.5, 1.0, 2.0, 5.0]),
     ("patch_feature_divide_conquer", "dnc_k_clusters", [5.0, 10.0, 15.0, 20.0]),
     ("patch_feature_progan_aug", "final_depth_epochs", [10.0, 25.0, 50.0]),
-    ("patch_feature_oko", "oko_k", [1.0, 2.0, 3.0, 4.0]),
+    ("patch_feature_oko", "oko_k", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 12.0, 20.0]),
 )
 WSI_BAG_SPECS = (
     ("mil_weighted_ce", "weight_power", [0.0, 0.125, 0.25, 0.5, 0.75, 1.0]),

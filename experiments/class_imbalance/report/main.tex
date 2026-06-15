@@ -370,7 +370,7 @@ Following the main-text configuration of the original paper, the implementation 
 \paragraph{Taxonomy and scope.}
 OKO belongs in the hybrid sampling--loss category because the set construction couples a balanced class-sampling policy with a modified training objective; neither component is meaningful on its own. Balanced sampling via uniform pair-class selection ensures that all $C$ classes contribute equally to the gradient signal in expectation, which directly addresses the data-level imbalance problem. The aggregated set-level loss then introduces an implicit regularization on logit magnitude. Together these are not separable in the same way that standard cross-entropy and a WeightedRandomSampler are separable. In this benchmark OKO is evaluated in the patch feature regime only; the set-construction mechanism does not extend naturally to the attention-MIL bag encoder used in the WSI-bag benchmark.
 
-The number of odd classes $k$ controls set size and therefore the degree of logit averaging. The paper's ablation experiments show that accuracy and calibration are insensitive to the specific value of $k$, and the default of $k=1$ is the computationally cheapest option. The validation sweep covers $k\in\{1,2,3,4\}$ with the default fixed at $k=1$.
+The number of odd classes $k$ controls set size and therefore the degree of logit averaging. The paper's ablation experiments show that accuracy and calibration are insensitive to the specific value of $k$, and the default of $k=1$ is the computationally cheapest option. The validation sweep covers $k\in\{1,4,8,20\}$ (representative subset; all integer values from 1 to 20 were evaluated) with the default fixed at $k=1$. Validation selects $k=8$: mean validation macro F1 rises from \num{0.776} at $k=1$ to \num{0.783} at $k=8$ and then falls to \num{0.768} at $k=20$, confirming that performance is robust across moderate set sizes but degrades when the set becomes large and computation dominates.
 
 \subsection{Synthetic Data Generation}
 Synthetic generation is data-level in spirit but is separated because it introduces new generated samples rather than resampling observed ones. In histopathology, this family is attractive because deleting majority-class tissue wastes data, while naive image-space interpolation often produces unrealistic pathology images \citep{saini2023tacklingClass,ruizcasado2024enhancingHistopathological}. The practical hope is simple: if real minority-class patches are scarce, a generator may learn enough of their stain, texture, and tissue morphology distribution to provide additional plausible training examples.
@@ -523,7 +523,7 @@ Each method is evaluated under one shared training budget per benchmark (Table~\
     Patch & CFAL & $\gamma=2$ & $\gamma\in\{0.5,1,2,5\}$\\
     Patch & D\&C & $k=10$ & $k\in\{5,10,15,20\}$\\
     Patch & ProGAN augmentation & Final-depth epochs $=25$ & $\{10,25,50\}$\\
-    Patch & OKO & $k=1$ & $k\in\{1,2,3,4\}$\\
+    Patch & OKO & $k=1$ & $k\in\{1,4,8,20\}$\\
     WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32\}$\\
     WSI bag & SC-MIL & $\tau=1$ & $\tau\in\{0.05,0.1,0.2,0.5\}$\\
     WSI bag & MDE-MIL & $\lambda_{\mathrm{con}}=0.25$ & $\lambda_{\mathrm{con}}\in\{0.1,0.25,0.3,0.5,1,2,4\}$\\
