@@ -18,11 +18,6 @@ def synthetic_output_root(outputs_root: Path, seed: int) -> Path:
     return outputs_root / "synthetic_patch_images" / f"seed={seed}"
 
 
-def variant_output_root(outputs_root: Path, seed: int, variant: int) -> Path:
-    """Return the per-variant synthetic image directory for one seed and epoch count."""
-    return synthetic_output_root(outputs_root, seed) / f"epochs={variant}"
-
-
 def count_generated(class_dir: Path) -> int:
     """Count generated JPEG patches for one class."""
     if not class_dir.exists():
@@ -85,14 +80,6 @@ def load_diagnostics(output_root: Path) -> list[dict[str, object]]:
     return diagnostics
 
 
-def generated_counts_match(
-    rows: list[dict[str, object]], expected: dict[str, int]
-) -> bool:
-    """Return whether generated rows match the expected per-class counts."""
-    counts = pd.DataFrame(rows)["cancer_type"].value_counts().to_dict()
-    return counts == expected
-
-
 def write_variant_manifest(
     variant_root: Path,
     rows: list[dict[str, object]],
@@ -144,44 +131,4 @@ def write_combined_manifest(seed_root: Path, settings: ProGanSettings) -> Path:
     combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     path = seed_root / "synthetic_patch_manifest.csv"
     combined.to_csv(path, index=False)
-    return path
-
-
-# Legacy alias kept for callers that still write a single-variant manifest directly
-# (used only by the image-level patch_progan_aug path via manifest.py).
-def write_manifest(
-    output_root: Path,
-    rows: list[dict[str, object]],
-    diagnostics: list[dict[str, object]],
-    seed: int,
-    settings: ProGanSettings,
-    variant: int | None = None,
-) -> Path:
-    """Write synthetic manifest and summary.  If variant is given, tags rows and
-    writes to the variant subdirectory; otherwise writes to output_root directly
-    (legacy behaviour for callers that manage their own root)."""
-    if variant is not None:
-        return write_variant_manifest(output_root, rows, diagnostics, seed, variant, settings)
-    output_root.mkdir(parents=True, exist_ok=True)
-    manifest = pd.DataFrame(rows)
-    if manifest.empty:
-        manifest = pd.DataFrame(
-            {"cancer_type": pd.Series(dtype=str), "image_path": pd.Series(dtype=str)}
-        )
-    manifest["split"] = "train"
-    manifest["slide_id"] = manifest["image_path"].map(lambda path: Path(str(path)).stem)
-    manifest["resolution"] = "synthetic"
-    path = output_root / "synthetic_patch_manifest.csv"
-    manifest.to_csv(path, index=False)
-    write_json(
-        output_root / "synthetic_patch_summary.json",
-        {
-            "seed": seed,
-            "n_patches": int(len(manifest)),
-            "counts_by_class": manifest["cancer_type"].value_counts().to_dict(),
-            "image_root": str(output_root),
-            "per_class": diagnostics,
-            "settings": asdict(settings),
-        },
-    )
     return path

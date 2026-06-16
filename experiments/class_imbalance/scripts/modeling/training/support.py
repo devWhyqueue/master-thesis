@@ -7,9 +7,7 @@ from sklearn.metrics import precision_recall_fscore_support
 from scripts.common import ensure_dirs, load_config
 from scripts.analysis.results import connect, init_schema, load_class_distribution
 from scripts.modeling.training.support_tiers import tier_support_for_classes
-from common_code.metrics.calibration import calibration_metrics
 from common_code.metrics.payload import classification_payload, resolve_device
-from common_code.metrics.payload import _tier_metrics
 
 
 def _resolve_device(configured: str) -> torch.device:

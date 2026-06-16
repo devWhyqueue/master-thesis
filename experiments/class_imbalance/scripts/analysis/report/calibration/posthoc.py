@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -225,7 +225,7 @@ def _publish_artifacts(
     init_schema(connection)
     replace_table(connection, "posthoc_calibration", frame)
     connection.close()
-    test_rows = frame[(frame["seed"] == seed) & (frame["split"] == "test")]
+    test_rows = cast(pd.DataFrame, frame[(frame["seed"] == seed) & (frame["split"] == "test")])
     _write_latex_table(
         test_rows, paths["tables"] / "result_posthoc_calibration_test.tex"
     )

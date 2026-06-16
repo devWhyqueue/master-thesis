@@ -17,7 +17,7 @@ def extra_metrics(
     tier_support: np.ndarray | None = None,
 ) -> dict[str, object]:
     resolved = tier_support if tier_support is not None else support
-    payload = {
+    payload: dict[str, object] = {
         "support_tier_metrics": _tier_metrics(
             precision, recall, f1, support, resolved
         )

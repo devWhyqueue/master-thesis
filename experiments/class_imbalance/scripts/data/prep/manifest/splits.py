@@ -88,7 +88,7 @@ def _validate_assignments(split_manifest: pd.DataFrame) -> None:
         ].unique()[:10]
         raise RuntimeError(f"Missing split assignments for slides: {missing}")
     case_split_counts = split_manifest.groupby("case_id")["split"].nunique()
-    leaking_cases = case_split_counts[case_split_counts > 1]
+    leaking_cases = cast(pd.Series, case_split_counts[case_split_counts > 1])
     if not leaking_cases.empty:
         examples = leaking_cases.index.astype(str).tolist()[:10]
         raise RuntimeError(f"Case-disjoint split violation for cases: {examples}")

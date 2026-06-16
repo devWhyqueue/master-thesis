@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -109,9 +109,12 @@ def _collect(
 
 
 def _aggregate(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFrame:
-    grouped = frame.groupby(["benchmark", "method"], as_index=False).agg(
-        **{f"{metric}_mean": (metric, "mean") for metric in CALIBRATION_METRICS},
-        **{f"{metric}_std": (metric, "std") for metric in CALIBRATION_METRICS},
+    grouped = cast(
+        pd.DataFrame,
+        frame.groupby(["benchmark", "method"], as_index=False).agg(
+            **{f"{metric}_mean": (metric, "mean") for metric in CALIBRATION_METRICS},
+            **{f"{metric}_std": (metric, "std") for metric in CALIBRATION_METRICS},
+        ),
     )
     connection = connect(paths["db"])
     init_schema(connection)
@@ -131,7 +134,7 @@ def _aggregate(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFrame:
         merged.iterrows(),
         key=lambda item: (item[1]["benchmark"], -float(item[1]["macro_f1_mean"])),
     )
-    return pd.DataFrame([row for _, row in rows]).drop(columns=["macro_f1_mean"])
+    return cast(pd.DataFrame, pd.DataFrame([row for _, row in rows]).drop(columns=["macro_f1_mean"]))
 
 
 def _format_metric(row: pd.Series, metric: str) -> str:

@@ -62,7 +62,11 @@ from scripts.data.progan.manifest import (
     progan_array_upper_bound,
     progan_settings as _settings,
 )
-from scripts.data.progan.storage import generated_counts_match as _generated_counts_match
+def _generated_counts_match(
+    rows: list[dict[str, object]], expected: dict[str, int]
+) -> bool:
+    counts = pd.DataFrame(rows)["cancer_type"].value_counts().to_dict()
+    return counts == expected
 from scripts.modeling.training.support_tiers import class_tier_labels
 from scripts.data.prep.manifest.patch import build_patch_manifest
 from scripts.data.prep.manifest.splits import _build_assignments, _validate_assignments

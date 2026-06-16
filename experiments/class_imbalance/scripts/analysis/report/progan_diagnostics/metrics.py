@@ -180,8 +180,8 @@ def _latex_summary_footer(
 
 def write_summary_latex(frame: pd.DataFrame, path: Path) -> None:
     """Write the paper table for per-class ProGAN quality diagnostics."""
-    fid = frame["inception_fid"].dropna()
-    nn = frame["virchow_mean_nn_distance"].dropna()
+    fid = cast(pd.Series, frame["inception_fid"].dropna())
+    nn = cast(pd.Series, frame["virchow_mean_nn_distance"].dropna())
     lines = [
         "\\begin{tabularx}{\\linewidth}{@{}>{\\raggedright\\arraybackslash}Xrrrr@{}}",
         "\\toprule",
@@ -193,25 +193,3 @@ def write_summary_latex(frame: pd.DataFrame, path: Path) -> None:
         lines.append(_format_metric_row(row))
     lines.extend(_latex_summary_footer(frame, fid, nn))
     path.write_text("\n".join(lines), encoding="utf-8")
-
-
-def write_summary_json(frame: pd.DataFrame, path: Path, seed: int) -> None:
-    """Write machine-readable ProGAN diagnostic summaries."""
-    payload = {
-        "seed": seed,
-        "n_augmented_classes": int(len(frame)),
-        "total_generated_patches": int(frame["generated_patches"].sum()),
-        "total_real_train_patches_in_augmented_classes": int(
-            frame["real_train_patches"].sum()
-        ),
-        "inception_fid_median": float(frame["inception_fid"].median()),
-        "inception_fid_min": float(frame["inception_fid"].min()),
-        "inception_fid_max": float(frame["inception_fid"].max()),
-        "virchow_mean_nn_median": float(frame["virchow_mean_nn_distance"].median()),
-        "virchow_mean_nn_min": float(frame["virchow_mean_nn_distance"].min()),
-        "virchow_mean_nn_max": float(frame["virchow_mean_nn_distance"].max()),
-        "per_class": frame.to_dict("records"),
-    }
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )

@@ -15,12 +15,10 @@ from scripts.data.progan.storage import (
     collect_rows,
     diagnostics_path,
     fid_payload,
-    generated_counts_match,
     load_class_diagnostics,
     load_diagnostics,
     save_class_diagnostics,
     synthetic_output_root,
-    variant_output_root,
     write_combined_manifest,
     write_variant_manifest,
 )
@@ -111,11 +109,6 @@ def output_root_for_seed(config: dict, seed: int) -> Path:
     paths = ensure_dirs(config)
     return synthetic_output_root(paths["root"], seed)
 
-
-def _variant_root_for_seed(config: dict, seed: int, variant: int) -> Path:
-    """Return the per-variant synthetic output directory for one seed."""
-    paths = ensure_dirs(config)
-    return variant_output_root(paths["root"], seed, variant)
 
 
 def progan_array_upper_bound(config: dict, smoke: bool = False) -> int:

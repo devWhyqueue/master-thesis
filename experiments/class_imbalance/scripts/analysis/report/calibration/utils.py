@@ -103,7 +103,7 @@ def fit_dirichlet(logits: np.ndarray, labels: np.ndarray) -> CalibrationFit:
         probs = apply_dirichlet_scaling(logits, matrix, biases)
         return negative_log_likelihood(probs, labels)
 
-    optimum = minimize(_objective, initial, method="L-BFGS-B", maxiter=250)
+    optimum = minimize(_objective, initial, method="L-BFGS-B", options={"maxiter": 250})
     matrix = optimum.x[: n_classes * n_classes].reshape(n_classes, n_classes)
     biases = optimum.x[n_classes * n_classes :]
     return CalibrationFit("dirichlet", weights=matrix, biases=biases)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 import argparse
 import json
 import logging
@@ -22,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_test(result_root: Path, method: str, seed: int) -> dict[str, object] | None:
+def _load_test(result_root: Path, method: str, seed: int) -> dict[str, Any] | None:
     path = result_root / method / f"seed={seed}" / "test_results.json"
     if not path.exists():
         return None

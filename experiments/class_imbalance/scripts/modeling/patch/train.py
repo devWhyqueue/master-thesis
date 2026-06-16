@@ -20,7 +20,6 @@ from scripts.modeling.patch.artifacts import (
     _write_run_record,
 )
 from scripts.modeling.patch.data import (
-    PatchImageDataset,
     patch_loader,
     _labels,
     _load_manifest,

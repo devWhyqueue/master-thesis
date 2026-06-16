@@ -143,7 +143,7 @@ def _upsert_benchmark_table(
     existing = read_table(connection, table_name)
     if not existing.empty and "benchmark" in existing.columns:
         existing = existing[existing["benchmark"] != benchmark]
-        frame = pd.concat([existing, frame], ignore_index=True)
+        frame = cast(pd.DataFrame, pd.concat([existing, frame], ignore_index=True))
     replace_table(connection, table_name, frame)
 
 

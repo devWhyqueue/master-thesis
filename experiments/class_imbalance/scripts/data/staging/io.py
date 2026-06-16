@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import cast
 import logging
 import os
 import shutil
@@ -41,7 +42,7 @@ def _split_raw_and_synthetic(
     mask = (
         frame["image_path"].astype(str).map(lambda path: _is_under_raw(path, raw_root))
     )
-    return frame[mask].copy(), frame[~mask].copy()
+    return cast(pd.DataFrame, frame[mask].copy()), cast(pd.DataFrame, frame[~mask].copy())
 
 
 def _remap_via_sqfs_mount(
@@ -95,7 +96,7 @@ def _stage_via_copy(
         for future in as_completed(futures):
             source = futures[future]
             mapping[str(source)] = future.result()
-    staged["image_path"] = staged["image_path"].astype(str).map(mapping)
+    staged["image_path"] = staged["image_path"].astype(str).map(lambda x: mapping[x])
     return staged
 
 

@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from scripts.common import write_json, write_run_record
+from scripts.common import write_run_record
 from scripts.metadata import benchmark_metadata
 from scripts.modeling.patch.data import PatchImageDataset
 from scripts.modeling.patch.models import PatchClassifier
@@ -33,27 +33,6 @@ def seed_patch_run(seed: int) -> dict[str, Any]:
         "cudnn_benchmark": False,
         "cudnn_deterministic": True,
     }
-
-
-def write_patch_config(
-    result_dir: Path,
-    method: str,
-    seed: int,
-    class_names: list[str],
-    deterministic: dict[str, Any],
-) -> None:
-    """Write reproducibility metadata for a patch result."""
-    write_json(
-        result_dir / "config.json",
-        {
-            "benchmark": "patch",
-            "class_names": class_names,
-            "deterministic": deterministic,
-            "method": method,
-            "method_metadata": benchmark_metadata("patch", method),
-            "seed": seed,
-        },
-    )
 
 
 def save_patch_checkpoint(

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import pandas as pd
 
 BASELINE_METHOD = {"patch": "patch_feature_ce", "wsi_bag": "mil_ce"}
@@ -31,7 +32,7 @@ def macro_f1_frame(details: list[dict[str, Any]], methods: list[str]) -> pd.Data
 
 
 def _plot_method_line(
-    ax: plt.Axes,
+    ax: Axes,
     frame: pd.DataFrame,
     method: str,
     baseline_key: str,
