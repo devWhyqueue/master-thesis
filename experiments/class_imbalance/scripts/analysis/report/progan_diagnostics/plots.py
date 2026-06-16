@@ -19,9 +19,9 @@ from scripts.data.staging.io import resolve_raw_image_path
 
 
 def _feature_cache_frame(cache_dir: Path) -> tuple[pd.DataFrame, np.memmap]:
-    manifest = pd.read_csv(cache_dir / "manifest.csv", low_memory=False)
-    features = np.load(cache_dir / "features.npy", mmap_mode="r")
-    return manifest, features
+    return pd.read_csv(cache_dir / "manifest.csv", low_memory=False), np.load(
+        cache_dir / "features.npy", mmap_mode="r"
+    )
 
 
 def _class_feature_groups(
@@ -32,63 +32,51 @@ def _class_feature_groups(
 ) -> tuple[np.ndarray, np.ndarray]:
     frame = cast(pd.DataFrame, manifest[manifest["cancer_type"] == class_name])
     real = frame[~frame["is_synthetic"].astype(bool)]
-    synthetic_all = frame[frame["is_synthetic"].astype(bool)]
-    if "final_depth_epochs" in synthetic_all.columns:
-        synthetic = cast(
-            pd.DataFrame,
-            synthetic_all[synthetic_all["final_depth_epochs"].astype(int) == variant],
+    syn_all = frame[frame["is_synthetic"].astype(bool)]
+    syn = (
+        cast(
+            pd.DataFrame, syn_all[syn_all["final_depth_epochs"].astype(int) == variant]
         )
-    else:
-        synthetic = synthetic_all
-    real_idx = np.asarray(real["feature_index"], dtype=np.int64)
-    synthetic_idx = np.asarray(synthetic["feature_index"], dtype=np.int64)
-    real_features = np.asarray(features[real_idx], dtype=np.float32)
-    synthetic_features = np.asarray(features[synthetic_idx], dtype=np.float32)
-    return real_features, synthetic_features
+        if "final_depth_epochs" in syn_all.columns
+        else syn_all
+    )
+    real_idx, syn_idx = (
+        np.asarray(real["feature_index"], dtype=np.int64),
+        np.asarray(syn["feature_index"], dtype=np.int64),
+    )
+    return np.asarray(features[real_idx], dtype=np.float32), np.asarray(
+        features[syn_idx], dtype=np.float32
+    )
 
 
 def _nearest_real_index(real_features: np.ndarray, synthetic_vector: np.ndarray) -> int:
-    distances = np.linalg.norm(real_features - synthetic_vector, axis=1)
-    return int(distances.argmin())
+    return int(np.linalg.norm(real_features - synthetic_vector, axis=1).argmin())
 
 
 def _synthetic_image_root(
-    paths: dict[str, Path],
-    seed: int,
-    summary: dict[str, Any],
-    variant: int = _REFERENCE_FINAL_DEPTH_EPOCHS,
+    paths: dict, seed: int, summary: dict, var: int = _REFERENCE_FINAL_DEPTH_EPOCHS
 ) -> Path:
+    root = paths["root"]
     candidates = [
         Path(str(summary["image_root"])),
-        paths["root"] / "synthetic_patch_images" / f"seed={seed}" / f"epochs={variant}",
-        paths["root"] / "outputs" / "synthetic_patch_images" / f"seed={seed}",
-        paths["root"] / "synthetic_patch_images" / f"seed={seed}",
+        root / "synthetic_patch_images" / f"seed={seed}" / f"epochs={var}",
+        root / "outputs" / "synthetic_patch_images" / f"seed={seed}",
+        root / "synthetic_patch_images" / f"seed={seed}",
     ]
-    for path in candidates:
-        if path.exists():
-            return path
-    return candidates[0]
+    return next((p for p in candidates if p.exists()), candidates[0])
 
 
 def _resolve_image_path(path: Path, fallback_dir: Path | None = None) -> Path:
     if path.exists():
         return path
-    if fallback_dir is not None:
-        candidate = fallback_dir / path.name
-        if candidate.exists():
-            return candidate
+    if fallback_dir and (fb := fallback_dir / path.name).exists():
+        return fb
     raise FileNotFoundError(f"Image not found: {path}")
 
 
-def _canonical_real_path(row: pd.Series, raw_root: Path) -> Path:
-    filename = Path(str(row["image_path"])).name
-    return (
-        raw_root
-        / str(row["cancer_type"])
-        / str(row["resolution"])
-        / str(row["slide_id"])
-        / filename
-    )
+def _canonical_real_path(r: pd.Series, raw_root: Path) -> Path:
+    p = raw_root / str(r["cancer_type"]) / str(r["resolution"]) / str(r["slide_id"])
+    return p / Path(str(r["image_path"])).name
 
 
 def _nearest_real_row(
@@ -155,7 +143,9 @@ def _plot_class_examples(
         )
     else:
         synthetic_frame = synthetic_all
-    real_features, _ = _class_feature_groups(manifest, features, class_name, variant=variant)
+    real_features, _ = _class_feature_groups(
+        manifest, features, class_name, variant=variant
+    )
     for col_idx, (_, synthetic_row) in enumerate(
         synthetic_frame.head(examples_per_class).iterrows()
     ):
@@ -191,8 +181,7 @@ def _save_example_figure(
     fig: Figure, axes: np.ndarray, row_labels: list[str], seed: int, output_path: Path
 ) -> None:
     fig.suptitle(
-        "ProGAN synthetic patches and nearest real training neighbors (seed "
-        f"{seed}, Virchow2 embedding space)",
+        f"ProGAN synthetic patches and nearest real training neighbors (seed {seed}, Virchow2 embedding space)",
         fontsize=10,
     )
     fig.tight_layout(rect=(0.0, 0.04, 1.0, 0.95), h_pad=2.0)
@@ -208,26 +197,19 @@ def _add_row_labels(fig: Figure, axes: np.ndarray, row_labels: list[str]) -> Non
         right = max(axis.get_position().x1 for axis in row_axes)
         bottom = min(axis.get_position().y0 for axis in row_axes)
         fig.text(
-            (left + right) / 2,
-            bottom - 0.012,
-            label,
-            ha="center",
-            va="top",
-            fontsize=8,
+            (left + right) / 2, bottom - 0.012, label, ha="center", va="top", fontsize=8
         )
 
 
 def _example_axes(
-    example_classes: list[str], examples_per_class: int
+    classes: list[str], examples_per_class: int
 ) -> tuple[Figure, np.ndarray]:
     fig, axes = plt.subplots(
-        len(example_classes),
+        len(classes),
         examples_per_class * 2,
-        figsize=(examples_per_class * 2.05, len(example_classes) * 1.95),
+        figsize=(examples_per_class * 2.05, len(classes) * 1.95),
     )
-    if len(example_classes) == 1:
-        axes = np.expand_dims(axes, axis=0)
-    return fig, axes
+    return fig, (np.expand_dims(axes, axis=0) if len(classes) == 1 else axes)
 
 
 def plot_examples(
@@ -246,24 +228,20 @@ def plot_examples(
     summary = load_summary(summary_path(paths, seed, variant))
     image_root = _synthetic_image_root(paths, seed, summary, variant)
     raw_root = Path(str(config["paths"]["raw_root"]))
-
     fig, axes = _example_axes(example_classes, examples_per_class)
-
-    row_labels = []
-    for row_idx, class_name in enumerate(example_classes):
-        row_labels.append(
-            _plot_class_examples(
-                axes,
-                row_idx,
-                class_name,
-                manifest,
-                features,
-                frame,
-                image_root,
-                raw_root,
-                examples_per_class,
-                variant=variant,
-            )
+    row_labels = [
+        _plot_class_examples(
+            axes,
+            idx,
+            name,
+            manifest,
+            features,
+            frame,
+            image_root,
+            raw_root,
+            examples_per_class,
+            variant=variant,
         )
-
+        for idx, name in enumerate(example_classes)
+    ]
     _save_example_figure(fig, axes, row_labels, seed, output_path)

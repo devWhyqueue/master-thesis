@@ -134,7 +134,10 @@ def _aggregate(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFrame:
         merged.iterrows(),
         key=lambda item: (item[1]["benchmark"], -float(item[1]["macro_f1_mean"])),
     )
-    return cast(pd.DataFrame, pd.DataFrame([row for _, row in rows]).drop(columns=["macro_f1_mean"]))
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame([row for _, row in rows]).drop(columns=["macro_f1_mean"]),
+    )
 
 
 def _format_metric(row: pd.Series, metric: str) -> str:

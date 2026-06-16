@@ -24,48 +24,19 @@ def paper_batch_size(depth: int) -> int:
 def train_class_progan(
     image_paths: list[Path], settings: ProGanSettings, device: torch.device, seed: int
 ) -> tuple[dict[int, ProgressiveGenerator], list[dict[str, object]]]:
-    """Train one class-specific ProGAN; return generator snapshots keyed by final-depth epoch.
-
-    Depths 1..max_depth-1 train for settings.epochs_per_depth each.  The final depth
-    trains to max(settings.final_depth_epoch_grid) and the generator state is captured
-    after each epoch in the grid.  Fade-in at the final depth is pinned to the schedule
-    defined by settings.epochs_per_depth so all snapshots share identical early-fade
-    behavior regardless of the longest training run.
-    """
+    """Train one class-specific ProGAN; return snapshots keyed by final-depth epoch."""
     torch.manual_seed(seed)
-    generator, discriminator, opt_g, opt_d = _build_models(settings, device)
-    criterion = nn.BCEWithLogitsLoss()
+    models = (*_build_models(settings, device), nn.BCEWithLogitsLoss())
     diagnostics: list[dict[str, object]] = []
+    ctx = (image_paths, settings, device)
     for depth in range(1, settings.max_depth + 1):
         if depth < settings.max_depth:
-            diagnostics.append(
-                _train_depth(
-                    image_paths,
-                    settings,
-                    device,
-                    depth,
-                    generator,
-                    discriminator,
-                    criterion,
-                    opt_d,
-                    opt_g,
-                )
-            )
+            diag = _train_depth(ctx, depth, models)
+            diagnostics.append(diag)
         else:
-            diag, snapshots = _train_final_depth(
-                image_paths,
-                settings,
-                device,
-                depth,
-                generator,
-                discriminator,
-                criterion,
-                opt_d,
-                opt_g,
-            )
+            diag, snapshots = _train_final(ctx, depth, models)
             diagnostics.append(diag)
             return snapshots, diagnostics
-    # Reached only when max_depth == 0 (should never happen in practice).
     return {}, diagnostics
 
 
@@ -94,17 +65,8 @@ def _build_models(
     return generator, discriminator, opt_g, opt_d
 
 
-def _train_depth(
-    image_paths: list[Path],
-    settings: ProGanSettings,
-    device: torch.device,
-    depth: int,
-    generator: ProgressiveGenerator,
-    discriminator: ProgressiveDiscriminator,
-    criterion: nn.Module,
-    opt_d: torch.optim.Optimizer,
-    opt_g: torch.optim.Optimizer,
-) -> dict[str, object]:
+def _train_depth(ctx: tuple, depth: int, models: tuple) -> dict[str, object]:
+    image_paths, settings, device = ctx
     loader = _depth_loader(image_paths, depth)
     discriminator_losses: list[float] = []
     generator_losses: list[float] = []
@@ -112,15 +74,7 @@ def _train_depth(
         alpha = _fade_alpha(epoch, settings.epochs_per_depth, settings.fade_in_fraction)
         for real in loader:
             loss_d, loss_g = _train_step(
-                generator,
-                discriminator,
-                real.to(device),
-                depth,
-                alpha,
-                criterion,
-                opt_d,
-                opt_g,
-                settings,
+                models, real.to(device), depth, alpha, settings
             )
             discriminator_losses.append(loss_d)
             generator_losses.append(loss_g)
@@ -134,55 +88,33 @@ def _train_depth(
     )
 
 
-def _train_final_depth(
-    image_paths: list[Path],
-    settings: ProGanSettings,
-    device: torch.device,
-    depth: int,
-    generator: ProgressiveGenerator,
-    discriminator: ProgressiveDiscriminator,
-    criterion: nn.Module,
-    opt_d: torch.optim.Optimizer,
-    opt_g: torch.optim.Optimizer,
+def _train_final(
+    ctx: tuple, depth: int, models: tuple
 ) -> tuple[dict[str, object], dict[int, ProgressiveGenerator]]:
-    """Train the final progressive depth to max(grid) epochs and capture snapshots.
-
-    The fade-in alpha schedule is pinned to settings.epochs_per_depth (the reference
-    schedule) so that all snapshots see the same ramp regardless of total run length.
-    """
+    """Train the final progressive depth to max(grid) epochs and capture snapshots."""
+    image_paths, settings, device = ctx
+    generator = models[0]
     loader = _depth_loader(image_paths, depth)
     grid = sorted(settings.final_depth_epoch_grid)
-    max_epochs = grid[-1]
     grid_set = set(grid)
     fade_epochs = max(1, round(settings.epochs_per_depth * settings.fade_in_fraction))
-
     discriminator_losses: list[float] = []
     generator_losses: list[float] = []
     snapshots: dict[int, ProgressiveGenerator] = {}
-
-    for epoch in range(max_epochs):
+    for epoch in range(grid[-1]):
         alpha = min(1.0, (epoch + 1) / fade_epochs)
         for real in loader:
             loss_d, loss_g = _train_step(
-                generator,
-                discriminator,
-                real.to(device),
-                depth,
-                alpha,
-                criterion,
-                opt_d,
-                opt_g,
-                settings,
+                models, real.to(device), depth, alpha, settings
             )
             discriminator_losses.append(loss_d)
             generator_losses.append(loss_g)
         if (epoch + 1) in grid_set:
             snapshots[epoch + 1] = copy.deepcopy(generator)
-
     diag = _depth_diagnostics(
         image_paths,
         depth,
-        max_epochs,
+        grid[-1],
         loader.batch_size,
         discriminator_losses,
         generator_losses,
@@ -205,16 +137,13 @@ def _fade_alpha(epoch: int, epochs: int, fade_fraction: float) -> float:
 
 
 def _train_step(
-    generator: ProgressiveGenerator,
-    discriminator: ProgressiveDiscriminator,
+    models: tuple,
     real: torch.Tensor,
     depth: int,
     alpha: float,
-    criterion: nn.Module,
-    opt_d: torch.optim.Optimizer,
-    opt_g: torch.optim.Optimizer,
     settings: ProGanSettings,
 ) -> tuple[float, float]:
+    generator, discriminator, opt_g, opt_d, criterion = models
     batch_size = len(real)
     device = real.device
     noise = torch.randn(batch_size, settings.latent_dim, 1, 1, device=device)

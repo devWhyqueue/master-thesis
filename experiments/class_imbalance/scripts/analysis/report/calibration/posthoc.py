@@ -46,39 +46,33 @@ def parse_args() -> argparse.Namespace:
         nargs="*",
         default=list(DEFAULT_CALIBRATORS),
         choices=list(ALL_CALIBRATORS),
-        help=(
-            "Calibrators to fit on validation logits (default: temperature only). "
-            "Vector/Dirichlet are slower and mainly useful as diagnostics."
-        ),
+        help="Calibrators to fit.",
     )
     parser.add_argument(
         "--methods",
         nargs="*",
         default=list(PATCH_METHODS),
-        help="Patch-feature methods to calibrate (default: CE and CFAL).",
+        help="Methods to calibrate.",
     )
     return parser.parse_args()
 
 
-def _load_split(
-    connection,
-    method: str,
-    seed: int,
-    split: str,
-) -> dict[str, Any]:
-    payload = load_split_payload(connection, "patch", method, seed, split)
-    if payload is None:
+def _load_split(connection, method: str, seed: int, split: str) -> dict[str, Any]:
+    if (
+        payload := load_split_payload(connection, "patch", method, seed, split)
+    ) is None:
         raise FileNotFoundError(
-            f"Missing patch-feature result for method={method} seed={seed} split={split}"
+            f"Missing patch result for {method} seed={seed} split={split}"
         )
     return payload
 
 
 def _arrays(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, int]:
-    labels = np.asarray(payload["labels"], dtype=np.int64)
-    probabilities = np.asarray(payload["probabilities"], dtype=np.float64)
-    n_classes = len(payload["class_names"])
-    return labels, probabilities, n_classes
+    return (
+        np.asarray(payload["labels"], dtype=np.int64),
+        np.asarray(payload["probabilities"], dtype=np.float64),
+        len(payload["class_names"]),
+    )
 
 
 def _fit_and_evaluate(
@@ -89,15 +83,14 @@ def _fit_and_evaluate(
     n_classes: int,
     calibrator: str,
 ) -> dict[str, dict[str, float]]:
-    if calibrator == "temperature":
-        fit = fit_temperature(val_logits, val_labels)
-    elif calibrator == "vector":
-        fit = fit_vector_scaling(val_logits, val_labels)
-    elif calibrator == "dirichlet":
-        fit = fit_dirichlet(val_logits, val_labels)
-    else:
+    fit_fns = {
+        "temperature": fit_temperature,
+        "vector": fit_vector_scaling,
+        "dirichlet": fit_dirichlet,
+    }
+    if calibrator not in fit_fns:
         raise ValueError(f"Unsupported calibrator: {calibrator}")
-
+    fit = fit_fns[calibrator](val_logits, val_labels)
     val_probs = calibrated_probabilities(val_logits, fit)
     test_probs = calibrated_probabilities(test_logits, fit)
     return {
@@ -225,15 +218,14 @@ def _publish_artifacts(
     init_schema(connection)
     replace_table(connection, "posthoc_calibration", frame)
     connection.close()
-    test_rows = cast(pd.DataFrame, frame[(frame["seed"] == seed) & (frame["split"] == "test")])
+    test_rows = cast(
+        pd.DataFrame, frame[(frame["seed"] == seed) & (frame["split"] == "test")]
+    )
     _write_latex_table(
         test_rows, paths["tables"] / "result_posthoc_calibration_test.tex"
     )
-    _plot_reliability(
-        reliability_inputs,
-        seed,
-        paths["figures"] / f"reliability_patch_ce_cfal_seed{seed}.png",
-    )
+    fig_path = paths["figures"] / f"reliability_patch_ce_cfal_seed{seed}.png"
+    _plot_reliability(reliability_inputs, seed, fig_path)
 
 
 def main() -> None:
@@ -242,12 +234,8 @@ def main() -> None:
     paths = ensure_dirs(load_config(args.config))
     connection = connect(paths["db"])
     init_schema(connection)
-    frame, reliability_inputs = _collect_rows(
-        connection,
-        list(args.methods),
-        args.seed,
-        list(args.calibrators),
-    )
+    methods, calibs = list(args.methods), list(args.calibrators)
+    frame, reliability_inputs = _collect_rows(connection, methods, args.seed, calibs)
     connection.close()
     _publish_artifacts(frame, reliability_inputs, paths, args.seed)
 

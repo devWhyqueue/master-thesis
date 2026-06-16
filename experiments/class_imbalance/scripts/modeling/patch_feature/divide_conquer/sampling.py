@@ -28,10 +28,7 @@ class SubproblemSpec:
 
 class BinarySubproblemDataset(Dataset):
     def __init__(
-        self,
-        base: PatchFeatureDataset,
-        indices: np.ndarray,
-        positive_mask: np.ndarray,
+        self, base: PatchFeatureDataset, indices: np.ndarray, positive_mask: np.ndarray
     ) -> None:
         self.base = base
         self.indices = indices
@@ -48,14 +45,13 @@ class BinarySubproblemDataset(Dataset):
 
 def dnc_class_partitions(class_names: list[str]) -> dict[str, frozenset[str]]:
     """Return fixed, disjoint D&C groups derived only from dataset support."""
-    tier_labels = _tier_labels_for_classes(class_names)
-    if tier_labels is None:
+    if (tier_labels := _tier_labels_for_classes(class_names)) is None:
         raise FileNotFoundError(
             "Missing dataset class distribution required for D&C partitions."
         )
     partitions = {
-        tier: frozenset(name for name, label in tier_labels.items() if label == tier)
-        for tier in ("tail", "body", "head")
+        t: frozenset(k for k, v in tier_labels.items() if v == t)
+        for t in ("tail", "body", "head")
     }
     if any(not group for group in partitions.values()):
         raise ValueError("D&C requires non-empty tail, body, and head support tiers")
@@ -66,23 +62,15 @@ def dnc_class_partitions(class_names: list[str]) -> dict[str, frozenset[str]]:
 
 def _tier_labels_for_classes(class_names: list[str]) -> dict[str, str] | None:
     paths = ensure_dirs(load_config(None))
-    connection = connect(paths["db"])
-    init_schema(connection)
-    distribution = load_class_distribution(connection, paths)
-    connection.close()
-    if not distribution.empty:
-        slide_counts = dict(
-            zip(
-                distribution["cancer_type"].astype(str),
-                distribution["n_slides"].astype(int),
-                strict=True,
-            )
-        )
-        return class_tier_labels(class_names, slide_counts)
-    slide_counts_path = (
-        EXPERIMENT_ROOT / "outputs" / "tables" / "class_distribution.csv"
-    )
-    return load_class_tier_labels(class_names, slide_counts_path)
+    conn = connect(paths["db"])
+    init_schema(conn)
+    dist = load_class_distribution(conn, paths)
+    conn.close()
+    if not dist.empty:
+        sc = dict(zip(dist["cancer_type"].astype(str), dist["n_slides"].astype(int)))
+        return class_tier_labels(class_names, sc)
+    p = EXPERIMENT_ROOT / "outputs/tables/class_distribution.csv"
+    return load_class_tier_labels(class_names, p)
 
 
 def cluster_sample_binary_indices(
@@ -143,9 +131,7 @@ def _subproblem_specs(
     class_names: list[str],
 ) -> tuple[tuple[SubproblemSpec, SubproblemSpec, SubproblemSpec], dict[str, object]]:
     partitions = dnc_class_partitions(class_names)
-    tail = partitions["tail"]
-    body = partitions["body"]
-    head = partitions["head"]
+    tail, body, head = partitions["tail"], partitions["body"], partitions["head"]
     non_tail = body | head
     specs = (
         SubproblemSpec("tail_vs_body", tail, body),

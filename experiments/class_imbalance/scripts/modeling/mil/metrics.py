@@ -16,11 +16,10 @@ def extra_metrics(
     n_classes: int,
     tier_support: np.ndarray | None = None,
 ) -> dict[str, object]:
+    """Compute extra classification metrics including support tiers and calibration."""
     resolved = tier_support if tier_support is not None else support
     payload: dict[str, object] = {
-        "support_tier_metrics": _tier_metrics(
-            precision, recall, f1, support, resolved
-        )
+        "support_tier_metrics": _tier_metrics(precision, recall, f1, support, resolved)
     }
     payload.update(_calibration_metrics(y_true, probabilities, n_classes))
     return payload

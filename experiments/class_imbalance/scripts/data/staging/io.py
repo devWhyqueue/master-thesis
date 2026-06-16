@@ -42,7 +42,9 @@ def _split_raw_and_synthetic(
     mask = (
         frame["image_path"].astype(str).map(lambda path: _is_under_raw(path, raw_root))
     )
-    return cast(pd.DataFrame, frame[mask].copy()), cast(pd.DataFrame, frame[~mask].copy())
+    return cast(pd.DataFrame, frame[mask].copy()), cast(
+        pd.DataFrame, frame[~mask].copy()
+    )
 
 
 def _remap_via_sqfs_mount(

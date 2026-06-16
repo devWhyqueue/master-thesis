@@ -12,12 +12,7 @@ _REFERENCE_FINAL_DEPTH_EPOCHS = 25
 
 
 def summary_path(paths: dict[str, Path], seed: int, variant: int | None = None) -> Path:
-    """Return the stored ProGAN summary JSON for one benchmark seed.
-
-    If variant is given, looks in the per-variant subdirectory.  Defaults to the
-    reference variant (25 epochs) when the new layout is present, with fallback to
-    the legacy seed-level location for backward compatibility.
-    """
+    """Return the stored ProGAN summary JSON for one benchmark seed."""
     ref = variant if variant is not None else _REFERENCE_FINAL_DEPTH_EPOCHS
     candidates = [
         paths["root"]

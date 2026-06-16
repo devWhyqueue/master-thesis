@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse WSI-bag calibration audit arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None)
     parser.add_argument("--seed", type=int, action="append", dest="seeds")
@@ -73,7 +74,38 @@ def _audit_seed(result_root: Path, methods: list[str], seed: int) -> list[str]:
     return issues
 
 
+def _compare_baselines(
+    paths: dict[str, Path], methods: list[str], seeds: list[int]
+) -> None:
+    """Compare baseline WSI-bag calibration against rankmix calibration."""
+    reference_method = methods[0]
+    rankmix = "rankmix_mil"
+    for seed in seeds:
+        baseline = _load_test(paths["wsi_results"], reference_method, seed)
+        mixed = _load_test(paths["wsi_results"], rankmix, seed)
+        if baseline is None or mixed is None:
+            continue
+        labels = np.asarray(baseline["labels"], dtype=np.int64)
+        base_probs = np.asarray(baseline["probabilities"], dtype=np.float64)
+        mix_probs = np.asarray(mixed["probabilities"], dtype=np.float64)
+        base_true = base_probs[np.arange(len(labels)), labels]
+        mix_true = mix_probs[np.arange(len(labels)), labels]
+        logger.info(
+            f"seed={seed} n={len(labels)} "
+            f"labels_match={baseline['labels'] == mixed['labels']} | "
+            f"{reference_method}: NLL={baseline['negative_log_likelihood']:.4f} "
+            f"ECE={baseline['expected_calibration_error']:.4f} "
+            f"mean_conf={base_probs.max(axis=1).mean():.3f} "
+            f"mean_p_true={base_true.mean():.3f} | "
+            f"{rankmix}: NLL={mixed['negative_log_likelihood']:.4f} "
+            f"ECE={mixed['expected_calibration_error']:.4f} "
+            f"mean_conf={mix_probs.max(axis=1).mean():.3f} "
+            f"mean_p_true={mix_true.mean():.3f}"
+        )
+
+
 def main() -> None:
+    """Audit calibration metrics and compare baseline/mixed runs."""
     args = parse_args()
     config = load_config(args.config)
     paths = ensure_dirs(config)
@@ -88,30 +120,7 @@ def main() -> None:
     for issue in issues:
         logger.info(issue)
 
-    reference_method = methods[0]
-    rankmix = "rankmix_mil"
-    for seed in seeds:
-        baseline = _load_test(paths["wsi_results"], reference_method, seed)
-        mixed = _load_test(paths["wsi_results"], rankmix, seed)
-        if baseline is None or mixed is None:
-            continue
-        labels = np.asarray(baseline["labels"], dtype=np.int64)
-        base_probs = np.asarray(baseline["probabilities"], dtype=np.float64)
-        mix_probs = np.asarray(mixed["probabilities"], dtype=np.float64)
-        base_true = base_probs[np.arange(len(labels)), labels]
-        mix_true = mix_probs[np.arange(len(labels)), labels]
-        print(
-            f"seed={seed} n={len(labels)} "
-            f"labels_match={baseline['labels'] == mixed['labels']} | "
-            f"{reference_method}: NLL={baseline['negative_log_likelihood']:.4f} "
-            f"ECE={baseline['expected_calibration_error']:.4f} "
-            f"mean_conf={base_probs.max(axis=1).mean():.3f} "
-            f"mean_p_true={base_true.mean():.3f} | "
-            f"{rankmix}: NLL={mixed['negative_log_likelihood']:.4f} "
-            f"ECE={mixed['expected_calibration_error']:.4f} "
-            f"mean_conf={mix_probs.max(axis=1).mean():.3f} "
-            f"mean_p_true={mix_true.mean():.3f}"
-        )
+    _compare_baselines(paths, methods, seeds)
 
 
 if __name__ == "__main__":

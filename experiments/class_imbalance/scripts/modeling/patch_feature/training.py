@@ -49,9 +49,7 @@ def select_patch_feature_rows(
     if method != "patch_feature_progan_aug":
         frame = cast(pd.DataFrame, frame[~frame["is_synthetic"].astype(bool)])
     else:
-        frame = _select_progan_variant(
-            frame, int(params.get("final_depth_epochs", 25))
-        )
+        frame = _select_progan_variant(frame, int(params.get("final_depth_epochs", 25)))
     if smoke:
         parts = [part.head(8) for _, part in frame.groupby("split", sort=False)]
         return pd.concat(parts, ignore_index=True)

@@ -86,7 +86,10 @@ def _aggregate_details(frame: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFr
         merged.iterrows(),
         key=lambda item: (item[1]["benchmark"], -float(item[1]["macro_f1_mean"])),
     )
-    return cast(pd.DataFrame, pd.DataFrame([row for _, row in rows]).drop(columns=["macro_f1_mean"]))
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame([row for _, row in rows]).drop(columns=["macro_f1_mean"]),
+    )
 
 
 def _method_label(method: str) -> str:

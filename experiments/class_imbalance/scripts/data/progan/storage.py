@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 import json
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 import torch
@@ -90,29 +90,26 @@ def write_variant_manifest(
 ) -> Path:
     """Write per-variant synthetic manifest and summary under variant_root."""
     variant_root.mkdir(parents=True, exist_ok=True)
-    manifest = pd.DataFrame(rows)
-    if manifest.empty:
-        manifest = pd.DataFrame(
-            {"cancer_type": pd.Series(dtype=str), "image_path": pd.Series(dtype=str)}
-        )
+    manifest = (
+        pd.DataFrame(rows)
+        if rows
+        else pd.DataFrame(columns=cast(Any, ["cancer_type", "image_path"]))
+    )
     manifest["split"] = "train"
-    manifest["slide_id"] = manifest["image_path"].map(lambda path: Path(str(path)).stem)
+    manifest["slide_id"] = manifest["image_path"].map(lambda p: Path(str(p)).stem)
     manifest["resolution"] = "synthetic"
     manifest["final_depth_epochs"] = variant
     path = variant_root / "synthetic_patch_manifest.csv"
     manifest.to_csv(path, index=False)
-    write_json(
-        variant_root / "synthetic_patch_summary.json",
-        {
-            "seed": seed,
-            "final_depth_epochs": variant,
-            "n_patches": int(len(manifest)),
-            "counts_by_class": manifest["cancer_type"].value_counts().to_dict(),
-            "image_root": str(variant_root),
-            "per_class": diagnostics,
-            "settings": asdict(settings),
-        },
-    )
+    summary: dict[str, object] = {
+        "seed": seed,
+        "final_depth_epochs": variant,
+        "n_patches": len(manifest),
+    }
+    summary["counts_by_class"] = manifest["cancer_type"].value_counts().to_dict()
+    summary.update({"image_root": str(variant_root), "per_class": diagnostics})
+    summary["settings"] = asdict(settings)
+    write_json(variant_root / "synthetic_patch_summary.json", summary)
     return path
 
 
@@ -125,7 +122,9 @@ def write_combined_manifest(seed_root: Path, settings: ProGanSettings) -> Path:
     """
     frames: list[pd.DataFrame] = []
     for variant in sorted(settings.final_depth_epoch_grid):
-        variant_manifest = seed_root / f"epochs={variant}" / "synthetic_patch_manifest.csv"
+        variant_manifest = (
+            seed_root / f"epochs={variant}" / "synthetic_patch_manifest.csv"
+        )
         if variant_manifest.exists():
             frames.append(pd.read_csv(variant_manifest))
     combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
