@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -92,3 +93,52 @@ def _balanced_sampler(
     counts = np.bincount(labels)
     sample_weights = [float(1.0 / counts[label]) for label in labels]
     return WeightedRandomSampler(sample_weights, len(sample_weights), True, generator)
+
+
+def _load_manifest(
+    paths: dict[str, Path],
+    seed: int,
+    smoke: bool,
+    config: dict,
+    staged_manifest: str | None = None,
+) -> pd.DataFrame:
+    manifest_path = staged_manifest or str(
+        paths["data"] / f"patch_manifest_seed={seed}.csv"
+    )
+    frame = pd.read_csv(manifest_path)
+    training = config["patch_training"]
+    if not smoke:
+        return frame
+    limits = {
+        "train": int(training.get("max_train_rows") or 64),
+        "val": int(training.get("max_eval_rows") or 32),
+        "test": int(training.get("max_eval_rows") or 32),
+    }
+    parts = [part.head(limits[str(name)]) for name, part in frame.groupby("split")]
+    return pd.concat(parts, ignore_index=True)
+
+
+def _labels(dataset: PatchImageDataset) -> np.ndarray:
+    return np.asarray(
+        [dataset.class_to_idx[str(name)] for name in dataset.rows["cancer_type"]],
+        dtype=np.int64,
+    )
+
+
+def _split_datasets(
+    frame: pd.DataFrame, config: dict
+) -> tuple[PatchImageDataset, PatchImageDataset, PatchImageDataset, list[str]]:
+    """Split a patch manifest into train/val/test datasets."""
+    class_names = sorted(frame["cancer_type"].unique().tolist())
+    class_to_idx = {name: idx for idx, name in enumerate(class_names)}
+    image_size = int(config["patch_training"]["image_size"])
+    datasets = []
+    for split in ["train", "val", "test"]:
+        datasets.append(
+            PatchImageDataset(
+                cast(pd.DataFrame, frame[frame["split"] == split]),
+                class_to_idx,
+                image_size,
+            )
+        )
+    return datasets[0], datasets[1], datasets[2], class_names

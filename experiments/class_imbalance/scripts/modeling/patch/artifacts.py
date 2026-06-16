@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from scripts.common import write_json
+from scripts.common import write_json, write_run_record
 from scripts.metadata import benchmark_metadata
 from scripts.modeling.patch.data import PatchImageDataset
 from scripts.modeling.patch.models import PatchClassifier
@@ -167,3 +167,44 @@ def copy_synthetic_artifacts(manifest_path: Path, result_dir: Path) -> None:
     shutil.copy2(manifest_path, result_dir / manifest_path.name)
     if summary_path.exists():
         shutil.copy2(summary_path, result_dir / summary_path.name)
+
+
+def _resolve_checkpoint_path(result_dir: Path) -> Path | None:
+    latest = result_dir / "checkpoint_latest.pt"
+    if latest.exists():
+        return latest
+    final = result_dir / "checkpoint.pt"
+    return final if final.exists() else None
+
+
+def _write_run_record(
+    result_dir: Path,
+    method: str,
+    seed: int,
+    class_names: list[str],
+    deterministic: dict[str, object],
+    model: PatchClassifier,
+    val_set: PatchImageDataset,
+    test_set: PatchImageDataset,
+    device: torch.device,
+) -> None:
+    write_run_record(
+        result_dir,
+        {
+            "benchmark": "patch_image",
+            "method": method,
+            "seed": seed,
+            "smoke": False,
+            "tuning_id": None,
+            "tuning_params": {},
+            "model_path": "model.pt",
+            "method_metadata": benchmark_metadata("patch", method),
+            "class_names": class_names,
+            "deterministic": deterministic,
+            "diagnostics": None,
+            "splits": {
+                "val": evaluate_patch_dataset(model, val_set, class_names, device),
+                "test": evaluate_patch_dataset(model, test_set, class_names, device),
+            },
+        },
+    )

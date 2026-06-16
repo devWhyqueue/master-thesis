@@ -4,29 +4,29 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import pandas as pd
 import torch
-from torch import nn
-from scripts.common import ensure_dirs, load_config, write_progress, write_run_record
-from scripts.metadata import benchmark_metadata
+from scripts.common import ensure_dirs, load_config, write_progress
 from scripts.modeling.patch.artifacts import (
     copy_synthetic_artifacts,
-    evaluate_patch_dataset,
     load_patch_checkpoint,
     load_training_checkpoint,
     save_patch_checkpoint,
     save_training_checkpoint,
     seed_patch_run,
+    _resolve_checkpoint_path,
+    _write_run_record,
 )
-from scripts.modeling.patch.data import PatchImageDataset, patch_loader
-from scripts.modeling.patch.losses import (
-    PatchFocalLoss,
-    ScholzCombinedLoss,
-    inverse_frequency_weights,
+from scripts.modeling.patch.data import (
+    PatchImageDataset,
+    patch_loader,
+    _labels,
+    _load_manifest,
+    _split_datasets,
 )
+from scripts.modeling.patch.losses import _criterion
 from scripts.modeling.patch.models import PatchClassifier
 from scripts.data.progan.manifest import (
     generate_patch_gan_manifest,
@@ -39,149 +39,17 @@ logger = logging.getLogger(__name__)
 
 def parse_args() -> argparse.Namespace:
     """Parse patch-training CLI arguments."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default=None)
-    parser.add_argument("--method", required=True)
-    parser.add_argument("--seed", type=int, required=True)
-    parser.add_argument("--smoke", action="store_true")
-    parser.add_argument(
-        "--skip-synthetic-generation",
-        action="store_true",
-        help="Use an existing merged ProGAN manifest (after parallel GAN jobs).",
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Continue from checkpoint_latest.pt in the result directory.",
-    )
-    parser.add_argument(
-        "--fresh",
-        action="store_true",
-        help="Ignore checkpoint_latest.pt and train from scratch.",
-    )
-    parser.add_argument(
-        "--eval-only",
-        action="store_true",
-        help="Run validation and test evaluation from checkpoint_latest.pt or checkpoint.pt.",
-    )
-    parser.add_argument(
-        "--staged-manifest",
-        default=None,
-        help="Train from a node-local staged manifest (see scripts.data.staging.patch).",
-    )
-    return parser.parse_args()
-
-
-def _load_manifest(
-    paths: dict[str, Path],
-    seed: int,
-    smoke: bool,
-    config: dict,
-    staged_manifest: str | None = None,
-) -> pd.DataFrame:
-    manifest_path = staged_manifest or str(
-        paths["data"] / f"patch_manifest_seed={seed}.csv"
-    )
-    frame = pd.read_csv(manifest_path)
-    training = config["patch_training"]
-    if not smoke:
-        return frame
-    limits = {
-        "train": int(training.get("max_train_rows") or 64),
-        "val": int(training.get("max_eval_rows") or 32),
-        "test": int(training.get("max_eval_rows") or 32),
-    }
-    parts = [part.head(limits[str(name)]) for name, part in frame.groupby("split")]
-    return pd.concat(parts, ignore_index=True)
-
-
-def _split_datasets(
-    frame: pd.DataFrame, config: dict
-) -> tuple[PatchImageDataset, PatchImageDataset, PatchImageDataset, list[str]]:
-    class_names = sorted(frame["cancer_type"].unique().tolist())
-    class_to_idx = {name: idx for idx, name in enumerate(class_names)}
-    image_size = int(config["patch_training"]["image_size"])
-    datasets = []
-    for split in ["train", "val", "test"]:
-        datasets.append(
-            PatchImageDataset(
-                cast(pd.DataFrame, frame[frame["split"] == split]),
-                class_to_idx,
-                image_size,
-            )
-        )
-    return datasets[0], datasets[1], datasets[2], class_names
-
-
-def _labels(dataset: PatchImageDataset) -> np.ndarray:
-    return np.asarray(
-        [dataset.class_to_idx[str(name)] for name in dataset.rows["cancer_type"]],
-        dtype=np.int64,
-    )
-
-
-def _criterion(
-    method: str, labels: np.ndarray, n_classes: int, gamma: float, device: torch.device
-) -> nn.Module:
-    if method == "patch_weighted_ce":
-        return nn.CrossEntropyLoss(
-            weight=inverse_frequency_weights(labels, n_classes).to(device)
-        )
-    if method == "patch_focal":
-        return PatchFocalLoss(gamma)
-    if method == "patch_ce_soft_f1_balanced":
-        return ScholzCombinedLoss(n_classes, "f1")
-    if method == "patch_ce_soft_mcc_balanced":
-        return ScholzCombinedLoss(n_classes, "mcc")
-    return nn.CrossEntropyLoss()
-
-
-def _resolve_checkpoint_path(result_dir: Path) -> Path | None:
-    latest = result_dir / "checkpoint_latest.pt"
-    if latest.exists():
-        return latest
-    final = result_dir / "checkpoint.pt"
-    return final if final.exists() else None
-
-
-def _num_workers(settings: dict[str, object]) -> int:
-    override = os.environ.get("PATCH_TRAINING_NUM_WORKERS")
-    if override is None:
-        return int(settings.get("num_workers", 0))
-    return int(override)
-
-
-def _write_run_record(
-    result_dir: Path,
-    method: str,
-    seed: int,
-    class_names: list[str],
-    deterministic: dict[str, object],
-    model: PatchClassifier,
-    val_set: PatchImageDataset,
-    test_set: PatchImageDataset,
-    device: torch.device,
-) -> None:
-    write_run_record(
-        result_dir,
-        {
-            "benchmark": "patch_image",
-            "method": method,
-            "seed": seed,
-            "smoke": False,
-            "tuning_id": None,
-            "tuning_params": {},
-            "model_path": "model.pt",
-            "method_metadata": benchmark_metadata("patch", method),
-            "class_names": class_names,
-            "deterministic": deterministic,
-            "diagnostics": None,
-            "splits": {
-                "val": evaluate_patch_dataset(model, val_set, class_names, device),
-                "test": evaluate_patch_dataset(model, test_set, class_names, device),
-            },
-        },
-    )
+    p = argparse.ArgumentParser()
+    p.add_argument("--config", default=None)
+    p.add_argument("--method", required=True)
+    p.add_argument("--seed", type=int, required=True)
+    p.add_argument("--smoke", action="store_true")
+    p.add_argument("--skip-synthetic-generation", action="store_true")
+    p.add_argument("--resume", action="store_true")
+    p.add_argument("--fresh", action="store_true")
+    p.add_argument("--eval-only", action="store_true")
+    p.add_argument("--staged-manifest", default=None)
+    return p.parse_args()
 
 
 def _train(args: argparse.Namespace) -> None:
@@ -191,7 +59,14 @@ def _train(args: argparse.Namespace) -> None:
     frame = _load_manifest(
         paths, args.seed, args.smoke, config, staged_manifest=args.staged_manifest
     )
-    original_train_rows = int((frame["split"] == "train").sum())
+    # Count only real (non-synthetic) train rows so the ProGAN epoch cap matches the
+    # unaugmented budget regardless of whether a staged manifest already has synthetics.
+    if "is_synthetic" in frame.columns:
+        original_train_rows = int(
+            ((frame["split"] == "train") & ~frame["is_synthetic"]).sum()
+        )
+    else:
+        original_train_rows = int((frame["split"] == "train").sum())
     synthetic_manifest: Path | None = None
     if args.method == "patch_progan_aug":
         if args.skip_synthetic_generation:
@@ -203,7 +78,10 @@ def _train(args: argparse.Namespace) -> None:
             synthetic_manifest = merge_patch_gan_manifest_reference(
                 config, args.seed, args.smoke
             )
-    if synthetic_manifest is not None:
+    # Only append synthetic rows when staging has not already merged them.
+    # A staged manifest produced with --include-synthetic already contains
+    # the per-epoch synthetic images; appending again would double-count them.
+    if synthetic_manifest is not None and args.staged_manifest is None:
         frame = pd.concat([frame, pd.read_csv(synthetic_manifest)], ignore_index=True)
     train_set, val_set, test_set, class_names = _split_datasets(frame, config)
     labels = _labels(train_set)
@@ -243,13 +121,15 @@ def _train(args: argparse.Namespace) -> None:
     criterion = _criterion(
         args.method, labels, len(class_names), float(settings["focal_gamma"]), device
     ).to(device)
+    _w = os.environ.get("PATCH_TRAINING_NUM_WORKERS")
+    num_workers = int(_w) if _w is not None else int(settings.get("num_workers", 0))
     loader = patch_loader(
         train_set,
         labels,
         args.method,
         int(settings["batch_size"]),
         args.seed,
-        _num_workers(settings),
+        num_workers,
         original_train_rows if args.method == "patch_progan_aug" else None,
     )
     if synthetic_manifest is not None:
