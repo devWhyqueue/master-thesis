@@ -59,7 +59,11 @@ def load_seed_manifest(paths: dict[str, Path], seed: int) -> pd.DataFrame:
 
 def _synthetic_manifest_path(config: dict, seed: int) -> Path:
     paths = ensure_dirs(config)
-    return synthetic_output_root(paths["root"], seed) / "synthetic_patch_manifest.csv"
+    root = synthetic_output_root(paths["root"], seed)
+    epoch_ref = os.environ.get("PATCH_SYNTHETIC_SQFS_EPOCH_REF")
+    if epoch_ref:
+        return root / f"epochs={epoch_ref}" / "synthetic_patch_manifest.csv"
+    return root / "synthetic_patch_manifest.csv"
 
 
 def combined_training_frame(

@@ -155,6 +155,7 @@ case "$job" in
     export EXPERIMENT_USE_GPU=1
     seed="$(seed_from_array)"
     export PATCH_SYNTHETIC_SQFS="${PATCH_SYNTHETIC_SQFS:-$(synthetic_sqfs_path "$seed")}"
+    export PATCH_SYNTHETIC_SQFS_EPOCH_REF="${PATCH_SYNTHETIC_SQFS_EPOCH_REF:-25}"
     bash scripts/hydra/run_patch_staged_train.sh "$seed" patch_progan_aug \
       --include-synthetic \
       --skip-synthetic-generation \
