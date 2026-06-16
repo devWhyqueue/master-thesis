@@ -257,7 +257,7 @@ Training optimizes a margin term on affinities rather than cross-entropy on logi
 \end{equation}
 \noindent where $E_c$ is the effective number of training examples in class $c$ derived from class count $n_c$ and hyperparameter $\beta$, and $\gamma$ up-weights examples whose true-class affinity remains low. Unlike the CE plus soft-F1 and soft-MCC hybrids, CFAL does not use balanced oversampling: it is categorized as an algorithm-level patch method because it changes the head and loss while keeping the natural training distribution.
 
-The reference defaults are $\lambda=\num{0.1}$, $\beta=\num{0.999}$, and $\gamma=\num{2.0}$ following Mahbub et al.; validation selects $\gamma$ from Table~\ref{tab:tuning-grid}. For frozen Virchow2 embeddings, the paper's $\sigma=\num{130}$ was reported for AlexNet FC features; on \num{2560}-dimensional Virchow2 vectors that scale collapses affinities unless embeddings are normalized, so this benchmark uses L2 normalization with $\sigma=\num{1.0}$. CFAL is evaluated only in the patch regime because the source method assumes instance-level labels rather than weak slide-level bags.
+The reference defaults are $\lambda=\num{0.1}$, $\beta=\num{0.999}$, and $\gamma=\num{2.0}$ following Mahbub et al.; all three are held fixed and validation instead selects the affinity bandwidth $\sigma$ from Table~\ref{tab:tuning-grid}. The paper's $\sigma=\num{130}$ was calibrated for un-normalized AlexNet FC features; on L2-normalized \num{2560}-dimensional Virchow2 vectors that scale is far too large and collapses all pairwise affinities, so this benchmark evaluates a range matched to the normalized embedding geometry. CFAL is evaluated only in the patch regime because the source method assumes instance-level labels rather than weak slide-level bags.
 
 \subsection{Hybrid Sampling--Loss Methods}
 Hybrid methods combine data-level and algorithm-level changes. The Scholz-style patch objectives below adapt the metric-derived losses of Scholz et al.\ for imbalanced medical classification \citep{scholz2024imbalanceAware}. Both tested variants use class-balanced oversampling together with metric-derived losses, so their effect cannot be attributed only to a new loss or only to a new sampler.
@@ -418,7 +418,7 @@ Representation-level methods try to make rare classes more separable in feature 
 \subsubsection{Divide-and-Conquer (D\&C)}
 Divide-and-conquer patch classification decomposes a long-tailed multiclass problem into three binary subproblems, trains separate experts on cluster-sampled subsets, and fuses their representations for the final decision \citep{nouyedb2025patternRecognition}. In the source paper's HiPath setting, the three groups are pathology-specific patch categories: tumor, benign patches from cancerous slides, and benign patches from benign slides. Nouyed et al.\ train experts on \emph{A vs B}, \emph{A vs C}, and \emph{A vs (B+C)} with k-means cluster sampling and z-score stratification so the majority side matches the minority count while preserving texture diversity. Because TCGA-UT patches have cancer-type labels but no corresponding benign-region groups, this benchmark replaces the HiPath tumor/benign patch groups with three mutually exclusive groups fixed before model fitting from dataset-level slide-support tiers (Section~\ref{sec:training-protocol}): set~A is the eight tail classes, set~B is the sixteen body classes, and set~C is the eight head classes. This partition is independent of validation and test predictions and prevents any class from appearing on both sides of a binary subproblem.
 
-Each expert uses the shared \num{2560}$\to$\num{512} MLP trunk and a binary linear head. For epochs~1--20, the three experts are trained independently on cluster-sampled binary datasets with BCE; for epochs~21--30, the expert trunks are frozen and a fusion head is trained on the full natural training manifest with multiclass CE. The fusion head uses a lightweight neural variant of the paper's M2 fusion idea: concatenate the three \num{512}-d expert embeddings, apply dropout, and map to 32 classes with a linear layer. This replaces the paper's PCA/RandomForest fusion modes because the benchmark keeps patch methods inside the same frozen-feature, neural-head training protocol. The reference default uses $k=\num{10}$ clusters, five z-score bins, and a \num{20480}-patch cap for k-means fitting; validation selects $k$ from Table~\ref{tab:tuning-grid}. D\&C is evaluated only in the patch benchmark because the source method assumes instance-level labels rather than weak slide-level bags.
+Each expert uses the shared \num{2560}$\to$\num{512} MLP trunk and a binary linear head. For the initial expert phase, the three experts are trained independently on cluster-sampled binary datasets with BCE; for the remaining epochs, the expert trunks are frozen and a fusion head is trained on the full natural training manifest with multiclass CE. The fusion head uses a lightweight neural variant of the paper's M2 fusion idea: concatenate the three \num{512}-d expert embeddings, apply dropout, and map to 32 classes with a linear layer. This replaces the paper's PCA/RandomForest fusion modes because the benchmark keeps patch methods inside the same frozen-feature, neural-head training protocol. The reference default uses $k=\num{10}$ clusters, five z-score bins, and a \num{20480}-patch cap for k-means fitting; validation selects the expert-phase epoch count and the number of z-score bins from Table~\ref{tab:tuning-grid}, while $k$ is fixed at \num{10}. D\&C is evaluated only in the patch benchmark because the source method assumes instance-level labels rather than weak slide-level bags.
 
 \subsubsection{SC-MIL}
 SC-MIL extends supervised contrastive learning to MIL by applying the contrastive objective to bag representations instead of assigning noisy slide labels to individual patches \citep{juyal2024scMil}. The motivation is that a slide label usually does not describe every patch in a bag. A cancer-type label can be correct for the slide while many instances contain background, normal tissue, technical noise, or weakly informative morphology. Applying contrastive learning directly to instances would therefore treat many patches as positives or negatives using labels they do not truly carry. SC-MIL avoids that mismatch by contrasting the aggregated slide-level representation.
@@ -518,13 +518,13 @@ Each method is evaluated under one shared training budget per benchmark (Table~\
     WSI bag & Weighted CE & Weight power $=1$ & $\{0,0.125,0.25,0.5,0.75,1\}$\\
     Patch, WSI & Balanced sampler & Sampler power $=1$ & $\{0.5,0.75,1\}$\\
     Patch, WSI & Focal loss & $\gamma=2$ & $\gamma\in\{0.5,1,1.5,2\}$\\
-    Patch & CE + soft F1 & Metric-loss weight $=1$ & $\{0.25,0.5,1,2,4,8,16,32\}$\\
-    Patch & CE + soft MCC & Metric-loss weight $=1$ & $\{0.25,0.5,1,2\}$\\
-    Patch & CFAL & $\gamma=2$ & $\gamma\in\{0.5,1,2,5\}$\\
-    Patch & D\&C & $k=10$ & $k\in\{5,10,15,20\}$\\
+    Patch & CE + soft F1 & Metric-loss weight $=1$ & $\{0.25,0.5,1,2,4,8,16,32,64,256,512,1024\}$\\
+    Patch & CE + soft MCC & Metric-loss weight $=1$ & $\{0.25,0.5,1,2,8,32\}$\\
+    Patch & CFAL & $\gamma=2$, $\sigma=1$ & $\sigma\in\{0.25,1,4\}$\\
+    Patch & D\&C & $k=10$, bins$=5$ & bins$\in\{1,5,20\}$; expert epochs$\in\{5,20\}$\\
     Patch & ProGAN augmentation & Final-depth epochs $=25$ & $\{10,25,50\}$\\
-    Patch & OKO & $k=1$ & $k\in\{1,4,8,20\}$\\
-    WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32\}$\\
+    Patch & OKO & $k=1$ & $k\in\{1,2,3,4,5,6,8,12,20\}$\\
+    WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32,128\}$\\
     WSI bag & SC-MIL & $\tau=1$ & $\tau\in\{0.05,0.1,0.2,0.5\}$\\
     WSI bag & MDE-MIL & $\lambda_{\mathrm{con}}=0.25$ & $\lambda_{\mathrm{con}}\in\{0.1,0.25,0.3,0.5,1,2,4\}$\\
     \bottomrule
@@ -546,6 +546,8 @@ Each method is evaluated under one shared training budget per benchmark (Table~\
   \caption{Validation-selected configuration provenance. Configurations are chosen by mean validation macro F1 over seeds 0--2; held-out test metrics in Tables~\ref{tab:patch-results} and~\ref{tab:wsi-results} are reported after selection.}
   \label{tab:tuning-selection}
 \end{table}
+
+\noindent A seed-blocked repeated-measures analysis of the validation sweeps shows that across-configuration variation exceeds twice the seed standard deviation only for OKO (range-to-seed-noise ratio \num{75.8}) and RankMix (ratio \num{2.06}, $p<\num{0.01}$). For all single-knob resampling, reweighting, and focal mechanisms on frozen Virchow2 embeddings the swept control produces variation within seed noise regardless of its value; the selected configurations in Table~\ref{tab:tuning-selection} therefore reflect the best observed point rather than a robustly isolated tuning effect.
 
 Figure~\ref{fig:benchmark-models} shows the patch and WSI-bag classifier heads.
 
