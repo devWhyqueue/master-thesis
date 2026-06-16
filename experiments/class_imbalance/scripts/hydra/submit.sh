@@ -200,7 +200,7 @@ case "$command" in
       --partition="${PATCH_TUNE_PARTITION:-gpu-2h}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
-      --array=0-107,117-143 \
+      --array=0-110,120-146 \
       --output=logs/patch-tune-%A-%a.out \
       --error=logs/patch-tune-%A-%a.err \
       "$@"

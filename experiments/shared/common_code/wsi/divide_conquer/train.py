@@ -12,7 +12,7 @@ from common_code.wsi.divide_conquer.sampling import (
     BinarySubproblemDataset,
     build_sampled_subproblem_datasets,
 )
-from scripts.modeling.patch_feature.training import PatchFeatureDataset
+from scripts.modeling.patch_feature.training import PatchFeatureDataset  # pyright: ignore[reportMissingImports]
 
 
 class BinaryExpert(nn.Module):
@@ -109,8 +109,9 @@ def train_divide_conquer_model(
     """Train divide-and-conquer experts then the fusion head."""
     k_clusters = _setting_int(tuning_params, settings, "dnc_k_clusters", default=10)
     n_bins = _setting_int(tuning_params, settings, "dnc_zscore_bins", default=5)
-    expert_epochs = _setting_int(
-        tuning_params, settings, "dnc_expert_epochs", default=20
+    expert_epochs = min(
+        _setting_int(tuning_params, settings, "dnc_expert_epochs", default=20),
+        int(settings["epochs"]) - 1,
     )
     sp_ht, sp_hh, sp_hr, diagnostics = build_sampled_subproblem_datasets(
         train_set,
