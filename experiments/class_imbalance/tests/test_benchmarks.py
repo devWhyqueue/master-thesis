@@ -579,9 +579,9 @@ def test_progan_subsamples_real_patches_with_stable_seed() -> None:
         base_channels=32,
     )
     raw_root = Path("/data/raw")
-    first = _class_image_paths(frame, "A", settings, raw_root, benchmark_seed=1)
-    second = _class_image_paths(frame, "A", settings, raw_root, benchmark_seed=1)
-    other_seed = _class_image_paths(frame, "A", settings, raw_root, benchmark_seed=2)
+    first = _class_image_paths(frame, "A", settings, raw_root, seed=1)
+    second = _class_image_paths(frame, "A", settings, raw_root, seed=1)
+    other_seed = _class_image_paths(frame, "A", settings, raw_root, seed=2)
     assert len(first) == 4
     assert first == second
     assert first != other_seed
