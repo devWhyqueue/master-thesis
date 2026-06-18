@@ -202,18 +202,34 @@ def main() -> None:
 def _publish_dataset_tables(
     paths: dict[str, Path], distribution: pd.DataFrame, stats: dict[str, Any]
 ) -> None:
+    paths["tables"].mkdir(parents=True, exist_ok=True)
+    distribution.to_csv(paths["tables"] / "class_distribution.csv", index=False)
+    stored_stats = dict(stats)
+    split_distribution = stored_stats.pop("split_distribution", None)
+    if isinstance(split_distribution, pd.DataFrame):
+        _write_split_distribution(paths, split_distribution)
+    (paths["tables"] / "dataset_stats.json").write_text(
+        json.dumps(stored_stats, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     connection = connect(paths["db"])
     init_schema(connection)
     replace_table(connection, "dataset_class_distribution", distribution)
-    split_distribution = stats.pop("split_distribution", None)
     if isinstance(split_distribution, pd.DataFrame):
         replace_table(connection, "dataset_split_distribution", split_distribution)
     replace_table(
         connection,
         "dataset_stats",
-        pd.DataFrame([{"payload_json": json.dumps(stats, sort_keys=True)}]),
+        pd.DataFrame([{"payload_json": json.dumps(stored_stats, sort_keys=True)}]),
     )
     connection.close()
+
+
+def _write_split_distribution(paths: dict[str, Path], frame: pd.DataFrame) -> None:
+    if "seed" in frame.columns and not frame.empty:
+        seed = int(frame["seed"].iloc[0])
+        frame.to_csv(
+            paths["tables"] / f"split_distribution_seed={seed}.csv", index=False
+        )
 
 
 if __name__ == "__main__":
