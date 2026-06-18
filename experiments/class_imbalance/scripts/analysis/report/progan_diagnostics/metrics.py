@@ -144,6 +144,46 @@ def build_metrics_frame(
     return frame
 
 
+def expected_augmented_classes(
+    paths: dict[str, Path], config: dict[str, Any], seed: int
+) -> set[str]:
+    """Return the tail classes a full ProGAN run is expected to augment for one seed.
+
+    Mirrors ``scripts.data.progan.manifest.tail_classes`` without importing the
+    torch-backed training module into the reporting path.
+    """
+    settings = config["patch_synthetic_progan"]
+    if settings["balance_target"] != "max_train_class_count":
+        raise ValueError(f"Unknown ProGAN balance target: {settings['balance_target']}")
+    manifest_path = paths["data"] / f"patch_manifest_seed={seed}.csv"
+    if not manifest_path.exists():
+        raise FileNotFoundError(
+            f"Patch manifest required for ProGAN completeness check: {manifest_path}"
+        )
+    manifest = pd.read_csv(manifest_path, low_memory=False)
+    train = cast(pd.DataFrame, manifest[manifest["split"] == "train"])
+    counts = cast(pd.Series, train["cancer_type"].value_counts())
+    target = int(counts.max())
+    tail = [str(name) for name, count in counts.items() if int(count) < target]
+    max_classes = settings.get("max_classes")
+    if max_classes is not None:
+        tail = tail[: int(max_classes)]
+    return set(tail)
+
+
+def assert_summary_complete(frame: pd.DataFrame, expected: set[str], seed: int) -> None:
+    """Raise if the ProGAN summary omits any expected augmented class."""
+    present = {str(name) for name in frame["class_name"]}
+    missing = sorted(expected - present)
+    if missing:
+        raise RuntimeError(
+            f"ProGAN diagnostics for seed={seed} cover {len(present)} of "
+            f"{len(expected)} augmented classes; missing {len(missing)}: "
+            f"{', '.join(missing)}. Regenerate the full ProGAN run before building "
+            "this table (a partial or smoke run yields an incomplete summary)."
+        )
+
+
 def _format_metric_row(row: dict[str, Any]) -> str:
     fid_value = row["inception_fid"]
     nn_value = row["virchow_mean_nn_distance"]

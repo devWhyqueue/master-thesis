@@ -6,7 +6,9 @@ from pathlib import Path
 from scripts.common import ensure_dirs, load_config
 from scripts.analysis.results import connect, init_schema, replace_table
 from scripts.analysis.report.progan_diagnostics.metrics import (
+    assert_summary_complete,
     build_metrics_frame,
+    expected_augmented_classes,
     write_summary_latex,
 )
 from scripts.analysis.report.progan_diagnostics.plots import (
@@ -39,6 +41,9 @@ def main() -> None:
     paths = ensure_dirs(config)
     cache_dir = _patch_feature_cache_dir(config, args.seed)
     frame = build_metrics_frame(paths, args.seed, cache_dir)
+    assert_summary_complete(
+        frame, expected_augmented_classes(paths, config, args.seed), args.seed
+    )
     stored = frame.copy()
     connection = connect(paths["db"])
     init_schema(connection)

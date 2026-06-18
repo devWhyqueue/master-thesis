@@ -14,7 +14,6 @@ from scripts.analysis.results import (
     load_split_payload,
     load_summary,
     replace_table,
-    write_json_table,
 )
 from scripts.analysis.report.calibration.utils import (
     calibrated_probabilities,
@@ -180,6 +179,17 @@ def main() -> None:
     config = load_config(args.config)
     paths = ensure_dirs(config)
     frame, missing = _collect(config, paths)
+    if missing:
+        detail = ", ".join(
+            f"{entry['benchmark']}/{entry['method']}@seed{entry['seed']}"
+            for entry in missing
+        )
+        raise RuntimeError(
+            f"Post-hoc calibration is missing validation/test probability payloads "
+            f"for {len(missing)} method-seed combinations: {detail}. Every method "
+            "needs stored val and test probabilities to fit and apply temperature "
+            "scaling; ingest the eval arrays for all methods before building this table."
+        )
     if frame.empty:
         raise RuntimeError(
             "No calibration rows collected; missing val/test result files."
@@ -188,7 +198,6 @@ def main() -> None:
     connection = connect(paths["db"])
     init_schema(connection)
     replace_table(connection, "calibration_posthoc", aggregate)
-    write_json_table(connection, "calibration_posthoc_missing", {"missing": missing})
     connection.close()
     write_latex(aggregate, paths["tables"] / "result_calibration_posthoc.tex")
 
