@@ -10,7 +10,7 @@ from scripts.common import ensure_dirs, load_config, read_run_record
 from scripts.analysis.results import connect, init_schema, load_summary, replace_table
 from scripts.metadata import PATCH_FEATURE_METHOD_ALIASES
 from scripts.analysis.report.figures.labels import latex_method_label
-from scripts.analysis.tuning.grid import TuningVariant, grid_for_benchmark
+from scripts.analysis.tuning import grid as tuning_grid
 from scripts.analysis.tuning.selected_reports import (
     materialize_selected_results,
     regenerate_selected_reports,
@@ -32,7 +32,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-regenerate",
         action="store_true",
-        help="Only select configurations and materialize results.",
+        help="Deprecated; tuning aggregation skips report regeneration by default.",
+    )
+    parser.add_argument(
+        "--regenerate-reports",
+        action="store_true",
+        help="Rebuild downstream report tables and figures after selecting winners.",
     )
     return parser.parse_args()
 
@@ -57,7 +62,7 @@ def main() -> None:
             f"Missing materialized selected results: {missing[:3]} "
             f"({len(missing)} total)"
         )
-    if not args.skip_regenerate:
+    if args.regenerate_reports and not args.skip_regenerate:
         regenerate_selected_reports(args.config)
 
 
@@ -65,13 +70,13 @@ def _collect_all(paths: dict[str, Path]) -> pd.DataFrame:
     rows = []
     for benchmark in ("patch_feature", "wsi_bag"):
         fixed = _fixed_summary(paths, benchmark)
-        for variant in grid_for_benchmark(benchmark):
+        for variant in tuning_grid.grid_for_benchmark(benchmark):
             rows.extend(_variant_rows(paths, benchmark, variant, fixed))
     return pd.DataFrame(rows)
 
 
 def _variant_rows(
-    paths: dict[str, Path], benchmark: str, variant: TuningVariant, fixed: pd.DataFrame
+    paths: dict[str, Path], benchmark: str, variant, fixed: pd.DataFrame
 ) -> list[dict[str, Any]]:
     rows = []
     for seed in (0, 1, 2):

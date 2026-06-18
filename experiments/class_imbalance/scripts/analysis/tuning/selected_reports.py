@@ -9,17 +9,19 @@ from typing import Any
 import pandas as pd
 
 from scripts.common import (
+    EVAL_ARRAYS_NAME,
     EXPERIMENT_ROOT,
     RUN_RECORD_NAME,
     ensure_dirs,
     load_config,
+    read_run_record,
     write_json,
 )
-from scripts.analysis.tuning.grid import SEEDS
 from scripts.analysis.tuning.paths import tuning_result_dir
 
-COPIED_FILES = (RUN_RECORD_NAME, "model.pt")
+COPIED_FILES = (EVAL_ARRAYS_NAME, "model.pt")
 BASELINE_METHOD = {"patch_feature": "patch_feature_ce", "wsi_bag": "mil_ce"}
+SEEDS = (0, 1, 2)
 
 
 def report_result_root(paths: dict[str, Path], benchmark: str) -> Path:
@@ -148,8 +150,18 @@ def _copy_run(source: Path, destination: Path) -> bool:
     if not (source / RUN_RECORD_NAME).exists():
         return False
     destination.mkdir(parents=True, exist_ok=True)
+    _copy_run_record(source, destination)
     for name in COPIED_FILES:
         src_file = source / name
         if src_file.exists():
             shutil.copy2(src_file, destination / name)
     return True
+
+
+def _copy_run_record(source: Path, destination: Path) -> None:
+    record = read_run_record(source)
+    if record is None:
+        return
+    report_record = dict(record)
+    report_record["tuning_id"] = None
+    write_json(destination / RUN_RECORD_NAME, report_record)

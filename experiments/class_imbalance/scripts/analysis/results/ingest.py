@@ -42,6 +42,7 @@ def ingest_run_record(
     for split, payload in splits.items():
         if isinstance(payload, dict):
             _ingest_split(connection, run_id, str(split), payload)
+            _delete_array_row(connection, run_id, str(split))
     _insert_diagnostics(connection, run_id, record.get("diagnostics"))
     connection.commit()
     return True
@@ -127,30 +128,19 @@ def _ingest_split(
         f"INSERT INTO eval_results ({columns}) VALUES ({placeholders})",
         metric_values,
     )
-    array_values = [
-        run_id,
-        split,
-        json.dumps(payload.get("labels")),
-        json.dumps(payload.get("preds")),
-        json.dumps(payload.get("probabilities")),
-        json.dumps(payload.get("class_names")),
-    ]
+
+
+def _delete_array_row(connection: sqlite3.Connection, run_id: str, split: str) -> None:
     connection.execute(
         "DELETE FROM eval_arrays WHERE run_id = ? AND split = ?",
         (run_id, split),
-    )
-    connection.execute(
-        """
-        INSERT INTO eval_arrays (
-            run_id, split, labels_json, preds_json, probabilities_json, class_names_json
-        ) VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        array_values,
     )
 
 
 def discover_result_dirs(
     paths: dict[str, Path],
+    *,
+    include_tuning: bool = False,
 ) -> list[tuple[Path, str, str, int, str | None]]:
     """Enumerate all per-run directories that may contain result payloads."""
     discovered: list[tuple[Path, str, str, int, str | None]] = []
@@ -161,7 +151,8 @@ def discover_result_dirs(
         discovered.extend(_discover_method_dirs(paths["patch_results"], "patch_image"))
     if paths["wsi_results"].exists():
         discovered.extend(_discover_method_dirs(paths["wsi_results"], "wsi_bag"))
-    discovered.extend(_discover_tuning_dirs(paths["root"] / "outputs" / "tuning"))
+    if include_tuning:
+        discovered.extend(_discover_tuning_dirs(paths["root"] / "outputs" / "tuning"))
     return discovered
 
 

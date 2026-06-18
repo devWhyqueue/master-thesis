@@ -17,7 +17,6 @@ sys.path.insert(0, str(EXPERIMENT_ROOT))
 
 from scripts.modeling.mil.bag.losses import (
     _mix_ranked_bags,
-    _mde_mil_loss,
     _supervised_contrastive_loss,
     bag_loss,
 )
@@ -41,7 +40,6 @@ from scripts.modeling.patch_feature.cfal import (
     gaussian_affinity,
 )
 from scripts.modeling.patch_feature.divide_conquer import (
-    DivideConquerModel,
     build_divide_conquer_model,
     cluster_sample_binary_indices,
     dnc_class_partitions,
@@ -60,8 +58,23 @@ from scripts.data.progan.train import (
     paper_batch_size,
     train_class_progan,
 )
-from scripts.common import RUN_RECORD_NAME, ensure_dirs, load_config, read_run_record, write_run_record
-from scripts.analysis.results import connect, init_schema, read_table, replace_table
+from scripts.common import (
+    EVAL_ARRAYS_NAME,
+    RUN_RECORD_NAME,
+    ensure_dirs,
+    load_config,
+    read_run_record,
+    write_run_record,
+)
+from scripts.analysis.results import (
+    connect,
+    discover_result_dirs,
+    ingest_run_record,
+    init_schema,
+    load_split_payload,
+    read_table,
+    replace_table,
+)
 from scripts.data.progan.manifest import (
     _class_image_paths,
     balance_target as _balance_target,
@@ -87,6 +100,7 @@ from scripts.analysis.tuning.grid import (
     validate_tuning_params,
 )
 from scripts.analysis.tuning.paths import tuning_result_dir
+from scripts.analysis.tuning.selected_reports import materialize_selected_results
 
 
 def test_patch_manifest_uses_fixed_resolution_and_split(tmp_path: Path) -> None:
@@ -821,6 +835,27 @@ def _class_names_from_distribution(paths: dict[str, Path]) -> list[str]:
     raise FileNotFoundError("No class distribution available for tests.")
 
 
+def _minimal_split(macro_f1: float) -> dict[str, object]:
+    return {
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "macro_precision": 1.0,
+        "macro_recall": 1.0,
+        "macro_f1": macro_f1,
+        "negative_log_likelihood": 0.1,
+        "brier_score": 0.1,
+        "expected_calibration_error": 0.1,
+        "class_names": ["a", "b"],
+        "precision_per_class": [1.0, 1.0],
+        "recall_per_class": [1.0, 1.0],
+        "f1_per_class": [1.0, 1.0],
+        "support_per_class": [1, 1],
+        "labels": [0, 1],
+        "preds": [0, 1],
+        "probabilities": [[0.8, 0.2], [0.1, 0.9]],
+    }
+
+
 def test_run_record_round_trip(tmp_path: Path) -> None:
     result_dir = tmp_path / "run"
     result_dir.mkdir()
@@ -840,10 +875,103 @@ def test_run_record_round_trip(tmp_path: Path) -> None:
     }
     write_run_record(result_dir, payload)
     assert (result_dir / RUN_RECORD_NAME).exists()
+    assert (result_dir / EVAL_ARRAYS_NAME).exists()
     loaded = read_run_record(result_dir)
     assert loaded is not None
     assert loaded["method"] == "patch_feature_ce"
     assert loaded["splits"]["test"]["macro_f1"] == 0.6
+    assert "probabilities" not in loaded["splits"]["test"]
+
+
+def test_split_payload_loads_arrays_from_sidecar(tmp_path: Path) -> None:
+    result_dir = tmp_path / "outputs" / "results" / "patch_feature" / "method" / "seed=0"
+    payload = {
+        "benchmark": "patch_feature",
+        "method": "method",
+        "seed": 0,
+        "smoke": False,
+        "tuning_id": None,
+        "tuning_params": {},
+        "model_path": "model.pt",
+        "method_metadata": {},
+        "diagnostics": None,
+        "splits": {
+            "val": _minimal_split(0.5),
+            "test": _minimal_split(0.6),
+        },
+    }
+    write_run_record(result_dir, payload)
+    db_path = tmp_path / "outputs" / "results.sqlite"
+    connection = connect(db_path)
+    init_schema(connection)
+    assert ingest_run_record(connection, result_dir, "patch_feature", "method", 0)
+    loaded = load_split_payload(connection, "patch", "method", 0, "test")
+    arrays = read_table(connection, "eval_arrays")
+    connection.close()
+    assert loaded is not None
+    assert loaded["labels"] == [0, 1]
+    assert loaded["preds"] == [0, 1]
+    assert loaded["probabilities"] == [[0.8, 0.2], [0.1, 0.9]]
+    assert arrays.empty
+
+
+def test_default_result_discovery_excludes_tuning(tmp_path: Path) -> None:
+    paths = {
+        "root": tmp_path,
+        "results": tmp_path / "outputs" / "results",
+        "patch_results": tmp_path / "outputs" / "results_patch",
+        "wsi_results": tmp_path / "outputs" / "results_wsi_bag",
+    }
+    report_dir = paths["results"] / "patch_feature" / "method" / "seed=0"
+    tuning_dir = (
+        tmp_path
+        / "outputs"
+        / "tuning"
+        / "patch_feature"
+        / "method"
+        / "variant"
+        / "seed=0"
+    )
+    report_dir.mkdir(parents=True)
+    tuning_dir.mkdir(parents=True)
+    default_dirs = discover_result_dirs(paths)
+    all_dirs = discover_result_dirs(paths, include_tuning=True)
+    assert [row[0] for row in default_dirs] == [report_dir]
+    assert tuning_dir in [row[0] for row in all_dirs]
+
+
+def test_materialize_selected_results_copies_array_sidecar(tmp_path: Path) -> None:
+    paths = {"root": tmp_path}
+    src = tuning_result_dir(paths, "patch_feature", "method", "variant", 0)
+    write_run_record(
+        src,
+        {
+            "benchmark": "patch_feature",
+            "method": "method",
+            "seed": 0,
+            "smoke": False,
+            "tuning_id": "variant",
+            "tuning_params": {},
+            "model_path": "model.pt",
+            "method_metadata": {},
+            "diagnostics": None,
+            "splits": {"val": _minimal_split(0.5), "test": _minimal_split(0.6)},
+        },
+    )
+    (src / "model.pt").write_bytes(b"model")
+    selected = pd.DataFrame(
+        [{"benchmark": "patch_feature", "method": "method", "variant": "variant"}]
+    )
+    missing = materialize_selected_results(paths, selected, seeds=(0,))
+    dst = tmp_path / "outputs" / "results" / "patch_feature" / "method" / "seed=0"
+    assert missing == []
+    assert (dst / RUN_RECORD_NAME).exists()
+    assert (dst / EVAL_ARRAYS_NAME).exists()
+    assert (dst / "model.pt").exists()
+    copied = read_run_record(dst)
+    assert copied is not None
+    assert copied["tuning_id"] is None
+    assert copied["tuning_params"] == {}
 
 
 def test_tuning_selection_requires_complete_seed_sets(tmp_path: Path) -> None:

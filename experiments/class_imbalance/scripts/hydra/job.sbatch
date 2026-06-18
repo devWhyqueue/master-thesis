@@ -215,7 +215,6 @@ case "$job" in
     ;;
 
   tuning-aggregate)
-    export EXPERIMENT_USE_GPU=1
     bash scripts/hydra/run_python.sh -m scripts.analysis.tuning.aggregate "$@"
     ;;
 

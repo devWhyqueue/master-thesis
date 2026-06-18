@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pandas as pd
 
+from scripts.common import load_eval_array_payload
 from scripts.analysis.results.core import SUMMARY_METRICS, read_table
 
 
@@ -120,6 +121,8 @@ def load_split_payload(
     if row is None:
         return None
     payload = _payload_from_result_row(row)
+    if (result_dir := _result_dir_for_run_id(connection, run_id)) is not None:
+        payload.update(load_eval_array_payload(Path(result_dir), split))
     array_row = _split_array_row(connection, run_id, split)
     if array_row is None:
         return payload
@@ -189,6 +192,16 @@ def _lookup_run_id(
             """,
             (benchmark, method, seed, tuning_id),
         )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return str(row[0])
+
+
+def _result_dir_for_run_id(connection: sqlite3.Connection, run_id: str) -> str | None:
+    cursor = connection.execute(
+        "SELECT result_dir FROM runs WHERE run_id = ? LIMIT 1", (run_id,)
+    )
     row = cursor.fetchone()
     if row is None:
         return None

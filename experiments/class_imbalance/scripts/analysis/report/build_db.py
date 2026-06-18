@@ -25,6 +25,11 @@ def parse_args() -> argparse.Namespace:
     """Parse database build arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None)
+    parser.add_argument(
+        "--include-tuning",
+        action="store_true",
+        help="Also ingest raw tuning runs; disabled by default to keep DB small.",
+    )
     return parser.parse_args()
 
 
@@ -103,13 +108,17 @@ def ingest_reference_tables(
     _ingest_wsi_profile(connection, paths)
 
 
-def build_database(paths: dict[str, Path]) -> dict[str, Any]:
+def build_database(
+    paths: dict[str, Path], include_tuning: bool = False
+) -> dict[str, Any]:
     """Ingest all discovered run records and reference tables."""
     connection = connect(paths["db"])
     init_schema(connection)
     ingested = 0
     skipped = 0
-    for result_dir, benchmark, method, seed, tuning_id in discover_result_dirs(paths):
+    for result_dir, benchmark, method, seed, tuning_id in discover_result_dirs(
+        paths, include_tuning=include_tuning
+    ):
         if read_run_record(result_dir) is None:
             skipped += 1
             continue
@@ -129,7 +138,7 @@ def main() -> None:
     )
     args = parse_args()
     paths = ensure_dirs(load_config(args.config))
-    summary = build_database(paths)
+    summary = build_database(paths, include_tuning=args.include_tuning)
     logger.info(
         "Built %s with %s runs (%s directories without payloads)",
         summary["database"],

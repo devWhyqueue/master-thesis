@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import time
-from typing import Any
+from typing import Any, cast
 
+import numpy as np
 import yaml
 
 
 EXPERIMENT_ROOT = Path(__file__).resolve().parents[1]
 RUN_RECORD_NAME = "run.json"
+EVAL_ARRAYS_NAME = "eval_arrays.npz"
+ARRAY_FIELDS = ("labels", "preds", "probabilities")
 
 
 def load_config(path: str | Path | None = None) -> dict[str, Any]:
@@ -69,7 +72,7 @@ def write_progress(path: Path, payload: dict[str, Any]) -> None:
 
 def write_run_record(result_dir: Path, record: dict[str, Any]) -> None:
     """Write the consolidated per-run record used by aggregate ingestion."""
-    write_json(result_dir / RUN_RECORD_NAME, record)
+    compact_run_record_payload(result_dir, record, keep_arrays=True)
 
 
 def read_run_record(result_dir: Path) -> dict[str, Any] | None:
@@ -82,6 +85,75 @@ def read_run_record(result_dir: Path) -> dict[str, Any] | None:
             return payload
         raise ValueError(f"Run record must be a mapping: {path}")
     return _read_legacy_run_record(result_dir)
+
+
+def compact_run_record(result_dir: Path, keep_arrays: bool) -> bool:
+    """Rewrite one run record with dense arrays removed from JSON."""
+    record = read_run_record(result_dir)
+    if record is None:
+        return False
+    compact_run_record_payload(result_dir, record, keep_arrays)
+    return True
+
+
+def compact_run_record_payload(
+    result_dir: Path, record: dict[str, Any], keep_arrays: bool
+) -> None:
+    """Write a slim run record and optionally persist dense split arrays."""
+    result_dir.mkdir(parents=True, exist_ok=True)
+    slim, arrays = _split_run_arrays(record)
+    if keep_arrays and arrays:
+        _write_eval_arrays(result_dir, arrays)
+    elif not keep_arrays:
+        _remove_eval_arrays(result_dir)
+    write_json(result_dir / RUN_RECORD_NAME, slim)
+
+
+def load_eval_array_payload(result_dir: Path, split: str) -> dict[str, Any]:
+    """Load dense per-example arrays for one split from the compact sidecar."""
+    path = result_dir / EVAL_ARRAYS_NAME
+    if not path.exists():
+        return {}
+    payload: dict[str, Any] = {}
+    with np.load(path, allow_pickle=False) as arrays:
+        for field in ARRAY_FIELDS:
+            key = f"{split}_{field}"
+            if key in arrays:
+                payload[field] = arrays[key].tolist()
+    return payload
+
+
+def _split_run_arrays(
+    record: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    slim = dict(record)
+    arrays: dict[str, np.ndarray] = {}
+    splits = record.get("splits")
+    if not isinstance(splits, dict):
+        return slim, arrays
+    slim_splits = {}
+    for split, payload in splits.items():
+        if not isinstance(payload, dict):
+            slim_splits[split] = payload
+            continue
+        slim_payload = dict(payload)
+        for field in ARRAY_FIELDS:
+            value = slim_payload.pop(field, None)
+            if value is not None:
+                arrays[f"{split}_{field}"] = np.asarray(value)
+        slim_splits[split] = slim_payload
+    slim["splits"] = slim_splits
+    return slim, arrays
+
+
+def _write_eval_arrays(result_dir: Path, arrays: dict[str, np.ndarray]) -> None:
+    np.savez_compressed(result_dir / EVAL_ARRAYS_NAME, **cast(Any, arrays))
+
+
+def _remove_eval_arrays(result_dir: Path) -> None:
+    path = result_dir / EVAL_ARRAYS_NAME
+    if path.exists():
+        path.unlink()
 
 
 def _read_legacy_run_record(result_dir: Path) -> dict[str, Any] | None:

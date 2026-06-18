@@ -256,8 +256,8 @@ case "$command" in
   tuning-aggregate)
     submit_with_args tuning-aggregate \
       --job-name=tcga-ut-tune-agg \
-      --partition="${TUNING_AGGREGATE_PARTITION:-gpu-9m}" \
-      --gpus-per-node=1 \
+      --partition="${TUNING_AGGREGATE_PARTITION:-cpu-2h}" \
+      --gpus-per-node=0 \
       --ntasks-per-node=2 \
       --output=logs/tuning-aggregate-%j.out \
       --error=logs/tuning-aggregate-%j.err \
