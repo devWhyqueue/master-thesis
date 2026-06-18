@@ -3,6 +3,7 @@ from __future__ import annotations
 # ruff: noqa: E402
 
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -48,11 +49,17 @@ from scripts.modeling.patch_feature.divide_conquer import (
 from scripts.modeling.patch_feature.training import PatchFeatureDataset, _select_progan_variant
 from scripts.data.prep.manifest.feature import tcga_case_id
 from scripts.data.progan.core import (
+    EqualizedConv2d,
     ProgressiveDiscriminator,
     ProgressiveGenerator,
     ProGanSettings,
 )
-from scripts.data.progan.train import paper_batch_size, train_class_progan
+from scripts.data.progan.train import (
+    _gradient_penalty,
+    _train_step,
+    paper_batch_size,
+    train_class_progan,
+)
 from scripts.common import RUN_RECORD_NAME, ensure_dirs, load_config, read_run_record, write_run_record
 from scripts.analysis.results import connect, init_schema, read_table, replace_table
 from scripts.data.progan.manifest import (
@@ -998,6 +1005,54 @@ def test_progan_snapshot_writer_produces_one_generator_per_grid_epoch(
             f"snapshot epoch={epoch} output shape mismatch"
         )
     assert len(diagnostics) == settings.max_depth
+
+
+def test_equalized_conv_applies_runtime_scale() -> None:
+    import torch.nn.functional as F
+
+    conv = EqualizedConv2d(3, 8, 3, padding=1)
+    assert abs(conv.weight.std().item() - 1.0) < 0.5
+    x = torch.randn(1, 3, 4, 4)
+    expected = F.conv2d(x, conv.weight * conv.scale, conv.bias, padding=1)
+    assert torch.allclose(conv(x), expected)
+
+
+def test_wgan_gp_gradient_penalty_is_scalar_and_differentiable() -> None:
+    discriminator = ProgressiveDiscriminator(max_depth=2, base_channels=32)
+    real = torch.randn(2, 3, 8, 8)
+    fake = torch.randn(2, 3, 8, 8)
+    penalty = _gradient_penalty(discriminator, real, fake, depth=2, alpha=1.0)
+    assert penalty.shape == ()
+    assert torch.isfinite(penalty).item()
+    assert penalty.requires_grad
+
+
+def test_progan_train_step_runs_with_wgan_gp() -> None:
+    settings = ProGanSettings(
+        image_size=8,
+        latent_dim=4,
+        epochs_per_depth=1,
+        learning_rate=0.001,
+        beta1=0.5,
+        max_real_patches_per_class=4,
+        balance_target="max_train_class_count",
+        max_classes=None,
+        fade_in_fraction=0.5,
+        base_channels=32,
+    )
+    generator = ProgressiveGenerator(4, 2, 32)
+    discriminator = ProgressiveDiscriminator(2, 32)
+    opt_g = torch.optim.Adam(generator.parameters())
+    opt_d = torch.optim.Adam(discriminator.parameters())
+    models = (generator, discriminator, opt_g, opt_d)
+    real = torch.randn(2, 3, 8, 8)
+    loss_d, loss_g = _train_step(models, real, depth=2, alpha=1.0, settings=settings)
+    assert math.isfinite(loss_d)
+    assert math.isfinite(loss_g)
+    with torch.no_grad():
+        scores = discriminator(real, depth=2, alpha=1.0)
+    assert scores.shape == (2,)
+    assert not scores.requires_grad
 
 
 def test_select_progan_variant_keeps_real_and_filters_by_epoch() -> None:

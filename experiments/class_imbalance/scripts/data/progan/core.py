@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 from torch import nn
 from torch.utils.data import Dataset
@@ -78,15 +80,48 @@ class MinibatchStdDev(nn.Module):
         return torch.cat([x, stddev], dim=1)
 
 
+class EqualizedConv2d(nn.Module):
+    # weight ~ N(0,1); scale = sqrt(2)/sqrt(fan_in) applied at forward matches akanimax
+    def __init__(
+        self, in_channels: int, out_channels: int, kernel_size: int, padding: int = 0
+    ) -> None:
+        super().__init__()
+        self.padding = padding
+        self.weight = nn.Parameter(
+            torch.randn(out_channels, in_channels, kernel_size, kernel_size)
+        )
+        self.bias = nn.Parameter(torch.zeros(out_channels))
+        self.scale = math.sqrt(2) / math.sqrt(in_channels * kernel_size * kernel_size)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa
+        """Apply convolution with weight scaled by the LR equalizer at runtime."""
+        return F.conv2d(x, self.weight * self.scale, self.bias, padding=self.padding)
+
+
+class EqualizedConvTranspose2d(nn.Module):
+    # fan_in=in_channels (not in*k*k) matches akanimax pro_gan_pytorch transpose convention
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int) -> None:
+        super().__init__()
+        self.weight = nn.Parameter(
+            torch.randn(in_channels, out_channels, kernel_size, kernel_size)
+        )
+        self.bias = nn.Parameter(torch.zeros(out_channels))
+        self.scale = math.sqrt(2) / math.sqrt(in_channels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa
+        """Apply transposed convolution with weight scaled by the LR equalizer at runtime."""
+        return F.conv_transpose2d(x, self.weight * self.scale, self.bias)
+
+
 class GeneratorBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.Upsample(scale_factor=2, mode="nearest"),
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            EqualizedConv2d(in_channels, out_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             PixelNorm(),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            EqualizedConv2d(out_channels, out_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             PixelNorm(),
         )
@@ -102,10 +137,10 @@ class ProgressiveGenerator(nn.Module):
     def __init__(self, latent_dim: int, max_depth: int, base_channels: int) -> None:
         super().__init__()
         self.initial = nn.Sequential(
-            nn.ConvTranspose2d(latent_dim, base_channels, 4),
+            EqualizedConvTranspose2d(latent_dim, base_channels, 4),
             nn.LeakyReLU(0.2, inplace=True),
             PixelNorm(),
-            nn.Conv2d(base_channels, base_channels, 3, padding=1),
+            EqualizedConv2d(base_channels, base_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             PixelNorm(),
         )
@@ -114,7 +149,9 @@ class ProgressiveGenerator(nn.Module):
             GeneratorBlock(channels[idx - 1], channels[idx])
             for idx in range(1, max_depth)
         )
-        self.to_rgb = nn.ModuleList(nn.Conv2d(channel, 3, 1) for channel in channels)
+        self.to_rgb = nn.ModuleList(
+            EqualizedConv2d(channel, 3, 1) for channel in channels
+        )
 
     def forward(self, noise: torch.Tensor, depth: int, alpha: float) -> torch.Tensor:  # noqa
         """Generate images at one active progressive depth."""
@@ -136,9 +173,9 @@ class DiscriminatorBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, 3, padding=1),
+            EqualizedConv2d(in_channels, in_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            EqualizedConv2d(in_channels, out_channels, 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.AvgPool2d(2),
         )
@@ -154,16 +191,18 @@ class ProgressiveDiscriminator(nn.Module):
     def __init__(self, max_depth: int, base_channels: int) -> None:
         super().__init__()
         channels = [max(base_channels // (2**idx), 32) for idx in range(max_depth)]
-        self.from_rgb = nn.ModuleList(nn.Conv2d(3, channel, 1) for channel in channels)
+        self.from_rgb = nn.ModuleList(
+            EqualizedConv2d(3, channel, 1) for channel in channels
+        )
         self.blocks = nn.ModuleList(
             DiscriminatorBlock(channels[idx], channels[idx - 1])
             for idx in range(1, max_depth)
         )
         self.minibatch_stddev = MinibatchStdDev()
         self.final = nn.Sequential(
-            nn.Conv2d(channels[0] + 1, channels[0], 3, padding=1),
+            EqualizedConv2d(channels[0] + 1, channels[0], 3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(channels[0], 1, 4),
+            EqualizedConv2d(channels[0], 1, 4),
             nn.Flatten(),
         )
 

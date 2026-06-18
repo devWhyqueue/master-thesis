@@ -5,7 +5,6 @@ from pathlib import Path
 
 import torch
 from PIL import Image
-from torch import nn
 from torch.utils.data import DataLoader
 
 from scripts.data.progan.core import (
@@ -14,6 +13,9 @@ from scripts.data.progan.core import (
     ProgressivePatchDataset,
     ProGanSettings,
 )
+
+_WGAN_GP_LAMBDA = 10.0
+_WGAN_GP_DRIFT = 0.001
 
 
 def paper_batch_size(depth: int) -> int:
@@ -26,7 +28,7 @@ def train_class_progan(
 ) -> tuple[dict[int, ProgressiveGenerator], list[dict[str, object]]]:
     """Train one class-specific ProGAN; return snapshots keyed by final-depth epoch."""
     torch.manual_seed(seed)
-    models = (*_build_models(settings, device), nn.BCEWithLogitsLoss())
+    models = _build_models(settings, device)
     diagnostics: list[dict[str, object]] = []
     ctx = (image_paths, settings, device)
     for depth in range(1, settings.max_depth + 1):
@@ -136,6 +138,28 @@ def _fade_alpha(epoch: int, epochs: int, fade_fraction: float) -> float:
     return min(1.0, (epoch + 1) / fade_epochs)
 
 
+def _gradient_penalty(
+    discriminator: ProgressiveDiscriminator,
+    real: torch.Tensor,
+    fake: torch.Tensor,
+    depth: int,
+    alpha: float,
+) -> torch.Tensor:
+    batch_size = len(real)
+    device = real.device
+    eps = torch.rand(batch_size, 1, 1, 1, device=device)
+    interp = (eps * real + (1.0 - eps) * fake).requires_grad_(True)
+    scores = discriminator(interp, depth, alpha)
+    grad = torch.autograd.grad(
+        outputs=scores,
+        inputs=interp,
+        grad_outputs=torch.ones_like(scores),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    return _WGAN_GP_LAMBDA * ((grad.flatten(1).norm(2, dim=1) - 1) ** 2).mean()
+
+
 def _train_step(
     models: tuple,
     real: torch.Tensor,
@@ -143,16 +167,19 @@ def _train_step(
     alpha: float,
     settings: ProGanSettings,
 ) -> tuple[float, float]:
-    generator, discriminator, opt_g, opt_d, criterion = models
+    generator, discriminator, opt_g, opt_d = models
     batch_size = len(real)
     device = real.device
+
     noise = torch.randn(batch_size, settings.latent_dim, 1, 1, device=device)
     fake = generator(noise, depth, alpha).detach()
-    loss_d = criterion(
-        discriminator(real, depth, alpha), torch.ones(batch_size, device=device)
-    )
-    loss_d += criterion(
-        discriminator(fake, depth, alpha), torch.zeros(batch_size, device=device)
+    real_scores = discriminator(real, depth, alpha)
+    fake_scores = discriminator(fake, depth, alpha)
+    loss_d = (
+        fake_scores.mean()
+        - real_scores.mean()
+        + _WGAN_GP_DRIFT * real_scores.pow(2).mean()
+        + _gradient_penalty(discriminator, real, fake, depth, alpha)
     )
     opt_d.zero_grad()
     loss_d.backward()
@@ -160,12 +187,11 @@ def _train_step(
 
     noise = torch.randn(batch_size, settings.latent_dim, 1, 1, device=device)
     fake = generator(noise, depth, alpha)
-    loss_g = criterion(
-        discriminator(fake, depth, alpha), torch.ones(batch_size, device=device)
-    )
+    loss_g = -discriminator(fake, depth, alpha).mean()
     opt_g.zero_grad()
     loss_g.backward()
     opt_g.step()
+
     return float(loss_d.detach().cpu().item()), float(loss_g.detach().cpu().item())
 
 
