@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -12,7 +12,6 @@ from torch.utils.data import Dataset
 
 from common_code.losses.oko import train_oko_model
 from common_code.wsi.cfal import train_cfal_model
-from common_code.wsi.divide_conquer.train import train_divide_conquer_model
 from data.dataset import TCGAUTDatasetImbalanced
 
 
@@ -57,17 +56,6 @@ def build_specialized_model(
         return train_cfal_model(
             train_set, n_classes, settings, device, args.seed, tuning_params
         )
-    if method == "patch_feature_divide_conquer":
-        model, _ = train_divide_conquer_model(
-            cast(Any, train_set),
-            sorted(dataset_train.dataset["cancer_type"].unique().tolist()),
-            n_classes,
-            settings,
-            device,
-            args.seed,
-            tuning_params,
-        )
-        return model
     if method == "patch_feature_oko":
         return train_oko_model(
             train_set, n_classes, settings, device, args.seed, tuning_params
@@ -90,8 +78,5 @@ def training_settings(args: argparse.Namespace) -> dict[str, object]:
         "cfal_sigma": args.cfal_sigma,
         "cfal_gamma": args.cfal_gamma,
         "cfal_beta": args.cfal_beta,
-        "dnc_k_clusters": args.dnc_k_clusters,
-        "dnc_zscore_bins": args.dnc_zscore_bins,
-        "dnc_expert_epochs": args.dnc_expert_epochs,
         "oko_k": args.oko_k,
     }

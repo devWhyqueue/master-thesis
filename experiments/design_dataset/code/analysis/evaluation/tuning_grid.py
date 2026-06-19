@@ -16,7 +16,9 @@ from common_code.tuning.grid import (
 CLASS_ORDERS = ("native_prevalence",)
 LAMBDAS = (0.8, 1.1, 1.3)
 
-PATCH_SPECS = PATCH_FEATURE_SPECS
+PATCH_SPECS = tuple(
+    s for s in PATCH_FEATURE_SPECS if s[0] != "patch_feature_divide_conquer"
+)
 WSI_SPECS = WSI_BAG_SPECS
 
 
