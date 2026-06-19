@@ -28,7 +28,11 @@ __all__ = ["max_feasible_total", "power_law_counts"]
 def load_manifest(path: str) -> pd.DataFrame:
     """Load a slide manifest with parsed patch identifiers."""
     frame = pd.read_csv(path)
-    if "patch_ids" in frame.columns and isinstance(frame["patch_ids"].iloc[0], str):
+    if (
+        not frame.empty
+        and "patch_ids" in frame.columns
+        and isinstance(frame["patch_ids"].iloc[0], str)
+    ):
         frame["patch_ids"] = frame["patch_ids"].apply(ast.literal_eval)
     return frame
 

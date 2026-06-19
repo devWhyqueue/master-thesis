@@ -125,8 +125,10 @@ class TCGAUTDatasetImbalanced(Dataset):
         dataset_original = filter_synthetic_rows(
             dataset_original, self.include_synthetic, self.synthetic_variant_epochs
         )
-        if "patch_ids" in dataset_original.columns and isinstance(
-            dataset_original["patch_ids"].iloc[0], str
+        if (
+            not dataset_original.empty
+            and "patch_ids" in dataset_original.columns
+            and isinstance(dataset_original["patch_ids"].iloc[0], str)
         ):
             dataset_original["patch_ids"] = dataset_original["patch_ids"].apply(
                 ast.literal_eval
@@ -139,16 +141,11 @@ class TCGAUTDatasetImbalanced(Dataset):
     def _flatten_dataset(self) -> pd.DataFrame:
         if "patch_ids" not in self.dataset_original.columns:
             return row_level_dataset(self.dataset_original)
-        rows = []
-        for _, row in self.dataset_original.iterrows():
-            for patch_id in cast(Sequence[str], row["patch_ids"]):
-                rows.append(
-                    patch_row(
-                        str(row["cancer_type"]),
-                        str(row["slide_id"]),
-                        patch_id,
-                    )
-                )
+        rows = [
+            patch_row(str(row["cancer_type"]), str(row["slide_id"]), patch_id)
+            for _, row in self.dataset_original.iterrows()
+            for patch_id in cast(Sequence[str], row["patch_ids"])
+        ]
         return pd.DataFrame(rows)
 
     def _load_args(self) -> dict[str, object]:

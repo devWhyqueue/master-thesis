@@ -88,7 +88,7 @@ def _patches_for_slide(class_path: str, slide_id: str) -> list[str]:
 
 
 def _parse_patch_lists(df: pd.DataFrame) -> pd.DataFrame:
-    if not isinstance(df["patch_ids"].iloc[0], str):
+    if df.empty or not isinstance(df["patch_ids"].iloc[0], str):
         return df
     parsed = df.copy()
     parsed["patch_ids"] = parsed["patch_ids"].apply(ast.literal_eval)
