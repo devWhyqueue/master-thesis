@@ -7,6 +7,38 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
+from data.feature_store import PATCHES_PER_CHUNK
+from data.sampling import patch_sort_key
+
+
+def expand_chunk_manifest(
+    manifest: pd.DataFrame, raw_root: str, raw_resolution: str
+) -> pd.DataFrame:
+    """Expand chunk-level manifest rows to individual patch rows for ProGAN."""
+    base_cols = [c for c in manifest.columns if c != "feature_id"]
+    rows: list[dict[str, object]] = []
+    for _, row in manifest.iterrows():
+        slide_id = str(row["slide_id"])
+        cancer_type = str(row["cancer_type"])
+        feature_id = str(row.get("feature_id", slide_id))
+        chunk_index = int(feature_id[len(slide_id) :].lstrip("_"))
+        slide_dir = Path(raw_root) / cancer_type / raw_resolution / slide_id
+        sorted_patches = sorted(
+            slide_dir.glob("*.jpg"), key=lambda p: patch_sort_key(p.stem)
+        )
+        chunk_patches = sorted_patches[
+            chunk_index * PATCHES_PER_CHUNK : (chunk_index + 1) * PATCHES_PER_CHUNK
+        ]
+        for local_idx, patch_file in enumerate(chunk_patches):
+            rows.append(
+                {
+                    **{c: row[c] for c in base_cols},
+                    "patch_id": patch_file.stem,
+                    "feature_index": local_idx,
+                }
+            )
+    return pd.DataFrame(rows)
+
 
 def tail_classes(manifest: pd.DataFrame, max_classes: int | None = None) -> list[str]:
     """Return minority train classes that need synthetic augmentation."""

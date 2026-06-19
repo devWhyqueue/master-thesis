@@ -28,6 +28,7 @@ from data.progan.features import build_feature_payload, real_only_payload
 from data.progan.manifest import (
     class_image_paths,
     combined_manifest,
+    expand_chunk_manifest,
     synthetic_manifest_rows,
     tail_classes,
     train_rows,
@@ -47,6 +48,8 @@ def main() -> None:
 def build_progan_cache(args: argparse.Namespace) -> None:
     """Build the augmented manifest and cache for one constructed regime."""
     manifest = pd.read_csv(args.manifest_path)
+    if "patch_id" not in manifest.columns:
+        manifest = expand_chunk_manifest(manifest, args.raw_root, args.raw_resolution)
     validate_manifest(manifest, args.manifest_path)
     settings = settings_from_args(args)
     combined = _combined_manifest(args, manifest, settings)

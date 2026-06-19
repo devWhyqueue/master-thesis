@@ -17,9 +17,7 @@ CLASS_ORDERS = ("native_prevalence",)
 LAMBDAS = (0.8, 1.1, 1.3)
 
 PATCH_SPECS = tuple(
-    s
-    for s in PATCH_FEATURE_SPECS
-    if s[0] not in {"patch_feature_divide_conquer", "patch_feature_progan_aug"}
+    s for s in PATCH_FEATURE_SPECS if s[0] != "patch_feature_divide_conquer"
 )
 WSI_SPECS = WSI_BAG_SPECS
 
