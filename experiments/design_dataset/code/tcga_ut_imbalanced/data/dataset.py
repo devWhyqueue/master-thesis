@@ -13,13 +13,13 @@ from torch.utils.data import Dataset
 from tcga_ut_imbalanced.data.feature_store import (
     feature_for_manifest_row,
     load_feature_cache,
-    load_feature_row,
     load_row_feature_cache,
     maybe_feature_store,
     patch_id_for_row,
     patch_row,
     row_level_dataset,
 )
+from tcga_ut_imbalanced.data.filtering import filter_synthetic_rows
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class TCGAUTDatasetImbalanced(Dataset):
         device: str | torch.device = "cpu",
         feature_cache_path: str | None = None,
         split_name: str | None = None,
+        include_synthetic: bool = False,
+        synthetic_variant_epochs: int | None = None,
     ) -> None:
         super().__init__()
         self.dataset_path = dataset_path
@@ -47,6 +49,8 @@ class TCGAUTDatasetImbalanced(Dataset):
         self.row_feature_cache = load_row_feature_cache(feature_cache_path)
         self.feature_store = maybe_feature_store(feature_path)
         self.split_name = split_name
+        self.include_synthetic = include_synthetic
+        self.synthetic_variant_epochs = synthetic_variant_epochs
         self.dataset_original = self._load_dataset_structure()
         self.dataset = self._flatten_dataset()
         self.args = self._load_args()
@@ -118,6 +122,9 @@ class TCGAUTDatasetImbalanced(Dataset):
         if self.split_name is not None and "split" in dataset_original.columns:
             mask = dataset_original["split"] == self.split_name
             dataset_original = dataset_original.loc[mask].copy()
+        dataset_original = filter_synthetic_rows(
+            dataset_original, self.include_synthetic, self.synthetic_variant_epochs
+        )
         if "patch_ids" in dataset_original.columns and isinstance(
             dataset_original["patch_ids"].iloc[0], str
         ):
@@ -215,18 +222,13 @@ class TCGAUTDatasetImbalanced(Dataset):
             ]
         tensor = torch.load(os.path.join(self.feature_path, target, f"{slide_id}.pt"))
         patch_ids = self._patch_ids_for_slide(slide_id)
-        indices = self._legacy_feature_indices(target, slide_id, patch_ids)
+        with open(os.path.join(self.feature_path, target, f"{slide_id}.json")) as file:
+            patch_mapping = json.load(file)
+        indices = [patch_mapping.index(f"{patch_id}.jpg") for patch_id in patch_ids]
         return [
             {"features": feature, "patch_id": patch_ids[index], "slide_id": slide_id}
             for index, feature in enumerate(tensor[indices])
         ]
-
-    def _legacy_feature_indices(
-        self, target: str, slide_id: str, patch_ids: list[str]
-    ) -> list[int]:
-        with open(os.path.join(self.feature_path, target, f"{slide_id}.json")) as file:
-            patch_mapping = json.load(file)
-        return [patch_mapping.index(f"{patch_id}.jpg") for patch_id in patch_ids]
 
     def _patch_ids_for_slide(self, slide_id: str) -> list[str]:
         patch_ids = self.dataset_original[

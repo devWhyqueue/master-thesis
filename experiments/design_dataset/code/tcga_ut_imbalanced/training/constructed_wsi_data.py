@@ -100,7 +100,7 @@ class ConstructedBagDataset(Dataset):
 
 
 def bag_rows(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return one row per slide bag, preserving replacement-sampled instances."""
+    """Return one row per slide bag, preserving explicit sampled instances."""
     group_columns = ["slide_id"]
     has_instances = "sample_instance" in frame and bool(
         frame["sample_instance"].notna().any()

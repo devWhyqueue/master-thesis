@@ -16,9 +16,7 @@ from common_code.tuning.grid import (
 CLASS_ORDERS = ("native_prevalence",)
 LAMBDAS = (0.8, 1.1, 1.3)
 
-PATCH_SPECS = tuple(
-    spec for spec in PATCH_FEATURE_SPECS if spec[0] != "patch_feature_progan_aug"
-)
+PATCH_SPECS = PATCH_FEATURE_SPECS
 WSI_SPECS = WSI_BAG_SPECS
 
 

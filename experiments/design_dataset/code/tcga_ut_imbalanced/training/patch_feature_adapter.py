@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 from typing import cast
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
+from common_code.losses.oko import train_oko_model
 from common_code.wsi.cfal import train_cfal_model
 from common_code.wsi.divide_conquer.train import train_divide_conquer_model
 from tcga_ut_imbalanced.data.dataset import TCGAUTDatasetImbalanced
@@ -21,10 +23,13 @@ class PreloadedPatchFeatureDataset(Dataset):
         if not source.preload_features:
             raise ValueError("Specialized trainers require --preload-features.")
         frame = source.dataset
-        self.features = [
-            cast(torch.Tensor, feature).float().cpu()
-            for feature in frame["features"].tolist()
-        ]
+        self.features = np.stack(
+            [
+                cast(torch.Tensor, feature).float().cpu().numpy()
+                for feature in frame["features"].tolist()
+            ]
+        )
+        self.indices = np.arange(len(self.features), dtype=np.int64)
         self.labels = torch.tensor(source.get_int_targets(), dtype=torch.long)
         self.rows = frame[["cancer_type"]].reset_index(drop=True)
 
@@ -32,7 +37,9 @@ class PreloadedPatchFeatureDataset(Dataset):
         return len(self.features)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        return self.features[int(idx)], int(self.labels[idx].item())
+        return torch.from_numpy(self.features[int(idx)].copy()), int(
+            self.labels[idx].item()
+        )
 
 
 def build_specialized_model(
@@ -42,7 +49,7 @@ def build_specialized_model(
     device: torch.device,
     tuning_params: dict[str, float],
 ) -> nn.Module:
-    """Train CFAL or divide-and-conquer on preloaded patch features."""
+    """Train a specialized patch-feature model on preloaded patch features."""
     train_set = PreloadedPatchFeatureDataset(dataset_train)
     settings = training_settings(args)
     n_classes = dataset_train.get_n_classes()
@@ -61,10 +68,15 @@ def build_specialized_model(
             tuning_params,
         )
         return model
+    if method == "patch_feature_oko":
+        return train_oko_model(
+            train_set, n_classes, settings, device, args.seed, tuning_params
+        )
     raise ValueError(f"Unsupported specialized method: {method}")
 
 
 def training_settings(args: argparse.Namespace) -> dict[str, object]:
+    """Return shared trainer settings for specialized patch-feature methods."""
     hidden = args.n_nodes_per_layer[0] if args.n_nodes_per_layer else 512
     return {
         "batch_size": args.batch_size,
@@ -81,4 +93,5 @@ def training_settings(args: argparse.Namespace) -> dict[str, object]:
         "dnc_k_clusters": args.dnc_k_clusters,
         "dnc_zscore_bins": args.dnc_zscore_bins,
         "dnc_expert_epochs": args.dnc_expert_epochs,
+        "oko_k": args.oko_k,
     }

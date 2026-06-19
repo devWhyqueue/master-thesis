@@ -1,5 +1,6 @@
 from patch_cache_jobs import patch_cache
-from sampling_jobs import sample_balanced, sample_full_scale, sample_imbalanced
+from progan_cache_jobs import patch_cache_progan
+from sampling_jobs import max_feasible_pool_size, sample_full_scale
 from training_jobs import train
 from tuning_jobs import tune, tune_aggregate, tune_wsi
 from wsi_cache_jobs import wsi_cache
@@ -10,13 +11,13 @@ from verify_jobs import verify_features
 from job_defs import Job, execute, load_config
 
 COMMAND_HANDLERS = {
-    "sample-balanced": sample_balanced,
-    "sample-imbalanced": sample_imbalanced,
+    "max-feasible-pool-size": max_feasible_pool_size,
     "sample-full-scale": sample_full_scale,
     "train": train,
     "train-wsi": train_wsi,
     "wsi-cache": wsi_cache,
     "patch-cache": patch_cache,
+    "patch-cache-progan": patch_cache_progan,
     "tune": tune,
     "tune-wsi": tune_wsi,
     "tune-aggregate": tune_aggregate,

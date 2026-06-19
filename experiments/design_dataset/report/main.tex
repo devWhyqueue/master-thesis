@@ -23,7 +23,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology is not only a question of how many examples a class contributes. A class may perform poorly because it is rare, because its frozen foundation-model features overlap with other classes, or because both effects coincide. The companion TCGA-UT imbalance benchmark established the dataset, the mitigation taxonomy, and patch-level and WSI-bag evaluations under the native TCGA-UT long tail. This report defines a controlled counterpart: artificial full-scale TCGA-UT training distributions that keep all 32 cancer types, preserve fixed validation and test splits, and vary only the training support assigned to each class. Power-law training distributions are generated under native-prevalence class ordering at imbalance parameters $\lambda \in \{0.8, 1.1, 1.3\}$ with a fixed pool of \num{1528} slides, yielding realized head-to-tail ratios of approximately 15:1, 43:1, and 78:1 that bracket the native TCGA-UT long tail. Using frozen Virchow2 patch features and WSI-bag features with the same 30-instance evidence budget as the companion benchmark, discrimination is evaluated for patch-feature and WSI-bag mitigation methods. Method rankings are preserved across imbalance severities, while balanced accuracy declines monotonically by three to four percentage points from $\lambda=0.8$ to $\lambda=1.3$.
+\noindent Class imbalance in computational pathology is not only a question of how many examples a class contributes. A class may perform poorly because it is rare, because its frozen foundation-model features overlap with other classes, or because both effects coincide. The companion TCGA-UT imbalance benchmark established the dataset, the mitigation taxonomy, and patch-level and WSI-bag evaluations under the native TCGA-UT long tail. This report defines a controlled counterpart: artificial full-scale TCGA-UT training distributions that keep all 32 cancer types, preserve fixed validation and test splits, and vary only the training support assigned to each class. Power-law training distributions are generated under native-prevalence class ordering at imbalance parameters $\lambda \in \{0.8, 1.1, 1.3\}$ with one shared strictly feasible pool of \num{1528} slides, yielding realized head-to-tail ratios of approximately 15:1, 43:1, and 78:1 that bracket the native TCGA-UT long tail. Using frozen Virchow2 patch features and WSI-bag features with the same 30-instance evidence budget as the companion benchmark, the controlled study is configured to mirror the first report's method families under exact-feasibility sampling rather than redistribution-based fallback. Method rankings are preserved across imbalance severities, while balanced accuracy declines monotonically by three to four percentage points from $\lambda=0.8$ to $\lambda=1.3$.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -35,7 +35,7 @@ The companion TCGA-UT imbalance benchmark compared class-imbalance mitigation me
 
 TCGA-UT is a useful test bed for this question because it provides both slide labels and patch-level evidence derived from diagnostic whole-slide images in The Cancer Genome Atlas \citep{tomczak2015reviewThe,komura2022universalEncoding}. The native dataset already has a long-tailed slide distribution over 32 cancer types. Native imbalance is realistic, but it entangles prevalence with many other factors: tumor morphology, tissue diversity, slide acquisition, and the representation geometry induced by the frozen encoder. A controlled construction complements the native benchmark by imposing known training-support profiles while holding validation and test data fixed.
 
-The goal is not to introduce a new mitigation method. Instead, the report evaluates representative methods from the companion taxonomy under three constructed training distributions that vary only the imbalance severity while holding the class ranking fixed. Patch-level methods include cross-entropy, class weighting, balanced sampling, focal loss, and Scholz-style metric losses \citep{scholz2024imbalanceAware}. WSI-bag methods include class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
+The goal is not to introduce a new mitigation method. Instead, the report evaluates the same method families as the companion taxonomy under three constructed training distributions that vary only the imbalance severity while holding the class ranking fixed. Patch-level methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, divide-and-conquer, ProGAN augmentation, and OKO set learning \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
 
 \section{Dataset Construction}
 \label{sec:dataset-construction}
@@ -49,7 +49,7 @@ All 32 TCGA-UT cancer types are retained. Let $C=32$ and let $\mathcal{D}_{\math
   c \in \{1,\ldots,C\}.
   \label{eq:full-scale-constraints}
 \end{equation}
-\noindent The first constraint keeps every class represented and prevents oversampling beyond available slides. The second fixes the training pool at $N$ slides, shared across all imbalance parameters and seeds; the choice of $N$ is discussed in Section~\ref{sec:class-orders}. The third makes the benchmark a 32-class TCGA-UT study throughout.
+\noindent The first constraint keeps every class represented and prevents oversampling beyond available slides. The second fixes the training pool at $N$ slides, shared across all imbalance parameters and seeds; the choice of $N$ is discussed in Section~\ref{sec:class-orders}. The third makes the benchmark a 32-class TCGA-UT study throughout. Unlike the earlier prototype code path, the active benchmark does not redistribute overflow mass or sample with replacement: an infeasible target distribution is treated as an invalid experimental request.
 
 After slide selection, the input evidence is capped in the same way as in the companion benchmark. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}. Features are read from the shared cls\_patchmean Virchow2 store ($\mathrm{concat}(\mathrm{CLS}, \mathrm{mean}(\mathrm{patch\ tokens}))$, \num{2560}-dimensional vectors) used by the companion WSI-bag benchmark. The cap prevents slides with more extracted tumor patches from dominating the training objective while keeping the input budget aligned across regimes.
 
@@ -62,28 +62,28 @@ For an ordered class list $(c_1,\ldots,c_C)$, the intended share for rank $i$ un
 \end{equation}
 \noindent When $\lambda=0$, the intended distribution is uniform over ranks. As $\lambda$ increases, early-ranked classes receive more training support and late-ranked classes receive less. Raw targets $|\mathcal{D}_{\mathrm{train}}|p_i(\lambda)$ are converted to integer counts by flooring and assigning residual slides by largest fractional remainder.
 
-The target distribution is then projected onto the feasible set in Equation~\eqref{eq:full-scale-constraints}. Each class receives one guaranteed slide. Remaining slides are allocated according to Equation~\eqref{eq:power-law}; classes whose requested support exceeds their available training support are capped, and the unused mass is redistributed over the uncapped classes using the same power-law ranks. This cap-and-redistribute procedure keeps the constructed split full-scale without dropping any cancer type.
+Each class first receives one guaranteed slide. The remaining $N-C$ slides are then allocated according to Equation~\eqref{eq:power-law}, again using largest-remainder rounding to obtain integer counts. A requested regime is accepted only when every rounded class target satisfies Equation~\eqref{eq:full-scale-constraints}. If any class target exceeds its available training support, the construction fails and the pool size must be reduced; there is no redistribution or replacement fallback.
 
 \subsection{Class Order and Training Pool}
 \label{sec:class-orders}
 All constructed splits use the \emph{native-prevalence order}: classes are ranked by their TCGA-UT training-split slide count, so that rank 1 is the most frequent cancer type and rank $C=32$ is the least frequent. This ordering follows the realistic direction of the native TCGA-UT long tail.
 
 \paragraph{Pool size.}
-The choice of pool size $N$ determines whether the cap-and-redistribute step in Section~\ref{sec:dataset-construction} is ever active. When $N = \sum_c a_c$ (the full available training pool), redistribution forces $n_c = a_c$ for every class regardless of $\lambda$, making the power-law parameter inert. To ensure that all three target $\lambda$ values produce genuinely distinct distributions, $N$ must be small enough that no class requires capping even at the steepest imbalance.
+The choice of pool size $N$ determines whether the requested regimes are feasible at all. When $N = \sum_c a_c$ (the full available training pool), the steepest power-law targets would exceed the capacity of the rare classes, so the benchmark would have to rely on a hidden fallback mechanism. To keep the construction exact, $N$ must instead be small enough that no class target exceeds its available support even at the steepest imbalance.
 
 Define the maximum clean pool for a given $\lambda$ and seed as
 \begin{equation}
   T^*(\lambda) = \min_{c} \frac{a_c}{p_c(\lambda)}.
   \label{eq:tstar}
 \end{equation}
-\noindent For $N \le T^*(\lambda)$, the intended targets $N\,p_c(\lambda)$ are feasible for every class without capping. Setting $N = \lfloor\min_{s} T^*_s(1.3)\rfloor$, where the outer minimum is over the three seeds, guarantees that the steepest evaluated imbalance produces a capping-free power-law distribution on every seed. For the TCGA-UT training splits, this yields $N = \num{1528}$ slides, approximately 25\% of the full training pool.
+\noindent For $N \le T^*(\lambda)$, the intended targets $N\,p_c(\lambda)$ are feasible for every class without fallback. Setting $N = \lfloor\min_{s} T^*_s(1.3)\rfloor$, where the outer minimum is over the three seeds, guarantees that the steepest evaluated imbalance produces an exact feasible power-law distribution on every seed. For the TCGA-UT training splits, this yields $N = \num{1528}$ slides, approximately 25\% of the full training pool.
 
 \paragraph{Realized support profiles.}
 The three $\lambda$ values produce head-to-tail ratios of approximately 15:1 ($\lambda=0.8$), 43:1 ($\lambda=1.1$), and 78:1 ($\lambda=1.3$), bracketing the native TCGA-UT ratio of approximately 28:1. The $\lambda=0.8$ setting places the constructed distribution below native imbalance; $\lambda=1.1$ is moderately more severe; and $\lambda=1.3$ is the strongest regime evaluated. These three operating points verify whether mitigation methods provide useful protection as imbalance intensifies along a common class ranking.
 
 \section{Methods}
 \label{sec:methods}
-The method taxonomy follows the companion benchmark, but this report uses it to study controlled training distributions rather than only the native TCGA-UT distribution. Cross-entropy is the no-mitigation reference. Data-level methods change minibatch exposure through balanced sampling or feature-space bag augmentation. Algorithm-level methods change the per-example loss through class weighting, focal loss, metric-derived objectives, or prototype-affinity objectives. WSI-specific methods change how slide bags are represented or mixed.
+The method taxonomy follows the companion benchmark, but this report uses it to study controlled training distributions rather than only the native TCGA-UT distribution. Cross-entropy is the no-mitigation reference. Data-level methods change minibatch exposure through balanced sampling or synthetic augmentation. Algorithm-level methods change the per-example loss through class weighting, focal loss, metric-derived objectives, prototype-affinity objectives, or OKO set supervision. WSI-specific methods change how slide bags are represented or mixed.
 
 \begin{table}[ht]
   \centering
@@ -94,8 +94,9 @@ The method taxonomy follows the companion benchmark, but this report uses it to 
     \midrule
     Patch & Baseline and losses & CE, weighted CE, focal loss & Frequency weighting and hard-example emphasis.\\
     Patch & Metric losses & CE + soft F1, CE + soft MCC & Macro-metric losses with balanced minibatch exposure.\\
-    Patch & Specialized & CFAL, divide-and-conquer & Prototype-affinity and expert fusion objectives.\\
-    WSI bag & Baseline and losses & Weighted CE, focal loss & Slide-level analogues of standard losses; weight\_power=0 recovers plain MIL CE.\\
+    Patch & Specialized & CFAL, divide-and-conquer, OKO & Prototype-affinity, expert fusion, and set-level supervision.\\
+    Patch & Synthetic augmentation & ProGAN augmentation & Tail-class synthetic patch generation embedded through the frozen encoder.\\
+    WSI bag & Baseline and losses & CE, weighted CE, focal loss & Slide-level analogues of standard losses; weight\_power=0 recovers plain MIL CE.\\
     WSI bag & MIL-specific & Balanced sampling, RankMix, SC-MIL, MDE-MIL & Bag-level sampling, augmentation, contrastive structure, and expert training.\\
     \bottomrule
   \end{tabularx}

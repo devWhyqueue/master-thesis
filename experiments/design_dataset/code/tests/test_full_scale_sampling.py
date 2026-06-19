@@ -4,6 +4,7 @@ from tcga_ut_imbalanced.data.full_scale_sampling import (
     assert_case_disjoint,
     cap_patches,
     construct_training_split,
+    max_feasible_total,
     power_law_counts,
     write_constructed_outputs,
 )
@@ -27,11 +28,34 @@ def test_construct_training_split_preserves_size_and_classes() -> None:
     ]
     frame = pd.DataFrame(rows)
 
-    sampled = construct_training_split(frame, ["a", "b", "c", "d"], 1.0, 0)
+    sampled = construct_training_split(frame, ["a", "b", "c", "d"], 1.0, 0, 12)
 
-    assert len(sampled) == len(frame)
+    assert sampled["slide_id"].nunique() == 12
     assert set(sampled["cancer_type"]) == {"a", "b", "c", "d"}
     assert sampled["slide_id"].is_unique
+
+
+def test_power_law_counts_raise_on_infeasible_request() -> None:
+    available = pd.Series({"a": 5, "b": 4, "c": 3, "d": 2})
+
+    try:
+        power_law_counts(available, ["a", "b", "c", "d"], 1.3, 15)
+    except ValueError as error:
+        assert "Infeasible power-law target" in str(error)
+        assert "class=" in str(error)
+    else:
+        raise AssertionError("Expected infeasible target counts to raise ValueError.")
+
+
+def test_max_feasible_total_returns_strict_upper_bound() -> None:
+    available = pd.Series({"a": 5, "b": 4, "c": 3, "d": 2})
+
+    total = max_feasible_total(available, ["a", "b", "c", "d"], 1.3)
+
+    assert total == 12
+    counts = power_law_counts(available, ["a", "b", "c", "d"], 1.3, total)
+
+    assert sum(counts.values()) == total
 
 
 def test_cap_patches_is_deterministic() -> None:

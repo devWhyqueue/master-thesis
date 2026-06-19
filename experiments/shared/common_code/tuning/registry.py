@@ -26,6 +26,8 @@ PATCH_FEATURE_METHOD_FLAGS: dict[str, list[str]] = {
     ],
     "patch_feature_cfal": ["--training-method=patch_feature_cfal"],
     "patch_feature_divide_conquer": ["--training-method=patch_feature_divide_conquer"],
+    "patch_feature_progan_aug": ["--training-method=patch_feature_progan_aug"],
+    "patch_feature_oko": ["--training-method=patch_feature_oko"],
 }
 
 WSI_METHOD_FLAGS: dict[str, list[str]] = {
@@ -40,12 +42,14 @@ WSI_METHOD_FLAGS: dict[str, list[str]] = {
 
 
 def patch_feature_method_flags(method: str) -> list[str]:
+    """Return the CLI flag bundle for one patch-feature method."""
     if method not in PATCH_FEATURE_METHOD_FLAGS:
         raise ValueError(f"Unknown patch-feature method: {method}")
     return PATCH_FEATURE_METHOD_FLAGS[method]
 
 
 def wsi_method_flags(method: str) -> list[str]:
+    """Return the CLI flag bundle for one WSI method."""
     if method not in WSI_METHOD_FLAGS:
         raise ValueError(f"Unknown WSI method: {method}")
     return WSI_METHOD_FLAGS[method]

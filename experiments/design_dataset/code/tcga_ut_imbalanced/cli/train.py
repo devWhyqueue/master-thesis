@@ -92,6 +92,7 @@ def _add_training_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dnc-k-clusters", type=int, default=10)
     parser.add_argument("--dnc-zscore-bins", type=int, default=5)
     parser.add_argument("--dnc-expert-epochs", type=int, default=20)
+    parser.add_argument("--oko-k", type=int, default=1)
     parser.add_argument("--batch-balancing", action="store_true")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--seed", type=int, default=0)

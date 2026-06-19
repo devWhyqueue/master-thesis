@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 
+from tcga_ut_imbalanced.data.dataset import TCGAUTDatasetImbalanced
 from tcga_ut_imbalanced.data.full_scale_sampling import write_constructed_outputs
 from tcga_ut_imbalanced.training.constructed_wsi_cache import _write_split_cache
 from tcga_ut_imbalanced.training.constructed_wsi_data import ConstructedBagDataset
@@ -75,3 +76,55 @@ def test_wsi_bag_cache_and_dataset(tmp_path) -> None:
     bag, label = dataset[0]
     assert bag.shape[-1] == 2560
     assert label == 0
+
+
+def test_dataset_filters_synthetic_rows_by_progan_variant(tmp_path) -> None:
+    slide_id = "TCGA-XX-0001"
+    patch_ids = ["0_0"]
+    feature_dir = _feature_dir(tmp_path, slide_id, patch_ids)
+    manifest = pd.DataFrame(
+        [
+            {
+                "split": "train",
+                "slide_id": slide_id,
+                "cancer_type": "a",
+                "patch_id": "0_0",
+                "feature_path": str(feature_dir / f"{slide_id}_0.pt"),
+                "feature_index": 0,
+                "is_synthetic": False,
+                "final_depth_epochs": 0,
+            },
+            {
+                "split": "train",
+                "slide_id": "TCGA-XX-0002",
+                "cancer_type": "a",
+                "patch_id": "0_0",
+                "feature_path": str(feature_dir / f"{slide_id}_0.pt"),
+                "feature_index": 0,
+                "is_synthetic": True,
+                "final_depth_epochs": 10,
+            },
+            {
+                "split": "train",
+                "slide_id": "TCGA-XX-0003",
+                "cancer_type": "a",
+                "patch_id": "0_0",
+                "feature_path": str(feature_dir / f"{slide_id}_0.pt"),
+                "feature_index": 0,
+                "is_synthetic": True,
+                "final_depth_epochs": 25,
+            },
+        ]
+    )
+    dataset_path = tmp_path / "progan_manifest.csv"
+    manifest.to_csv(dataset_path, index=False)
+
+    dataset = TCGAUTDatasetImbalanced(
+        str(dataset_path),
+        str(feature_dir),
+        preload_features=False,
+        split_name="train",
+        synthetic_variant_epochs=25,
+    )
+
+    assert len(dataset) == 2

@@ -60,13 +60,20 @@ def build_sklearn_model(
 
 def _build_context(args: argparse.Namespace) -> _TrainContext:
     device = torch.device(args.device)
-    train_ds = _dataset(args.dataset_structure_path, args, device, args.dataset_split)
+    train_ds = _dataset(
+        args.dataset_structure_path,
+        args,
+        device,
+        args.dataset_split,
+        synthetic_variant_epochs=_synthetic_variant_epochs(args, train=True),
+    )
     val_ds = (
         _dataset(
             args.validation_dataset_structure_path,
             args,
             device,
             args.validation_dataset_split,
+            synthetic_variant_epochs=_synthetic_variant_epochs(args, train=False),
         )
         if args.validation_dataset_structure_path
         else None
@@ -77,6 +84,7 @@ def _build_context(args: argparse.Namespace) -> _TrainContext:
             args,
             device,
             args.test_dataset_split,
+            synthetic_variant_epochs=_synthetic_variant_epochs(args, train=False),
         )
         if args.test_dataset_structure_path
         else None
@@ -104,6 +112,7 @@ def _dataset(
     args: argparse.Namespace,
     device: torch.device,
     split_name: str | None = None,
+    synthetic_variant_epochs: int | None = None,
 ) -> TCGAUTDatasetImbalanced:
     return TCGAUTDatasetImbalanced(
         path,
@@ -114,6 +123,7 @@ def _dataset(
         device,
         args.feature_cache_path,
         split_name=split_name,
+        synthetic_variant_epochs=synthetic_variant_epochs,
     )
 
 
@@ -228,3 +238,12 @@ def _json_ready(result: dict[str, object]) -> dict[str, object]:
         key: value.tolist() if isinstance(value, np.ndarray) else value
         for key, value in result.items()
     }
+
+
+def _synthetic_variant_epochs(args: argparse.Namespace, train: bool) -> int | None:
+    if args.training_method != "patch_feature_progan_aug" or not train:
+        return None
+    params = parse_tuning_params("patch", args.training_method, args.tuning_params)
+    if "final_depth_epochs" not in params:
+        return None
+    return int(params["final_depth_epochs"])

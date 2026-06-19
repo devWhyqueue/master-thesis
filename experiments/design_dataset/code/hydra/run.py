@@ -5,24 +5,20 @@ import logging
 from jobs import COMMAND_HANDLERS, execute, load_config
 
 
-def _add_balanced_args(subparsers: argparse._SubParsersAction) -> None:
-    parser = subparsers.add_parser("sample-balanced")
-    parser.add_argument("--n-slides-per-class", type=int, default=100)
-    parser.add_argument("--n-patches-per-slide", type=int, default=30)
-
-
-def _add_imbalanced_args(subparsers: argparse._SubParsersAction) -> None:
-    parser = subparsers.add_parser("sample-imbalanced")
-    parser.add_argument("--sweep", action="store_true")
-    parser.add_argument("--parameter", type=float, default=1.0)
-
-
 def _add_full_scale_args(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("sample-full-scale")
     parser.add_argument("--sweep", action="store_true")
     parser.add_argument("--parameter", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--pool-size", type=int, default=None)
+    parser.add_argument("--class-order-name", default="native_prevalence")
+    parser.add_argument("--class-order-file", default=None)
+
+
+def _add_max_pool_args(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser("max-feasible-pool-size")
+    parser.add_argument("--parameter", type=float, default=1.3)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--class-order-name", default="native_prevalence")
     parser.add_argument("--class-order-file", default=None)
 
@@ -36,6 +32,7 @@ def _add_train_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--k", type=int, default=9)
     parser.add_argument("--method", default="patch_feature_ce")
     parser.add_argument("--constructed", action="store_true")
+    parser.set_defaults(constructed=True)
     parser.add_argument("--class-order-name", default="native_prevalence")
 
 
@@ -85,6 +82,14 @@ def _add_patch_cache_args(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--class-order-name", default="native_prevalence")
 
 
+def _add_progan_cache_args(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser("patch-cache-progan")
+    parser.add_argument("--sweep", action="store_true")
+    parser.add_argument("--parameter", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--class-order-name", default="native_prevalence")
+
+
 def _add_tune_args(subparsers: argparse._SubParsersAction) -> None:
     subparsers.add_parser("tune")
     subparsers.add_parser("tune-wsi")
@@ -111,13 +116,13 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-container", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    _add_balanced_args(subparsers)
-    _add_imbalanced_args(subparsers)
+    _add_max_pool_args(subparsers)
     _add_full_scale_args(subparsers)
     _add_train_args(subparsers)
     _add_train_wsi_args(subparsers)
     _add_wsi_cache_args(subparsers)
     _add_patch_cache_args(subparsers)
+    _add_progan_cache_args(subparsers)
     _add_tune_args(subparsers)
     _add_tune_aggregate_args(subparsers)
     _add_visualize_args(subparsers)

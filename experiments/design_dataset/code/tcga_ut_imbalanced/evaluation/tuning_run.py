@@ -83,13 +83,28 @@ def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
         task.regime.parameter,
         task.seed,
     )
+    manifest_path = f"{stem}/train.csv"
+    validation_path = f"{stem}/validation.csv"
+    test_path = f"{stem}/test.csv"
+    cache_path = Path(stem) / "patch_feature_cache.pt"
+    dataset_split = None
+    validation_split = None
+    test_split = None
+    if task.variant.method == "patch_feature_progan_aug":
+        manifest_path = f"{stem}/manifest_splits_progan.csv"
+        validation_path = manifest_path
+        test_path = manifest_path
+        cache_path = Path(stem) / "patch_feature_cache_progan.pt"
+        dataset_split = "train"
+        validation_split = "validation"
+        test_split = "test"
     cmd = [
         sys.executable,
         "-m",
         "tcga_ut_imbalanced.cli.train",
-        f"--dataset-structure-path={stem}/train.csv",
-        f"--validation-dataset-structure-path={stem}/validation.csv",
-        f"--test-dataset-structure-path={stem}/test.csv",
+        f"--dataset-structure-path={manifest_path}",
+        f"--validation-dataset-structure-path={validation_path}",
+        f"--test-dataset-structure-path={test_path}",
         f"--feature-path={args.feature_path}",
         "--preload-features",
         f"--results-save-path={out}",
@@ -107,8 +122,13 @@ def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
         "--dropout=0.1",
         f"--class-names-path={stem}/class_order.json",
     ]
+    if dataset_split is not None:
+        cmd.append(f"--dataset-split={dataset_split}")
+    if validation_split is not None:
+        cmd.append(f"--validation-dataset-split={validation_split}")
+    if test_split is not None:
+        cmd.append(f"--test-dataset-split={test_split}")
     cmd.extend(patch_feature_method_flags(task.variant.method))
-    cache_path = Path(stem) / "patch_feature_cache.pt"
     if cache_path.is_file():
         cmd.append(f"--feature-cache-path={cache_path}")
     return cmd

@@ -14,12 +14,15 @@ from tcga_ut_imbalanced.data.full_scale_rows import (
     slide_frame,
 )
 from tcga_ut_imbalanced.data.feature_store import expand_splits_for_wsi_manifest
-from tcga_ut_imbalanced.data.full_scale_targets import power_law_counts, target_counts
+from tcga_ut_imbalanced.data.full_scale_targets import (
+    max_feasible_total,
+    power_law_counts,
+)
 from tcga_ut_imbalanced.data.sampling import patch_sort_key
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["power_law_counts"]
+__all__ = ["max_feasible_total", "power_law_counts"]
 
 
 def load_manifest(path: str) -> pd.DataFrame:
@@ -65,25 +68,19 @@ def construct_training_split(
     ordered_classes: list[str],
     parameter: float,
     seed: int,
-    overflow_strategy: str = "redistribute",
-    total: int | None = None,
+    total: int,
 ) -> pd.DataFrame:
     """Sample a constructed training split."""
     slides = slide_frame(train_frame)
     available = cast(pd.Series, slides.groupby("cancer_type")["slide_id"].nunique())
-    pool = len(slides) if total is None else min(total, len(slides))
-    targets = target_counts(
-        available, ordered_classes, parameter, pool, overflow_strategy
-    )
+    if total > len(slides):
+        raise ValueError(
+            f"Requested pool size {total} exceeds available training slides {len(slides)}."
+        )
+    targets = power_law_counts(available, ordered_classes, parameter, total)
     rng = np.random.default_rng(seed)
     parts = [
-        _sample_class(
-            slides,
-            class_name,
-            targets[class_name],
-            rng,
-            replace=overflow_strategy == "replacement",
-        )
+        _sample_class(slides, class_name, targets[class_name], rng)
         for class_name in ordered_classes
     ]
     sampled_slides = cast(pd.DataFrame, pd.concat(parts, ignore_index=True))
@@ -159,25 +156,26 @@ def constructed_payload(
     ordered_classes: list[str],
 ) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
     """Return capped split frames and target class counts."""
-    full = int(splits[args.train_name]["slide_id"].nunique())
-    pool = (
-        full if getattr(args, "pool_size", None) is None else min(args.pool_size, full)
-    )
+    if getattr(args, "pool_size", None) is None:
+        raise ValueError(
+            "Strict constructed sampling requires --pool-size. "
+            "Derive it with --max-feasible-pool-size on each seed at the steepest lambda "
+            "and use the minimum across seeds."
+        )
+    pool = int(args.pool_size)
     train = construct_training_split(
         splits[args.train_name],
         ordered_classes,
         args.parameter,
         args.seed,
-        args.overflow_strategy,
-        total=pool,
+        pool,
     )
     frames = _cap_all_splits(args, splits, train)
-    targets = target_counts(
-        _available_training_slides(args, splits),
+    targets = power_law_counts(
+        _available_training_slides(splits[args.train_name]),
         ordered_classes,
         args.parameter,
         pool,
-        args.overflow_strategy,
     )
     return frames, targets
 
@@ -222,24 +220,18 @@ def _sample_class(
     class_name: str,
     count: int,
     rng: np.random.Generator,
-    replace: bool = False,
 ) -> pd.DataFrame:
     class_frame = frame[frame["cancer_type"] == class_name]
     return cast(
         pd.DataFrame,
-        class_frame.sample(
-            n=count, replace=replace and count > len(class_frame), random_state=rng
-        ),
+        class_frame.sample(n=count, replace=False, random_state=rng),
     )
 
 
-def _available_training_slides(
-    args: argparse.Namespace,
-    splits: dict[str, pd.DataFrame],
-) -> pd.Series:
+def _available_training_slides(train_frame: pd.DataFrame) -> pd.Series:
     return cast(
         pd.Series,
-        splits[args.train_name].groupby("cancer_type")["slide_id"].nunique(),
+        train_frame.groupby("cancer_type")["slide_id"].nunique(),
     )
 
 

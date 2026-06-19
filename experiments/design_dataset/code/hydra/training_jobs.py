@@ -6,6 +6,10 @@ from job_defs import Job, parameters, prefix, train_base, train_csvs
 
 def train(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
     """Build training jobs."""
+    if not args.constructed:
+        raise ValueError(
+            "Legacy non-constructed training is retired. Use --constructed."
+        )
     if args.model == "mlp":
         return _mlp_jobs(args, config)
     if args.model == "knn":

@@ -3,6 +3,9 @@
 import argparse
 import json
 import logging
+from typing import cast
+
+import pandas as pd
 
 from tcga_ut_imbalanced.data.feature_store import (
     DEFAULT_FEATURE_DIR,
@@ -13,6 +16,7 @@ from tcga_ut_imbalanced.data.full_scale_sampling import (
     class_order,
     constructed_payload,
     load_manifest,
+    max_feasible_total,
     output_dir_for_args,
     split_frames,
     write_constructed_outputs,
@@ -30,6 +34,19 @@ def main() -> None:
         logger.info(json.dumps(report, indent=2))
         if not report["dim_matches"]:
             raise SystemExit("Feature dimension mismatch.")
+        return
+    if args.max_feasible_pool_size:
+        max_total = _max_feasible_pool_size(args)
+        logger.info(
+            json.dumps(
+                {
+                    "class_order_name": args.class_order_name,
+                    "lambda": args.parameter,
+                    "max_feasible_pool_size": max_total,
+                },
+                indent=2,
+            )
+        )
         return
     output_dir = _run_sampling(args)
     logger.info("Stored constructed manifests in %s.", output_dir)
@@ -56,6 +73,20 @@ def _run_sampling(args: argparse.Namespace) -> str:
     return output_dir
 
 
+def _max_feasible_pool_size(args: argparse.Namespace) -> int:
+    manifest = attach_splits(
+        load_manifest(args.slide_manifest_path),
+        args.split_assignment_path,
+        args.split_column,
+    )
+    ordered_classes = class_order(manifest, args.class_order_file)
+    splits = split_frames(args, manifest)
+    available = cast(
+        pd.Series, splits[args.train_name].groupby("cancer_type")["slide_id"].nunique()
+    )
+    return max_feasible_total(available, ordered_classes, args.parameter)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--slide-manifest-path")
@@ -70,16 +101,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--test-name", default="test")
     parser.add_argument("--n-patches-per-slide", type=int, default=30)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument(
-        "--overflow-strategy",
-        default="redistribute",
-        choices=["redistribute", "replacement"],
-    )
     parser.add_argument("--pool-size", type=int, default=None)
     parser.add_argument("--feature-dir", default=DEFAULT_FEATURE_DIR)
     parser.add_argument("--verify-features", action="store_true")
+    parser.add_argument("--max-feasible-pool-size", action="store_true")
     args = parser.parse_args()
-    if args.verify_features:
+    if args.verify_features or args.max_feasible_pool_size:
         return args
     missing = [
         name
