@@ -172,7 +172,7 @@ case "$command" in
   patch-feature-extract)
     submit_with_args patch-feature-extract \
       --job-name=tcga-ut-patch-feat \
-      --partition="${PATCH_FEATURE_PARTITION:-gpu-2d}" \
+      --partition="${PATCH_FEATURE_PARTITION:-gpu-5h}" \
       --constraint="${PATCH_FEATURE_CONSTRAINT:-h100|h200|blackwell}" \
       --gpus-per-node=1 \
       --ntasks-per-node=8 \
