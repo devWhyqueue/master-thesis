@@ -11,7 +11,7 @@ from data.feature_store import (
     DEFAULT_FEATURE_DIR,
     verify_feature_store,
 )
-from data.full_scale_sampling import (
+from data.full_scale.sampling import (
     attach_splits,
     class_order,
     constructed_payload,

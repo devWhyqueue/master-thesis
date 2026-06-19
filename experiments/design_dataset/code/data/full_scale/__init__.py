@@ -1,0 +1,1 @@
+"""Full-scale constructed sampling."""

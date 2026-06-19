@@ -11,6 +11,7 @@ from common_code.metrics.payload import resolve_device
 from common_code.wsi import trainer as mil_trainer
 from common_code.wsi.eval import _save_and_evaluate_bags
 from common_code.wsi.rankmix_teacher import load_rankmix_teacher, train_rankmix_teacher
+from common_code.wsi.bag_dataset import AttentionMil
 from analysis.evaluation.tuning_params import parse_tuning_params
 from modeling.training.constructed_wsi_data import (
     ConstructedBagDataset,
@@ -30,6 +31,7 @@ METHODS = (
 
 
 def get_args() -> argparse.Namespace:
+    """Parse command line arguments for training."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest-path", required=True)
     parser.add_argument("--results-save-path", required=True)
@@ -46,6 +48,7 @@ def get_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run WSI-level constructed training entrypoint."""
     args = get_args()
     output_dir = Path(args.results_save_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -137,7 +140,7 @@ def _train_method(
         )
         if teacher is None:
             teacher = train_rankmix_teacher(
-                model,
+                cast(AttentionMil, model),
                 train_dataset,
                 labels,
                 training,

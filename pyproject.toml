@@ -51,9 +51,6 @@ where = [".agents/skills/bib/src", "experiments/shared"]
 addopts = "-s"
 testpaths = [".agents/skills/bib/tests"]
 
-[tool.vulture]
-ignore_names = ["forward"]
-
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cpu" },

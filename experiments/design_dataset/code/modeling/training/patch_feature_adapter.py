@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -59,7 +59,7 @@ def build_specialized_model(
         )
     if method == "patch_feature_divide_conquer":
         model, _ = train_divide_conquer_model(
-            train_set,
+            cast(Any, train_set),
             sorted(dataset_train.dataset["cancer_type"].unique().tolist()),
             n_classes,
             settings,

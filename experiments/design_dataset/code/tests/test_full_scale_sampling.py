@@ -1,6 +1,6 @@
 import pandas as pd
 
-from data.full_scale_sampling import (
+from data.full_scale.sampling import (
     assert_case_disjoint,
     cap_patches,
     construct_training_split,

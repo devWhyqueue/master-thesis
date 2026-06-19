@@ -8,13 +8,13 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from data.full_scale_rows import (
+from data.full_scale.rows import (
     cap_rows_per_slide,
     rows_for_slides,
     slide_frame,
 )
 from data.feature_store import expand_splits_for_wsi_manifest
-from data.full_scale_targets import (
+from data.full_scale.targets import (
     max_feasible_total,
     power_law_counts,
 )

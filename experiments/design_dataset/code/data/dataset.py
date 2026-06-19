@@ -10,11 +10,11 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from data.feature_store import (
+from data.feature_store import maybe_feature_store
+from data.feature_cache import (
     feature_for_manifest_row,
     load_feature_cache,
     load_row_feature_cache,
-    maybe_feature_store,
     patch_id_for_row,
     patch_row,
     row_level_dataset,

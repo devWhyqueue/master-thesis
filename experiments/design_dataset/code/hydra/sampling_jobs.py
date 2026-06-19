@@ -9,7 +9,7 @@ def max_feasible_pool_size(
     """Build one job that reports the strict one-seed feasible pool size."""
     cmd = prefix(config, args) + [
         "-m",
-        "data.full_scale_cli",
+        "data.full_scale.cli",
         f"--slide-manifest-path={_seed_path(config.get('slide_manifest_csv', ''), args.seed)}",
         f"--parameter={args.parameter}",
         f"--seed={args.seed}",
@@ -53,7 +53,7 @@ def _sample_full_scale_cmd(
         )
     cmd = prefix(config, args) + [
         "-m",
-        "data.full_scale_cli",
+        "data.full_scale.cli",
         f"--slide-manifest-path={_seed_path(config.get('slide_manifest_csv', ''), seed)}",
         f"--file-save-path={config.get('constructed_dataset_dir', '')}",
         f"--parameter={parameter}",

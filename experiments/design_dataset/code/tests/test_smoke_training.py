@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 
 from data.dataset import TCGAUTDatasetImbalanced
-from data.full_scale_sampling import write_constructed_outputs
+from data.full_scale.sampling import write_constructed_outputs
 from modeling.training.constructed_wsi_cache import _write_split_cache
 from modeling.training.constructed_wsi_data import ConstructedBagDataset
 

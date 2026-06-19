@@ -6,7 +6,7 @@ from typing import cast
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
+from common_code.wsi.bag_dataset import BagFeatureDataset
 
 from data.feature_store import load_feature_row, load_slide_features
 from analysis.evaluation.tuning_params import parse_tuning_params
@@ -31,7 +31,7 @@ OPTIONAL_ARGS: tuple[tuple[str, type, object], ...] = (
 )
 
 
-class ConstructedBagDataset(Dataset):
+class ConstructedBagDataset(BagFeatureDataset):
     """WSI-bag dataset assembled from constructed feature-row manifests."""
 
     def __init__(

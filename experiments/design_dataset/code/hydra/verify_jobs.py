@@ -1,5 +1,4 @@
 import argparse
-import json
 
 from job_defs import Job, prefix
 
@@ -9,7 +8,7 @@ def verify_features(args: argparse.Namespace, config: dict[str, str]) -> list[Jo
     feature_dir = config.get("feature_path", "")
     cmd = prefix(config, args) + [
         "-m",
-        "data.full_scale_cli",
+        "data.full_scale.cli",
         "--verify-features",
         f"--feature-dir={feature_dir}",
         "--slide-manifest-path=unused",
