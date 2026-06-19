@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+from typing import Callable, cast
+
 import torch
 
-from scripts.modeling.patch_feature.cfal import train_cfal_model
-from scripts.modeling.patch_feature.divide_conquer import train_divide_conquer_model
-from scripts.modeling.patch_feature.oko import train_oko_model
 from scripts.modeling.patch_feature.training import PatchFeatureDataset
+
+SpecializedTrainer = Callable[..., torch.nn.Module]
+
+train_cfal_model = cast(
+    SpecializedTrainer,
+    getattr(import_module("scripts.modeling.patch_feature.cfal"), "train_cfal_model"),
+)
+train_oko_model = cast(
+    SpecializedTrainer,
+    getattr(import_module("scripts.modeling.patch_feature.oko"), "train_oko_model"),
+)
 
 
 def fit_special_patch_method(
@@ -19,7 +30,7 @@ def fit_special_patch_method(
     seed: int,
     tuning_params: dict[str, float],
 ) -> tuple[torch.nn.Module, dict[str, object] | None] | None:
-    """Train CFAL or divide-and-conquer when method matches; else return None."""
+    """Train patch-feature methods with specialized optimization loops."""
     if method == "patch_feature_cfal":
         return (
             train_cfal_model(
@@ -27,17 +38,6 @@ def fit_special_patch_method(
             ),
             None,
         )
-    if method == "patch_feature_divide_conquer":
-        model, diagnostics = train_divide_conquer_model(
-            train_set,
-            class_names,
-            len(class_names),
-            settings,
-            device,
-            seed,
-            tuning_params,
-        )
-        return model, diagnostics
     if method == "patch_feature_oko":
         return train_oko_model(
             train_set, len(class_names), settings, device, seed, tuning_params

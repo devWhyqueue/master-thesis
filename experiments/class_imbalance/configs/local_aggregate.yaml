@@ -54,9 +54,6 @@ patch_feature_training:
   cfal_sigma: 1.0
   cfal_gamma: 2.0
   cfal_beta: 0.999
-  dnc_k_clusters: 10
-  dnc_zscore_bins: 5
-  dnc_expert_epochs: 20
   device: auto
   max_train_rows:
   max_eval_rows:
@@ -101,7 +98,6 @@ patch_methods:
   - patch_ce_soft_mcc_balanced
   - patch_progan_aug
   - patch_cfal
-  - patch_dnc
 
 patch_feature_methods:
   - patch_feature_ce
@@ -112,7 +108,6 @@ patch_feature_methods:
   - patch_feature_ce_soft_mcc_balanced
   - patch_feature_progan_aug
   - patch_feature_cfal
-  - patch_feature_divide_conquer
 
 wsi_bag_methods:
   - mil_ce

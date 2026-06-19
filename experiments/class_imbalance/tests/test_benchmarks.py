@@ -39,11 +39,6 @@ from scripts.modeling.patch_feature.cfal import (
     effective_number,
     gaussian_affinity,
 )
-from scripts.modeling.patch_feature.divide_conquer import (
-    build_divide_conquer_model,
-    cluster_sample_binary_indices,
-    dnc_class_partitions,
-)
 from scripts.modeling.patch_feature.training import PatchFeatureDataset, _select_progan_variant
 from scripts.data.prep.manifest.feature import tcga_case_id
 from scripts.data.progan.core import (
@@ -672,117 +667,23 @@ def test_cfal_is_registered_patch_feature_method() -> None:
     config_path = EXPERIMENT_ROOT / "configs" / "default.yaml"
     config = load_config(config_path)
     assert "patch_feature_cfal" in config["patch_feature_methods"]
-    assert "patch_feature_divide_conquer" in config["patch_feature_methods"]
-
-
-def _synthetic_patch_dataset(
-    tmp_path: Path, class_names: list[str], rows_per_class: int = 12
-) -> PatchFeatureDataset:
-    feature_count = len(class_names) * rows_per_class
-    features = np.random.default_rng(0).standard_normal((feature_count, 16)).astype(
-        np.float32
-    )
-    features_path = tmp_path / "features.npy"
-    np.save(features_path, features)
-    rows = []
-    feature_index = 0
-    for class_name in class_names:
-        for _ in range(rows_per_class):
-            rows.append(
-                {
-                    "feature_index": feature_index,
-                    "cancer_type": class_name,
-                    "split": "train",
-                    "is_synthetic": False,
-                }
-            )
-            feature_index += 1
-    frame = pd.DataFrame(rows)
-    return PatchFeatureDataset(frame, features_path, {name: idx for idx, name in enumerate(class_names)})
-
-
-def test_divide_conquer_cluster_sampling_balances_majority_side(
-    tmp_path: Path,
-) -> None:
-    class_names = [f"class_{index}" for index in range(8)]
-    dataset = _synthetic_patch_dataset(tmp_path, class_names, rows_per_class=20)
-    positive_idx = np.arange(0, 10, dtype=np.int64)
-    negative_idx = np.arange(10, 160, dtype=np.int64)
-    pos, neg, stats = cluster_sample_binary_indices(
-        dataset,
-        positive_idx,
-        negative_idx,
-        k_clusters=5,
-        n_bins=5,
-        seed=0,
-    )
-    assert len(pos) == 10
-    assert len(neg) == 10
-    assert stats["negative_after"] == 10
-
-
-def test_divide_conquer_forward_and_training_step_runs_without_nan(
-    tmp_path: Path,
-) -> None:
-    class_names = [f"class_{index}" for index in range(32)]
-    dataset = _synthetic_patch_dataset(tmp_path, class_names, rows_per_class=4)
-    settings = {
-        "hidden_dim": 16,
-        "dropout": 0.0,
-        "learning_rate": 0.001,
-        "weight_decay": 0.0,
-        "batch_size": 8,
-        "epochs": 2,
-        "dnc_k_clusters": 3,
-        "dnc_zscore_bins": 3,
-        "dnc_expert_epochs": 1,
-    }
-    device = torch.device("cpu")
-    model = build_divide_conquer_model(dataset, settings, len(class_names), device)
-    sample, _ = dataset[0]
-    logits = model(sample.unsqueeze(0))
-    assert logits.shape == (1, len(class_names))
-    assert torch.isfinite(logits).all().item()
-
-
-def test_divide_conquer_support_partitions_are_disjoint_and_complete() -> None:
-    class_names = [f"class_{index}" for index in range(32)]
-    paths = ensure_dirs(load_config(EXPERIMENT_ROOT / "configs" / "default.yaml"))
-    distribution = pd.DataFrame(
-        {
-            "cancer_type": class_names,
-            "n_slides": list(range(1, 33)),
-            "rank_ascending": list(range(1, 33)),
-        }
-    )
-    connection = connect(paths["db"])
-    init_schema(connection)
-    replace_table(connection, "dataset_class_distribution", distribution)
-    connection.close()
-    partitions = dnc_class_partitions(class_names)
-    assert len(partitions["tail"]) == 8
-    assert len(partitions["head"]) == 8
-    assert not (partitions["tail"] & partitions["body"])
-    assert not (partitions["tail"] & partitions["head"])
-    assert not (partitions["body"] & partitions["head"])
-    assert set().union(*partitions.values()) == set(class_names)
 
 
 def test_tuning_grid_expands_expected_array_sizes() -> None:
-    assert task_count("patch_feature") == 147
+    assert task_count("patch_feature") == 132
     assert task_count("wsi_bag") == 99
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
     cfal_variant, cfal_seed = task_for_array_index("patch_feature", 87)
-    dnc_variant, dnc_seed = task_for_array_index("patch_feature", 96)
+    oko_variant, oko_seed = task_for_array_index("patch_feature", 96)
     last_variant, last_seed = task_for_array_index("wsi_bag", 98)
     assert first_variant.method == "patch_feature_weighted_ce"
     assert first_seed == 0
     assert cfal_variant.method == "patch_feature_cfal"
     assert cfal_variant.params == {"cfal_sigma": 0.25}
     assert cfal_seed == 0
-    assert dnc_variant.method == "patch_feature_divide_conquer"
-    assert dnc_variant.params == {"dnc_zscore_bins": 1.0}
-    assert dnc_seed == 0
+    assert oko_variant.method == "patch_feature_oko"
+    assert oko_variant.params == {"oko_k": 1.0}
+    assert oko_seed == 0
     assert last_variant.method == "mde_mil"
     assert last_variant.params == {"mde_mil_consistency_weight": 4.0}
     assert last_seed == 2
