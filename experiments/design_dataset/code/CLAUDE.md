@@ -14,5 +14,6 @@ AI assistant guidelines for working on the TCGA-UT Controlled Imbalance Benchmar
 
 ## Clean-Code Enforcement
 - Run the `/clean-code` audit command before committing any python edits:
-  `uv run python "C:\Users\yanni\.gemini\config\skills\clean-code\run.py" --scope design_dataset/code`
+  `uv run python "C:\Users\Yannik\.claude\skills\clean-code\run.py" --scope design_dataset/code`
+  Do **not** add `--vulture-scope design_dataset/code`; that flag passes invalid paths and causes vulture to exit with an error.
 - Unused code/modules must be deleted immediately (per the lazy senior dev ponytail rule) rather than commented out or left dead.
