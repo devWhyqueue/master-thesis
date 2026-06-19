@@ -60,6 +60,19 @@ for order in "${ORDERS[@]}"; do
   done
 done
 
+echo "=== Phase 3c: ProGAN augmentation cache (9 constructed splits, GPU) ==="
+for order in "${ORDERS[@]}"; do
+  for param in "${PARAMS[@]}"; do
+    for seed in "${SEEDS[@]}"; do
+      echo "patch-cache-progan order=${order} param=${param} seed=${seed}"
+      ${PYTHON} patch-cache-progan \
+        --parameter="${param}" \
+        --seed="${seed}" \
+        --class-order-name="${order}"
+    done
+  done
+done
+
 echo "=== Phase 4: validation tuning (patch + WSI) ==="
 ${PYTHON} tune
 ${PYTHON} tune-wsi

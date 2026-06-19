@@ -8,6 +8,7 @@ def tune(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
     """Build patch validation-tuning jobs as one SLURM array."""
     count = task_count("patch")
     throttle = config.get("tune_array_throttle", "50")
+    # ponytail: cpu-2h: patch tune ~18 min (sacct); cpu-9m limit is 9 min, too short
     return [
         Job(
             _tune_cmd(args, config, "patch"),
@@ -26,7 +27,8 @@ def tune_wsi(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
     """Build WSI validation-tuning jobs as one SLURM array."""
     count = task_count("wsi")
     throttle = config.get("wsi_tune_array_throttle", "20")
-    partition = config.get("wsi_partition", "gpu-2h")
+    # ponytail: gpu-9m: WSI tune ~2 min (sacct); 100 slots vs 50 for gpu-2h
+    partition = config.get("wsi_partition", "gpu-9m")
     return [
         Job(
             _tune_cmd(args, config, "wsi", gpu=True),

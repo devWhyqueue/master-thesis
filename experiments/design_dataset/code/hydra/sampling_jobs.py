@@ -7,6 +7,18 @@ def max_feasible_pool_size(
     args: argparse.Namespace, config: dict[str, str]
 ) -> list[Job]:
     """Build one job that reports the strict one-seed feasible pool size."""
+    # ponytail: cpu-9m: sampling completes in ~10s (sacct evidence)
+    return [
+        Job(
+            _max_pool_cmd(args, config),
+            "max_pool",
+            "logs/sampling/max_feasible_pool_size%j.out",
+            partition="cpu-9m",
+        )
+    ]
+
+
+def _max_pool_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[str]:
     cmd = prefix(config, args) + [
         "-m",
         "data.full_scale.cli",
@@ -24,7 +36,7 @@ def max_feasible_pool_size(
         cmd.append(f"--split-assignment-path={split_path}")
     if args.class_order_file is not None:
         cmd.append(f"--class-order-file={args.class_order_file}")
-    return [Job(cmd, "max_pool", "logs/sampling/max_feasible_pool_size%j.out")]
+    return cmd
 
 
 def sample_full_scale(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
@@ -34,6 +46,8 @@ def sample_full_scale(args: argparse.Namespace, config: dict[str, str]) -> list[
             _sample_full_scale_cmd(args, config, parameter, seed),
             "sample_full",
             "logs/sampling/sample_full_scale%j.out",
+            # ponytail: cpu-9m: sampling completes in ~10s (sacct evidence)
+            partition="cpu-9m",
         )
         for parameter in parameters(args)
         for seed in ([0, 1, 2] if args.sweep else [args.seed])

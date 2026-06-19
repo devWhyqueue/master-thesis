@@ -11,6 +11,8 @@ def patch_cache(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
             _patch_cache_cmd(args, config, parameter, seed),
             "patch_cache",
             "logs/patch/patch_cache%j.out",
+            # ponytail: cpu-9m: patch cache completes in ~3 min (sacct evidence)
+            partition="cpu-9m",
         )
         for parameter in parameters(args)
         for seed in seeds
