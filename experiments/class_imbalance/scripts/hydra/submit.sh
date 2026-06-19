@@ -36,7 +36,7 @@ Commands:
 Environment overrides:
   EXPERIMENT_CONTAINER, PROGAN_ARRAY_UPPER, PROGAN_ARRAY_MAX_PARALLEL,
   PROGAN_GPU_CONSTRAINT, PROGAN_PARTITION, PROGAN_TRAIN_PARTITION,
-  PROGAN_SYNTH_SQFS_PARTITION, PATCH_PARTITION, PATCH_SQFS_PARTITION,
+  PROGAN_SYNTH_SQFS_PARTITION, PROGAN_SYNTH_SQFS_MEM, PATCH_PARTITION, PATCH_SQFS_PARTITION,
   PATCH_FEATURE_PARTITION, PATCH_FEATURE_CONSTRAINT, WSI_PARTITION,
   PATCH_TUNE_PARTITION, WSI_TUNE_PARTITION, TUNING_AGGREGATE_PARTITION,
   PATCH_SYNTHETIC_SQFS_TEMPLATE
@@ -341,9 +341,10 @@ case "$command" in
     sqfs_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=build-synthetic-sqfs \
       --dependency="afterok:${merge_job}" \
-      --partition="${PROGAN_SYNTH_SQFS_PARTITION:-cpu-5h}" \
+      --partition="${PROGAN_SYNTH_SQFS_PARTITION:-cpu-2d}" \
       --gpus-per-node=0 \
       --ntasks-per-node=4 \
+      --mem="${PROGAN_SYNTH_SQFS_MEM:-0}" \
       --array=0-2 \
       --job-name=tcga-ut-synth-sqfs \
       --output=logs/build-synthetic-sqfs-%A-%a.out \
@@ -416,9 +417,10 @@ case "$command" in
     synth_sqfs_job=$(sbatch --parsable \
       --export=ALL,HYDRA_JOB=build-synthetic-sqfs \
       --dependency="afterok:${merge_job}" \
-      --partition="${PROGAN_SYNTH_SQFS_PARTITION:-cpu-5h}" \
+      --partition="${PROGAN_SYNTH_SQFS_PARTITION:-cpu-2d}" \
       --gpus-per-node=0 \
       --ntasks-per-node=4 \
+      --mem="${PROGAN_SYNTH_SQFS_MEM:-0}" \
       --array=0-2 \
       --job-name=tcga-ut-synth-sqfs \
       --output=logs/build-synthetic-sqfs-%A-%a.out \
