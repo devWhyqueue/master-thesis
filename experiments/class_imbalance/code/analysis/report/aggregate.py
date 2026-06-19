@@ -7,8 +7,8 @@ from typing import Any, cast
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import (
     SUMMARY_METRICS,
     connect,
     init_schema,
@@ -16,8 +16,8 @@ from scripts.analysis.results import (
     read_table,
     replace_table,
 )
-from scripts.metadata import benchmark_metadata
-from scripts.analysis.report.figures.labels import latex_method_label
+from code.metadata import benchmark_metadata
+from code.analysis.report.figures.labels import latex_method_label
 
 
 def parse_args() -> argparse.Namespace:

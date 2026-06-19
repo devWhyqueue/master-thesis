@@ -29,8 +29,8 @@ mount_synthetic_sqfs() {
 }
 
 mkdir -p "${PATCH_STAGE_DIR}"
-# shellcheck source=scripts/hydra/mount_real_patch_sqfs.sh
-source scripts/hydra/mount_real_patch_sqfs.sh copy
+# shellcheck source=code/hydra/mount_real_patch_sqfs.sh
+source code/hydra/mount_real_patch_sqfs.sh copy
 trap cleanup_patch_feature_mounts EXIT
 
 args=(--seed "$seed")
@@ -39,4 +39,4 @@ if [ "$include_synthetic" = 1 ]; then
   args+=(--include-synthetic)
 fi
 
-bash scripts/hydra/run_python.sh -m scripts.modeling.patch_feature.patch_feature_cache "${args[@]}" "$@"
+bash code/hydra/run_python.sh -m code.modeling.patch_feature.patch_feature_cache "${args[@]}" "$@"

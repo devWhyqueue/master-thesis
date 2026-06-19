@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from scripts.common import ensure_dirs, load_config, write_progress
-from scripts.modeling.patch.artifacts import (
+from code.common import ensure_dirs, load_config, write_progress
+from code.modeling.patch.artifacts import (
     copy_synthetic_artifacts,
     load_patch_checkpoint,
     load_training_checkpoint,
@@ -19,19 +19,19 @@ from scripts.modeling.patch.artifacts import (
     _resolve_checkpoint_path,
     _write_run_record,
 )
-from scripts.modeling.patch.data import (
+from code.modeling.patch.data import (
     patch_loader,
     _labels,
     _load_manifest,
     _split_datasets,
 )
-from scripts.modeling.patch.losses import _criterion
-from scripts.modeling.patch.models import PatchClassifier
-from scripts.data.progan.manifest import (
+from code.modeling.patch.losses import _criterion
+from code.modeling.patch.models import PatchClassifier
+from code.data.progan.manifest import (
     generate_patch_gan_manifest,
     merge_patch_gan_manifest_reference,
 )
-from scripts.modeling.training.support import _resolve_device
+from code.modeling.training.support import _resolve_device
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import (
     connect,
     init_schema,
     load_class_distribution,

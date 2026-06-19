@@ -15,45 +15,45 @@ import torch
 EXPERIMENT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EXPERIMENT_ROOT))
 
-from scripts.modeling.mil.bag.losses import (
+from code.modeling.mil.bag.losses import (
     _mix_ranked_bags,
     _supervised_contrastive_loss,
     bag_loss,
 )
-from scripts.modeling.mil.bag.dataset import AttentionMil, BagFeatureDataset, DualExpertMil, _feature_to_bag
-from scripts.modeling.mil.bag.trainer import _loader, _run_mde_training
-from scripts.modeling.mil.metadata import BAG_METHODS
-from scripts.modeling.patch.artifacts import (
+from code.modeling.mil.bag.dataset import AttentionMil, BagFeatureDataset, DualExpertMil, _feature_to_bag
+from code.modeling.mil.bag.trainer import _loader, _run_mde_training
+from code.modeling.mil.metadata import BAG_METHODS
+from code.modeling.patch.artifacts import (
     load_training_checkpoint,
     save_patch_checkpoint,
     save_training_checkpoint,
     seed_patch_run,
 )
-from scripts.modeling.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
-from scripts.data.staging.io import stage_destination
-from scripts.modeling.patch.models import PatchClassifier
-from scripts.modeling.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
-from scripts.modeling.patch_feature.cfal import (
+from code.modeling.patch.data import PatchImageDataset, patch_loader, uses_balanced_sampler
+from code.data.staging.io import stage_destination
+from code.modeling.patch.models import PatchClassifier
+from code.modeling.patch.losses import ScholzCombinedLoss, SoftF1LossMulti, SoftMCCLossMulti
+from code.modeling.patch_feature.cfal import (
     build_cfal_loss,
     build_cfal_model,
     effective_number,
     gaussian_affinity,
 )
-from scripts.modeling.patch_feature.training import PatchFeatureDataset, _select_progan_variant
-from scripts.data.prep.manifest.feature import tcga_case_id
-from scripts.data.progan.core import (
+from code.modeling.patch_feature.training import PatchFeatureDataset, _select_progan_variant
+from code.data.prep.manifest.feature import tcga_case_id
+from code.data.progan.core import (
     EqualizedConv2d,
     ProgressiveDiscriminator,
     ProgressiveGenerator,
     ProGanSettings,
 )
-from scripts.data.progan.train import (
+from code.data.progan.train import (
     _gradient_penalty,
     _train_step,
     paper_batch_size,
     train_class_progan,
 )
-from scripts.common import (
+from code.common import (
     EVAL_ARRAYS_NAME,
     RUN_RECORD_NAME,
     ensure_dirs,
@@ -61,7 +61,7 @@ from scripts.common import (
     read_run_record,
     write_run_record,
 )
-from scripts.analysis.results import (
+from code.analysis.results import (
     connect,
     discover_result_dirs,
     ingest_run_record,
@@ -70,7 +70,7 @@ from scripts.analysis.results import (
     read_table,
     replace_table,
 )
-from scripts.data.progan.manifest import (
+from code.data.progan.manifest import (
     _class_image_paths,
     balance_target as _balance_target,
     decode_progan_array_task,
@@ -82,20 +82,20 @@ def _generated_counts_match(
 ) -> bool:
     counts = pd.DataFrame(rows)["cancer_type"].value_counts().to_dict()
     return counts == expected
-from scripts.modeling.training.support_tiers import class_tier_labels
-from scripts.data.prep.manifest.patch import build_patch_manifest
-from scripts.data.prep.manifest.splits import _build_assignments, _validate_assignments
-from scripts.analysis.report.paired_delta_table import build_paired_delta_table
-from scripts.analysis.tuning.aggregate import _select_all
-from scripts.analysis.tuning.grid import (
+from code.modeling.training.support_tiers import class_tier_labels
+from code.data.prep.manifest.patch import build_patch_manifest
+from code.data.prep.manifest.splits import _build_assignments, _validate_assignments
+from code.analysis.report.paired_delta_table import build_paired_delta_table
+from code.analysis.tuning.aggregate import _select_all
+from code.analysis.tuning.grid import (
     PATCH_FEATURE_SPECS,
     WSI_BAG_SPECS,
     task_count,
     task_for_array_index,
     validate_tuning_params,
 )
-from scripts.analysis.tuning.paths import tuning_result_dir
-from scripts.analysis.tuning.selected_reports import materialize_selected_results
+from code.analysis.tuning.paths import tuning_result_dir
+from code.analysis.tuning.selected_reports import materialize_selected_results
 
 
 def test_patch_manifest_uses_fixed_resolution_and_split(tmp_path: Path) -> None:
@@ -674,7 +674,7 @@ def test_tuning_grid_expands_expected_array_sizes() -> None:
     assert task_count("wsi_bag") == 99
     first_variant, first_seed = task_for_array_index("patch_feature", 0)
     cfal_variant, cfal_seed = task_for_array_index("patch_feature", 87)
-    oko_variant, oko_seed = task_for_array_index("patch_feature", 96)
+    oko_variant, oko_seed = task_for_array_index("patch_feature", 105)
     last_variant, last_seed = task_for_array_index("wsi_bag", 98)
     assert first_variant.method == "patch_feature_weighted_ce"
     assert first_seed == 0
@@ -929,7 +929,7 @@ def test_temperature_scaling_lowers_synthetic_overconfidence_nll() -> None:
     labels = rng.integers(0, n_classes, size=200)
     overconfident = np.exp(logits * 4.0)
     overconfident /= overconfident.sum(axis=1, keepdims=True)
-    from scripts.analysis.report.calibration.utils import (
+    from code.analysis.report.calibration.utils import (
         apply_temperature,
         fit_temperature,
         negative_log_likelihood,

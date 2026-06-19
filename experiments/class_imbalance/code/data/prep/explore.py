@@ -13,8 +13,8 @@ import pandas as pd
 
 import json
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import connect, init_schema, replace_table
+from code.common import ensure_dirs, load_config
+from code.analysis.results import connect, init_schema, replace_table
 
 ABBREVIATIONS = {
     "Brain_Lower_Grade_Glioma": "LGG",

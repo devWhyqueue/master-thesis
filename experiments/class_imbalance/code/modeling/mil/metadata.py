@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.metadata import WSI_METHOD_METADATA
+from code.metadata import WSI_METHOD_METADATA
 
 BAG_METHODS = set(WSI_METHOD_METADATA)
 

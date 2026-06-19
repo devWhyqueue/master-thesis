@@ -4,8 +4,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from scripts.common import compact_run_record, ensure_dirs, load_config
-from scripts.analysis.results.ingest import discover_result_dirs
+from code.common import compact_run_record, ensure_dirs, load_config
+from code.analysis.results.ingest import discover_result_dirs
 
 logger = logging.getLogger(__name__)
 

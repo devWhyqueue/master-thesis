@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import minimize, minimize_scalar
 
-from scripts.modeling.mil.metrics import _calibration_metrics
+from code.modeling.mil.metrics import _calibration_metrics
 
 N_BINS = 10
 

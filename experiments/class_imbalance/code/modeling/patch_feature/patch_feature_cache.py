@@ -15,9 +15,9 @@ from timm.data.config import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from timm.layers.mlp import SwiGLUPacked
 
-from scripts.common import ensure_dirs, load_config, write_json
-from scripts.data.staging.patch import stage_patch_manifest
-from scripts.modeling.training.support import _resolve_device
+from code.common import ensure_dirs, load_config, write_json
+from code.data.staging.patch import stage_patch_manifest
+from code.modeling.training.support import _resolve_device
 
 logger = logging.getLogger(__name__)
 

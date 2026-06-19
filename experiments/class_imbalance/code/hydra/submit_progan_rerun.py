@@ -7,9 +7,13 @@ B4 submission: progan GAN → feature-extract → feature-train (progan only)
 Run with optional --existing-sqfs=<job_id> to skip the GAN/merge/sqfs
 submission when those jobs are already queued from a prior run.
 """
+
+import logging
 import os
 import subprocess
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def sbatch(args: list[str], *, dependency: str | None = None) -> str:
@@ -32,7 +36,7 @@ def _env(name: str, default: str) -> str:
 
 
 def main() -> None:
-    script = "scripts/hydra/job.sbatch"
+    script = "code/hydra/job.sbatch"
 
     existing_sqfs = None
     for arg in sys.argv[1:]:
@@ -41,15 +45,15 @@ def main() -> None:
 
     if existing_sqfs:
         sqfs_id = existing_sqfs
-        print(f"Reusing existing sqfs job id: {sqfs_id}")
+        logger.info(f"Reusing existing sqfs job id: {sqfs_id}")
     else:
         # ── Step 1: ProGAN GAN + merge + SquashFS chain ──────────────────────
-        print("Submitting ProGAN chain (GAN → merge → SquashFS) …")
+        logger.info("Submitting ProGAN chain (GAN → merge → SquashFS) …")
         progan_out = run(
-            ["bash", "scripts/hydra/submit.sh", "progan"],
+            ["bash", "code/hydra/submit.sh", "progan"],
             capture=True,
         )
-        print(progan_out)
+        logger.info(progan_out)
 
         sqfs_id = next(
             line.split(":")[1].strip().split()[0]
@@ -61,14 +65,14 @@ def main() -> None:
             for line in progan_out.splitlines()
             if "ProGAN train" in line
         )
-        print(f"  sqfs_id={sqfs_id}  progan-train={train_job_id} (will cancel)")
+        logger.info(f"  sqfs_id={sqfs_id}  progan-train={train_job_id} (will cancel)")
 
         # Cancel the image-classifier ProGAN train (not in the report)
         subprocess.run(["scancel", train_job_id], check=True)
-        print(f"  Cancelled patch-progan-train job {train_job_id}")
+        logger.info(f"  Cancelled patch-progan-train job {train_job_id}")
 
     # ── Step 2: Feature extraction (real + new synthetic, all seeds) ─────────
-    print("Submitting patch-feature-extract (array 0-2) …")
+    logger.info("Submitting patch-feature-extract (array 0-2) …")
     feat_id = sbatch(
         [
             "--export=ALL,HYDRA_JOB=patch-feature-extract",
@@ -84,10 +88,10 @@ def main() -> None:
         ],
         dependency=f"afterok:{sqfs_id}",
     )
-    print(f"  feat_extract_id={feat_id}")
+    logger.info(f"  feat_extract_id={feat_id}")
 
     # ── Step 3a: Train patch_feature_progan_aug (tasks 18-20) ────────────────
-    print("Submitting patch-feature-train --array=18-20 …")
+    logger.info("Submitting patch-feature-train --array=18-20 …")
     feat_train_id = sbatch(
         [
             "--export=ALL,HYDRA_JOB=patch-feature-train",
@@ -102,10 +106,10 @@ def main() -> None:
         ],
         dependency=f"afterok:{feat_id}",
     )
-    print(f"  feat_train_id={feat_train_id}")
+    logger.info(f"  feat_train_id={feat_train_id}")
 
     # ── Step 3b: Tune ProGAN final-depth-epoch sweep (tasks 111-119) ─────────
-    print("Submitting patch-feature-tune --array=111-119 …")
+    logger.info("Submitting patch-feature-tune --array=111-119 …")
     feat_tune_id = sbatch(
         [
             "--export=ALL,HYDRA_JOB=patch-feature-tune",
@@ -120,10 +124,10 @@ def main() -> None:
         ],
         dependency=f"afterok:{feat_id}",
     )
-    print(f"  feat_tune_id={feat_tune_id}")
+    logger.info(f"  feat_tune_id={feat_tune_id}")
 
     # ── Step 4: Tuning aggregate ──────────────────────────────────────────────
-    print("Submitting tuning-aggregate …")
+    logger.info("Submitting tuning-aggregate …")
     tuning_agg_id = sbatch(
         [
             "--export=ALL,HYDRA_JOB=tuning-aggregate",
@@ -137,10 +141,10 @@ def main() -> None:
         ],
         dependency=f"afterok:{feat_train_id}:{feat_tune_id}",
     )
-    print(f"  tuning_agg_id={tuning_agg_id}")
+    logger.info(f"  tuning_agg_id={tuning_agg_id}")
 
     # ── Step 5a: Aggregate tables ─────────────────────────────────────────────
-    print("Submitting aggregate …")
+    logger.info("Submitting aggregate …")
     agg_id = sbatch(
         [
             "--export=ALL,HYDRA_JOB=aggregate",
@@ -154,10 +158,10 @@ def main() -> None:
         ],
         dependency=f"afterok:{tuning_agg_id}",
     )
-    print(f"  agg_id={agg_id}")
+    logger.info(f"  agg_id={agg_id}")
 
     # ── Step 5b: ProGAN diagnostics ───────────────────────────────────────────
-    print("Submitting progan-diagnostics …")
+    logger.info("Submitting progan-diagnostics …")
     diag_id = sbatch(
         [
             "--export=ALL,HYDRA_JOB=progan-diagnostics",
@@ -171,19 +175,17 @@ def main() -> None:
         ],
         dependency=f"afterok:{agg_id}",
     )
-    print(f"  diag_id={diag_id}")
+    logger.info(f"  diag_id={diag_id}")
 
-    print("\n=== Chain submitted ===")
-    print(f"  sqfs:         {sqfs_id}")
-    print(f"  feat-extract: {feat_id}")
-    print(f"  feat-train:   {feat_train_id}")
-    print(f"  feat-tune:    {feat_tune_id}")
-    print(f"  tuning-agg:   {tuning_agg_id}")
-    print(f"  aggregate:    {agg_id}")
-    print(f"  progan-diag:  {diag_id}")
-    print(
-        "\nMonitor with: squeue -u $USER -o '%%i %%j %%T %%M %%R' | sort -k1"
-    )
+    logger.info("\n=== Chain submitted ===")
+    logger.info(f"  sqfs:         {sqfs_id}")
+    logger.info(f"  feat-extract: {feat_id}")
+    logger.info(f"  feat-train:   {feat_train_id}")
+    logger.info(f"  feat-tune:    {feat_tune_id}")
+    logger.info(f"  tuning-agg:   {tuning_agg_id}")
+    logger.info(f"  aggregate:    {agg_id}")
+    logger.info(f"  progan-diag:  {diag_id}")
+    logger.info("\nMonitor with: squeue -u $USER -o '%%i %%j %%T %%M %%R' | sort -k1")
 
 
 if __name__ == "__main__":

@@ -11,14 +11,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import (
     connect,
     init_schema,
     load_split_payload,
     replace_table,
 )
-from scripts.analysis.report.calibration.utils import (
+from code.analysis.report.calibration.utils import (
     calibrated_probabilities,
     fit_dirichlet,
     fit_temperature,
@@ -27,7 +27,7 @@ from scripts.analysis.report.calibration.utils import (
     probabilities_to_logits,
     reliability_curve,
 )
-from scripts.analysis.report.figures.labels import METHOD_LABELS
+from code.analysis.report.figures.labels import METHOD_LABELS
 
 logger = logging.getLogger(__name__)
 

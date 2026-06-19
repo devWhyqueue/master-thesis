@@ -1,4 +1,4 @@
-from scripts.analysis.results.core import (
+from code.analysis.results.core import (
     ARRAY_FIELDS,
     SUMMARY_METRICS,
     connect,
@@ -8,8 +8,8 @@ from scripts.analysis.results.core import (
     run_id_for_record,
     write_json_table,
 )
-from scripts.analysis.results.ingest import discover_result_dirs, ingest_run_record
-from scripts.analysis.results.query import (
+from code.analysis.results.ingest import discover_result_dirs, ingest_run_record
+from code.analysis.results.query import (
     load_class_distribution,
     load_eval_details,
     load_runs_frame,

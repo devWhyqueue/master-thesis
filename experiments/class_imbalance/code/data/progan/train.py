@@ -7,7 +7,7 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-from scripts.data.progan.core import (
+from code.data.progan.core import (
     ProgressiveDiscriminator,
     ProgressiveGenerator,
     ProgressivePatchDataset,

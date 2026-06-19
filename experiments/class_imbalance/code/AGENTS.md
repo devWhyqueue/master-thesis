@@ -1,11 +1,11 @@
-# Agent Navigation & Script Guide: `experiments/class_imbalance/scripts`
+# Agent Navigation & Script Guide: `experiments/class_imbalance/code`
 
 This document provides a concise navigation map of the scripts directory for AI agents.
 
 ## Core Navigation Map
 
 ```
-scripts/
+code/
 ├── run_pipeline.py          # CLI pipeline orchestrator (runs prep -> patch -> WSI sequentially)
 ├── common.py                # Shared config loading, path resolution, and run-record json I/O
 ├── metadata.py              # Central metadata definitions for methods & taxonomy mapping
@@ -29,19 +29,19 @@ scripts/
 ### Running the pipeline locally (Smoke Mode)
 To run a fast validation pipeline locally on a subset of data:
 ```bash
-uv run python -m scripts.run_pipeline --smoke
+uv run python -m code.run_pipeline --smoke
 ```
 
 ### Running Cluster Jobs
 Submit jobs via the wrapper script to handle SLURM partitions and arrays:
 ```bash
-bash scripts/hydra/submit.sh [prepare|patch-train|progan|wsi-train|aggregate]
+bash code/hydra/submit.sh [prepare|patch-train|progan|wsi-train|aggregate]
 ```
 
 ### Running Checks (Ruff, Vulture, Pyright, Pytest)
 Always verify your edits before final submission:
-* **Linter:** `uv run ruff check experiments/class_imbalance/scripts`
-* **Dead Code:** `uv run vulture experiments/class_imbalance/scripts`
+* **Linter:** `uv run ruff check experiments/class_imbalance/code`
+* **Dead Code:** `uv run vulture experiments/class_imbalance/code`
 * **Type Safety:** `uv run pyright`
 * **Tests:** `uv run pytest experiments/class_imbalance/tests`
 

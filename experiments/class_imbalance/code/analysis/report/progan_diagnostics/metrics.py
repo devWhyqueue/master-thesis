@@ -149,7 +149,7 @@ def expected_augmented_classes(
 ) -> set[str]:
     """Return the tail classes a full ProGAN run is expected to augment for one seed.
 
-    Mirrors ``scripts.data.progan.manifest.tail_classes`` without importing the
+    Mirrors ``code.data.progan.manifest.tail_classes`` without importing the
     torch-backed training module into the reporting path.
     """
     settings = config["patch_synthetic_progan"]

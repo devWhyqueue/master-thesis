@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_json
-from scripts.data.progan.storage import synthetic_output_root
-from scripts.data.staging.io import _stage_with_copy, _stage_with_sqfs, _unmount_sqfs
+from code.common import ensure_dirs, load_config, write_json
+from code.data.progan.storage import synthetic_output_root
+from code.data.staging.io import _stage_with_copy, _stage_with_sqfs, _unmount_sqfs
 
 logger = logging.getLogger(__name__)
 

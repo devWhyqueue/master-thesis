@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_json
-from scripts.data.progan.storage import synthetic_output_root
+from code.common import ensure_dirs, load_config, write_json
+from code.data.progan.storage import synthetic_output_root
 
 logger = logging.getLogger(__name__)
 

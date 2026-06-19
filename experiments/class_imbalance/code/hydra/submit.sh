@@ -5,12 +5,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 mkdir -p logs
 
-script="scripts/hydra/job.sbatch"
+script="code/hydra/job.sbatch"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  bash scripts/hydra/submit.sh <command> [job args...]
+  bash code/hydra/submit.sh <command> [job args...]
 
 Commands:
   build-container          Build environment.sif

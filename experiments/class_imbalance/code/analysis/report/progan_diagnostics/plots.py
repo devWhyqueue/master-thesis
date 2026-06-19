@@ -9,13 +9,13 @@ import pandas as pd
 from matplotlib.figure import Figure
 from PIL import Image
 
-from scripts.analysis.report.progan_diagnostics.metrics import (
+from code.analysis.report.progan_diagnostics.metrics import (
     _REFERENCE_FINAL_DEPTH_EPOCHS,
     load_summary,
     pretty_class_name,
     summary_path,
 )
-from scripts.data.staging.io import resolve_raw_image_path
+from code.data.staging.io import resolve_raw_image_path
 
 
 def _feature_cache_frame(cache_dir: Path) -> tuple[pd.DataFrame, np.memmap]:

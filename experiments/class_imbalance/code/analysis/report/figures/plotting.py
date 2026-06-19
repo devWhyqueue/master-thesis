@@ -9,19 +9,19 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import (
     connect,
     init_schema,
     load_class_distribution,
     load_eval_details,
 )
-from scripts.analysis.report.figures.labels import METHOD_LABELS, method_label
-from scripts.analysis.report.figures.metrics import (
+from code.analysis.report.figures.labels import METHOD_LABELS, method_label
+from code.analysis.report.figures.metrics import (
     benchmark_title,
     plot_macro_f1_by_seed,
 )
-from scripts.modeling.training.support_tiers import class_tier_labels
+from code.modeling.training.support_tiers import class_tier_labels
 
 
 def parse_args() -> argparse.Namespace:

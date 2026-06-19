@@ -7,8 +7,8 @@ from typing import cast
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import (
     connect,
     init_schema,
     load_summary_by_seed,

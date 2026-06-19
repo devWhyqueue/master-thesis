@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from common_code.wsi import trainer as _trainer
-from scripts.common import output_root
+from code.common import output_root
 
 _build_model = _trainer._build_model
 _build_mde_model = _trainer._build_mde_model

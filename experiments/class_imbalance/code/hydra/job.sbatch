@@ -57,7 +57,7 @@ case "$job" in
       echo "tar not found on PATH" >&2
       exit 1
     fi
-    raw_root="$(bash scripts/hydra/run_python.sh -m scripts.data.prep.export.patch --file-list "$PATCH_SQFS_FILE_LIST")"
+    raw_root="$(bash code/hydra/run_python.sh -m code.data.prep.export.patch --file-list "$PATCH_SQFS_FILE_LIST")"
     tar -C "$raw_root" -cf - -T "$PATCH_SQFS_FILE_LIST" | mksquashfs - "$PATCH_SQFS_OUTPUT" \
       -tar \
       -noappend \
@@ -93,7 +93,7 @@ case "$job" in
     if [ -n "${PATCH_SYNTHETIC_SQFS_EPOCH_REF:-}" ]; then
       epoch_ref_arg=(--epoch-ref "${PATCH_SYNTHETIC_SQFS_EPOCH_REF}")
     fi
-    image_root="$(bash scripts/hydra/run_python.sh -m scripts.data.prep.export.synthetic --seed "$seed" --file-list "$PATCH_SYNTHETIC_SQFS_FILE_LIST" "${epoch_ref_arg[@]}")"
+    image_root="$(bash code/hydra/run_python.sh -m code.data.prep.export.synthetic --seed "$seed" --file-list "$PATCH_SYNTHETIC_SQFS_FILE_LIST" "${epoch_ref_arg[@]}")"
     tar -C "$image_root" -cf - -T "$PATCH_SYNTHETIC_SQFS_FILE_LIST" | mksquashfs - "$PATCH_SYNTHETIC_SQFS_OUTPUT" \
       -tar \
       -noappend \
@@ -106,18 +106,18 @@ case "$job" in
     ;;
 
   prepare)
-    bash scripts/hydra/run_python.sh -m scripts.data.prep.check_env
-    bash scripts/hydra/run_python.sh -m scripts.data.prep.manifest.feature
+    bash code/hydra/run_python.sh -m code.data.prep.check_env
+    bash code/hydra/run_python.sh -m code.data.prep.manifest.feature
     for seed in 0 1 2; do
-      bash scripts/hydra/run_python.sh -m scripts.data.prep.manifest.splits --seed "$seed"
-      bash scripts/hydra/run_python.sh -m scripts.data.prep.manifest.patch --seed "$seed"
+      bash code/hydra/run_python.sh -m code.data.prep.manifest.splits --seed "$seed"
+      bash code/hydra/run_python.sh -m code.data.prep.manifest.patch --seed "$seed"
     done
-    bash scripts/hydra/run_python.sh -m scripts.data.prep.explore --seed 0
+    bash code/hydra/run_python.sh -m code.data.prep.explore --seed 0
     ;;
 
   patch-manifests)
     for seed in 0 1 2; do
-      bash scripts/hydra/run_python.sh -m scripts.data.prep.manifest.patch --seed "$seed"
+      bash code/hydra/run_python.sh -m code.data.prep.manifest.patch --seed "$seed"
     done
     ;;
 
@@ -127,27 +127,27 @@ case "$job" in
     seeds=(0 1 2)
     method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
     seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"
-    bash scripts/hydra/run_patch_staged_train.sh "$seed" "$method" "$@"
+    bash code/hydra/run_patch_staged_train.sh "$seed" "$method" "$@"
     ;;
 
   patch-progan-gan)
     export EXPERIMENT_USE_GPU=1
-    # shellcheck source=scripts/hydra/mount_real_patch_sqfs.sh
-    source scripts/hydra/mount_real_patch_sqfs.sh direct
+    # shellcheck source=code/hydra/mount_real_patch_sqfs.sh
+    source code/hydra/mount_real_patch_sqfs.sh direct
     trap cleanup_real_patch_sqfs EXIT
     if [ -n "${PATCH_SQFS_MOUNT:-}" ]; then
       echo "GAN training reads real patches from ${PATCH_SQFS_MOUNT}"
     else
       echo "SquashFS unavailable; GAN reads real patches from BeeGFS"
     fi
-    bash scripts/hydra/run_python.sh -m scripts.modeling.patch.synthetic \
+    bash code/hydra/run_python.sh -m code.modeling.patch.synthetic \
       --array-task-id "${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID required}" \
       "$@"
     ;;
 
   merge-progan-manifests)
     for seed in 0 1 2; do
-      bash scripts/hydra/run_python.sh -m scripts.modeling.patch.synthetic --seed "$seed" --merge-only
+      bash code/hydra/run_python.sh -m code.modeling.patch.synthetic --seed "$seed" --merge-only
     done
     ;;
 
@@ -156,7 +156,7 @@ case "$job" in
     seed="$(seed_from_array)"
     export PATCH_SYNTHETIC_SQFS="${PATCH_SYNTHETIC_SQFS:-$(synthetic_sqfs_path "$seed")}"
     export PATCH_SYNTHETIC_SQFS_EPOCH_REF="${PATCH_SYNTHETIC_SQFS_EPOCH_REF:-25}"
-    bash scripts/hydra/run_patch_staged_train.sh "$seed" patch_progan_aug \
+    bash code/hydra/run_patch_staged_train.sh "$seed" patch_progan_aug \
       --include-synthetic \
       --skip-synthetic-generation \
       --resume \
@@ -167,7 +167,7 @@ case "$job" in
     export EXPERIMENT_USE_GPU=1
     seed="$(seed_from_array)"
     export PATCH_SYNTHETIC_SQFS="${PATCH_SYNTHETIC_SQFS:-$(synthetic_sqfs_path "$seed")}"
-    bash scripts/hydra/run_patch_feature_extract.sh "$seed" "$@"
+    bash code/hydra/run_patch_feature_extract.sh "$seed" "$@"
     ;;
 
   patch-feature-train)
@@ -176,12 +176,12 @@ case "$job" in
     seeds=(0 1 2)
     method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
     seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"
-    bash scripts/hydra/run_python.sh -m scripts.modeling.train_patch_features --method "$method" --seed "$seed" "$@"
+    bash code/hydra/run_python.sh -m code.modeling.train_patch_features --method "$method" --seed "$seed" "$@"
     ;;
 
   patch-feature-tune)
     export EXPERIMENT_USE_GPU=1
-    bash scripts/hydra/run_python.sh -m scripts.analysis.tuning.run \
+    bash code/hydra/run_python.sh -m code.analysis.tuning.run \
       --benchmark patch_feature \
       --array-task-id "${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID required}" \
       "$@"
@@ -189,12 +189,12 @@ case "$job" in
 
   wsi-cache)
     seed="$(seed_from_array)"
-    bash scripts/hydra/run_python.sh -m scripts.data.prep.wsi_bag_cache --seed "$seed"
+    bash code/hydra/run_python.sh -m code.data.prep.wsi_bag_cache --seed "$seed"
     ;;
 
   wsi-profile)
     export EXPERIMENT_USE_GPU=1
-    bash scripts/hydra/run_python.sh -m scripts.modeling.mil.profile_wsi_bags --seed 0
+    bash code/hydra/run_python.sh -m code.modeling.mil.profile_wsi_bags --seed 0
     ;;
 
   wsi-train)
@@ -203,49 +203,49 @@ case "$job" in
     seeds=(0 1 2)
     method="${methods[$((SLURM_ARRAY_TASK_ID / 3))]}"
     seed="${seeds[$((SLURM_ARRAY_TASK_ID % 3))]}"
-    bash scripts/hydra/run_python.sh -m scripts.modeling.training.train --method "$method" --seed "$seed" "$@"
+    bash code/hydra/run_python.sh -m code.modeling.training.train --method "$method" --seed "$seed" "$@"
     ;;
 
   wsi-tune)
     export EXPERIMENT_USE_GPU=1
-    bash scripts/hydra/run_python.sh -m scripts.analysis.tuning.run \
+    bash code/hydra/run_python.sh -m code.analysis.tuning.run \
       --benchmark wsi_bag \
       --array-task-id "${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID required}" \
       "$@"
     ;;
 
   tuning-aggregate)
-    bash scripts/hydra/run_python.sh -m scripts.analysis.tuning.aggregate "$@"
+    bash code/hydra/run_python.sh -m code.analysis.tuning.aggregate "$@"
     ;;
 
   aggregate)
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.build_db
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.recompute_tier_metrics
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.aggregate --benchmark patch
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.aggregate --benchmark wsi_bag
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.calibration.table
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.calibration.posthoc_table
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.paired_delta_table
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.progan_diagnostics --seed 0
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.figures --benchmark patch
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.figures --benchmark wsi_bag
+    bash code/hydra/run_python.sh -m code.analysis.report.build_db
+    bash code/hydra/run_python.sh -m code.analysis.report.recompute_tier_metrics
+    bash code/hydra/run_python.sh -m code.analysis.report.aggregate --benchmark patch
+    bash code/hydra/run_python.sh -m code.analysis.report.aggregate --benchmark wsi_bag
+    bash code/hydra/run_python.sh -m code.analysis.report.calibration.table
+    bash code/hydra/run_python.sh -m code.analysis.report.calibration.posthoc_table
+    bash code/hydra/run_python.sh -m code.analysis.report.paired_delta_table
+    bash code/hydra/run_python.sh -m code.analysis.report.progan_diagnostics --seed 0
+    bash code/hydra/run_python.sh -m code.analysis.report.figures --benchmark patch
+    bash code/hydra/run_python.sh -m code.analysis.report.figures --benchmark wsi_bag
     ;;
 
   progan-diagnostics)
-    # shellcheck source=scripts/hydra/mount_real_patch_sqfs.sh
-    source scripts/hydra/mount_real_patch_sqfs.sh direct
+    # shellcheck source=code/hydra/mount_real_patch_sqfs.sh
+    source code/hydra/mount_real_patch_sqfs.sh direct
     trap cleanup_real_patch_sqfs EXIT
-    bash scripts/hydra/run_python.sh -m scripts.analysis.report.progan_diagnostics --seed 0 "$@"
+    bash code/hydra/run_python.sh -m code.analysis.report.progan_diagnostics --seed 0 "$@"
     ;;
 
   all)
     export EXPERIMENT_USE_GPU=1
-    bash scripts/hydra/run_python.sh -m scripts.run_pipeline --benchmark all "$@"
+    bash code/hydra/run_python.sh -m code.run_pipeline --benchmark all "$@"
     ;;
 
   smoke)
     export EXPERIMENT_USE_GPU=1
-    bash scripts/hydra/run_python.sh -m scripts.run_pipeline --benchmark all --smoke "$@"
+    bash code/hydra/run_python.sh -m code.run_pipeline --benchmark all --smoke "$@"
     ;;
 
   *)

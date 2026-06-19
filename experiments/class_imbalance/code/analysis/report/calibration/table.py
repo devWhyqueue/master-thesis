@@ -6,15 +6,15 @@ from typing import Any, cast
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import (
     connect,
     init_schema,
     load_eval_details,
     load_summary,
     replace_table,
 )
-from scripts.analysis.report.figures.labels import latex_method_label
+from code.analysis.report.figures.labels import latex_method_label
 
 CALIBRATION_METRICS = (
     "negative_log_likelihood",

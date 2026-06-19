@@ -16,7 +16,7 @@ sqfs_job=$(sbatch --parsable \
   --job-name=tcga-ut-synth-sqfs \
   --output=logs/build-synthetic-sqfs-%A-%a.out \
   --error=logs/build-synthetic-sqfs-%A-%a.err \
-  scripts/hydra/job.sbatch)
+  code/hydra/job.sbatch)
 echo "SQFS build (seeds 0,2): ${sqfs_job}"
 
 # Seed 1 SQFS already valid; still include seed 1 in train array (it will use the existing file)
@@ -31,5 +31,5 @@ train_job=$(sbatch --parsable \
   --job-name=tcga-ut-progan-train \
   --output=logs/progan-train-%A-%a.out \
   --error=logs/progan-train-%A-%a.err \
-  scripts/hydra/job.sbatch)
+  code/hydra/job.sbatch)
 echo "Train (seeds 0-2):      ${train_job} (after ${sqfs_job})"

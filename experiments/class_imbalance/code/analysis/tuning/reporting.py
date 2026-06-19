@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from scripts.analysis.results import connect, init_schema, replace_table
+from code.analysis.results import connect, init_schema, replace_table
 
 
 def _provenance_table_column_spec() -> str:

@@ -6,7 +6,7 @@ from typing import cast
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config
+from code.common import ensure_dirs, load_config
 from common_code.wsi.bag_cache import write_split_cache
 
 logger = logging.getLogger(__name__)

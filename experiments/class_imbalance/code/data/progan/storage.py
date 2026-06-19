@@ -8,9 +8,9 @@ from typing import Any, cast
 import pandas as pd
 import torch
 
-from scripts.common import write_json
-from scripts.data.progan.core import ProGanSettings
-from scripts.data.progan.fid import fid_for_paths
+from code.common import write_json
+from code.data.progan.core import ProGanSettings
+from code.data.progan.fid import fid_for_paths
 
 
 def synthetic_output_root(outputs_root: Path, seed: int) -> Path:

@@ -9,8 +9,8 @@ from typing import Any
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, read_run_record
-from scripts.analysis.results import (
+from code.common import ensure_dirs, load_config, read_run_record
+from code.analysis.results import (
     connect,
     discover_result_dirs,
     ingest_run_record,

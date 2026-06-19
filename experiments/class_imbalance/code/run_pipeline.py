@@ -4,7 +4,7 @@ import argparse
 import subprocess
 import sys
 
-from scripts.common import EXPERIMENT_ROOT, load_config
+from code.common import EXPERIMENT_ROOT, load_config
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,14 +25,14 @@ def _run(args: list[str]) -> None:
 
 
 def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
-    _run([python, "-m", "scripts.data.prep.check_env"])
-    _run([python, "-m", "scripts.data.prep.manifest.feature", "--config", config_path])
+    _run([python, "-m", "code.data.prep.check_env"])
+    _run([python, "-m", "code.data.prep.manifest.feature", "--config", config_path])
     for seed in seeds:
         _run(
             [
                 python,
                 "-m",
-                "scripts.data.prep.manifest.splits",
+                "code.data.prep.manifest.splits",
                 "--config",
                 config_path,
                 "--seed",
@@ -43,7 +43,7 @@ def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
             [
                 python,
                 "-m",
-                "scripts.data.prep.manifest.patch",
+                "code.data.prep.manifest.patch",
                 "--config",
                 config_path,
                 "--seed",
@@ -54,7 +54,7 @@ def _prepare(python: str, config_path: str, seeds: list[int]) -> None:
         [
             python,
             "-m",
-            "scripts.data.prep.explore",
+            "code.data.prep.explore",
             "--config",
             config_path,
             "--seed",
@@ -70,7 +70,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
             cmd = [
                 python,
                 "-m",
-                "scripts.modeling.patch.train",
+                "code.modeling.patch.train",
                 "--config",
                 config_path,
                 "--method",
@@ -85,7 +85,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
         [
             python,
             "-m",
-            "scripts.analysis.report.build_db",
+            "code.analysis.report.build_db",
             "--config",
             config_path,
         ]
@@ -94,7 +94,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
         [
             python,
             "-m",
-            "scripts.analysis.report.aggregate",
+            "code.analysis.report.aggregate",
             "--config",
             config_path,
             "--benchmark",
@@ -105,7 +105,7 @@ def _train_patch(python: str, config_path: str, config: dict, smoke: bool) -> No
         [
             python,
             "-m",
-            "scripts.analysis.report.figures",
+            "code.analysis.report.figures",
             "--config",
             config_path,
             "--benchmark",
@@ -121,7 +121,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
             cmd = [
                 python,
                 "-m",
-                "scripts.modeling.training.train",
+                "code.modeling.training.train",
                 "--config",
                 config_path,
                 "--method",
@@ -136,7 +136,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
         [
             python,
             "-m",
-            "scripts.analysis.report.build_db",
+            "code.analysis.report.build_db",
             "--config",
             config_path,
         ]
@@ -145,7 +145,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
         [
             python,
             "-m",
-            "scripts.analysis.report.aggregate",
+            "code.analysis.report.aggregate",
             "--config",
             config_path,
             "--benchmark",
@@ -156,7 +156,7 @@ def _train_wsi(python: str, config_path: str, config: dict, smoke: bool) -> None
         [
             python,
             "-m",
-            "scripts.analysis.report.figures",
+            "code.analysis.report.figures",
             "--config",
             config_path,
             "--benchmark",

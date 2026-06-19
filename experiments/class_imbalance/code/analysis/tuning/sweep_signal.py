@@ -8,8 +8,8 @@ import math
 import sqlite3
 from typing import Any
 
-from scripts.analysis.results.core import connect, init_schema
-from scripts.common import ensure_dirs, load_config
+from code.analysis.results.core import connect, init_schema
+from code.common import ensure_dirs, load_config
 
 logger = logging.getLogger(__name__)
 

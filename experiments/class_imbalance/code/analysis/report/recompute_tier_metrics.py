@@ -7,10 +7,10 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.common import ensure_dirs, load_config, read_run_record, write_run_record
-from scripts.modeling.mil.metrics import _tier_metrics
-from scripts.modeling.training.support_tiers import tier_support_for_classes
-from scripts.analysis.results import connect, init_schema, load_class_distribution
+from code.common import ensure_dirs, load_config, read_run_record, write_run_record
+from code.modeling.mil.metrics import _tier_metrics
+from code.modeling.training.support_tiers import tier_support_for_classes
+from code.analysis.results import connect, init_schema, load_class_distribution
 
 logger = logging.getLogger(__name__)
 

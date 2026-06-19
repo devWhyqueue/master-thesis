@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import logging
 
-from scripts.common import load_config
-from scripts.data.progan.manifest import (
+from code.common import load_config
+from code.data.progan.manifest import (
     decode_progan_array_task,
     generate_class_progan,
     generate_patch_gan_manifest,

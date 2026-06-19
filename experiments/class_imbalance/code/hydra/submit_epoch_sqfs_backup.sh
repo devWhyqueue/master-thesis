@@ -18,7 +18,7 @@ build_epoch() {
     --job-name=tcga-ut-synth-sqfs-e${epoch}-bak \
     --output=logs/build-synthetic-sqfs-e${epoch}-bak-%A-%a.out \
     --error=logs/build-synthetic-sqfs-e${epoch}-bak-%A-%a.err \
-    scripts/hydra/job.sbatch
+    code/hydra/job.sbatch
 }
 
 e10=$(build_epoch 10); echo "Backup build e10: ${e10}"
@@ -36,5 +36,5 @@ train_job=$(sbatch --parsable \
   --job-name=tcga-ut-progan-train \
   --output=logs/progan-train-%A-%a.out \
   --error=logs/progan-train-%A-%a.err \
-  scripts/hydra/job.sbatch)
+  code/hydra/job.sbatch)
 echo "Train (seeds 0-2):  ${train_job} (after e25 backup ${e25})"

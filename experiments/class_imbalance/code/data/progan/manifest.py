@@ -8,12 +8,12 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from scripts.common import ensure_dirs
-from scripts.data.progan import storage as st
-from scripts.data.progan.core import ProGanSettings
-from scripts.data.progan.train import train_class_progan, write_generated_images
-from scripts.data.staging.io import resolve_raw_image_path
-from scripts.modeling.training.support import _resolve_device
+from code.common import ensure_dirs
+from code.data.progan import storage as st
+from code.data.progan.core import ProGanSettings
+from code.data.progan.train import train_class_progan, write_generated_images
+from code.data.staging.io import resolve_raw_image_path
+from code.modeling.training.support import _resolve_device
 
 
 _REFERENCE_FINAL_DEPTH_EPOCHS = 25
@@ -175,7 +175,9 @@ def generate_class_progan(
     seed_root = output_root_for_seed(config, seed)
     expected = expected_generated_counts(train_frame, settings).get(class_name, 0)
     grid = settings.final_depth_epoch_grid
-    dp = lambda v: st.diagnostics_path(seed_root / f"epochs={v}", class_name)
+    def dp(v):
+        return st.diagnostics_path(seed_root / f"epochs={v}", class_name)
+
     all_done = all(
         st.class_is_complete(seed_root / f"epochs={v}" / class_name, expected)
         and dp(v).exists()

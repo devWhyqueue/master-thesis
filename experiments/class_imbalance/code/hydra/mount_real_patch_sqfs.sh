@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mount the real-patch SquashFS for read access in Apptainer jobs.
-# Usage: source scripts/hydra/mount_real_patch_sqfs.sh [copy|direct]
+# Usage: source code/hydra/mount_real_patch_sqfs.sh [copy|direct]
 set -euo pipefail
 mode="${1:-copy}"
 PATCH_SQFS="${PATCH_SQFS:-/home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs}"

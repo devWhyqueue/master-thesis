@@ -7,17 +7,17 @@ from typing import Callable, cast
 
 import torch
 
-from scripts.modeling.patch_feature.training import PatchFeatureDataset
+from code.modeling.patch_feature.training import PatchFeatureDataset
 
 SpecializedTrainer = Callable[..., torch.nn.Module]
 
 train_cfal_model = cast(
     SpecializedTrainer,
-    getattr(import_module("scripts.modeling.patch_feature.cfal"), "train_cfal_model"),
+    getattr(import_module("code.modeling.patch_feature.cfal"), "train_cfal_model"),
 )
 train_oko_model = cast(
     SpecializedTrainer,
-    getattr(import_module("scripts.modeling.patch_feature.oko"), "train_oko_model"),
+    getattr(import_module("code.modeling.patch_feature.oko"), "train_oko_model"),
 )
 
 

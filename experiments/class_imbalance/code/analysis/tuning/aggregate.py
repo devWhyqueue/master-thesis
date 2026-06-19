@@ -6,16 +6,16 @@ from typing import Any, cast
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, read_run_record
-from scripts.analysis.results import connect, init_schema, load_summary, replace_table
-from scripts.metadata import PATCH_FEATURE_METHOD_ALIASES
-from scripts.analysis.report.figures.labels import latex_method_label
-from scripts.analysis.tuning import grid as tuning_grid
-from scripts.analysis.tuning.selected_reports import (
+from code.common import ensure_dirs, load_config, read_run_record
+from code.analysis.results import connect, init_schema, load_summary, replace_table
+from code.metadata import PATCH_FEATURE_METHOD_ALIASES
+from code.analysis.report.figures.labels import latex_method_label
+from code.analysis.tuning import grid as tuning_grid
+from code.analysis.tuning.selected_reports import (
     materialize_selected_results,
     regenerate_selected_reports,
 )
-from scripts.analysis.tuning.reporting import write_empty_outputs, write_latex_table
+from code.analysis.tuning.reporting import write_empty_outputs, write_latex_table
 
 
 METRICS = ("accuracy", "balanced_accuracy", "macro_f1")

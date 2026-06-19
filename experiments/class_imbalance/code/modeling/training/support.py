@@ -4,9 +4,9 @@ import numpy as np
 import torch
 from sklearn.metrics import precision_recall_fscore_support
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import connect, init_schema, load_class_distribution
-from scripts.modeling.training.support_tiers import tier_support_for_classes
+from code.common import ensure_dirs, load_config
+from code.analysis.results import connect, init_schema, load_class_distribution
+from code.modeling.training.support_tiers import tier_support_for_classes
 from common_code.metrics.payload import classification_payload, resolve_device
 
 

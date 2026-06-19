@@ -11,15 +11,15 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import connect, init_schema, replace_table
-from scripts.modeling.mil.bag.dataset import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import connect, init_schema, replace_table
+from code.modeling.mil.bag.dataset import (
     AttentionMil,
     BagFeatureDataset,
     bag_collate,
     infer_input_dim,
 )
-from scripts.modeling.training.support import _resolve_device
+from code.modeling.training.support import _resolve_device
 
 logger = logging.getLogger(__name__)
 

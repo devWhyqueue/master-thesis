@@ -7,8 +7,8 @@ from typing import Any, cast
 
 import pandas as pd
 
-from scripts.common import load_eval_array_payload
-from scripts.analysis.results.core import SUMMARY_METRICS, read_table
+from code.common import load_eval_array_payload
+from code.analysis.results.core import SUMMARY_METRICS, read_table
 
 
 def load_runs_frame(

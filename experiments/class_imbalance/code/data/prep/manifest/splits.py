@@ -7,8 +7,8 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_json
-from scripts.data.prep.manifest.feature import tcga_case_id
+from code.common import ensure_dirs, load_config, write_json
+from code.data.prep.manifest.feature import tcga_case_id
 
 logger = logging.getLogger(__name__)
 

@@ -10,8 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.common import ensure_dirs, load_config
-from scripts.modeling.mil.metrics import _calibration_metrics
+from code.common import ensure_dirs, load_config
+from code.modeling.mil.metrics import _calibration_metrics
 
 logger = logging.getLogger(__name__)
 

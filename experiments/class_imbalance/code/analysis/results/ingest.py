@@ -5,8 +5,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from scripts.common import read_run_record
-from scripts.analysis.results.core import (
+from code.common import read_run_record
+from code.analysis.results.core import (
     ARRAY_FIELDS,
     SUMMARY_METRICS,
     run_id_for_record,

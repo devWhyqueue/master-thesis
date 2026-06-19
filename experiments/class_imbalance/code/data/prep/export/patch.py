@@ -10,8 +10,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from scripts.common import ensure_dirs, load_config, write_json
-from scripts.data.staging.patch import load_seed_manifest
+from code.common import ensure_dirs, load_config, write_json
+from code.data.staging.patch import load_seed_manifest
 
 logger = logging.getLogger(__name__)
 

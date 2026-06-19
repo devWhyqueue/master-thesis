@@ -8,9 +8,9 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
-from scripts.modeling.patch.data import uses_balanced_sampler
-from scripts.modeling.patch_feature.cfal import CfalPrototypeClassifier
-from scripts.modeling.training.support import _metric_payload
+from code.modeling.patch.data import uses_balanced_sampler
+from code.modeling.patch_feature.cfal import CfalPrototypeClassifier
+from code.modeling.training.support import _metric_payload
 
 
 class PatchFeatureDataset(Dataset):

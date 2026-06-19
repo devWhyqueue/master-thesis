@@ -8,12 +8,12 @@ from typing import Any
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_progress, write_run_record
-from scripts.modeling.mil.bag.trainer import _train_bag_method
-from scripts.modeling.mil.metadata import BAG_METHODS, method_metadata
-from scripts.analysis.tuning.grid import validate_tuning_params
-from scripts.analysis.tuning.paths import tuning_result_dir
-from scripts.modeling.training.split import _slice_split_rows
+from code.common import ensure_dirs, load_config, write_progress, write_run_record
+from code.modeling.mil.bag.trainer import _train_bag_method
+from code.modeling.mil.metadata import BAG_METHODS, method_metadata
+from code.analysis.tuning.grid import validate_tuning_params
+from code.analysis.tuning.paths import tuning_result_dir
+from code.modeling.training.split import _slice_split_rows
 
 logger = logging.getLogger(__name__)
 

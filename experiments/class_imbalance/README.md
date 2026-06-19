@@ -9,9 +9,9 @@ Controlled class-imbalance benchmarks on TCGA-UT: patch-level classifier and WSI
 | `configs/default.yaml` | Shared experiment config (seeds, splits, caps) |
 | `configs/environment.def` | Apptainer container definition |
 | `configs/requirements-experiment.txt` | Container Python dependencies |
-| `scripts/` | All Python pipeline code — see `scripts/README.md` |
-| `scripts/hydra/submit.sh` | Stable entry point for all cluster jobs |
-| `scripts/run_pipeline.py` | Local sequential pipeline runner |
+| `code/` | All Python pipeline code — see `code/README.md` |
+| `code/hydra/submit.sh` | Stable entry point for all cluster jobs |
+| `code/run_pipeline.py` | Local sequential pipeline runner |
 | `outputs/results.sqlite` | Generated: benchmark results DB (after `aggregate`) |
 | `outputs/tables/` | Generated: paper-facing LaTeX tables |
 | `outputs/figures/` | Generated: paper-facing figures |
@@ -22,19 +22,19 @@ Controlled class-imbalance benchmarks on TCGA-UT: patch-level classifier and WSI
 ## Hydra workflow
 
 ```bash
-bash scripts/hydra/submit.sh build-container
+bash code/hydra/submit.sh build-container
 export EXPERIMENT_CONTAINER="$PWD/environment.sif"
-bash scripts/hydra/submit.sh prepare
-bash scripts/hydra/submit.sh patch-train
-bash scripts/hydra/submit.sh progan
-bash scripts/hydra/submit.sh wsi-train
-bash scripts/hydra/submit.sh aggregate
+bash code/hydra/submit.sh prepare
+bash code/hydra/submit.sh patch-train
+bash code/hydra/submit.sh progan
+bash code/hydra/submit.sh wsi-train
+bash code/hydra/submit.sh aggregate
 ```
 
 `prepare` builds participant-level split manifests and derives patch manifests case-disjointly (no patient leakage across splits). See `CLUSTER.md` before changing storage or submission behaviour.
 
 ```bash
-bash scripts/hydra/submit.sh --help
+bash code/hydra/submit.sh --help
 ```
 
 ## Benchmarks
@@ -48,9 +48,9 @@ bash scripts/hydra/submit.sh --help
 ## Development
 
 ```bash
-uv run python -m scripts.run_pipeline --smoke   # fast local validation
+uv run python -m code.run_pipeline --smoke   # fast local validation
 uv run pytest experiments/class_imbalance/tests
-uv run ruff check experiments/class_imbalance/scripts
-uv run vulture experiments/class_imbalance/scripts
+uv run ruff check experiments/class_imbalance/code
+uv run vulture experiments/class_imbalance/code
 uv run pyright
 ```

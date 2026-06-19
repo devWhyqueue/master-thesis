@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from scripts.common import (
+from code.common import (
     EVAL_ARRAYS_NAME,
     EXPERIMENT_ROOT,
     RUN_RECORD_NAME,
@@ -17,7 +17,7 @@ from scripts.common import (
     read_run_record,
     write_json,
 )
-from scripts.analysis.tuning.paths import tuning_result_dir
+from code.analysis.tuning.paths import tuning_result_dir
 
 COPIED_FILES = (EVAL_ARRAYS_NAME, "model.pt")
 BASELINE_METHOD = {"patch_feature": "patch_feature_ce", "wsi_bag": "mil_ce"}
@@ -77,12 +77,12 @@ def regenerate_selected_reports(config_path: str | Path | None = None) -> None:
 def _report_commands(python: str, config_path: str | Path | None) -> list[list[str]]:
     config_arg = ["--config", str(config_path)] if config_path else []
     return [
-        [python, "-m", "scripts.analysis.report.build_db", *config_arg],
-        [python, "-m", "scripts.analysis.report.recompute_tier_metrics", *config_arg],
+        [python, "-m", "code.analysis.report.build_db", *config_arg],
+        [python, "-m", "code.analysis.report.recompute_tier_metrics", *config_arg],
         [
             python,
             "-m",
-            "scripts.analysis.report.aggregate",
+            "code.analysis.report.aggregate",
             *config_arg,
             "--benchmark",
             "patch",
@@ -90,23 +90,23 @@ def _report_commands(python: str, config_path: str | Path | None) -> list[list[s
         [
             python,
             "-m",
-            "scripts.analysis.report.aggregate",
+            "code.analysis.report.aggregate",
             *config_arg,
             "--benchmark",
             "wsi_bag",
         ],
-        [python, "-m", "scripts.analysis.report.calibration.table", *config_arg],
+        [python, "-m", "code.analysis.report.calibration.table", *config_arg],
         [
             python,
             "-m",
-            "scripts.analysis.report.calibration.posthoc_table",
+            "code.analysis.report.calibration.posthoc_table",
             *config_arg,
         ],
-        [python, "-m", "scripts.analysis.report.paired_delta_table", *config_arg],
+        [python, "-m", "code.analysis.report.paired_delta_table", *config_arg],
         [
             python,
             "-m",
-            "scripts.analysis.report.figures",
+            "code.analysis.report.figures",
             *config_arg,
             "--benchmark",
             "patch",
@@ -114,13 +114,13 @@ def _report_commands(python: str, config_path: str | Path | None) -> list[list[s
         [
             python,
             "-m",
-            "scripts.analysis.report.figures",
+            "code.analysis.report.figures",
             *config_arg,
             "--benchmark",
             "wsi_bag",
         ],
-        [python, "-m", "scripts.analysis.classwise_difficulty", *config_arg],
-        [python, "-m", "scripts.analysis.report.calibration.audit", *config_arg],
+        [python, "-m", "code.analysis.classwise_difficulty", *config_arg],
+        [python, "-m", "code.analysis.report.calibration.audit", *config_arg],
     ]
 
 

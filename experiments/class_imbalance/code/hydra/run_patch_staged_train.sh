@@ -40,8 +40,8 @@ mount_sqfs_image() {
 }
 
 trap cleanup_sqfs_mounts EXIT
-# shellcheck source=scripts/hydra/mount_real_patch_sqfs.sh
-source scripts/hydra/mount_real_patch_sqfs.sh copy
+# shellcheck source=code/hydra/mount_real_patch_sqfs.sh
+source code/hydra/mount_real_patch_sqfs.sh copy
 if [ -n "${PATCH_SQFS_MOUNT:-}" ]; then
   echo "Real-patch SquashFS mounted at ${PATCH_SQFS_MOUNT}"
 else
@@ -63,11 +63,11 @@ if [ "$include_synthetic" = 1 ]; then
 fi
 echo "Staging patch images under ${PATCH_STAGE_DIR}"
 STAGED_MANIFEST="$(
-  bash scripts/hydra/run_python.sh -m scripts.data.staging.patch "${stage_args[@]}"
+  bash code/hydra/run_python.sh -m code.data.staging.patch "${stage_args[@]}"
 )"
 export PATCH_STAGED_MANIFEST="$STAGED_MANIFEST"
 echo "Training with staged manifest: ${PATCH_STAGED_MANIFEST}"
-bash scripts/hydra/run_python.sh -m scripts.modeling.patch.train \
+bash code/hydra/run_python.sh -m code.modeling.patch.train \
   --method "$method" \
   --seed "$seed" \
   --staged-manifest "$STAGED_MANIFEST" \

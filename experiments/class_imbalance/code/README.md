@@ -6,7 +6,7 @@ This directory contains scripts for running controlled patch-level and WSI-bag c
 
 1. **Pipeline Orchestrator:** Use `run_pipeline.py` to run the sequential steps locally. Supporting a `--smoke` mode for testing logic.
    ```bash
-   uv run python -m scripts.run_pipeline --smoke
+   uv run python -m code.run_pipeline --smoke
    ```
 2. **Data Preparation (`data/`):** Initializes manifests, partitions splits case-disjointly (preventing patient leakage), and stages patch images locally on computing nodes.
 3. **Model Training (`modeling/`):**
@@ -21,8 +21,8 @@ This directory contains scripts for running controlled patch-level and WSI-bag c
 Before committing code changes, make sure all tests and quality checks pass:
 
 ```bash
-uv run ruff check experiments/class_imbalance/scripts    # Linter check
-uv run vulture experiments/class_imbalance/scripts       # Dead code check
+uv run ruff check experiments/class_imbalance/code    # Linter check
+uv run vulture experiments/class_imbalance/code       # Dead code check
 uv run pyright                                           # Type safety check
 uv run pytest experiments/class_imbalance/tests          # Run tests
 ```

@@ -9,11 +9,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from scripts.common import write_run_record
-from scripts.metadata import benchmark_metadata
-from scripts.modeling.patch.data import PatchImageDataset
-from scripts.modeling.patch.models import PatchClassifier
-from scripts.modeling.training.support import _metric_payload
+from code.common import write_run_record
+from code.metadata import benchmark_metadata
+from code.modeling.patch.data import PatchImageDataset
+from code.modeling.patch.models import PatchClassifier
+from code.modeling.training.support import _metric_payload
 
 
 def seed_patch_run(seed: int) -> dict[str, Any]:

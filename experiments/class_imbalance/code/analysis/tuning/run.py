@@ -4,8 +4,8 @@ import argparse
 import subprocess
 import sys
 
-from scripts.common import EXPERIMENT_ROOT
-from scripts.analysis.tuning.grid import task_for_array_index
+from code.common import EXPERIMENT_ROOT
+from code.analysis.tuning.grid import task_for_array_index
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,9 +40,9 @@ def _trainer_command(
     seed: int,
 ) -> list[str]:
     module = (
-        "scripts.modeling.train_patch_features"
+        "code.modeling.train_patch_features"
         if args.benchmark == "patch_feature"
-        else "scripts.modeling.training.train"
+        else "code.modeling.training.train"
     )
     cmd = [
         sys.executable,

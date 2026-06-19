@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.common import ensure_dirs, load_config, write_json
+from code.common import ensure_dirs, load_config, write_json
 
 logger = logging.getLogger(__name__)
 

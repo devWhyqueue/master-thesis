@@ -3,15 +3,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scripts.common import ensure_dirs, load_config
-from scripts.analysis.results import connect, init_schema, replace_table
-from scripts.analysis.report.progan_diagnostics.metrics import (
+from code.common import ensure_dirs, load_config
+from code.analysis.results import connect, init_schema, replace_table
+from code.analysis.report.progan_diagnostics.metrics import (
     assert_summary_complete,
     build_metrics_frame,
     expected_augmented_classes,
     write_summary_latex,
 )
-from scripts.analysis.report.progan_diagnostics.plots import (
+from code.analysis.report.progan_diagnostics.plots import (
     plot_examples,
     select_example_classes,
 )
