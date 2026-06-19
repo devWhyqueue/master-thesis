@@ -1,6 +1,6 @@
 import torch
 
-from tcga_ut_imbalanced.data.feature_store import (
+from data.feature_store import (
     DEFAULT_FEATURE_DIR,
     load_feature_row,
     load_slide_features,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from tcga_ut_imbalanced.progan import (
+from data.progan import (
     combined_manifest,
     resolve_real_patch_path,
     tail_classes,

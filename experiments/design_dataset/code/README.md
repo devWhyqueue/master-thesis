@@ -17,7 +17,7 @@ Legacy balanced-to-imbalanced sampling is retired and is not part of the support
 
 ## Strict constructed sampling
 
-Use `tcga_ut_imbalanced.data.full_scale_cli` through the Hydra wrapper.
+Use `data.full_scale_cli` through the Hydra wrapper.
 
 ### Derive one-seed feasibility
 

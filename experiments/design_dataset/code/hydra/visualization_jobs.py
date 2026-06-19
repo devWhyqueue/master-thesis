@@ -37,7 +37,7 @@ def _standard_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[str]
     base = _method_root(res_dir, _STANDARD_METHOD, class_order)
     return prefix(config, args) + [
         "-m",
-        "tcga_ut_imbalanced.cli.visualize",
+        "cli.visualize",
         "--plot-types",
         "scatter_accuracies_of_two_parameters",
         "difference_confusion_matrix",
@@ -65,7 +65,7 @@ def _point_plot_cmd(args: argparse.Namespace, config: dict[str, str]) -> list[st
     methods = [label for _, _, label in _POINT_PLOT_SPECS]
     return prefix(config, args) + [
         "-m",
-        "tcga_ut_imbalanced.cli.visualize",
+        "cli.visualize",
         "--plot-types",
         "point_plot_compare_methods",
         "--results-paths",

@@ -10,10 +10,10 @@ import torch
 from sklearn.cluster import KMeans
 from torch.utils.data import Dataset
 
-from scripts.common import EXPERIMENT_ROOT, ensure_dirs, load_config
-from scripts.analysis.results import connect, init_schema, load_class_distribution
-from scripts.modeling.patch_feature.training import PatchFeatureDataset
-from scripts.modeling.training.support_tiers import (
+from code.common import EXPERIMENT_ROOT, ensure_dirs, load_config
+from code.analysis.results import connect, init_schema, load_class_distribution
+from code.modeling.patch_feature.training import PatchFeatureDataset
+from code.modeling.training.support_tiers import (
     class_tier_labels,
     load_class_tier_labels,
 )

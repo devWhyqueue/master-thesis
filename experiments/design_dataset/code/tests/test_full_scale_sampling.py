@@ -1,6 +1,6 @@
 import pandas as pd
 
-from tcga_ut_imbalanced.data.full_scale_sampling import (
+from data.full_scale_sampling import (
     assert_case_disjoint,
     cap_patches,
     construct_training_split,

@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from tcga_ut_imbalanced.data.feature_store import load_feature_row
+from data.feature_store import load_feature_row
 
 logger = logging.getLogger(__name__)
 

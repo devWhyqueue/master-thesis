@@ -6,10 +6,10 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from tcga_ut_imbalanced.data.dataset import TCGAUTDatasetImbalanced
-from tcga_ut_imbalanced.data.full_scale_sampling import write_constructed_outputs
-from tcga_ut_imbalanced.training.constructed_wsi_cache import _write_split_cache
-from tcga_ut_imbalanced.training.constructed_wsi_data import ConstructedBagDataset
+from data.dataset import TCGAUTDatasetImbalanced
+from data.full_scale_sampling import write_constructed_outputs
+from modeling.training.constructed_wsi_cache import _write_split_cache
+from modeling.training.constructed_wsi_data import ConstructedBagDataset
 
 
 def _feature_dir(tmp_path: Path, slide_id: str, patch_ids: list[str]) -> Path:

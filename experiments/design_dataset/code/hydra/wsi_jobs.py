@@ -48,7 +48,7 @@ def _wsi_cmd(
         prefix(config, args, gpu=True)
         + [
             "-m",
-            "tcga_ut_imbalanced.training.constructed_wsi",
+            "modeling.training.constructed_wsi",
             f"--manifest-path={stem}/manifest_splits.csv",
             f"--results-save-path={out}",
             f"--method={method}",

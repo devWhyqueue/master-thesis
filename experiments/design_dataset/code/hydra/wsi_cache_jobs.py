@@ -26,7 +26,7 @@ def _wsi_cache_cmd(
     stem = _constructed_stem(args, config, parameter, seed)
     return prefix(config, args) + [
         "-m",
-        "tcga_ut_imbalanced.training.constructed_wsi_cache",
+        "modeling.training.constructed_wsi_cache",
         f"--manifest-path={stem}/manifest_splits.csv",
         f"--cache-dir={stem}/wsi_bag_cache",
     ]

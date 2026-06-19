@@ -12,7 +12,7 @@ from common_code.wsi.divide_conquer.sampling import (
     BinarySubproblemDataset,
     build_sampled_subproblem_datasets,
 )
-from scripts.modeling.patch_feature.training import PatchFeatureDataset  # pyright: ignore[reportMissingImports]
+from code.modeling.patch_feature.training import PatchFeatureDataset  # pyright: ignore[reportMissingImports]
 
 
 class BinaryExpert(nn.Module):

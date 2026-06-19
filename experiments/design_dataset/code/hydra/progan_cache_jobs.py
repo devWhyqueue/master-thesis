@@ -28,7 +28,7 @@ def _progan_cache_cmd(
     stem = _constructed_stem(args, config, parameter, seed)
     cmd = prefix(config, args, gpu=True) + [
         "-m",
-        "tcga_ut_imbalanced.progan.cache",
+        "data.progan.cache",
         f"--manifest-path={stem}/manifest_splits.csv",
         f"--manifest-save-path={stem}/manifest_splits_progan.csv",
         f"--file-save-path={stem}/patch_feature_cache_progan.pt",

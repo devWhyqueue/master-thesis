@@ -92,7 +92,7 @@ def train_base(config: dict[str, str], ds: str, val: str, out: str) -> list[str]
     """Build common training command arguments."""
     cmd = [
         "-m",
-        "tcga_ut_imbalanced.cli.train",
+        "cli.train",
         f"--dataset-structure-path={ds}",
         f"--validation-dataset-structure-path={val}",
         f"--feature-path={config.get('feature_path', '')}",

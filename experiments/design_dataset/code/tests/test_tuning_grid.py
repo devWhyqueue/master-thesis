@@ -1,7 +1,7 @@
 from argparse import Namespace
 
-from tcga_ut_imbalanced.evaluation.tuning_grid import patch_grid, task_count, task_for_index, wsi_grid
-from tcga_ut_imbalanced.evaluation.tuning_run import _patch_command
+from analysis.evaluation.tuning_grid import patch_grid, task_count, task_for_index, wsi_grid
+from analysis.evaluation.tuning_run import _patch_command
 
 
 def test_tuning_task_counts() -> None:

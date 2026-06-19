@@ -1,7 +1,7 @@
 import argparse
 
 from job_defs import Job, prefix
-from tcga_ut_imbalanced.evaluation.tuning_grid import task_count
+from analysis.evaluation.tuning_grid import task_count
 
 
 def tune(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
@@ -45,7 +45,7 @@ def tune_aggregate(args: argparse.Namespace, config: dict[str, str]) -> list[Job
     """Build tuning aggregation job."""
     cmd = prefix(config, args) + [
         "-m",
-        "tcga_ut_imbalanced.evaluation.tuning_aggregate",
+        "analysis.evaluation.tuning_aggregate",
         f"--results-dir={config.get('results_dir', '')}",
         f"--output-dir={config.get('report_output_dir', '')}",
     ]
@@ -65,7 +65,7 @@ def _tune_cmd(
 ) -> list[str]:
     return prefix(config, args, gpu=gpu) + [
         "-m",
-        "tcga_ut_imbalanced.evaluation.tuning_run",
+        "analysis.evaluation.tuning_run",
         f"--benchmark={benchmark}",
         f"--config={args.config}",
         f"--constructed-dataset-dir={config.get('constructed_dataset_dir', '')}",

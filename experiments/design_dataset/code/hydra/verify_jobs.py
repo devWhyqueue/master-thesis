@@ -9,7 +9,7 @@ def verify_features(args: argparse.Namespace, config: dict[str, str]) -> list[Jo
     feature_dir = config.get("feature_path", "")
     cmd = prefix(config, args) + [
         "-m",
-        "tcga_ut_imbalanced.data.full_scale_cli",
+        "data.full_scale_cli",
         "--verify-features",
         f"--feature-dir={feature_dir}",
         "--slide-manifest-path=unused",
