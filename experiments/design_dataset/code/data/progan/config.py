@@ -57,6 +57,17 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--raw-resolution", default="0")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--class-shard",
+        default=None,
+        metavar="I/N",
+        help="Process only the I-th round-robin shard of tail classes (0-indexed).",
+    )
+    parser.add_argument(
+        "--train-only",
+        action="store_true",
+        help="Train and generate images only; skip feature extraction and manifest writing.",
+    )
 
 
 def _add_progan_args(parser: argparse.ArgumentParser) -> None:

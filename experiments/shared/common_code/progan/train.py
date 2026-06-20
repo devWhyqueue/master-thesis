@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 
 import torch
@@ -12,6 +13,7 @@ from common_code.progan.core import (
     ProgressiveGenerator,
     ProgressivePatchDataset,
     ProGanSettings,
+    decode_raw_images,
 )
 
 _WGAN_GP_LAMBDA = 10.0
@@ -29,8 +31,9 @@ def train_class_progan(
     """Train one class-specific ProGAN and return final-depth snapshots."""
     torch.manual_seed(seed)
     models = _build_models(settings, device)
+    raw_images = decode_raw_images(image_paths)
     diagnostics: list[dict[str, object]] = []
-    context = (image_paths, settings, device)
+    context = (image_paths, raw_images, settings, device)
     for depth in range(1, settings.max_depth + 1):
         if depth < settings.max_depth:
             diagnostics.append(_train_depth(context, depth, models))
@@ -69,39 +72,44 @@ def _build_models(
 
 
 def _train_depth(context: tuple, depth: int, models: tuple) -> dict[str, object]:
-    image_paths, settings, device = context
-    loader = _depth_loader(image_paths, depth)
-    discriminator_losses: list[float] = []
-    generator_losses: list[float] = []
+    image_paths, raw_images, settings, device = context
+    loader = _depth_loader(raw_images, depth)
+    sum_loss_d = torch.zeros(1, device=device)
+    sum_loss_g = torch.zeros(1, device=device)
+    n_steps = 0
     for epoch in range(settings.epochs_per_depth):
         alpha = _fade_alpha(epoch, settings.epochs_per_depth, settings.fade_in_fraction)
         for real in loader:
             loss_d, loss_g = _train_step(
                 models, real.to(device), depth, alpha, settings
             )
-            discriminator_losses.append(loss_d)
-            generator_losses.append(loss_g)
+            sum_loss_d += loss_d
+            sum_loss_g += loss_g
+            n_steps += 1
+    denom = max(n_steps, 1)
     return _depth_diagnostics(
         image_paths,
         depth,
         settings.epochs_per_depth,
         loader.batch_size,
-        discriminator_losses,
-        generator_losses,
+        (sum_loss_d / denom).item() if n_steps else None,
+        (sum_loss_g / denom).item() if n_steps else None,
+        n_steps,
     )
 
 
 def _train_final(
     context: tuple, depth: int, models: tuple
 ) -> tuple[dict, dict[int, ProgressiveGenerator]]:
-    image_paths, settings, device = context
+    image_paths, raw_images, settings, device = context
     generator = models[0]
-    loader = _depth_loader(image_paths, depth)
+    loader = _depth_loader(raw_images, depth)
     grid = sorted(settings.final_depth_epoch_grid)
     grid_set = set(grid)
     fade_epochs = max(1, round(settings.epochs_per_depth * settings.fade_in_fraction))
-    discriminator_losses: list[float] = []
-    generator_losses: list[float] = []
+    sum_loss_d = torch.zeros(1, device=device)
+    sum_loss_g = torch.zeros(1, device=device)
+    n_steps = 0
     snapshots: dict[int, ProgressiveGenerator] = {}
     for epoch in range(grid[-1]):
         alpha = min(1.0, (epoch + 1) / fade_epochs)
@@ -109,27 +117,35 @@ def _train_final(
             loss_d, loss_g = _train_step(
                 models, real.to(device), depth, alpha, settings
             )
-            discriminator_losses.append(loss_d)
-            generator_losses.append(loss_g)
+            sum_loss_d += loss_d
+            sum_loss_g += loss_g
+            n_steps += 1
         if (epoch + 1) in grid_set:
             snapshots[epoch + 1] = copy.deepcopy(generator)
+    denom = max(n_steps, 1)
     diagnostics = _depth_diagnostics(
         image_paths,
         depth,
         grid[-1],
         loader.batch_size,
-        discriminator_losses,
-        generator_losses,
+        (sum_loss_d / denom).item() if n_steps else None,
+        (sum_loss_g / denom).item() if n_steps else None,
+        n_steps,
     )
     return diagnostics, snapshots
 
 
-def _depth_loader(image_paths: list[Path], depth: int) -> DataLoader:
+def _depth_loader(raw_images: list, depth: int) -> DataLoader:
     resolution = 2 ** (depth + 1)
+    num_workers = int(os.environ.get("DATALOADER_NUM_WORKERS", "0"))
     return DataLoader(
-        ProgressivePatchDataset(image_paths, resolution),
-        batch_size=min(paper_batch_size(depth), len(image_paths)),
+        ProgressivePatchDataset([], resolution, raw=raw_images),
+        batch_size=min(paper_batch_size(depth), len(raw_images)),
         shuffle=True,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available() and num_workers > 0,
+        persistent_workers=num_workers > 0,
+        prefetch_factor=2 if num_workers > 0 else None,
     )
 
 
@@ -165,7 +181,7 @@ def _train_step(
     depth: int,
     alpha: float,
     settings: ProGanSettings,
-) -> tuple[float, float]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     generator, discriminator, optimizer_generator, optimizer_discriminator = models
     batch_size = len(real)
     noise = torch.randn(batch_size, settings.latent_dim, 1, 1, device=real.device)
@@ -181,16 +197,13 @@ def _train_step(
     optimizer_discriminator.zero_grad()
     loss_discriminator.backward()
     optimizer_discriminator.step()
-
     noise = torch.randn(batch_size, settings.latent_dim, 1, 1, device=real.device)
     fake = generator(noise, depth, alpha)
     loss_generator = -discriminator(fake, depth, alpha).mean()
     optimizer_generator.zero_grad()
     loss_generator.backward()
     optimizer_generator.step()
-    return float(loss_discriminator.detach().cpu().item()), float(
-        loss_generator.detach().cpu().item()
-    )
+    return loss_discriminator.detach(), loss_generator.detach()
 
 
 def _depth_diagnostics(
@@ -198,23 +211,20 @@ def _depth_diagnostics(
     depth: int,
     epochs: int,
     batch_size: int | None,
-    discriminator_losses: list[float],
-    generator_losses: list[float],
+    discriminator_loss_mean: float | None,
+    generator_loss_mean: float | None,
+    steps: int,
 ) -> dict[str, object]:
     return {
         "batch_size": int(batch_size or 0),
         "depth": depth,
-        "discriminator_loss_mean": _mean_loss(discriminator_losses),
+        "discriminator_loss_mean": discriminator_loss_mean,
         "epochs": epochs,
-        "generator_loss_mean": _mean_loss(generator_losses),
+        "generator_loss_mean": generator_loss_mean,
         "n_real_images": len(image_paths),
         "resolution": 2 ** (depth + 1),
-        "steps": len(discriminator_losses),
+        "steps": steps,
     }
-
-
-def _mean_loss(values: list[float]) -> float | None:
-    return sum(values) / len(values) if values else None
 
 
 def write_generated_images(

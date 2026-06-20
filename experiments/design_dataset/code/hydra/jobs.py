@@ -8,7 +8,7 @@ from wsi_jobs import train_wsi
 from visualization_jobs import visualize
 from report_jobs import report
 from verify_jobs import verify_features
-from job_defs import Job, execute, load_config
+from job_defs import Job, execute, execute_progan_pipeline, load_config
 
 COMMAND_HANDLERS = {
     "max-feasible-pool-size": max_feasible_pool_size,
@@ -26,4 +26,10 @@ COMMAND_HANDLERS = {
     "verify-features": verify_features,
 }
 
-__all__ = ["COMMAND_HANDLERS", "Job", "execute", "load_config"]
+__all__ = [
+    "COMMAND_HANDLERS",
+    "Job",
+    "execute",
+    "execute_progan_pipeline",
+    "load_config",
+]

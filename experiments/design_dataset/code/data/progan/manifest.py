@@ -64,6 +64,11 @@ def tail_classes(manifest: pd.DataFrame, max_classes: int | None = None) -> list
     return classes if max_classes is None else classes[:max_classes]
 
 
+def shard_classes(classes: list[str], shard_index: int, n_shards: int) -> list[str]:
+    """Return the round-robin shard of classes for parallel training jobs."""
+    return classes[shard_index::n_shards]
+
+
 def train_rows(manifest: pd.DataFrame) -> pd.DataFrame:
     """Return the training rows of one constructed manifest."""
     return cast(pd.DataFrame, manifest[manifest["split"] == "train"].copy())

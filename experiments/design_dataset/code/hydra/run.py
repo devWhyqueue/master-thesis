@@ -3,6 +3,7 @@ import argparse
 import logging
 
 from jobs import COMMAND_HANDLERS, execute, load_config
+from progan_cache_jobs import execute_progan
 
 
 def _add_full_scale_args(subparsers: argparse._SubParsersAction) -> None:
@@ -139,6 +140,9 @@ def main() -> None:
     )
     args = create_parser().parse_args()
     config = load_config(args.config)
+    if args.command == "patch-cache-progan" and not args.local:
+        execute_progan(args, config, args.local, args.dry_run)
+        return
     for job in COMMAND_HANDLERS[args.command](args, config):
         execute(job, config, args.local, args.dry_run)
 

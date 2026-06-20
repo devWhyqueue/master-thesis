@@ -29,6 +29,7 @@ from data.progan.manifest import (
     class_image_paths,
     combined_manifest,
     expand_chunk_manifest,
+    shard_classes,
     synthetic_manifest_rows,
     tail_classes,
     train_rows,
@@ -53,6 +54,8 @@ def build_progan_cache(args: argparse.Namespace) -> None:
     validate_manifest(manifest, args.manifest_path)
     settings = settings_from_args(args)
     combined = _combined_manifest(args, manifest, settings)
+    if getattr(args, "train_only", False):
+        return
     combined.to_csv(args.manifest_save_path, index=False)
     payload = _feature_payload(args, combined)
     torch.save(payload, args.file_save_path)
@@ -68,6 +71,7 @@ def _combined_manifest(
             "No tail classes require ProGAN augmentation: %s", args.manifest_path
         )
         return with_real_metadata(manifest)
+    class_shard = getattr(args, "class_shard", None)
     generated = generate_synthetic_rows(
         manifest,
         settings,
@@ -76,6 +80,7 @@ def _combined_manifest(
         str(args.raw_resolution),
         args.seed,
         torch.device(args.device),
+        class_shard,
     )
     return combined_manifest(manifest, generated, args.file_save_path)
 
@@ -101,11 +106,14 @@ def generate_synthetic_rows(
     raw_resolution: str,
     seed: int,
     device: torch.device,
+    class_shard: str | None = None,
 ) -> dict[int, pd.DataFrame]:
     """Train class-specific ProGANs and return per-variant synthetic rows."""
     train = train_rows(manifest)
     target = int(train["cancer_type"].value_counts().max())
-    rows = _variant_row_buckets(settings)
+    rows: dict[int, list[dict[str, object]]] = {
+        v: [] for v in settings.final_depth_epoch_grid
+    }
     seed_root = synthetic_root / f"seed={seed}"
     _populate_variant_rows(
         rows,
@@ -118,13 +126,11 @@ def generate_synthetic_rows(
         raw_resolution,
         seed,
         device,
+        class_shard,
     )
-    _write_variant_manifests(seed_root, settings, seed)
-    return {
-        variant: pd.DataFrame(variant_rows)
-        for variant, variant_rows in rows.items()
-        if variant_rows
-    }
+    if class_shard is None:
+        _write_variant_manifests(seed_root, settings, seed)
+    return {v: pd.DataFrame(r) for v, r in rows.items() if r}
 
 
 def _populate_variant_rows(
@@ -138,8 +144,12 @@ def _populate_variant_rows(
     raw_resolution: str,
     seed: int,
     device: torch.device,
+    class_shard: str | None = None,
 ) -> None:
     tail = tail_classes(manifest, settings.max_classes)
+    if class_shard is not None:
+        shard_index, n_shards = (int(x) for x in class_shard.split("/"))
+        tail = shard_classes(tail, shard_index, n_shards)
     for i, class_name in enumerate(tail, 1):
         logger.info("ProGAN: class %s (%d/%d)", class_name, i, len(tail))
         class_rows = cast(
@@ -233,12 +243,6 @@ def _write_variant_manifests(
             settings,
         )
     write_combined_manifest(seed_root, settings)
-
-
-def _variant_row_buckets(
-    settings: ProGanSettings,
-) -> dict[int, list[dict[str, object]]]:
-    return {variant: [] for variant in settings.final_depth_epoch_grid}
 
 
 if __name__ == "__main__":

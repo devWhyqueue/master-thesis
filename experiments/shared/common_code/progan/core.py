@@ -33,22 +33,44 @@ class ProGanSettings:
 
 
 class ProgressivePatchDataset(Dataset):
-    """Load one class of RGB patches at the active ProGAN resolution."""
+    """Load one class of RGB patches at the active ProGAN resolution.
 
-    def __init__(self, image_paths: list[Path], image_size: int) -> None:
-        self.image_paths = image_paths
+    Pass ``raw`` (pre-decoded uint8 HxWxC arrays) to avoid repeated BeeGFS reads
+    across multiple depth stages; without it images are decoded on every access.
+    """
+
+    def __init__(
+        self,
+        image_paths: list[Path],
+        image_size: int,
+        raw: list[np.ndarray] | None = None,
+    ) -> None:
         self.image_size = image_size
+        self._raw = raw if raw is not None else _decode_raw(image_paths)
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        return len(self._raw)
 
     def __getitem__(self, idx: int) -> torch.Tensor:
-        image = Image.open(self.image_paths[idx]).convert("RGB")
-        image = image.resize(
-            (self.image_size, self.image_size), Image.Resampling.BILINEAR
-        )
-        array = np.asarray(image, dtype=np.float32) / 127.5 - 1.0
-        return torch.from_numpy(array).permute(2, 0, 1)
+        arr = self._raw[idx]
+        if arr.shape[0] != self.image_size:
+            arr = np.asarray(
+                Image.fromarray(arr).resize(
+                    (self.image_size, self.image_size), Image.Resampling.BILINEAR
+                )
+            )
+        return torch.from_numpy(
+            np.asarray(arr, dtype=np.float32) / 127.5 - 1.0
+        ).permute(2, 0, 1)
+
+
+def decode_raw_images(image_paths: list[Path]) -> list[np.ndarray]:
+    """Decode JPEG paths to uint8 HxWxC arrays once for reuse across depths."""
+    return _decode_raw(image_paths)
+
+
+def _decode_raw(image_paths: list[Path]) -> list[np.ndarray]:
+    return [np.asarray(Image.open(p).convert("RGB")) for p in image_paths]
 
 
 class PixelNorm(nn.Module):

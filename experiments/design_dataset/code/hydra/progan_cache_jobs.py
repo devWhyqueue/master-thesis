@@ -1,22 +1,78 @@
 import argparse
 
-from job_defs import Job, parameters, prefix
+from job_defs import Job, execute_progan_pipeline, parameters, prefix
 
 
 def patch_cache_progan(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
-    """Build constructed ProGAN cache jobs for one or all regimes."""
+    """Return all ProGAN jobs as a flat list (shard jobs followed by finalize).
+
+    Used for local / dry-run sequential execution via the standard runner.
+    For SLURM parallel dispatch use execute_progan instead.
+    """
+    n_shards = int(config.get("progan_n_shards", "10"))
     seeds = [0, 1, 2] if args.sweep else [args.seed]
-    return [
-        Job(
-            _progan_cache_cmd(args, config, parameter, seed),
-            "patch_cache_progan",
-            "logs/patch/patch_cache_progan%j.out",
-            partition=config.get("progan_partition", "gpu-2h"),
-            gpus_per_node=1,
-        )
-        for parameter in parameters(args)
-        for seed in seeds
+    jobs = []
+    for parameter in parameters(args):
+        for seed in seeds:
+            for i in range(n_shards):
+                jobs.append(_shard_job(args, config, parameter, seed, i, n_shards))
+            jobs.append(_finalize_job(args, config, parameter, seed))
+    return jobs
+
+
+def execute_progan(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    local: bool,
+    dry_run: bool,
+) -> None:
+    """Submit N shard jobs per (parameter, seed), then a finalize job with afterok dependency."""
+    n_shards = int(config.get("progan_n_shards", "10"))
+    seeds = [0, 1, 2] if args.sweep else [args.seed]
+    for parameter in parameters(args):
+        for seed in seeds:
+            shards = [
+                _shard_job(args, config, parameter, seed, i, n_shards)
+                for i in range(n_shards)
+            ]
+            finalize = _finalize_job(args, config, parameter, seed)
+            execute_progan_pipeline(shards, finalize, config, local, dry_run)
+
+
+def _shard_job(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+    shard_index: int,
+    n_shards: int,
+) -> Job:
+    cmd = _progan_cache_cmd(args, config, parameter, seed) + [
+        f"--class-shard={shard_index}/{n_shards}",
+        "--train-only",
     ]
+    return Job(
+        cmd,
+        "patch_cache_progan_shard",
+        "logs/patch/patch_cache_progan_shard%j.out",
+        partition=config.get("progan_partition", "gpu-2h"),
+        gpus_per_node=1,
+    )
+
+
+def _finalize_job(
+    args: argparse.Namespace,
+    config: dict[str, str],
+    parameter: float,
+    seed: int,
+) -> Job:
+    return Job(
+        _progan_cache_cmd(args, config, parameter, seed),
+        "patch_cache_progan",
+        "logs/patch/patch_cache_progan%j.out",
+        partition=config.get("progan_partition", "gpu-2h"),
+        gpus_per_node=1,
+    )
 
 
 def _progan_cache_cmd(

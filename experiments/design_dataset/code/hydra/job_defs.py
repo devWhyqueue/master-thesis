@@ -1,11 +1,15 @@
 import argparse
+import dataclasses
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+_SBATCH_JOB_ID_RE = re.compile(r"Submitted batch job (\d+)")
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,7 @@ class Job:
     cpus_per_task: int = 4
     time_limit: str | None = None
     mem: str | None = None
+    dependency: str | None = None
 
 
 def load_config(config_path: str) -> dict[str, str]:
@@ -33,12 +38,28 @@ def load_config(config_path: str) -> dict[str, str]:
         return {}
 
 
-def execute(job: Job, config: dict[str, str], local: bool, dry_run: bool) -> None:
-    """Execute one job locally or submit it to SLURM."""
+def execute(job: Job, config: dict[str, str], local: bool, dry_run: bool) -> str | None:
+    """Execute one job locally or submit it to SLURM; return SLURM job ID if applicable."""
     if local:
         _run_local(job, config, dry_run)
-        return
-    _submit_slurm(job, config, dry_run)
+        return None
+    return _submit_slurm(job, config, dry_run)
+
+
+def execute_progan_pipeline(
+    shard_jobs: list[Job],
+    finalize_job: Job,
+    config: dict[str, str],
+    local: bool,
+    dry_run: bool,
+) -> None:
+    """Submit N shard jobs then a finalize job that depends on all of them."""
+    job_ids = [execute(j, config, local, dry_run) for j in shard_jobs]
+    real_ids = [jid for jid in job_ids if jid]
+    if real_ids:
+        dep = "afterok:" + ":".join(real_ids)
+        finalize_job = dataclasses.replace(finalize_job, dependency=dep)
+    execute(finalize_job, config, local, dry_run)
 
 
 def pythonpath_env(config: dict[str, str]) -> str:
@@ -120,13 +141,17 @@ def _run_local(job: Job, config: dict[str, str], dry_run: bool) -> None:
     subprocess.run(job.cmd, check=True)
 
 
-def _submit_slurm(job: Job, config: dict[str, str], dry_run: bool) -> None:
+def _submit_slurm(job: Job, config: dict[str, str], dry_run: bool) -> str | None:
     script = _slurm_script(job, config)
     if dry_run:
         logging.info("Dry-run (SLURM %s):\n%s", job.name, script)
-        return
+        return None
     logging.info("Reiche Job %s bei SLURM ein...", job.name)
-    subprocess.run(["sbatch"], input=script, text=True, check=True)
+    result = subprocess.run(
+        ["sbatch"], input=script, text=True, check=True, capture_output=True
+    )
+    match = _SBATCH_JOB_ID_RE.search(result.stdout)
+    return match.group(1) if match else None
 
 
 def _slurm_script(job: Job, config: dict[str, str]) -> str:
@@ -150,6 +175,8 @@ def _slurm_script(job: Job, config: dict[str, str]) -> str:
         lines.append(f"#SBATCH --mem={job.mem}")
     if job.array_spec:
         lines.append(f"#SBATCH --array={job.array_spec}")
+    if job.dependency:
+        lines.append(f"#SBATCH --dependency={job.dependency}")
     lines.extend(
         [
             "",
