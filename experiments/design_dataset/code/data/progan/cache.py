@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import cast
+from typing import Sequence, cast
 
 import pandas as pd
 import torch
@@ -159,6 +159,22 @@ def _populate_variant_rows(
         )
 
 
+def _all_images_exist(
+    seed_root: Path, variants: Sequence[int], class_name: str, n: int
+) -> bool:
+    return all(
+        len(list((seed_root / f"epochs={v}" / class_name).glob("*.jpg"))) >= n
+        for v in variants
+    )
+
+
+def _rows_from_disk(
+    class_dir: Path, class_name: str, n: int
+) -> list[dict[str, object]]:
+    paths = sorted(class_dir.glob("*.jpg"))[:n]
+    return [{"image_path": str(p), "cancer_type": class_name} for p in paths]
+
+
 def _generate_class_rows(
     rows: dict[int, list[dict[str, object]]],
     class_rows: pd.DataFrame,
@@ -171,11 +187,22 @@ def _generate_class_rows(
     seed: int,
     device: torch.device,
 ) -> None:
+    n_generate = target - len(class_rows)
+    if _all_images_exist(
+        seed_root, settings.final_depth_epoch_grid, class_name, n_generate
+    ):
+        logger.info("ProGAN: class %s — resuming from disk", class_name)
+        for variant in settings.final_depth_epoch_grid:
+            rows[variant].extend(
+                _rows_from_disk(
+                    seed_root / f"epochs={variant}" / class_name, class_name, n_generate
+                )
+            )
+        return
     image_paths = class_image_paths(
         class_rows, raw_root, raw_resolution, settings.max_real_patches_per_class, seed
     )
     snapshots, training = train_class_progan(image_paths, settings, device, seed)
-    n_generate = target - len(class_rows)
     for variant, generator in snapshots.items():
         variant_dir = seed_root / f"epochs={variant}"
         generated = write_generated_images(
