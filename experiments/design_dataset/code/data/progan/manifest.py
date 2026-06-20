@@ -16,6 +16,8 @@ def expand_chunk_manifest(
 ) -> pd.DataFrame:
     """Expand chunk-level manifest rows to individual patch rows for ProGAN."""
     base_cols = [c for c in manifest.columns if c != "feature_id"]
+    # ponytail: cache glob per slide_dir — 6× fewer BeeGFS listings (4k unique slides, 25k rows)
+    slide_patch_cache: dict[Path, list[Path]] = {}
     rows: list[dict[str, object]] = []
     for _, row in manifest.iterrows():
         slide_id = str(row["slide_id"])
@@ -23,10 +25,11 @@ def expand_chunk_manifest(
         feature_id = str(row.get("feature_id", slide_id))
         chunk_index = int(feature_id[len(slide_id) :].lstrip("_"))
         slide_dir = Path(raw_root) / cancer_type / raw_resolution / slide_id
-        sorted_patches = sorted(
-            slide_dir.glob("*.jpg"), key=lambda p: patch_sort_key(p.stem)
-        )
-        chunk_patches = sorted_patches[
+        if slide_dir not in slide_patch_cache:
+            slide_patch_cache[slide_dir] = sorted(
+                slide_dir.glob("*.jpg"), key=lambda p: patch_sort_key(p.stem)
+            )
+        chunk_patches = slide_patch_cache[slide_dir][
             chunk_index * PATCHES_PER_CHUNK : (chunk_index + 1) * PATCHES_PER_CHUNK
         ]
         for local_idx, patch_file in enumerate(chunk_patches):
