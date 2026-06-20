@@ -139,7 +139,9 @@ def _populate_variant_rows(
     seed: int,
     device: torch.device,
 ) -> None:
-    for class_name in tail_classes(manifest, settings.max_classes):
+    tail = tail_classes(manifest, settings.max_classes)
+    for i, class_name in enumerate(tail, 1):
+        logger.info("ProGAN: class %s (%d/%d)", class_name, i, len(tail))
         class_rows = cast(
             pd.DataFrame, train.loc[train["cancer_type"] == class_name].copy()
         )

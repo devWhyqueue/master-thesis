@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import cast
 
@@ -10,6 +11,21 @@ import pandas as pd
 from data.feature_store import PATCHES_PER_CHUNK
 from data.sampling import patch_sort_key
 
+logger = logging.getLogger(__name__)
+
+
+def _glob_cached(
+    cache: dict[Path, list[Path]], slide_dir: Path, total_unique: int
+) -> list[Path]:
+    if slide_dir not in cache:
+        cache[slide_dir] = sorted(
+            slide_dir.glob("*.jpg"), key=lambda p: patch_sort_key(p.stem)
+        )
+        n = len(cache)
+        if n % 500 == 0 or n == total_unique:
+            logger.info("expand: %d/%d unique slides globbed", n, total_unique)
+    return cache[slide_dir]
+
 
 def expand_chunk_manifest(
     manifest: pd.DataFrame, raw_root: str, raw_resolution: str
@@ -17,26 +33,23 @@ def expand_chunk_manifest(
     """Expand chunk-level manifest rows to individual patch rows for ProGAN."""
     base_cols = [c for c in manifest.columns if c != "feature_id"]
     # ponytail: cache glob per slide_dir — 6× fewer BeeGFS listings (4k unique slides, 25k rows)
-    slide_patch_cache: dict[Path, list[Path]] = {}
+    cache: dict[Path, list[Path]] = {}
+    total_unique = int(manifest[["cancer_type", "slide_id"]].drop_duplicates().shape[0])
     rows: list[dict[str, object]] = []
     for _, row in manifest.iterrows():
         slide_id = str(row["slide_id"])
-        cancer_type = str(row["cancer_type"])
         feature_id = str(row.get("feature_id", slide_id))
         chunk_index = int(feature_id[len(slide_id) :].lstrip("_"))
-        slide_dir = Path(raw_root) / cancer_type / raw_resolution / slide_id
-        if slide_dir not in slide_patch_cache:
-            slide_patch_cache[slide_dir] = sorted(
-                slide_dir.glob("*.jpg"), key=lambda p: patch_sort_key(p.stem)
-            )
-        chunk_patches = slide_patch_cache[slide_dir][
+        slide_dir = Path(raw_root) / str(row["cancer_type"]) / raw_resolution / slide_id
+        patches = _glob_cached(cache, slide_dir, total_unique)
+        chunk = patches[
             chunk_index * PATCHES_PER_CHUNK : (chunk_index + 1) * PATCHES_PER_CHUNK
         ]
-        for local_idx, patch_file in enumerate(chunk_patches):
+        for local_idx, p in enumerate(chunk):
             rows.append(
                 {
                     **{c: row[c] for c in base_cols},
-                    "patch_id": patch_file.stem,
+                    "patch_id": p.stem,
                     "feature_index": local_idx,
                 }
             )
