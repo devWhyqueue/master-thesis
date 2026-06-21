@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from typing import cast
 
@@ -10,6 +11,7 @@ from timm.data.config import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from timm.layers.mlp import SwiGLUPacked
 import torch
+from torch.utils.data import DataLoader, Dataset
 
 from data.feature_store import load_feature_row
 
@@ -75,13 +77,34 @@ def _synthetic_features(
     if synthetic.empty:
         return []
     model, transforms = _load_feature_model(model_name, device)
-    rows = synthetic.reset_index(drop=True)
+    n_workers = int(os.environ.get("DATALOADER_NUM_WORKERS", "0"))
+    loader = DataLoader(
+        _ImageDataset(synthetic["image_path"].astype(str).tolist(), transforms),
+        batch_size=batch_size,
+        num_workers=n_workers,
+        pin_memory=device.type == "cuda" and n_workers > 0,
+        persistent_workers=n_workers > 0,
+    )
     features: list[torch.Tensor] = []
-    for start in range(0, len(rows), batch_size):
-        batch = rows.iloc[start : start + batch_size]
-        images = _image_batch(batch, transforms, device)
-        features.extend(_embed_batch(model, images, dtype, device))
+    for images in loader:
+        features.extend(_embed_batch(model, images.to(device), dtype, device))
     return features
+
+
+class _ImageDataset(Dataset):  # type: ignore[type-arg]
+    def __init__(
+        self,
+        paths: list[str],
+        transforms: Callable[[Image.Image], torch.Tensor],
+    ) -> None:
+        self._paths = paths
+        self._transforms = transforms
+
+    def __len__(self) -> int:
+        return len(self._paths)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        return self._transforms(Image.open(self._paths[idx]).convert("RGB"))
 
 
 def _load_feature_model(
@@ -99,20 +122,6 @@ def _load_feature_model(
         create_transform(**resolve_data_config(model.pretrained_cfg, model=model)),
     )
     return model, transforms
-
-
-def _image_batch(
-    batch: pd.DataFrame,
-    transforms: Callable[[Image.Image], torch.Tensor],
-    device: torch.device,
-) -> torch.Tensor:
-    images = torch.stack(
-        [
-            cast(torch.Tensor, transforms(Image.open(path).convert("RGB")))
-            for path in batch["image_path"].astype(str)
-        ]
-    )
-    return images.to(device)
 
 
 def _embed_batch(
