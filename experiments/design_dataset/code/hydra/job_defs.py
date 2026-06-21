@@ -26,6 +26,7 @@ class Job:
     time_limit: str | None = None
     mem: str | None = None
     dependency: str | None = None
+    constraint: str | None = None
 
 
 def load_config(config_path: str) -> dict[str, str]:
@@ -177,10 +178,14 @@ def _slurm_script(job: Job, config: dict[str, str]) -> str:
         lines.append(f"#SBATCH --array={job.array_spec}")
     if job.dependency:
         lines.append(f"#SBATCH --dependency={job.dependency}")
+    if job.constraint:
+        lines.append(f"#SBATCH --constraint={job.constraint}")
+    n_workers = max(0, job.cpus_per_task - 1)
     lines.extend(
         [
             "",
             f"export APPTAINERENV_PYTHONPATH={pythonpath}",
+            f"export APPTAINERENV_DATALOADER_NUM_WORKERS={n_workers}",
             command,
             "",
         ]

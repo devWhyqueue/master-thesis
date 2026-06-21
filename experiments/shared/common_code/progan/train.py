@@ -29,6 +29,7 @@ def train_class_progan(
     image_paths: list[Path], settings: ProGanSettings, device: torch.device, seed: int
 ) -> tuple[dict[int, ProgressiveGenerator], list[dict[str, object]]]:
     """Train one class-specific ProGAN and return final-depth snapshots."""
+    torch.backends.cudnn.benchmark = True
     torch.manual_seed(seed)
     models = _build_models(settings, device)
     raw_images = decode_raw_images(image_paths)
@@ -136,10 +137,9 @@ def _train_final(
 
 
 def _depth_loader(raw_images: list, depth: int) -> DataLoader:
-    resolution = 2 ** (depth + 1)
     num_workers = int(os.environ.get("DATALOADER_NUM_WORKERS", "0"))
     return DataLoader(
-        ProgressivePatchDataset([], resolution, raw=raw_images),
+        ProgressivePatchDataset([], 2 ** (depth + 1), raw=raw_images),
         batch_size=min(paper_batch_size(depth), len(raw_images)),
         shuffle=True,
         num_workers=num_workers,

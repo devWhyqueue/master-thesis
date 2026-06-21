@@ -55,8 +55,9 @@ def _shard_job(
         cmd,
         "patch_cache_progan_shard",
         "logs/patch/patch_cache_progan_shard%j.out",
-        partition=config.get("progan_partition", "gpu-2h"),
+        partition=config.get("progan_partition", "gpu-5h"),
         gpus_per_node=1,
+        constraint=config.get("progan_gpu_constraint") or None,
     )
 
 
@@ -70,8 +71,9 @@ def _finalize_job(
         _progan_cache_cmd(args, config, parameter, seed),
         "patch_cache_progan",
         "logs/patch/patch_cache_progan%j.out",
-        partition=config.get("progan_partition", "gpu-2h"),
+        partition=config.get("progan_partition", "gpu-5h"),
         gpus_per_node=1,
+        constraint=config.get("progan_gpu_constraint") or None,
     )
 
 
