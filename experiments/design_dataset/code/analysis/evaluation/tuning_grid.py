@@ -14,7 +14,7 @@ from common_code.tuning.grid import (
 )
 
 CLASS_ORDERS = ("native_prevalence",)
-LAMBDAS = (0.8, 1.1, 1.3)
+LAMBDAS = (0.5, 1.0, 1.5)
 
 PATCH_SPECS = tuple(
     s for s in PATCH_FEATURE_SPECS if s[0] != "patch_feature_divide_conquer"

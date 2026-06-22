@@ -10,7 +10,7 @@ CONFIG="${1:-config.json}"
 PYTHON="python3 run.py --config=${CONFIG}"
 
 ORDERS=(native_prevalence)
-PARAMS=(0.8 1.1 1.3)
+PARAMS=(0.5 1.0 1.5)
 SEEDS=(0 1 2)
 
 echo "=== Cancel obsolete prior-work jobs ==="

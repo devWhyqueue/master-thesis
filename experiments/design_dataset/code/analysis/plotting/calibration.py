@@ -168,7 +168,7 @@ def write_calibration_tables(frame: pd.DataFrame, tables_dir: Path) -> None:
 
 def write_calibration_table(frame: pd.DataFrame, path: Path, is_patch: bool) -> None:
     """Write headline calibration table: ECE (raw and TS) and fitted T, lambda as columns."""
-    params = [0.8, 1.1, 1.3]
+    params = [0.5, 1.0, 1.5]
     fallback = (
         "Method & "
         + " & ".join(f"ECE & ECE+TS ($\\lambda={p:.1f}$)" for p in params)

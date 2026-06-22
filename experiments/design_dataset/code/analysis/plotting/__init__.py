@@ -166,7 +166,7 @@ def write_result_tables(frame: pd.DataFrame, tables_dir: Path) -> None:
 
 def write_result_table(frame: pd.DataFrame, path: Path) -> None:
     """Write one benchmark result table with lambda as columns, BAcc and F1 per cell."""
-    params = [0.8, 1.1, 1.3]
+    params = [0.5, 1.0, 1.5]
     fallback_header = "Method & " + " & ".join(
         f"BAcc ($\\lambda={p:.1f}$) & F1 ($\\lambda={p:.1f}$)" for p in params
     )

@@ -201,7 +201,7 @@ def _find_native_param(frame: pd.DataFrame, order: str) -> float:
 
 
 def _add_severity_lines(ax: matplotlib.axes.Axes, grouped: pd.DataFrame) -> None:
-    params = [0.8, 1.1, 1.3]
+    params = [0.5, 1.0, 1.5]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
     for param, color in zip(params, colors):
         part = grouped[grouped["parameter"] == param]
