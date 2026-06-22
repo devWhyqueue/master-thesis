@@ -6,6 +6,7 @@ from typing import cast
 
 import matplotlib.axes
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import pandas as pd
 
 from analysis.plotting import (
@@ -168,9 +169,10 @@ def plot_support(frame: pd.DataFrame, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(7, 4))
     _add_severity_lines(ax, grouped)
     _add_native_line(ax, grouped, native_param)
-    ax.set_xlabel("Class rank (native-prevalence order)")
+    ax.set_xlabel("Class rank")
     ax.set_ylabel("Training slides")
     ax.set_yscale("log")
+    ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=300)
