@@ -4,20 +4,18 @@ import re
 from pathlib import Path
 from typing import cast
 
+import matplotlib.axes
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from analysis.plotting import (
     _benchmark,
-    _mean_std,
     _tex,
     _write_table,
     _write_unavailable,
+    write_result_tables,
 )
-from analysis.plotting.calibration import (
-    calibration_summary,
-    write_calibration_tables,
-)
+from analysis.plotting.calibration import calibration_summary, write_calibration_tables
 
 SPLIT_PATTERN = re.compile(
     r"constructed_order=(?P<order>.+)_parameter=(?P<parameter>[\d.]+)_seed=(?P<seed>\d+)"
@@ -71,14 +69,13 @@ def result_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
     selection = json.loads(selection_path.read_text(encoding="utf-8"))
     if not selection:
         return pd.DataFrame()
-    return pd.DataFrame(_result_runs(results_dir, selection))
+    return pd.DataFrame(_result_rows(results_dir, selection))
 
 
-def _result_runs(results_dir: Path, selection: list[dict]) -> list[dict]:
-    rows: list[dict] = []
-    for entry in selection:
-        rows.extend(_entry_result_rows(entry, results_dir))
-    return rows
+def _result_rows(results_dir: Path, selection: list[dict]) -> list[dict]:
+    return [
+        row for entry in selection for row in _entry_result_rows(entry, results_dir)
+    ]
 
 
 def _entry_result_rows(entry: dict, results_dir: Path) -> list[dict]:
@@ -98,21 +95,27 @@ def _entry_result_rows(entry: dict, results_dir: Path) -> list[dict]:
             / f"seed={seed}"
             / "test_results.json"
         )
-        if not test_path.exists():
-            continue
-        with open(test_path, encoding="utf-8") as f:
-            payload = json.load(f)
-        rows.append(
-            {
-                "method": entry["method"],
-                "benchmark": _benchmark(entry["method"]),
-                "order": order,
-                "parameter": parameter,
-                "seed": seed,
-                **{metric: float(payload[metric]) for metric in METRICS},
-            }
-        )
+        row = _load_result_row(test_path, entry, order, parameter, seed)
+        if row:
+            rows.append(row)
     return rows
+
+
+def _load_result_row(
+    test_path: Path, entry: dict, order: str, parameter: float, seed: int
+) -> dict | None:
+    if not test_path.exists():
+        return None
+    with open(test_path, encoding="utf-8") as f:
+        payload = json.load(f)
+    return {
+        "method": entry["method"],
+        "benchmark": _benchmark(entry["method"]),
+        "order": order,
+        "parameter": parameter,
+        "seed": seed,
+        **{metric: float(payload[metric]) for metric in METRICS},
+    }
 
 
 def write_split_summary(frame: pd.DataFrame, path: Path) -> None:
@@ -127,28 +130,13 @@ def write_split_summary(frame: pd.DataFrame, path: Path) -> None:
 
 
 def _split_summary_rows(frame: pd.DataFrame) -> list[str]:
-    aggregate = _aggregate_split_summary(_per_seed_split_summary(frame))
-    rows = []
-    for _, row in aggregate.iterrows():
-        rows.append(
-            f"{_tex(row['order'])} & {float(row['parameter']):.1f} & "
-            f"{float(row['total']):.0f} & "
-            f"{float(row['minimum']):.1f}--{float(row['maximum']):.1f}\\\\"
-        )
-    return rows
-
-
-def _per_seed_split_summary(frame: pd.DataFrame) -> pd.DataFrame:
-    return (
+    per_seed = (
         frame.groupby(["order", "parameter", "seed"])
         .agg(total=("count", "sum"), minimum=("count", "min"), maximum=("count", "max"))
         .reset_index()
     )
-
-
-def _aggregate_split_summary(frame: pd.DataFrame) -> pd.DataFrame:
-    return (
-        frame.groupby(["order", "parameter"])
+    aggregate = (
+        per_seed.groupby(["order", "parameter"])
         .agg(
             total=("total", "mean"),
             minimum=("minimum", "mean"),
@@ -156,65 +144,72 @@ def _aggregate_split_summary(frame: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
+    return [
+        f"{_tex(row['order'])} & {float(row['parameter']):.1f} & "
+        f"{float(row['total']):.0f} & "
+        f"{float(row['minimum']):.1f}--{float(row['maximum']):.1f}\\\\"
+        for _, row in aggregate.iterrows()
+    ]
 
 
 def plot_support(frame: pd.DataFrame, path: Path) -> None:
-    """Plot constructed support by rank."""
+    """Plot training support by rank for the three evaluated severities plus native reference."""
     if frame.empty:
         return
-    fig, ax = plt.subplots(figsize=(7, 4))
+    native_order = "native_prevalence"
+    # ponytail: native full-pool split (largest total) reused as the native reference curve
+    native_param = _find_native_param(frame, native_order)
     grouped = (
-        frame.groupby(["order", "parameter", "rank"])["count"].mean().reset_index()
+        frame[frame["order"] == native_order]
+        .groupby(["parameter", "rank"])["count"]
+        .mean()
+        .reset_index()
     )
-    for key, part in grouped.groupby(["order", "parameter"]):
-        order, parameter = cast(tuple[str, float], key)
-        if float(parameter) not in {0.0, 1.0, 1.3}:
-            continue
-        ax.plot(
-            part["rank"], part["count"], label=f"{order}, $\\lambda={parameter:.1f}$"
-        )
-    ax.set_xlabel("Class rank")
+    fig, ax = plt.subplots(figsize=(7, 4))
+    _add_severity_lines(ax, grouped)
+    _add_native_line(ax, grouped, native_param)
+    ax.set_xlabel("Class rank (native-prevalence order)")
     ax.set_ylabel("Training slides")
     ax.set_yscale("log")
-    ax.legend(fontsize=7)
+    ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=300)
     plt.close(fig)
 
 
-def write_result_tables(frame: pd.DataFrame, tables_dir: Path) -> None:
-    """Write patch and WSI result summary tables."""
-    for benchmark, filename in [
-        ("patch", "result_summary_patch.tex"),
-        ("wsi_bag", "result_summary_wsi_bag.tex"),
-    ]:
-        part = (
-            cast(pd.DataFrame, frame[frame["benchmark"] == benchmark])
-            if not frame.empty
-            else frame
+def _add_native_line(
+    ax: matplotlib.axes.Axes, grouped: pd.DataFrame, native_param: float
+) -> None:
+    native_part = grouped[grouped["parameter"] == native_param]
+    if not native_part.empty:
+        ax.plot(
+            native_part["rank"],
+            native_part["count"],
+            color="black",
+            linestyle="--",
+            label="Native (full pool)",
         )
-        write_result_table(part, tables_dir / filename)
 
 
-def write_result_table(frame: pd.DataFrame, path: Path) -> None:
-    """Write one benchmark result table."""
-    if frame.empty:
-        _write_unavailable(path, "Method & Accuracy & Balanced accuracy & Macro F1")
-        return
-    aggregate = frame.groupby(["method", "order", "parameter"]).agg(
-        **{f"{metric}_mean": (metric, "mean") for metric in METRICS},
-        **{f"{metric}_std": (metric, "std") for metric in METRICS},
+def _find_native_param(frame: pd.DataFrame, order: str) -> float:
+    totals = (
+        frame[frame["order"] == order].groupby("parameter")["count"].sum().reset_index()
     )
-    rows = []
-    for _, row in aggregate.reset_index().iterrows():
-        rows.append(
-            f"{_tex(row['method'])} ({_tex(row['order'])}, "
-            f"$\\lambda={float(row['parameter']):.1f}$) & "
-            f"{_mean_std(row, 'accuracy')} & "
-            f"{_mean_std(row, 'balanced_accuracy')} & "
-            f"{_mean_std(row, 'macro_f1')}\\\\"
-        )
-    _write_table(path, "Method & Accuracy & Balanced accuracy & Macro F1", rows)
+    return float(totals.loc[cast(int, totals["count"].idxmax()), "parameter"])
+
+
+def _add_severity_lines(ax: matplotlib.axes.Axes, grouped: pd.DataFrame) -> None:
+    params = [0.8, 1.1, 1.3]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+    for param, color in zip(params, colors):
+        part = grouped[grouped["parameter"] == param]
+        if not part.empty:
+            ax.plot(
+                part["rank"],
+                part["count"],
+                color=color,
+                label=f"$\\lambda={param:.1f}$",
+            )
 
 
 def _split_rows(metadata: dict[str, str], counts_path: Path) -> list[dict[str, object]]:
