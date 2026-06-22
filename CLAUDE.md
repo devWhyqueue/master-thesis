@@ -12,15 +12,17 @@
 
 # LaTeX
 
-- TeX Live is installed on Windows and can be used from WSL via `/mnt/c/texlive/2026/bin/windows/pdflatex.exe` and `/mnt/c/texlive/2026/bin/windows/bibtex.exe`.
-- Compile from the directory containing the `.tex` file. Use a temporary build directory and copy out only the final PDF, for example:
-  - `mkdir -p .latex-build`
-  - `cp *.bib .latex-build/`
-  - `/mnt/c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode -halt-on-error -output-directory=.latex-build main.tex`
-  - `(cd .latex-build && /mnt/c/texlive/2026/bin/windows/bibtex.exe main)`
-  - `/mnt/c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode -halt-on-error -output-directory=.latex-build main.tex`
-  - `/mnt/c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode -halt-on-error -output-directory=.latex-build main.tex`
-  - `cp .latex-build/main.pdf main.pdf && rm -rf .latex-build`
+- TeX Live is installed on Windows (`C:\texlive\2026\bin\windows\`). Use it via PowerShell — the WSL `/mnt/c/texlive` mount is not available.
+- Compile from the directory containing the `.tex` file. Use a temporary build directory and copy out only the final PDF:
+  ```powershell
+  New-Item -ItemType Directory -Force .latex-build | Out-Null
+  Copy-Item *.bib .latex-build\
+  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" main.tex
+  Set-Location .latex-build; & "C:\texlive\2026\bin\windows\bibtex.exe" main; Set-Location ..
+  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" main.tex
+  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" main.tex
+  Copy-Item .latex-build\main.pdf main.pdf; Remove-Item -Recurse -Force .latex-build
+  ```
 - Do not leave LaTeX auxiliary files in the worktree.
 
 # NotebookLM
