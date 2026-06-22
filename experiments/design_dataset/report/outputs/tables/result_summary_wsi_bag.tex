@@ -1,24 +1,13 @@
-\begin{tabular}{llll}
+\begin{tabular}{lrrrrrr}
 \toprule
-Method & Accuracy & Balanced accuracy & Macro F1\\
+Method & \multicolumn{2}{c}{$\lambda=0.8$} & \multicolumn{2}{c}{$\lambda=1.1$} & \multicolumn{2}{c}{$\lambda=1.3$} \\ \cmidrule(lr){2--3} \cmidrule(lr){4--5} \cmidrule(lr){6--7}\\
+ & BAcc & F1 & BAcc & F1 & BAcc & F1\\
 \midrule
-mde\_mil (native\_prevalence, $\lambda=0.8$) & \num{0.858} $\pm$ \num{0.010} & \num{0.824} $\pm$ \num{0.014} & \num{0.809} $\pm$ \num{0.006}\\
-mde\_mil (native\_prevalence, $\lambda=1.1$) & \num{0.852} $\pm$ \num{0.007} & \num{0.811} $\pm$ \num{0.004} & \num{0.808} $\pm$ \num{0.007}\\
-mde\_mil (native\_prevalence, $\lambda=1.3$) & \num{0.845} $\pm$ \num{0.008} & \num{0.804} $\pm$ \num{0.006} & \num{0.802} $\pm$ \num{0.016}\\
-mil\_balanced\_sampler\_ce (native\_prevalence, $\lambda=0.8$) & \num{0.837} $\pm$ \num{0.007} & \num{0.809} $\pm$ \num{0.005} & \num{0.782} $\pm$ \num{0.004}\\
-mil\_balanced\_sampler\_ce (native\_prevalence, $\lambda=1.1$) & \num{0.829} $\pm$ \num{0.012} & \num{0.791} $\pm$ \num{0.010} & \num{0.778} $\pm$ \num{0.020}\\
-mil\_balanced\_sampler\_ce (native\_prevalence, $\lambda=1.3$) & \num{0.817} $\pm$ \num{0.025} & \num{0.777} $\pm$ \num{0.013} & \num{0.768} $\pm$ \num{0.017}\\
-mil\_focal (native\_prevalence, $\lambda=0.8$) & \num{0.833} $\pm$ \num{0.005} & \num{0.794} $\pm$ \num{0.004} & \num{0.778} $\pm$ \num{0.006}\\
-mil\_focal (native\_prevalence, $\lambda=1.1$) & \num{0.843} $\pm$ \num{0.012} & \num{0.800} $\pm$ \num{0.004} & \num{0.795} $\pm$ \num{0.008}\\
-mil\_focal (native\_prevalence, $\lambda=1.3$) & \num{0.832} $\pm$ \num{0.006} & \num{0.786} $\pm$ \num{0.006} & \num{0.785} $\pm$ \num{0.003}\\
-mil\_weighted\_ce (native\_prevalence, $\lambda=0.8$) & \num{0.834} $\pm$ \num{0.004} & \num{0.802} $\pm$ \num{0.006} & \num{0.778} $\pm$ \num{0.003}\\
-mil\_weighted\_ce (native\_prevalence, $\lambda=1.1$) & \num{0.837} $\pm$ \num{0.009} & \num{0.794} $\pm$ \num{0.005} & \num{0.785} $\pm$ \num{0.001}\\
-mil\_weighted\_ce (native\_prevalence, $\lambda=1.3$) & \num{0.833} $\pm$ \num{0.012} & \num{0.789} $\pm$ \num{0.009} & \num{0.785} $\pm$ \num{0.012}\\
-rankmix\_mil (native\_prevalence, $\lambda=0.8$) & \num{0.849} $\pm$ \num{0.002} & \num{0.824} $\pm$ \num{0.018} & \num{0.799} $\pm$ \num{0.018}\\
-rankmix\_mil (native\_prevalence, $\lambda=1.1$) & \num{0.851} $\pm$ \num{0.020} & \num{0.824} $\pm$ \num{0.017} & \num{0.804} $\pm$ \num{0.011}\\
-rankmix\_mil (native\_prevalence, $\lambda=1.3$) & \num{0.837} $\pm$ \num{0.014} & \num{0.804} $\pm$ \num{0.008} & \num{0.790} $\pm$ \num{0.009}\\
-sc\_mil (native\_prevalence, $\lambda=0.8$) & \num{0.845} $\pm$ \num{0.007} & \num{0.812} $\pm$ \num{0.021} & \num{0.794} $\pm$ \num{0.015}\\
-sc\_mil (native\_prevalence, $\lambda=1.1$) & \num{0.841} $\pm$ \num{0.012} & \num{0.801} $\pm$ \num{0.013} & \num{0.789} $\pm$ \num{0.015}\\
-sc\_mil (native\_prevalence, $\lambda=1.3$) & \num{0.832} $\pm$ \num{0.009} & \num{0.782} $\pm$ \num{0.016} & \num{0.783} $\pm$ \num{0.011}\\
+Weighted CE & \num{0.802} $\pm$ \num{0.006} & \num{0.778} $\pm$ \num{0.003} & \num{0.794} $\pm$ \num{0.005} & \num{0.785} $\pm$ \num{0.001} & \num{0.789} $\pm$ \num{0.009} & \num{0.785} $\pm$ \num{0.012}\\
+Focal loss & \num{0.794} $\pm$ \num{0.004} & \num{0.778} $\pm$ \num{0.006} & \num{0.800} $\pm$ \num{0.004} & \num{0.795} $\pm$ \num{0.008} & \num{0.786} $\pm$ \num{0.006} & \num{0.785} $\pm$ \num{0.003}\\
+Balanced sampling & \num{0.809} $\pm$ \num{0.005} & \num{0.782} $\pm$ \num{0.004} & \num{0.791} $\pm$ \num{0.010} & \num{0.778} $\pm$ \num{0.020} & \num{0.777} $\pm$ \num{0.013} & \num{0.768} $\pm$ \num{0.017}\\
+RankMix & \num{0.824} $\pm$ \num{0.018} & \num{0.799} $\pm$ \num{0.018} & \num{0.824} $\pm$ \num{0.017} & \num{0.804} $\pm$ \num{0.011} & \num{0.804} $\pm$ \num{0.008} & \num{0.790} $\pm$ \num{0.009}\\
+SC-MIL & \num{0.812} $\pm$ \num{0.021} & \num{0.794} $\pm$ \num{0.015} & \num{0.801} $\pm$ \num{0.013} & \num{0.789} $\pm$ \num{0.015} & \num{0.782} $\pm$ \num{0.016} & \num{0.783} $\pm$ \num{0.011}\\
+MDE-MIL & \num{0.824} $\pm$ \num{0.014} & \num{0.809} $\pm$ \num{0.006} & \num{0.811} $\pm$ \num{0.004} & \num{0.808} $\pm$ \num{0.007} & \num{0.804} $\pm$ \num{0.006} & \num{0.802} $\pm$ \num{0.016}\\
 \bottomrule
 \end{tabular}
