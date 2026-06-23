@@ -1,15 +1,14 @@
 \begin{tabular}{lrrrrrr}
 \toprule
-Method & \multicolumn{2}{c}{$\lambda=0.8$} & \multicolumn{2}{c}{$\lambda=1.1$} & \multicolumn{2}{c}{$\lambda=1.3$} \\ \cmidrule(lr){2--3} \cmidrule(lr){4--5} \cmidrule(lr){6--7}\\
+Method & \multicolumn{2}{c}{$\lambda=0.5$} & \multicolumn{2}{c}{$\lambda=1.0$} & \multicolumn{2}{c}{$\lambda=1.5$} \\ \cmidrule(lr){2--3} \cmidrule(lr){4--5} \cmidrule(lr){6--7}\\
  & BAcc & F1 & BAcc & F1 & BAcc & F1\\
 \midrule
-Weighted CE & \num{0.714} $\pm$ \num{0.004} & \num{0.698} $\pm$ \num{0.006} & \num{0.698} $\pm$ \num{0.014} & \num{0.690} $\pm$ \num{0.016} & \num{0.679} $\pm$ \num{0.007} & \num{0.677} $\pm$ \num{0.013}\\
-Focal loss & \num{0.718} $\pm$ \num{0.004} & \num{0.698} $\pm$ \num{0.004} & \num{0.696} $\pm$ \num{0.015} & \num{0.690} $\pm$ \num{0.018} & \num{0.672} $\pm$ \num{0.006} & \num{0.670} $\pm$ \num{0.013}\\
-CFAL & \num{0.723} $\pm$ \num{0.004} & \num{0.699} $\pm$ \num{0.007} & \num{0.703} $\pm$ \num{0.013} & \num{0.705} $\pm$ \num{0.015} & \num{0.681} $\pm$ \num{0.010} & \num{0.685} $\pm$ \num{0.013}\\
-CE + soft F1 & \num{0.718} $\pm$ \num{0.005} & \num{0.685} $\pm$ \num{0.002} & \num{0.703} $\pm$ \num{0.020} & \num{0.680} $\pm$ \num{0.018} & \num{0.688} $\pm$ \num{0.007} & \num{0.668} $\pm$ \num{0.008}\\
-CE + soft MCC & \num{0.709} $\pm$ \num{0.013} & \num{0.690} $\pm$ \num{0.007} & \num{0.692} $\pm$ \num{0.014} & \num{0.681} $\pm$ \num{0.020} & \num{0.668} $\pm$ \num{0.014} & \num{0.658} $\pm$ \num{0.012}\\
-Balanced sampling & \num{0.712} $\pm$ \num{0.004} & \num{0.693} $\pm$ \num{0.006} & \num{0.694} $\pm$ \num{0.021} & \num{0.686} $\pm$ \num{0.027} & \num{0.672} $\pm$ \num{0.009} & \num{0.671} $\pm$ \num{0.009}\\
-OKO & \num{0.723} $\pm$ \num{0.014} & \num{0.695} $\pm$ \num{0.020} & \num{0.707} $\pm$ \num{0.016} & \num{0.699} $\pm$ \num{0.018} & \num{0.683} $\pm$ \num{0.005} & \num{0.678} $\pm$ \num{0.003}\\
-ProGAN augmentation & \num{0.723} $\pm$ \num{0.004} & \num{0.692} $\pm$ \num{0.010} & \num{0.698} $\pm$ \num{0.010} & \num{0.690} $\pm$ \num{0.011} & \num{0.677} $\pm$ \num{0.007} & \num{0.686} $\pm$ \num{0.010}\\
+Weighted CE & \num{0.721} $\pm$ \num{0.012} & \num{0.693} $\pm$ \num{0.006} & \num{0.704} $\pm$ \num{0.012} & \num{0.693} $\pm$ \num{0.016} & \num{0.634} $\pm$ \num{0.006} & \num{0.641} $\pm$ \num{0.009}\\
+Focal loss & \num{0.718} $\pm$ \num{0.011} & \num{0.692} $\pm$ \num{0.007} & \num{0.698} $\pm$ \num{0.016} & \num{0.689} $\pm$ \num{0.018} & \num{0.630} $\pm$ \num{0.005} & \num{0.641} $\pm$ \num{0.009}\\
+CFAL & \num{0.724} $\pm$ \num{0.009} & \num{0.697} $\pm$ \num{0.007} & \num{0.710} $\pm$ \num{0.014} & \num{0.704} $\pm$ \num{0.015} & \num{0.632} $\pm$ \num{0.013} & \num{0.645} $\pm$ \num{0.014}\\
+CE + soft F1 & \num{0.721} $\pm$ \num{0.012} & \num{0.685} $\pm$ \num{0.004} & \num{0.713} $\pm$ \num{0.007} & \num{0.686} $\pm$ \num{0.014} & \num{0.638} $\pm$ \num{0.021} & \num{0.630} $\pm$ \num{0.019}\\
+CE + soft MCC & \num{0.719} $\pm$ \num{0.006} & \num{0.690} $\pm$ \num{0.009} & \num{0.698} $\pm$ \num{0.010} & \num{0.684} $\pm$ \num{0.009} & \num{0.634} $\pm$ \num{0.019} & \num{0.633} $\pm$ \num{0.018}\\
+Balanced sampling & \num{0.719} $\pm$ \num{0.012} & \num{0.691} $\pm$ \num{0.007} & \num{0.701} $\pm$ \num{0.015} & \num{0.688} $\pm$ \num{0.018} & \num{0.631} $\pm$ \num{0.012} & \num{0.635} $\pm$ \num{0.013}\\
+OKO & \num{0.722} $\pm$ \num{0.012} & \num{0.689} $\pm$ \num{0.008} & \num{0.712} $\pm$ \num{0.011} & \num{0.694} $\pm$ \num{0.018} & \num{0.644} $\pm$ \num{0.015} & \num{0.648} $\pm$ \num{0.014}\\
 \bottomrule
 \end{tabular}
