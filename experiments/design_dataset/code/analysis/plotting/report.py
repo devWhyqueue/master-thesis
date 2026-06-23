@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 import pandas as pd
 
+from analysis.evaluation.tuning_grid import CLASS_ORDERS, LAMBDAS
 from analysis.plotting import (
     _benchmark,
     _tex,
@@ -57,6 +58,10 @@ def split_summary(root: Path) -> pd.DataFrame:
         match = SPLIT_PATTERN.fullmatch(path.name)
         counts_path = path / "target_counts.json"
         if match is None or not counts_path.exists():
+            continue
+        if match.group("order") not in CLASS_ORDERS:
+            continue
+        if float(match.group("parameter")) not in LAMBDAS:
             continue
         rows.extend(_split_rows(match.groupdict(), counts_path))
     return pd.DataFrame(rows)
