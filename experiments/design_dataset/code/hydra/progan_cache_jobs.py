@@ -73,6 +73,7 @@ def _finalize_job(
         "logs/patch/patch_cache_progan%j.out",
         partition=config.get("progan_partition", "gpu-5h"),
         gpus_per_node=1,
+        mem=config.get("progan_finalize_mem", "128G"),
         constraint=config.get("progan_gpu_constraint") or None,
     )
 
