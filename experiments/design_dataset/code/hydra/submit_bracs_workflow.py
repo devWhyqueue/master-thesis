@@ -1,9 +1,9 @@
 """Submit BRACS native-or-power-law benchmark workflow on Hydra."""
 
-import logging
 from __future__ import annotations
 
 import argparse
+import logging
 import dataclasses
 from types import SimpleNamespace
 
