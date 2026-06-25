@@ -23,11 +23,12 @@ def bracs_stage(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
         "bash",
         "-lc",
         (
-            f"test -d {data_root}/BRACS_WSI && "
+            f"(test -d {data_root}/BRACS_WSI && "
             f"test -d {data_root}/BRACS_RoI && "
-            f"test -f {data_root}/BRACS.xlsx && "
-            f"echo 'BRACS data verified at {data_root}' || "
-            f"(echo 'ERROR: BRACS source files missing under {data_root}' && exit 1)"
+            f"test -f {data_root}/BRACS.xlsx) || "
+            f"(echo 'ERROR: BRACS source files missing under {data_root}' && exit 1); "
+            "python3 -m pip install --user openpyxl --quiet; "
+            f"echo 'BRACS staged at {data_root}'"
         ),
     ]
     return [
