@@ -1,0 +1,13 @@
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+Method & \multicolumn{3}{c}{$\lambda=0.5$} & \multicolumn{3}{c}{$\lambda=1.0$} & \multicolumn{3}{c}{$\lambda=1.5$} \\ \cmidrule(lr){2--4} \cmidrule(lr){5--7} \cmidrule(lr){8--10}\\
+ & Head & Body & Tail & Head & Body & Tail & Head & Body & Tail\\
+\midrule
+Weighted CE & \num{0.870} $\pm$ \num{0.009} & \num{0.799} $\pm$ \num{0.006} & \num{0.706} $\pm$ \num{0.056} & \num{0.870} $\pm$ \num{0.011} & \num{0.797} $\pm$ \num{0.024} & \num{0.686} $\pm$ \num{0.033} & \num{0.845} $\pm$ \num{0.015} & \num{0.739} $\pm$ \num{0.026} & \num{0.602} $\pm$ \num{0.064}\\
+Focal loss & \num{0.873} $\pm$ \num{0.012} & \num{0.794} $\pm$ \num{0.006} & \num{0.706} $\pm$ \num{0.052} & \num{0.876} $\pm$ \num{0.019} & \num{0.798} $\pm$ \num{0.020} & \num{0.698} $\pm$ \num{0.038} & \num{0.833} $\pm$ \num{0.013} & \num{0.722} $\pm$ \num{0.037} & \num{0.555} $\pm$ \num{0.066}\\
+Balanced sampling & \num{0.861} $\pm$ \num{0.012} & \num{0.791} $\pm$ \num{0.007} & \num{0.659} $\pm$ \num{0.045} & \num{0.863} $\pm$ \num{0.006} & \num{0.792} $\pm$ \num{0.030} & \num{0.692} $\pm$ \num{0.047} & \num{0.829} $\pm$ \num{0.015} & \num{0.727} $\pm$ \num{0.042} & \num{0.598} $\pm$ \num{0.074}\\
+RankMix & \num{0.866} $\pm$ \num{0.019} & \num{0.804} $\pm$ \num{0.012} & \num{0.699} $\pm$ \num{0.046} & \num{0.874} $\pm$ \num{0.018} & \num{0.802} $\pm$ \num{0.018} & \num{0.701} $\pm$ \num{0.031} & \num{0.862} $\pm$ \num{0.008} & \num{0.753} $\pm$ \num{0.025} & \num{0.636} $\pm$ \num{0.036}\\
+SC-MIL & \num{0.862} $\pm$ \num{0.008} & \num{0.794} $\pm$ \num{0.002} & \num{0.674} $\pm$ \num{0.065} & \num{0.861} $\pm$ \num{0.016} & \num{0.795} $\pm$ \num{0.015} & \num{0.698} $\pm$ \num{0.033} & \num{0.848} $\pm$ \num{0.003} & \num{0.741} $\pm$ \num{0.021} & \num{0.643} $\pm$ \num{0.030}\\
+MDE-MIL & \num{0.875} $\pm$ \num{0.014} & \num{0.817} $\pm$ \num{0.008} & \num{0.711} $\pm$ \num{0.056} & \num{0.879} $\pm$ \num{0.005} & \num{0.820} $\pm$ \num{0.011} & \num{0.738} $\pm$ \num{0.050} & \num{0.845} $\pm$ \num{0.009} & \num{0.735} $\pm$ \num{0.022} & \num{0.610} $\pm$ \num{0.024}\\
+\bottomrule
+\end{tabular}
