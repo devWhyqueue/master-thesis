@@ -17,20 +17,13 @@ from job_defs import Job, prefix
 
 
 def bracs_stage(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
-    """Verify BRACS source files are present at the configured data root."""
+    """Verify BRACS source files and pre-convert BRACS.xlsx to CSV outside the container."""
     data_root = bracs_data_root(config)
-    cmd = [
-        "bash",
-        "-lc",
-        (
-            f"(test -d {data_root}/BRACS_WSI && "
-            f"test -d {data_root}/BRACS_RoI && "
-            f"test -f {data_root}/BRACS.xlsx) || "
-            f"(echo 'ERROR: BRACS source files missing under {data_root}' && exit 1); "
-            "python3 -m pip install --user openpyxl --quiet; "
-            f"echo 'BRACS staged at {data_root}'"
-        ),
-    ]
+    root = bracs_root(config)
+    working_dir = config.get("working_dir", ".")
+    metadata_csv = f"{root}/BRACS_metadata.csv"
+    convert_script = f"{working_dir}/hydra/bracs/convert_xlsx.py"
+    cmd = ["bash", "-lc", _stage_bash(data_root, convert_script, metadata_csv)]
     return [
         Job(
             cmd,
@@ -40,6 +33,18 @@ def bracs_stage(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
             cpus_per_task=1,
         )
     ]
+
+
+def _stage_bash(data_root: str, convert_script: str, metadata_csv: str) -> str:
+    """Build the bracs_stage bash command string."""
+    return (
+        f"(test -d {data_root}/BRACS_WSI && "
+        f"test -d {data_root}/BRACS_RoI && "
+        f"test -f {data_root}/BRACS.xlsx) || "
+        f"(echo 'ERROR: BRACS source files missing under {data_root}' && exit 1); "
+        f"python3 {convert_script} {data_root} {metadata_csv}; "
+        f"echo 'BRACS staged: metadata CSV ready at {metadata_csv}'"
+    )
 
 
 def bracs_prepare(args: argparse.Namespace, config: dict[str, str]) -> list[Job]:
@@ -54,6 +59,7 @@ def bracs_prepare(args: argparse.Namespace, config: dict[str, str]) -> list[Job]
                 "data.bracs.prepare",
                 f"--bracs-root={data_root}",
                 f"--output-root={root}",
+                f"--metadata-csv={root}/BRACS_metadata.csv",
                 "--tile-size=256",
                 "--max-tiles-per-roi=30",
                 "--seeds",

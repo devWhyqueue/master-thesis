@@ -39,6 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--bracs-root", required=True)
     parser.add_argument("--output-root", required=True)
+    parser.add_argument("--metadata-csv", default=None)
     parser.add_argument("--tile-size", type=int, default=256)
     parser.add_argument("--max-tiles-per-roi", type=int, default=30)
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
@@ -52,7 +53,8 @@ def main() -> None:
     root = Path(args.bracs_root)
     output = Path(args.output_root)
     output.mkdir(parents=True, exist_ok=True)
-    roi_frame = load_roi_metadata(root)
+    metadata_csv = Path(args.metadata_csv) if args.metadata_csv else None
+    roi_frame = load_roi_metadata(root, metadata_csv)
     image_index = index_roi_images(root)
     tiled = tile_rois(
         roi_frame,
