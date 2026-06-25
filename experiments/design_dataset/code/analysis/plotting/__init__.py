@@ -60,10 +60,6 @@ def _mean_std(row: pd.Series, metric: str) -> str:
     return f"\\num{{{mean:.3f}}} $\\pm$ \\num{{{std_value:.3f}}}"
 
 
-def _tex(value: object) -> str:
-    return str(value).replace("_", "\\_")
-
-
 def _write_unavailable(path: Path, header: str) -> None:
     columns = header.count("&") + 1
     row = f"\\multicolumn{{{columns}}}{{c}}{{Generated results unavailable.}}\\\\"
@@ -145,79 +141,6 @@ def temperature_scale(probabilities: np.ndarray, temperature: float) -> np.ndarr
     logits = logits - logits.max(axis=1, keepdims=True)
     exp_logits = np.exp(logits)
     return exp_logits / exp_logits.sum(axis=1, keepdims=True)
-
-
-# --- Result table writers ---
-
-
-def write_result_tables(frame: pd.DataFrame, tables_dir: Path) -> None:
-    """Write patch and WSI result summary tables."""
-    for benchmark, filename in [
-        ("patch", "result_summary_patch.tex"),
-        ("wsi_bag", "result_summary_wsi_bag.tex"),
-    ]:
-        part = (
-            cast(pd.DataFrame, frame[frame["benchmark"] == benchmark])
-            if not frame.empty
-            else frame
-        )
-        write_result_table(part, tables_dir / filename)
-
-
-def write_result_table(frame: pd.DataFrame, path: Path) -> None:
-    """Write one benchmark result table with lambda as columns, BAcc and F1 per cell."""
-    params = [0.5, 1.0, 1.5]
-    fallback_header = "Method & " + " & ".join(
-        f"BAcc ($\\lambda={p:.1f}$) & F1 ($\\lambda={p:.1f}$)" for p in params
-    )
-    if frame.empty:
-        _write_unavailable(path, fallback_header)
-        return
-    by_method = _by_method_map(frame)
-    method_order = PATCH_ORDER if any("patch" in m for m in by_method) else WSI_ORDER
-    ordered = [m for m in method_order if m in by_method] + [
-        m for m in by_method if m not in method_order
-    ]
-    colspec, header_lines = _result_colspec_headers(params)
-    rows = [_result_method_row(m, by_method[m], params) for m in ordered]
-    _write_wide_table(path, colspec, header_lines, rows)
-
-
-def _by_method_map(frame: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    metrics = ("balanced_accuracy", "macro_f1")
-    agg = (
-        frame.groupby(["method", "parameter"])
-        .agg(**{f"{m}_{s}": (m, s) for m in metrics for s in ("mean", "std")})
-        .reset_index()
-    )
-    return {
-        str(m): cast(pd.DataFrame, agg[agg["method"] == m])
-        for m in agg["method"].unique()
-    }
-
-
-def _result_colspec_headers(params: list[float]) -> tuple[str, list[str]]:
-    colspec = "l" + "r" * (len(params) * 2)
-    header_top = "Method & " + " & ".join(
-        f"\\multicolumn{{2}}{{c}}{{$\\lambda={p:.1f}$}}" for p in params
-    )
-    cmidrule = " ".join(
-        f"\\cmidrule(lr){{{2 + i * 2}--{3 + i * 2}}}" for i in range(len(params))
-    )
-    header_sub = " & ".join([""] + ["BAcc & F1"] * len(params))
-    return colspec, [header_top + f" \\\\ {cmidrule}", header_sub]
-
-
-def _result_method_row(method: str, part: pd.DataFrame, params: list[float]) -> str:
-    cells = [_method_label(method)]
-    for p in params:
-        p_row = part[part["parameter"] == p]
-        if p_row.empty:
-            cells += ["--", "--"]
-        else:
-            r = p_row.iloc[0]
-            cells += [_mean_std(r, "balanced_accuracy"), _mean_std(r, "macro_f1")]
-    return " & ".join(cells) + "\\\\"
 
 
 # --- Calibration table helpers (used by calibration.py) ---

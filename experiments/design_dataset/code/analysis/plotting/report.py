@@ -10,19 +10,17 @@ import matplotlib.ticker
 import pandas as pd
 
 from analysis.evaluation.tuning_grid import CLASS_ORDERS, LAMBDAS
-from analysis.plotting import (
-    _benchmark,
-    _tex,
-    _write_table,
-    _write_unavailable,
+from analysis.plotting import _write_table, _write_unavailable
+from analysis.plotting.calibration import calibration_summary, write_calibration_tables
+from analysis.plotting.results import (
+    native_results,
+    result_summary,
     write_result_tables,
 )
-from analysis.plotting.calibration import calibration_summary, write_calibration_tables
 
 SPLIT_PATTERN = re.compile(
     r"constructed_order=(?P<order>.+)_parameter=(?P<parameter>[\d.]+)_seed=(?P<seed>\d+)"
 )
-METRICS = ("accuracy", "balanced_accuracy", "macro_f1")
 
 
 def get_args() -> argparse.Namespace:
@@ -42,11 +40,15 @@ def main() -> None:
     figures_dir = output_dir / "figures"
     tables_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
-    split_frame = split_summary(Path(args.constructed_dataset_dir))
-    write_split_summary(split_frame, tables_dir / "constructed_split_summary.tex")
-    plot_support(split_frame, figures_dir / "constructed_support_by_rank.png")
+    constructed_dir = Path(args.constructed_dataset_dir)
+    split_frame = split_summary(constructed_dir)
+    native = native_distribution(constructed_dir)
+    write_split_summary(
+        split_frame, native, tables_dir / "constructed_split_summary.tex"
+    )
+    plot_support(split_frame, native, figures_dir / "constructed_support_by_rank.png")
     result_frame = result_summary(Path(args.results_dir), output_dir)
-    write_result_tables(result_frame, tables_dir)
+    write_result_tables(result_frame, tables_dir, native_results())
     calibration_frame = calibration_summary(Path(args.results_dir), output_dir)
     write_calibration_tables(calibration_frame, tables_dir)
 
@@ -67,113 +69,56 @@ def split_summary(root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def result_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
-    """Return test results for tuning-selected winners, one row per (method, regime, seed)."""
-    selection_path = output_dir / "tuning_selection.json"
-    if not selection_path.exists():
-        return pd.DataFrame()
-    selection = json.loads(selection_path.read_text(encoding="utf-8"))
-    if not selection:
-        return pd.DataFrame()
-    return pd.DataFrame(_result_rows(results_dir, selection))
+SPLIT_HEADER = "$\\lambda$ & Training slides & Support range & Head:tail ratio"
 
 
-def _result_rows(results_dir: Path, selection: list[dict]) -> list[dict]:
-    return [
-        row for entry in selection for row in _entry_result_rows(entry, results_dir)
-    ]
-
-
-def _entry_result_rows(entry: dict, results_dir: Path) -> list[dict]:
-    m = re.match(r"order=(?P<order>.+)/param=(?P<parameter>[\d.]+)", entry["regime"])
-    if m is None:
-        return []
-    order, parameter = m.group("order"), float(m.group("parameter"))
-    rows = []
-    for seed in range(3):
-        test_path = (
-            results_dir
-            / "tuning"
-            / entry["benchmark"]
-            / entry["regime"]
-            / entry["method"]
-            / entry["variant"]
-            / f"seed={seed}"
-            / "test_results.json"
-        )
-        row = _load_result_row(test_path, entry, order, parameter, seed)
-        if row:
-            rows.append(row)
-    return rows
-
-
-def _load_result_row(
-    test_path: Path, entry: dict, order: str, parameter: float, seed: int
-) -> dict | None:
-    if not test_path.exists():
-        return None
-    with open(test_path, encoding="utf-8") as f:
-        payload = json.load(f)
-    return {
-        "method": entry["method"],
-        "benchmark": _benchmark(entry["method"]),
-        "order": order,
-        "parameter": parameter,
-        "seed": seed,
-        **{metric: float(payload[metric]) for metric in METRICS},
-    }
-
-
-def write_split_summary(frame: pd.DataFrame, path: Path) -> None:
-    """Write the constructed split summary table."""
+def write_split_summary(frame: pd.DataFrame, native: pd.Series, path: Path) -> None:
+    """Write the constructed split summary table, including the native full-pool row."""
     if frame.empty:
-        _write_unavailable(
-            path, "Order & $\\lambda$ & Training slides & Minimum class support"
-        )
+        _write_unavailable(path, SPLIT_HEADER)
         return
     rows = _split_summary_rows(frame)
-    _write_table(path, "Order & $\\lambda$ & Training slides & Support range", rows)
+    if not native.empty:
+        total, lo, hi = float(native.sum()), float(native.min()), float(native.max())
+        rows.append(_support_row("native (full pool)", total, lo, hi))
+    _write_table(path, SPLIT_HEADER, rows)
 
 
 def _split_summary_rows(frame: pd.DataFrame) -> list[str]:
-    per_seed = (
-        frame.groupby(["order", "parameter", "seed"])
+    agg = (
+        frame.groupby(["parameter", "seed"])
         .agg(total=("count", "sum"), minimum=("count", "min"), maximum=("count", "max"))
-        .reset_index()
-    )
-    aggregate = (
-        per_seed.groupby(["order", "parameter"])
-        .agg(
-            total=("total", "mean"),
-            minimum=("minimum", "mean"),
-            maximum=("maximum", "mean"),
-        )
+        .groupby("parameter")
+        .mean()
         .reset_index()
     )
     return [
-        f"{_tex(row['order'])} & {float(row['parameter']):.1f} & "
-        f"{float(row['total']):.0f} & "
-        f"{float(row['minimum']):.1f}--{float(row['maximum']):.1f}\\\\"
-        for _, row in aggregate.iterrows()
+        _support_row(f"{r['parameter']:.1f}", r["total"], r["minimum"], r["maximum"])
+        for r in agg.to_dict("records")
     ]
 
 
-def plot_support(frame: pd.DataFrame, path: Path) -> None:
+def _support_row(label: str, total: float, minimum: float, maximum: float) -> str:
+    ratio = round(maximum / minimum) if minimum else 0
+    return (
+        f"{label} & {total:.0f} & {minimum:.0f}--{maximum:.0f} & "
+        f"${{\\approx}}{ratio}{{:}}1$\\\\"
+    )
+
+
+def plot_support(frame: pd.DataFrame, native: pd.Series, path: Path) -> None:
     """Plot training support by rank for the three evaluated severities plus native reference."""
     if frame.empty:
         return
-    native_order = "native_prevalence"
-    # ponytail: native full-pool split (largest total) reused as the native reference curve
-    native_param = _find_native_param(frame, native_order)
     grouped = (
-        frame[frame["order"] == native_order]
+        frame[frame["order"] == "native_prevalence"]
         .groupby(["parameter", "rank"])["count"]
         .mean()
         .reset_index()
     )
     fig, ax = plt.subplots(figsize=(7, 4))
     _add_severity_lines(ax, grouped)
-    _add_native_line(ax, grouped, native_param)
+    _add_native_line(ax, native)
     ax.set_xlabel("Class rank")
     ax.set_ylabel("Training slides")
     ax.set_yscale("log")
@@ -184,25 +129,33 @@ def plot_support(frame: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def _add_native_line(
-    ax: matplotlib.axes.Axes, grouped: pd.DataFrame, native_param: float
-) -> None:
-    native_part = grouped[grouped["parameter"] == native_param]
-    if not native_part.empty:
-        ax.plot(
-            native_part["rank"],
-            native_part["count"],
-            color="black",
-            linestyle="--",
-            label="Native (full pool)",
-        )
-
-
-def _find_native_param(frame: pd.DataFrame, order: str) -> float:
-    totals = (
-        frame[frame["order"] == order].groupby("parameter")["count"].sum().reset_index()
+def _add_native_line(ax: matplotlib.axes.Axes, native: pd.Series) -> None:
+    if native.empty:
+        return
+    ax.plot(
+        range(1, len(native) + 1),
+        native.to_numpy(),
+        color="black",
+        linestyle="--",
+        label="Native (full pool)",
     )
-    return float(totals.loc[cast(int, totals["count"].idxmax()), "parameter"])
+
+
+def native_distribution(root: Path) -> pd.Series:
+    """Return seed-averaged native full-pool counts ordered by native-prevalence rank."""
+    by_seed: dict[str, dict[str, int]] = {}
+    for path in sorted(root.glob("constructed_order=native_prevalence_*_seed=*")):
+        match = SPLIT_PATTERN.fullmatch(path.name)
+        counts_path = path / "available_counts.json"
+        if match is None or not counts_path.exists():
+            continue
+        by_seed[match.group("seed")] = json.loads(
+            counts_path.read_text(encoding="utf-8")
+        )
+    if not by_seed:
+        return pd.Series(dtype=float)
+    mean = cast(pd.Series, pd.DataFrame(by_seed.values()).mean())
+    return cast(pd.Series, mean.sort_values(ascending=False))
 
 
 def _add_severity_lines(ax: matplotlib.axes.Axes, grouped: pd.DataFrame) -> None:
@@ -229,10 +182,9 @@ def _split_rows(metadata: dict[str, str], counts_path: Path) -> list[dict[str, o
             "parameter": float(metadata["parameter"]),
             "seed": int(metadata["seed"]),
             "rank": rank,
-            "class_name": class_name,
             "count": int(count),
         }
-        for rank, (class_name, count) in enumerate(ordered, start=1)
+        for rank, (_class_name, count) in enumerate(ordered, start=1)
     ]
 
 

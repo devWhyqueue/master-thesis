@@ -8,16 +8,9 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from data.full_scale.rows import (
-    cap_rows_per_slide,
-    rows_for_slides,
-    slide_frame,
-)
+from data.full_scale.rows import cap_rows_per_slide, rows_for_slides, slide_frame
 from data.feature_store import expand_splits_for_wsi_manifest
-from data.full_scale.targets import (
-    max_feasible_total,
-    power_law_counts,
-)
+from data.full_scale.targets import max_feasible_total, power_law_counts
 from data.sampling import patch_sort_key
 
 logger = logging.getLogger(__name__)
@@ -109,6 +102,7 @@ def write_constructed_outputs(
     output_dir: str,
     metadata: dict[str, object],
     feature_dir: str | None = None,
+    available_counts: dict[str, int] | None = None,
 ) -> None:
     """Write constructed manifests and provenance files."""
     os.makedirs(output_dir, exist_ok=True)
@@ -118,6 +112,8 @@ def write_constructed_outputs(
     manifest.to_csv(os.path.join(output_dir, "manifest_splits.csv"), index=False)
     _write_json(os.path.join(output_dir, "class_order.json"), ordered_classes)
     _write_json(os.path.join(output_dir, "target_counts.json"), targets)
+    if available_counts is not None:
+        _write_json(os.path.join(output_dir, "available_counts.json"), available_counts)
     _write_json(os.path.join(output_dir, "args.json"), metadata)
 
 
@@ -176,7 +172,7 @@ def constructed_payload(
     )
     frames = _cap_all_splits(args, splits, train)
     targets = power_law_counts(
-        _available_training_slides(splits[args.train_name]),
+        pd.Series(available_training_counts(splits[args.train_name])),
         ordered_classes,
         args.parameter,
         pool,
@@ -232,11 +228,10 @@ def _sample_class(
     )
 
 
-def _available_training_slides(train_frame: pd.DataFrame) -> pd.Series:
-    return cast(
-        pd.Series,
-        train_frame.groupby("cancer_type")["slide_id"].nunique(),
-    )
+def available_training_counts(train_frame: pd.DataFrame) -> dict[str, int]:
+    """Return native full-pool slide counts per class (the construction's a_c)."""
+    counts = train_frame.groupby("cancer_type")["slide_id"].nunique()
+    return {str(name): int(count) for name, count in counts.items()}
 
 
 def _write_json(path: str, data: object) -> None:

@@ -23,7 +23,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology is routinely studied under real distributions, where prevalence, class separability, and data-collection history are entangled. This report defines a controlled TCGA-UT benchmark that varies only the imbalance severity of the training distribution while holding validation and test splits fixed. Power-law training distributions are generated under native-prevalence class ordering at imbalance parameters $\lambda \in \{0.5, 1.0, 1.5\}$ with a shared strictly feasible pool of \num{1132} slides, yielding head-to-tail ratios of approximately 6:1, 30:1, and 122:1 that bracket and extend the native TCGA-UT imbalance ratio (${\approx}28{:}1$). Using frozen Virchow2 patch and WSI-bag features with a 30-instance evidence budget, the same method families evaluated in a prior class-imbalance study on TCGA-UT \citep{queisler2026imbalanceTCGA} are compared across three constructed severities, including a ProGAN synthetic-augmentation baseline that generates class-specific patch images for tail classes. At the patch level, ProGAN leads all methods at the mildest severity ($\lambda=0.5$, BAcc $\num{0.729}$) but undergoes the steepest severity-induced decline, falling to last at $\lambda=1.5$ (BAcc $\num{0.624}$); all other patch methods decline by eight to nine percentage points. WSI-bag methods show larger absolute performance and RankMix is the most severity-robust bag-composition method.
+\noindent Class imbalance in computational pathology is routinely studied under real distributions, where prevalence, class separability, and data-collection history are entangled. This report defines a controlled TCGA-UT benchmark that varies only the imbalance severity of the training distribution while holding validation and test splits fixed. Power-law training distributions are generated under native-prevalence class ordering at three imbalance levels that bracket and extend the native TCGA-UT imbalance ratio, ranging from milder than native to substantially more skewed, over a shared strictly feasible slide pool. Using frozen Virchow2 patch and WSI-bag features with a fixed evidence budget, the same method families evaluated in a prior class-imbalance study on TCGA-UT \citep{queisler2026imbalanceTCGA} are compared across the three constructed severities, including a synthetic patch-augmentation baseline. Method rankings are largely preserved across severities while absolute performance declines monotonically as rare-class support diminishes. At the patch level, synthetic augmentation is competitive at mild imbalance but undergoes the steepest severity-induced decline; OKO is the most robust. WSI-bag methods outperform patch methods throughout, and bag-composition mechanisms---notably RankMix---are the most severity-robust.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -35,7 +35,7 @@ A prior class-imbalance study on TCGA-UT compared mitigation methods under the d
 
 TCGA-UT is a suitable test bed for this isolation because it provides slide labels and patch-level evidence from diagnostic whole-slide images in The Cancer Genome Atlas \citep{tomczak2015reviewThe,komura2022universalEncoding}. Controlling only the imbalance severity under a fixed native-prevalence class ordering allows the question to be posed cleanly: do mitigation methods maintain their relative advantage as the imbalance between frequent and rare cancer types intensifies along the same ranking?
 
-The report evaluates the same method families as \citet{queisler2026imbalanceTCGA} under three constructed training distributions that vary only $\lambda \in \{0.5, 1.0, 1.5\}$, the imbalance-severity parameter, while holding the class ranking fixed. Patch-level methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, OKO set learning, and ProGAN synthetic augmentation \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
+The report evaluates the same method families as \citet{queisler2026imbalanceTCGA} under three constructed training distributions that vary only $\lambda \in \{0.5, 1.0, 1.5\}$, the imbalance-severity parameter, while holding the class ranking fixed. A single head-to-tail ratio is only a coarse summary of imbalance; $\lambda$ instead governs the full shape of the power-law training profile, so every rank---not just the extremes---changes in a controlled way. Patch-level methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, OKO set learning, and ProGAN synthetic augmentation \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
 
 \section{Dataset Construction}
 \label{sec:dataset-construction}
@@ -50,7 +50,7 @@ All 32 cancer types are retained. Let $C=32$, let $\mathcal{D}_{\mathrm{train}}$
 \end{equation}
 \noindent Every class receives at least one slide, no class is oversampled beyond its available pool, and the total training set is fixed at $N$ slides shared across all imbalance parameters and seeds.
 
-After slide selection, the input evidence is capped. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}, read from the shared \texttt{cls\_patchmean} store ($\mathrm{concat}(\mathrm{CLS},\,\mathrm{mean}(\mathrm{patch\ tokens}))$, \num{2560}-dimensional vectors). The cap aligns the input budget across regimes and prevents slides with more extracted tumor patches from dominating the training objective.
+After slide selection, the input evidence is capped. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}, represented as the concatenation of the CLS token and the mean of the patch tokens ($\num{2560}$-dimensional vectors). The cap aligns the input budget across regimes and prevents slides with more extracted tumor patches from dominating the training objective.
 
 \subsection{Power-Law Training Support}
 For an ordered class list $(c_1,\ldots,c_C)$, the intended share for rank $i$ under imbalance parameter $\lambda$ is
@@ -120,24 +120,7 @@ Calibration is evaluated alongside discrimination using negative log likelihood 
 
 \section{Results}
 \label{sec:results}
-The analysis asks how methods respond as imbalance severity increases from $\lambda=0.5$ to $\lambda=1.5$ under the native-prevalence class order. The realized support profiles are summarised in Table~\ref{tab:constructed-split-summary}; Tables~\ref{tab:patch-results} and~\ref{tab:wsi-results} compare mitigation methods within the patch-feature and WSI-bag regimes.
-
-\begin{table}[ht]
-  \centering
-  \begin{tabular}{lllll}
-    \toprule
-    $\lambda$ & Training slides & Support range & Head:tail ratio\\
-    \midrule
-    0.5 & \num{1132} & 20--112 & ${\approx}6{:}1$\\
-    1.0 & \num{1132} & \phantom{0}9--272 & ${\approx}30{:}1$\\
-    1.5 & \num{1132} & \phantom{0}4--487 & ${\approx}122{:}1$\\
-    \midrule
-    native (full pool) & \num{6110} & 20--567 & ${\approx}28{:}1$\\
-    \bottomrule
-  \end{tabular}
-  \caption{Constructed training-support profiles under native-prevalence ordering. Support range and head:tail ratio are the minimum and maximum per-class slide counts averaged across seeds. The native full-pool row is shown for reference; it is not part of the constructed experiment.}
-  \label{tab:constructed-split-summary}
-\end{table}
+The analysis asks how methods respond as imbalance severity increases from $\lambda=0.5$ to $\lambda=1.5$ under the native-prevalence class order. The realized support profiles are summarised in Table~\ref{tab:constructed-split-summary} (Appendix~\ref{sec:appendix-support}); Tables~\ref{tab:patch-results} and~\ref{tab:wsi-results} compare mitigation methods within the patch-feature and WSI-bag regimes.
 
 \begin{table}[ht]
   \centering
@@ -152,11 +135,11 @@ The analysis asks how methods respond as imbalance severity increases from $\lam
       \bottomrule
     \end{tabular}%
   }
-  \caption{Patch-feature test results for validation-selected configurations under constructed training distributions.}
+  \caption{Patch-feature test results (balanced accuracy and macro F1) for validation-selected configurations under constructed training distributions. The Native column reports the companion full-pool benchmark \citep{queisler2026imbalanceTCGA} (native ${\approx}28{:}1$ imbalance, complete training pool) as a reference; it is not part of the constructed experiment.}
   \label{tab:patch-results}
 \end{table}
 
-Patch-feature results show a consistent, monotone decline as imbalance intensifies (Table~\ref{tab:patch-results}). At the mildest severity ($\lambda=0.5$), ProGAN augmentation leads in balanced accuracy (\num{0.729}), with CFAL (\num{0.724}) and OKO (\num{0.722}) close behind; at moderate severity ($\lambda=1.0$), CE+soft-F1 (\num{0.713}), OKO (\num{0.712}), and ProGAN (\num{0.712}) are tightly grouped at the front; at the harshest regime ($\lambda=1.5$), OKO (\num{0.644}) retains a clear lead while ProGAN drops to last (\num{0.624}), reversing its mild-severity advantage. Individual declines from $\lambda=0.5$ to $\lambda=1.5$ span eight to eleven percentage points; ProGAN undergoes the steepest decline (10.5 pp), while OKO and CE+soft-F1 are most stable. Focal loss is consistently the weakest among remaining methods. Within the patch family the spread across methods at any fixed $\lambda$ is approximately one to two percentage points---so the severity-induced decline is substantially larger than the advantage of choosing the best method.
+Patch-feature results show a consistent, monotone decline as imbalance intensifies (Table~\ref{tab:patch-results}). ProGAN augmentation leads in balanced accuracy at the mildest severity but reverses to last at the harshest, undergoing the steepest decline of any patch method; OKO and CE+soft-F1 are the most stable and retain the lead at $\lambda=1.5$. Focal loss is consistently the weakest among the remaining methods. The key observation is one of scale: the spread across methods at any fixed $\lambda$ is only one to two percentage points, whereas the severity-induced decline from $\lambda=0.5$ to $\lambda=1.5$ is roughly eight to eleven percentage points---choosing the right severity matters far more than choosing the best method. The native full-pool benchmark (rightmost block) sits above even the mildest constructed severity, despite carrying a larger imbalance (${\approx}28{:}1$) than $\lambda=0.5$ (${\approx}6{:}1$); because it draws on the complete training pool rather than the constructed subset, this gap isolates training-set size---not imbalance---as the dominant lever on absolute patch performance.
 
 \begin{table}[ht]
   \centering
@@ -171,12 +154,12 @@ Patch-feature results show a consistent, monotone decline as imbalance intensifi
       \bottomrule
     \end{tabular}%
   }
-  \caption{WSI-bag test results for validation-selected configurations under constructed training distributions.}
+  \caption{WSI-bag test results (balanced accuracy and macro F1) for validation-selected configurations under constructed training distributions. The Native column is the companion full-pool benchmark \citep{queisler2026imbalanceTCGA} reference, as in Table~\ref{tab:patch-results}.}
   \label{tab:wsi-results}
 \end{table}
 
 
-The WSI-bag regime shows higher absolute performance than the patch regime (Table~\ref{tab:wsi-results}). MDE-MIL leads at mild and moderate severities (\num{0.836} and \num{0.818}), while RankMix overtakes it at the harshest regime (\num{0.765} versus MDE-MIL's \num{0.730}). RankMix is the most severity-robust method overall, declining by approximately 6.5 percentage points from $\lambda=0.5$ to $\lambda=1.5$; focal loss is the least stable, declining by nearly 12 percentage points. At $\lambda=1.5$, MDE-MIL falls narrowly below Weighted CE (\num{0.736}), indicating that the advantage of consistency regularisation over simple loss weighting erodes at the highest severity. The ordering of bag-composition methods (RankMix, SC-MIL) over loss-based variants is maintained throughout all three regimes, confirming that WSI-specific aggregation mechanisms retain their advantage under increasing imbalance.
+The WSI-bag regime shows higher absolute performance than the patch regime (Table~\ref{tab:wsi-results}), roughly ten balanced-accuracy points above patch methods at equivalent imbalance. MDE-MIL leads at mild and moderate severities, but RankMix overtakes it at the harshest regime and is the most severity-robust method overall, while focal loss is the least stable. MDE-MIL's advantage over simple loss weighting erodes at $\lambda=1.5$, where it falls narrowly below Weighted CE---consistency regularisation provides diminishing returns as rare-class support becomes critically scarce. The ordering of bag-composition methods (RankMix, SC-MIL) over loss-based variants holds across all three regimes, confirming that WSI-specific aggregation mechanisms retain their advantage under increasing imbalance. As in the patch regime, the native full-pool benchmark (rightmost block) exceeds even $\lambda=0.5$ despite its larger imbalance, again pointing to training-set size rather than imbalance severity as the main driver of absolute performance.
 
 \paragraph{Probability Calibration.}
 \begin{table}[ht]
@@ -238,6 +221,26 @@ This report defines a full-scale controlled TCGA-UT imbalance benchmark that kee
 
 \clearpage
 \appendix
+\section{Constructed Training-Support Profiles}
+\label{sec:appendix-support}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/constructed_split_summary.tex}{%
+    \input{outputs/tables/constructed_split_summary.tex}%
+  }{%
+    \begin{tabular}{llll}
+      \toprule
+      $\lambda$ & Training slides & Support range & Head:tail ratio\\
+      \midrule
+      \multicolumn{4}{c}{Constructed split summary unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{Constructed training-support profiles under native-prevalence ordering. Support range and head:tail ratio are the minimum and maximum per-class slide counts averaged across seeds. The native full-pool row is shown for reference; it is not part of the constructed experiment.}
+  \label{tab:constructed-split-summary}
+\end{table}
+
 \section{Full Calibration Metrics}
 \label{sec:appendix-calibration}
 

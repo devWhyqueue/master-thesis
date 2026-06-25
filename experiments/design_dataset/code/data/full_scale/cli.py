@@ -13,6 +13,7 @@ from data.feature_store import (
 )
 from data.full_scale.sampling import (
     attach_splits,
+    available_training_counts,
     class_order,
     constructed_payload,
     load_manifest,
@@ -69,6 +70,7 @@ def _run_sampling(args: argparse.Namespace) -> str:
         output_dir,
         vars(args),
         feature_dir=args.feature_dir,
+        available_counts=available_training_counts(splits[args.train_name]),
     )
     return output_dir
 

@@ -1,7 +1,10 @@
+import json
+
 import pandas as pd
 
 from data.full_scale.sampling import (
     assert_case_disjoint,
+    available_training_counts,
     cap_patches,
     construct_training_split,
     max_feasible_total,
@@ -89,6 +92,29 @@ def test_write_constructed_outputs_includes_combined_manifest(tmp_path) -> None:
 
     combined = pd.read_csv(tmp_path / "manifest_splits.csv")
     assert combined["split"].tolist() == ["train", "validation", "test"]
+
+
+def test_available_training_counts_uses_native_full_pool(tmp_path) -> None:
+    train = pd.DataFrame(
+        [
+            {"cancer_type": class_name, "slide_id": f"{class_name}_{index}"}
+            for class_name, count in {"a": 3, "b": 1}.items()
+            for index in range(count)
+        ]
+    )
+    available = available_training_counts(train)
+    assert available == {"a": 3, "b": 1}
+
+    write_constructed_outputs(
+        {"train": train.assign(patch_ids=[[] for _ in range(len(train))])},
+        {"a": 2, "b": 1},
+        ["a", "b"],
+        str(tmp_path),
+        {"seed": 0},
+        available_counts=available,
+    )
+    with open(tmp_path / "available_counts.json") as file:
+        assert json.load(file) == {"a": 3, "b": 1}
 
 
 def test_case_disjoint_split_validation_accepts_patient_disjoint_splits() -> None:
