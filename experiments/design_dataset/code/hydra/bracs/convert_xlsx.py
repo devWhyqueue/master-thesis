@@ -1,33 +1,22 @@
-"""Convert BRACS.xlsx to a normalised CSV without pandas or the container."""
+"""Build per-ROI metadata CSV from the BRACS filesystem and xlsx patient map.
+
+BRACS.xlsx contains WSI-level rows only; ROI filenames and labels come from
+the BRACS_RoI directory tree (BRACS_<wsi>_<subtype>_<seq>.ext).
+"""
 
 from __future__ import annotations
 
 import csv
 import logging
 import pathlib
-import re
 import sys
 from openpyxl import load_workbook  # available on login/compute nodes via system Python
 
 logger = logging.getLogger(__name__)
 
 _FIELDS = ["case_id", "slide_id", "roi_id", "cancer_type", "dataset", "lesion_type"]
-_ALIASES = {
-    "NORMAL": "N",
-    "N": "N",
-    "PB": "PB",
-    "PATHOLOGICALBENIGN": "PB",
-    "UDH": "UDH",
-    "USUALDUCTALHYPERPLASIA": "UDH",
-    "FEA": "FEA",
-    "FLATEPITHELIALATYPIA": "FEA",
-    "ADH": "ADH",
-    "ATYPICALDUCTALHYPERPLASIA": "ADH",
-    "DCIS": "DCIS",
-    "DUCTALCARCINOMAINSITU": "DCIS",
-    "IC": "IC",
-    "INVASIVECARCINOMA": "IC",
-}
+_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+_SUBTYPE = {"N", "PB", "UDH", "FEA", "ADH", "DCIS", "IC"}
 _LESION = {
     "N": "benign",
     "PB": "benign",
@@ -39,66 +28,60 @@ _LESION = {
 }
 
 
-def _canon(v: object) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", str(v).strip().lower()).strip("_")
-
-
-def _first(names: tuple[str, ...], cols: dict[str, int]) -> int | None:
-    """Return the first column index matching any of the candidate names."""
-    for n in names:
-        if n in cols:
-            return cols[n]
-    for k, v in cols.items():
-        if any(n in k for n in names):
-            return v
-    return None
-
-
-def _clean(v: object) -> str:
-    s = str(v).strip()
-    return "" if s.lower() == "nan" else pathlib.Path(s).stem
-
-
-def _find_columns(
-    header_cells: list,
-) -> tuple[int | None, int | None, int | None, int | None]:
-    """Return (roi_idx, slide_idx, case_idx, label_idx) column positions."""
-    cols = {_canon(c.value): i for i, c in enumerate(header_cells)}
-    return (
-        _first(("roi", "roi_id", "roi_filename", "roi_name", "image"), cols),
-        _first(("wsi", "slide", "slide_id", "wsi_filename"), cols),
-        _first(("patient", "patient_id", "case", "case_id"), cols),
-        _first(
-            ("subtype", "lesion_subtype", "label", "class", "diagnosis", "category"),
-            cols,
-        ),
-    )
-
-
-def _load_sheet_rows(xlsx: pathlib.Path) -> tuple[list, list]:
-    """Return header cells and data rows from the largest sheet."""
+def _wsi_patient_map(data_root: pathlib.Path) -> dict[str, str]:
+    """Return {wsi_filename: patient_id} from the WSI_Information xlsx sheet."""
+    xlsx = next(data_root.rglob("BRACS.xlsx"))
     wb = load_workbook(xlsx, read_only=True)
-    largest = max(wb.worksheets, key=lambda ws: ws.max_row)
-    rows = list(largest.rows)
-    return list(rows[0]), rows[1:]
+    for sheet in wb.worksheets:
+        rows = list(sheet.rows)
+        if not rows:
+            continue
+        headers = [str(c.value or "").strip().lower() for c in rows[0]]
+        wsi_col = next(
+            (i for i, h in enumerate(headers) if "wsi" in h and "filename" in h), None
+        )
+        pat_col = next((i for i, h in enumerate(headers) if "patient" in h), None)
+        if wsi_col is None or pat_col is None:
+            continue
+        return {
+            str(r[wsi_col].value).strip(): str(r[pat_col].value).split(".")[0]
+            for r in rows[1:]
+            if r[wsi_col].value and r[pat_col].value
+        }
+    raise ValueError("Could not find WSI filename / patient columns in BRACS.xlsx")
 
 
-def _make_row(vals: list, ri: int, si: int, ci: int, li: int) -> dict | None:
-    """Build a normalised CSV row dict, or None to skip."""
-    if all(v is None for v in vals):
-        return None
-    label = _ALIASES.get(re.sub(r"[^A-Z0-9]+", "", str(vals[li]).strip().upper()))
-    roi, slide, case = _clean(vals[ri]), _clean(vals[si]), _clean(vals[ci])
-    if not (label and roi and slide and case):
-        return None
-    return {
-        "case_id": case,
-        "slide_id": slide,
-        "roi_id": roi,
-        "cancer_type": label,
-        "dataset": "bracs",
-        "lesion_type": _LESION[label],
-    }
+def _roi_rows(data_root: pathlib.Path, wsi_map: dict[str, str]) -> list[dict]:
+    """Build per-ROI rows by walking the BRACS_RoI/latest_version directory."""
+    roi_dir = next((p for p in data_root.rglob("BRACS_RoI") if p.is_dir()), None)
+    if roi_dir is None:
+        raise FileNotFoundError(f"BRACS_RoI not found under {data_root}")
+    scan_root = (
+        roi_dir / "latest_version" if (roi_dir / "latest_version").is_dir() else roi_dir
+    )
+    rows = []
+    for img in sorted(scan_root.rglob("*")):
+        if img.suffix.lower() not in _IMAGE_EXT:
+            continue
+        parts = img.stem.split("_")
+        if len(parts) < 4 or parts[0] != "BRACS" or parts[2].upper() not in _SUBTYPE:
+            continue
+        wsi_id = f"{parts[0]}_{parts[1]}"
+        label = parts[2].upper()
+        patient_id = wsi_map.get(wsi_id, "")
+        if not patient_id:
+            continue
+        rows.append(
+            {
+                "case_id": patient_id,
+                "slide_id": wsi_id,
+                "roi_id": img.stem,
+                "cancer_type": label,
+                "dataset": "bracs",
+                "lesion_type": _LESION[label],
+            }
+        )
+    return rows
 
 
 def _write_csv(output_csv: pathlib.Path, rows: list) -> None:
@@ -111,19 +94,11 @@ def _write_csv(output_csv: pathlib.Path, rows: list) -> None:
 
 
 def convert(data_root: pathlib.Path, output_csv: pathlib.Path) -> int:
-    """Convert BRACS.xlsx to a normalised CSV and return the row count."""
-    xlsx = next(data_root.rglob("BRACS.xlsx"))
-    header_cells, data_rows = _load_sheet_rows(xlsx)
-    ri, si, ci, li = _find_columns(header_cells)
-    if ri is None or si is None or ci is None or li is None:
-        raise ValueError(f"Could not identify required columns in {xlsx}")
-    out = [
-        r
-        for row in data_rows
-        if (r := _make_row([c.value for c in row], ri, si, ci, li))
-    ]
-    _write_csv(output_csv, out)
-    return len(out)
+    """Build per-ROI metadata CSV from BRACS filesystem and return the row count."""
+    wsi_map = _wsi_patient_map(data_root)
+    rows = _roi_rows(data_root, wsi_map)
+    _write_csv(output_csv, rows)
+    return len(rows)
 
 
 if __name__ == "__main__":
