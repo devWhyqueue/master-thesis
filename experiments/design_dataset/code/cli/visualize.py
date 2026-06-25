@@ -1,4 +1,4 @@
-from analysis.plotting.plots import main
+from analysis.plotting.cli_runner import main
 
 
 if __name__ == "__main__":

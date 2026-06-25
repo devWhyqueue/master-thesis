@@ -194,7 +194,8 @@ def _result_colspec_headers(
     blocks = [f"$\\lambda={p:.1f}$" for p in params] + (
         ["Native"] if with_native else []
     )
-    colspec = "l" + "r" * (len(blocks) * 2)
+    # Native is contextual, not part of the constructed experiment: rule it off.
+    colspec = "l" + "r" * (len(params) * 2) + ("|rr" if with_native else "")
     header_top = "Method & " + " & ".join(
         f"\\multicolumn{{2}}{{c}}{{{block}}}" for block in blocks
     )

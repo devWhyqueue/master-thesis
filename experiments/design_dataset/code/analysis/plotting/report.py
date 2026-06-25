@@ -1,6 +1,5 @@
 import argparse
 import json
-import re
 from pathlib import Path
 from typing import cast
 
@@ -10,16 +9,22 @@ import matplotlib.ticker
 import pandas as pd
 
 from analysis.evaluation.tuning_grid import CLASS_ORDERS, LAMBDAS
-from analysis.plotting import _write_table, _write_unavailable
+from analysis.plotting import (
+    SEVERITY_COLORS,
+    SPLIT_PATTERN,
+    _write_table,
+    _write_unavailable,
+)
 from analysis.plotting.calibration import calibration_summary, write_calibration_tables
 from analysis.plotting.results import (
     native_results,
     result_summary,
     write_result_tables,
 )
-
-SPLIT_PATTERN = re.compile(
-    r"constructed_order=(?P<order>.+)_parameter=(?P<parameter>[\d.]+)_seed=(?P<seed>\d+)"
+from analysis.plotting.tail_class import (
+    plot_support_vs_recall,
+    tail_class_frame,
+    write_tail_class_tables,
 )
 
 
@@ -51,6 +56,11 @@ def main() -> None:
     write_result_tables(result_frame, tables_dir, native_results())
     calibration_frame = calibration_summary(Path(args.results_dir), output_dir)
     write_calibration_tables(calibration_frame, tables_dir)
+    tail_frame = tail_class_frame(
+        Path(args.results_dir), output_dir, constructed_dir, native
+    )
+    write_tail_class_tables(tail_frame, tables_dir)
+    plot_support_vs_recall(tail_frame, figures_dir / "support_vs_recall.png")
 
 
 def split_summary(root: Path) -> pd.DataFrame:
@@ -160,8 +170,7 @@ def native_distribution(root: Path) -> pd.Series:
 
 def _add_severity_lines(ax: matplotlib.axes.Axes, grouped: pd.DataFrame) -> None:
     params = [0.5, 1.0, 1.5]
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
-    for param, color in zip(params, colors):
+    for param, color in zip(params, SEVERITY_COLORS):
         part = grouped[grouped["parameter"] == param]
         if not part.empty:
             ax.plot(

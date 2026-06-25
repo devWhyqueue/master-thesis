@@ -1,10 +1,17 @@
 """Plotting helpers shared across all report modules."""
 
+import re
 from pathlib import Path
 from typing import cast
 
 import numpy as np
 import pandas as pd
+
+SEVERITY_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c")
+
+SPLIT_PATTERN = re.compile(
+    r"constructed_order=(?P<order>.+)_parameter=(?P<parameter>[\d.]+)_seed=(?P<seed>\d+)"
+)
 
 DISPLAY_NAMES: dict[str, str] = {
     "patch_feature_balanced_sampler_ce": "Balanced sampling",
