@@ -34,6 +34,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--constructed-dataset-dir", required=True)
     parser.add_argument("--results-dir", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--no-native-reference", action="store_true")
     return parser.parse_args()
 
 
@@ -53,7 +54,8 @@ def main() -> None:
     )
     plot_support(split_frame, native, figures_dir / "constructed_support_by_rank.png")
     result_frame = result_summary(Path(args.results_dir), output_dir)
-    write_result_tables(result_frame, tables_dir, native_results())
+    native_reference = None if args.no_native_reference else native_results()
+    write_result_tables(result_frame, tables_dir, native_reference)
     calibration_frame = calibration_summary(Path(args.results_dir), output_dir)
     write_calibration_tables(calibration_frame, tables_dir)
     tail_frame = tail_class_frame(

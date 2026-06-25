@@ -158,16 +158,19 @@ def class_image_paths(
     seed: int,
 ) -> list[Path]:
     """Return deterministic real image paths for one train class."""
-    paths = [
-        resolve_real_patch_path(
-            raw_root,
-            raw_resolution,
-            str(row["cancer_type"]),
-            str(row["slide_id"]),
-            str(row["patch_id"]),
-        )
-        for _, row in frame.iterrows()
-    ]
+    if "image_path" in frame.columns:
+        paths = [Path(path) for path in frame["image_path"].astype(str).tolist()]
+    else:
+        paths = [
+            resolve_real_patch_path(
+                raw_root,
+                raw_resolution,
+                str(row["cancer_type"]),
+                str(row["slide_id"]),
+                str(row["patch_id"]),
+            )
+            for _, row in frame.iterrows()
+        ]
     if len(paths) <= limit:
         return paths
     rng = np.random.default_rng(subsample_seed(seed, str(frame.iloc[0]["cancer_type"])))

@@ -109,6 +109,28 @@ def _add_verify_args(subparsers: argparse._SubParsersAction) -> None:
     subparsers.add_parser("verify-features")
 
 
+def _add_bracs_args(subparsers: argparse._SubParsersAction) -> None:
+    for command in (
+        "bracs-stage",
+        "bracs-prepare",
+        "bracs-features",
+        "bracs-patch-cache",
+        "bracs-wsi-cache",
+        "bracs-progan-cache",
+        "bracs-progan-power-law",
+        "bracs-power-law",
+        "bracs-tune",
+        "bracs-tune-wsi",
+        "bracs-tune-power-law",
+        "bracs-tune-wsi-power-law",
+        "bracs-tune-aggregate",
+        "bracs-tune-aggregate-power-law",
+        "bracs-report",
+        "bracs-report-power-law",
+    ):
+        subparsers.add_parser(command)
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the Hydra job runner parser."""
     parser = argparse.ArgumentParser(description="Run TCGA-UT jobs.")
@@ -129,6 +151,7 @@ def create_parser() -> argparse.ArgumentParser:
     _add_visualize_args(subparsers)
     _add_report_args(subparsers)
     _add_verify_args(subparsers)
+    _add_bracs_args(subparsers)
     return parser
 
 

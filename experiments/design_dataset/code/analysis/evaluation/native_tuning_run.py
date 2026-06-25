@@ -1,4 +1,4 @@
-"""Run one validation-tuning task for patch or WSI constructed training."""
+"""Run one native-dataset validation-tuning task."""
 
 from __future__ import annotations
 
@@ -11,18 +11,17 @@ import sys
 from pathlib import Path
 
 from common_code.tuning.registry import patch_feature_method_flags
-from analysis.evaluation.tuning_grid import task_for_index
+from analysis.evaluation.native_tuning_grid import task_for_index
 
 logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse tuning runner CLI arguments."""
+    """Parse native tuning runner arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", required=True, choices=["patch", "wsi"])
     parser.add_argument("--array-task-id", type=int, default=None)
-    parser.add_argument("--config", required=True)
-    parser.add_argument("--constructed-dataset-dir", required=True)
+    parser.add_argument("--manifest-root", required=True)
     parser.add_argument("--results-dir", required=True)
     parser.add_argument("--feature-path", required=True)
     parser.add_argument("--prepare-report", default=None)
@@ -32,14 +31,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Run one tuning task or skip it when outputs already exist."""
+    """Run one native tuning task."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = parse_args()
     if _skip_for_mode(args.prepare_report, args.required_mode):
         return
-    task_index = _resolve_array_task_id(args)
-    task = task_for_index(args.benchmark, task_index)
-    out = _output_dir(args, task)
+    task = task_for_index(args.benchmark, _resolve_array_task_id(args))
+    out = _output_dir(args.results_dir, args.benchmark, task.variant, task.seed)
     if _output_complete(out):
         logger.info("Skipping completed task: %s", out)
         return
@@ -58,11 +56,9 @@ def _resolve_array_task_id(args: argparse.Namespace) -> int:
     if args.array_task_id is not None:
         return args.array_task_id
     env_value = os.environ.get("SLURM_ARRAY_TASK_ID")
-    if env_value is not None:
-        return int(env_value)
-    raise ValueError(
-        "Missing task index: pass --array-task-id or run inside a SLURM array job."
-    )
+    if env_value is None:
+        raise ValueError("Pass --array-task-id or run in a SLURM array.")
+    return int(env_value)
 
 
 def _skip_for_mode(report_path: str | None, required_mode: str | None) -> bool:
@@ -79,41 +75,38 @@ def _skip_for_mode(report_path: str | None, required_mode: str | None) -> bool:
     return True
 
 
-def _output_dir(args: argparse.Namespace, task) -> str:
-    benchmark = "patch" if args.benchmark == "patch" else "wsi"
+def _output_dir(results_dir: str, benchmark: str, variant, seed: int) -> str:
     return (
-        f"{args.results_dir}/tuning/{benchmark}/"
-        f"{task.regime.label}/{task.variant.method}/{task.variant.variant}/"
-        f"seed={task.seed}"
+        f"{results_dir}/tuning/{benchmark}/native/{variant.method}/"
+        f"{variant.variant}/seed={seed}"
     )
 
 
 def _output_complete(out: str) -> bool:
-    out_path = Path(out)
-    return (out_path / "validation_results.json").exists() and (
-        out_path / "test_results.json"
+    path = Path(out)
+    return (path / "validation_results.json").exists() and (
+        path / "test_results.json"
     ).exists()
 
 
+def _seed_dir(manifest_root: str, seed: int) -> Path:
+    return Path(manifest_root) / f"native_seed={seed}"
+
+
 def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
-    stem = _constructed_stem(
-        args.constructed_dataset_dir,
-        task.regime.class_order_name,
-        task.regime.parameter,
-        task.seed,
-    )
-    manifest_path = f"{stem}/train.csv"
-    validation_path = f"{stem}/validation.csv"
-    test_path = f"{stem}/test.csv"
-    cache_path = Path(stem) / "patch_feature_cache.pt"
+    stem = _seed_dir(args.manifest_root, task.seed)
+    train = stem / "train.csv"
+    validation = stem / "validation.csv"
+    test = stem / "test.csv"
+    cache = stem / "patch_feature_cache.pt"
     dataset_split = None
     validation_split = None
     test_split = None
     if task.variant.method == "patch_feature_progan_aug":
-        manifest_path = f"{stem}/manifest_splits_progan.csv"
-        validation_path = manifest_path
-        test_path = manifest_path
-        cache_path = Path(stem) / "patch_feature_cache_progan.pt"
+        train = stem / "manifest_splits_progan.csv"
+        validation = train
+        test = train
+        cache = stem / "patch_feature_cache_progan.pt"
         dataset_split = "train"
         validation_split = "validation"
         test_split = "test"
@@ -121,9 +114,9 @@ def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
         sys.executable,
         "-m",
         "cli.train",
-        f"--dataset-structure-path={manifest_path}",
-        f"--validation-dataset-structure-path={validation_path}",
-        f"--test-dataset-structure-path={test_path}",
+        f"--dataset-structure-path={train}",
+        f"--validation-dataset-structure-path={validation}",
+        f"--test-dataset-structure-path={test}",
         f"--feature-path={args.feature_path}",
         "--preload-features",
         f"--results-save-path={out}",
@@ -139,44 +132,37 @@ def _patch_command(args: argparse.Namespace, task, out: str) -> list[str]:
         "--n-epochs=30",
         "--batch-size=256",
         "--dropout=0.1",
-        f"--class-names-path={stem}/class_order.json",
+        f"--class-names-path={stem / 'class_order.json'}",
     ]
     if dataset_split is not None:
         cmd.append(f"--dataset-split={dataset_split}")
-    if validation_split is not None:
         cmd.append(f"--validation-dataset-split={validation_split}")
-    if test_split is not None:
         cmd.append(f"--test-dataset-split={test_split}")
+    if cache.is_file():
+        cmd.append(f"--feature-cache-path={cache}")
     cmd.extend(patch_feature_method_flags(task.variant.method))
-    if cache_path.is_file():
-        cmd.append(f"--feature-cache-path={cache_path}")
     return cmd
 
 
 def _wsi_command(args: argparse.Namespace, task, out: str) -> list[str]:
-    stem = _constructed_stem(
-        args.constructed_dataset_dir,
-        task.regime.class_order_name,
-        task.regime.parameter,
-        task.seed,
-    )
+    stem = _seed_dir(args.manifest_root, task.seed)
     cmd = [
         sys.executable,
         "-m",
         "modeling.training.constructed_wsi",
-        f"--manifest-path={stem}/manifest_splits.csv",
+        f"--manifest-path={stem / 'manifest_splits.csv'}",
         f"--results-save-path={out}",
         f"--method={task.variant.method}",
         f"--seed={task.seed}",
-        f"--class-order-name={task.regime.class_order_name}",
-        f"--parameter={task.regime.parameter}",
+        "--class-order-name=native",
+        "--parameter=0.0",
         f"--tuning-id={task.variant.variant}",
         f"--tuning-params={task.variant.params_json}",
         "--device=auto",
         "--epochs=30",
         "--bag-batch-size=32",
         "--max-instances-per-bag=30",
-        f"--bag-cache-dir={stem}/wsi_bag_cache",
+        f"--bag-cache-dir={stem / 'wsi_bag_cache'}",
     ]
     cmd.extend(_wsi_tuning_flags(task.variant.params))
     return cmd
@@ -192,13 +178,6 @@ def _wsi_tuning_flags(params: dict[str, float]) -> list[str]:
         "mde_mil_consistency_weight": "--mde-mil-consistency-weight",
     }
     return [f"{flag}={params[key]:g}" for key, flag in mapping.items() if key in params]
-
-
-def _constructed_stem(
-    root: str, class_order_name: str, parameter: float, seed: int
-) -> str:
-    name = f"constructed_order={class_order_name}_parameter={parameter}_seed={seed}"
-    return f"{root}/{name}"
 
 
 if __name__ == "__main__":
