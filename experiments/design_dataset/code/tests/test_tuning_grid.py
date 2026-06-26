@@ -19,7 +19,7 @@ def test_patch_grid_restores_progan_and_oko() -> None:
 def test_patch_command_uses_progan_manifest_and_split_filters(tmp_path) -> None:
     stem = (
         tmp_path
-        / "constructed_order=native_prevalence_parameter=0.8_seed=0"
+        / "constructed_order=native_prevalence_parameter=0.5_seed=0"
     )
     stem.mkdir()
     (stem / "patch_feature_cache_progan.pt").write_bytes(b"x")

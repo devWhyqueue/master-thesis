@@ -24,7 +24,8 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 def load_roi_metadata(root: Path, metadata_csv: Path | None = None) -> pd.DataFrame:
     """Load and normalize ROI metadata from a pre-converted CSV or BRACS.xlsx."""
     if metadata_csv is not None and metadata_csv.exists():
-        return cast(pd.DataFrame, pd.read_csv(metadata_csv))
+        df = pd.read_csv(metadata_csv, dtype={"case_id": str})
+        return cast(pd.DataFrame, df)
     workbook = find_summary_file(root)
     sheets = pd.read_excel(workbook, sheet_name=None)
     candidates = [_normalize_sheet(sheet) for sheet in sheets.values()]
