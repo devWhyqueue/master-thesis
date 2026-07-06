@@ -10,6 +10,7 @@ from typing import cast
 
 import pandas as pd
 
+from data.full_scale.rows import slide_frame
 from data.full_scale.sampling import (
     available_training_counts,
     class_order,
@@ -63,7 +64,7 @@ def _pool_size(root: Path) -> int:
             splits = split_frames(_args(parameter, seed, root), manifest)
             available = cast(
                 pd.Series,
-                splits["train"].groupby("cancer_type")["slide_id"].nunique(),
+                slide_frame(splits["train"]).groupby("cancer_type")["slide_id"].nunique(),
             )
             totals.append(max_feasible_total(available, ordered, parameter))
     pool = min(totals)
