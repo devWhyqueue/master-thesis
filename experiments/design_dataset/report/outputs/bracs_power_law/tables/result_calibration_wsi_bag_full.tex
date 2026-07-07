@@ -1,0 +1,24 @@
+\begin{tabular}{lllllllll}
+\toprule
+Method & $\lambda$ & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
+\midrule
+MDE-MIL & $\lambda=0.5$ & \num{1.473} $\pm$ \num{0.178} & \num{1.263} $\pm$ \num{0.082} & \num{0.666} $\pm$ \num{0.044} & \num{0.602} $\pm$ \num{0.034} & \num{0.260} $\pm$ \num{0.068} & \num{0.143} $\pm$ \num{0.040} & \num{1.600} $\pm$ \num{0.053}\\
+MDE-MIL & $\lambda=1.0$ & \num{1.169} $\pm$ \num{0.097} & \num{1.150} $\pm$ \num{0.099} & \num{0.560} $\pm$ \num{0.047} & \num{0.554} $\pm$ \num{0.041} & \num{0.164} $\pm$ \num{0.042} & \num{0.153} $\pm$ \num{0.042} & \num{1.243} $\pm$ \num{0.124}\\
+MDE-MIL & $\lambda=1.5$ & \num{1.334} $\pm$ \num{0.130} & \num{1.308} $\pm$ \num{0.094} & \num{0.654} $\pm$ \num{0.058} & \num{0.631} $\pm$ \num{0.033} & \num{0.222} $\pm$ \num{0.025} & \num{0.145} $\pm$ \num{0.051} & \num{1.313} $\pm$ \num{0.113}\\
+Balanced sampling & $\lambda=0.5$ & \num{2.014} $\pm$ \num{0.328} & \num{1.188} $\pm$ \num{0.099} & \num{0.666} $\pm$ \num{0.034} & \num{0.559} $\pm$ \num{0.018} & \num{0.287} $\pm$ \num{0.029} & \num{0.096} $\pm$ \num{0.027} & \num{3.489} $\pm$ \num{0.694}\\
+Balanced sampling & $\lambda=1.0$ & \num{2.303} $\pm$ \num{0.788} & \num{1.203} $\pm$ \num{0.171} & \num{0.742} $\pm$ \num{0.149} & \num{0.584} $\pm$ \num{0.062} & \num{0.335} $\pm$ \num{0.089} & \num{0.154} $\pm$ \num{0.035} & \num{4.031} $\pm$ \num{0.792}\\
+Balanced sampling & $\lambda=1.5$ & \num{2.328} $\pm$ \num{0.510} & \num{1.236} $\pm$ \num{0.074} & \num{0.794} $\pm$ \num{0.088} & \num{0.613} $\pm$ \num{0.029} & \num{0.365} $\pm$ \num{0.064} & \num{0.155} $\pm$ \num{0.043} & \num{3.697} $\pm$ \num{0.433}\\
+Focal loss & $\lambda=0.5$ & \num{1.533} $\pm$ \num{0.241} & \num{1.151} $\pm$ \num{0.079} & \num{0.635} $\pm$ \num{0.037} & \num{0.560} $\pm$ \num{0.025} & \num{0.232} $\pm$ \num{0.053} & \num{0.139} $\pm$ \num{0.036} & \num{2.569} $\pm$ \num{0.386}\\
+Focal loss & $\lambda=1.0$ & \num{1.736} $\pm$ \num{0.540} & \num{1.148} $\pm$ \num{0.151} & \num{0.651} $\pm$ \num{0.102} & \num{0.563} $\pm$ \num{0.050} & \num{0.244} $\pm$ \num{0.072} & \num{0.108} $\pm$ \num{0.013} & \num{2.851} $\pm$ \num{0.514}\\
+Focal loss & $\lambda=1.5$ & \num{1.560} $\pm$ \num{0.199} & \num{1.235} $\pm$ \num{0.075} & \num{0.710} $\pm$ \num{0.085} & \num{0.618} $\pm$ \num{0.033} & \num{0.277} $\pm$ \num{0.041} & \num{0.171} $\pm$ \num{0.031} & \num{2.098} $\pm$ \num{0.246}\\
+Weighted CE & $\lambda=0.5$ & \num{1.992} $\pm$ \num{0.108} & \num{1.172} $\pm$ \num{0.067} & \num{0.709} $\pm$ \num{0.049} & \num{0.567} $\pm$ \num{0.022} & \num{0.316} $\pm$ \num{0.063} & \num{0.160} $\pm$ \num{0.051} & \num{3.366} $\pm$ \num{0.882}\\
+Weighted CE & $\lambda=1.0$ & \num{1.933} $\pm$ \num{0.568} & \num{1.137} $\pm$ \num{0.139} & \num{0.685} $\pm$ \num{0.105} & \num{0.566} $\pm$ \num{0.051} & \num{0.302} $\pm$ \num{0.088} & \num{0.127} $\pm$ \num{0.019} & \num{3.469} $\pm$ \num{0.516}\\
+Weighted CE & $\lambda=1.5$ & \num{2.258} $\pm$ \num{0.562} & \num{1.211} $\pm$ \num{0.121} & \num{0.796} $\pm$ \num{0.131} & \num{0.610} $\pm$ \num{0.046} & \num{0.358} $\pm$ \num{0.090} & \num{0.164} $\pm$ \num{0.001} & \num{3.568} $\pm$ \num{0.308}\\
+RankMix & $\lambda=0.5$ & \num{1.187} $\pm$ \num{0.076} & \num{1.186} $\pm$ \num{0.037} & \num{0.587} $\pm$ \num{0.071} & \num{0.582} $\pm$ \num{0.043} & \num{0.179} $\pm$ \num{0.055} & \num{0.150} $\pm$ \num{0.079} & \num{1.441} $\pm$ \num{0.330}\\
+RankMix & $\lambda=1.0$ & \num{1.227} $\pm$ \num{0.178} & \num{1.187} $\pm$ \num{0.134} & \num{0.640} $\pm$ \num{0.098} & \num{0.608} $\pm$ \num{0.073} & \num{0.222} $\pm$ \num{0.037} & \num{0.148} $\pm$ \num{0.019} & \num{1.570} $\pm$ \num{0.157}\\
+RankMix & $\lambda=1.5$ & \num{1.342} $\pm$ \num{0.141} & \num{1.255} $\pm$ \num{0.087} & \num{0.669} $\pm$ \num{0.056} & \num{0.624} $\pm$ \num{0.030} & \num{0.235} $\pm$ \num{0.047} & \num{0.147} $\pm$ \num{0.047} & \num{1.756} $\pm$ \num{0.203}\\
+SC-MIL & $\lambda=0.5$ & \num{1.787} $\pm$ \num{0.385} & \num{1.168} $\pm$ \num{0.102} & \num{0.652} $\pm$ \num{0.108} & \num{0.554} $\pm$ \num{0.045} & \num{0.267} $\pm$ \num{0.069} & \num{0.132} $\pm$ \num{0.014} & \num{3.200} $\pm$ \num{0.371}\\
+SC-MIL & $\lambda=1.0$ & \num{1.621} $\pm$ \num{0.317} & \num{1.126} $\pm$ \num{0.182} & \num{0.625} $\pm$ \num{0.042} & \num{0.548} $\pm$ \num{0.059} & \num{0.223} $\pm$ \num{0.025} & \num{0.129} $\pm$ \num{0.011} & \num{2.891} $\pm$ \num{0.285}\\
+SC-MIL & $\lambda=1.5$ & \num{1.839} $\pm$ \num{0.382} & \num{1.195} $\pm$ \num{0.056} & \num{0.722} $\pm$ \num{0.063} & \num{0.599} $\pm$ \num{0.015} & \num{0.307} $\pm$ \num{0.089} & \num{0.158} $\pm$ \num{0.035} & \num{3.027} $\pm$ \num{0.355}\\
+\bottomrule
+\end{tabular}

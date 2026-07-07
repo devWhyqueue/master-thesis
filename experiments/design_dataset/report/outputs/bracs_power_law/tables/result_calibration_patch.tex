@@ -1,0 +1,15 @@
+\begin{tabular}{lrrrrrrr}
+\toprule
+Method & \multicolumn{2}{c}{$\lambda=0.5$} & \multicolumn{2}{c}{$\lambda=1.0$} & \multicolumn{2}{c}{$\lambda=1.5$} & $T$ \\ \cmidrule(lr){2--3} \cmidrule(lr){4--5} \cmidrule(lr){6--7}\\
+ & ECE & ECE+TS & ECE & ECE+TS & ECE & ECE+TS & \\
+\midrule
+Weighted CE & \num{0.404} $\pm$ \num{0.046} & \num{0.041} $\pm$ \num{0.010} & \num{0.420} $\pm$ \num{0.046} & \num{0.054} $\pm$ \num{0.021} & \num{0.470} $\pm$ \num{0.016} & \num{0.076} $\pm$ \num{0.012} & \num{5.54} $\pm$ \num{0.06}\\
+Focal loss & \num{0.315} $\pm$ \num{0.051} & \num{0.046} $\pm$ \num{0.021} & \num{0.386} $\pm$ \num{0.043} & \num{0.057} $\pm$ \num{0.009} & \num{0.429} $\pm$ \num{0.014} & \num{0.064} $\pm$ \num{0.010} & \num{4.10} $\pm$ \num{0.52}\\
+CFAL & \num{0.299} $\pm$ \num{0.064} & \num{0.058} $\pm$ \num{0.034} & \num{0.300} $\pm$ \num{0.060} & \num{0.053} $\pm$ \num{0.010} & \num{0.251} $\pm$ \num{0.013} & \num{0.090} $\pm$ \num{0.035} & \num{0.07} $\pm$ \num{0.01}\\
+CE + soft F1 & \num{0.461} $\pm$ \num{0.057} & \num{0.057} $\pm$ \num{0.018} & \num{0.463} $\pm$ \num{0.042} & \num{0.054} $\pm$ \num{0.004} & \num{0.547} $\pm$ \num{0.036} & \num{0.110} $\pm$ \num{0.046} & \num{8.39} $\pm$ \num{0.72}\\
+CE + soft MCC & \num{0.405} $\pm$ \num{0.073} & \num{0.065} $\pm$ \num{0.019} & \num{0.452} $\pm$ \num{0.036} & \num{0.052} $\pm$ \num{0.013} & \num{0.499} $\pm$ \num{0.029} & \num{0.073} $\pm$ \num{0.033} & \num{6.69} $\pm$ \num{0.67}\\
+Balanced sampling & \num{0.405} $\pm$ \num{0.059} & \num{0.051} $\pm$ \num{0.008} & \num{0.419} $\pm$ \num{0.035} & \num{0.057} $\pm$ \num{0.016} & \num{0.446} $\pm$ \num{0.016} & \num{0.063} $\pm$ \num{0.016} & \num{5.38} $\pm$ \num{0.19}\\
+OKO & \num{0.260} $\pm$ \num{0.038} & \num{0.048} $\pm$ \num{0.021} & \num{0.251} $\pm$ \num{0.067} & \num{0.078} $\pm$ \num{0.010} & \num{0.249} $\pm$ \num{0.036} & \num{0.072} $\pm$ \num{0.024} & \num{0.20} $\pm$ \num{0.06}\\
+ProGAN augmentation & \num{0.419} $\pm$ \num{0.051} & \num{0.042} $\pm$ \num{0.010} & \num{0.428} $\pm$ \num{0.040} & \num{0.051} $\pm$ \num{0.009} & \num{0.475} $\pm$ \num{0.016} & \num{0.067} $\pm$ \num{0.025} & \num{5.97} $\pm$ \num{0.08}\\
+\bottomrule
+\end{tabular}
