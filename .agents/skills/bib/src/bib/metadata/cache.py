@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -37,13 +38,9 @@ class ResponseCache:
     _HASH_PREFIX_LENGTH: int = 16
 
     def _cache_path(self, provider: str, namespace: str, key: str) -> Path:
-        safe_key = (
-            key.replace("/", "__")
-            .replace(":", "_")
-            .replace("?", "_")
-            .replace("&", "_")
-            .replace("=", "_")
-        )
+        # Collapse filesystem-reserved characters. Windows also forbids
+        # | * < > " \, so sanitize the full reserved set, not just POSIX ones.
+        safe_key = re.sub(r'[:?&=|*<>"\\]', "_", key.replace("/", "__"))
         filename = f"{provider}-{namespace}-{safe_key}.json"
         if len(filename.encode()) > self._MAX_SAFE_FILENAME_BYTES:
             digest = hashlib.sha256(key.encode()).hexdigest()[: self._HASH_PREFIX_LENGTH]
