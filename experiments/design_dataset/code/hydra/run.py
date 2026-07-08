@@ -127,6 +127,14 @@ def _add_bracs_args(subparsers: argparse._SubParsersAction) -> None:
         "bracs-tune-aggregate-power-law",
         "bracs-report",
         "bracs-report-power-law",
+        "camelyon16-prepare",
+        "camelyon16-features",
+        "camelyon16-patch-cache",
+        "camelyon16-progan-cache",
+        "camelyon16-tune",
+        "camelyon16-tune-wsi",
+        "camelyon16-tune-aggregate",
+        "camelyon16-report",
     ):
         subparsers.add_parser(command)
 

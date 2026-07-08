@@ -18,6 +18,16 @@ from bracs.power_law_jobs import (
     bracs_tune_power_law,
     bracs_tune_wsi_power_law,
 )
+from camelyon16.native_jobs import (
+    camelyon16_features,
+    camelyon16_patch_cache,
+    camelyon16_prepare,
+    camelyon16_progan_cache,
+    camelyon16_report,
+    camelyon16_tune,
+    camelyon16_tune_aggregate,
+    camelyon16_tune_wsi,
+)
 from patch_cache_jobs import patch_cache
 from progan_cache_jobs import patch_cache_progan
 from sampling_jobs import max_feasible_pool_size, sample_full_scale
@@ -60,6 +70,14 @@ COMMAND_HANDLERS = {
     "bracs-tune-aggregate-power-law": bracs_tune_aggregate_power_law,
     "bracs-report": bracs_report,
     "bracs-report-power-law": bracs_report_power_law,
+    "camelyon16-prepare": camelyon16_prepare,
+    "camelyon16-features": camelyon16_features,
+    "camelyon16-patch-cache": camelyon16_patch_cache,
+    "camelyon16-progan-cache": camelyon16_progan_cache,
+    "camelyon16-tune": camelyon16_tune,
+    "camelyon16-tune-wsi": camelyon16_tune_wsi,
+    "camelyon16-tune-aggregate": camelyon16_tune_aggregate,
+    "camelyon16-report": camelyon16_report,
 }
 
 __all__ = [

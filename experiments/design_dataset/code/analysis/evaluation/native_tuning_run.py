@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--feature-path", required=True)
     parser.add_argument("--prepare-report", default=None)
     parser.add_argument("--required-mode", default=None)
+    parser.add_argument("--max-instances-per-bag", type=int, default=30)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -161,7 +162,7 @@ def _wsi_command(args: argparse.Namespace, task, out: str) -> list[str]:
         "--device=auto",
         "--epochs=30",
         "--bag-batch-size=32",
-        "--max-instances-per-bag=30",
+        f"--max-instances-per-bag={args.max_instances_per_bag}",
         f"--bag-cache-dir={stem / 'wsi_bag_cache'}",
     ]
     cmd.extend(_wsi_tuning_flags(task.variant.params))
