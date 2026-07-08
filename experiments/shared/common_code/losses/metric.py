@@ -9,6 +9,7 @@ from torch.nn import functional as F
 
 class _SoftF1LossWithLogits(nn.Module):
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Return the soft (1 - F1) loss for one binary logit column."""
         pred = torch.sigmoid(pred)
         tp = (target * pred).sum()
         fp = ((1 - target) * pred).sum()
@@ -28,6 +29,7 @@ class SoftF1LossMulti(nn.Module):
         self._binary = _SoftF1LossWithLogits()
 
     def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Return the macro-averaged soft F1 loss over all classes."""
         loss = torch.zeros(1, device=logits.device, dtype=logits.dtype)
         for class_idx in range(self.num_classes):
             loss = loss + self._binary(logits[:, class_idx], labels[:, class_idx])
@@ -38,17 +40,25 @@ class SoftMCCLossMulti(nn.Module):
     """Multiclass soft MCC loss (with logits)."""
 
     def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Return the soft (1 - MCC) loss for a multiclass logit batch."""
         preds = torch.softmax(logits, dim=1)
         correct = torch.sum(preds * labels)
         sample_count = preds.size(0)
         label_totals = torch.sum(labels, dim=0)
         pred_totals = torch.sum(preds, dim=0)
         numerator = correct * sample_count - (label_totals * pred_totals).sum()
-        denominator = (
-            torch.sqrt(sample_count**2 - pred_totals.square().sum())
-            * torch.sqrt(sample_count**2 - label_totals.square().sum())
-            + 1e-8
+        # The R_K spread terms N^2 - sum(totals^2) vanish when a batch's
+        # predictions (or labels) concentrate on one class; sqrt has an
+        # infinite gradient at 0, which yields NaN gradients on confident
+        # binary batches. Flooring the arguments is a no-op wherever they are
+        # non-degenerate (e.g. multiclass batches, where they stay large).
+        pred_spread = torch.clamp(
+            sample_count**2 - pred_totals.square().sum(), min=1e-8
         )
+        label_spread = torch.clamp(
+            sample_count**2 - label_totals.square().sum(), min=1e-8
+        )
+        denominator = torch.sqrt(pred_spread) * torch.sqrt(label_spread) + 1e-8
         return 1 - numerator / denominator
 
 
@@ -68,6 +78,7 @@ class ScholzCombinedLoss(nn.Module):
         self._soft_mcc = SoftMCCLossMulti() if metric == "mcc" else None
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Return cross-entropy plus the weighted soft metric loss."""
         one_hot = F.one_hot(targets, num_classes=logits.size(1)).float()
         ce_loss = self.ce(logits, targets)
         if self.metric == "f1":
