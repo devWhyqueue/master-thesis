@@ -21,7 +21,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent A prior study benchmarked class-imbalance mitigation methods on TCGA-UT, a pan-cancer whole-slide-image cohort with a native, moderately imbalanced slide distribution \citep{queisler2026imbalanceTCGA}. This report extends the same benchmark machinery to additional datasets, keeping the frozen Virchow2 representation, the bounded evidence budget, and the patient-disjoint evaluation protocol fixed, and asks whether the method comparison remains meaningful when the data regime changes. The first such dataset is BRACS, an organ-specific H\&E breast-lesion cohort evaluated on its native seven-subtype distribution. Both patch-feature and whole-slide-image (WSI) feature-bag method families are compared, each within its own prediction regime, and a plain cross-entropy no-mitigation baseline (CE, MIL CE) is added so mitigation gains are measured against an unweighted reference. On BRACS's native seven-subtype distribution (head-to-tail ${\approx}2.3{:}1$), CFAL leads the patch regime by a clear margin over both the unweighted CE baseline and the other mitigation methods, while ProGAN synthetic augmentation is the weakest patch method overall, falling slightly below unweighted CE. In the WSI-bag regime the unweighted MIL CE baseline is competitive with, and in several cases stronger than, dedicated mitigation methods---only focal loss and SC-MIL clearly exceed it. Both regimes remain substantially miscalibrated after temperature scaling relative to what is achievable on the pan-cancer TCGA-UT cohort, reflecting the smaller training pool and the difficulty of fine-grained breast-lesion subtyping.
+\noindent A prior study benchmarked class-imbalance mitigation methods on TCGA-UT, a pan-cancer whole-slide-image cohort with a native, moderately imbalanced slide distribution \citep{queisler2026imbalanceTCGA}. This report extends the same benchmark machinery to two additional datasets, keeping the frozen Virchow2 representation, a bounded per-slide evidence budget, and the patient-disjoint evaluation protocol fixed, and asks whether the method comparison remains meaningful when the data regime changes. The datasets are chosen to bracket the imbalance spectrum: BRACS, an organ-specific H\&E breast-lesion cohort with a mildly imbalanced native seven-subtype distribution (head-to-tail ${\approx}2.3{:}1$), and CAMELYON16, a sentinel lymph-node metastasis cohort whose mask-derived tumor/normal patch distribution is severely imbalanced (${\approx}39{:}1$). Both patch-feature and whole-slide-image feature-bag method families are compared, each within its own prediction regime, and a plain cross-entropy no-mitigation baseline (CE, MIL CE) is added so mitigation gains are measured against an unweighted reference. On BRACS, CFAL leads the patch regime while most other methods---including ProGAN augmentation, which falls slightly below CE---are statistically indistinguishable from the unweighted baseline, and in the WSI-bag regime only focal loss and SC-MIL clearly exceed a competitive MIL CE baseline; both regimes remain substantially miscalibrated after temperature scaling. On CAMELYON16, despite an imbalance an order of magnitude more severe, every method in both regimes reaches near-ceiling discrimination (balanced accuracy \num{0.96}--\num{0.99}) and near-ideal calibration, and no mitigation method separates from the unweighted baseline. The two datasets together show that imbalance severity alone predicts neither task difficulty nor the value of mitigation: what governs the headroom for imbalance mitigation under a frozen-feature benchmark is the separability of the classes in the representation, not the head-to-tail ratio.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -31,15 +31,15 @@
 \section{Introduction}
 A companion study compared class-imbalance mitigation methods under the native, moderately imbalanced slide distribution of TCGA-UT (head-to-tail ${\approx}28{:}1$) across 32 cancer types \citep{queisler2026imbalanceTCGA,tomczak2015reviewThe,komura2022universalEncoding}. That benchmark fixes a frozen Virchow2 encoder, a bounded per-slide evidence budget, and patient-disjoint splits, so that the only thing being compared is how each mitigation method reshapes minibatch exposure or the per-example loss. The natural next question is external validity: does the same benchmark machinery stay meaningful when it is pointed at a different dataset, with a different organ, a different label set, and a different native class distribution?
 
-This report takes the first step by extending the benchmark to a further dataset on its \emph{native} class distribution. The design is deliberately conservative: the representation family (frozen Virchow2), the 30-instance evidence budget, the patient-disjoint split protocol, the method families, and the validation-based model-selection rule are all carried over unchanged, and only the dataset is swapped. A dataset therefore acts as a check on how far the benchmark generalizes rather than as a new experimental variable.
+This report takes that step by extending the benchmark to two further datasets on their \emph{native} class distributions, chosen so that they bracket the imbalance spectrum from mild to severe. The design is deliberately conservative: the representation family (frozen Virchow2), the bounded per-slide evidence budget, the patient-disjoint split protocol, the method families, and the validation-based model-selection rule are all carried over unchanged, and only the dataset is swapped. A dataset therefore acts as a check on how far the benchmark generalizes rather than as a new experimental variable.
 
-The first such dataset is BRACS, an H\&E breast-pathology dataset with \num{547} WSIs and \num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three board-certified pathologists into three lesion types and seven subtypes \citep{brancati2022bracs}. The atypical categories are clinically important and comparatively scarce, so BRACS is a genuine class-imbalance setting without any resampling. Unlike TCGA-UT it is organ-specific, has far fewer labels, and provides lesion-focused ROI annotations; these differences are exactly what make it a useful check on the benchmark's generality. Additional datasets are planned and will slot into the same benchmark.
+The first dataset is BRACS, an H\&E breast-pathology dataset with \num{547} WSIs and \num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three board-certified pathologists into three lesion types and seven subtypes \citep{brancati2022bracs}. The atypical categories are clinically important and comparatively scarce, so BRACS is a genuine class-imbalance setting without any resampling, but its native head-to-tail ratio (${\approx}2.3{:}1$) is only mild. The second dataset is CAMELYON16, an organ-specific cohort of sentinel lymph-node sections for breast-cancer metastasis detection \citep{bejnordi2017diagnostic,litjens2018gigascience}. Its pixel-level tumor annotations make it possible to label individual tiles as tumor or normal, and because metastatic tissue is scarce within a section, the resulting native patch distribution is severely imbalanced (${\approx}39{:}1$). Together the two datasets test whether the method comparison holds both where imbalance is mild and where it is severe, and they differ from TCGA-UT and from each other in organ, label granularity, and annotation type---exactly the variation that stresses a benchmark's generality.
 
 Both regimes from the companion study are carried over. Patch-feature methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, OKO set learning, and ProGAN synthetic augmentation \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
 
 \section{Datasets}
 \label{sec:datasets}
-The benchmark evaluates each dataset on its \emph{native} class distribution: the observed per-class support is measured after a patient-disjoint preparation and used directly, without any resampling. This report covers BRACS; further datasets will be added under the same protocol.
+The benchmark evaluates each dataset on its \emph{native} class distribution: the observed per-class support is measured after a patient-disjoint preparation and used directly, without any resampling. This report covers two datasets chosen to span the imbalance spectrum: BRACS, whose seven breast-lesion subtypes are only mildly imbalanced, and CAMELYON16, whose patch-level tumor/normal distribution is severely imbalanced. Further datasets can be added under the same protocol.
 
 \subsection{BRACS}
 BRACS is an organ-specific H\&E breast-lesion dataset rather than a pan-cancer dataset, and its annotations are lesion-subtype labels rather than cancer-type labels. It contains \num{547} WSIs and \num{4539} ROIs from \num{189} patients, annotated by consensus of three board-certified pathologists \citep{brancati2022bracs}. The labels form three lesion types---benign, atypical, and malignant---and seven subtypes: normal tissue (N), pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma in situ (DCIS), and invasive carcinoma (IC).
@@ -94,6 +94,57 @@ After patch extraction, \num{387} of the \num{547} published WSIs contribute at 
   \label{fig:bracs-class-distribution}
 \end{figure}
 
+\subsection{CAMELYON16}
+CAMELYON16 is an organ-specific H\&E dataset of sentinel lymph-node sections for the detection of breast-cancer metastases \citep{bejnordi2017diagnostic,litjens2018gigascience}. It differs from BRACS along the axes that matter for a generality check. Its label is binary---each slide is either \emph{normal} or contains \emph{tumor} (metastasis)---and its expert annotations are supplied as pixel-level masks that mark tumor and normal tissue, rather than as region-of-interest crops. Holding the frozen Virchow2 representation and the patient-disjoint protocol fixed while changing the organ, the label granularity, and, above all, the severity of the native imbalance, CAMELYON16 is the deliberate severe counterpart to BRACS's mild seven-subtype distribution.
+
+The benchmark reuses the \num{398} slides for which pre-extracted $256\times256$ tissue tiles at \num{20}$\times$ magnification are available, out of the \num{399} published slides, comprising \num{160} tumor and \num{238} normal slides. Each slide is its own patient (case), so slide-disjoint train, validation, and test partitions across three seeds coincide with patient-disjoint splits. CAMELYON16 is evaluated in the same two regimes as BRACS, but with regime-specific labels. In the patch regime, each tile is labelled tumor or normal by intersecting it with the published tumor mask; because metastatic regions occupy only a small fraction of the sectioned tissue, tumor tiles are scarce and the native patch distribution is severely imbalanced (head-to-tail ${\approx}39{:}1$; Table~\ref{tab:camelyon16-dataset-summary} and Figure~\ref{fig:camelyon16-class-distribution}). In the WSI-bag regime, each slide is a single bag carrying its slide-level tumor/normal label, which recovers the canonical CAMELYON16 metastasis-detection task.
+
+Two dataset-specific choices follow from this design. First, the \num{20} tumor slides whose annotations are not exhaustive---so that unannotated tumor could be mislabelled as normal---are excluded from the patch regime but retained in the WSI-bag regime, where only the reliable slide-level label is used. Second, the per-slide evidence budget is set data-driven rather than fixed: the WSI-bag size is the empirical median number of available tissue tiles per slide, which for CAMELYON16 is \num{7874} tiles. This is two orders of magnitude larger than the \num{30}-tile budget that the tile-sparse TCGA-UT and BRACS cohorts admit, and reflects that a whole lymph-node section yields far more tissue than a single lesion ROI. Patch evidence is otherwise the same frozen Virchow2 $\num{2560}$-dimensional embedding used throughout the benchmark \citep{vorontsov2024virchow,zimmermann2024virchow2}, computed once per tile and shared by both regimes.
+
+\begin{table}[ht]
+  \centering
+  \begin{minipage}{0.32\linewidth}
+    \centering
+    \IfFileExists{outputs/figures/camelyon16_example_patch.jpg}{%
+      \includegraphics[width=\linewidth]{camelyon16_example_patch.jpg}%
+    }{%
+      \fbox{\parbox{0.85\linewidth}{\centering\vspace{2em}CAMELYON16 example tumor tile unavailable.\vspace{2em}}}%
+    }
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.62\linewidth}
+    \centering
+    \small
+    \IfFileExists{outputs/tables/camelyon16_dataset_summary.tex}{%
+      \input{outputs/tables/camelyon16_dataset_summary.tex}%
+    }{%
+      \begin{tabular}{ll}
+        \toprule
+        Property & Value\\
+        \midrule
+        WSIs (tumor / normal) & \num{160} / \num{238}\\
+        WSI-bag size (median tiles) & \num{7874}\\
+        Patch labels & tumor, normal\\
+        Patch imbalance ratio & ${\approx}\num{39}{:}1$\\
+        \bottomrule
+      \end{tabular}%
+    }
+  \end{minipage}
+  \caption{CAMELYON16 dataset properties used by the native benchmark, after patient-disjoint preparation and mask-based patch labelling, alongside an example $256\times256$ tumor tile. The WSI-bag size is the data-driven median of available \num{20}$\times$ tissue tiles per slide.}
+  \label{tab:camelyon16-dataset-summary}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \IfFileExists{outputs/figures/camelyon16_class_distribution.png}{%
+    \includegraphics[width=0.6\linewidth]{camelyon16_class_distribution.png}%
+  }{%
+    \fbox{\parbox{0.70\linewidth}{\centering CAMELYON16 native patch distribution figure unavailable.}}%
+  }
+  \caption{Native CAMELYON16 patch support by tumor/normal label after patient-disjoint preparation and mask-based labelling (log scale). Tumor tiles are roughly \num{39} times scarcer than normal tiles, giving the benchmark its severe native imbalance setting.}
+  \label{fig:camelyon16-class-distribution}
+\end{figure}
+
 \section{Methods}
 \label{sec:methods}
 The method taxonomy follows the companion benchmark \citep{queisler2026imbalanceTCGA}. Cross-entropy is the no-mitigation reference. Data-level methods change minibatch exposure through balanced sampling or synthetic augmentation. Algorithm-level methods change the per-example loss through class weighting, focal loss, metric-derived objectives, prototype-affinity objectives, or OKO set supervision. WSI-specific methods change how slide bags are represented or mixed.
@@ -113,7 +164,7 @@ The method taxonomy follows the companion benchmark \citep{queisler2026imbalance
     Representation and architecture & SC-MIL & WSI bag\\
     \bottomrule
   \end{tabularx}
-  \caption{Method families evaluated on the native BRACS benchmark, following the taxonomy of \citet{queisler2026imbalanceTCGA}. CE and MIL CE are unweighted cross-entropy baselines, added so mitigation gains are measured against a genuine no-mitigation reference. Patch and WSI-bag methods are compared only within their own input regime.}
+  \caption{Method families evaluated on both native benchmarks (BRACS and CAMELYON16), following the taxonomy of \citet{queisler2026imbalanceTCGA}. CE and MIL CE are unweighted cross-entropy baselines, added so mitigation gains are measured against a genuine no-mitigation reference. Patch and WSI-bag methods are compared only within their own input regime.}
   \label{tab:method-groups}
 \end{table}
 
@@ -123,13 +174,16 @@ Full method definitions follow \citet{queisler2026imbalanceTCGA} and \citet{scho
 \label{sec:evaluation}
 The benchmark evaluates each dataset on its native class distribution. Hyperparameters are selected independently for every method: for each candidate configuration the validation macro F1 is averaged over the three patient-disjoint seeds, and the configuration with the highest mean is chosen, with ties broken by mean validation balanced accuracy. A single configuration is therefore fixed per method (shared across seeds). Selected configurations are evaluated on the fixed test split, and results are reported as mean $\pm$ standard deviation across seeds. Macro F1 is the primary discrimination metric because it weights classes equally; balanced accuracy and accuracy are reported as complementary discrimination metrics.
 
-The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the patient-disjoint splits, the frozen Virchow2 representation family, and the 30-instance evidence budget, but they differ in prediction unit and aggregation mechanism.
+The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the patient-disjoint splits, the frozen Virchow2 representation family, and a bounded per-slide evidence budget, but they differ in prediction unit and aggregation mechanism. The evidence budget itself is dataset-specific: BRACS caps evidence at \num{30} tiles per ROI, matching TCGA-UT, whereas CAMELYON16 sets the WSI-bag size to the empirical median of \num{7874} available tiles per slide, so the budget tracks how much tissue each cohort actually provides.
 
 Calibration is evaluated alongside discrimination using expected calibration error \citep[ECE;][]{naeini2015obtaining,guo2017calibration}. For each method and seed, a single temperature is fit by minimizing negative log likelihood on the validation split and applied unchanged to the test score matrix before softmax \citep{guo2017calibration}. Tables~\ref{tab:bracs-calibration-patch} and~\ref{tab:bracs-calibration-wsi} report ECE before and after temperature scaling with the fitted temperature.
 
 \section{Results}
 \label{sec:results}
-The patch-feature and WSI-bag regimes are reported separately (Tables~\ref{tab:bracs-patch-results} and~\ref{tab:bracs-wsi-results}). Scores are specific to the seven-class breast-lesion subtyping task and are not directly comparable to the 32-class TCGA-UT benchmark: the label set, task difficulty, and cohort size all differ. The absolute discrimination and calibration numbers are markedly lower than on TCGA-UT for two concrete reasons: fine-grained breast-lesion subtyping (distinguishing e.g.\ FEA, ADH, and DCIS) is intrinsically harder than pan-cancer type classification, and the native breast-only training pool is far smaller than the large constructed pan-cancer pools used for TCGA-UT, so each method has both a harder decision boundary and less data to fit it. This is consistent with the external literature: even recent task-specific BRACS models---purpose-built graph and transformer architectures trained end-to-end for this task---report only mid-\num{60}\% weighted F1 on seven-subtype ROI classification (HACT-Net \num{61.5}\%, ScoreNet \num{64.4}\%), with the atypical UDH and ADH subtypes still around \num{45}\% F1 \citep{pati2022hierarchical,stegmuller2023scorenet}. A frozen-feature benchmark under a bounded evidence budget should therefore not be expected to approach TCGA-UT-level discrimination; the binding limitation is fine-grained lesion morphology and limited task-specific representation learning, not class imbalance alone.
+Each dataset is evaluated on its own native distribution, with the patch-feature and WSI-bag regimes reported separately. Scores are specific to each dataset's task and are not directly comparable across datasets or to the 32-class TCGA-UT benchmark, because the label set, task difficulty, and cohort size all differ. The two datasets turn out to occupy opposite corners of the difficulty--imbalance plane---BRACS is mildly imbalanced but hard, CAMELYON16 severely imbalanced but easy---and it is this contrast, rather than either dataset alone, that tests the benchmark's generality.
+
+\subsection{BRACS}
+The patch-feature and WSI-bag regimes are reported separately (Tables~\ref{tab:bracs-patch-results} and~\ref{tab:bracs-wsi-results}). The absolute discrimination and calibration numbers are markedly lower than on TCGA-UT for two concrete reasons: fine-grained breast-lesion subtyping (distinguishing e.g.\ FEA, ADH, and DCIS) is intrinsically harder than pan-cancer type classification, and the native breast-only training pool is far smaller than the large constructed pan-cancer pools used for TCGA-UT, so each method has both a harder decision boundary and less data to fit it. This is consistent with the external literature: even recent task-specific BRACS models---purpose-built graph and transformer architectures trained end-to-end for this task---report only mid-\num{60}\% weighted F1 on seven-subtype ROI classification (HACT-Net \num{61.5}\%, ScoreNet \num{64.4}\%), with the atypical UDH and ADH subtypes still around \num{45}\% F1 \citep{pati2022hierarchical,stegmuller2023scorenet}. A frozen-feature benchmark under a bounded evidence budget should therefore not be expected to approach TCGA-UT-level discrimination; the binding limitation is fine-grained lesion morphology and limited task-specific representation learning, not class imbalance alone.
 
 \begin{table}[ht]
   \centering
@@ -206,6 +260,84 @@ In the WSI-bag regime, the unweighted MIL CE baseline (BAcc \num{0.446}, F1 \num
 
 In the patch regime, raw (pre-scaling) miscalibration is severe for most methods: ECE ranges from \num{0.28} to \num{0.42}, requiring large temperature corrections ($T \approx 3$--\num{9}) to reach post-scaling ECE of \num{0.04}--\num{0.08}. OKO is the exception, with by far the lowest raw ECE (\num{0.146}) and the smallest fitted temperature ($T\approx\num{1.47}$), consistent with its behaviour on the companion TCGA-UT benchmark. CFAL again shows the CFAL-specific pattern of a near-degenerate low temperature ($T\approx\num{0.058}$) alongside the highest post-scaling ECE (\num{0.068}) of any patch method, echoing its affinity-based outputs being nearly flat prior to scaling. Focal loss achieves the lowest post-scaling ECE (\num{0.038}). ProGAN augmentation calibrates similarly to the unweighted baselines (raw ECE \num{0.394}, $T\approx\num{6.34}$, post-scaling ECE \num{0.053}), showing no distinctive miscalibration pattern despite its weaker discrimination. In the WSI-bag regime, calibration is uniformly worse than the patch regime and than the companion TCGA-UT benchmark: post-scaling ECE ranges from \num{0.112} (SC-MIL, the best-calibrated method) to \num{0.155} (MIL CE and Weighted CE, tied for worst). RankMix has the lowest raw ECE (\num{0.152}) and smallest temperature ($T\approx\num{1.16}$) of any WSI-bag method, but its post-scaling ECE (\num{0.133}) is not the best. The elevated residual miscalibration across all BRACS methods, relative to TCGA-UT, reflects the smaller training pool and the intrinsic difficulty of seven-class fine-grained subtyping rather than a failure specific to any one method.
 
+\subsection{CAMELYON16}
+On CAMELYON16 the picture inverts: the same frozen features that struggle with BRACS's fine-grained subtypes separate tumor from normal tissue almost perfectly, so despite an imbalance an order of magnitude more severe, every method reaches near-ceiling discrimination in both regimes (Tables~\ref{tab:camelyon16-patch-results} and~\ref{tab:camelyon16-wsi-results}).
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/camelyon16_result_summary_patch.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/camelyon16_result_summary_patch.tex}}%
+  }{%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & Accuracy & Balanced accuracy & Macro F1\\
+      \midrule
+      \multicolumn{4}{c}{CAMELYON16 patch result table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{CAMELYON16 native patch-feature test results (tumor vs.\ normal tiles) for validation-selected configurations, mean $\pm$ standard deviation across patient-disjoint seeds.}
+  \label{tab:camelyon16-patch-results}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/camelyon16_result_summary_wsi_bag.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/camelyon16_result_summary_wsi_bag.tex}}%
+  }{%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & Accuracy & Balanced accuracy & Macro F1\\
+      \midrule
+      \multicolumn{4}{c}{CAMELYON16 WSI-bag result table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{CAMELYON16 native WSI-bag test results (slide-level metastasis detection) for validation-selected configurations, mean $\pm$ standard deviation across patient-disjoint seeds.}
+  \label{tab:camelyon16-wsi-results}
+\end{table}
+
+In the patch regime, balanced accuracy ranges from \num{0.961} (CFAL) to \num{0.986} (CE + soft F1) and macro F1 from \num{0.940} to \num{0.966}, on \num{99.5}--\num{99.7}\% accuracy. The unweighted CE baseline (BAcc \num{0.962}, F1 \num{0.958}) sits squarely inside this band, and no mitigation method separates from it by more than the between-seed noise: CFAL edges ahead on macro F1 (\num{0.966}) and CE + soft F1 on balanced accuracy (\num{0.986}), but the spread across the whole field is under \num{0.03} on either metric. The severe native imbalance (${\approx}39{:}1$) does not translate into a hard problem, because tumor and normal tiles are highly separable in the frozen Virchow2 space; there is little error left for any reweighting or resampling scheme to remove.
+
+The WSI-bag regime tells the same story at the slide level. All seven methods score between balanced accuracy \num{0.965} and \num{0.984} and macro F1 \num{0.965} and \num{0.982}. MDE-MIL and SC-MIL lead (both F1 \num{0.982}), the unweighted MIL CE baseline (BAcc \num{0.965}, F1 \num{0.965}, tied with Weighted CE) is again fully competitive, and the entire field is separated by less than \num{0.02} macro F1. Canonical slide-level metastasis detection is nearly solved from a bounded bag of Virchow2 features, leaving no meaningful gap for bag-composition or resampling methods to close.
+
+\paragraph{Probability Calibration.}
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/camelyon16_calibration_patch.tex}{%
+    \input{outputs/tables/camelyon16_calibration_patch.tex}%
+  }{%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & ECE & ECE+TS & $T$\\
+      \midrule
+      \multicolumn{4}{c}{CAMELYON16 patch calibration table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{CAMELYON16 native patch-feature calibration: ECE before (raw) and after (TS) temperature scaling, with the fitted temperature $T$, mean $\pm$ standard deviation across seeds.}
+  \label{tab:camelyon16-calibration-patch}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/camelyon16_calibration_wsi_bag.tex}{%
+    \input{outputs/tables/camelyon16_calibration_wsi_bag.tex}%
+  }{%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & ECE & ECE+TS & $T$\\
+      \midrule
+      \multicolumn{4}{c}{CAMELYON16 WSI-bag calibration table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
+  }
+  \caption{CAMELYON16 native WSI-bag calibration: ECE before and after temperature scaling, with the fitted temperature $T$. Columns as in Table~\ref{tab:camelyon16-calibration-patch}.}
+  \label{tab:camelyon16-calibration-wsi}
+\end{table}
+
+\noindent Calibration follows discrimination: because the models are both confident and correct, they are well calibrated out of the box. In the patch regime raw ECE is \num{0.003}--\num{0.005} for every method except CFAL, and temperature scaling brings it to \num{0.001}--\num{0.002} (Table~\ref{tab:camelyon16-calibration-patch}); the fitted temperatures ($T\approx\num{3}$--\num{5}) merely soften mildly over-confident logits. CFAL is again the lone exception, with the same near-degenerate low-temperature signature seen on BRACS (raw ECE \num{0.464}, $T\approx\num{0.05}$, post-scaling ECE \num{0.068}). In the WSI-bag regime raw ECE is \num{0.013}--\num{0.027} and post-scaling ECE \num{0.017}--\num{0.034} (Table~\ref{tab:camelyon16-calibration-wsi}); MDE-MIL is the best calibrated (raw ECE \num{0.013}), and for several methods the fitted temperature reaches the grid's lower floor ($T\approx\num{0.05}$) without lowering ECE, reflecting how little miscalibration remains to correct on the small \num{398}-slide cohort. Both regimes are markedly better calibrated than BRACS---patch post-scaling ECE around \num{0.001} versus BRACS's \num{0.04}--\num{0.08}, and WSI-bag around \num{0.02}--\num{0.03} versus BRACS's \num{0.11}--\num{0.15}---which is the calibration counterpart of the same separability gap.
+
 \section{Discussion}
 \label{sec:discussion}
 The benchmark's central design change from the companion TCGA-UT study is the addition of an unweighted no-mitigation baseline (CE, MIL CE), and the two regimes answer the question it was added to ask quite differently. In the patch regime, most mitigation methods do not clearly separate from the CE baseline on BRACS's mild native imbalance (${\approx}2.3{:}1$)---Weighted CE, focal loss, CE + soft MCC, and balanced sampling all sit within noise of unweighted cross-entropy, and ProGAN augmentation falls fractionally below it. Only CFAL, and to a lesser extent CE + soft F1 and OKO, produce a measurable gain. This is a plausible consequence of the imbalance itself being mild: with a native ratio an order of magnitude below TCGA-UT's ${\approx}28{:}1$, there may simply be less headroom for reweighting or resampling to help. ProGAN's reversal is particularly informative: on TCGA-UT it led at the mildest constructed severity before collapsing as tail-class support fell to single-digit patch counts at the harshest severity. BRACS's native imbalance never reaches that regime, so ProGAN never gets the tail-scarcity conditions under which synthetic augmentation would be expected to help, and it is left carrying only the risk of the generative step (distributional mismatch between synthetic and real patches) without the corresponding benefit.
@@ -214,11 +346,13 @@ The WSI-bag regime tells a sharper version of the same story: several mitigation
 
 Calibration adds a second, independent axis on which BRACS is harder than TCGA-UT: even the best-calibrated method in each regime (focal loss for patch, SC-MIL for WSI-bag) needs temperature scaling to reach an ECE that is still \num{2}--\num{3}$\times$ worse than typical TCGA-UT post-scaling values. This is consistent with the smaller training pool and finer-grained label set rather than a method-specific weakness, since the pattern holds across every method in both regimes.
 
+CAMELYON16 sharpens the central lesson by inverting BRACS's regime. It is severely imbalanced (${\approx}39{:}1$, an order of magnitude beyond BRACS and comparable to TCGA-UT's ${\approx}28{:}1$) yet nearly solved: every method in both regimes exceeds \num{0.96} balanced accuracy, the unweighted baselines are competitive with the best mitigation method, and calibration is near-ideal without any dataset-specific tuning. Read together, the two datasets show that imbalance severity alone determines neither task difficulty nor the headroom available to mitigation. BRACS is mildly imbalanced but hard, because fine-grained lesion subtypes are poorly separated by the frozen features; CAMELYON16 is severely imbalanced but easy, because tumor and normal tissue are nearly separable in those same features. What governs whether a mitigation method can help is therefore the separability of the classes in the representation, not the head-to-tail ratio: a severely imbalanced but separable problem leaves a plain cross-entropy baseline essentially optimal, whereas a mildly imbalanced but entangled problem is exactly where the method choice, and the no-mitigation reference, come to matter. This is a direct caution against selecting or ranking imbalance-mitigation methods by imbalance ratio alone, and it is only visible because the benchmark now spans both corners of the difficulty--imbalance plane.
+
 \section{Conclusion}
 \label{sec:conclusion}
-This report extended the class-imbalance mitigation benchmark introduced for TCGA-UT \citep{queisler2026imbalanceTCGA} to a first additional dataset, BRACS, keeping the frozen Virchow2 representation, the 30-instance evidence budget, and the patient-disjoint evaluation protocol unchanged and adding an unweighted cross-entropy baseline (CE, MIL CE) so mitigation gains are measured against doing nothing. Evaluated on BRACS's native seven-subtype distribution (${\approx}2.3{:}1$ head-to-tail), the patch regime shows CFAL leading by a clear margin (BAcc \num{0.512} vs.\ \num{0.457} for CE), with most other mitigation methods statistically indistinguishable from the no-mitigation baseline and ProGAN augmentation---the leader at mild severity on the companion TCGA-UT benchmark---falling fractionally below it (BAcc \num{0.455}). The WSI-bag regime shows that several mitigation methods---Weighted CE, balanced sampling, RankMix, and MDE-MIL---do not clearly improve on the unweighted MIL CE baseline; only focal loss and SC-MIL do. Both regimes remain substantially more miscalibrated after temperature scaling than the companion TCGA-UT benchmark, consistent with BRACS's smaller training pool and harder seven-class fine-grained subtyping task.
+This report extended the class-imbalance mitigation benchmark introduced for TCGA-UT \citep{queisler2026imbalanceTCGA} to two additional datasets on their native distributions, keeping the frozen Virchow2 representation, a bounded per-slide evidence budget, and the patient-disjoint evaluation protocol unchanged, and adding an unweighted cross-entropy baseline (CE, MIL CE) so mitigation gains are measured against doing nothing. The two datasets were chosen to bracket the imbalance spectrum. On BRACS's native seven-subtype distribution (${\approx}2.3{:}1$ head-to-tail), the patch regime shows CFAL leading by a clear margin (BAcc \num{0.512} vs.\ \num{0.457} for CE), with most other mitigation methods statistically indistinguishable from the no-mitigation baseline and ProGAN augmentation falling fractionally below it; in the WSI-bag regime several mitigation methods do not clearly improve on the unweighted MIL CE baseline, and only focal loss and SC-MIL do. On CAMELYON16's severely imbalanced patch distribution (${\approx}39{:}1$), by contrast, every patch and WSI-bag method reaches near-ceiling discrimination (balanced accuracy \num{0.96}--\num{0.99}) and near-ideal calibration, and the unweighted baselines are competitive with the best mitigation method in both regimes.
 
-These results validate the benchmark's external applicability while also showing that method rankings are not universal: CFAL's patch-level lead, ProGAN's reversal from TCGA-UT leader to BRACS laggard, and several WSI-bag methods' failure to beat plain cross-entropy are all new findings relative to TCGA-UT, and none would have been visible without a native additional dataset and a genuine no-mitigation reference. Further datasets can be added under the same protocol to test whether these rankings hold more broadly.
+Taken together, the two datasets show that method rankings are not universal and, more pointedly, that imbalance severity alone does not predict whether mitigation helps: CAMELYON16 is far more imbalanced than BRACS yet leaves essentially no headroom for mitigation, because its classes are separable in the frozen representation, whereas BRACS's milder imbalance coincides with a genuinely hard, entangled task where the method choice and the no-mitigation reference matter. What governs the value of imbalance mitigation under a frozen-feature benchmark is therefore class separability, not the head-to-tail ratio---a finding that only becomes visible with a native additional dataset, a genuine no-mitigation baseline, and coverage of both corners of the difficulty--imbalance plane. Further datasets can be added under the same protocol to test how far this pattern generalizes.
 
 \clearpage
 \bibliographystyle{plainnat}
