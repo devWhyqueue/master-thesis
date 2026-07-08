@@ -1,0 +1,152 @@
+[
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_balanced_sampler_ce",
+    "regime": "native",
+    "selected_params": "{\"sampler_power\":0.5}",
+    "test_balanced_accuracy": 0.9685073412449708,
+    "test_macro_f1": 0.9603084513630537,
+    "val_macro_f1": 0.958394516979855,
+    "variant": "sampler_power=0.5"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_ce",
+    "regime": "native",
+    "selected_params": "{}",
+    "test_balanced_accuracy": 0.9623720395654844,
+    "test_macro_f1": 0.9579024995654314,
+    "val_macro_f1": 0.9574384118796625,
+    "variant": "default"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_ce_soft_f1_balanced",
+    "regime": "native",
+    "selected_params": "{\"metric_loss_weight\":0.25}",
+    "test_balanced_accuracy": 0.9856605755269081,
+    "test_macro_f1": 0.9518229266860431,
+    "val_macro_f1": 0.9569457382569243,
+    "variant": "metric_loss_weight=0.25"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_ce_soft_mcc_balanced",
+    "regime": "native",
+    "selected_params": "{\"metric_loss_weight\":1.0}",
+    "test_balanced_accuracy": 0.9816808406937257,
+    "test_macro_f1": 0.9399029876644951,
+    "val_macro_f1": 0.9499883892109073,
+    "variant": "metric_loss_weight=1"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_cfal",
+    "regime": "native",
+    "selected_params": "{\"cfal_sigma\":4.0}",
+    "test_balanced_accuracy": 0.9612396617139728,
+    "test_macro_f1": 0.9660114878703515,
+    "val_macro_f1": 0.9647816293973607,
+    "variant": "cfal_sigma=4"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_focal",
+    "regime": "native",
+    "selected_params": "{\"focal_gamma\":0.5}",
+    "test_balanced_accuracy": 0.9715054965066493,
+    "test_macro_f1": 0.9571176905422726,
+    "val_macro_f1": 0.9618655701529697,
+    "variant": "focal_gamma=0.5"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_oko",
+    "regime": "native",
+    "selected_params": "{\"oko_k\":1.0}",
+    "test_balanced_accuracy": 0.9735459102236673,
+    "test_macro_f1": 0.9554502247422776,
+    "val_macro_f1": 0.9609615729473951,
+    "variant": "oko_k=1"
+  },
+  {
+    "benchmark": "patch",
+    "method": "patch_feature_weighted_ce",
+    "regime": "native",
+    "selected_params": "{\"weight_power\":0.75}",
+    "test_balanced_accuracy": 0.9664052289892693,
+    "test_macro_f1": 0.9517241710864024,
+    "val_macro_f1": 0.9601711008582209,
+    "variant": "weight_power=0.75"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "mde_mil",
+    "regime": "native",
+    "selected_params": "{\"mde_mil_consistency_weight\":0.1}",
+    "test_balanced_accuracy": 0.983531746031746,
+    "test_macro_f1": 0.9824768313122351,
+    "val_macro_f1": 1.0,
+    "variant": "mde_mil_consistency_weight=0.1"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "mil_balanced_sampler_ce",
+    "regime": "native",
+    "selected_params": "{\"sampler_power\":0.5}",
+    "test_balanced_accuracy": 0.9787698412698412,
+    "test_macro_f1": 0.9766600118308193,
+    "val_macro_f1": 1.0,
+    "variant": "sampler_power=0.5"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "mil_ce",
+    "regime": "native",
+    "selected_params": "{}",
+    "test_balanced_accuracy": 0.9648809523809524,
+    "test_macro_f1": 0.9647962799187679,
+    "val_macro_f1": 1.0,
+    "variant": "default"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "mil_focal",
+    "regime": "native",
+    "selected_params": "{\"focal_gamma\":0.5}",
+    "test_balanced_accuracy": 0.9787698412698412,
+    "test_macro_f1": 0.9766600118308193,
+    "val_macro_f1": 1.0,
+    "variant": "focal_gamma=0.5"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "mil_weighted_ce",
+    "regime": "native",
+    "selected_params": "{\"weight_power\":0.0}",
+    "test_balanced_accuracy": 0.9648809523809524,
+    "test_macro_f1": 0.9647962799187679,
+    "val_macro_f1": 1.0,
+    "variant": "weight_power=0"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "rankmix_mil",
+    "regime": "native",
+    "selected_params": "{\"rankmix_alpha\":0.2}",
+    "test_balanced_accuracy": 0.9740079365079365,
+    "test_macro_f1": 0.9709159025929214,
+    "val_macro_f1": 0.9942512216154067,
+    "variant": "rankmix_alpha=0.2"
+  },
+  {
+    "benchmark": "wsi",
+    "method": "sc_mil",
+    "regime": "native",
+    "selected_params": "{\"sc_mil_temperature\":0.2}",
+    "test_balanced_accuracy": 0.983531746031746,
+    "test_macro_f1": 0.9824768313122351,
+    "val_macro_f1": 1.0,
+    "variant": "sc_mil_temperature=0.2"
+  }
+]
