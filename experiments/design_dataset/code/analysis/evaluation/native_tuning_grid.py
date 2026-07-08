@@ -18,6 +18,13 @@ PATCH_SPECS = tuple(
 )
 WSI_SPECS = WSI_BAG_SPECS
 
+# Parameter-free no-mitigation baselines. Both methods are registered trainers
+# (patch_feature_ce is cli.train's default; mil_ce is in constructed_wsi.METHODS)
+# but carry no tuning knob, so they are prepended as single "default" variants
+# rather than expanded from a spec grid.
+CE_PATCH_VARIANT = TuningVariant("patch_feature", "patch_feature_ce", "default", {})
+CE_WSI_VARIANT = TuningVariant("wsi_bag", "mil_ce", "default", {})
+
 
 @dataclass(frozen=True)
 class NativeTask:
@@ -29,12 +36,12 @@ class NativeTask:
 
 def patch_grid() -> list[TuningVariant]:
     """Return the native patch-feature tuning grid."""
-    return grid_from_specs("patch_feature", PATCH_SPECS)
+    return [CE_PATCH_VARIANT] + grid_from_specs("patch_feature", PATCH_SPECS)
 
 
 def wsi_grid() -> list[TuningVariant]:
     """Return the native WSI-bag tuning grid."""
-    return grid_from_specs("wsi_bag", WSI_SPECS)
+    return [CE_WSI_VARIANT] + grid_from_specs("wsi_bag", WSI_SPECS)
 
 
 def task_count(benchmark: str) -> int:

@@ -9,13 +9,11 @@
 \usepackage{hyperref}
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
 \sisetup{group-separator={,}, group-minimum-digits=4}
 
 \graphicspath{{outputs/figures/}{../../experiments/class_imbalance/outputs/figures/}}
 
-\title{Class-Imbalance Benchmarks for Whole-Slide Images and Patches}
+\title{Extending Class-Imbalance Mitigation Benchmarks to External Datasets:\\A Native BRACS Benchmark}
 \author{Yannik Queisler}
 \date{\today}
 
@@ -23,7 +21,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology appears both as a native property of clinical cohorts and as an experimental factor that can be controlled by resampling. This report studies both forms in patch-level and whole-slide-image (WSI) feature-bag benchmarks. TCGA-UT provides a pan-cancer setting in which training imbalance is varied artificially by power-law sampling while validation and test splits remain case-disjoint and fixed. BRACS provides an external breast-lesion setting in which the native distribution over seven histologic subtypes is measured first and used only if it is meaningfully imbalanced; otherwise the same power-law severity sweep is applied. Across both datasets, frozen Virchow2 features and a fixed evidence budget separate imbalance mechanisms from encoder training. The current TCGA-UT results show that method rankings are largely preserved across constructed severities while balanced accuracy declines monotonically as rare-class support diminishes; macro F1 is more stable between $\lambda=0.5$ and $\lambda=1.0$ before dropping at $\lambda=1.5$. BRACS's native seven-subtype distribution measures approximately 2.25:1 after preparation---below the minimum ratio required for a meaningful native imbalance benchmark---so the same power-law severity sweep is applied instead. On BRACS, OKO retains its patch-level lead across all three constructed severities and the absolute severity decline is smaller than on TCGA-UT, while the WSI-bag regime shows non-monotone responses and substantially higher between-seed variance, consistent with the constraints of the smaller 108-slide training pool and the greater difficulty of fine-grained seven-class breast-lesion subtyping.
+\noindent A prior study benchmarked class-imbalance mitigation methods on TCGA-UT, a pan-cancer whole-slide-image cohort with a native, moderately imbalanced slide distribution \citep{queisler2026imbalanceTCGA}. This report extends the same benchmark machinery to additional datasets, keeping the frozen Virchow2 representation, the bounded evidence budget, and the patient-disjoint evaluation protocol fixed, and asks whether the method comparison remains meaningful when the data regime changes. The first external dataset is BRACS, an organ-specific H\&E breast-lesion cohort evaluated on its native seven-subtype distribution; further datasets are planned. Both patch-feature and whole-slide-image (WSI) feature-bag method families are compared, each within its own prediction regime, and a plain cross-entropy no-mitigation baseline (CE, MIL CE) is added so mitigation gains are measured against an unweighted reference. On BRACS's native seven-subtype distribution (head-to-tail ${\approx}2.3{:}1$), CFAL leads the patch regime by a clear margin over both the unweighted CE baseline and the other mitigation methods, while ProGAN synthetic augmentation is the weakest patch method overall, falling slightly below unweighted CE. In the WSI-bag regime the unweighted MIL CE baseline is competitive with, and in several cases stronger than, dedicated mitigation methods---only focal loss and SC-MIL clearly exceed it. Both regimes remain substantially miscalibrated after temperature scaling relative to what is achievable on the pan-cancer TCGA-UT cohort, reflecting the smaller training pool and the difficulty of fine-grained breast-lesion subtyping.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -31,73 +29,26 @@
 \clearpage
 
 \section{Introduction}
-A prior class-imbalance study on TCGA-UT compared mitigation methods under the dataset's native, moderately imbalanced slide distribution (head-to-tail ${\approx}28{:}1$) across 32 cancer types \citep{queisler2026imbalanceTCGA}. Native distributions are realistic but confound several factors simultaneously: how often each class appears, tumor morphology, tissue diversity, slide acquisition, and the representation geometry of the frozen encoder. A controlled construction isolates one factor---training-support frequency---by imposing known power-law distributions while holding validation and test data fixed. A native external dataset, in contrast, tests whether the same benchmark machinery remains meaningful when the class distribution is not designed by the experimenter.
+A companion study compared class-imbalance mitigation methods under the native, moderately imbalanced slide distribution of TCGA-UT (head-to-tail ${\approx}28{:}1$) across 32 cancer types \citep{queisler2026imbalanceTCGA,tomczak2015reviewThe,komura2022universalEncoding}. That benchmark fixes a frozen Virchow2 encoder, a bounded per-slide evidence budget, and patient-disjoint splits, so that the only thing being compared is how each mitigation method reshapes minibatch exposure or the per-example loss. The natural next question is external validity: does the same benchmark machinery stay meaningful when it is pointed at a different dataset, with a different organ, a different label set, and a different native class distribution?
 
-TCGA-UT is a suitable test bed for this isolation because it provides slide labels and patch-level evidence from diagnostic whole-slide images in The Cancer Genome Atlas \citep{tomczak2015reviewThe,komura2022universalEncoding}. Controlling only the imbalance severity under a fixed native-prevalence class ordering allows the question to be posed cleanly: do mitigation methods maintain their relative advantage as the imbalance between frequent and rare cancer types intensifies along the same ranking?
+This report takes the first step by extending the benchmark to \emph{native} external datasets rather than to a controlled reconstruction of TCGA-UT. The design is deliberately conservative: the representation family (frozen Virchow2), the 30-instance evidence budget, the patient-disjoint split protocol, the method families, and the validation-based model-selection rule are all carried over unchanged, and only the dataset is swapped. A dataset therefore acts as an external check on the benchmark rather than as a new experimental variable.
 
-BRACS adds a complementary native benchmark. It is an H\&E breast-pathology dataset with \num{547} WSIs and \num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three board-certified pathologists into three lesion types and seven subtypes \citep{brancati2022bracs}. The atypical categories are clinically important and comparatively scarce, making BRACS a natural class-imbalance setting without imposing power-law resampling. Unlike TCGA-UT, BRACS is organ-specific, has fewer labels, and provides lesion-focused ROI annotations; these differences make it useful as an external check rather than a duplicate of the pan-cancer experiment.
+The first external dataset is BRACS, an H\&E breast-pathology dataset with \num{547} WSIs and \num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three board-certified pathologists into three lesion types and seven subtypes \citep{brancati2022bracs}. The atypical categories are clinically important and comparatively scarce, so BRACS is a genuine class-imbalance setting without any resampling. Unlike TCGA-UT it is organ-specific, has far fewer labels, and provides lesion-focused ROI annotations; these differences are exactly what make it a useful external check. Additional datasets are planned and will slot into the same benchmark.
 
-The report therefore contains two benchmark roles. TCGA-UT evaluates the same method families as \citet{queisler2026imbalanceTCGA} under three constructed training distributions that vary only $\lambda \in \{0.5, 1.0, 1.5\}$, the imbalance-severity parameter. BRACS evaluates the same patch and WSI-bag method families on its native seven-subtype distribution. Patch-level methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, OKO set learning, and ProGAN synthetic augmentation \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
+Both regimes from the companion study are carried over. Patch-feature methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, OKO set learning, and ProGAN synthetic augmentation \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
 
-\section{Dataset Construction}
-\label{sec:dataset-construction}
-The two datasets serve different roles. TCGA-UT is used for a controlled severity sweep in which the training distribution is designed by the experimenter. BRACS is first treated as a native external benchmark: its observed seven-subtype distribution is measured and used directly if it provides a meaningful class-imbalance setting. If the prepared BRACS distribution is too close to balanced to test imbalance mitigation, the same power-law construction used for TCGA-UT is applied to BRACS instead, with $\lambda \in \{0.5,1.0,1.5\}$.
+\section{Datasets}
+\label{sec:datasets}
+The benchmark evaluates each dataset on its \emph{native} class distribution: the observed per-class support is measured after a patient-disjoint preparation and used directly, without any resampling or power-law reconstruction. This report covers BRACS; further datasets will be added under the same protocol.
 
-\subsection{TCGA-UT Controlled Severity Benchmark}
-The construction shares the TCGA-UT case-disjoint split protocol with \citet{queisler2026imbalanceTCGA}. For each of three random seeds, the validation and test splits are held fixed, and artificial imbalance is applied only to the training split. The assignment is patient-disjoint: all slides and feature rows associated with one TCGA participant remain in exactly one partition. This isolates the effect of training-support frequency: model selection and evaluation are comparable across imbalance parameters and mitigation methods without patient leakage. Strictly, the controlled lever is the per-class training-support \emph{distribution}: because each $\lambda$ selects a different number of slides per class from the shared pool, the specific slides realized for a class also change across $\lambda$. Differences observed across severities therefore reflect both the change in class counts and, secondarily, which slides happen to be sampled; the fixed validation and test splits and the shared slide pool limit but do not fully remove this slide-composition confound.
+\subsection{BRACS}
+BRACS is an organ-specific H\&E breast-lesion dataset rather than a pan-cancer dataset, and its annotations are lesion-subtype labels rather than cancer-type labels. It contains \num{547} WSIs and \num{4539} ROIs from \num{189} patients, annotated by consensus of three board-certified pathologists \citep{brancati2022bracs}. The labels form three lesion types---benign, atypical, and malignant---and seven subtypes: normal tissue (N), pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma in situ (DCIS), and invasive carcinoma (IC).
 
-All 32 cancer types are retained. Let $C=32$, let $\mathcal{D}_{\mathrm{train}}$ denote the seed-specific training slide pool, and let $a_c$ be the number of available training slides for class $c$. The constructed training split must satisfy
-\begin{equation}
-  1 \le n_c \le a_c,\qquad
-  \sum_{c=1}^{C} n_c = N,\qquad
-  c \in \{1,\ldots,C\}.
-  \label{eq:full-scale-constraints}
-\end{equation}
-\noindent Every class receives at least one slide, no class is oversampled beyond its available pool, and the total training set is fixed at $N$ slides shared across all imbalance parameters and seeds.
+The benchmark uses the seven-subtype target because it is the level at which class imbalance is most relevant. The atypical categories FEA and ADH are clinically important precancerous lesions and are less common than many benign or malignant samples, so collapsing BRACS to the three lesion types would hide part of the rare-class problem. Patient identifiers from the BRACS summary sheet define the split unit, and the prepared benchmark enforces patient-disjoint train, validation, and test partitions across three seeds---matching the leakage-control standard used for TCGA-UT.
 
-After slide selection, the input evidence is capped. Patch classifiers use up to 30 deterministic patches per slide. WSI-bag classifiers use up to 30 deterministic frozen feature instances per slide. In both regimes, Virchow2 features remain frozen \citep{vorontsov2024virchow,zimmermann2024virchow2}, represented as the concatenation of the CLS token and the mean of the patch tokens ($\num{2560}$-dimensional vectors). The cap aligns the input budget across regimes and prevents slides with more extracted tumor patches from dominating the training objective.
+BRACS evidence is derived from the ROI set. Each annotated ROI is tiled deterministically into $256\times256$ RGB patches, capped at 30 tiles per ROI to match the evidence budget used for the companion study. Patch methods consume one frozen Virchow2 feature per ROI tile \citep{vorontsov2024virchow,zimmermann2024virchow2}, represented as the concatenation of the CLS token and the mean of the patch tokens ($\num{2560}$-dimensional vectors). The WSI-bag pipeline consumes grouped ROI-tile features as bounded bags, preserving the same patch-versus-bag comparison while avoiding an additional tissue-detection step on full WSIs. This choice prioritizes label fidelity: all training instances originate from pathologist-selected lesion regions rather than from unlabeled background tissue.
 
-\subsection{Power-Law Training Support}
-For an ordered class list $(c_1,\ldots,c_C)$, the intended share for rank $i$ under imbalance parameter $\lambda$ is
-\begin{equation}
-  p_i(\lambda) =
-  \frac{i^{-\lambda}}{\sum_{j=1}^{C} j^{-\lambda}}.
-  \label{eq:power-law}
-\end{equation}
-\noindent When $\lambda=0$ the intended distribution is uniform over ranks; as $\lambda$ increases, early-ranked classes receive more training support and late-ranked classes receive less. All constructed splits use the \emph{native-prevalence order}: classes are ranked by their TCGA-UT training-split slide count, so rank 1 is the most frequent cancer type and rank $C=32$ the least frequent. The power-law form is imposed to obtain controlled, monotonic severity steps; it is not a fit to the native TCGA-UT distribution, which is only moderately imbalanced (${\approx}28{:}1$) and not well described by a single power law.
-
-Raw targets $N\,p_i(\lambda)$ are converted to integer counts by flooring and assigning residual slides by largest fractional remainder. Each class first receives one guaranteed slide; the remaining $N-C$ slides are then allocated according to Equation~\eqref{eq:power-law}. A regime is accepted only when every rounded target satisfies Equation~\eqref{eq:full-scale-constraints}.
-
-\subsection{Feasible Pool Size and Realized Profiles}
-\label{sec:class-orders}
-The pool size $N$ must be small enough that no class target exceeds its available support across all evaluated imbalance parameters. Define the maximum feasible pool for a given $\lambda$ and seed as
-\begin{equation}
-  T^*(\lambda) = \min_{c} \frac{a_c}{p_c(\lambda)}.
-  \label{eq:tstar}
-\end{equation}
-\noindent Equation~\eqref{eq:tstar} is a continuous bound on the real-valued targets $N\,p_c(\lambda)$ and does not by itself account for the guaranteed-one floor, flooring, and largest-remainder steps of the integer allocation. The operational pool size is therefore the largest total whose \emph{integer} allocation satisfies Equation~\eqref{eq:full-scale-constraints} on every seed, found by a feasibility search that runs the full rounding rule and rejects any total that overruns a class capacity. The continuous bound $\lfloor\min_{s} T^*_s(0.5)\rfloor$ and this integer-verified value coincide for the TCGA-UT splits, so reporting the closed-form bound is exact here; the integer check is what guarantees feasibility in general. The binding regime is $\lambda=0.5$ rather than the steepest: the flat power-law profile at $\lambda=0.5$ requires every class---including rare ones with limited available slides---to contribute a non-trivial share, saturating the rarest class's supply at a lower total $N$ than the peaked profiles at $\lambda\ge 1.0$. For the TCGA-UT training splits, this yields $N = \num{1132}$ slides, approximately 18\% of the full available training pool.
-
-\begin{figure}[ht]
-  \centering
-  \IfFileExists{outputs/figures/constructed_support_by_rank.png}{%
-    \includegraphics[width=0.86\linewidth]{constructed_support_by_rank.png}%
-  }{%
-    \fbox{\parbox{0.80\linewidth}{\centering Constructed support figure unavailable.}}%
-  }
-  \caption{Constructed training support by class rank under the three evaluated imbalance parameters, with the native full-pool distribution shown as a reference. Classes are ordered by native prevalence (rank 1 = most frequent). The vertical axis (training slides per class) is log-scaled.}
-  \label{fig:constructed-support}
-\end{figure}
-
-The three $\lambda$ values produce head-to-tail ratios of approximately 6:1 ($\lambda=0.5$), 30:1 ($\lambda=1.0$), and 122:1 ($\lambda=1.5$) (Figure~\ref{fig:constructed-support}). The $\lambda=0.5$ setting places the constructed distribution well below the native TCGA-UT ratio of approximately 28:1; $\lambda=1.0$ reproduces near-native severity; and $\lambda=1.5$ is substantially more skewed than anything observed in the native data.
-
-\subsection{BRACS Native Benchmark}
-BRACS is prepared as a second benchmark because it changes the data regime without changing the evaluation question. It is an organ-specific H\&E breast-lesion dataset rather than a pan-cancer dataset, and its annotations are lesion-subtype labels rather than cancer-type labels. The dataset contains \num{547} WSIs and \num{4539} ROIs from \num{189} patients, annotated by consensus of three board-certified pathologists \citep{brancati2022bracs}. The labels form three lesion types---benign, atypical, and malignant---and seven subtypes: normal tissue (N), pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma in situ (DCIS), and invasive carcinoma (IC).
-
-The benchmark uses the seven-subtype target because it is the level at which class imbalance is most relevant. The atypical categories FEA and ADH are clinically important precancerous lesions and are less common than many benign or malignant samples, so collapsing BRACS to the three lesion types would hide part of the rare-class problem. Patient identifiers from the BRACS summary sheet define the split unit. The prepared benchmark therefore enforces patient-disjoint train, validation, and test partitions across three seeds, matching the leakage-control standard used for TCGA-UT.
-
-BRACS evidence is derived from the ROI set. Each annotated ROI is tiled deterministically into $256\times256$ RGB patches, capped at 30 tiles per ROI to match the evidence budget used for TCGA-UT. Patch methods consume one frozen Virchow2 feature per ROI tile. The WSI-bag pipeline consumes grouped ROI-tile features as bounded bags, preserving the same patch-versus-bag comparison while avoiding an additional tissue-detection step on full WSIs. This choice prioritizes label fidelity: all training instances originate from pathologist-selected lesion regions rather than from unlabeled background tissue.
-
-After patch extraction, \num{387} of the \num{547} published WSIs contribute at least one annotated ROI tile; the remaining slides have no tiled ROI annotations available. The prepared benchmark covers \num{151} patients, the full \num{4539} ROI metadata records, and \num{98282} extracted patches (Table~\ref{tab:bracs-dataset-summary}). The seven-subtype WSI support spans PB (\num{196} slides) at the head to DCIS (\num{87} slides) at the tail, a ratio of approximately 2.25:1. This falls below the minimum ratio of 5:1 required for a meaningful native imbalance benchmark, so the benchmark switches to the same three power-law severity levels as TCGA-UT. The feasible pool size is \num{108} WSIs, yielding constructed head-to-tail ratios of approximately 3:1 ($\lambda=0.5$), 6:1 ($\lambda=1.0$), and 14:1 ($\lambda=1.5$)---a narrower and milder range than TCGA-UT, reflecting the smaller label set and shallower per-class WSI supply.
+After patch extraction, \num{387} of the \num{547} published WSIs contribute at least one annotated ROI tile; the remaining slides have no tiled ROI annotations available. The prepared benchmark covers \num{151} patients, the full \num{4539} ROI metadata records, and \num{98282} extracted patches (Table~\ref{tab:bracs-dataset-summary}). The seven-subtype WSI support spans PB (\num{196} slides) at the head to DCIS (\num{87} slides) at the tail, a native head-to-tail ratio of approximately 2.25:1 (Figure~\ref{fig:bracs-class-distribution}). This is mild imbalance relative to the pan-cancer TCGA-UT cohort, but it reflects the true clinical distribution of breast-lesion subtypes and is used as-is.
 
 \begin{table}[ht]
   \centering
@@ -108,14 +59,14 @@ After patch extraction, \num{387} of the \num{547} published WSIs contribute at 
       \toprule
       Property & Value\\
       \midrule
-      Patients & \num{189}\\
-      Whole-slide images & \num{547}\\
+      Patients & \num{151}\\
+      Whole-slide images & \num{387}\\
       Regions of interest & \num{4539}\\
       Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
       \bottomrule
     \end{tabular}%
   }
-  \caption{BRACS dataset properties used by the native benchmark. Generated rows add the prepared ROI-tile counts and measured subtype imbalance after staging.}
+  \caption{BRACS dataset properties used by the native benchmark, after patient-disjoint preparation and ROI tiling.}
   \label{tab:bracs-dataset-summary}
 \end{table}
 
@@ -126,13 +77,13 @@ After patch extraction, \num{387} of the \num{547} published WSIs contribute at 
   }{%
     \fbox{\parbox{0.70\linewidth}{\centering BRACS native subtype distribution figure unavailable.}}%
   }
-  \caption{Native BRACS WSI support by seven-subtype label after patient-disjoint preparation. If the observed support range is not sufficiently imbalanced, BRACS is evaluated with the same three power-law severity settings as TCGA-UT rather than as a native imbalance benchmark.}
+  \caption{Native BRACS WSI support by seven-subtype label after patient-disjoint preparation. The distribution is used directly as the benchmark's native class-imbalance setting.}
   \label{fig:bracs-class-distribution}
 \end{figure}
 
 \section{Methods}
 \label{sec:methods}
-The method taxonomy follows the companion benchmark, but this report uses it to study controlled training distributions rather than only the native TCGA-UT distribution. Cross-entropy is the no-mitigation reference. Data-level methods change minibatch exposure through balanced sampling or synthetic augmentation. Algorithm-level methods change the per-example loss through class weighting, focal loss, metric-derived objectives, prototype-affinity objectives, or OKO set supervision. WSI-specific methods change how slide bags are represented or mixed.
+The method taxonomy follows the companion benchmark \citep{queisler2026imbalanceTCGA}. Cross-entropy is the no-mitigation reference. Data-level methods change minibatch exposure through balanced sampling or synthetic augmentation. Algorithm-level methods change the per-example loss through class weighting, focal loss, metric-derived objectives, prototype-affinity objectives, or OKO set supervision. WSI-specific methods change how slide bags are represented or mixed.
 
 \begin{table}[ht]
   \centering
@@ -141,7 +92,7 @@ The method taxonomy follows the companion benchmark, but this report uses it to 
     \toprule
     Family & Methods & Regime\\
     \midrule
-    No-mitigation baseline & CE / MIL CE & Patch, WSI bag\\
+    No-mitigation baseline & CE, MIL CE & Patch, WSI bag\\
     Data-level sampling and augmentation & Balanced sampling, RankMix & Patch, WSI bag\\
     Algorithm-level losses & Weighted CE, Focal loss, CFAL & Patch (CFAL); Patch and WSI bag (others)\\
     Hybrid sampling--loss & CE + soft F1, CE + soft MCC, OKO, MDE-MIL & Patch (first three, OKO); WSI bag (MDE-MIL)\\
@@ -149,309 +100,115 @@ The method taxonomy follows the companion benchmark, but this report uses it to 
     Representation and architecture & SC-MIL & WSI bag\\
     \bottomrule
   \end{tabularx}
-  \caption{Method families evaluated under the TCGA-UT controlled severity benchmark and the BRACS external benchmark, following the taxonomy of \citet{queisler2026imbalanceTCGA}. Patch and WSI-bag methods are compared only within their own input regime.}
+  \caption{Method families evaluated on the native BRACS benchmark, following the taxonomy of \citet{queisler2026imbalanceTCGA}. CE and MIL CE are unweighted cross-entropy baselines, added so mitigation gains are measured against a genuine no-mitigation reference. Patch and WSI-bag methods are compared only within their own input regime.}
   \label{tab:method-groups}
 \end{table}
 
-Full method definitions follow \citet{queisler2026imbalanceTCGA} and \citet{scholz2024imbalanceAware}. RankMix, SC-MIL, and MDE-MIL are WSI-bag methods whose mechanisms operate on bags rather than isolated patch embeddings \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}.
+Full method definitions follow \citet{queisler2026imbalanceTCGA} and \citet{scholz2024imbalanceAware}. RankMix, SC-MIL, and MDE-MIL are WSI-bag methods whose mechanisms operate on bags rather than isolated patch embeddings \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. The plain cross-entropy baselines (CE for the patch regime, MIL CE for the WSI-bag regime) apply uniform class weights and no resampling, so any improvement from a mitigation method is measured relative to doing nothing.
 
 \section{Evaluation Protocol}
 \label{sec:evaluation}
-Each TCGA-UT constructed split is indexed by seed and imbalance parameter $\lambda \in \{0.5, 1.0, 1.5\}$. Hyperparameters are selected independently for every method and every $\lambda$: for each candidate configuration the validation macro F1 is averaged over the three seeds, and the configuration with the highest mean is chosen, with ties broken by mean validation balanced accuracy. A single configuration is therefore fixed per method and $\lambda$ (shared across seeds) and is not reused across $\lambda$. Because tuning is performed separately at each severity, the reported figures reflect each method at its per-$\lambda$ best, which can partly absorb the effect of imbalance severity; the comparison thus targets achievable rather than fixed-configuration performance. Selected configurations are evaluated on the fixed test split, and results are reported as mean $\pm$ standard deviation across seeds. Macro F1 is the primary discrimination metric because it weights classes equally. Balanced accuracy and accuracy are reported as complementary discrimination metrics.
+The benchmark evaluates each dataset on its native class distribution. Hyperparameters are selected independently for every method: for each candidate configuration the validation macro F1 is averaged over the three patient-disjoint seeds, and the configuration with the highest mean is chosen, with ties broken by mean validation balanced accuracy. A single configuration is therefore fixed per method (shared across seeds). Selected configurations are evaluated on the fixed test split, and results are reported as mean $\pm$ standard deviation across seeds. Macro F1 is the primary discrimination metric because it weights classes equally; balanced accuracy and accuracy are reported as complementary discrimination metrics.
 
-BRACS follows the same validation-selection rule, but the regime index depends on the prepared distribution. If the native seven-subtype support is meaningfully imbalanced, one native configuration is selected per method by averaging validation macro F1 across the three patient-disjoint seeds. If the native support is not a useful class-imbalance setting, BRACS is switched to the same $\lambda \in \{0.5,1.0,1.5\}$ power-law construction as TCGA-UT, and tuning is performed per $\lambda$.
+The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the patient-disjoint splits, the frozen Virchow2 representation family, and the 30-instance evidence budget, but they differ in prediction unit and aggregation mechanism.
 
-The comparison is intentionally regime-specific. Patch-feature methods are compared only with other patch-feature methods, and WSI-bag methods are compared only with other WSI-bag methods. The two regimes share the case-disjoint splits, frozen Virchow2 representation family, and 30-instance evidence budget, but they differ in prediction unit and aggregation mechanism.
-
-Calibration is evaluated alongside discrimination using negative log likelihood (NLL), multiclass Brier score \citep{brier1950verification}, and expected calibration error \citep[ECE;][]{naeini2015obtaining,guo2017calibration}. For each method and seed, a single temperature is fit by minimizing NLL on the validation split and applied unchanged to the test score matrix before softmax \citep{guo2017calibration}. Tables~\ref{tab:calibration-patch} and~\ref{tab:calibration-wsi} report ECE before and after temperature scaling; full NLL and Brier metrics are given in Tables~\ref{tab:calibration-patch-full} and~\ref{tab:calibration-wsi-full}.
+Calibration is evaluated alongside discrimination using expected calibration error \citep[ECE;][]{naeini2015obtaining,guo2017calibration}. For each method and seed, a single temperature is fit by minimizing negative log likelihood on the validation split and applied unchanged to the test score matrix before softmax \citep{guo2017calibration}. Tables~\ref{tab:bracs-calibration-patch} and~\ref{tab:bracs-calibration-wsi} report ECE before and after temperature scaling with the fitted temperature.
 
 \section{Results}
 \label{sec:results}
-The analysis asks how methods respond as imbalance severity increases from $\lambda=0.5$ to $\lambda=1.5$ under the native-prevalence class order. The realized support profiles are summarised in Table~\ref{tab:constructed-split-summary} (Appendix~\ref{sec:appendix-support}); Tables~\ref{tab:patch-results} and~\ref{tab:wsi-results} compare mitigation methods within the patch-feature and WSI-bag regimes.
+The patch-feature and WSI-bag regimes are reported separately (Tables~\ref{tab:bracs-patch-results} and~\ref{tab:bracs-wsi-results}). Scores are specific to the seven-class breast-lesion subtyping task and are not directly comparable to the 32-class TCGA-UT benchmark: the label set, task difficulty, and cohort size all differ.
 
 \begin{table}[ht]
   \centering
-  \IfFileExists{outputs/tables/result_summary_patch.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_summary_patch.tex}}%
+  \IfFileExists{outputs/tables/bracs_result_summary_patch.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/bracs_result_summary_patch.tex}}%
   }{%
     \begin{tabular}{lccc}
       \toprule
       Method & Accuracy & Balanced accuracy & Macro F1\\
       \midrule
-      \multicolumn{4}{c}{Patch result table unavailable.}\\
+      \multicolumn{4}{c}{BRACS patch result table unavailable.}\\
       \bottomrule
     \end{tabular}%
   }
-  \caption{Patch-feature test results (balanced accuracy and macro F1) for validation-selected configurations under constructed training distributions. The Native column reports the companion full-pool benchmark \citep{queisler2026imbalanceTCGA} (native ${\approx}28{:}1$ imbalance, complete training pool) as a reference; it is not part of the constructed experiment.}
-  \label{tab:patch-results}
-\end{table}
-
-Patch-feature balanced accuracy shows a consistent, monotone decline as imbalance intensifies, whereas macro F1 is comparatively flat between $\lambda=0.5$ and $\lambda=1.0$---rising slightly for several methods (CFAL, CE+soft-F1, OKO, ProGAN)---before dropping at $\lambda=1.5$ (Table~\ref{tab:patch-results}). ProGAN augmentation numerically leads in balanced accuracy at the mildest severity but reverses to last at the harshest, undergoing the steepest decline of any patch method; OKO and CE+soft-F1 are the most stable and numerically retain the lead at $\lambda=1.5$. With a within-severity spread of only one to two percentage points and overlapping standard deviations, these orderings should be read as numerical rather than statistically separated. Focal loss is typically among the weakest of the remaining methods, though by margins within seed-to-seed variation. The key observation is one of scale: the spread across methods at any fixed $\lambda$ is only one to two percentage points, whereas the severity-induced decline from $\lambda=0.5$ to $\lambda=1.5$ is roughly eight to eleven percentage points---choosing the right severity matters far more than choosing the best method. The native full-pool benchmark (rightmost block) sits above even the mildest constructed severity, despite carrying a larger imbalance (${\approx}28{:}1$) than $\lambda=0.5$ (${\approx}6{:}1$); because it draws on the complete training pool rather than the constructed subset, this gap suggests training-set size---rather than imbalance---is the dominant lever on absolute patch performance.
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/result_summary_wsi_bag.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_summary_wsi_bag.tex}}%
-  }{%
-    \begin{tabular}{lccc}
-      \toprule
-      Method & Accuracy & Balanced accuracy & Macro F1\\
-      \midrule
-      \multicolumn{4}{c}{WSI-bag result table unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{WSI-bag test results (balanced accuracy and macro F1) for validation-selected configurations under constructed training distributions. The Native column is the companion full-pool benchmark \citep{queisler2026imbalanceTCGA} reference, as in Table~\ref{tab:patch-results}.}
-  \label{tab:wsi-results}
-\end{table}
-
-
-The WSI-bag regime shows higher absolute performance than the patch regime (Table~\ref{tab:wsi-results}), roughly ten balanced-accuracy points above patch methods at equivalent imbalance. MDE-MIL numerically leads at mild and moderate severities, but RankMix is clearly ahead at the harshest regime ($\lambda=1.5$, BAcc \num{0.765} vs \num{0.730}) and is the most severity-robust method overall, while focal loss is the least stable. MDE-MIL's advantage over simple loss weighting erodes at $\lambda=1.5$, where it falls narrowly below Weighted CE in balanced accuracy and ties it in macro F1---consistency regularisation provides diminishing returns as rare-class support becomes critically scarce. RankMix is consistently among the strongest WSI-bag methods and is the most robust at $\lambda=1.5$; SC-MIL remains competitive but does not uniformly outperform loss-based baselines---at $\lambda=0.5$ it sits below both Weighted CE and focal loss. Because many gaps are one to two percentage points with overlapping standard deviations, these orderings are best read as numerical leads rather than statistically separated outcomes. As in the patch regime, the native full-pool benchmark (rightmost block) exceeds even $\lambda=0.5$ despite its larger imbalance, again pointing to training-set size rather than imbalance severity as the main driver of absolute performance.
-
-\subsection{BRACS Power-Law Breast-Lesion Benchmark}
-\label{sec:bracs-results}
-The BRACS benchmark is reported separately because its target is seven-class breast-lesion subtyping rather than 32-class pan-cancer recognition. The native distribution proved too balanced (2.25:1) for a native imbalance benchmark, so Tables~\ref{tab:bracs-patch-results} and~\ref{tab:bracs-wsi-results} report the power-law severity sweep applied instead. Scores are not directly comparable to TCGA-UT: the label set, task difficulty, and pool size all differ.
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/bracs_power_law/tables/result_summary_patch.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/bracs_power_law/tables/result_summary_patch.tex}}%
-  }{%
-    \IfFileExists{outputs/tables/bracs_result_summary_patch.tex}{%
-      \resizebox{\linewidth}{!}{\input{outputs/tables/bracs_result_summary_patch.tex}}%
-    }{%
-      \begin{tabular}{lccc}
-        \toprule
-        Method & Balanced accuracy & Macro F1\\
-        \midrule
-        \multicolumn{3}{c}{BRACS patch result table unavailable.}\\
-        \bottomrule
-      \end{tabular}%
-    }%
-  }
-  \caption{BRACS patch-feature test results (balanced accuracy and macro F1) under the three power-law severity levels, mean $\pm$ standard deviation across patient-disjoint seeds. Pool size: \num{108} WSIs; head-to-tail ratios approximately 3:1, 6:1, and 14:1 for $\lambda=0.5$, $1.0$, and $1.5$.}
+  \caption{BRACS native patch-feature test results (accuracy, balanced accuracy, and macro F1) for validation-selected configurations, mean $\pm$ standard deviation across patient-disjoint seeds.}
   \label{tab:bracs-patch-results}
 \end{table}
 
 \begin{table}[ht]
   \centering
-  \IfFileExists{outputs/bracs_power_law/tables/result_summary_wsi_bag.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/bracs_power_law/tables/result_summary_wsi_bag.tex}}%
+  \IfFileExists{outputs/tables/bracs_result_summary_wsi_bag.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/bracs_result_summary_wsi_bag.tex}}%
   }{%
-    \IfFileExists{outputs/tables/bracs_result_summary_wsi_bag.tex}{%
-      \resizebox{\linewidth}{!}{\input{outputs/tables/bracs_result_summary_wsi_bag.tex}}%
-    }{%
-      \begin{tabular}{lccc}
-        \toprule
-        Method & Balanced accuracy & Macro F1\\
-        \midrule
-        \multicolumn{3}{c}{BRACS WSI-bag result table unavailable.}\\
-        \bottomrule
-      \end{tabular}%
-    }%
+    \begin{tabular}{lccc}
+      \toprule
+      Method & Accuracy & Balanced accuracy & Macro F1\\
+      \midrule
+      \multicolumn{4}{c}{BRACS WSI-bag result table unavailable.}\\
+      \bottomrule
+    \end{tabular}%
   }
-  \caption{BRACS WSI-bag test results under the three power-law severity levels, mean $\pm$ standard deviation across patient-disjoint seeds. Pool size and severity levels as in Table~\ref{tab:bracs-patch-results}.}
+  \caption{BRACS native WSI-bag test results for validation-selected configurations, mean $\pm$ standard deviation across patient-disjoint seeds.}
   \label{tab:bracs-wsi-results}
 \end{table}
 
-In the patch regime, all methods cluster within approximately one percentage point of each other at the mildest severity (0.392--0.401 balanced accuracy), with OKO as the only clear outlier at \num{0.423} (Table~\ref{tab:bracs-patch-results}). The severity decline is 2.3 to 4.3 percentage points across methods---roughly half the decline observed on TCGA-UT---consistent with the narrower achievable imbalance range (3:1 to 14:1) and the smaller pool. OKO is the most stable method ($\Delta\text{BAcc} = 2.3$ pp) and the only one that separates from the cluster at all three severities; CE+soft-F1 and CFAL are the next most stable. ProGAN augmentation does not reverse to worst at the harshest severity as it did on TCGA-UT; its decline (3.7 pp) matches that of the loss-based baselines, likely because tail classes retain enough per-class patches to support synthetic augmentation across all three severity levels.
+In the patch regime, CFAL leads on all three metrics (BAcc \num{0.512}, F1 \num{0.499}), \num{2.2} points of balanced accuracy ahead of the next-best method (CE + soft F1, BAcc \num{0.490}) and \num{5.5} points ahead of the unweighted CE baseline (BAcc \num{0.457}, F1 \num{0.443}). The remaining methods---Weighted CE, focal loss, CE + soft MCC, and balanced sampling---cluster tightly between BAcc \num{0.458} and \num{0.468}, indistinguishable from the CE baseline within one standard deviation (all $\sigma \approx 0.03$--$0.08$). OKO (BAcc \num{0.482}) sits between this cluster and CFAL. ProGAN augmentation is the weakest method in the regime (BAcc \num{0.455}, F1 \num{0.437}), fractionally below the unweighted CE baseline on every metric---unlike on the companion TCGA-UT benchmark, where ProGAN led at the mildest severity, BRACS's native imbalance never becomes severe enough for synthetic augmentation to pay off. The overall picture is that most patch mitigation methods provide little measurable lift over unweighted cross-entropy on BRACS's mild native imbalance, and one (ProGAN) falls slightly below it; only CFAL and, to a lesser extent, CE + soft F1 and OKO separate from the no-mitigation baseline.
 
-The WSI-bag regime differs from TCGA-UT in two important respects. First, severity responses are non-monotone: Weighted CE and SC-MIL both peak at $\lambda=1.0$ (0.540 and 0.532, respectively) before falling at $\lambda=1.5$, and the same pattern recurs for MDE-MIL and focal loss. Second, between-seed standard deviations reach $\pm$0.09--0.10, substantially higher than the $\pm$0.02--0.05 typical on TCGA-UT. RankMix, the most severity-robust method on TCGA-UT, shows the highest variance at mild severity ($0.478 \pm 0.100$) and does not lead at any BRACS severity level. SC-MIL is numerically ahead at $\lambda=1.0$ (BAcc \num{0.532}) and $\lambda=1.5$ (BAcc \num{0.459}), though the overlapping standard deviations mean these differences are not statistically separated.
-
-\paragraph{Tail-Class Behaviour.}
-Aggregate macro F1 and balanced accuracy can mask whether a method helps rare cancer types or merely preserves frequent ones. To separate these, classes are grouped into support tiers by native prevalence---head (the 8 most frequent), body (the middle 16), and tail (the 8 rarest)---and per-class test recall is plotted against the realized training support of each class (Figure~\ref{fig:support-recall}). Tables~\ref{tab:tail-patch} and~\ref{tab:tail-wsi} report tier-resolved macro F1 per severity.
-
-\begin{figure}[ht]
-  \centering
-  \IfFileExists{outputs/figures/support_vs_recall.png}{%
-    \includegraphics[width=\linewidth]{support_vs_recall.png}%
-  }{%
-    \fbox{\parbox{0.80\linewidth}{\centering Support-versus-recall figure unavailable.}}%
-  }
-  \caption{Per-class test recall against training slides per class (log scale), one panel per regime. Each point is a cancer type at one severity, averaged over methods and seeds; colour encodes the imbalance parameter $\lambda$. The horizontal axis is log-scaled.}
-  \label{fig:support-recall}
-\end{figure}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/result_tail_class_patch.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_tail_class_patch.tex}}%
-  }{%
-    \begin{tabular}{lccc}
-      \toprule
-      Method & Head & Body & Tail\\
-      \midrule
-      \multicolumn{4}{c}{Patch tail-class table unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{Patch-feature tier-resolved test macro F1 (head/body/tail support tiers) per imbalance parameter, mean $\pm$ standard deviation across seeds.}
-  \label{tab:tail-patch}
-\end{table}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/result_tail_class_wsi_bag.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_tail_class_wsi_bag.tex}}%
-  }{%
-    \begin{tabular}{lccc}
-      \toprule
-      Method & Head & Body & Tail\\
-      \midrule
-      \multicolumn{4}{c}{WSI-bag tail-class table unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{WSI-bag tier-resolved test macro F1 per imbalance parameter, as in Table~\ref{tab:tail-patch}.}
-  \label{tab:tail-wsi}
-\end{table}
-
-The support--recall relationship makes the locus of the severity effect explicit (Figure~\ref{fig:support-recall}): per-class recall is near-saturated ($\approx\num{0.9}$) for high-support classes and degrades sharply for low-support classes, with the $\lambda=1.5$ points dominating the low-support, low-recall corner. The tier-resolved tables confirm that the aggregate decline is concentrated in the rare classes. Head-tier macro F1 is essentially flat across severity---patch head F1 holds near \num{0.79} and only edges down to ${\approx}\num{0.77}$ at $\lambda=1.5$, and WSI-bag head F1 stays near \num{0.87}---whereas tail-tier F1 falls substantially: from ${\approx}\num{0.53}$ to ${\approx}\num{0.46}$ in the patch regime and from ${\approx}\num{0.69}$ to ${\approx}\num{0.61}$ in the WSI-bag regime. The head--tail gap therefore widens with $\lambda$, and mitigation methods differ almost entirely in how well they protect the tail rather than the already-saturated head. In the WSI-bag regime at $\lambda=1.5$, the bag-composition methods retain the highest tail F1 (SC-MIL \num{0.643}, RankMix \num{0.636}), MDE-MIL's tail erodes to \num{0.610} despite its strong head and body tiers---mirroring its aggregate erosion at high severity---and focal loss is weakest in the tail (\num{0.555}). These tail-tier differences are small relative to their seed-to-seed standard deviations (up to ${\approx}\num{0.07}$), so they should be read as numerical rather than statistically separated.
-
-The three-tier partition (head/body/tail of eight classes each) is designed for the 32-class TCGA-UT label set and does not segment a seven-class label set. All seven BRACS subtypes fall into the head tier; body and tail columns are empty throughout Tables~\ref{tab:tail-patch} and~\ref{tab:tail-wsi} for the BRACS rows. The tier-resolved analysis is therefore not informative for BRACS, and cross-dataset comparisons of tier F1 are not drawn.
+In the WSI-bag regime, the unweighted MIL CE baseline (BAcc \num{0.446}, F1 \num{0.430}) is competitive with most dedicated mitigation methods: it outperforms Weighted CE (BAcc \num{0.415}), balanced sampling (BAcc \num{0.400}), RankMix (BAcc \num{0.408}), and MDE-MIL (BAcc \num{0.426}) on balanced accuracy. Only focal loss (BAcc \num{0.469}, the regime leader) and SC-MIL (BAcc \num{0.453}, F1 \num{0.472}, the regime's highest macro F1) clearly exceed the CE baseline. Between-seed standard deviations are large throughout this regime (up to $\sigma \approx 0.10$--$0.13$ for RankMix and SC-MIL), so individual rankings should be read as numerical leads rather than statistically separated outcomes; the qualitative pattern---that several bag-composition and resampling methods do not clearly beat plain MIL CE on BRACS---is nonetheless the direct motivation for including the baseline. Balanced sampling is the weakest method in this regime (BAcc \num{0.400}, F1 \num{0.395}), below the unweighted baseline on every metric.
 
 \paragraph{Probability Calibration.}
 \begin{table}[ht]
   \centering
-  \IfFileExists{outputs/tables/result_calibration_patch.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_patch.tex}}%
+  \IfFileExists{outputs/tables/bracs_calibration_patch.tex}{%
+    \input{outputs/tables/bracs_calibration_patch.tex}%
   }{%
-    \begin{tabular}{lcccccccc}
+    \begin{tabular}{lccc}
       \toprule
-      Method & \multicolumn{2}{c}{$\lambda=0.5$} & \multicolumn{2}{c}{$\lambda=1.0$} & \multicolumn{2}{c}{$\lambda=1.5$} & $T$\\
-      & ECE & ECE+TS & ECE & ECE+TS & ECE & ECE+TS & \\
+      Method & ECE & ECE+TS & $T$\\
       \midrule
-      \multicolumn{8}{c}{Patch calibration table unavailable.}\\
+      \multicolumn{4}{c}{BRACS patch calibration table unavailable.}\\
       \bottomrule
     \end{tabular}%
   }
-  \caption{Patch-feature calibration: ECE before (raw) and after (TS) temperature scaling across evaluated imbalance parameters. ECE is reported per $\lambda$, whereas the single $T$ column is one fitted temperature averaged across seeds and all three severities and is shown only as a coarse summary; the per-$\lambda$ temperatures actually applied appear in Table~\ref{tab:calibration-patch-full}, along with full NLL and Brier metrics.}
-  \label{tab:calibration-patch}
+  \caption{BRACS native patch-feature calibration: ECE before (raw) and after (TS) temperature scaling, with the fitted temperature $T$, mean $\pm$ standard deviation across seeds.}
+  \label{tab:bracs-calibration-patch}
 \end{table}
 
 \begin{table}[ht]
   \centering
-  \IfFileExists{outputs/tables/result_calibration_wsi_bag.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_wsi_bag.tex}}%
+  \IfFileExists{outputs/tables/bracs_calibration_wsi_bag.tex}{%
+    \input{outputs/tables/bracs_calibration_wsi_bag.tex}%
   }{%
-    \begin{tabular}{lcccccccc}
+    \begin{tabular}{lccc}
       \toprule
-      Method & \multicolumn{2}{c}{$\lambda=0.5$} & \multicolumn{2}{c}{$\lambda=1.0$} & \multicolumn{2}{c}{$\lambda=1.5$} & $T$\\
-      & ECE & ECE+TS & ECE & ECE+TS & ECE & ECE+TS & \\
+      Method & ECE & ECE+TS & $T$\\
       \midrule
-      \multicolumn{8}{c}{WSI-bag calibration table unavailable.}\\
+      \multicolumn{4}{c}{BRACS WSI-bag calibration table unavailable.}\\
       \bottomrule
     \end{tabular}%
   }
-  \caption{WSI-bag calibration: ECE (per $\lambda$) and a single fitted temperature $T$ averaged across seeds and severities, shown only as a coarse summary. Columns as in Table~\ref{tab:calibration-patch}; per-$\lambda$ temperatures appear in Table~\ref{tab:calibration-wsi-full}.}
-  \label{tab:calibration-wsi}
+  \caption{BRACS native WSI-bag calibration: ECE before and after temperature scaling, with the fitted temperature $T$. Columns as in Table~\ref{tab:bracs-calibration-patch}.}
+  \label{tab:bracs-calibration-wsi}
 \end{table}
 
-\noindent In the patch regime, CFAL is a calibration outlier: its affinity-based outputs are nearly flat over 32 classes, requiring strong temperature concentration ($T \approx 0.05$) and remaining substantially miscalibrated ($\text{ECE} \approx \num{0.07}$) even after scaling---roughly five times higher than all other patch methods post-scaling. All other patch methods achieve ECE below \num{0.04} after temperature scaling. OKO shows a non-monotone calibration trajectory: well-calibrated at mild severity ($\text{ECE}\approx\num{0.07}$ raw at $\lambda=0.5$) but deteriorating to $\text{ECE}\approx\num{0.19}$ at moderate severity before scaling. ProGAN augmentation requires the highest temperature correction of any patch method ($T\approx\num{4.05}$), consistent with the highly peaked, overconfident predictions that synthetic-feature training tends to produce; post-scaling ECE is unremarkable ($\text{ECE+TS}\approx\num{0.014}$--\num{0.019}). In the WSI-bag regime, RankMix is already well calibrated before scaling ($\text{ECE}\approx\num{0.025}$); MDE-MIL shows only marginal improvement from temperature scaling and retains residual miscalibration ($\text{ECE+TS}\approx\num{0.037}$--\num{0.039}). All WSI-bag methods reach ECE at or below \num{0.039} after scaling. Calibration rankings are broadly stable across imbalance severities.
-
-BRACS calibration is substantially harder than TCGA-UT. On the patch regime, post-temperature-scaling ECE ranges from \num{0.041} to \num{0.110} depending on method and severity, compared to below \num{0.04} on TCGA-UT; CFAL again shows the lowest temperature ($T\approx\num{0.07}$) and OKO the next lowest ($T\approx\num{0.20}$), consistent with their behaviour on TCGA-UT. On the WSI-bag regime, residual post-scaling ECE ranges from \num{0.096} to \num{0.171}---three to four times higher than on TCGA-UT---with RankMix the best calibrated before scaling ($\text{ECE}\approx\num{0.179}$--\num{0.235}) and Weighted CE the worst after scaling ($\text{ECE+TS}\approx\num{0.127}$--\num{0.164}). The elevated post-scaling ECE across all BRACS methods reflects the smaller training pool and the inherent difficulty of the seven-class fine-grained subtyping problem rather than a systematic failure of any one approach.
+In the patch regime, raw (pre-scaling) miscalibration is severe for most methods: ECE ranges from \num{0.28} to \num{0.42}, requiring large temperature corrections ($T \approx 3$--\num{9}) to reach post-scaling ECE of \num{0.04}--\num{0.08}. OKO is the exception, with by far the lowest raw ECE (\num{0.146}) and the smallest fitted temperature ($T\approx\num{1.47}$), consistent with its behaviour on the companion TCGA-UT benchmark. CFAL again shows the CFAL-specific pattern of a near-degenerate low temperature ($T\approx\num{0.058}$) alongside the highest post-scaling ECE (\num{0.068}) of any patch method, echoing its affinity-based outputs being nearly flat prior to scaling. Focal loss achieves the lowest post-scaling ECE (\num{0.038}). ProGAN augmentation calibrates similarly to the unweighted baselines (raw ECE \num{0.394}, $T\approx\num{6.34}$, post-scaling ECE \num{0.053}), showing no distinctive miscalibration pattern despite its weaker discrimination. In the WSI-bag regime, calibration is uniformly worse than the patch regime and than the companion TCGA-UT benchmark: post-scaling ECE ranges from \num{0.112} (SC-MIL, the best-calibrated method) to \num{0.155} (MIL CE and Weighted CE, tied for worst). RankMix has the lowest raw ECE (\num{0.152}) and smallest temperature ($T\approx\num{1.16}$) of any WSI-bag method, but its post-scaling ECE (\num{0.133}) is not the best. The elevated residual miscalibration across all BRACS methods, relative to TCGA-UT, reflects the smaller training pool and the intrinsic difficulty of seven-class fine-grained subtyping rather than a failure specific to any one method.
 
 \section{Discussion}
 \label{sec:discussion}
-The TCGA-UT controlled construction reveals two complementary patterns. First, method rankings are broadly preserved across imbalance severities, with moderate reshuffling among closely performing methods at the extremes. Second, balanced accuracy declines monotonically with $\lambda$ for almost all methods, with a total range of eight to nine percentage points from the mildest to the strongest constructed regime. These patterns suggest that the relative utility of mitigation methods is largely robust to the particular severity chosen within this range, while absolute performance degrades substantially as rare-class support diminishes.
+The benchmark's central design change from the companion TCGA-UT study is the addition of an unweighted no-mitigation baseline (CE, MIL CE), and the two regimes answer the question it was added to ask quite differently. In the patch regime, most mitigation methods do not clearly separate from the CE baseline on BRACS's mild native imbalance (${\approx}2.3{:}1$)---Weighted CE, focal loss, CE + soft MCC, and balanced sampling all sit within noise of unweighted cross-entropy, and ProGAN augmentation falls fractionally below it. Only CFAL, and to a lesser extent CE + soft F1 and OKO, produce a measurable gain. This is a plausible consequence of the imbalance itself being mild: with a native ratio an order of magnitude below TCGA-UT's ${\approx}28{:}1$, there may simply be less headroom for reweighting or resampling to help. ProGAN's reversal is particularly informative: on TCGA-UT it led at the mildest constructed severity before collapsing as tail-class support fell to single-digit patch counts at the harshest severity. BRACS's native imbalance never reaches that regime, so ProGAN never gets the tail-scarcity conditions under which synthetic augmentation would be expected to help, and it is left carrying only the risk of the generative step (distributional mismatch between synthetic and real patches) without the corresponding benefit.
 
-At the patch level, declines span from approximately 7.8 percentage points for OKO to 10.5 for ProGAN augmentation. ProGAN leads all patch methods at the mildest severity ($\lambda=0.5$, BAcc \num{0.729}) but drops to last at the harshest ($\lambda=1.5$, BAcc \num{0.624})---a reversal that reflects the difficulty of training patch-level generative models when tail-class support falls to single digits: synthetic features complement real training data at mild imbalance but cannot compensate for critically scarce patches at severe imbalance. OKO and CE+soft-F1 maintain their relative advantage at the harshest severity; focal loss is typically among the weakest of the remaining methods, by margins within seed-to-seed variation.
+The WSI-bag regime tells a sharper version of the same story: several mitigation methods (Weighted CE, balanced sampling, RankMix, MDE-MIL) score \emph{below} the unweighted MIL CE baseline on balanced accuracy. Only focal loss and SC-MIL clearly improve on it. This is exactly the failure mode a no-mitigation baseline is meant to surface, and it would have been invisible in a benchmark that only compared mitigation methods against each other---the companion TCGA-UT report, which lacked this baseline, could not have detected it. Whether this reflects BRACS's smaller training pool (108 native WSIs after preparation, versus TCGA-UT's constructed pools of over 1000 slides), the milder native imbalance giving resampling less to correct, or a genuine difference in how bag-composition methods behave outside a pan-cancer setting cannot be distinguished from a single external dataset; it is a hypothesis for the next dataset in this benchmark to test.
 
-In the WSI-bag regime, RankMix stands out for its stability, declining by only 6.5 percentage points from $\lambda=0.5$ to $\lambda=1.5$. Focal MIL is the least stable, dropping by nearly 12 percentage points and landing at the bottom of the WSI rankings at $\lambda=1.5$. MDE-MIL declines more than RankMix and falls narrowly below Weighted CE at the harshest regime, showing that consistency regularisation provides diminishing returns as rare-class support becomes critically scarce. RankMix is consistently among the strongest WSI-bag methods and the most robust at $\lambda=1.5$; SC-MIL stays competitive but does not uniformly beat loss-based baselines---at $\lambda=0.5$ it trails Weighted CE and focal loss---so the advantage of WSI-specific bag-composition is clear for RankMix but only partial for SC-MIL.
-
-Calibration analysis complements discrimination: CFAL leads on patch discrimination but requires the strongest temperature correction and retains the highest post-scaling ECE. In the WSI-bag regime, RankMix is already well calibrated before scaling, while MDE-MIL shows only marginal improvement from temperature scaling despite leading on discrimination at mild and moderate severities.
-
-The BRACS results refine rather than contradict the TCGA-UT findings. On the patch regime, OKO's advantage generalises: it leads at all three BRACS severity levels and is the only method that numerically separates from the cluster, while CE+soft-F1 and CFAL are the next most stable---the same ordering as on TCGA-UT. The absolute severity decline on BRACS (2--4 pp) is roughly half that on TCGA-UT (8--11 pp), consistent with the narrower achievable imbalance range (3:1 to 14:1 vs 6:1 to 122:1) and the smaller pool. ProGAN augmentation does not reverse to worst at $\lambda=1.5$ on BRACS, unlike on TCGA-UT, suggesting that the reversal requires tail-class support to fall below a critical threshold (single-digit patches) that the BRACS pool does not reach.
-
-The WSI-bag regime, however, does not replicate TCGA-UT conclusions. The non-monotone severity responses and high between-seed variance ($\pm$0.09--0.10) indicate that the 108-slide training pool is too shallow for the severity signal to be stable across seeds. RankMix's severity robustness on TCGA-UT does not replicate at this scale. This suggests a minimum pool-depth requirement for the constructed benchmark to produce interpretable rankings: the 1,132-slide TCGA-UT pool supports clean comparisons, while the 108-slide BRACS pool amplifies seed-to-seed noise beyond the severity effect.
-
-Taken together, the TCGA-UT and BRACS results show that patch-regime method rankings generalise to the organ-specific lesion-subtyping setting when the training pool is comparable in scale to the imbalance range imposed. The prediction unit remains the dominant determinant of absolute performance: WSI-bag methods achieve balanced accuracy approximately ten percentage points higher than patch methods on TCGA-UT at equivalent severity. On BRACS, where pool depth limits the severity range achievable, the WSI-bag and patch regimes converge to a narrower absolute performance gap, and the WSI-bag method ordering becomes less stable.
+Calibration adds a second, independent axis on which BRACS is harder than TCGA-UT: even the best-calibrated method in each regime (focal loss for patch, SC-MIL for WSI-bag) needs temperature scaling to reach an ECE that is still \num{2}--\num{3}$\times$ worse than typical TCGA-UT post-scaling values. This is consistent with the smaller training pool and finer-grained label set rather than a method-specific weakness, since the pattern holds across every method in both regimes.
 
 \section{Conclusion}
-This report defines class-imbalance benchmarks for both patch-level and WSI-bag computational pathology. The TCGA-UT component keeps all 32 cancer types, preserves patient-disjoint validation and test splits, and varies only the training-support frequency under native-prevalence class ordering at $\lambda \in \{0.5, 1.0, 1.5\}$. The shared pool of \num{1132} slides is determined by the mildest parameter $\lambda=0.5$, whose flat profile saturates the rarest class's available supply earliest. The three regimes span head-to-tail ratios of approximately 6:1, 30:1, and 122:1, bracketing and extending the native TCGA-UT ratio (${\approx}28{:}1$).
+\label{sec:conclusion}
+This report extended the class-imbalance mitigation benchmark introduced for TCGA-UT \citep{queisler2026imbalanceTCGA} to a first external dataset, BRACS, keeping the frozen Virchow2 representation, the 30-instance evidence budget, and the patient-disjoint evaluation protocol unchanged and adding an unweighted cross-entropy baseline (CE, MIL CE) so mitigation gains are measured against doing nothing. Evaluated on BRACS's native seven-subtype distribution (${\approx}2.3{:}1$ head-to-tail), the patch regime shows CFAL leading by a clear margin (BAcc \num{0.512} vs.\ \num{0.457} for CE), with most other mitigation methods statistically indistinguishable from the no-mitigation baseline and ProGAN augmentation---the leader at mild severity on the companion TCGA-UT benchmark---falling fractionally below it (BAcc \num{0.455}). The WSI-bag regime shows that several mitigation methods---Weighted CE, balanced sampling, RankMix, and MDE-MIL---do not clearly improve on the unweighted MIL CE baseline; only focal loss and SC-MIL do. Both regimes remain substantially more miscalibrated after temperature scaling than the companion TCGA-UT benchmark, consistent with BRACS's smaller training pool and harder seven-class fine-grained subtyping task.
 
-The TCGA-UT results show that method rankings are broadly preserved across all three constructed severities, while balanced accuracy declines by eight to eleven percentage points from the mildest to the strongest regime. At the patch level, ProGAN augmentation leads at mild severity ($\lambda=0.5$, BAcc \num{0.729}) and undergoes the steepest decline (10.5 pp), reversing from best to worst as tail-class support diminishes; OKO and CE+soft-F1 are most robust at the harshest severity. At the WSI-bag level, RankMix is consistently among the strongest methods and is the most severity-robust; SC-MIL remains competitive but does not uniformly outperform loss-based baselines, and MDE-MIL's advantage over those baselines erodes under the most extreme imbalance. The prediction unit remains the dominant performance determinant: WSI-bag methods achieve balanced accuracy roughly 12 percentage points above patch-feature methods at equivalent imbalance.
-
-The BRACS component extends the benchmark design to seven-class breast-lesion subtyping with patient-disjoint splits and ROI-derived patch and bag evidence. The prepared native distribution (2.25:1) falls below the minimum threshold for a meaningful native imbalance benchmark, so BRACS is evaluated under the same three power-law severity levels as TCGA-UT using a 108-slide pool (constructed head-to-tail ratios 3:1, 6:1, and 14:1). On the patch regime, OKO retains its lead across all BRACS severities and the severity decline is smaller than on TCGA-UT, consistent with the narrower constructed range. On the WSI-bag regime, non-monotone severity responses and high between-seed variance ($\pm$0.09--0.10) indicate that the 108-slide pool is too shallow for the severity signal to dominate; the WSI-bag method ordering is not stable across severities. These results confirm the patch-regime conclusions from TCGA-UT while establishing a pool-depth requirement for the WSI-bag benchmark to produce interpretable severity comparisons.
+These results validate the benchmark's external applicability while also showing that method rankings are not universal: CFAL's patch-level lead, ProGAN's reversal from TCGA-UT leader to BRACS laggard, and several WSI-bag methods' failure to beat plain cross-entropy are all new findings relative to TCGA-UT, and none would have been visible without a native external dataset and a genuine no-mitigation reference. Further external datasets remain to be added under the same protocol; the controlled power-law severity construction previously explored for TCGA-UT and BRACS has been moved to a separate follow-up experiment (see \texttt{controlled\_imbalance\_experiment.md}) rather than folded into this native-benchmark report.
 
 \clearpage
 \bibliographystyle{plainnat}
 \bibliography{references}
-
-\clearpage
-\appendix
-\section{Constructed Training-Support Profiles}
-\label{sec:appendix-support}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/constructed_split_summary.tex}{%
-    \input{outputs/tables/constructed_split_summary.tex}%
-  }{%
-    \begin{tabular}{llll}
-      \toprule
-      $\lambda$ & Training slides & Support range & Head:tail ratio\\
-      \midrule
-      \multicolumn{4}{c}{Constructed split summary unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{Constructed training-support profiles under native-prevalence ordering. Support range and head:tail ratio are the minimum and maximum per-class slide counts averaged across seeds. The native full-pool row is shown for reference; it is not part of the constructed experiment.}
-  \label{tab:constructed-split-summary}
-\end{table}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/bracs_power_law/tables/constructed_split_summary.tex}{%
-    \input{outputs/bracs_power_law/tables/constructed_split_summary.tex}%
-  }{%
-    \begin{tabular}{llll}
-      \toprule
-      $\lambda$ & Training slides & Support range & Head:tail ratio\\
-      \midrule
-      \multicolumn{4}{c}{BRACS constructed split summary unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{BRACS power-law constructed training-support profiles. Pool size \num{108} WSIs; native full-pool row shown for reference.}
-  \label{tab:bracs-constructed-split-summary}
-\end{table}
-
-\section{Full Calibration Metrics}
-\label{sec:appendix-calibration}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/result_calibration_patch_full.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_patch_full.tex}}%
-  }{%
-    \begin{tabular}{llccccccc}
-      \toprule
-      Method & $\lambda$ & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
-      \midrule
-      \multicolumn{9}{c}{Patch calibration table unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{Patch-feature calibration: NLL, Brier score, and ECE before (raw) and after (TS) temperature scaling, with fitted temperature $T$. One row per method per imbalance parameter.}
-  \label{tab:calibration-patch-full}
-\end{table}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/result_calibration_wsi_bag_full.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/result_calibration_wsi_bag_full.tex}}%
-  }{%
-    \begin{tabular}{llccccccc}
-      \toprule
-      Method & $\lambda$ & NLL & NLL+TS & Brier & Brier+TS & ECE & ECE+TS & $T$\\
-      \midrule
-      \multicolumn{9}{c}{WSI-bag calibration table unavailable.}\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{WSI-bag calibration: NLL, Brier score, and ECE before and after temperature scaling. Columns as in Table~\ref{tab:calibration-patch-full}.}
-  \label{tab:calibration-wsi-full}
-\end{table}
 
 \end{document}

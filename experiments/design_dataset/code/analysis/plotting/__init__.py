@@ -14,6 +14,8 @@ SPLIT_PATTERN = re.compile(
 )
 
 DISPLAY_NAMES: dict[str, str] = {
+    "patch_feature_ce": "CE",
+    "mil_ce": "MIL CE",
     "patch_feature_balanced_sampler_ce": "Balanced sampling",
     "patch_feature_ce_soft_f1_balanced": "CE + soft F1",
     "patch_feature_ce_soft_mcc_balanced": "CE + soft MCC",
@@ -31,6 +33,7 @@ DISPLAY_NAMES: dict[str, str] = {
 }
 
 PATCH_ORDER = [
+    "patch_feature_ce",
     "patch_feature_weighted_ce",
     "patch_feature_focal",
     "patch_feature_cfal",
@@ -42,6 +45,7 @@ PATCH_ORDER = [
 ]
 
 WSI_ORDER = [
+    "mil_ce",
     "mil_weighted_ce",
     "mil_focal",
     "mil_balanced_sampler_ce",
