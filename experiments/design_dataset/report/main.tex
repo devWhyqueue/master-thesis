@@ -13,7 +13,7 @@
 
 \graphicspath{{outputs/figures/}{../../experiments/class_imbalance/outputs/figures/}}
 
-\title{Extending Class-Imbalance Mitigation Benchmarks to External Datasets:\\A Native BRACS Benchmark}
+\title{Extending class imbalance mitigation benchmarks to more datasets}
 \author{Yannik Queisler}
 \date{\today}
 
@@ -21,7 +21,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent A prior study benchmarked class-imbalance mitigation methods on TCGA-UT, a pan-cancer whole-slide-image cohort with a native, moderately imbalanced slide distribution \citep{queisler2026imbalanceTCGA}. This report extends the same benchmark machinery to additional datasets, keeping the frozen Virchow2 representation, the bounded evidence budget, and the patient-disjoint evaluation protocol fixed, and asks whether the method comparison remains meaningful when the data regime changes. The first external dataset is BRACS, an organ-specific H\&E breast-lesion cohort evaluated on its native seven-subtype distribution; further datasets are planned. Both patch-feature and whole-slide-image (WSI) feature-bag method families are compared, each within its own prediction regime, and a plain cross-entropy no-mitigation baseline (CE, MIL CE) is added so mitigation gains are measured against an unweighted reference. On BRACS's native seven-subtype distribution (head-to-tail ${\approx}2.3{:}1$), CFAL leads the patch regime by a clear margin over both the unweighted CE baseline and the other mitigation methods, while ProGAN synthetic augmentation is the weakest patch method overall, falling slightly below unweighted CE. In the WSI-bag regime the unweighted MIL CE baseline is competitive with, and in several cases stronger than, dedicated mitigation methods---only focal loss and SC-MIL clearly exceed it. Both regimes remain substantially miscalibrated after temperature scaling relative to what is achievable on the pan-cancer TCGA-UT cohort, reflecting the smaller training pool and the difficulty of fine-grained breast-lesion subtyping.
+\noindent A prior study benchmarked class-imbalance mitigation methods on TCGA-UT, a pan-cancer whole-slide-image cohort with a native, moderately imbalanced slide distribution \citep{queisler2026imbalanceTCGA}. This report extends the same benchmark machinery to additional datasets, keeping the frozen Virchow2 representation, the bounded evidence budget, and the patient-disjoint evaluation protocol fixed, and asks whether the method comparison remains meaningful when the data regime changes. The first such dataset is BRACS, an organ-specific H\&E breast-lesion cohort evaluated on its native seven-subtype distribution. Both patch-feature and whole-slide-image (WSI) feature-bag method families are compared, each within its own prediction regime, and a plain cross-entropy no-mitigation baseline (CE, MIL CE) is added so mitigation gains are measured against an unweighted reference. On BRACS's native seven-subtype distribution (head-to-tail ${\approx}2.3{:}1$), CFAL leads the patch regime by a clear margin over both the unweighted CE baseline and the other mitigation methods, while ProGAN synthetic augmentation is the weakest patch method overall, falling slightly below unweighted CE. In the WSI-bag regime the unweighted MIL CE baseline is competitive with, and in several cases stronger than, dedicated mitigation methods---only focal loss and SC-MIL clearly exceed it. Both regimes remain substantially miscalibrated after temperature scaling relative to what is achievable on the pan-cancer TCGA-UT cohort, reflecting the smaller training pool and the difficulty of fine-grained breast-lesion subtyping.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -31,15 +31,15 @@
 \section{Introduction}
 A companion study compared class-imbalance mitigation methods under the native, moderately imbalanced slide distribution of TCGA-UT (head-to-tail ${\approx}28{:}1$) across 32 cancer types \citep{queisler2026imbalanceTCGA,tomczak2015reviewThe,komura2022universalEncoding}. That benchmark fixes a frozen Virchow2 encoder, a bounded per-slide evidence budget, and patient-disjoint splits, so that the only thing being compared is how each mitigation method reshapes minibatch exposure or the per-example loss. The natural next question is external validity: does the same benchmark machinery stay meaningful when it is pointed at a different dataset, with a different organ, a different label set, and a different native class distribution?
 
-This report takes the first step by extending the benchmark to \emph{native} external datasets rather than to a controlled reconstruction of TCGA-UT. The design is deliberately conservative: the representation family (frozen Virchow2), the 30-instance evidence budget, the patient-disjoint split protocol, the method families, and the validation-based model-selection rule are all carried over unchanged, and only the dataset is swapped. A dataset therefore acts as an external check on the benchmark rather than as a new experimental variable.
+This report takes the first step by extending the benchmark to a further dataset on its \emph{native} class distribution. The design is deliberately conservative: the representation family (frozen Virchow2), the 30-instance evidence budget, the patient-disjoint split protocol, the method families, and the validation-based model-selection rule are all carried over unchanged, and only the dataset is swapped. A dataset therefore acts as a check on how far the benchmark generalizes rather than as a new experimental variable.
 
-The first external dataset is BRACS, an H\&E breast-pathology dataset with \num{547} WSIs and \num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three board-certified pathologists into three lesion types and seven subtypes \citep{brancati2022bracs}. The atypical categories are clinically important and comparatively scarce, so BRACS is a genuine class-imbalance setting without any resampling. Unlike TCGA-UT it is organ-specific, has far fewer labels, and provides lesion-focused ROI annotations; these differences are exactly what make it a useful external check. Additional datasets are planned and will slot into the same benchmark.
+The first such dataset is BRACS, an H\&E breast-pathology dataset with \num{547} WSIs and \num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three board-certified pathologists into three lesion types and seven subtypes \citep{brancati2022bracs}. The atypical categories are clinically important and comparatively scarce, so BRACS is a genuine class-imbalance setting without any resampling. Unlike TCGA-UT it is organ-specific, has far fewer labels, and provides lesion-focused ROI annotations; these differences are exactly what make it a useful check on the benchmark's generality. Additional datasets are planned and will slot into the same benchmark.
 
 Both regimes from the companion study are carried over. Patch-feature methods include cross-entropy, class weighting, balanced sampling, focal loss, Scholz-style metric losses, CFAL, OKO set learning, and ProGAN synthetic augmentation \citep{scholz2024imbalanceAware}. WSI-bag methods include cross-entropy, class weighting, balanced sampling, focal loss, RankMix, SC-MIL, and MDE-MIL \citep{chen2023rankmix,juyal2024scMil,ling2025mdeMil}. Patch and WSI-bag methods are reported separately because they consume different prediction units and answer regime-specific questions.
 
 \section{Datasets}
 \label{sec:datasets}
-The benchmark evaluates each dataset on its \emph{native} class distribution: the observed per-class support is measured after a patient-disjoint preparation and used directly, without any resampling or power-law reconstruction. This report covers BRACS; further datasets will be added under the same protocol.
+The benchmark evaluates each dataset on its \emph{native} class distribution: the observed per-class support is measured after a patient-disjoint preparation and used directly, without any resampling. This report covers BRACS; further datasets will be added under the same protocol.
 
 \subsection{BRACS}
 BRACS is an organ-specific H\&E breast-lesion dataset rather than a pan-cancer dataset, and its annotations are lesion-subtype labels rather than cancer-type labels. It contains \num{547} WSIs and \num{4539} ROIs from \num{189} patients, annotated by consensus of three board-certified pathologists \citep{brancati2022bracs}. The labels form three lesion types---benign, atypical, and malignant---and seven subtypes: normal tissue (N), pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma in situ (DCIS), and invasive carcinoma (IC).
@@ -52,21 +52,34 @@ After patch extraction, \num{387} of the \num{547} published WSIs contribute at 
 
 \begin{table}[ht]
   \centering
-  \IfFileExists{outputs/tables/bracs_dataset_summary.tex}{%
-    \input{outputs/tables/bracs_dataset_summary.tex}%
-  }{%
-    \begin{tabular}{ll}
-      \toprule
-      Property & Value\\
-      \midrule
-      Patients & \num{151}\\
-      Whole-slide images & \num{387}\\
-      Regions of interest & \num{4539}\\
-      Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
-      \bottomrule
-    \end{tabular}%
-  }
-  \caption{BRACS dataset properties used by the native benchmark, after patient-disjoint preparation and ROI tiling.}
+  \begin{minipage}{0.32\linewidth}
+    \centering
+    \IfFileExists{outputs/figures/bracs_example_patch.jpg}{%
+      \includegraphics[width=\linewidth]{bracs_example_patch.jpg}%
+    }{%
+      \fbox{\parbox{0.85\linewidth}{\centering\vspace{2em}BRACS example ROI patch unavailable.\vspace{2em}}}%
+    }
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.62\linewidth}
+    \centering
+    \small
+    \IfFileExists{outputs/tables/bracs_dataset_summary.tex}{%
+      \input{outputs/tables/bracs_dataset_summary.tex}%
+    }{%
+      \begin{tabular}{ll}
+        \toprule
+        Property & Value\\
+        \midrule
+        Patients & \num{151}\\
+        WSIs with ROI tiles & \num{387}\\
+        Regions of interest & \num{4539}\\
+        Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
+        \bottomrule
+      \end{tabular}%
+    }
+  \end{minipage}
+  \caption{BRACS dataset properties used by the native benchmark, after patient-disjoint preparation and ROI tiling, alongside an example $256\times256$ ROI tile. Each tile is one frozen Virchow2 feature consumed by the patch regime and a candidate instance in the WSI bag.}
   \label{tab:bracs-dataset-summary}
 \end{table}
 
@@ -116,7 +129,7 @@ Calibration is evaluated alongside discrimination using expected calibration err
 
 \section{Results}
 \label{sec:results}
-The patch-feature and WSI-bag regimes are reported separately (Tables~\ref{tab:bracs-patch-results} and~\ref{tab:bracs-wsi-results}). Scores are specific to the seven-class breast-lesion subtyping task and are not directly comparable to the 32-class TCGA-UT benchmark: the label set, task difficulty, and cohort size all differ.
+The patch-feature and WSI-bag regimes are reported separately (Tables~\ref{tab:bracs-patch-results} and~\ref{tab:bracs-wsi-results}). Scores are specific to the seven-class breast-lesion subtyping task and are not directly comparable to the 32-class TCGA-UT benchmark: the label set, task difficulty, and cohort size all differ. The absolute discrimination and calibration numbers are markedly lower than on TCGA-UT for two concrete reasons: fine-grained breast-lesion subtyping (distinguishing e.g.\ FEA, ADH, and DCIS) is intrinsically harder than pan-cancer type classification, and the native breast-only training pool is far smaller than the large constructed pan-cancer pools used for TCGA-UT, so each method has both a harder decision boundary and less data to fit it. This is consistent with the external literature: even recent task-specific BRACS models---purpose-built graph and transformer architectures trained end-to-end for this task---report only mid-\num{60}\% weighted F1 on seven-subtype ROI classification (HACT-Net \num{61.5}\%, ScoreNet \num{64.4}\%), with the atypical UDH and ADH subtypes still around \num{45}\% F1 \citep{pati2022hierarchical,stegmuller2023scorenet}. A frozen-feature benchmark under a bounded evidence budget should therefore not be expected to approach TCGA-UT-level discrimination; the binding limitation is fine-grained lesion morphology and limited task-specific representation learning, not class imbalance alone.
 
 \begin{table}[ht]
   \centering
@@ -197,15 +210,15 @@ In the patch regime, raw (pre-scaling) miscalibration is severe for most methods
 \label{sec:discussion}
 The benchmark's central design change from the companion TCGA-UT study is the addition of an unweighted no-mitigation baseline (CE, MIL CE), and the two regimes answer the question it was added to ask quite differently. In the patch regime, most mitigation methods do not clearly separate from the CE baseline on BRACS's mild native imbalance (${\approx}2.3{:}1$)---Weighted CE, focal loss, CE + soft MCC, and balanced sampling all sit within noise of unweighted cross-entropy, and ProGAN augmentation falls fractionally below it. Only CFAL, and to a lesser extent CE + soft F1 and OKO, produce a measurable gain. This is a plausible consequence of the imbalance itself being mild: with a native ratio an order of magnitude below TCGA-UT's ${\approx}28{:}1$, there may simply be less headroom for reweighting or resampling to help. ProGAN's reversal is particularly informative: on TCGA-UT it led at the mildest constructed severity before collapsing as tail-class support fell to single-digit patch counts at the harshest severity. BRACS's native imbalance never reaches that regime, so ProGAN never gets the tail-scarcity conditions under which synthetic augmentation would be expected to help, and it is left carrying only the risk of the generative step (distributional mismatch between synthetic and real patches) without the corresponding benefit.
 
-The WSI-bag regime tells a sharper version of the same story: several mitigation methods (Weighted CE, balanced sampling, RankMix, MDE-MIL) score \emph{below} the unweighted MIL CE baseline on balanced accuracy. Only focal loss and SC-MIL clearly improve on it. This is exactly the failure mode a no-mitigation baseline is meant to surface, and it would have been invisible in a benchmark that only compared mitigation methods against each other---the companion TCGA-UT report, which lacked this baseline, could not have detected it. Whether this reflects BRACS's smaller training pool (108 native WSIs after preparation, versus TCGA-UT's constructed pools of over 1000 slides), the milder native imbalance giving resampling less to correct, or a genuine difference in how bag-composition methods behave outside a pan-cancer setting cannot be distinguished from a single external dataset; it is a hypothesis for the next dataset in this benchmark to test.
+The WSI-bag regime tells a sharper version of the same story: several mitigation methods (Weighted CE, balanced sampling, RankMix, MDE-MIL) score \emph{below} the unweighted MIL CE baseline on balanced accuracy. Only focal loss and SC-MIL clearly improve on it. This is exactly the failure mode a no-mitigation baseline is meant to surface, and it would have been invisible in a benchmark that only compared mitigation methods against each other---the companion TCGA-UT report, which lacked this baseline, could not have detected it. Whether this reflects BRACS's smaller training pool (283 native training WSIs from 387 prepared slides, versus TCGA-UT's constructed pools of over 1000 slides), the milder native imbalance giving resampling less to correct, or a genuine difference in how bag-composition methods behave outside a pan-cancer setting cannot be distinguished from a single additional dataset; it is a hypothesis for the next dataset in this benchmark to test.
 
 Calibration adds a second, independent axis on which BRACS is harder than TCGA-UT: even the best-calibrated method in each regime (focal loss for patch, SC-MIL for WSI-bag) needs temperature scaling to reach an ECE that is still \num{2}--\num{3}$\times$ worse than typical TCGA-UT post-scaling values. This is consistent with the smaller training pool and finer-grained label set rather than a method-specific weakness, since the pattern holds across every method in both regimes.
 
 \section{Conclusion}
 \label{sec:conclusion}
-This report extended the class-imbalance mitigation benchmark introduced for TCGA-UT \citep{queisler2026imbalanceTCGA} to a first external dataset, BRACS, keeping the frozen Virchow2 representation, the 30-instance evidence budget, and the patient-disjoint evaluation protocol unchanged and adding an unweighted cross-entropy baseline (CE, MIL CE) so mitigation gains are measured against doing nothing. Evaluated on BRACS's native seven-subtype distribution (${\approx}2.3{:}1$ head-to-tail), the patch regime shows CFAL leading by a clear margin (BAcc \num{0.512} vs.\ \num{0.457} for CE), with most other mitigation methods statistically indistinguishable from the no-mitigation baseline and ProGAN augmentation---the leader at mild severity on the companion TCGA-UT benchmark---falling fractionally below it (BAcc \num{0.455}). The WSI-bag regime shows that several mitigation methods---Weighted CE, balanced sampling, RankMix, and MDE-MIL---do not clearly improve on the unweighted MIL CE baseline; only focal loss and SC-MIL do. Both regimes remain substantially more miscalibrated after temperature scaling than the companion TCGA-UT benchmark, consistent with BRACS's smaller training pool and harder seven-class fine-grained subtyping task.
+This report extended the class-imbalance mitigation benchmark introduced for TCGA-UT \citep{queisler2026imbalanceTCGA} to a first additional dataset, BRACS, keeping the frozen Virchow2 representation, the 30-instance evidence budget, and the patient-disjoint evaluation protocol unchanged and adding an unweighted cross-entropy baseline (CE, MIL CE) so mitigation gains are measured against doing nothing. Evaluated on BRACS's native seven-subtype distribution (${\approx}2.3{:}1$ head-to-tail), the patch regime shows CFAL leading by a clear margin (BAcc \num{0.512} vs.\ \num{0.457} for CE), with most other mitigation methods statistically indistinguishable from the no-mitigation baseline and ProGAN augmentation---the leader at mild severity on the companion TCGA-UT benchmark---falling fractionally below it (BAcc \num{0.455}). The WSI-bag regime shows that several mitigation methods---Weighted CE, balanced sampling, RankMix, and MDE-MIL---do not clearly improve on the unweighted MIL CE baseline; only focal loss and SC-MIL do. Both regimes remain substantially more miscalibrated after temperature scaling than the companion TCGA-UT benchmark, consistent with BRACS's smaller training pool and harder seven-class fine-grained subtyping task.
 
-These results validate the benchmark's external applicability while also showing that method rankings are not universal: CFAL's patch-level lead, ProGAN's reversal from TCGA-UT leader to BRACS laggard, and several WSI-bag methods' failure to beat plain cross-entropy are all new findings relative to TCGA-UT, and none would have been visible without a native external dataset and a genuine no-mitigation reference. Further external datasets remain to be added under the same protocol; the controlled power-law severity construction previously explored for TCGA-UT and BRACS has been moved to a separate follow-up experiment (see \texttt{controlled\_imbalance\_experiment.md}) rather than folded into this native-benchmark report.
+These results validate the benchmark's external applicability while also showing that method rankings are not universal: CFAL's patch-level lead, ProGAN's reversal from TCGA-UT leader to BRACS laggard, and several WSI-bag methods' failure to beat plain cross-entropy are all new findings relative to TCGA-UT, and none would have been visible without a native additional dataset and a genuine no-mitigation reference. Further datasets can be added under the same protocol to test whether these rankings hold more broadly.
 
 \clearpage
 \bibliographystyle{plainnat}

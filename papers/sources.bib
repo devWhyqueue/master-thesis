@@ -69,6 +69,22 @@
   x_screening_bucket = {review}
 }
 
+@inproceedings{bozorgtabar2023scorenetLearning,
+  author = {Stegm{\"u}ller, Thomas and Bozorgtabar, Behzad and Spahr, Antoine and Thiran, Jean-Philippe},
+  title = {ScoreNet: Learning Non-Uniform Attention and Augmentation for Transformer-Based Histopathological Image Classification},
+  booktitle = {2023 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  publisher = {IEEE},
+  pages = {6159-6168},
+  doi = {10.1109/wacv56688.2023.00611},
+  url = {https://doi.org/10.1109/wacv56688.2023.00611},
+  year = {2023},
+  file = {datasets/bracs/Stegmuller et al.; ScoreNet.pdf},
+  x_screening_reason = {limited venue signal: not in configured top-tier list},
+  x_screening_score = {-0.30},
+  x_screening_details = {bucket_rule=review; citation_count=11; citation_ratio=0.8467803948114512; doi=10.1109/wacv56688.2023.00611; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=proceedings-article; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=2023 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  x_screening_bucket = {review}
+}
+
 @article{brancati2022bracs,
   author    = {Brancati, Nadia and Anniciello, Anna Maria and Pati, Pushpak and Riccio, Daniel and Scognamiglio, Giosue and Jaume, Guillaume and De Pietro, Giuseppe and Di Bonito, Maurizio and Foncubierta, Antonio and Botti, Gerardo and Gabrani, Maria and Feroce, Florinda and Frucci, Maria},
   title = {BRACS: A Dataset for BReAst Carcinoma Subtyping in H&amp;E Histology Images},
@@ -83,7 +99,7 @@
   x_screening_reason = {limited venue signal: not in configured top-tier list; positive signal: citation impact is strong for paper age},
   x_screening_details = {bucket_rule=review; citation_count=138; citation_ratio=6.9; doi=10.1093/database/baac093; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=journal-article; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=Database},
   publisher = {Oxford University Press (OUP)},
-  file = {datasets/Brancati et al.; BRACS.pdf}
+  file = {datasets/bracs/Brancati et al.; BRACS.pdf}
 }
 
 @article{brier1950verification,
@@ -97,7 +113,11 @@
   doi = {10.1175/1520-0493(1950)078<0001:vofeit>2.0.co;2},
   file = {calibration/Brier; Verification of forecasts expressed in terms of probability.pdf},
   url = {https://doi.org/10.1175/1520-0493(1950)078<0001:vofeit>2.0.co;2},
-  publisher = {American Meteorological Society}
+  publisher = {American Meteorological Society},
+  x_screening_reason = {limited venue signal: not in configured top-tier list; positive signal: citation impact is strong for paper age},
+  x_screening_score = {0.90},
+  x_screening_details = {bucket_rule=review; citation_count=5271; citation_ratio=3.182237719030871; doi=10.1175/1520-0493(1950)078<0001:vofeit>2.0.co;2; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=journal-article; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=Monthly Weather Review},
+  x_screening_bucket = {review}
 }
 
 @article{bulten2022panda,
@@ -194,9 +214,12 @@
   year = {2024},
   file = {foundation models/models/Dippel et al.; RudolfV.pdf},
   x_screening_score = {-0.70},
-  x_screening_details = {bucket_rule=review; citation_count=None; citation_ratio=None; doi=None; expected_citations=None; matched=False; missing_metadata_count=3; provider_notes=['match candidate below confidence threshold']; publication_type=article; resolution_confidence=0.4799999999999999; retracted=False; serious_update=False; top_tier_venue=False; venue=None},
-  x_screening_reason = {review suggested: no resolvable external match found},
-  x_screening_bucket = {review}
+  x_screening_details = {bucket_rule=review; citation_count=None; citation_ratio=None; doi=10.54499/2024.01637.bd; expected_citations=None; matched=True; missing_metadata_count=2; provider_notes=['resolved by DOI']; publication_type=grant; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=None},
+  x_screening_reason = {review suggested: provider lookup failed, metadata stayed incomplete},
+  x_screening_bucket = {review},
+  doi = {10.54499/2024.01637.bd},
+  url = {https://doi.org/10.54499/2024.01637.bd},
+  publisher = {Fundacao para a Ciencia e a Tecnologia (unidadeFCCN)}
 }
 
 @article{fu2024fastA,
@@ -230,12 +253,16 @@
 
 @inproceedings{guo2017calibration,
   author = {Chuan Guo and Geoff Pleiss and Yu Sun and Kilian Q. Weinberger},
-  title = {On Calibration of Modern Neural Networks},
+  title = {On Calibration of Modern Neural Networks Chuan Guo * 1 Geoff Pleiss * 1 Yu Sun* 1 Kilian Q. Weinberger1},
   booktitle = {Proceedings of the 34th International Conference on Machine Learning},
   pages = {1321--1330},
-  year = {2017},
+  year = {2015},
   publisher = {PMLR},
-  file = {calibration/Guo et al.; On calibration of modern neural networks.pdf}
+  file = {calibration/Guo et al.; On calibration of modern neural networks.pdf},
+  x_screening_reason = {limited venue signal: not in configured top-tier list; review suggested: provider lookup failed, metadata stayed incomplete},
+  x_screening_score = {-1.00},
+  x_screening_details = {bucket_rule=review; citation_count=None; citation_ratio=None; doi=None; expected_citations=None; matched=False; missing_metadata_count=2; provider_notes=['match candidate below confidence threshold']; publication_type=inproceedings; resolution_confidence=0.5037878787878788; retracted=False; serious_update=False; top_tier_venue=False; venue=Proceedings of the 34th International Conference on Machine Learning},
+  x_screening_bucket = {review}
 }
 
 @article{hasan2025fmsWith,
@@ -292,7 +319,7 @@
   x_screening_reason = {review suggested: no resolvable external match found},
   x_screening_score = {-0.70},
   x_screening_bucket = {review},
-  x_screening_details = {bucket_rule=review; citation_count=None; citation_ratio=None; doi=None; expected_citations=None; matched=False; missing_metadata_count=3; provider_notes=['match candidate below confidence threshold']; publication_type=article; resolution_confidence=0.7384615384615385; retracted=False; serious_update=False; top_tier_venue=False; venue=None}
+  x_screening_details = {bucket_rule=review; citation_count=None; citation_ratio=None; doi=None; expected_citations=None; matched=False; missing_metadata_count=3; provider_notes=['match candidate below confidence threshold']; publication_type=article; resolution_confidence=0.6384615384615385; retracted=False; serious_update=False; top_tier_venue=False; venue=None}
 }
 
 @inproceedings{ilse2018attentionBased,
@@ -358,7 +385,11 @@
   doi = {10.1016/j.celrep.2022.110424},
   file = {datasets/Komura et al.; TCGA-UT.pdf},
   url = {https://doi.org/10.1016/j.celrep.2022.110424},
-  publisher = {Elsevier BV}
+  publisher = {Elsevier BV},
+  x_screening_reason = {review carefully: update or relation flag detected; limited venue signal: not in configured top-tier list; positive signal: citation impact is strong for paper age},
+  x_screening_score = {-1.10},
+  x_screening_details = {bucket_rule=review; citation_count=56; citation_ratio=2.8; doi=10.1016/j.celrep.2022.110424; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=journal-article; resolution_confidence=1.0; retracted=False; serious_update=True; top_tier_venue=False; venue=Cell Reports},
+  x_screening_bucket = {review}
 }
 
 @inproceedings{li2021dualStream,
@@ -565,7 +596,11 @@
   doi = {10.1609/aaai.v29i1.9602},
   file = {calibration/Naeini et al.; Obtaining well calibrated probabilities using Bayesian binning.pdf},
   url = {https://doi.org/10.1609/aaai.v29i1.9602},
-  publisher = {Association for the Advancement of Artificial Intelligence (AAAI)}
+  publisher = {Association for the Advancement of Artificial Intelligence (AAAI)},
+  x_screening_reason = {limited venue signal: not in configured top-tier list; positive signal: citation impact is strong for paper age},
+  x_screening_score = {0.90},
+  x_screening_details = {bucket_rule=review; citation_count=938; citation_ratio=10.284277862325174; doi=10.1609/aaai.v29i1.9602; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=journal-article; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=Proceedings of the AAAI Conference on Artificial Intelligence},
+  x_screening_bucket = {review}
 }
 
 @inproceedings{nallamothu2024assessmentOf,
@@ -646,6 +681,23 @@
   x_screening_details = {bucket_rule=review; citation_count=0; citation_ratio=0.0; doi=10.59567/ktaml.v2.01; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=journal-issue; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=Knowledge Transactions on Applied Machine Learning},
   x_screening_bucket = {review},
   x_screening_reason = {limited venue signal: not in configured top-tier list}
+}
+
+@article{pati2022hierarchical,
+  author = {Pati, Pushpak and Jaume, Guillaume and Foncubierta-Rodriguez, Antonio and Feroce, Florinda and Anniciello, Anna Maria and Scognamiglio, Giosue and Brancati, Nadia and Fiche, Maryse and Dubruc, Estelle and Riccio, Daniel and Di Bonito, Maurizio and De Pietro, Giuseppe and Botti, Gerardo and Thiran, Jean-Philippe and Frucci, Maria and Goksel, Orcun and Gabrani, Maria},
+  title = {Hierarchical graph representations in digital pathology},
+  journal = {Medical Image Analysis},
+  volume = {75},
+  pages = {102264},
+  year = {2022},
+  doi = {10.1016/j.media.2021.102264},
+  url = {https://doi.org/10.1016/j.media.2021.102264},
+  file = {datasets/bracs/Pati et al.; HACT-Net hierarchical graph.pdf},
+  publisher = {Elsevier BV},
+  x_screening_details = {bucket_rule=review; citation_count=9; citation_ratio=0.45; doi=10.1016/j.media.2021.102264; expected_citations=None; matched=True; missing_metadata_count=0; provider_notes=['resolved by DOI']; publication_type=journal-article; resolution_confidence=1.0; retracted=False; serious_update=False; top_tier_venue=False; venue=Medical Image Analysis},
+  x_screening_bucket = {review},
+  x_screening_reason = {limited venue signal: not in configured top-tier list},
+  x_screening_score = {-0.30}
 }
 
 @article{qu2025computerVision,
