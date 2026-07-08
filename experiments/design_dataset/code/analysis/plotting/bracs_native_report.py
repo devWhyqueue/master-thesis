@@ -112,15 +112,15 @@ def result_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
 
 def write_result_tables(frame: pd.DataFrame, tables: Path) -> None:
     """Write native BRACS patch and WSI result tables."""
-    for benchmark, filename, order in (
-        ("patch", "bracs_result_summary_patch.tex", PATCH_ORDER),
-        ("wsi_bag", "bracs_result_summary_wsi_bag.tex", WSI_ORDER),
+    for benchmark, filename in (
+        ("patch", "bracs_result_summary_patch.tex"),
+        ("wsi_bag", "bracs_result_summary_wsi_bag.tex"),
     ):
         part = frame[frame["benchmark"] == benchmark] if not frame.empty else frame
-        write_result_table(cast(pd.DataFrame, part), tables / filename, order)
+        write_result_table(cast(pd.DataFrame, part), tables / filename)
 
 
-def write_result_table(frame: pd.DataFrame, path: Path, order: list[str]) -> None:
+def write_result_table(frame: pd.DataFrame, path: Path) -> None:
     """Write one native BRACS result table."""
     header = "Method & Accuracy & Balanced accuracy & Macro F1"
     if frame.empty:
@@ -138,16 +138,13 @@ def write_result_table(frame: pd.DataFrame, path: Path, order: list[str]) -> Non
         )
         .reset_index()
     )
-    methods = [m for m in order if m in set(stats["method"])] + [
-        str(m) for m in stats["method"].tolist() if m not in order
-    ]
+    stats = stats.sort_values("macro_f1_mean", ascending=False, kind="stable")
     rows = []
-    for method in methods:
-        row = stats[stats["method"] == method].iloc[0]
+    for _, row in stats.iterrows():
         rows.append(
             " & ".join(
                 [
-                    _method_label(method),
+                    _method_label(row["method"]),
                     _mean_std(row, "accuracy"),
                     _mean_std(row, "balanced_accuracy"),
                     _mean_std(row, "macro_f1"),
