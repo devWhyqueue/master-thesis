@@ -114,7 +114,7 @@ class TCGAUTDatasetImbalanced(Dataset):
             "features": cast(torch.Tensor, feature).to(self.device),
             "target_str": target,
             "target": self.features_str_to_int_map[target],
-            "patch_id": row["patch_id"],
+            "patch_id": str(row["patch_id"]),
         }
 
     def _load_dataset_structure(self) -> pd.DataFrame:

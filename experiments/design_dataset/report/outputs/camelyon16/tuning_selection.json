@@ -71,6 +71,16 @@
   },
   {
     "benchmark": "patch",
+    "method": "patch_feature_progan_aug",
+    "regime": "native",
+    "selected_params": "{\"final_depth_epochs\":10.0}",
+    "test_balanced_accuracy": 0.9563739660616509,
+    "test_macro_f1": 0.9586547488030597,
+    "val_macro_f1": 0.9591506034552971,
+    "variant": "final_depth_epochs=10"
+  },
+  {
+    "benchmark": "patch",
     "method": "patch_feature_weighted_ce",
     "regime": "native",
     "selected_params": "{\"weight_power\":0.75}",
