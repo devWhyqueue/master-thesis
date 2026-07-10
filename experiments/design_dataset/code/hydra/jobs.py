@@ -28,6 +28,18 @@ from camelyon16.native_jobs import (
     camelyon16_tune_aggregate,
     camelyon16_tune_wsi,
 )
+from panda.native_jobs import (
+    panda_features,
+    panda_patch_cache,
+    panda_prepare,
+    panda_progan_cache,
+    panda_report,
+    panda_select,
+    panda_tile,
+    panda_tune,
+    panda_tune_aggregate,
+    panda_tune_wsi,
+)
 from patch_cache_jobs import patch_cache
 from progan_cache_jobs import patch_cache_progan
 from sampling_jobs import max_feasible_pool_size, sample_full_scale
@@ -78,6 +90,16 @@ COMMAND_HANDLERS = {
     "camelyon16-tune-wsi": camelyon16_tune_wsi,
     "camelyon16-tune-aggregate": camelyon16_tune_aggregate,
     "camelyon16-report": camelyon16_report,
+    "panda-select": panda_select,
+    "panda-tile": panda_tile,
+    "panda-prepare": panda_prepare,
+    "panda-features": panda_features,
+    "panda-patch-cache": panda_patch_cache,
+    "panda-progan-cache": panda_progan_cache,
+    "panda-tune": panda_tune,
+    "panda-tune-wsi": panda_tune_wsi,
+    "panda-tune-aggregate": panda_tune_aggregate,
+    "panda-report": panda_report,
 }
 
 __all__ = [

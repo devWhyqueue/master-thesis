@@ -135,6 +135,16 @@ def _add_bracs_args(subparsers: argparse._SubParsersAction) -> None:
         "camelyon16-tune-wsi",
         "camelyon16-tune-aggregate",
         "camelyon16-report",
+        "panda-select",
+        "panda-tile",
+        "panda-prepare",
+        "panda-features",
+        "panda-patch-cache",
+        "panda-progan-cache",
+        "panda-tune",
+        "panda-tune-wsi",
+        "panda-tune-aggregate",
+        "panda-report",
     ):
         subparsers.add_parser(command)
 
