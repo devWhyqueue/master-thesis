@@ -185,6 +185,20 @@ Shared datasets may also exist under `/home/space/datasets/`. For this thesis, t
 /home/space/datasets/patho_ds/tcga-ut
 ```
 
+BRACS lives at:
+
+```text
+/home/space/datasets/patho_ds/BRACS
+```
+
+PANDA (prostate cancer grade assessment) lives at:
+
+```text
+/home/space/datasets/panda/raw
+```
+
+See `/home/space/datasets/panda/README.md` for source, license, and layout details.
+
 Treat shared dataset directories as read-only unless you created the specific files yourself. It is fine to inspect `/home/space/datasets/` to find existing data, but do not modify, rename, or remove datasets created by other users.
 
 Create SquashFS images from a compute node, not the login node:
