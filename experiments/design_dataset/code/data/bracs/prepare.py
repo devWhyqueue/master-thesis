@@ -41,7 +41,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", required=True)
     parser.add_argument("--metadata-csv", default=None)
     parser.add_argument("--tile-size", type=int, default=256)
-    parser.add_argument("--max-tiles-per-roi", type=int, default=30)
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     return parser.parse_args()
 
@@ -56,29 +55,34 @@ def main() -> None:
     metadata_csv = Path(args.metadata_csv) if args.metadata_csv else None
     roi_frame = load_roi_metadata(root, metadata_csv)
     image_index = index_roi_images(root)
-    tiled = tile_rois(
+    tiled, bag_size = tile_rois(
         roi_frame,
         image_index,
         output / "tiles",
         int(args.tile_size),
-        int(args.max_tiles_per_roi),
     )
     if tiled.empty:
         raise RuntimeError("No BRACS ROI tiles were generated.")
     write_seed_manifests(tiled, output / "manifests", [int(s) for s in args.seeds])
-    write_report(root, output, roi_frame, tiled)
+    write_report(root, output, roi_frame, tiled, bag_size)
 
 
 def write_report(
-    root: Path, output: Path, metadata: pd.DataFrame, tiled: pd.DataFrame
+    root: Path,
+    output: Path,
+    metadata: pd.DataFrame,
+    tiled: pd.DataFrame,
+    bag_size: int,
 ) -> None:
     """Write BRACS preparation metadata and dataset summary."""
-    report = _report_payload(root, metadata, tiled)
+    report = _report_payload(root, metadata, tiled, bag_size)
     _write_json(output / "bracs_prepare_report.json", report)
     (output / "README.md").write_text(_readme_text(report), encoding="utf-8")
 
 
-def _report_payload(root: Path, metadata: pd.DataFrame, tiled: pd.DataFrame) -> dict:
+def _report_payload(
+    root: Path, metadata: pd.DataFrame, tiled: pd.DataFrame, bag_size: int
+) -> dict:
     counts = (
         tiled.drop_duplicates(["slide_id", "cancer_type"])
         .groupby("cancer_type")["slide_id"]
@@ -98,9 +102,8 @@ def _report_payload(root: Path, metadata: pd.DataFrame, tiled: pd.DataFrame) -> 
         "class_counts_wsi": {str(k): int(v) for k, v in counts.items()},
         "imbalance_ratio_wsi": ratio,
         "min_native_imbalance_ratio": MIN_NATIVE_IMBALANCE_RATIO,
-        "recommended_benchmark_mode": (
-            "native" if ratio >= MIN_NATIVE_IMBALANCE_RATIO else "power_law"
-        ),
+        "wsi_bag_size": int(bag_size),
+        "recommended_benchmark_mode": "native",
         "labels": list(LABELS),
     }
 

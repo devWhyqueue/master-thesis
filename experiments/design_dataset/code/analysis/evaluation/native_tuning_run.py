@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--feature-path", required=True)
     parser.add_argument("--prepare-report", default=None)
     parser.add_argument("--required-mode", default=None)
-    parser.add_argument("--max-instances-per-bag", type=int, default=30)
+    parser.add_argument("--max-instances-per-bag", type=int, default=None)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -162,11 +162,28 @@ def _wsi_command(args: argparse.Namespace, task, out: str) -> list[str]:
         "--device=auto",
         "--epochs=30",
         "--bag-batch-size=32",
-        f"--max-instances-per-bag={args.max_instances_per_bag}",
+        f"--max-instances-per-bag={_resolve_max_instances(args)}",
         f"--bag-cache-dir={stem / 'wsi_bag_cache'}",
     ]
     cmd.extend(_wsi_tuning_flags(task.variant.params))
     return cmd
+
+
+def _resolve_max_instances(args: argparse.Namespace) -> int:
+    """Use the explicit bag cap, else the median ``wsi_bag_size`` from the prepare report."""
+    if args.max_instances_per_bag is not None:
+        return int(args.max_instances_per_bag)
+    return _bag_size_from_report(args.prepare_report)
+
+
+def _bag_size_from_report(report_path: str | None) -> int:
+    if report_path is not None:
+        path = Path(report_path)
+        if path.exists():
+            bag_size = json.loads(path.read_text(encoding="utf-8")).get("wsi_bag_size")
+            if bag_size:
+                return int(bag_size)
+    return 30
 
 
 def _wsi_tuning_flags(params: dict[str, float]) -> list[str]:

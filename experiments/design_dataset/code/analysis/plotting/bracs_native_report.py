@@ -54,17 +54,16 @@ def main() -> None:
 
 def write_dataset_summary(report: dict, path: Path) -> None:
     """Write a compact BRACS dataset summary table."""
-    counts = cast(dict, report.get("class_counts_wsi", {}))
-    min_count = min(counts.values()) if counts else 0
-    max_count = max(counts.values()) if counts else 0
+    counts = cast(dict, report.get("class_counts_wsi", {})).values()
     ratio = float(report.get("imbalance_ratio_wsi", 0.0))
     rows = [
         f"Patients & \\num{{{int(report.get('n_patients', 0))}}}\\\\",
         f"WSIs with ROI tiles & \\num{{{int(report.get('n_wsis_with_tiles', 0))}}}\\\\",
         f"ROI metadata rows & \\num{{{int(report.get('n_roi_metadata_rows', 0))}}}\\\\",
         f"ROI tiles & \\num{{{int(report.get('n_tiled_rows', 0))}}}\\\\",
+        f"WSI-bag size (median tiles) & \\num{{{int(report.get('wsi_bag_size', 0))}}}\\\\",
         f"Subtype labels & {', '.join(LABELS)}\\\\",
-        f"WSI support range & \\num{{{min_count}}}--\\num{{{max_count}}}\\\\",
+        f"WSI support range & \\num{{{min(counts, default=0)}}}--\\num{{{max(counts, default=0)}}}\\\\",
         f"WSI imbalance ratio & ${{\\approx}}\\num{{{ratio:.1f}}}{{:}}1$\\\\",
     ]
     _write_table(path, "Property & Value", rows)

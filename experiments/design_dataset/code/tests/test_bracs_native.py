@@ -61,10 +61,38 @@ def test_bracs_roi_tiling_is_deterministic(tmp_path) -> None:
         ]
     )
 
-    tiled = tile_rois(metadata, {"roi_a": image}, tmp_path / "tiles", 256, 30)
+    tiled, bag_size = tile_rois(metadata, {"roi_a": image}, tmp_path / "tiles", 256)
 
+    assert bag_size == 2
     assert tiled["patch_id"].tolist() == ["roi_a__000_0_0", "roi_a__001_256_0"]
     assert all(path.endswith(".jpg") for path in tiled["image_path"])
+
+
+def test_bracs_tiling_caps_each_wsi_at_median(tmp_path) -> None:
+    images = {}
+    rows = []
+    for slide, n_tiles in (("s1", 2), ("s2", 3), ("s3", 5)):
+        roi_id = f"roi_{slide}"
+        path = tmp_path / f"{roi_id}.jpg"
+        Image.new("RGB", (256 * n_tiles, 256), color=(120, 80, 40)).save(path)
+        images[roi_id] = path
+        rows.append(
+            {
+                "case_id": slide,
+                "slide_id": slide,
+                "roi_id": roi_id,
+                "cancer_type": "N",
+                "lesion_type": "benign",
+            }
+        )
+    metadata = pd.DataFrame(rows)
+
+    tiled, bag_size = tile_rois(metadata, images, tmp_path / "tiles", 256)
+
+    assert bag_size == 3  # median of available tiles per WSI: [2, 3, 5]
+    per_wsi = tiled.groupby("slide_id")["patch_id"].count()
+    assert per_wsi.max() <= bag_size
+    assert per_wsi.to_dict() == {"s1": 2, "s2": 3, "s3": 3}
 
 
 def test_native_tuning_aggregate_selects_winner() -> None:

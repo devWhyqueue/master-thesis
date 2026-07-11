@@ -61,7 +61,6 @@ def bracs_prepare(args: argparse.Namespace, config: dict[str, str]) -> list[Job]
                 f"--output-root={root}",
                 f"--metadata-csv={root}/BRACS_metadata.csv",
                 "--tile-size=256",
-                "--max-tiles-per-roi=30",
                 "--seeds",
                 "0",
                 "1",
