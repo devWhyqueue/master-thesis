@@ -1,0 +1,112 @@
+[
+  {
+    "dataset": "CAMELYON16",
+    "tile": {
+      "level": "tile (tumor/normal)",
+      "counts": {"normal": 2340040, "tumor": 59672}
+    },
+    "slide": {
+      "level": "slide (tumor/normal)",
+      "counts": {"normal": 238, "tumor": 160}
+    }
+  },
+  {
+    "dataset": "TCGA-UT",
+    "tile": {
+      "level": "patch (32 types)",
+      "counts": {
+        "Glioblastoma_multiforme": 4724,
+        "Brain_Lower_Grade_Glioma": 4674,
+        "Breast_invasive_carcinoma": 4614,
+        "Lung_adenocarcinoma": 2960,
+        "Lung_squamous_cell_carcinoma": 2814,
+        "Sarcoma": 2694,
+        "Uterine_Corpus_Endometrial_Carcinoma": 2496,
+        "Kidney_renal_clear_cell_carcinoma": 2329,
+        "Thyroid_carcinoma": 2273,
+        "Skin_Cutaneous_Melanoma": 2008,
+        "Bladder_Urothelial_Carcinoma": 1995,
+        "Head_and_Neck_squamous_cell_carcinoma": 1969,
+        "Prostate_adenocarcinoma": 1935,
+        "Liver_hepatocellular_carcinoma": 1668,
+        "Stomach_adenocarcinoma": 1629,
+        "Kidney_renal_papillary_cell_carcinoma": 1350,
+        "Colon_adenocarcinoma": 1272,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 1250,
+        "Testicular_Germ_Cell_Tumors": 1198,
+        "Adrenocortical_carcinoma": 996,
+        "Pancreatic_adenocarcinoma": 810,
+        "Thymoma": 720,
+        "Esophageal_carcinoma": 676,
+        "Ovarian_serous_cystadenocarcinoma": 501,
+        "Kidney_Chromophobe": 490,
+        "Uterine_Carcinosarcoma": 422,
+        "Mesothelioma": 407,
+        "Rectum_adenocarcinoma": 372,
+        "Uveal_Melanoma": 330,
+        "Pheochromocytoma_and_Paraganglioma": 270,
+        "Cholangiocarcinoma": 180,
+        "Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma": 168
+      }
+    },
+    "slide": {
+      "level": "slide (32 types)",
+      "counts": {
+        "Glioblastoma_multiforme": 792,
+        "Brain_Lower_Grade_Glioma": 784,
+        "Breast_invasive_carcinoma": 770,
+        "Lung_adenocarcinoma": 494,
+        "Lung_squamous_cell_carcinoma": 469,
+        "Sarcoma": 451,
+        "Uterine_Corpus_Endometrial_Carcinoma": 416,
+        "Kidney_renal_clear_cell_carcinoma": 389,
+        "Thyroid_carcinoma": 379,
+        "Skin_Cutaneous_Melanoma": 337,
+        "Bladder_Urothelial_Carcinoma": 333,
+        "Head_and_Neck_squamous_cell_carcinoma": 329,
+        "Prostate_adenocarcinoma": 328,
+        "Liver_hepatocellular_carcinoma": 278,
+        "Stomach_adenocarcinoma": 274,
+        "Kidney_renal_papillary_cell_carcinoma": 227,
+        "Colon_adenocarcinoma": 212,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 209,
+        "Testicular_Germ_Cell_Tumors": 201,
+        "Adrenocortical_carcinoma": 166,
+        "Pancreatic_adenocarcinoma": 137,
+        "Thymoma": 120,
+        "Esophageal_carcinoma": 113,
+        "Ovarian_serous_cystadenocarcinoma": 84,
+        "Kidney_Chromophobe": 82,
+        "Uterine_Carcinosarcoma": 71,
+        "Mesothelioma": 70,
+        "Rectum_adenocarcinoma": 63,
+        "Uveal_Melanoma": 55,
+        "Pheochromocytoma_and_Paraganglioma": 45,
+        "Cholangiocarcinoma": 30,
+        "Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma": 28
+      }
+    }
+  },
+  {
+    "dataset": "BRACS",
+    "tile": {
+      "level": "tile (7 subtypes)",
+      "counts": {"PB": 29743, "IC": 21761, "DCIS": 12577, "N": 12010, "UDH": 8933, "FEA": 7842, "ADH": 6486}
+    },
+    "slide": {
+      "level": "WSI (7 subtypes)",
+      "counts": {"PB": 196, "N": 130, "UDH": 128, "IC": 111, "ADH": 106, "FEA": 93, "DCIS": 87}
+    }
+  },
+  {
+    "dataset": "PANDA",
+    "tile": {
+      "level": "tile (benign/cancer)",
+      "counts": {"benign": 580531, "cancer": 122751}
+    },
+    "slide": {
+      "level": "WSI (ISUP 0-5)",
+      "counts": {"ISUP0": 544, "ISUP1": 503, "ISUP2": 253, "ISUP4": 236, "ISUP3": 234, "ISUP5": 230}
+    }
+  }
+]
