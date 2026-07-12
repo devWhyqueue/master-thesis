@@ -1,0 +1,130 @@
+paths:
+  tcga_root: /home/space/datasets/patho_ds/tcga-ut
+  raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
+  feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
+  patch_sqfs: /home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs
+  patch_synthetic_sqfs: /home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-{seed}.sqfs
+  outputs: experiments/2_cls_imb_benchmark
+
+staging:
+  prefer_sqfs: true
+  copy_workers: 8
+
+data:
+  feature_glob: "*.pt"
+  feature_suffix_pattern: "_[0-9]+"
+  validation_fraction: 0.15
+  test_fraction: 0.15
+  balanced_test_per_class: 0
+  patch_resolution: "0"
+  patches_per_slide: 30
+
+patch_training:
+  seeds: [0, 1, 2]
+  batch_size: 128
+  num_workers: 8
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  hidden_dim: 256
+  dropout: 0.1
+  image_size: 256
+  focal_gamma: 2.0
+  device: auto
+  max_train_rows:
+  max_eval_rows:
+
+patch_feature_extraction:
+  batch_size: 64
+  device: auto
+  include_synthetic: true
+  model_name: hf-hub:paige-ai/Virchow2
+  dtype: float16
+
+patch_feature_training:
+  seeds: [0, 1, 2]
+  batch_size: 256
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  hidden_dim: 512
+  dropout: 0.1
+  focal_gamma: 2.0
+  cfal_lambda: 0.1
+  cfal_sigma: 1.0
+  cfal_gamma: 2.0
+  cfal_beta: 0.999
+  oko_k: 1
+  device: auto
+  max_train_rows:
+  max_eval_rows:
+
+wsi_training:
+  seeds: [0, 1, 2]
+  bag_batch_size: 32
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  hidden_dim: 256
+  dropout: 0.1
+  focal_gamma: 2.0
+  max_instances_per_bag: 30
+  rankmix_teacher_epochs: 30
+  rankmix_alpha: 1.0
+  sc_mil_temperature: 1.0
+  mde_mil_consistency_weight: 0.25
+  device: auto
+  max_train_rows:
+  max_eval_rows:
+
+patch_synthetic_progan:
+  enabled: true
+  image_size: 256
+  latent_dim: 128
+  epochs_per_depth: 25
+  learning_rate: 0.0002
+  beta1: 0.5
+  max_real_patches_per_class: 2048
+  balance_target: max_train_class_count
+  fade_in_fraction: 0.5
+  base_channels: 512
+  max_classes:
+
+patch_methods:
+  - patch_ce
+  - patch_weighted_ce
+  - patch_focal
+  - patch_balanced_sampler_ce
+  - patch_ce_soft_f1_balanced
+  - patch_ce_soft_mcc_balanced
+  - patch_progan_aug
+  - patch_cfal
+
+patch_feature_methods:
+  - patch_feature_ce
+  - patch_feature_weighted_ce
+  - patch_feature_focal
+  - patch_feature_balanced_sampler_ce
+  - patch_feature_ce_soft_f1_balanced
+  - patch_feature_ce_soft_mcc_balanced
+  - patch_feature_progan_aug
+  - patch_feature_cfal
+  - patch_feature_oko
+
+wsi_bag_methods:
+  - mil_ce
+  - mil_weighted_ce
+  - mil_focal
+  - mil_balanced_sampler_ce
+  - rankmix_mil
+  - sc_mil
+  - mde_mil
+
+slurm:
+  partition: gpu-2h
+  progan_partition: gpu-5h
+  progan_train_partition: gpu-5h
+  progan_gpu_constraint: 40gb|80gb|h100|h200|blackwell
+  progan_array_max_parallel: 35
+  ntasks_per_node: 8
+  container: ./environment.sif

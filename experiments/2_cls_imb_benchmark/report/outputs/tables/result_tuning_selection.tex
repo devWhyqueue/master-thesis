@@ -1,0 +1,22 @@
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.10\linewidth}>{\raggedright\arraybackslash}p{0.22\linewidth}>{\raggedright\arraybackslash}X>{\centering\arraybackslash}p{0.10\linewidth}>{\centering\arraybackslash}p{0.10\linewidth}>{\centering\arraybackslash}p{0.12\linewidth}@{}}
+\toprule
+Regime & Method & Selected control & Val macro F1 & Test macro F1 & Test bal.\ acc.\\
+\midrule
+Patch & CE & baseline (no sweep) & -- & \num{0.773} & \num{0.764}\\
+Patch & Balanced sampler & sampler\_power=1 & \num{0.768} & \num{0.771} & \num{0.769}\\
+Patch & CE + soft F1 (balanced) & metric\_loss\_weight=256 & \num{0.781} & \num{0.780} & \num{0.781}\\
+Patch & CE + soft MCC (balanced) & metric\_loss\_weight=32 & \num{0.771} & \num{0.770} & \num{0.772}\\
+Patch & CFAL & cfal\_sigma=1 & \num{0.792} & \num{0.798} & \num{0.789}\\
+Patch & Focal & focal\_gamma=1.5 & \num{0.764} & \num{0.765} & \num{0.758}\\
+Patch & OKO & oko\_k=4 & \num{0.783} & \num{0.788} & \num{0.791}\\
+Patch & ProGAN augmentation & final\_depth\_epochs=10 & \num{0.756} & \num{0.766} & \num{0.760}\\
+Patch & Weighted CE & weight\_power=0.5 & \num{0.764} & \num{0.774} & \num{0.767}\\
+WSI bag & MIL CE & baseline (no sweep) & -- & \num{0.826} & \num{0.823}\\
+WSI bag & MDE-MIL (ensemble) & mde\_mil\_consistency\_weight=2 & \num{0.851} & \num{0.865} & \num{0.849}\\
+WSI bag & Balanced MIL & sampler\_power=0.75 & \num{0.821} & \num{0.831} & \num{0.829}\\
+WSI bag & Focal MIL & focal\_gamma=0.5 & \num{0.823} & \num{0.824} & \num{0.823}\\
+WSI bag & Weighted MIL & weight\_power=0.125 & \num{0.828} & \num{0.835} & \num{0.833}\\
+WSI bag & RankMix & rankmix\_alpha=32 & \num{0.843} & \num{0.854} & \num{0.864}\\
+WSI bag & SC-MIL & sc\_mil\_temperature=0.1 & \num{0.828} & \num{0.839} & \num{0.837}\\
+\bottomrule
+\end{tabularx}

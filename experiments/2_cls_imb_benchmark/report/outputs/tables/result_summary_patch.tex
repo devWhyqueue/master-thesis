@@ -1,0 +1,15 @@
+\begin{tabular}{lccc}
+\toprule
+Method & Accuracy & Balanced accuracy & Macro F1\\
+\midrule
+CFAL & $\num{0.847} \pm \num{0.008}$ & $\num{0.789} \pm \num{0.007}$ & $\num{0.798} \pm \num{0.009}$\\
+OKO & $\num{0.841} \pm \num{0.006}$ & $\num{0.791} \pm \num{0.005}$ & $\num{0.788} \pm \num{0.003}$\\
+CE + soft F1 (balanced) & $\num{0.835} \pm \num{0.004}$ & $\num{0.781} \pm \num{0.002}$ & $\num{0.780} \pm \num{0.003}$\\
+Weighted CE & $\num{0.826} \pm \num{0.008}$ & $\num{0.767} \pm \num{0.006}$ & $\num{0.774} \pm \num{0.005}$\\
+CE & $\num{0.828} \pm \num{0.010}$ & $\num{0.764} \pm \num{0.011}$ & $\num{0.773} \pm \num{0.015}$\\
+Balanced sampler & $\num{0.827} \pm \num{0.010}$ & $\num{0.769} \pm \num{0.007}$ & $\num{0.771} \pm \num{0.014}$\\
+CE + soft MCC (balanced) & $\num{0.824} \pm \num{0.009}$ & $\num{0.772} \pm \num{0.004}$ & $\num{0.770} \pm \num{0.005}$\\
+ProGAN augmentation & $\num{0.824} \pm \num{0.004}$ & $\num{0.760} \pm \num{0.005}$ & $\num{0.766} \pm \num{0.002}$\\
+Focal & $\num{0.825} \pm \num{0.007}$ & $\num{0.758} \pm \num{0.007}$ & $\num{0.765} \pm \num{0.009}$\\
+\bottomrule
+\end{tabular}
