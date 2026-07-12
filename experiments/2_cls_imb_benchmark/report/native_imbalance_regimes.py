@@ -15,30 +15,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from compute_imbalance import entropy_imbalance
+
 logger = logging.getLogger(__name__)
 
-COUNTS = (
-    Path(__file__).resolve().parents[2]
-    / "0_datasets"
-    / "report"
-    / "outputs"
-    / "counts"
-    / "counts.json"
-)
+COUNTS = Path(__file__).resolve().parent / "outputs" / "counts" / "counts.json"
 FIGURES_DIR = Path(__file__).resolve().parent / "outputs" / "figures"
 
 PATCH_COLOR = "#4c78a8"
 SLIDE_COLOR = "#c8615a"
-
-
-def entropy_imbalance(counts: list[float]) -> float:
-    """Return 1 - normalised entropy of the class-count distribution."""
-    c = np.asarray([v for v in counts if v > 0], dtype=float)
-    k = c.size
-    if k <= 1:
-        return 1.0
-    p = c / c.sum()
-    return float(1.0 - (-(p * np.log(p)).sum()) / np.log(k))
 
 
 def cifar_lt_reference(n_classes: int, n_max: int, rho: float) -> list[float]:

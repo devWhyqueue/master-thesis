@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 COUNTS = Path(__file__).resolve().parent / "outputs" / "counts" / "counts.json"
 
 
-def entropy_imbalance(counts: list[int]) -> float:
+def entropy_imbalance(counts: Sequence[float]) -> float:
     """Return 1 - normalised entropy of the class-count distribution."""
     c = np.asarray([v for v in counts if v > 0], dtype=float)
     k = c.size

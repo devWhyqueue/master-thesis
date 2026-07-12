@@ -46,7 +46,12 @@ The benchmark asks one question across four datasets, presented in order of the 
 \section{Datasets}
 \label{sec:data}
 % ============================================================
-The four datasets are summarised in Table~\ref{tab:dataset-overview}; this section states only what the benchmark consumes from each. Imbalance is quantified by the entropy-based measure $\Hnorm\in[0,1]$ (\num{0} = perfectly balanced, values closer to \num{1} = more skewed), reported separately at patch and slide level because the two can differ sharply when patch labels are derived from masks rather than inherited from the slide; its definition and the full native class distributions are given in \citet{queisler2026datasets}. All benchmarks use frozen Virchow2 \num{2560}-dimensional features (concatenation of CLS token and mean patch token, cast to float32) and patient-disjoint train/validation/test splits across three random seeds \citep{vorontsov2024virchow,zimmermann2024virchow2}.
+The four datasets are summarised in Table~\ref{tab:dataset-overview}; this section states only what the benchmark consumes from each. Imbalance is quantified by an entropy-based measure. For empirical class proportions $p_1,\dots,p_K$ (with $\sum_i p_i = 1$), the Shannon entropy $H(p)=-\sum_{i=1}^{K} p_i \log p_i$ attains its maximum $\log K$ at the uniform distribution; normalising and complementing gives
+\begin{equation}
+  \label{eq:imbalance}
+  \Hnorm \;=\; 1 - \frac{-\sum_{i=1}^{K} p_i \log p_i}{\log K} \;\in\; [0,1],
+\end{equation}
+where \num{0} is a perfectly balanced distribution and values closer to \num{1} indicate stronger imbalance. Because the $\log K$ normalisation removes the dependence on the number of classes, the measure compares a two-class cohort against a thirty-two-class one fairly, unlike the raw head-to-tail (largest-to-smallest class support) ratio. It is reported separately at patch and slide level, because the two can differ sharply when patch labels are derived from masks rather than inherited from the slide; the full native class distributions are given in \citet{queisler2026datasets}. All benchmarks use frozen Virchow2 \num{2560}-dimensional features (concatenation of CLS token and mean patch token, cast to float32) and patient-disjoint train/validation/test splits across three random seeds \citep{vorontsov2024virchow,zimmermann2024virchow2}.
 
 \begin{table}[ht]
   \centering

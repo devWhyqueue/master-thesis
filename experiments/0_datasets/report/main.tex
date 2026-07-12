@@ -191,22 +191,18 @@ a pathology \emph{foundation model}, pre-trained self-supervised on large slide 
 frozen feature extractor that embeds each patch once into a fixed-length vector, leaving only a
 lightweight classifier or MIL head to train. Virchow2 is one such H\&E foundation model
 \citep{vorontsov2024virchow,zimmermann2024virchow2}. Freezing the representation lets a study isolate
-the effect of, for example, class imbalance from the confounds of end-to-end backbone training, and
+the effect of a downstream modelling choice from the confounds of end-to-end backbone training, and
 makes the patch and MIL regimes directly comparable, because both consume the same embeddings.
 
-\subsection{Data, annotation, and the challenge of class imbalance}
+\subsection{Data and annotation}
 \label{sec:data-challenge}
 Deep learning is data-hungry, and expert annotation is the binding constraint in CPath: pathologist
 labelling is slow, expensive, and hard to scale, so datasets range from densely mask-annotated
 cohorts to those carrying only a single slide-level diagnosis
-\citep{abels2019computationalPathology,hosseini2024computationalPathology}. The four datasets in
-this report deliberately span that range of annotation form. A second, pervasive property of
-clinical tissue cohorts is that they are \emph{imbalanced}. Common tumour types and benign tissue
-dominate, while the categories that matter most for a patient --- rare cancers, precancerous
-atypia, small metastatic foci --- are scarce. A model can post a high overall accuracy while failing
-exactly on these under-represented classes, so imbalance is a concern for both training and
-evaluation. The next section introduces the datasets, together with a simple measure that makes the
-imbalance of a class distribution quantitative and comparable across datasets.
+\citep{abels2019computationalPathology,hosseini2024computationalPathology}. The four datasets in this
+report deliberately span that range of annotation form, from pixel-level tumour masks through
+region-of-interest crops to a single slide-level diagnosis. The next section introduces them in the
+order of the diagnostic question they pose.
 
 \section{Datasets}
 \label{sec:datasets}
@@ -225,24 +221,6 @@ annotation:
         biopsies, with region masks and built-in two-provider heterogeneity.
 \end{itemize}
 
-\paragraph{Measuring class imbalance.}
-Two numbers summarise how skewed a dataset's class distribution is. The head-to-tail ratio --- the
-largest class support divided by the smallest --- is intuitive, but it reads only the two extreme
-classes and ignores the number of classes $K$, so it cannot fairly compare a two-class cohort with a
-thirty-two-class one. An entropy-based measure complements it. For empirical class proportions
-$p_1,\dots,p_K$ (with $\sum_i p_i=1$), let the Shannon entropy be $H(p)=-\sum_{i=1}^{K} p_i \log p_i$,
-whose maximum, attained by the uniform distribution, is $\log K$. Normalising and complementing gives
-\begin{equation}
-  \label{eq:imbalance}
-  \text{imbalance} \;=\; 1 - H_{\mathrm{norm}} \;=\; 1 - \frac{-\sum_{i=1}^{K} p_i \log p_i}{\log K}
-  \;\in\; [0,1],
-\end{equation}
-where \num{0} is a perfectly balanced distribution and values closer to \num{1} indicate stronger
-imbalance. Because the $\log K$ normalisation removes the dependence on the number of classes, this
-measure is comparable across datasets, unlike the raw ratio. It is reported in each dataset's summary
-table at both \emph{tile} and \emph{slide} level, since the two can differ substantially when tile
-labels are derived from masks rather than inherited from the slide.
-
 \subsection{CAMELYON16 --- lymph-node metastasis detection}
 \label{sec:camelyon16}
 CAMELYON16 is an organ-specific H\&E cohort of sentinel lymph-node sections for the detection of
@@ -256,12 +234,9 @@ The benchmark uses \num{398} of the \num{399} published slides (\num{160} tumor,
 after excluding one slide without usable tile evidence; each slide is its own patient, so
 slide-disjoint splits coincide with patient-disjoint splits. Because metastatic tissue occupies only
 a small fraction of a sectioned node, mask-derived tumor tiles are scarce: the patch distribution is
-\num{2340040} normal against \num{59672} tumor tiles, a head-to-tail ratio of
-approximately $\num{39}{:}1$ and an entropy-based imbalance of $1-H_{\mathrm{norm}}\approx\num{0.83}$
---- the most severe in the suite despite being the simplest task (Table~\ref{tab:camelyon16-summary},
-Figure~\ref{fig:camelyon16-dist}). At the slide level, however, tumour and normal slides are almost
-balanced (\num{160} versus \num{238}; $1-H_{\mathrm{norm}}\approx\num{0.03}$): the severe imbalance is
-a within-slide effect, since tumour tiles are scarce even on slides that do contain a metastasis. The
+\num{2340040} normal against \num{59672} tumor tiles (Table~\ref{tab:camelyon16-summary},
+Figure~\ref{fig:camelyon16-dist}), even though tumour and normal slides are themselves close to even
+(\num{160} versus \num{238})---tumour tiles are scarce even on slides that do contain a metastasis. The
 \num{20} tumor slides whose annotations are not exhaustive are excluded from the tile-labelling
 regime, where unannotated tumour could be mislabelled as normal, but retained where only the reliable
 slide-level label is used.
@@ -289,14 +264,12 @@ slide-level label is used.
       WSI-bag size (median tiles) & \num{7874}\\
       Tile labels & tumor, normal\\
       Tumor / normal tiles & \num{59672} / \num{2340040}\\
-      Imbalance $1-H_{\mathrm{norm}}$ (tile) & \num{0.832}\\
-      Imbalance $1-H_{\mathrm{norm}}$ (slide) & \num{0.028}\\
       \bottomrule
     \end{tabular}%
   \end{minipage}
   \caption{CAMELYON16 dataset properties, alongside an example $256\times256$ tumor tile. The
-  WSI-bag size is the data-driven median of available tissue tiles per slide. Imbalance is far more
-  severe at tile than at slide level, because tumour tiles are rare even within tumour slides.}
+  WSI-bag size is the data-driven median of available tissue tiles per slide. Tumour tiles are scarce
+  even within slides that contain a metastasis.}
   \label{tab:camelyon16-summary}
 \end{table}
 
@@ -308,7 +281,7 @@ slide-level label is used.
     \fbox{\parbox{0.7\linewidth}{\centering CAMELYON16 patch distribution figure unavailable.}}%
   }
   \caption{CAMELYON16 patch support by tumor/normal label after mask-based labelling
-  (log scale). Tumor tiles are roughly \num{39} times scarcer than normal tiles.}
+  (log scale). Tumor tiles are far scarcer than normal tiles.}
   \label{fig:camelyon16-dist}
 \end{figure}
 
@@ -326,10 +299,8 @@ bags. The labels are cancer types, not dense pixel masks or cell-level annotatio
 question is \emph{what cancer is it?}, a nominal classification across 32 organs.
 
 The largest class is glioblastoma multiforme (GBM; \num{792} slides) and the smallest is diffuse
-large B-cell lymphoma (DLBC; \num{28} slides), a slide-level head-to-tail ratio of \num{28.3}. Yet
-spread across 32 gradually declining classes this is only a mild entropy-based imbalance
-($1-H_{\mathrm{norm}}\approx\num{0.09}$; Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist})
---- a first illustration that the head-to-tail ratio and the $K$-aware measure need not agree.
+large B-cell lymphoma (DLBC; \num{28} slides), with the remaining types spread across a gradually
+declining tail (Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist}).
 
 \begin{table}[ht]
   \centering
@@ -354,13 +325,12 @@ spread across 32 gradually declining classes this is only a mild entropy-based i
       Patches & \num{1608060} of $256\times256$\\
       Largest class & Glioblastoma (GBM), \num{792} slides\\
       Smallest class & B-cell lymphoma (DLBC), \num{28} slides\\
-      Imbalance $1-H_{\mathrm{norm}}$ (patch) & \num{0.085}\\
-      Imbalance $1-H_{\mathrm{norm}}$ (slide) & \num{0.085}\\
       \bottomrule
     \end{tabular}
   \end{minipage}
   \caption{TCGA-UT dataset properties, alongside an example $256\times256$ H\&E tumor patch. Because
-  every patch inherits its slide's label, the tile- and slide-level imbalance coincide.}
+  every patch inherits its slide's cancer-type label, the patch- and slide-level class distributions
+  coincide.}
   \label{tab:tcgaut-summary}
 \end{table}
 
@@ -371,8 +341,8 @@ spread across 32 gradually declining classes this is only a mild entropy-based i
   }{%
     \fbox{\parbox{0.7\linewidth}{\centering TCGA-UT cancer-type distribution figure unavailable.}}%
   }
-  \caption{TCGA-UT slide support by cancer-type rank. The imbalance is moderate once spread
-  over \num{32} classes, with a head-to-tail ratio of \num{28.3}.}
+  \caption{TCGA-UT slide support by cancer-type rank, declining gradually across the \num{32}
+  classes from GBM at the head to DLBC at the tail.}
   \label{fig:tcgaut-dist}
 \end{figure}
 
@@ -388,17 +358,15 @@ benign, atypical, and malignant --- refined into seven subtypes: normal (N), pat
 rather than whole-slide labels or pixel masks, and a single slide may contain ROIs of several
 subtypes.
 
-The benchmark uses the seven-subtype target, the level at which imbalance is most relevant: the
-atypical lesions FEA and ADH are clinically important, comparatively scarce precancers that
-collapsing to three lesion types would hide. After deterministic ROI tiling into $256\times256$
-patches, \num{387} of the \num{547} WSIs contribute at least one annotated tile; the prepared cohort
-spans \num{151} patients, the full \num{4539} ROI records, and \num{99352} patches. Counting the
-slides that contain each subtype (a slide with several lesions counts under each), support ranges
-from PB (\num{196} slides) at the head to DCIS (\num{87} slides) at the tail, a mild head-to-tail
-ratio of approximately $\num{2.3}{:}1$ and an entropy-based imbalance of only
-$1-H_{\mathrm{norm}}\approx\num{0.02}$ (Table~\ref{tab:bracs-summary},
-Figure~\ref{fig:bracs-dist}). BRACS is thus a genuine but mild imbalance setting whose difficulty
-comes from fine-grained morphology rather than a steep tail.
+The benchmark uses the seven-subtype target, which keeps clinically important but comparatively
+scarce precancers visible: the atypical lesions FEA and ADH would be hidden by collapsing to three
+lesion types. After deterministic ROI tiling into $256\times256$ patches, \num{387} of the
+\num{547} WSIs contribute at least one annotated tile; the prepared cohort spans \num{151} patients,
+the full \num{4539} ROI records, and \num{99352} patches. Counting the slides that contain each
+subtype (a slide with several lesions counts under each), support ranges from PB (\num{196} slides)
+at the head to DCIS (\num{87} slides) at the tail (Table~\ref{tab:bracs-summary},
+Figure~\ref{fig:bracs-dist}). BRACS's difficulty comes from fine-grained morphology rather than a
+steep tail.
 
 \begin{table}[ht]
   \centering
@@ -423,14 +391,12 @@ comes from fine-grained morphology rather than a steep tail.
       ROI tiles & \num{99352}\\
       WSI-bag size (median tiles) & \num{360}\\
       Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
-      Imbalance $1-H_{\mathrm{norm}}$ (tile) & \num{0.072}\\
-      Imbalance $1-H_{\mathrm{norm}}$ (slide) & \num{0.018}\\
       \bottomrule
     \end{tabular}%
   \end{minipage}
   \caption{BRACS dataset properties, alongside an example $256\times256$ ROI tile. Slide-level support
-  counts each slide under every subtype it contains; the tile-level distribution weights subtypes by
-  their tile counts, making it somewhat more skewed.}
+  counts each slide under every subtype it contains; the tile-level distribution instead weights
+  subtypes by their tile counts.}
   \label{tab:bracs-summary}
 \end{table}
 
@@ -463,13 +429,11 @@ Institute --- that differ in staining, scanning, and annotation convention, and 
 (Karolinska biopsies concentrate at low grades, Radboud spread more evenly). To keep frozen-feature
 extraction tractable on a cohort an order of magnitude larger than the others, the benchmark draws a
 stratified subset of approximately \num{2000} biopsies preserving the joint distribution of ISUP grade
-and provider. The ISUP distribution is mildly imbalanced, from ISUP\,0 (\num{544} biopsies) to
-ISUP\,5 (\num{230}), a ratio of approximately $\num{2.4}{:}1$ and an entropy-based imbalance of
-$1-H_{\mathrm{norm}}\approx\num{0.04}$. PANDA's masks additionally support a provider-consistent
+and provider. The ISUP distribution runs from ISUP\,0 (\num{544} biopsies) at the head to
+ISUP\,5 (\num{230}) at the tail. PANDA's masks additionally support a provider-consistent
 binary cancer/benign tile label --- the only labelling the two institutions share --- giving
-\num{580531} benign against \num{122751} cancer tiles (approximately $\num{4.7}{:}1$,
-$1-H_{\mathrm{norm}}\approx\num{0.33}$), so the same biopsies furnish both an ordinal slide-level
-grading target and a binary tile-level detection target (Table~\ref{tab:panda-summary},
+\num{580531} benign against \num{122751} cancer tiles, so the same biopsies furnish both an ordinal
+slide-level grading target and a binary tile-level detection target (Table~\ref{tab:panda-summary},
 Figure~\ref{fig:panda-dist}).
 
 PANDA is the only one of the four datasets whose two regimes answer different questions, and this
@@ -492,14 +456,12 @@ share one task and differ only in prediction unit.
     WSI-bag size (median tiles) & \num{421}\\
     WSI labels / tile labels & ISUP 0--5 / benign, cancer\\
     Benign / cancer tiles & \num{580531} / \num{122751}\\
-    Imbalance $1-H_{\mathrm{norm}}$ (tile, cancer/benign) & \num{0.332}\\
-    Imbalance $1-H_{\mathrm{norm}}$ (slide, ISUP) & \num{0.043}\\
     \bottomrule
   \end{tabular}
   \caption{PANDA dataset properties after stratified subset selection and mask-based patch labelling.
   The WSI-bag size is the data-driven median of available tissue tiles per biopsy. Unlike the other
   datasets, the tile and slide regimes carry different labels (binary cancer/benign vs six-class
-  ISUP), so their imbalance figures describe two different tasks.}
+  ISUP), and so describe two different tasks.}
   \label{tab:panda-summary}
 \end{table}
 
@@ -522,8 +484,7 @@ gigapixel whole-slide image, patching, weakly supervised multiple-instance learn
 foundation-model features --- and the four H\&E datasets it covers, presented as a
 progression of diagnostic questions from CAMELYON16 detection through TCGA-UT typing and BRACS
 subtyping to PANDA grading, each with its organ, label type, annotation form, example patch, and
-class distribution. The entropy-based imbalance measure $1-H_{\mathrm{norm}}$ was defined so that
-each dataset's class distribution can be read on a comparable scale.
+class distribution.
 
 \clearpage
 \bibliographystyle{plainnat}
