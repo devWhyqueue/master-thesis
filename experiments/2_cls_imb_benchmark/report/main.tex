@@ -81,6 +81,35 @@ Evidence is derived from the ROI set: each annotated ROI is tiled into $256\time
 \paragraph{PANDA.}
 The WSI-bag regime uses the canonical six-class ISUP grade (0~=~benign, 1--5~=~increasing cancer grade groups; $\Hnorm\approx\num{0.043}$). The patch regime uses a provider-consistent binary cancer/benign target derived from pixel masks ($\Hnorm\approx\num{0.332}$); because Radboud and Karolinska masks use institution-dependent value semantics, collapsing both to cancer/benign is the only label the two providers share. To keep frozen-feature extraction tractable, the benchmark uses a stratified subset of approximately \num{2000} biopsies, sampled to preserve the joint distribution of ISUP grade and provider. The per-slide evidence budget is the empirical median number of tissue tiles per biopsy (\num{421}); biopsies without available masks are excluded from the patch regime but kept in the WSI-bag regime.
 
+\paragraph{Native imbalance is mild at the level the benchmark evaluates.}
+Table~\ref{tab:dataset-overview} makes a second point beyond the per-dataset summaries above: at
+\emph{slide} level---the unit every diagnostic target in this benchmark is ultimately scored
+on---all four datasets are only mildly skewed ($\Hnorm\in[0.018,0.085]$). The two large values in
+the table (CAMELYON16 patch $0.832$, PANDA patch $0.332$) are within-slide, binary mask effects, not
+properties of the typing, subtyping, or grading targets themselves. Figure~\ref{fig:native-imbalance-regimes}
+places these eight numbers against the imbalance factors long-tailed CV benchmarks use to stress-test
+the very mitigation methods evaluated here: Cui et al.\ construct long-tailed CIFAR-10/100 by an
+exponential class-count decay at imbalance factor $\rho=N_{\max}/N_{\min}\in\{10,\dots,200\}$
+\citep{cui2019classBalanced}, and Buda et al.\ study step and linear imbalance at comparable ratios
+\citep{buda2018systematic}; at $\rho=100$ this places $\Hnorm$ at $0.29$ for CIFAR-10-LT and $0.13$
+for CIFAR-100-LT (shaded band). Every native slide-level target sits below this band, and three of
+the four sit below even the more conservative CIFAR-100-LT end. Benchmarking imbalance-mitigation
+methods on these native distributions therefore under-tests them: the methods were designed for,
+and validated on, a regime of imbalance the native slide-level targets do not reach. \S\ref{sec:controlled}
+proposes a controlled-imbalance construction that closes this gap for a future benchmark iteration.
+
+\begin{figure}[ht]
+  \centering
+  \IfFileExists{outputs/figures/native_imbalance_regimes.png}{%
+    \includegraphics[width=0.75\linewidth]{native_imbalance_regimes.png}%
+  }{\emph{Native imbalance regime figure unavailable.}}
+  \caption{Native $\Hnorm$ at patch/tile and slide level for all four datasets, against a reference
+    band for CIFAR-10-LT/CIFAR-100-LT at imbalance factor $\rho=100$
+    \citep{cui2019classBalanced}. Every slide-level target---the unit each diagnostic
+    question is scored on---sits below the band.}
+  \label{fig:native-imbalance-regimes}
+\end{figure}
+
 \medskip\noindent
 All four datasets use three random seeds, deterministic per-slide evidence caps, and frozen Virchow2 features. Hyperparameters are selected independently per method: for each candidate configuration the validation macro F1 is averaged over the three seeds and the configuration with the highest mean is chosen (balanced accuracy as tie-breaker); a single configuration per method is then fixed before evaluating on the held-out test split. Results are reported as mean~$\pm$~standard deviation across seeds, and patch and WSI-bag methods are compared only within their own regime.
 
@@ -245,6 +274,76 @@ The patch and WSI-bag classifier heads (Figure~\ref{fig:benchmark-models}) are s
 \end{figure}
 
 Macro F1 is the primary ranking metric within each regime because it weights classes equally and penalizes failure on rare classes; balanced accuracy and accuracy are reported alongside it. Three complementary probability-quality metrics---negative log likelihood (NLL), multiclass Brier score, and expected calibration error (ECE)---are reported on held-out softmax outputs, both before and after a unified post-hoc temperature-scaling protocol in which, for each method and seed, a single temperature is fit on validation by minimizing NLL and applied unchanged to the test scores. Full metric definitions and the temperature-scaling protocol are given in \citet{queisler2026imbalanceMethods}.
+
+\subsection{Controlled imbalance construction}
+\label{sec:controlled}
+Section~\ref{sec:data} showed that every slide-level target is only mildly imbalanced relative to
+the CIFAR-LT regime the evaluated mitigation methods were designed for. Rather than accepting that
+mismatch, each dataset can be restructured to a controlled, artificially skewed distribution using
+two constructions from the long-tailed-recognition literature, both of which enforce a hard minimum
+support $N_{\text{floor}}$ so that no class is starved below what is needed for stable evaluation.
+
+\paragraph{Truncated exponential decay (Cui et al.).}
+Ranking classes by native support, the target count for the $i$-th ranked class ($i=0,\dots,K-1$) is
+\begin{equation}
+  \label{eq:exp-decay}
+  n_i \;=\; \max\bigl(N_{\text{floor}},\ \lfloor N_{\max}\,\mu^{\,i}\rfloor\bigr),
+  \qquad \mu\in(0,1),
+\end{equation}
+with $\mu$ chosen to hit a target imbalance factor $\rho=N_{\max}/N_{\min}$ \citep{cui2019classBalanced}.
+Unlike the original CIFAR-LT construction, which lets the tail decay to as few as a handful of images,
+$N_{\text{floor}}$ caps the decay so every class retains enough slides for macro-averaged evaluation.
+
+\paragraph{Step imbalance (Buda et al.).}
+Classes are split into a head group, which keeps its native support, and a tail group, which is
+uniformly downsampled to $N_{\text{floor}}$ \citep{buda2018systematic}. This isolates rarity as a
+binary property (in the head group or not) rather than a continuous rank effect, and lets the tail
+group be chosen for clinical relevance rather than by native rank.
+
+\paragraph{Per-dataset strategy.}
+Table~\ref{tab:controlled-targets} applies these constructions, plus simple ratio downsampling for
+the binary CAMELYON16 case, to each dataset's native slide counts:
+\begin{itemize}
+  \item \textbf{TCGA-UT} (32 classes) uses exponential decay ranked by native support, floored at
+    $N_{\text{floor}}=20$, so rare types such as DLBC and cholangiocarcinoma remain evaluable while
+    the head-to-tail ratio widens well past its native $28.3$:1.
+  \item \textbf{PANDA} (6 ordinal ISUP grades) uses the same decay but fixed to the ordinal grade
+    order rather than re-ranked by support, so the artificial skew still respects grade order; the
+    aggressive ISUP~4--5 grades are floored at $N_{\text{floor}}=50$.
+  \item \textbf{BRACS} (7 subtypes) uses step imbalance: the benign/usual head group
+    $\{$N, PB, UDH, IC$\}$ keeps native support, while the clinically critical atypical/malignant
+    tail $\{$FEA, ADH, DCIS$\}$ is floored at $N_{\text{floor}}=30$.
+  \item \textbf{CAMELYON16} (binary) is downsampled to a fixed \num{10}:1 normal:tumor ratio, floored
+    at $N_{\text{floor}}=20$ tumor slides, simulating a low-prevalence screening scenario.
+\end{itemize}
+Figure~\ref{fig:controlled-construction} shows the resulting native-versus-target support for all
+four datasets; Table~\ref{tab:controlled-targets} reports the resulting head-to-tail ratio and
+$\Hnorm$. This construction is proposed as the basis for a future benchmark iteration; the results
+in \S\ref{sec:results} still use the native distributions.
+
+\begin{figure}[ht]
+  \centering
+  \IfFileExists{outputs/figures/controlled_imbalance_construction.png}{%
+    \includegraphics[width=0.85\linewidth]{controlled_imbalance_construction.png}%
+  }{\emph{Controlled imbalance construction figure unavailable.}}
+  \caption{Native (grey) versus proposed controlled-imbalance target (red) slide support per
+    dataset, with the hard floor $N_{\text{floor}}$ (dotted). TCGA-UT and PANDA use truncated
+    exponential decay (Equation~\ref{eq:exp-decay}), ranked by support and by ordinal grade
+    respectively; BRACS uses step imbalance; CAMELYON16 uses ratio downsampling.}
+  \label{fig:controlled-construction}
+\end{figure}
+
+\begin{table}[ht]
+  \centering
+  \small
+  \IfFileExists{outputs/tables/controlled_imbalance_targets.tex}{%
+    \resizebox{\linewidth}{!}{\input{outputs/tables/controlled_imbalance_targets.tex}}%
+  }{\emph{Controlled imbalance targets table unavailable.}}
+  \caption{Per-dataset controlled-imbalance construction: method, class count $K$, floor
+    $N_{\text{floor}}$, and the resulting head-to-tail ratio and entropy-based imbalance, native
+    versus target.}
+  \label{tab:controlled-targets}
+\end{table}
 
 % ============================================================
 \section{Results}
