@@ -27,8 +27,8 @@ An Introduction to the Domain and Data}
 \maketitle
 
 \begin{abstract}
-\noindent This report introduces the domain of computational pathology and the public datasets used
-in this thesis. It first explains what diagnostic pathology is, how a stained glass slide becomes a
+\noindent This report introduces the domain of computational pathology and the four public
+histopathology datasets it covers. It first explains what diagnostic pathology is, how a stained glass slide becomes a
 gigapixel whole-slide image, why such images are tiled into patches, and how weakly supervised and
 frozen foundation-model pipelines turn those patches into predictions. It then describes, in detail,
 four H\&E datasets --- CAMELYON16, TCGA-UT, BRACS, and PANDA --- presented in the order of the
@@ -54,25 +54,24 @@ intra-observer variability, which motivates computational assistance
 \citep{madabhushi2016imageAnalysis,song2023aiPathology}.
 
 Computerised analysis of microscopy images is not new: the earliest work on cell and chromosome
-image analysis dates back more than fifty years \citep{madabhushi2016imageAnalysis}. What changed
+image analysis dates back more than fifty years. What changed
 recently is scale and method. \emph{Digital pathology} digitises the glass slide with a
 whole-slide scanner, enabling telepathology, archiving, and education; \emph{computational
 pathology} (CPath) goes further, treating the resulting images as high-dimensional data for
-quantitative, reproducible analysis and integrating them with clinical and molecular context
-\citep{abels2019computationalPathology,hosseini2024computationalPathology}. A useful distinction
+quantitative, reproducible analysis and integrating them with clinical and molecular context. A useful distinction
 here is between the \emph{ground truth}, the abstract label one wishes to predict, and the
 \emph{gold standard}, the practical benchmark used to approximate it --- typically a pathologist's
 own assessment. Because algorithmic outputs can eventually prove more reproducible than the human
 benchmark that trained them, CPath must navigate a \emph{gold-standard paradox} in which the
-reference itself is imperfect \citep{abels2019computationalPathology}.
+reference itself is imperfect \citep{abels2019computationalPathology,madabhushi2016imageAnalysis,hosseini2024computationalPathology}.
 
-The clinical value of CPath is usually framed along two axes \citep{song2023aiPathology,madabhushi2016imageAnalysis}.
+The clinical value of CPath is usually framed along two axes.
 \emph{Automation} standardises tasks pathologists already perform --- detecting metastases,
 subtyping and grading tumours, quantifying immunohistochemical markers --- reducing workload and
 observer variability. \emph{Discovery} identifies signatures beyond human visual limits, such as
 predicting prognosis, therapy response, or molecular alterations (for example microsatellite
 instability) directly from H\&E morphology; these are the ``sub-visual'' features that quantitative
-analysis can mine but a human eye cannot reliably see \citep{madabhushi2016imageAnalysis}.
+analysis can mine but a human eye cannot reliably see \citep{song2023aiPathology,madabhushi2016imageAnalysis}.
 Table~\ref{tab:cpath-tasks} summarises representative tasks. The datasets in this report all sit
 on the automation axis: each carries a diagnostic label a pathologist established, and the task is
 to predict it from H\&E tissue.
@@ -100,13 +99,13 @@ to predict it from H\&E tissue.
 \label{sec:pipeline}
 A digitised slide is a \emph{whole-slide image} (WSI): a single H\&E image of an entire tissue
 section, routinely on the order of \num{100000}$\times$\num{100000} pixels and \num{0.5}--\num{4}\,GB
-in size \citep{song2023aiPathology,abels2019computationalPathology}. To make this tractable, a WSI is
+in size. To make this tractable, a WSI is
 stored as a \emph{pyramid} of progressively downsampled copies, so the same slide can be read at
 several magnifications (Table~\ref{tab:magnification}): high magnification resolves nuclear detail
 and mitoses, while lower magnifications carry the tissue-architectural context that diagnosis also
 depends on. Scanning the whole section, rather than a manually chosen field of view, removes
 selection bias and captures intratumoral heterogeneity, but it produces far more data than fits in
-GPU memory.
+GPU memory \citep{song2023aiPathology,abels2019computationalPathology}.
 
 \begin{table}[ht]
   \centering
@@ -164,7 +163,7 @@ slide to prediction, that every dataset in this report passes through.
     \draw[arrow] (mhead)--(slabel);
   \end{tikzpicture}%
   }
-  \caption{The computational-pathology pipeline used throughout the benchmarks. A stained slide is
+  \caption{The computational-pathology pipeline the datasets pass through. A stained slide is
   scanned into a pyramidal WSI and tiled into patches; a frozen foundation-model encoder embeds each
   patch once, after which either a patch classifier predicts a per-tile label or a multiple-instance
   head aggregates the patch features of a slide into a slide-level prediction.}
@@ -187,15 +186,13 @@ datasets below, and two of them (CAMELYON16 and PANDA) support both on the same 
 
 The features fed to these heads have shifted from hand-crafted descriptors --- interpretable
 measurements of nuclear shape, texture, or spatial architecture --- to learned representations that
-capture patterns beyond human perception \citep{madabhushi2016imageAnalysis}. Modern CPath rarely
-trains an image encoder from scratch: a pathology \emph{foundation model}, pre-trained
-self-supervised on large slide archives, provides a frozen feature extractor that embeds each patch
-once into a fixed-length vector, leaving only a lightweight classifier or MIL head to train. The
-benchmarks that build on this report use Virchow2, one such H\&E foundation model, as a frozen
-encoder \citep{vorontsov2024virchow,zimmermann2024virchow2}. Freezing the representation isolates the
-effect being studied --- here, class imbalance --- from the confounds of end-to-end backbone
-training, and makes the patch and MIL regimes directly comparable, because both consume the same
-embeddings.
+capture patterns beyond human perception. Modern CPath rarely trains an image encoder from scratch:
+a pathology \emph{foundation model}, pre-trained self-supervised on large slide archives, provides a
+frozen feature extractor that embeds each patch once into a fixed-length vector, leaving only a
+lightweight classifier or MIL head to train. Virchow2 is one such H\&E foundation model
+\citep{vorontsov2024virchow,zimmermann2024virchow2}. Freezing the representation lets a study isolate
+the effect of, for example, class imbalance from the confounds of end-to-end backbone training, and
+makes the patch and MIL regimes directly comparable, because both consume the same embeddings.
 
 \subsection{Data, annotation, and the challenge of class imbalance}
 \label{sec:data-challenge}
@@ -522,7 +519,7 @@ share one task and differ only in prediction unit.
 \label{sec:summary}
 This report introduced the computational-pathology pipeline --- from a stained glass slide to a
 gigapixel whole-slide image, patching, weakly supervised multiple-instance learning, and frozen
-foundation-model features --- and the four H\&E datasets used in this thesis, presented as a
+foundation-model features --- and the four H\&E datasets it covers, presented as a
 progression of diagnostic questions from CAMELYON16 detection through TCGA-UT typing and BRACS
 subtyping to PANDA grading, each with its organ, label type, annotation form, example patch, and
 class distribution. The entropy-based imbalance measure $1-H_{\mathrm{norm}}$ was defined so that
