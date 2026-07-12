@@ -2,6 +2,10 @@
 
 - `Update papers`: Look for uncommited Git changes, run compress command of skill pdf for these and bib refresh command of skill bib.
 
+# Git
+
+- When asked to commit changes, do not create a new branch — just commit to `main`.
+
 # Cluster
 
 - Use the project-local `hydra-cluster` skill before working with the TU Berlin Hydra cluster. The skill refers to `CLUSTER.md`, which contains the SSH shortcut, SLURM workflow, storage rules, and dataset safety notes.
@@ -24,6 +28,7 @@
   Copy-Item .latex-build\main.pdf main.pdf; Remove-Item -Recurse -Force .latex-build
   ```
 - Do not leave LaTeX auxiliary files in the worktree.
+- When writing in academic reports, use the `/scientific-writing` skill.
 
 # NotebookLM
 
