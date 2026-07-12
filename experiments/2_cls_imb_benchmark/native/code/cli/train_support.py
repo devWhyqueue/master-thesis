@@ -15,7 +15,7 @@ from data.dataset import TCGAUTDatasetImbalanced
 from analysis.evaluation.tuning_params import parse_tuning_params
 from modeling.losses.factory import LossFactory
 from modeling.models.mlp import MLP
-from analysis.plotting.matrices import plot_extended_confusion_matrix
+from analysis.plotting.support.matrices import plot_extended_confusion_matrix
 from modeling.training.batch_sampler import BatchBalancingSampler
 from modeling.training.loops import train
 from modeling.training.patch_feature_adapter import build_specialized_model

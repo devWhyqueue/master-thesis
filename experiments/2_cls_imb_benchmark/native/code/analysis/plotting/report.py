@@ -15,13 +15,16 @@ from analysis.plotting import (
     _write_table,
     _write_unavailable,
 )
-from analysis.plotting.calibration import calibration_summary, write_calibration_tables
+from analysis.plotting.support.calibration import (
+    calibration_summary,
+    write_calibration_tables,
+)
 from analysis.plotting.results import (
     native_results,
     result_summary,
     write_result_tables,
 )
-from analysis.plotting.tail_class import (
+from analysis.plotting.support.tail_class import (
     plot_support_vs_recall,
     tail_class_frame,
     write_tail_class_tables,

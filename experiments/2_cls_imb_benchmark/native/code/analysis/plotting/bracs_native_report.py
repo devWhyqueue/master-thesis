@@ -19,7 +19,7 @@ from analysis.plotting import (
     _write_table,
     _write_unavailable,
 )
-from analysis.plotting.calibration import _calibration_row
+from analysis.plotting.support.calibration import _calibration_row
 
 LABELS = ("N", "PB", "UDH", "FEA", "ADH", "DCIS", "IC")
 
@@ -136,22 +136,24 @@ def write_result_table(frame: pd.DataFrame, path: Path) -> None:
             macro_f1_std=("macro_f1", "std"),
         )
         .reset_index()
+        .sort_values("macro_f1_mean", ascending=False, kind="stable")
     )
-    stats = stats.sort_values("macro_f1_mean", ascending=False, kind="stable")
-    rows = []
-    for _, row in stats.iterrows():
-        rows.append(
-            " & ".join(
-                [
-                    _method_label(row["method"]),
-                    _mean_std(row, "accuracy"),
-                    _mean_std(row, "balanced_accuracy"),
-                    _mean_std(row, "macro_f1"),
-                ]
-            )
-            + "\\\\"
-        )
+    rows = [_result_row(row) for _, row in stats.iterrows()]
     _write_table(path, header, rows)
+
+
+def _result_row(row: pd.Series) -> str:
+    return (
+        " & ".join(
+            [
+                _method_label(str(row["method"])),
+                _mean_std(row, "accuracy"),
+                _mean_std(row, "balanced_accuracy"),
+                _mean_std(row, "macro_f1"),
+            ]
+        )
+        + "\\\\"
+    )
 
 
 def calibration_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
@@ -181,58 +183,54 @@ def calibration_summary(results_dir: Path, output_dir: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+CALIBRATION_HEADER = "Method & ECE & ECE+TS & $T$"
+
+
 def write_calibration_tables(frame: pd.DataFrame, tables: Path) -> None:
     """Write compact native ECE tables for BRACS."""
-    header = "Method & ECE & ECE+TS & $T$"
     for benchmark, filename, order in (
         ("patch", "bracs_calibration_patch.tex", PATCH_ORDER),
         ("wsi_bag", "bracs_calibration_wsi_bag.tex", WSI_ORDER),
     ):
         part = frame[frame["benchmark"] == benchmark] if not frame.empty else frame
-        path = tables / filename
-        if part.empty:
-            _write_unavailable(path, header)
-            continue
-        agg = (
-            part.groupby("method")
-            .agg(
-                expected_calibration_error_mean=("expected_calibration_error", "mean"),
-                expected_calibration_error_std=("expected_calibration_error", "std"),
-                expected_calibration_error_scaled_mean=(
-                    "expected_calibration_error_scaled",
-                    "mean",
-                ),
-                expected_calibration_error_scaled_std=(
-                    "expected_calibration_error_scaled",
-                    "std",
-                ),
-                temperature_mean=("temperature", "mean"),
-                temperature_std=("temperature", "std"),
-            )
-            .reset_index()
+        _write_calibration_table(cast(pd.DataFrame, part), tables / filename, order)
+
+
+def _write_calibration_table(part: pd.DataFrame, path: Path, order: list[str]) -> None:
+    if part.empty:
+        _write_unavailable(path, CALIBRATION_HEADER)
+        return
+    agg = _calibration_stats(part)
+    methods = [m for m in order if m in set(agg["method"])] + [
+        str(m) for m in agg["method"].tolist() if m not in order
+    ]
+    rows = [_calibration_row_tex(agg, method) for method in methods]
+    _write_table(path, CALIBRATION_HEADER, rows)
+
+
+def _calibration_stats(part: pd.DataFrame) -> pd.DataFrame:
+    metrics = (
+        "expected_calibration_error",
+        "expected_calibration_error_scaled",
+        "temperature",
+    )
+    agg = {f"{m}_{s}": (m, s) for m in metrics for s in ("mean", "std")}
+    return part.groupby("method").agg(**agg).reset_index()
+
+
+def _calibration_row_tex(agg: pd.DataFrame, method: str) -> str:
+    row = agg[agg["method"] == method].iloc[0]
+    return (
+        " & ".join(
+            [
+                _method_label(method),
+                _mean_std(row, "expected_calibration_error"),
+                _mean_std(row, "expected_calibration_error_scaled"),
+                _mean_std(row, "temperature"),
+            ]
         )
-        methods = [m for m in order if m in set(agg["method"])] + [
-            str(m) for m in agg["method"].tolist() if m not in order
-        ]
-        rows = [
-            " & ".join(
-                [
-                    _method_label(method),
-                    _mean_std(
-                        agg[agg["method"] == method].iloc[0],
-                        "expected_calibration_error",
-                    ),
-                    _mean_std(
-                        agg[agg["method"] == method].iloc[0],
-                        "expected_calibration_error_scaled",
-                    ),
-                    _mean_std(agg[agg["method"] == method].iloc[0], "temperature"),
-                ]
-            )
-            + "\\\\"
-            for method in methods
-        ]
-        _write_table(path, header, rows)
+        + "\\\\"
+    )
 
 
 def _selection(output_dir: Path) -> list[dict]:

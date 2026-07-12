@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from analysis.plotting.tail_class import (
+from analysis.plotting.support.tail_class import (
     _native_tiers,
     _regime_param,
     tail_class_frame,

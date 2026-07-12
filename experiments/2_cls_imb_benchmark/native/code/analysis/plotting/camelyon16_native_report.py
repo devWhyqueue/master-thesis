@@ -19,7 +19,7 @@ from analysis.plotting import (
     _write_table,
     _write_unavailable,
 )
-from analysis.plotting.calibration import _calibration_row
+from analysis.plotting.support.calibration import _calibration_row
 
 LABELS = ("normal", "tumor")
 
@@ -132,7 +132,7 @@ def write_result_table(frame: pd.DataFrame, path: Path) -> None:
     rows = [
         " & ".join(
             [
-                _method_label(row["method"]),
+                _method_label(str(row["method"])),
                 _mean_std(row, "accuracy"),
                 _mean_std(row, "balanced_accuracy"),
                 _mean_std(row, "macro_f1"),

@@ -7,11 +7,11 @@ from typing import Literal, cast, overload
 from matplotlib.figure import Figure
 import pandas as pd
 
-from analysis.plotting.comparisons import (
+from analysis.plotting.support.comparisons import (
     plot_scatter_accuracies_of_two_parameters,
     point_plot_compare_methods,
 )
-from analysis.plotting.matrices import (
+from analysis.plotting.support.matrices import (
     compute_average_confusion_matrix,
     number_of_slides_per_class_bar,
     plot_confusion_matrix,
