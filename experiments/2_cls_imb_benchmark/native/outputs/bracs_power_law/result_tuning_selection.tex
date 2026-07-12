@@ -1,0 +1,48 @@
+\begin{tabular}{llllrr}
+\toprule
+Benchmark & Regime & Method & Variant & Val macro-F1 & Test macro-F1\\
+\midrule
+patch & order=native_prevalence/param=0.5 & patch_feature_balanced_sampler_ce & sampler_power=0.5 & 0.363 & 0.398\\
+patch & order=native_prevalence/param=0.5 & patch_feature_ce_soft_f1_balanced & metric_loss_weight=4 & 0.365 & 0.397\\
+patch & order=native_prevalence/param=0.5 & patch_feature_ce_soft_mcc_balanced & metric_loss_weight=0.5 & 0.368 & 0.401\\
+patch & order=native_prevalence/param=0.5 & patch_feature_cfal & cfal_sigma=1 & 0.354 & 0.397\\
+patch & order=native_prevalence/param=0.5 & patch_feature_focal & focal_gamma=1.5 & 0.368 & 0.399\\
+patch & order=native_prevalence/param=0.5 & patch_feature_oko & oko_k=6 & 0.391 & 0.421\\
+patch & order=native_prevalence/param=0.5 & patch_feature_progan_aug & final_depth_epochs=50 & 0.365 & 0.396\\
+patch & order=native_prevalence/param=0.5 & patch_feature_weighted_ce & weight_power=0.75 & 0.366 & 0.399\\
+patch & order=native_prevalence/param=1 & patch_feature_balanced_sampler_ce & sampler_power=0.75 & 0.388 & 0.378\\
+patch & order=native_prevalence/param=1 & patch_feature_ce_soft_f1_balanced & metric_loss_weight=4 & 0.384 & 0.395\\
+patch & order=native_prevalence/param=1 & patch_feature_ce_soft_mcc_balanced & metric_loss_weight=8 & 0.378 & 0.376\\
+patch & order=native_prevalence/param=1 & patch_feature_cfal & cfal_sigma=4 & 0.378 & 0.392\\
+patch & order=native_prevalence/param=1 & patch_feature_focal & focal_gamma=0.5 & 0.383 & 0.385\\
+patch & order=native_prevalence/param=1 & patch_feature_oko & oko_k=6 & 0.396 & 0.410\\
+patch & order=native_prevalence/param=1 & patch_feature_progan_aug & final_depth_epochs=10 & 0.379 & 0.384\\
+patch & order=native_prevalence/param=1 & patch_feature_weighted_ce & weight_power=0.25 & 0.381 & 0.386\\
+patch & order=native_prevalence/param=1.5 & patch_feature_balanced_sampler_ce & sampler_power=0.75 & 0.380 & 0.355\\
+patch & order=native_prevalence/param=1.5 & patch_feature_ce_soft_f1_balanced & metric_loss_weight=256 & 0.387 & 0.349\\
+patch & order=native_prevalence/param=1.5 & patch_feature_ce_soft_mcc_balanced & metric_loss_weight=8 & 0.388 & 0.340\\
+patch & order=native_prevalence/param=1.5 & patch_feature_cfal & cfal_sigma=1 & 0.378 & 0.346\\
+patch & order=native_prevalence/param=1.5 & patch_feature_focal & focal_gamma=0.5 & 0.368 & 0.346\\
+patch & order=native_prevalence/param=1.5 & patch_feature_oko & oko_k=8 & 0.395 & 0.386\\
+patch & order=native_prevalence/param=1.5 & patch_feature_progan_aug & final_depth_epochs=50 & 0.370 & 0.345\\
+patch & order=native_prevalence/param=1.5 & patch_feature_weighted_ce & weight_power=0.25 & 0.371 & 0.341\\
+wsi & order=native_prevalence/param=0.5 & mde_mil & mde_mil_consistency_weight=0.5 & 0.511 & 0.477\\
+wsi & order=native_prevalence/param=0.5 & mil_balanced_sampler_ce & sampler_power=0.5 & 0.440 & 0.504\\
+wsi & order=native_prevalence/param=0.5 & mil_focal & focal_gamma=1 & 0.470 & 0.509\\
+wsi & order=native_prevalence/param=0.5 & mil_weighted_ce & weight_power=1 & 0.475 & 0.473\\
+wsi & order=native_prevalence/param=0.5 & rankmix_mil & rankmix_alpha=1 & 0.499 & 0.480\\
+wsi & order=native_prevalence/param=0.5 & sc_mil & sc_mil_temperature=0.2 & 0.475 & 0.511\\
+wsi & order=native_prevalence/param=1 & mde_mil & mde_mil_consistency_weight=2 & 0.503 & 0.522\\
+wsi & order=native_prevalence/param=1 & mil_balanced_sampler_ce & sampler_power=0.75 & 0.463 & 0.462\\
+wsi & order=native_prevalence/param=1 & mil_focal & focal_gamma=0.5 & 0.485 & 0.520\\
+wsi & order=native_prevalence/param=1 & mil_weighted_ce & weight_power=0.75 & 0.479 & 0.523\\
+wsi & order=native_prevalence/param=1 & rankmix_mil & rankmix_alpha=32 & 0.503 & 0.494\\
+wsi & order=native_prevalence/param=1 & sc_mil & sc_mil_temperature=0.2 & 0.521 & 0.525\\
+wsi & order=native_prevalence/param=1.5 & mde_mil & mde_mil_consistency_weight=4 & 0.440 & 0.432\\
+wsi & order=native_prevalence/param=1.5 & mil_balanced_sampler_ce & sampler_power=0.75 & 0.421 & 0.431\\
+wsi & order=native_prevalence/param=1.5 & mil_focal & focal_gamma=2 & 0.464 & 0.419\\
+wsi & order=native_prevalence/param=1.5 & mil_weighted_ce & weight_power=0.75 & 0.467 & 0.416\\
+wsi & order=native_prevalence/param=1.5 & rankmix_mil & rankmix_alpha=4 & 0.446 & 0.425\\
+wsi & order=native_prevalence/param=1.5 & sc_mil & sc_mil_temperature=0.2 & 0.489 & 0.447\\
+\bottomrule
+\end{tabular}

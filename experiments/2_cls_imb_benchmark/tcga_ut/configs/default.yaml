@@ -4,7 +4,7 @@ paths:
   feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
   patch_sqfs: /home/space/datasets-sqfs/tcga-ut-controlled-patches.sqfs
   patch_synthetic_sqfs: /home/space/datasets-sqfs/tcga-ut-synthetic-patches-seed-{seed}.sqfs
-  outputs: experiments/2_cls_imb_benchmark
+  outputs: experiments/2_cls_imb_benchmark/tcga_ut
 
 staging:
   prefer_sqfs: true

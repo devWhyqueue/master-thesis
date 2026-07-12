@@ -18,9 +18,9 @@ def bracs_data_root(config: dict[str, str]) -> str:
 
 
 def report_output_dir(config: dict[str, str]) -> str:
-    """Return the design-dataset report output directory."""
+    """Return the native-benchmark report output directory."""
     return config.get(
-        "report_output_dir", "experiments/2_cls_imb_benchmark/report/outputs"
+        "report_output_dir", "experiments/2_cls_imb_benchmark/native/outputs"
     )
 
 

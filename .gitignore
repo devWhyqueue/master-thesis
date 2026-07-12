@@ -32,12 +32,20 @@ experiments/class_imbalance/outputs/**/checkpoint*.pt
 experiments/class_imbalance/**/*.npy
 experiments/class_imbalance/outputs/**/run.json
 experiments/class_imbalance/outputs/**/progress.json
+experiments/2_cls_imb_benchmark/tcga_ut/environment.sif
+experiments/2_cls_imb_benchmark/tcga_ut/outputs/**/model.pt
+experiments/2_cls_imb_benchmark/tcga_ut/outputs/**/checkpoint*.pt
+experiments/2_cls_imb_benchmark/tcga_ut/**/*.npy
+experiments/2_cls_imb_benchmark/tcga_ut/outputs/**/run.json
+experiments/2_cls_imb_benchmark/tcga_ut/outputs/**/progress.json
+experiments/2_cls_imb_benchmark/tcga_ut/data/
+experiments/2_cls_imb_benchmark/tcga_ut/logs/
 
 # Design dataset: large generated artifacts, machine-specific config
 experiments/design_dataset/data/
 experiments/design_dataset/results/
-experiments/design_dataset/code/config.json
-experiments/design_dataset/code/hydra/config.json
-experiments/design_dataset/code/hydra/logs/
 experiments/design_dataset/report/outputs/tuning_selection.json
+experiments/2_cls_imb_benchmark/native/code/config.json
+experiments/2_cls_imb_benchmark/native/code/hydra/config.json
+experiments/2_cls_imb_benchmark/native/code/hydra/logs/
 

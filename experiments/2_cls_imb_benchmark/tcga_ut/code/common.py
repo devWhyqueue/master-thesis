@@ -9,20 +9,19 @@ import numpy as np
 import yaml
 
 
-def _find_experiment_root() -> Path:
-    """Walk up from this file until we reach the dir that sits inside 'experiments/'.
-
-    ponytail: simple parent-walk; O(depth) but depth is always tiny here.
-    """
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if parent.parent.name == "experiments":
+def _find_experiments_dir() -> Path:
+    """Walk up from this file to the ancestor directory literally named 'experiments'."""
+    for parent in Path(__file__).resolve().parents:
+        if parent.name == "experiments":
             return parent
-    # Fallback: old fixed-index behaviour (one level above code/)
-    return here.parents[1]
+    raise RuntimeError("Could not locate an 'experiments' ancestor directory")
 
 
-EXPERIMENT_ROOT = _find_experiment_root()
+# EXPERIMENT_ROOT is the direct parent of code/, i.e. this experiment's own folder
+# (e.g. experiments/2_cls_imb_benchmark/tcga_ut). This is a fixed offset from this
+# file's own location, so it stays correct regardless of how deep 'experiments/'
+# nests this experiment folder.
+EXPERIMENT_ROOT = Path(__file__).resolve().parent.parent
 RUN_RECORD_NAME = "run.json"
 EVAL_ARRAYS_NAME = "eval_arrays.npz"
 ARRAY_FIELDS = ("labels", "preds", "probabilities")
@@ -41,9 +40,7 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
 def output_root(config: dict[str, Any]) -> Path:
     """Resolve the configured output root path."""
     configured = Path(config["paths"]["outputs"])
-    # Repo root is the parent of the 'experiments' directory.
-    # EXPERIMENT_ROOT sits inside experiments/, so its parent is experiments/.
-    repo_root = EXPERIMENT_ROOT.parent.parent
+    repo_root = _find_experiments_dir().parent
     return configured if configured.is_absolute() else repo_root / configured
 
 

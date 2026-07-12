@@ -68,8 +68,8 @@ def pythonpath_env(config: dict[str, str]) -> str:
     working = Path(config.get("working_dir", ".")).resolve()
     experiments_root = working.parent.parent
     common = experiments_root / "shared"
-    class_imbalance = experiments_root / "class_imbalance"
-    return f"{common}{os.pathsep}{class_imbalance}{os.pathsep}{working}"
+    tcga_ut = experiments_root / "2_cls_imb_benchmark" / "tcga_ut"
+    return f"{common}{os.pathsep}{tcga_ut}{os.pathsep}{working}"
 
 
 def prefix(

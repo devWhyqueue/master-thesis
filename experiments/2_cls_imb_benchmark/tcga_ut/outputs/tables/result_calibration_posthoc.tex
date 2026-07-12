@@ -1,0 +1,23 @@
+\begin{tabular}{llccc}
+\toprule
+Regime & Method & NLL & Brier & ECE\\
+\midrule
+Patch & CFAL & $\num{0.532} \pm \num{0.029}$ & $\num{0.220} \pm \num{0.011}$ & $\num{0.019} \pm \num{0.003}$\\
+Patch & OKO & $\num{0.617} \pm \num{0.032}$ & $\num{0.236} \pm \num{0.011}$ & $\num{0.029} \pm \num{0.006}$\\
+Patch & CE + soft F1 (balanced) & $\num{0.780} \pm \num{0.026}$ & $\num{0.263} \pm \num{0.008}$ & $\num{0.061} \pm \num{0.028}$\\
+Patch & Weighted CE & $\num{0.654} \pm \num{0.030}$ & $\num{0.252} \pm \num{0.012}$ & $\num{0.038} \pm \num{0.005}$\\
+Patch & CE & $\num{0.649} \pm \num{0.035}$ & $\num{0.250} \pm \num{0.014}$ & $\num{0.041} \pm \num{0.002}$\\
+Patch & Balanced sampler & $\num{0.653} \pm \num{0.034}$ & $\num{0.252} \pm \num{0.013}$ & $\num{0.038} \pm \num{0.008}$\\
+Patch & CE + soft MCC (balanced) & $\num{0.768} \pm \num{0.034}$ & $\num{0.271} \pm \num{0.013}$ & $\num{0.076} \pm \num{0.029}$\\
+Patch & ProGAN augmentation & $\num{0.723} \pm \num{0.017}$ & $\num{0.263} \pm \num{0.005}$ & $\num{0.073} \pm \num{0.007}$\\
+Patch & Focal & $\num{0.618} \pm \num{0.025}$ & $\num{0.251} \pm \num{0.009}$ & $\num{0.006} \pm \num{0.004}$\\
+\addlinespace
+WSI bag & MDE-MIL (ensemble) & $\num{0.471} \pm \num{0.009}$ & $\num{0.163} \pm \num{0.003}$ & $\num{0.023} \pm \num{0.002}$\\
+WSI bag & RankMix & $\num{0.428} \pm \num{0.012}$ & $\num{0.166} \pm \num{0.005}$ & $\num{0.028} \pm \num{0.002}$\\
+WSI bag & SC-MIL & $\num{0.440} \pm \num{0.045}$ & $\num{0.173} \pm \num{0.018}$ & $\num{0.007} \pm \num{0.004}$\\
+WSI bag & Weighted MIL & $\num{0.455} \pm \num{0.033}$ & $\num{0.177} \pm \num{0.011}$ & $\num{0.013} \pm \num{0.004}$\\
+WSI bag & Balanced MIL & $\num{0.479} \pm \num{0.031}$ & $\num{0.185} \pm \num{0.010}$ & $\num{0.013} \pm \num{0.003}$\\
+WSI bag & MIL CE & $\num{0.473} \pm \num{0.018}$ & $\num{0.188} \pm \num{0.015}$ & $\num{0.017} \pm \num{0.010}$\\
+WSI bag & Focal MIL & $\num{0.475} \pm \num{0.024}$ & $\num{0.189} \pm \num{0.008}$ & $\num{0.012} \pm \num{0.002}$\\
+\bottomrule
+\end{tabular}

@@ -18,7 +18,10 @@ from analysis.plotting import (
 METRICS = ("accuracy", "balanced_accuracy", "macro_f1")
 NativeResults = dict[str, dict[str, dict[str, tuple[float, float]]]]
 
-NATIVE_TABLES = Path(__file__).parents[5] / "experiments/class_imbalance/outputs/tables"
+_EXPERIMENTS_ROOT = next(
+    p for p in Path(__file__).resolve().parents if p.name == "experiments"
+)
+NATIVE_TABLES = _EXPERIMENTS_ROOT / "2_cls_imb_benchmark/tcga_ut/outputs/tables"
 # Maps companion (native-benchmark) display labels to this report's display names.
 NATIVE_LABEL_MAP = {
     "CFAL": "CFAL",
