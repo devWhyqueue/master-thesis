@@ -96,6 +96,7 @@ def discrimination_gate_comparison(
         "ci": ci,
         "gate_passed": passed,
         "p_value": None,
+        "bootstrap_effect": deficit_dist.tolist(),
     }
     return comparison, passed, deficit_dist
 
@@ -119,5 +120,6 @@ def calibration_gate_comparison(
         "ci": ci,
         "gate_passed": passed,
         "p_value": None,
+        "bootstrap_effect": deficit_dist.tolist(),
     }
     return comparison, passed, deficit_dist

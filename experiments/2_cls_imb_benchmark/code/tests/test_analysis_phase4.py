@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
     resample_patient_weights,
     weighted_balanced_accuracy,
 )
+from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import (
     calibration_gate,
     ci_excludes_zero,
@@ -29,6 +31,9 @@ from imbalance_benchmark.analysis.inference.gates import (
     recovery,
 )
 from imbalance_benchmark.analysis.inference.holm import apply_holm, confirmatory_family
+from imbalance_benchmark.analysis.inference.crossed_permutation import (
+    crossed_block_permutation_ba,
+)
 from imbalance_benchmark.analysis.inference.permutation import paired_block_permutation_ba
 from imbalance_benchmark.analysis.metrics import assign_tiers, classification_payload, negative_log_likelihood
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
@@ -39,7 +44,8 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
 from imbalance_benchmark.analysis.predictors.separability import effective_support, intraclass_correlation
 from imbalance_benchmark.analysis.query import load_classwise, load_eval_details, load_test_identity
 from imbalance_benchmark.analysis.reporting.tables import calibration_table, results_table
-from imbalance_benchmark.common import write_run_record
+from imbalance_benchmark.commands.analyze import _aggregate_split_comparisons
+from imbalance_benchmark.common import ensure_dirs, split_paths, write_json, write_run_record
 
 
 # --- metrics ------------------------------------------------------------------
@@ -258,6 +264,14 @@ def test_permutation_block_swap_keeps_patient_rows_together():
     assert 0.0 <= p <= 1.0
 
 
+def test_crossed_permutation_uses_one_patient_swap_across_split_appearances():
+    labels = np.array([0, 1])
+    first = (labels, np.array([[0, 1]]), np.array([[1, 0]]), np.array(["P0", "P1"]))
+    second = (labels, np.array([[0, 1]]), np.array([[1, 0]]), np.array(["P0", "P1"]))
+    p_value = crossed_block_permutation_ba([first, second], n_classes=2)
+    assert 0.0 <= p_value <= 1.0
+
+
 # --- Holm / confirmatory family -------------------------------------------------------
 
 
@@ -424,3 +438,43 @@ def test_load_test_identity_matches_row_order(tmp_path: Path):
     manifest.to_csv(manifest_path, index=False)
     identity = load_test_identity(manifest_path, is_mil=False)
     assert identity["case_id"].tolist() == ["P0", "P1"]
+
+
+def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_path: Path):
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index, effect in enumerate(([0.02, 0.04], [0.04, 0.08], [0.06, 0.12])):
+        ce = {
+            "assignment": "native", "severity": "severe", "method": "ce",
+            "gate": "discrimination", "effect": float(np.mean(effect)),
+            "bootstrap_effect": effect, "gate_passed": True, "p_value": None,
+        }
+        method = {
+            "assignment": "native", "severity": "severe", "method": "weighted_ce",
+            "gate": "discrimination", "effect": float(np.mean(effect)),
+            "bootstrap_effect": effect, "bootstrap_numerator": effect,
+            "bootstrap_denominator": effect, "gate_passed": True, "p_value": 0.1,
+        }
+        write_json(
+            split_paths(paths, index)["data"] / "gates_and_recovery.json",
+            {"comparisons": [ce, method]},
+        )
+    _aggregate_split_comparisons(paths)
+    output = json.loads((paths["data"] / "cross_split_gates_and_recovery.json").read_text())
+    weighted = next(c for c in output["comparisons"] if c["method"] == "weighted_ce")
+    assert weighted["effect"] == pytest.approx(0.06)
+    assert weighted["recovery"] == pytest.approx(1.0)
+
+
+def test_crossed_bootstrap_reuses_one_patient_weight_across_split_appearances(tmp_path: Path):
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index in (0, 1):
+        manifest = pd.DataFrame(
+            [
+                {"case_id": "P0", "slide_id": f"P0_{index}", "cancer_type": "A", "split": "test"},
+                {"case_id": "P1", "slide_id": f"P1_{index}", "cancer_type": "B", "split": "test"},
+            ]
+        )
+        manifest.to_csv(split_paths(paths, index)["data"] / "manifest.csv", index=False)
+    first = BootstrapContext(split_paths(paths, 0), is_mil=False, n_replicates=20, seed=4)
+    second = BootstrapContext(split_paths(paths, 1), is_mil=False, n_replicates=20, seed=4)
+    assert np.array_equal(first.row_weights[0], second.row_weights[0])

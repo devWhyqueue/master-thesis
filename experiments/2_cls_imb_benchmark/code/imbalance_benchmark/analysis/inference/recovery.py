@@ -46,6 +46,7 @@ def _recovery_comparison(
     gate: str,
     effect_dist: np.ndarray,
     recovery_dist: np.ndarray,
+    deficit_dist: np.ndarray,
     gate_passed: bool,
     p_value: float | None,
 ) -> dict[str, Any]:
@@ -61,6 +62,9 @@ def _recovery_comparison(
         "assignment": inp.assignment,
         "gate_passed": gate_passed,
         "p_value": p_value,
+        "bootstrap_effect": effect_dist.tolist(),
+        "bootstrap_numerator": effect_dist.tolist(),
+        "bootstrap_denominator": deficit_dist.tolist(),
     }
 
 
@@ -95,7 +99,14 @@ def _method_discrimination_recovery(
         else None
     )
     return _recovery_comparison(
-        inp, method, "discrimination", effect_dist, recovery_dist, gate_passed, p_val
+        inp,
+        method,
+        "discrimination",
+        effect_dist,
+        recovery_dist,
+        ba_deficit_dist,
+        gate_passed,
+        p_val,
     )
 
 
@@ -133,7 +144,14 @@ def _method_calibration_recovery(
         else None
     )
     return _recovery_comparison(
-        inp, method, "calibration", effect_dist, rec_cal_dist, gate_passed, p_val
+        inp,
+        method,
+        "calibration",
+        effect_dist,
+        rec_cal_dist,
+        cal_deficit_dist,
+        gate_passed,
+        p_val,
     )
 
 

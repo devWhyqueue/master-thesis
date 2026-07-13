@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from imbalance_benchmark.analysis.inference.bootstrap import (
     build_strata,
@@ -21,6 +22,27 @@ from imbalance_benchmark.analysis.query import load_seed_predictions, load_test_
 __all__ = ["BootstrapContext", "Baseline", "balanced_baseline"]
 
 
+def _crossed_test_identity(paths: dict[str, Path], is_mil: bool) -> pd.DataFrame:
+    """Load every available fixed test split for shared patient-block resampling."""
+    frames = []
+    for index in range(3):
+        manifest = paths["root"].parent / f"split={index}" / "data" / "manifest.csv"
+        if manifest.exists():
+            frames.append(
+                load_test_identity(manifest, is_mil).assign(patient_split=index)
+            )
+    if not frames:
+        local_manifest = paths["data"] / "manifest.csv"
+        if not local_manifest.exists():
+            raise FileNotFoundError(
+                "No prepared test manifest is available for bootstrap"
+            )
+        frames.append(
+            load_test_identity(local_manifest, is_mil).assign(patient_split=0)
+        )
+    return pd.concat(frames, ignore_index=True)
+
+
 class BootstrapContext:
     """Precomputed patient-block resampling shared by every gate/recovery comparison."""
 
@@ -28,7 +50,8 @@ class BootstrapContext:
         self, paths: dict[str, Path], is_mil: bool, n_replicates: int, seed: int
     ) -> None:
         identity = load_test_identity(paths["data"] / "manifest.csv", is_mil)
-        strata = build_strata(identity)
+        crossed_identity = _crossed_test_identity(paths, is_mil)
+        strata = build_strata(crossed_identity)
         rng = np.random.default_rng(seed)
         unique_cases, patient_weights = resample_patient_weights(
             strata, n_replicates, rng
@@ -86,9 +109,12 @@ def _tail_classes(
     freeze: dict[str, Any], class_names: list[str], assignment: str
 ) -> list[int]:
     """Class indices assigned to the tail tier under the severe condition's allocated support."""
-    allocated = freeze.get("assignment_conditions", {}).get(assignment, {}).get(
-        "severe", {}
-    ).get("allocated_counts", {})
+    allocated = (
+        freeze.get("assignment_conditions", {})
+        .get(assignment, {})
+        .get("severe", {})
+        .get("allocated_counts", {})
+    )
     if not allocated:
         return []
     tiers = assign_tiers(class_names, allocated)
@@ -128,6 +154,4 @@ def balanced_baseline(
     tail_nll = ctx.tail_nll_distribution(
         balanced["labels"], balanced["probs"], tail_classes
     )
-    return Baseline(
-        balanced, ctx, n_classes, tail_classes, 100_000, ba, tail_nll
-    )
+    return Baseline(balanced, ctx, n_classes, tail_classes, 100_000, ba, tail_nll)
