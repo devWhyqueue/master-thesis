@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from typing import Any
 
 import torch
@@ -12,6 +13,7 @@ from imbalance_benchmark.common import (
     write_json,
 )
 from imbalance_benchmark.data import ImbalanceDataset
+from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.models import MLP
 from imbalance_benchmark.modeling.training import fit_model
 
@@ -54,6 +56,9 @@ def cmd_tune(args: argparse.Namespace) -> None:
     """Run validation tuning sweep."""
     config = load_config(args.config)
     paths = ensure_dirs(config)
+    freeze_path = paths["data"] / "manifest_freeze.json"
+    if freeze_path.exists():
+        verify_manifest_freeze(json.loads(freeze_path.read_text()))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     val_ds = ImbalanceDataset(
         paths["data"] / "manifest.csv", split_name="validation", device=device

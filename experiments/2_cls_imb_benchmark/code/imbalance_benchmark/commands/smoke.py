@@ -8,7 +8,8 @@ import yaml
 
 from imbalance_benchmark.commands.analyze import cmd_analyze
 from imbalance_benchmark.commands.confirm import cmd_confirm
-from imbalance_benchmark.commands.freeze import cmd_freeze, cmd_pilot
+from imbalance_benchmark.commands.freeze import cmd_freeze
+from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.commands.tuning import cmd_tune
 from imbalance_benchmark.common import cmd_submit

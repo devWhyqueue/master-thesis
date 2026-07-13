@@ -10,7 +10,17 @@ from torch.utils.data import DataLoader
 
 from imbalance_benchmark.modeling.models import AttentionMil, DualExpertMil
 
-__all__ = ["run_evaluation"]
+__all__ = ["run_evaluation", "per_class_recall"]
+
+
+def per_class_recall(
+    preds: np.ndarray, targets: np.ndarray, n_classes: int
+) -> list[float]:
+    """Compute per-class recall from prediction and target arrays."""
+    return [
+        float((preds[targets == c] == c).sum()) / max(1, int((targets == c).sum()))
+        for c in range(n_classes)
+    ]
 
 
 def _gather_and_eval(

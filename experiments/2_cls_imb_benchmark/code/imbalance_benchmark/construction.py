@@ -11,10 +11,12 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "split_cases",
+    "validate_split_leakage",
     "allocate_counts",
     "select_patches_round_robin",
     "select_slides_round_robin",
     "build_manifest_hash",
+    "patient_equals_slide",
 ]
 
 
@@ -45,6 +47,21 @@ def split_cases(
     df_splits = df.copy()
     df_splits["split"] = df_splits["case_id"].astype(str).map(assignments.get)
     return df_splits
+
+
+def validate_split_leakage(df: pd.DataFrame) -> None:
+    """Raise if any case/patient is assigned to more than one split partition."""
+    counts = df.groupby("case_id")["split"].nunique()
+    leaking = cast(pd.Series, counts[counts > 1])
+    if not leaking.empty:
+        raise RuntimeError(
+            f"Patient-disjoint split violated for cases: {leaking.index.tolist()[:10]}"
+        )
+
+
+def patient_equals_slide(df: pd.DataFrame) -> bool:
+    """Return whether every case contributes at most one slide (e.g. CAMELYON16/PANDA)."""
+    return bool(df.groupby("case_id")["slide_id"].nunique().max() <= 1)
 
 
 def _adjust_alloc(

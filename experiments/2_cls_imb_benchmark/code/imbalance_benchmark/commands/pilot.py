@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import argparse
+from typing import Any, cast
+
+import pandas as pd
+import torch
+
+from imbalance_benchmark.common import ensure_dirs, load_config, write_json
+from imbalance_benchmark.construction import patient_equals_slide
+from imbalance_benchmark.data import BagFeatureDataset, ImbalanceDataset
+from imbalance_benchmark.manifest.pilot import (
+    method_floor,
+    pilot_levels_for,
+    run_pilot_seed,
+    stability_floor_from_curve,
+)
+from imbalance_benchmark.manifest.seeds import derive_seed
+
+__all__ = ["cmd_pilot"]
+
+
+def _pilot_setup(
+    paths: dict[str, Any], config: dict[str, Any]
+) -> tuple[pd.DataFrame, list[str], bool, bool, list[int]]:
+    """Load the training manifest and derive the regime, unit type, and candidate levels."""
+    df = pd.read_csv(paths["data"] / "manifest.csv")
+    train_df = cast(pd.DataFrame, df[df["split"] == "train"])
+    classes = sorted(train_df["cancer_type"].unique())
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    eq_slide = patient_equals_slide(train_df)
+    unit_col = "slide_id" if (is_mil or eq_slide) else "case_id"
+    available = train_df.groupby("cancer_type")[unit_col].nunique().to_dict()
+    return train_df, classes, is_mil, eq_slide, pilot_levels_for(available)
+
+
+def _run_all_pilot_seeds(
+    train_df: pd.DataFrame,
+    classes: list[str],
+    levels: list[int],
+    is_mil: bool,
+    base_seed: int,
+    paths: dict[str, Any],
+) -> tuple[
+    list[int],
+    dict[int, int | None],
+    dict[int, list[float]],
+    dict[int, list[list[float]]],
+]:
+    """Run every pilot construction seed and collect its candidate-level curves."""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    val_ds: ImbalanceDataset | BagFeatureDataset = (
+        BagFeatureDataset(paths["data"] / "manifest.csv", "validation", device=device)
+        if is_mil
+        else ImbalanceDataset(
+            paths["data"] / "manifest.csv", "validation", device=device
+        )
+    )
+    scratch_dir = paths["data"] / "pilot"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    n_cls = len(classes)
+    pilot_seeds = [derive_seed(base_seed, f"pilot_construction_{i}") for i in range(3)]
+    quotas, ba_by_seed, recall_by_seed = {}, {}, {}
+    for seed in pilot_seeds:
+        quota, ba_curve, recall_curve = run_pilot_seed(
+            train_df, classes, levels, seed, val_ds, device, n_cls, is_mil, scratch_dir
+        )
+        quotas[seed], ba_by_seed[seed], recall_by_seed[seed] = (
+            quota,
+            ba_curve,
+            recall_curve,
+        )
+    return pilot_seeds, quotas, ba_by_seed, recall_by_seed
+
+
+def _pilot_report_payload(
+    levels: list[int],
+    eq_slide: bool,
+    pilot_seeds: list[int],
+    quotas: dict[int, int | None],
+    ba_by_seed: dict[int, list[float]],
+    recall_by_seed: dict[int, list[list[float]]],
+) -> dict[str, Any]:
+    """Assemble the frozen pilot report: floors, curves, seeds, and exclusion status."""
+    stability_floor = stability_floor_from_curve(levels, ba_by_seed, recall_by_seed)
+    floor = method_floor(eq_slide)
+    definitive_floor = max(
+        stability_floor, floor.get("patients", floor.get("slides", 0))
+    )
+    return {
+        "levels": levels,
+        "pilot_construction_seeds": pilot_seeds,
+        "quotas": {str(s): q for s, q in quotas.items()},
+        "balanced_accuracy_by_seed": {str(s): v for s, v in ba_by_seed.items()},
+        "per_class_recall_by_seed": {str(s): v for s, v in recall_by_seed.items()},
+        "stability_floor": stability_floor,
+        "method_floor": floor,
+        "definitive_floor": definitive_floor,
+        "patient_equals_slide": eq_slide,
+        "excluded": levels[-1] < definitive_floor,
+    }
+
+
+def cmd_pilot(args: argparse.Namespace) -> None:
+    """Run the nested support-stability pilot and freeze the definitive floors."""
+    config = load_config(args.config)
+    paths = ensure_dirs(config)
+    train_df, classes, is_mil, eq_slide, levels = _pilot_setup(paths, config)
+    pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
+        train_df, classes, levels, is_mil, args.seed, paths
+    )
+    payload = _pilot_report_payload(
+        levels, eq_slide, pilot_seeds, quotas, ba_by_seed, recall_by_seed
+    )
+    write_json(paths["data"] / "pilot_report.json", payload)
