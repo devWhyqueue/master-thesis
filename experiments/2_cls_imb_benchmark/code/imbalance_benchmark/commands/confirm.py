@@ -61,7 +61,11 @@ def _confirm_inputs(args: argparse.Namespace) -> tuple[dict[str, Any], RunContex
     freeze_path = paths["data"] / "manifest_freeze.json"
     if freeze_path.exists():
         verify_manifest_freeze(json.loads(freeze_path.read_text()))
-    with (paths["data"] / "tuning_selections.json").open() as f:
+    condition = getattr(args, "condition", None)
+    selection_name = (
+        f"tuning_selections_{condition}.json" if condition else "tuning_selections.json"
+    )
+    with (paths["data"] / selection_name).open() as f:
         best_configs = json.load(f)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
@@ -94,5 +98,6 @@ def cmd_confirm(args: argparse.Namespace) -> None:
     """Fit every roster method's five confirmation seeds and emit locked test predictions."""
     best_configs, run = _confirm_inputs(args)
     methods = roster_for_regime(run.is_mil)
-    for cond in CONDITIONS:
+    conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
+    for cond in conditions:
         _confirm_condition(cond, methods, best_configs, run)

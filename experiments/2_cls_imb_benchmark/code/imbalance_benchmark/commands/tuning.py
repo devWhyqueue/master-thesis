@@ -180,8 +180,14 @@ def cmd_tune(args: argparse.Namespace) -> None:
         derive_seed(args.seed, "tuning_initialization_1"),
     ]
     methods = roster_for_regime(regime.is_mil)
+    conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
     selections = {
         cond: _tune_condition(cond, methods, paths, val_loader, regime, seeds)
-        for cond in CONDITIONS
+        for cond in conditions
     }
-    write_json(paths["data"] / "tuning_selections.json", selections)
+    if getattr(args, "condition", None):
+        write_json(
+            paths["data"] / f"tuning_selections_{args.condition}.json", selections
+        )
+    else:
+        write_json(paths["data"] / "tuning_selections.json", selections)
