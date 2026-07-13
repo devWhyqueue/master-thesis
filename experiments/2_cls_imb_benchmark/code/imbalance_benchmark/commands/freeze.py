@@ -212,11 +212,10 @@ def _write_natural_condition(train_df: pd.DataFrame, data_dir: Path) -> dict[str
 
 
 def _load_train_context(
-    args: argparse.Namespace,
+    args: argparse.Namespace, paths: dict[str, Path]
 ) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], dict[str, int]]:
     """Load the training manifest and derive the regime, classes, and support counts."""
     config = load_config(args.config)
-    paths = ensure_dirs(config)
     df = pd.read_csv(paths["data"] / "manifest.csv")
     train_df = cast(pd.DataFrame, df[df["split"] == "train"])
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
@@ -253,7 +252,13 @@ def _freeze_meta(
 
 def cmd_freeze(args: argparse.Namespace) -> None:
     """Freeze the definitive condition manifests and content-hashed analysis manifest."""
-    paths, train_df, is_mil, classes, counts = _load_train_context(args)
+    if args.split_index is None:
+        for index in range(3):
+            cmd_freeze(argparse.Namespace(**vars(args), split_index=index))
+        return
+    config = load_config(args.config)
+    paths = split_paths(ensure_dirs(config), args.split_index)
+    paths, train_df, is_mil, classes, counts = _load_train_context(args, paths)
     min_support, requested_min_support, excluded = _load_pilot_floor(
         paths["data"] / "pilot_report.json", is_mil, counts
     )

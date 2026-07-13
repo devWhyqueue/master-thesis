@@ -6,7 +6,7 @@ from typing import Any, cast
 import pandas as pd
 import torch
 
-from imbalance_benchmark.common import ensure_dirs, load_config, write_json
+from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, write_json
 from imbalance_benchmark.construction import patient_equals_slide
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.manifest.pilot import (
@@ -103,8 +103,12 @@ def _pilot_report_payload(
 
 def cmd_pilot(args: argparse.Namespace) -> None:
     """Run the nested support-stability pilot and freeze the definitive floors."""
+    if args.split_index is None:
+        for index in range(3):
+            cmd_pilot(argparse.Namespace(**vars(args), split_index=index))
+        return
     config = load_config(args.config)
-    paths = ensure_dirs(config)
+    paths = split_paths(ensure_dirs(config), args.split_index)
     train_df, classes, is_mil, eq_slide, levels = _pilot_setup(paths, config)
     pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
         train_df, classes, levels, is_mil, args.seed, paths

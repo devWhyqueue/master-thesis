@@ -34,9 +34,9 @@ def test_workflow_has_afterok_condition_arrays() -> None:
     assert jobs[3].array_conditions == ("natural", "balanced", "moderate", "severe")
     assert jobs[4].dependency == "tune"
     script = render_sbatch(jobs[4], _config(), "config.yaml")
-    assert "#SBATCH --array=0-3" in script
+    assert "#SBATCH --array=0-11" in script
     assert (
-        "python /home/example/master-thesis/experiments/2_cls_imb_benchmark/code/__main__.py --config config.yaml confirm --condition"
+        "python /home/example/master-thesis/experiments/2_cls_imb_benchmark/code/__main__.py --config config.yaml --split-index"
         in script
     )
     assert "APPTAINERENV_PYTHONPATH" in script

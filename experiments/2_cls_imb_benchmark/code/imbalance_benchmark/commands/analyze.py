@@ -24,7 +24,7 @@ from imbalance_benchmark.analysis.reporting.tables import (
     confirmatory_table,
     results_table,
 )
-from imbalance_benchmark.common import ensure_dirs, load_config, write_json
+from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, write_json
 
 __all__ = ["cmd_analyze"]
 
@@ -94,10 +94,47 @@ def _write_figures(paths: dict[str, Path], conn: sqlite3.Connection) -> None:
             )
 
 
+def _aggregate_split_comparisons(base_paths: dict[str, Path]) -> None:
+    """Equal-weight average split-specific estimands without duplicating assignments."""
+    rows = []
+    for index in range(3):
+        path = split_paths(base_paths, index) / "data" / "gates_and_recovery.json"
+        if not path.exists():
+            continue
+        for comparison in json.loads(path.read_text()).get("comparisons", []):
+            rows.append({**comparison, "patient_split": index})
+    if not rows:
+        return
+    frame = pd.DataFrame(rows)
+    keys = [key for key in ("assignment", "severity", "method", "gate") if key in frame]
+    grouped = frame.groupby(keys, dropna=False)
+    aggregate = []
+    for key, group in grouped:
+        entry = dict(zip(keys, key if isinstance(key, tuple) else (key,), strict=True))
+        effects = group["effect"].dropna()
+        entry.update(
+            {
+                "effect": float(effects.mean()) if not effects.empty else None,
+                "n_splits": int(group["patient_split"].nunique()),
+                "split_effects": {
+                    str(row.patient_split): row.effect
+                    for row in group[["patient_split", "effect"]].itertuples(index=False)
+                },
+            }
+        )
+        aggregate.append(entry)
+    write_json(base_paths["data"] / "cross_split_gates_and_recovery.json", {"comparisons": aggregate})
+
+
 def cmd_analyze(args: argparse.Namespace) -> None:
     """Rebuild the result database, calibration/gate/recovery diagnostics, tables, and figures."""
+    if args.split_index is None:
+        for index in range(3):
+            cmd_analyze(argparse.Namespace(**vars(args), split_index=index))
+        _aggregate_split_comparisons(ensure_dirs(load_config(args.config)))
+        return
     config = load_config(args.config)
-    paths = ensure_dirs(config)
+    paths = split_paths(ensure_dirs(config), args.split_index)
     freeze = _load_freeze(paths)
     n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
     seed = int(getattr(args, "seed", 0) or 0)

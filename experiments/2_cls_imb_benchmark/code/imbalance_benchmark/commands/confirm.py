@@ -13,7 +13,7 @@ from imbalance_benchmark.commands.confirm_methods import (
     confirm_method,
     confirm_post_hoc,
 )
-from imbalance_benchmark.common import ensure_dirs, load_config
+from imbalance_benchmark.common import ensure_dirs, load_config, split_paths
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
@@ -57,11 +57,10 @@ def _confirm_condition(
 
 
 def _confirm_inputs(
-    args: argparse.Namespace,
+    args: argparse.Namespace, paths: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Load config, best tuning selections, and the locked-test loader for confirmation."""
     config = load_config(args.config)
-    paths = ensure_dirs(config)
     freeze_path = paths["data"] / "manifest_freeze.json"
     if freeze_path.exists():
         verify_manifest_freeze(json.loads(freeze_path.read_text()))
@@ -100,7 +99,13 @@ def _confirm_inputs(
 
 def cmd_confirm(args: argparse.Namespace) -> None:
     """Fit every roster method's five confirmation seeds and emit locked test predictions."""
-    best_configs, run_data, freeze = _confirm_inputs(args)
+    if args.split_index is None:
+        for index in range(3):
+            cmd_confirm(argparse.Namespace(**vars(args), split_index=index))
+        return
+    config = load_config(args.config)
+    paths = split_paths(ensure_dirs(config), args.split_index)
+    best_configs, run_data, freeze = _confirm_inputs(args, paths)
     methods = roster_for_regime(run_data["is_mil"])
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))

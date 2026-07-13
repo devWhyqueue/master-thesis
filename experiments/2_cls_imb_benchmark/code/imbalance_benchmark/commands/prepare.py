@@ -6,10 +6,11 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from imbalance_benchmark.common import ensure_dirs, load_config
+from imbalance_benchmark.common import ensure_dirs, load_config, split_indices, split_paths
 from imbalance_benchmark.construction import split_cases
 from imbalance_benchmark.datasets import build_manifest
 from imbalance_benchmark.datasets.features import attach_extracted_features
+from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_prepare"]
 
@@ -36,26 +37,38 @@ def _synthetic_manifest(paths: dict[str, Path]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def cmd_prepare(args: argparse.Namespace) -> None:
-    """Validate the configured dataset, create patient-disjoint splits, and extract Virchow2 features."""
-    config = load_config(args.config)
-    paths = ensure_dirs(config)
+def _base_manifest(config: dict[str, object], paths: dict[str, Path]) -> pd.DataFrame:
+    """Build the eligible feature manifest once before deriving patient splits."""
     dataset_cfg = config.get("dataset", {})
+    if not isinstance(dataset_cfg, dict):
+        raise ValueError("dataset config must be a mapping")
     dataset_name = dataset_cfg.get("name", "synthetic")
     if dataset_name == "synthetic":
-        df = split_cases(_synthetic_manifest(paths), seed=args.seed)
-    else:
-        df = build_manifest(config)
-        if "image_path" in df.columns and "feature_path" not in df.columns:
-            feature_cfg = config.get("feature_extraction", {})
-            df = attach_extracted_features(
-                df,
-                paths["data"] / "features" / dataset_name,
-                model_name=feature_cfg.get("model_name", "hf-hub:paige-ai/Virchow2"),
-                batch_size=int(feature_cfg.get("batch_size", 64)),
-                dtype=feature_cfg.get("dtype", "float16"),
-            )
-    df.to_csv(paths["data"] / "manifest.csv", index=False)
-    df.drop_duplicates("slide_id").to_csv(
-        paths["data"] / "slide_manifest.csv", index=False
+        return _synthetic_manifest(paths)
+    df = build_manifest(config)
+    if "image_path" not in df.columns or "feature_path" in df.columns:
+        return df
+    feature_cfg = config.get("feature_extraction", {})
+    if not isinstance(feature_cfg, dict):
+        raise ValueError("feature_extraction config must be a mapping")
+    return attach_extracted_features(
+        df,
+        paths["data"] / "features" / str(dataset_name),
+        model_name=str(feature_cfg.get("model_name", "hf-hub:paige-ai/Virchow2")),
+        batch_size=int(feature_cfg.get("batch_size", 64)),
+        dtype=str(feature_cfg.get("dtype", "float16")),
     )
+
+
+def cmd_prepare(args: argparse.Namespace) -> None:
+    """Create exactly three disjoint patient-split manifests from one eligible pool."""
+    config = load_config(args.config)
+    base_paths = ensure_dirs(config)
+    df = _base_manifest(config, base_paths)
+    for index in split_indices(args.split_index):
+        paths = split_paths(base_paths, index)
+        split_df = split_cases(df, seed=derive_seed(args.seed, f"patient_split_{index}"))
+        split_df.to_csv(paths["data"] / "manifest.csv", index=False)
+        split_df.drop_duplicates("slide_id").to_csv(
+            paths["data"] / "slide_manifest.csv", index=False
+        )

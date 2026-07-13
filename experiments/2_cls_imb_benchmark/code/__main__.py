@@ -23,6 +23,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Class-Imbalance Benchmark CLI")
     parser.add_argument("--config", default=None)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--split-index", type=int, choices=range(3), default=None)
     sub = parser.add_subparsers(dest="command", required=True)
     for command in (
         "prepare",

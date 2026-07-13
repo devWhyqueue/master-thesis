@@ -17,6 +17,8 @@ __all__ = [
     "load_config",
     "output_root",
     "ensure_dirs",
+    "split_paths",
+    "split_indices",
     "write_json",
     "compute_sha256",
     "compute_data_hash",
@@ -39,6 +41,7 @@ def find_repo_root() -> Path:
 REPO_ROOT = find_repo_root()
 EXPERIMENT_ROOT = REPO_ROOT / "experiments" / "2_cls_imb_benchmark"
 DEFAULT_CONFIG_PATH = EXPERIMENT_ROOT / "configs" / "default.yaml"
+N_PATIENT_SPLITS = 3
 RUN_RECORD_NAME = "run.json"
 EVAL_ARRAYS_NAME = "eval_arrays.npz"
 ARRAY_FIELDS = (
@@ -91,6 +94,30 @@ def ensure_dirs(config: dict[str, Any]) -> dict[str, Path]:
     for key, path in paths.items():
         (path.parent if key == "db" else path).mkdir(parents=True, exist_ok=True)
     return paths
+
+
+def split_paths(paths: dict[str, Path], split_index: int) -> dict[str, Path]:
+    """Return an isolated output namespace for one locked patient split."""
+    if split_index not in range(N_PATIENT_SPLITS):
+        raise ValueError(f"split_index must be in [0, {N_PATIENT_SPLITS - 1}]")
+    root = paths["root"] / f"split={split_index}"
+    scoped = {
+        "root": root,
+        "data": root / "data",
+        "db": root / "results.sqlite",
+        "figures": root / "figures",
+        "tables": root / "tables",
+        "results": root / "results",
+        "logs": root / "logs",
+    }
+    for key, path in scoped.items():
+        (path.parent if key == "db" else path).mkdir(parents=True, exist_ok=True)
+    return scoped
+
+
+def split_indices(split_index: int | None) -> range | tuple[int]:
+    """Return every required split for local commands or one SLURM-array split."""
+    return range(N_PATIENT_SPLITS) if split_index is None else (split_index,)
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:

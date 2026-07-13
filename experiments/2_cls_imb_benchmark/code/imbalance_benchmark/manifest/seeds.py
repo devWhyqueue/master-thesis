@@ -6,6 +6,9 @@ __all__ = ["SEED_ROLES", "derive_seed"]
 
 SEED_ROLES = (
     "patient_split",
+    "patient_split_0",
+    "patient_split_1",
+    "patient_split_2",
     "assignment",
     "pilot_construction_0",
     "pilot_construction_1",

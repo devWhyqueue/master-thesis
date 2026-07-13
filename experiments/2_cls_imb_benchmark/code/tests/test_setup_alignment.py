@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from argparse import Namespace
 
 import pandas as pd
 import pytest
 import torch
+import yaml
 
 from imbalance_benchmark.commands.confirm_methods import RunContext, confirm_ce
+from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 
@@ -77,3 +80,21 @@ def test_confirmation_training_context_receives_the_validation_loader(
     confirm_ce("balanced", {"lr": 1e-3}, object(), run)  # type: ignore[arg-type]
 
     assert seen == [val_loader]
+
+
+def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    with config_path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump({"paths": {"outputs": str(tmp_path / "outputs")}}, handle)
+
+    cmd_prepare(Namespace(config=str(config_path), seed=3, split_index=None))
+
+    manifests = [
+        pd.read_csv(tmp_path / "outputs" / f"split={index}" / "data" / "manifest.csv")
+        for index in range(3)
+    ]
+    assert all(set(frame["split"]) == {"train", "validation", "test"} for frame in manifests)
+    assert any(
+        not manifests[0][["case_id", "split"]].equals(frame[["case_id", "split"]])
+        for frame in manifests[1:]
+    )

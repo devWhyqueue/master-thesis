@@ -27,6 +27,7 @@ class SlurmJob:
     cpus: int
     time_limit: str
     dependency: str | None = None
+    array_splits: tuple[int, ...] = ()
     array_conditions: tuple[str, ...] = ()
 
 
@@ -57,11 +58,12 @@ def build_workflow(config: dict[str, Any], smoke: bool = False) -> list[SlurmJob
             "test_partition", "gpu-test"
         )
         return [SlurmJob("smoke", "smoke", **resources)]
-    prepare = _job(config, "prepare", "prepare", gpu=True)
-    pilot = _job(config, "pilot", "pilot", gpu=False)
-    freeze = _job(config, "freeze", "freeze", gpu=False)
+    split_array = (0, 1, 2)
+    prepare = replace(_job(config, "prepare", "prepare", gpu=True), array_splits=split_array)
+    pilot = replace(_job(config, "pilot", "pilot", gpu=False), array_splits=split_array)
+    freeze = replace(_job(config, "freeze", "freeze", gpu=False), array_splits=split_array)
     tune = _job(config, "tune", "tune", gpu=True)
-    confirm = _job(config, "confirm", "confirm", gpu=True)
+    confirm = replace(_job(config, "confirm", "confirm", gpu=True), array_splits=split_array)
     analyze = _job(config, "analyze", "analyze", gpu=False)
     return [
         prepare,
@@ -110,11 +112,36 @@ def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
 
 def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
     """Build the benchmark command, mapping each array task to one condition."""
-    command = f"python {shlex.quote(code_dir)}/__main__.py{_config_argument(config_path)} {job.command}"
-    if not job.array_conditions:
+    prefix = f"python {shlex.quote(code_dir)}/__main__.py{_config_argument(config_path)}"
+    command = f"{prefix} {job.command}"
+    if not job.array_splits and not job.array_conditions:
         return command
-    values = " ".join(shlex.quote(value) for value in job.array_conditions)
-    return f'CONDITIONS=({values})\n{command} --condition "${{CONDITIONS[$SLURM_ARRAY_TASK_ID]}}"'
+    lines = []
+    if job.array_splits:
+        values = " ".join(str(value) for value in job.array_splits)
+        lines.append(f"SPLITS=({values})")
+    if job.array_conditions:
+        values = " ".join(shlex.quote(value) for value in job.array_conditions)
+        lines.append(f"CONDITIONS=({values})")
+    if job.array_splits and job.array_conditions:
+        lines.extend(
+            [
+                f"N_CONDITIONS={len(job.array_conditions)}",
+                'SPLIT_INDEX="${SPLITS[$SLURM_ARRAY_TASK_ID / $N_CONDITIONS]}"',
+                'CONDITION="${CONDITIONS[$SLURM_ARRAY_TASK_ID % $N_CONDITIONS]}"',
+                f'{prefix} --split-index "$SPLIT_INDEX" {job.command} --condition "$CONDITION"',
+            ]
+        )
+    elif job.array_splits:
+        lines.append(f'{prefix} --split-index "${{SPLITS[$SLURM_ARRAY_TASK_ID]}}" {job.command}')
+    else:
+        lines.append(f'{command} --condition "${{CONDITIONS[$SLURM_ARRAY_TASK_ID]}}"')
+    return "\n".join(lines)
+
+
+def _array_size(job: SlurmJob) -> int:
+    """Return the number of scheduler tasks needed for a split/condition grid."""
+    return max(1, len(job.array_splits)) * max(1, len(job.array_conditions))
 
 
 def _directives(job: SlurmJob, root: str) -> list[str]:
@@ -129,8 +156,8 @@ def _directives(job: SlurmJob, root: str) -> list[str]:
         f"#SBATCH --output={shlex.quote(root)}/experiments/2_cls_imb_benchmark/outputs/logs/%x-%A_%a.out",
         f"#SBATCH --error={shlex.quote(root)}/experiments/2_cls_imb_benchmark/outputs/logs/%x-%A_%a.err",
     ]
-    if job.array_conditions:
-        lines.append(f"#SBATCH --array=0-{len(job.array_conditions) - 1}")
+    if job.array_splits or job.array_conditions:
+        lines.append(f"#SBATCH --array=0-{_array_size(job) - 1}")
     if job.dependency:
         lines.append(f"#SBATCH --dependency={job.dependency}")
     return lines
