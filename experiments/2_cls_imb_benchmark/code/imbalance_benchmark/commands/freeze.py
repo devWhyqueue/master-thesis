@@ -12,8 +12,10 @@ from imbalance_benchmark.common import (
     compute_sha256,
     ensure_dirs,
     load_config,
+    split_paths,
     write_json,
 )
+from imbalance_benchmark.analysis.inference.bootstrap import bootstrap_preflight
 from imbalance_benchmark.construction import (
     allocate_counts,
     build_manifest_hash,
@@ -109,7 +111,7 @@ def _build_conditions(
         name: allocate_counts(
             available,
             shared_t,
-            effective_rho(available, CONDITION_RHOS[name], min_support),
+            effective_rho(available, CONDITION_RHOS[name], min_support, shared_t),
             min_support,
         )
         for name in condition_names
@@ -130,13 +132,14 @@ def _build_conditions(
     for name in condition_names:
         allocated = allocations[name]
         rows = [
-            selector(
-                fixed_patch_pools.get(
-                    cls,
+            (
+                fixed_patch_pools[cls].iloc[: allocated[idx]].copy()
+                if not is_mil
+                else selector(
                     cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
-                ),
-                allocated[idx],
-                seed=seed,
+                    allocated[idx],
+                    seed=seed,
+                )
             )
             for idx, cls in enumerate(classes)
         ]
@@ -177,33 +180,6 @@ def _write_natural_condition(train_df: pd.DataFrame, data_dir: Path) -> dict[str
     """Write the descriptive full-training-set anchor, excluded from deficit estimands."""
     path = data_dir / "manifest_natural.csv"
     train_df.to_csv(path, index=False)
-    assignments = build_tail_assignments(
-        classes, derive_seed(args.seed, "assignment"), ordinal=False
-    )
-    assignment_conditions = {
-        assignment: _build_conditions(
-            train_df,
-            order,
-            shared_t,
-            min_support,
-            is_mil,
-            construction_seed,
-            paths["data"],
-            file_prefix=f"{assignment}_",
-            condition_names=("moderate", "severe"),
-        )
-        for assignment, order in assignments.items()
-    }
-    native_conditions = _build_conditions(
-        train_df,
-        classes,
-        shared_t,
-        min_support,
-        is_mil,
-        construction_seed,
-        paths["data"],
-        condition_names=("balanced",),
-    )
     return {
         "path": str(path),
         "sha256": compute_sha256(path),
@@ -237,6 +213,33 @@ def _freeze_meta(
 ) -> dict[str, Any]:
     """Assemble the frozen analysis manifest: conditions, tail assignments, and provenance."""
     construction_seed = derive_seed(args.seed, "definitive_construction")
+    assignments = build_tail_assignments(
+        classes, derive_seed(args.seed, "assignment"), ordinal=False
+    )
+    assignment_conditions = {
+        assignment: _build_conditions(
+            train_df,
+            order,
+            shared_t,
+            min_support,
+            is_mil,
+            construction_seed,
+            paths["data"],
+            file_prefix=f"{assignment}_",
+            condition_names=("moderate", "severe"),
+        )
+        for assignment, order in assignments.items()
+    }
+    native_conditions = _build_conditions(
+        train_df,
+        classes,
+        shared_t,
+        min_support,
+        is_mil,
+        construction_seed,
+        paths["data"],
+        condition_names=("balanced",),
+    )
     return {
         "shared_T": shared_t,
         "min_support": min_support,
@@ -263,7 +266,9 @@ def cmd_freeze(args: argparse.Namespace) -> None:
         paths["data"] / "pilot_report.json", is_mil, counts
     )
     if excluded:
-        logger.warning("Skipping definitive freeze because the pilot excluded this dataset-regime")
+        logger.warning(
+            "Skipping definitive freeze because the pilot excluded this dataset-regime"
+        )
         return
     shared_t = max_shared_total([counts[c] for c in classes], min_support)
     meta = _freeze_meta(
@@ -277,4 +282,31 @@ def cmd_freeze(args: argparse.Namespace) -> None:
         requested_min_support,
         excluded,
     )
+    test_frames = []
+    for index in range(3):
+        split_manifest = (
+            split_paths(ensure_dirs(config), index)["data"] / "manifest.csv"
+        )
+        if split_manifest.exists():
+            test_frame = pd.read_csv(split_manifest)
+            test_frames.append(
+                cast(pd.DataFrame, test_frame[test_frame["split"] == "test"]).assign(
+                    patient_split=index
+                )
+            )
+    if not test_frames:
+        raise FileNotFoundError("No prepared test manifest is available for bootstrap preflight")
+    test_rows = pd.concat(test_frames, ignore_index=True)
+    preflight = bootstrap_preflight(
+        test_rows,
+        int(config.get("analysis", {}).get("bootstrap_replicates", 10_000)),
+        derive_seed(args.seed, "bootstrap"),
+    )
+    preflight_path = paths["data"] / "bootstrap_preflight.json"
+    write_json(preflight_path, preflight)
+    meta["bootstrap_preflight"] = {
+        "path": str(preflight_path),
+        "sha256": compute_sha256(preflight_path),
+        "is_descriptive_only": preflight["is_descriptive_only"],
+    }
     write_json(paths["data"] / "manifest_freeze.json", meta)

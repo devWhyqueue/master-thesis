@@ -10,7 +10,6 @@ import pandas as pd
 
 from imbalance_benchmark.analysis.calibration import reliability_curve
 from imbalance_benchmark.analysis.db import connect_db, init_schema
-from imbalance_benchmark.analysis.inference.bootstrap import bootstrap_preflight
 from imbalance_benchmark.analysis.inference.holm import apply_holm
 from imbalance_benchmark.analysis.inference.recovery import gates_and_recovery
 from imbalance_benchmark.analysis.pipeline import calibration_summary, ingest_all_runs
@@ -42,14 +41,6 @@ def _write_diagnostics(
     seed: int,
 ) -> None:
     """Write the bootstrap preflight, gate/recovery, and calibration diagnostic JSON files."""
-    manifest_path = paths["data"] / "manifest.csv"
-    if manifest_path.exists():
-        df_test = pd.read_csv(manifest_path)
-        test_rows = cast(pd.DataFrame, df_test[df_test["split"] == "test"])
-        write_json(
-            paths["data"] / "bootstrap_preflight.json",
-            bootstrap_preflight(test_rows, n_replicates, seed),
-        )
     write_json(
         paths["data"] / "gates_and_recovery.json",
         {"comparisons": apply_holm(comparisons)},
@@ -98,7 +89,7 @@ def _aggregate_split_comparisons(base_paths: dict[str, Path]) -> None:
     """Equal-weight average split-specific estimands without duplicating assignments."""
     rows = []
     for index in range(3):
-        path = split_paths(base_paths, index) / "data" / "gates_and_recovery.json"
+        path = split_paths(base_paths, index)["data"] / "gates_and_recovery.json"
         if not path.exists():
             continue
         for comparison in json.loads(path.read_text()).get("comparisons", []):
@@ -118,12 +109,17 @@ def _aggregate_split_comparisons(base_paths: dict[str, Path]) -> None:
                 "n_splits": int(group["patient_split"].nunique()),
                 "split_effects": {
                     str(row.patient_split): row.effect
-                    for row in group[["patient_split", "effect"]].itertuples(index=False)
+                    for row in group[["patient_split", "effect"]].itertuples(
+                        index=False
+                    )
                 },
             }
         )
         aggregate.append(entry)
-    write_json(base_paths["data"] / "cross_split_gates_and_recovery.json", {"comparisons": aggregate})
+    write_json(
+        base_paths["data"] / "cross_split_gates_and_recovery.json",
+        {"comparisons": aggregate},
+    )
 
 
 def cmd_analyze(args: argparse.Namespace) -> None:

@@ -106,3 +106,11 @@ def verify_manifest_freeze(freeze_meta: dict[str, Any]) -> None:
                     f"Manifest '{name}' at {path} no longer matches its frozen hash; "
                     "refusing to train on an altered condition."
                 )
+    preflight = freeze_meta.get("bootstrap_preflight")
+    if preflight:
+        path = Path(preflight["path"])
+        if not path.exists() or compute_sha256(path) != preflight["sha256"]:
+            raise RuntimeError(
+                "Frozen bootstrap preflight no longer matches its recorded hash; "
+                "refusing to train or analyse an altered design."
+            )

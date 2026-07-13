@@ -185,6 +185,22 @@ def test_stratum_preservation_invariant():
         assert np.all(stratum_sum == len(members))
 
 
+def test_crossed_strata_distinguish_complete_split_by_class_contributions():
+    identity = pd.DataFrame(
+        [
+            {"case_id": "P0", "cancer_type": "A", "patient_split": 0},
+            {"case_id": "P0", "cancer_type": "B", "patient_split": 1},
+            {"case_id": "P1", "cancer_type": "A", "patient_split": 0},
+            {"case_id": "P1", "cancer_type": "B", "patient_split": 1},
+            {"case_id": "P2", "cancer_type": "A", "patient_split": 0},
+            {"case_id": "P2", "cancer_type": "A", "patient_split": 1},
+        ]
+    )
+    strata = build_strata(identity)
+    assert strata["P0"] == strata["P1"]
+    assert strata["P0"] != strata["P2"]
+
+
 def test_bootstrap_preflight_flags_small_kish():
     # A single dominant patient per class should be flagged descriptive-only.
     rows = [{"case_id": "DOMINANT_A", "slide_id": f"S{i}", "cancer_type": "A"} for i in range(20)]

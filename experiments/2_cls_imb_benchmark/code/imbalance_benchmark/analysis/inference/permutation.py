@@ -90,15 +90,22 @@ def _p_value(observed: float, extremes: np.ndarray, enumerated: bool) -> float:
     return (exceed + 1) / (n + 1)
 
 
-def _as_seed_stack(values: np.ndarray) -> np.ndarray:
-    """Normalize one prediction vector or a matched seed stack to (seed, row, ...)."""
-    return values[None, ...] if values.ndim in (1, 2) else values
+def _as_seed_stack(values: np.ndarray, prediction_rank: int) -> np.ndarray:
+    """Normalize one prediction array or matched seed stack to ``(seed, row, ...)``."""
+    if values.ndim == prediction_rank:
+        return values[None, ...]
+    if values.ndim == prediction_rank + 1:
+        return values
+    raise ValueError("Unexpected prediction-array rank for permutation test")
 
 
 def _seed_mean_ba(labels: np.ndarray, preds: np.ndarray, n_classes: int) -> np.ndarray:
     """Compute one balanced-accuracy value per permutation after seed averaging."""
     return np.mean(
-        [_balanced_accuracy_batch(labels, seed_preds, n_classes) for seed_preds in preds],
+        [
+            _balanced_accuracy_batch(labels, seed_preds, n_classes)
+            for seed_preds in preds
+        ],
         axis=0,
     )
 
@@ -108,7 +115,10 @@ def _seed_mean_tail_nll(
 ) -> np.ndarray:
     """Compute tail NLL per permutation after averaging matched seed blocks."""
     return np.mean(
-        [_tail_nll_batch(labels, seed_probs, len(labels), tail_classes) for seed_probs in probs],
+        [
+            _tail_nll_batch(labels, seed_probs, len(labels), tail_classes)
+            for seed_probs in probs
+        ],
         axis=0,
     )
 
@@ -129,7 +139,10 @@ def paired_block_permutation_ba(
     balanced-accuracy difference is recomputed; two-sided p-value with the
     plus-one correction when permutations are sampled rather than enumerated.
     """
-    method_stack, ce_stack = _as_seed_stack(method_preds), _as_seed_stack(ce_preds)
+    method_stack, ce_stack = (
+        _as_seed_stack(method_preds, 1),
+        _as_seed_stack(ce_preds, 1),
+    )
     if method_stack.shape != ce_stack.shape:
         raise ValueError("Permutation pairs require equal seed and prediction shapes")
     observed = float(
@@ -144,7 +157,10 @@ def paired_block_permutation_ba(
         swap = swap_rows[None, :, :]
         preds_a = np.where(swap, ce_stack[:, :, None], method_stack[:, :, None])
         preds_b = np.where(swap, method_stack[:, :, None], ce_stack[:, :, None])
-        stats.append(_seed_mean_ba(labels, preds_a, n_classes) - _seed_mean_ba(labels, preds_b, n_classes))
+        stats.append(
+            _seed_mean_ba(labels, preds_a, n_classes)
+            - _seed_mean_ba(labels, preds_b, n_classes)
+        )
     return _p_value(float(observed), np.concatenate(stats), enumerated)
 
 
@@ -163,7 +179,10 @@ def paired_block_permutation_tail_nll(
     ``NLL_tail(CE) - NLL_tail(method)``.
     """
 
-    method_stack, ce_stack = _as_seed_stack(method_probs), _as_seed_stack(ce_probs)
+    method_stack, ce_stack = (
+        _as_seed_stack(method_probs, 2),
+        _as_seed_stack(ce_probs, 2),
+    )
     if method_stack.shape != ce_stack.shape:
         raise ValueError("Permutation pairs require equal seed and prediction shapes")
     observed = float(

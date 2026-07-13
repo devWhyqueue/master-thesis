@@ -4,10 +4,12 @@ from pathlib import Path
 from argparse import Namespace
 
 import pandas as pd
+import numpy as np
 import pytest
 import torch
 import yaml
 
+from imbalance_benchmark.analysis.inference.permutation import paired_block_permutation_ba
 from imbalance_benchmark.commands.confirm_methods import RunContext, confirm_ce
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
@@ -98,3 +100,12 @@ def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -
         not manifests[0][["case_id", "split"]].equals(frame[["case_id", "split"]])
         for frame in manifests[1:]
     )
+
+
+def test_two_seed_permutation_stack_is_not_mistaken_for_one_probability_matrix():
+    labels = np.array([0, 1, 0, 1])
+    case_ids = np.array(["P0", "P1", "P2", "P3"])
+    method = np.array([[0, 1, 0, 1], [0, 1, 1, 1]])
+    ce = np.array([[1, 1, 0, 1], [1, 0, 1, 1]])
+    p_value = paired_block_permutation_ba(labels, method, ce, case_ids, n_classes=2)
+    assert 0.0 <= p_value <= 1.0

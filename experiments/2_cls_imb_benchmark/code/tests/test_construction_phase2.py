@@ -25,6 +25,7 @@ from imbalance_benchmark.manifest.pilot import (
     stability_floor_from_curve,
 )
 from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.commands.freeze import _build_conditions
 
 
 def _patch_frame(n_patients: int, slides_per_patient: int, patches_per_slide: int) -> pd.DataFrame:
@@ -158,6 +159,28 @@ def test_contribution_stats_reports_pool_fraction():
     stats = contribution_stats(condition, pool, is_mil=False)
     assert stats["class_A"]["pool_fraction_retained"] <= 1.0
     assert stats["class_A"]["n_patches"] == 20
+
+
+def test_patch_conditions_are_nested_prefixes_of_one_frozen_master_pool(tmp_path):
+    pool = pd.concat(
+        [
+            _patch_frame(20, 3, 10).assign(cancer_type="class_A"),
+            _patch_frame(20, 3, 10).assign(cancer_type="class_B"),
+        ],
+        ignore_index=True,
+    )
+    pool["case_id"] = pool["cancer_type"] + "_" + pool["case_id"]
+    pool["slide_id"] = pool["cancer_type"] + "_" + pool["slide_id"]
+    pool["split"] = "train"
+    conditions = _build_conditions(
+        pool, ["class_A", "class_B"], 200, 10, False, 3, tmp_path
+    )
+    balanced = pd.read_csv(conditions["balanced"]["path"])
+    severe = pd.read_csv(conditions["severe"]["path"])
+    for cls in ["class_A", "class_B"]:
+        balanced_ids = balanced[balanced["cancer_type"] == cls]["patch_id"].tolist()
+        severe_ids = severe[severe["cancer_type"] == cls]["patch_id"].tolist()
+        assert set(severe_ids) <= set(balanced_ids) or set(balanced_ids) <= set(severe_ids)
 
 
 def test_verify_manifest_freeze_detects_tampering(tmp_path):

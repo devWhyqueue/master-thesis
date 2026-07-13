@@ -125,31 +125,60 @@ def max_shared_total(
     """
     if not available or min(available) < min_support:
         raise ValueError("No shared total satisfies the independent-support floor")
-    effective_rhos = tuple(effective_rho(available, rho, min_support) for rho in rhos)
-    upper = len(available) * min(available)
+    # Controlled conditions intentionally remain smaller than the complete
+    # eligible pool; the latter is the descriptive natural anchor.
+    upper = min(len(available) * min(available), sum(available) - 1)
     for total in range(upper, len(available) * min_support - 1, -1):
-        allocations = [
-            allocate_counts(available, total, rho, min_support) for rho in effective_rhos
-        ]
-        retains_requested_skew = all(
-            max(counts) / min(counts)
-            >= rho
-            for rho, counts in zip(effective_rhos, allocations, strict=True)
+        effective_rhos = tuple(
+            effective_rho(available, rho, min_support, total) for rho in rhos
         )
-        if retains_requested_skew and all(sum(counts) == total for counts in allocations):
+        allocations = [
+            allocate_counts(available, total, rho, min_support)
+            for rho in effective_rhos
+        ]
+        if all(sum(counts) == total for counts in allocations):
             return total
     raise ValueError("No shared total is feasible for every requested condition")
 
 
-def effective_rho(available: list[int], rho: float, min_support: int) -> float:
-    """Lower an infeasible requested ratio to the largest floor-compatible ratio.
+def effective_rho(
+    available: list[int], rho: float, min_support: int, total_t: int | None = None
+) -> float:
+    """Lower a requested ratio to the largest allocation-feasible value.
 
-    The first class is the assigned head.  A head cannot exceed its unique
-    support and every tail must retain the independent-support floor.
+    Feasibility is evaluated using the complete exponential allocation, every
+    class-specific availability cap, and the requested shared total.  This
+    avoids the invalid head-only shortcut that can reject attainable designs.
     """
     if not available or min_support < 1:
         raise ValueError("Support and floor must be positive")
-    return min(rho, available[0] / min_support)
+    if total_t is None:
+        return min(rho, available[0] / min_support)
+    if total_t < len(available) * min_support:
+        raise ValueError("Shared total cannot satisfy the independent-support floor")
+
+    def feasible(candidate: float) -> bool:
+        """Whether the complete constrained allocation fits its requested total."""
+        allocation = allocate_counts(available, total_t, candidate, min_support)
+        return sum(allocation) == total_t and all(
+            min_support <= count <= cap
+            for count, cap in zip(allocation, available, strict=True)
+        )
+
+    if feasible(rho):
+        return rho
+    low, high = 1.0, rho
+    if not feasible(low):
+        raise ValueError(
+            "No shared total satisfies all availability and support constraints"
+        )
+    for _ in range(48):
+        mid = (low + high) / 2.0
+        if feasible(mid):
+            low = mid
+        else:
+            high = mid
+    return low
 
 
 def _build_patch_hierarchy(

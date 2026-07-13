@@ -29,7 +29,10 @@ from imbalance_benchmark.modeling.special_methods import (
     select_post_hoc_tau,
 )
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
-from imbalance_benchmark.commands.tuning_aggregate import TuningScope, tune_across_splits
+from imbalance_benchmark.commands.tuning_aggregate import (
+    TuningScope,
+    tune_across_splits,
+)
 
 __all__ = ["cmd_tune"]
 
@@ -184,12 +187,16 @@ def cmd_tune(args: argparse.Namespace) -> None:
             derive_seed(args.seed, "tuning_initialization_1"),
         ]
         methods = roster_for_regime(regime.is_mil)
-        conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
+        conditions = (
+            (args.condition,) if getattr(args, "condition", None) else CONDITIONS
+        )
         freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
         assignments = tuple(freeze.get("tail_assignments", {"native": []}))
         selections = {assignment: {} for assignment in assignments}
         for cond in conditions:
-            scoped_assignments = ("native",) if cond in {"natural", "balanced"} else assignments
+            scoped_assignments = (
+                ("native",) if cond in {"natural", "balanced"} else assignments
+            )
             for assignment in scoped_assignments:
                 manifest_name = (
                     f"manifest_{cond}.csv"
@@ -213,9 +220,7 @@ def cmd_tune(args: argparse.Namespace) -> None:
         write_json(paths["data"] / output_name, selections)
         return
     indices = range(3) if args.split_index is None else (args.split_index,)
-    scoped = [
-        _tuning_inputs(args, split_paths(base_paths, index)) for index in indices
-    ]
+    scoped = [_tuning_inputs(args, split_paths(base_paths, index)) for index in indices]
     paths, regime, _ = scoped[0]
     seeds = [
         derive_seed(args.seed, "tuning_initialization_0"),
@@ -225,12 +230,17 @@ def cmd_tune(args: argparse.Namespace) -> None:
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
     freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    selections: dict[str, dict[str, Any]] = {assignment: {} for assignment in assignments}
+    selections: dict[str, dict[str, Any]] = {
+        assignment: {} for assignment in assignments
+    }
     for cond in conditions:
-        scoped_assignments = ("native",) if cond in {"natural", "balanced"} else assignments
+        scoped_assignments = (
+            ("native",) if cond in {"natural", "balanced"} else assignments
+        )
+        combined_scopes: list[TuningScope] = []
         for assignment in scoped_assignments:
             dataset_cls = BagFeatureDataset if regime.is_mil else ImbalanceDataset
-            scopes = [
+            combined_scopes.extend(
                 TuningScope(
                     scope_regime,
                     scope_loader,
@@ -245,8 +255,10 @@ def cmd_tune(args: argparse.Namespace) -> None:
                     ),
                 )
                 for scope_paths, scope_regime, scope_loader in scoped
-            ]
-            selections[assignment][cond] = tune_across_splits(methods, scopes, seeds)
+            )
+        selected = tune_across_splits(methods, combined_scopes, seeds)
+        for assignment in scoped_assignments:
+            selections[assignment][cond] = selected
     if getattr(args, "condition", None):
         output_name = f"tuning_selections_{args.condition}.json"
     else:

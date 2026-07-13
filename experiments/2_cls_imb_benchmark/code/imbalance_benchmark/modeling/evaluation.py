@@ -85,19 +85,31 @@ def run_evaluation(
     class_priors: torch.Tensor | None = None,
 ) -> dict[str, Any]:
     """Evaluate model and return predictions, probs, and validation metrics."""
-    acc, f1, nll, logits, targets = _gather_and_eval(
+    _, _, _, logits, targets = _gather_and_eval(
         model, loader, device, is_mil, n_classes
     )
     if logit_adj_tau is not None and class_priors is not None:
         logits = logits - logit_adj_tau * torch.log(class_priors.cpu() + 1e-8)
     probs = torch.softmax(logits, dim=-1)
+    preds = probs.argmax(dim=-1)
+    recalls = [
+        float((preds[targets == c] == c).sum().item())
+        / max(1, (targets == c).sum().item())
+        for c in range(n_classes)
+    ]
+    f1s = []
+    for c in range(n_classes):
+        tp = float(((preds == c) & (targets == c)).sum().item())
+        fp = float(((preds == c) & (targets != c)).sum().item())
+        fn = float(((preds != c) & (targets == c)).sum().item())
+        f1s.append(2 * tp / max(1.0, 2 * tp + fp + fn))
     return {
-        "balanced_accuracy": acc,
-        "macro_f1": f1,
-        "nll": nll,
+        "balanced_accuracy": float(np.mean(recalls)),
+        "macro_f1": float(np.mean(f1s)),
+        "nll": float(F.cross_entropy(logits, targets).item()),
         "logits": logits.numpy(),
         "probs": probs.numpy(),
-        "preds": probs.argmax(dim=-1).numpy(),
+        "preds": preds.numpy(),
         "targets": targets.numpy(),
     }
 

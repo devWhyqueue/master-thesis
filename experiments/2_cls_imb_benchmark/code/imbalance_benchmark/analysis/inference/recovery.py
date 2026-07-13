@@ -41,16 +41,25 @@ class _SeverityInputs:
 
 
 def _recovery_comparison(
-    method: str, gate: str, severity: str, effect_dist: np.ndarray, p_value: float
+    inp: _SeverityInputs,
+    method: str,
+    gate: str,
+    effect_dist: np.ndarray,
+    recovery_dist: np.ndarray,
+    gate_passed: bool,
+    p_value: float | None,
 ) -> dict[str, Any]:
-    """One method's bootstrap recovery ratio and paired permutation p-value for one gate."""
+    """Record a raw tested effect and its descriptive normalized recovery ratio."""
     return {
         "method": method,
         "gate": gate,
-        "severity": severity,
+        "severity": inp.severity,
         "effect": float(np.nanmean(effect_dist)),
         "ci": confidence_interval(effect_dist),
-        "gate_passed": True,
+        "recovery": float(np.nanmean(recovery_dist)),
+        "recovery_ci": confidence_interval(recovery_dist),
+        "assignment": inp.assignment,
+        "gate_passed": gate_passed,
         "p_value": p_value,
     }
 
@@ -61,6 +70,7 @@ def _method_discrimination_recovery(
     severity_ba: np.ndarray,
     method: str,
     method_rec: dict[str, Any],
+    gate_passed: bool,
 ) -> dict[str, Any]:
     """One method's discrimination-axis recovery ratio and permutation p-value against imbalanced CE."""
     method_ba = inp.ctx.ba_distribution(
@@ -70,17 +80,22 @@ def _method_discrimination_recovery(
         recovery_dist = np.where(
             ba_deficit_dist != 0, (method_ba - severity_ba) / ba_deficit_dist, np.nan
         )
-    p_val = paired_block_permutation_ba(
-        inp.balanced["labels"],
-        method_rec["preds"],
-        inp.severity_ce["preds"],
-        inp.ctx.case_ids,
-        inp.n_classes,
-        inp.n_perm,
-        inp.seed,
+    effect_dist = method_ba - severity_ba
+    p_val = (
+        paired_block_permutation_ba(
+            inp.balanced["labels"],
+            method_rec["preds"],
+            inp.severity_ce["preds"],
+            inp.ctx.case_ids,
+            inp.n_classes,
+            inp.n_perm,
+            inp.seed,
+        )
+        if gate_passed
+        else None
     )
     return _recovery_comparison(
-        method, "discrimination", inp.severity, recovery_dist, p_val
+        inp, method, "discrimination", effect_dist, recovery_dist, gate_passed, p_val
     )
 
 
@@ -91,6 +106,7 @@ def _method_calibration_recovery(
     tail_classes: list[int],
     method: str,
     method_rec: dict[str, Any],
+    gate_passed: bool,
 ) -> dict[str, Any]:
     """One method's calibration-axis (tail NLL) recovery ratio and permutation p-value."""
     method_tail_nll = inp.ctx.tail_nll_distribution(
@@ -102,17 +118,22 @@ def _method_calibration_recovery(
             (severity_tail_nll - method_tail_nll) / cal_deficit_dist,
             np.nan,
         )
-    p_val = paired_block_permutation_tail_nll(
-        inp.balanced["labels"],
-        method_rec["probs"],
-        inp.severity_ce["probs"],
-        inp.ctx.case_ids,
-        tail_classes,
-        inp.n_perm,
-        inp.seed,
+    effect_dist = severity_tail_nll - method_tail_nll
+    p_val = (
+        paired_block_permutation_tail_nll(
+            inp.balanced["labels"],
+            method_rec["probs"],
+            inp.severity_ce["probs"],
+            inp.ctx.case_ids,
+            tail_classes,
+            inp.n_perm,
+            inp.seed,
+        )
+        if gate_passed
+        else None
     )
     return _recovery_comparison(
-        method, "calibration", inp.severity, rec_cal_dist, p_val
+        inp, method, "calibration", effect_dist, rec_cal_dist, gate_passed, p_val
     )
 
 
@@ -137,16 +158,17 @@ def _method_recoveries(
         method = method_dir.name
         if method == "ce":
             continue
-        method_rec = load_seed_predictions(inp.paths, inp.severity, method, inp.assignment)
+        method_rec = load_seed_predictions(
+            inp.paths, inp.severity, method, inp.assignment
+        )
         if method_rec is None:
             continue
-        if disc_gate:
-            out.append(
-                _method_discrimination_recovery(
-                    inp, ba_deficit_dist, severity_ba, method, method_rec
-                )
+        out.append(
+            _method_discrimination_recovery(
+                inp, ba_deficit_dist, severity_ba, method, method_rec, disc_gate
             )
-        if cal_gate and cal_deficit_dist is not None and severity_tail_nll is not None:
+        )
+        if cal_deficit_dist is not None and severity_tail_nll is not None:
             out.append(
                 _method_calibration_recovery(
                     inp,
@@ -155,6 +177,7 @@ def _method_recoveries(
                     tail_classes,
                     method,
                     method_rec,
+                    cal_gate,
                 )
             )
     return out
@@ -184,22 +207,27 @@ def _severity_comparisons(
     if cal_result is not None:
         cal_comparison, cal_gate, cal_deficit_dist = cal_result
         comparisons.append(cal_comparison)
-    if disc_gate or cal_gate:
-        comparisons += _method_recoveries(
-            inp,
-            disc_gate,
-            cal_gate,
-            ba_deficit_dist,
-            cal_deficit_dist,
-            severity_ba,
-            severity_tail_nll,
-            tail_classes,
-        )
+    comparisons += _method_recoveries(
+        inp,
+        disc_gate,
+        cal_gate,
+        ba_deficit_dist,
+        cal_deficit_dist,
+        severity_ba,
+        severity_tail_nll,
+        tail_classes,
+    )
+    for comparison in comparisons:
+        comparison.setdefault("assignment", inp.assignment)
     return comparisons
 
 
 def _severity_result(
-    baseline: Baseline, paths: dict[str, Path], severity: str, seed: int, assignment: str
+    baseline: Baseline,
+    paths: dict[str, Path],
+    severity: str,
+    seed: int,
+    assignment: str,
 ) -> list[dict[str, Any]]:
     """One severity's gate/recovery comparisons against the shared balanced-CE baseline."""
     severity_ce = load_seed_predictions(paths, severity, "ce", assignment)
@@ -235,7 +263,9 @@ def gates_and_recovery(
     """
     comparisons: list[dict[str, Any]] = []
     for assignment in freeze.get("tail_assignments", {"native": []}):
-        baseline = balanced_baseline(paths, config, freeze, n_replicates, seed, assignment)
+        baseline = balanced_baseline(
+            paths, config, freeze, n_replicates, seed, assignment
+        )
         if baseline is None:
             continue
         for severity in ("moderate", "severe"):

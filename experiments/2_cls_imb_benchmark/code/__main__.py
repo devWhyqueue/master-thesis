@@ -40,7 +40,7 @@ def _parser() -> argparse.ArgumentParser:
     submit.add_argument("--smoke", action="store_true")
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
-            "--condition", choices=("balanced", "moderate", "severe")
+            "--condition", choices=("natural", "balanced", "moderate", "severe")
         )
     return parser
 

@@ -37,9 +37,15 @@ def _confirm_condition(
 ) -> None:
     """Run confirmation training for every roster method within one imbalance condition."""
     dataset_cls = BagFeatureDataset if run.is_mil else ImbalanceDataset
-    file_name = f"manifest_{cond}.csv" if cond in {"natural", "balanced"} else f"manifest_{run.assignment}_{cond}.csv"
-    train_ds: TrainDataset = dataset_cls(run.paths["data"] / file_name, device=run.device)
-    cond_configs = best_configs.get(cond, {})
+    file_name = (
+        f"manifest_{cond}.csv"
+        if cond in {"natural", "balanced"}
+        else f"manifest_{run.assignment}_{cond}.csv"
+    )
+    train_ds: TrainDataset = dataset_cls(
+        run.paths["data"] / file_name, device=run.device
+    )
+    cond_configs = best_configs
     ce_states: list[dict[str, Any]] | None = None
     for method in methods:
         cfg = cond_configs.get(method, {"lr": 1e-3})
@@ -110,7 +116,9 @@ def cmd_confirm(args: argparse.Namespace) -> None:
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for cond in conditions:
-        scoped_assignments = ("native",) if cond in {"natural", "balanced"} else assignments
+        scoped_assignments = (
+            ("native",) if cond in {"natural", "balanced"} else assignments
+        )
         for assignment in scoped_assignments:
             run = RunContext(**run_data, assignment=assignment)
             selected = best_configs.get(assignment, {}).get(cond, {})

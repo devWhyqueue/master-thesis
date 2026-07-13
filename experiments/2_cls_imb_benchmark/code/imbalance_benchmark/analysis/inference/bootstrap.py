@@ -18,17 +18,29 @@ __all__ = [
 ]
 
 
-def build_strata(identity: pd.DataFrame) -> pd.Series:
-    """Map each patient to its stratum: the sorted tuple of classes it contributes to.
+def _contribution_vector(
+    rows: pd.DataFrame, split_col: str | None
+) -> tuple[tuple[str, str, int], ...]:
+    """Encode one patient's observed split-by-class row counts deterministically."""
+    splits = rows[split_col].astype(str) if split_col else pd.Series("0", index=rows.index)
+    counts = pd.DataFrame({"split": splits, "class": rows["cancer_type"].astype(str)}).value_counts()
+    return tuple((str(split), str(cls), int(count)) for (split, cls), count in counts.sort_index().items())
 
-    Patients sharing a stratum contribute the identical set of classes, so
-    resampling *within* a stratum can only reshuffle which patient supplies a
-    class, never remove a class the stratum contributes — the report's
-    "preserving every observed contribution stratum guarantees class
-    representation" invariant.
+
+def build_strata(identity: pd.DataFrame) -> pd.Series:
+    """Map each patient to its complete split-by-class contribution stratum.
+
+    The optional ``patient_split`` column is retained when all three fixed
+    patient-split repetitions are analysed jointly.  Thus a patient occurring
+    in several test repetitions has one resampling multiplicity across those
+    appearances, while resampling within identical contribution vectors keeps
+    every observed split/class represented.
     """
-    grouped = identity.groupby("case_id")["cancer_type"].apply(
-        lambda s: tuple(sorted(set(s)))
+    split_col = "patient_split" if "patient_split" in identity else None
+
+    columns = ["cancer_type"] + ([split_col] if split_col else [])
+    grouped = identity.groupby("case_id", sort=True)[columns].apply(
+        _contribution_vector, split_col=split_col
     )
     return cast(pd.Series, grouped)
 

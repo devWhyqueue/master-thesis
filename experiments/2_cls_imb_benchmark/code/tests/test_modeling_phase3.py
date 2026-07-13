@@ -20,7 +20,7 @@ from imbalance_benchmark.modeling.models import (
 )
 from imbalance_benchmark.modeling.oko import build_class_index, oko_set_loss, sample_oko_sets
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method, mde_bag_loss
-from imbalance_benchmark.modeling.training import update_budget
+from imbalance_benchmark.modeling.training import ClassAwareBatchSampler, update_budget
 
 DIM = 16
 
@@ -158,6 +158,14 @@ def test_oko_grid_capped_by_k_minus_1():
 def test_update_budget_formula():
     assert update_budget(support=100, batch_size=32) == 30 * 4
     assert update_budget(support=96, batch_size=32) == 30 * 3
+
+
+def test_sc_mil_batch_sampler_provides_same_class_positive_pairs():
+    labels = np.array([0, 0, 0, 1, 1, 2, 2, 2])
+    sampler = ClassAwareBatchSampler(labels, batch_size=6, seed=1)
+    for batch in sampler:
+        counts = np.bincount(labels[batch], minlength=3)
+        assert all(count == 0 or count >= 2 for count in counts)
 
 
 # --- model construction ------------------------------------------------------

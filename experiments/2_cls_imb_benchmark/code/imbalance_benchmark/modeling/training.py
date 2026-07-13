@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, Sampler, WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate
 from imbalance_benchmark.modeling.evaluation import (
@@ -30,6 +30,7 @@ __all__ = [
     "FIXED_BALANCED_SAMPLER_METHODS",
     "get_class_weights",
     "get_balanced_sampler",
+    "ClassAwareBatchSampler",
     "class_priors",
     "run_evaluation",
     "update_budget",
@@ -65,6 +66,54 @@ def get_balanced_sampler(
         replacement=True,
         generator=torch.Generator().manual_seed(seed),
     )
+
+
+class ClassAwareBatchSampler(Sampler[list[int]]):
+    """Yield batches with at least two independent bags from every sampled class.
+
+    SC-MIL's supervised contrastive term has no same-class positive pair when
+    a class appears once.  This sampler forms paired class draws first, then
+    fills each batch with independently sampled bags from those classes.
+    """
+
+    def __init__(self, labels: np.ndarray, batch_size: int, seed: int) -> None:
+        if batch_size < 2:
+            raise ValueError("SC-MIL requires a batch size of at least two")
+        self.batch_size = batch_size
+        self.seed = seed
+        self.class_indices = {
+            int(cls): np.flatnonzero(labels == cls)
+            for cls in np.unique(labels)
+            if int(np.sum(labels == cls)) >= 2
+        }
+        if not self.class_indices:
+            raise ValueError(
+                "SC-MIL requires two independent bags in at least one class"
+            )
+        self.n_batches = math.ceil(len(labels) / batch_size)
+
+    def __iter__(self):
+        rng = np.random.default_rng(self.seed)
+        classes = np.array(sorted(self.class_indices))
+        for _ in range(self.n_batches):
+            n_pairs = min(len(classes), self.batch_size // 2)
+            selected_classes = rng.choice(classes, size=n_pairs, replace=False)
+            batch = [
+                int(index)
+                for cls in selected_classes
+                for index in rng.choice(
+                    self.class_indices[int(cls)], size=2, replace=False
+                )
+            ]
+            fill_classes = selected_classes if len(selected_classes) else classes
+            while len(batch) < self.batch_size:
+                cls = int(rng.choice(fill_classes))
+                batch.append(int(rng.choice(self.class_indices[cls])))
+            rng.shuffle(batch)
+            yield batch
+
+    def __len__(self) -> int:
+        return self.n_batches
 
 
 def class_priors(
@@ -160,6 +209,12 @@ def _build_train_loader(
 ) -> DataLoader:
     """Build the training loader, applying the balanced sampler when required."""
     method = ctx["method"]
+    if method == "sc_mil":
+        return DataLoader(
+            ctx["train_dataset"],
+            batch_sampler=ClassAwareBatchSampler(train_labels, b_size, ctx["seed"]),
+            collate_fn=bag_collate if is_mil else None,
+        )
     if method == "balanced_sampling" and param:
         sampler = get_balanced_sampler(train_labels, param, ctx["seed"])
     elif method in FIXED_BALANCED_SAMPLER_METHODS:

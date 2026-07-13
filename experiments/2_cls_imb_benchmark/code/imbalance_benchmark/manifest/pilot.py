@@ -58,8 +58,12 @@ def compute_pilot_quota(
     for cls in classes:
         df_class = cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls])
         patients = _patient_order(df_class, seed)[:level]
-        n_patches = int(df_class["case_id"].isin(patients).sum())
-        quotas.append(n_patches // level)
+        per_patient = (
+            df_class[df_class["case_id"].isin(patients)].groupby("case_id").size()
+        )
+        if len(per_patient) != level:
+            raise ValueError("Pilot ordering did not retain every requested patient")
+        quotas.append(int(per_patient.min()))
     return max(1, min(quotas))
 
 
@@ -95,7 +99,11 @@ def build_patch_pilot_manifest(
     for cls in classes:
         df_class = cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls])
         patients = _patient_order(df_class, seed)[:level]
-        parts.append(_apportion_quota(df_class, patients, quota, seed))
+        selected = _apportion_quota(df_class, patients, quota, seed)
+        counts = selected["case_id"].value_counts()
+        if len(counts) != level or not (counts == quota).all():
+            raise ValueError("Pilot quota is not feasible for every selected patient")
+        parts.append(selected)
     return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
 

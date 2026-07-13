@@ -95,6 +95,7 @@ def confirmatory_table(comparisons: list[dict[str, Any]]) -> str:
             "gate",
             "severity",
             "effect",
+            "recovery",
             "p_value",
             "adjusted_p_value",
             "status",
