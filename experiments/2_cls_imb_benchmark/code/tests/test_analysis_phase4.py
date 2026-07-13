@@ -78,6 +78,8 @@ def test_classification_payload_shapes_and_macro_nll():
     assert payload["macro_nll"] == pytest.approx(
         float(np.mean([negative_log_likelihood(np.array(labels)[np.array(labels) == c], np.array(probs)[np.array(labels) == c]) for c in range(3)]))
     )
+    assert "quadratic_weighted_kappa" in payload
+    assert payload["ordinal_mean_absolute_error"] >= 0.0
 
 
 # --- calibration ----------------------------------------------------------------

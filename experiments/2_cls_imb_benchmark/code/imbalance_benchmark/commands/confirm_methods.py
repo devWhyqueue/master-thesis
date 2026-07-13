@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+import platform
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -68,7 +70,20 @@ def _cost_payload(
         "updates": updates,
         "processed_examples": updates * batch_size,
         "wall_clock_seconds": elapsed,
+        "examples_per_update": batch_size,
         **param_counts(model),
+    }
+
+
+def _environment_payload() -> dict[str, Any]:
+    """Capture the executable environment required to reproduce a confirmation run."""
+    return {
+        "python": sys.version,
+        "platform": platform.platform(),
+        "torch": torch.__version__,
+        "cuda_available": torch.cuda.is_available(),
+        "cuda_version": torch.version.cuda,
+        "device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
     }
 
 
@@ -83,7 +98,9 @@ def _split_payload(
     """Assemble one evaluated split's real classwise metrics and prediction arrays."""
     raw_logits = res["logits"]
     train_prior_array = train_priors.detach().cpu().numpy()
-    decision_logits = balanced_decision_logits(raw_logits, method, tau, train_prior_array)
+    decision_logits = balanced_decision_logits(
+        raw_logits, method, tau, train_prior_array
+    )
     target_logits = apply_target_prior_correction(
         raw_logits, method, tau, train_prior_array, target_priors
     )
@@ -143,7 +160,11 @@ def _run_and_record(
     batch_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), batch_size)
     write_run_record(
-        run.paths["results"] / f"assignment={run.assignment}" / cond / method / f"seed={seed_idx}",
+        run.paths["results"]
+        / f"assignment={run.assignment}"
+        / cond
+        / method
+        / f"seed={seed_idx}",
         {
             "benchmark": "wsi" if run.is_mil else "patch",
             "condition": cond,
@@ -155,6 +176,7 @@ def _run_and_record(
             "train_priors": class_priors_tensor.detach().cpu().tolist(),
             "target_priors": target_priors.tolist(),
             "cost": _cost_payload(method, budget, batch_size, elapsed, model),
+            "environment": _environment_payload(),
             "splits": splits,
         },
     )
@@ -184,7 +206,9 @@ def confirm_post_hoc(
     priors = class_priors(train_ds.get_int_targets(), run.n_classes, run.device)
     tau = float(cfg.get("parameter", 1.0))
     for i, (seed, state) in enumerate(zip(run.seeds, ce_states, strict=True)):
-        ctx = build_training_ctx("ce", train_ds, run, seed, {"lr": 1e-3}, run.val_loader)
+        ctx = build_training_ctx(
+            "ce", train_ds, run, seed, {"lr": 1e-3}, run.val_loader
+        )
         _run_and_record(
             cond, "post_hoc_logit_adjustment", i, ctx, state, run, 0.0, tau, priors
         )

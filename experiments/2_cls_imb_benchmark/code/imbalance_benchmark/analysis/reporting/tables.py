@@ -55,6 +55,8 @@ def results_table(conn: sqlite3.Connection, split: str = "test") -> str:
             macro_f1=("macro_f1", "mean"),
             negative_log_likelihood=("negative_log_likelihood", "mean"),
             macro_nll=("macro_nll", "mean"),
+            quadratic_weighted_kappa=("quadratic_weighted_kappa", "mean"),
+            ordinal_mean_absolute_error=("ordinal_mean_absolute_error", "mean"),
             n_seeds=("seed_index", "nunique"),
         )
         .reset_index()

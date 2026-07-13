@@ -79,7 +79,9 @@ def _write_tables(
     )
 
 
-def _write_figures(paths: dict[str, Path], conn: sqlite3.Connection) -> None:
+def _write_figures(
+    paths: dict[str, Path], conn: sqlite3.Connection, freeze: dict[str, Any]
+) -> None:
     """Replace the placeholder figure with real tail-vs-support and reliability plots."""
     paths["figures"].mkdir(parents=True, exist_ok=True)
     classwise = load_classwise(conn)
@@ -98,6 +100,27 @@ def _write_figures(paths: dict[str, Path], conn: sqlite3.Connection) -> None:
                 accuracy,
                 paths["figures"] / "reliability_diagram.png",
             )
+        for assignment, conditions in freeze.get("assignment_conditions", {}).items():
+            allocated = conditions.get("severe", {}).get("allocated_counts", {})
+            tiers = assign_tiers(balanced["class_names"], allocated)
+            tail = [
+                index
+                for index, name in enumerate(balanced["class_names"])
+                if tiers.get(name) == "tail"
+            ]
+            mask = np.isin(balanced["labels"], tail)
+            if not mask.any():
+                continue
+            centers, mean_conf, accuracy = reliability_curve(
+                balanced["probs"][0][mask], balanced["labels"][mask]
+            )
+            if len(centers):
+                plot_reliability_diagram(
+                    centers,
+                    mean_conf,
+                    accuracy,
+                    paths["figures"] / f"tail_reliability_{assignment}.png",
+                )
 
 
 def _crossed_p_value(
@@ -241,5 +264,5 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     comparisons = gates_and_recovery(paths, config, freeze, n_replicates, seed)
     _write_diagnostics(paths, comparisons, n_replicates, seed)
     _write_tables(paths, conn, comparisons)
-    _write_figures(paths, conn)
+    _write_figures(paths, conn, freeze)
     conn.close()

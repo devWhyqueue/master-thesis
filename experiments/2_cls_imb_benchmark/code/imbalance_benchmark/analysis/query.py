@@ -29,7 +29,8 @@ def load_eval_details(conn: sqlite3.Connection) -> pd.DataFrame:
     return pd.read_sql_query(
         "SELECT r.*, e.split, e.accuracy, e.balanced_accuracy, e.macro_precision, "
         "e.macro_recall, e.macro_f1, e.macro_nll, e.negative_log_likelihood, "
-        "e.brier_score, e.expected_calibration_error, e.extended_json "
+        "e.brier_score, e.expected_calibration_error, e.quadratic_weighted_kappa, "
+        "e.ordinal_mean_absolute_error, e.extended_json "
         "FROM runs r JOIN eval_results e ON r.run_id = e.run_id",
         conn,
     )
@@ -79,7 +80,9 @@ def load_seed_predictions(
 ) -> dict[str, Any] | None:
     """Stack one method's confirmed test-split predictions across its confirmation seeds."""
     assigned_dir = paths["results"] / f"assignment={assignment}" / condition / method
-    method_dir = assigned_dir if assigned_dir.exists() else paths["results"] / condition / method
+    method_dir = (
+        assigned_dir if assigned_dir.exists() else paths["results"] / condition / method
+    )
     if not method_dir.exists():
         return None
     seed_dirs = sorted(

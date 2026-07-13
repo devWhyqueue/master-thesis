@@ -10,6 +10,7 @@ from sklearn.metrics import (
     confusion_matrix,
     precision_recall_fscore_support,
 )
+from imbalance_benchmark.analysis.ordinal import ordinal_metrics
 
 __all__ = [
     "assign_tiers",
@@ -174,6 +175,7 @@ def _scalar_metrics(
         "macro_nll": float(np.nanmean(stats["nll"][present])),
         "brier_score": brier_score(y_true, probs, len(stats["support"])),
         "expected_calibration_error": expected_calibration_error(y_true, probs),
+        **ordinal_metrics(y_true, y_pred),
     }
 
 

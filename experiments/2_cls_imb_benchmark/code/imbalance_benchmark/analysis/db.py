@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS eval_results (
     run_id TEXT NOT NULL, split TEXT NOT NULL, accuracy REAL,
     balanced_accuracy REAL, macro_precision REAL, macro_recall REAL,
     macro_f1 REAL, macro_nll REAL, negative_log_likelihood REAL, brier_score REAL,
-    expected_calibration_error REAL, extended_json TEXT,
+    expected_calibration_error REAL, quadratic_weighted_kappa REAL,
+    ordinal_mean_absolute_error REAL, extended_json TEXT,
     PRIMARY KEY (run_id, split), FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS eval_classwise (
@@ -39,6 +40,8 @@ _EVAL_SCALAR_FIELDS = (
     "negative_log_likelihood",
     "brier_score",
     "expected_calibration_error",
+    "quadratic_weighted_kappa",
+    "ordinal_mean_absolute_error",
 )
 _CLASSWISE_ARRAY_FIELDS = (
     "precision_per_class",
@@ -60,8 +63,14 @@ def connect_db(db_file: Path) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """Initialize SQL tables schema."""
+    """Initialize the schema and migrate result databases created by earlier versions."""
     conn.executescript(_SCHEMA_SQL)
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(eval_results)").fetchall()
+    }
+    for name in ("quadratic_weighted_kappa", "ordinal_mean_absolute_error"):
+        if name not in columns:
+            conn.execute(f"ALTER TABLE eval_results ADD COLUMN {name} REAL")
     conn.commit()
 
 
@@ -191,8 +200,8 @@ def _ingest_run_splits(
         conn.execute(
             "INSERT INTO eval_results (run_id, split, accuracy, balanced_accuracy, "
             "macro_precision, macro_recall, macro_f1, macro_nll, negative_log_likelihood, "
-            "brier_score, expected_calibration_error, extended_json) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "brier_score, expected_calibration_error, quadratic_weighted_kappa, "
+            "ordinal_mean_absolute_error, extended_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 split_name,
