@@ -151,11 +151,13 @@ RankMix-inspired denotes the tested adaptation with teacher ranking, representat
 \label{sec:training}
 The frozen encoder, classifier family, optimizer family, batch definition, augmentation, numerical precision, and maximum evidence budget are held fixed within a regime. A common maximum epoch or update budget is fixed before the definitive comparison using training and natural-validation learning curves that do not access test labels. Each run stores validation metrics at every checkpoint. The selected checkpoint maximizes natural-validation balanced accuracy, with macro F1 and then lower NLL as deterministic tie-breakers. Test predictions are produced once from that locked checkpoint.
 
-Every tunable mitigation method receives the same number of candidate values for its single imbalance-specific control. The common grids are prespecified in Appendix~\ref{app:controls}. Fixed method parameters follow the definitions in the methods report. cRT records stage-one and stage-two compute separately. Post-hoc logit adjustment has no retraining cost but is selected under the same validation-only rule. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
+Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity. For each trainable mitigation method, its four-value imbalance-specific grid is crossed with the common four-value learning-rate grid in Appendix~\ref{app:controls}, yielding at most 16 candidate configurations. This joint search accommodates interactions between a method's objective and optimization dynamics while holding the optimizer family, weight decay, architecture, batch definition, and all other training parameters fixed. CE and methods without a meaningful imbalance-specific control evaluate the four learning rates without introducing an artificial search dimension. Train-time logit adjustment is tuned jointly over $\tau$ and learning rate; post-hoc logit adjustment inherits the selected CE model and tunes only $\tau$ because it performs no gradient optimization.
+
+One configuration is selected per method, dataset, prediction regime, and imbalance severity by aggregate natural-validation balanced accuracy across the prespecified tuning patient splits and tail assignments. Macro F1 and then lower NLL are deterministic tie-breakers. Hyperparameters are not selected separately for individual initialization seeds; the chosen configuration is locked before the confirmation initializations and test evaluation. For cRT, stage one inherits the selected CE configuration, while the stage-two classifier learning rate is selected separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
 
 Controlled contrasts are paired on split, assignment, initialization, and held-out cases. Each locked patient split and tail assignment is repeated with five initialization seeds. Three patient-split seeds are used, subject to dataset feasibility; if a smaller number is required, it is declared before test evaluation. The unit of replication and all missing or failed runs are reported. A failed run is not silently replaced using a test-informed seed.
 
-Computational cost is reported as wall-clock training time, accelerator-hours, peak accelerator memory, total and trainable parameter counts, and effective passes through unique training examples. Costs include all stages required by the method but exclude one-time frozen-feature extraction shared by all methods. Hardware and software environments are recorded with each run.
+Computational cost is reported separately for validation search and locked-configuration fitting, using wall-clock training time, accelerator-hours, peak accelerator memory, total and trainable parameter counts, and effective passes through unique training examples. Costs include all stages required by the method, including both cRT stages, but exclude one-time frozen-feature extraction shared by all methods. Hardware and software environments are recorded with each run.
 
 \section{Outcomes and Statistical Analysis}
 \label{sec:analysis}
@@ -202,14 +204,19 @@ The protocol isolates training-distribution effects under frozen Virchow2 repres
 \appendix
 \section{Protocol Controls}
 \label{app:controls}
-Table~\ref{tab:controls} records equal-cardinality candidate grids. These values may be narrowed only before definitive test evaluation and with a documented validation-only rationale; they are never changed using test results.
+Every trainable method uses the common learning-rate grid
+\begin{equation}
+  \eta\in\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}.
+  \label{eq:learning-rate-grid}
+\end{equation}
+\noindent For methods in Table~\ref{tab:controls}, this grid is crossed with the four candidate values of the method-specific control. The resulting maximum is 16 configurations per method, dataset, regime, and severity. These grids may be narrowed only before test evaluation and with a documented validation-only rationale; they are never changed using test results.
 
 \begin{table}[ht]
   \centering
   \footnotesize
   \begin{tabularx}{\linewidth}{@{}lX@{}}
     \toprule
-    Method or family & Candidate imbalance-specific control \\
+    Method or family & Candidate method-specific control \\
     \midrule
     Balanced sampling / weighted CE & strength $\in\{0.25,0.5,0.75,1\}$ \\
     Focal loss & $\gamma\in\{0.5,1,1.5,2\}$ \\
@@ -222,7 +229,7 @@ Table~\ref{tab:controls} records equal-cardinality candidate grids. These values
     MDE-inspired & consistency weight $\lambda_{\mathrm{con}}\in\{0,0.1,0.25,0.5\}$ \\
     \bottomrule
   \end{tabularx}
-  \caption{Prespecified equal-cardinality control grids. cRT has no imbalance-strength grid; its stage-two checkpoint is selected on natural validation.}
+  \caption{Prespecified method-specific grids crossed with the common learning-rate grid in Equation~\eqref{eq:learning-rate-grid}. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately.}
   \label{tab:controls}
 \end{table}
 
