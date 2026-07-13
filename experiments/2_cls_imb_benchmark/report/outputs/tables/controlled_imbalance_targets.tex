@@ -1,10 +1,17 @@
-\begin{tabular}{llllll}
+\begin{tabular}{llrllll}
 \toprule
-Dataset & Method & $K$ & $N_{floor}$ & $\rho$ (native $\to$ target) & $1-H_{\mathrm{norm}}$ (native $\to$ target)\\
+Dataset & Level & $K$ & Method & Support & $\rho$ & $1-H_{\mathrm{norm}}$\\
 \midrule
-TCGA-UT & Exp.\ decay & 32 & 20 & 28.3:1 $\to$ 39.6:1 & \num{0.085} $\to$ \num{0.126}\\
-BRACS & Step & 7 & 30 & 2.3:1 $\to$ 6.5:1 & \num{0.018} $\to$ \num{0.113}\\
-PANDA & Ordinal exp.\ decay & 6 & 50 & 2.4:1 $\to$ 10.9:1 & \num{0.043} $\to$ \num{0.153}\\
-CAMELYON16 & Ratio downsampling (10:1) & 2 & 20 & 1.5:1 $\to$ 9.9:1 & \num{0.028} $\to$ \num{0.558}\\
+CAMELYON16 & Patch & 2 & Ratio (100:1) & \num{2399712} $\to$ \num{2363440} (98\%) & 39.2:1 $\to$ 100.0:1 & \num{0.832} $\to$ \num{0.920}\\
+ & Slide & 2 & Ratio (10:1) & \num{398} $\to$ \num{262} (66\%) & 1.5:1 $\to$ 9.9:1 & \num{0.028} $\to$ \num{0.558}\\
+\addlinespace
+TCGA-UT & Patch & 32 & Exp.\ decay & \num{52194} $\to$ \num{45723} (88\%) & 28.1:1 $\to$ 28.1:1 & \num{0.085} $\to$ \num{0.100}\\
+ & Slide & 32 & Exp.\ decay & \num{8736} $\to$ \num{6837} (78\%) & 28.3:1 $\to$ 39.6:1 & \num{0.085} $\to$ \num{0.126}\\
+\addlinespace
+BRACS & Patch & 7 & Step & \num{99352} $\to$ \num{73047} (74\%) & 4.6:1 $\to$ 148.7:1 & \num{0.072} $\to$ \num{0.317}\\
+ & Slide & 7 & Step & \num{851} $\to$ \num{625} (73\%) & 2.3:1 $\to$ 9.8:1 & \num{0.018} $\to$ \num{0.151}\\
+\addlinespace
+PANDA & Patch & 2 & Ratio (100:1) & \num{703282} $\to$ \num{586336} (83\%) & 4.7:1 $\to$ 100.0:1 & \num{0.332} $\to$ \num{0.920}\\
+ & Slide & 6 & Ordinal decay & \num{10616} $\to$ \num{4576} (43\%) & 2.4:1 $\to$ 144.6:1 & \num{0.043} $\to$ \num{0.427}\\
 \bottomrule
 \end{tabular}

@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report benchmarks representative class-imbalance mitigation methods on four histopathology datasets---CAMELYON16, TCGA-UT, BRACS, and PANDA---presented in order of the diagnostic question they pose (detection, typing, subtyping, grading) and chosen to span the difficulty--imbalance plane while varying organ, label type, and annotation form. Imbalance is characterised throughout by the entropy-based measure $\Hnorm\in[0,1]$, reported separately at patch and slide level. All benchmarks fix a frozen Virchow2 encoder, a bounded per-slide evidence budget, and patient-disjoint splits, so that comparisons within each regime isolate the imbalance mechanism. The four datasets place the same methods at very different points of the plane. On CAMELYON16 (severe patch imbalance $\Hnorm\approx\num{0.83}$, near-balanced slide labels $\approx\num{0.03}$, separable detection task) every method reaches near-ceiling discrimination and the unweighted baseline is competitive. On TCGA-UT (mild imbalance $\approx\num{0.09}$, 32-class typing) centre-focused affinity loss (CFAL) reaches the highest patch-level macro F1, OKO set learning the highest balanced accuracy and the best raw NLL and Brier among patch methods, while RankMix and MDE-MIL lead the WSI-bag regime. On BRACS (mild patch imbalance $\approx\num{0.07}$, hard fine-grained subtyping) only OKO and CFAL separate from the CE baseline. On PANDA (mild imbalance, two targets of very different difficulty on the same biopsies) the no-mitigation baseline is competitive in both regimes. Together the four datasets show that the headroom for imbalance mitigation is governed by class separability in the frozen representation, not by the imbalance of the class distribution.
+\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report benchmarks representative class-imbalance mitigation methods on four histopathology datasets---CAMELYON16, TCGA-UT, BRACS, and PANDA---presented in order of the diagnostic question they pose (detection, typing, subtyping, grading) and chosen to span the difficulty--imbalance plane while varying organ, label type, and annotation form. Imbalance is characterised primarily by the head-to-tail ratio $\rho=N_{\max}/N_{\min}$---the standard imbalance factor of the long-tailed-recognition literature---with the entropy-based $\Hnorm\in[0,1]$ as a class-count-invariant cross-check, both reported separately at patch and slide level. All benchmarks fix a frozen Virchow2 encoder, a bounded per-slide evidence budget, and patient-disjoint splits, so that comparisons within each regime isolate the imbalance mechanism. The four datasets place the same methods at very different points of the plane. On CAMELYON16 (the suite's highest patch imbalance, $\rho\approx\num{39}$; near-balanced slide labels, $\rho\approx\num{1.5}$; separable detection task) every method reaches near-ceiling discrimination and the unweighted baseline is competitive. On TCGA-UT (mild imbalance, $\rho\approx\num{28}$, 32-class typing) centre-focused affinity loss (CFAL) reaches the highest patch-level macro F1, OKO set learning the highest balanced accuracy and the best raw NLL and Brier among patch methods, while RankMix and MDE-MIL lead the WSI-bag regime. On BRACS (mild patch imbalance, $\rho\approx\num{4.6}$, hard fine-grained subtyping) only OKO and CFAL separate from the CE baseline. On PANDA (mild imbalance, two targets of very different difficulty on the same biopsies) the no-mitigation baseline is competitive in both regimes. Together the four datasets show that the headroom for imbalance mitigation is governed by class separability in the frozen representation, not by the imbalance of the class distribution.
 \end{abstract}
 \clearpage
 
@@ -40,83 +40,126 @@ Class imbalance changes what a pathology classifier is rewarded for learning. Wh
 
 Imbalance methods often assume a specific prediction unit. Image-level methods use labeled images, image embeddings, or directly generated image samples, whereas WSI-level methods use weak labels over bags of instances together with attention, instance ranking, or bag-level representation learning. The computational-pathology pipeline these regimes sit in---whole-slide imaging, tiling into patches, and weakly supervised multiple-instance learning over frozen foundation-model features---and the full method definitions, imbalance mechanisms, and dataset provenance are documented in two companion reports \citep{queisler2026datasets,queisler2026imbalanceMethods}; this report contributes the experimental results and cites them only where a definition is needed.
 
-The benchmark asks one question across four datasets, presented in order of the diagnostic question they pose---CAMELYON16 detection, TCGA-UT typing, BRACS subtyping, PANDA grading: when the encoder is a strong frozen foundation model, which imbalance mechanism helps in each input regime, and what property of the data governs whether any mitigation helps at all? The four datasets span the difficulty--imbalance plane by design. CAMELYON16 is severely imbalanced at patch level but separable; TCGA-UT is a mildly imbalanced many-class typing anchor; BRACS is mildly imbalanced but hard; and PANDA supplies two mildly imbalanced targets of different difficulty on the same biopsies. This spread separates the roles of imbalance severity and class separability: if the imbalance of the class distribution governed mitigation headroom, CAMELYON16 should show the largest gains; if class separability governs it, CAMELYON16 should show the smallest gains despite being the most imbalanced.
+This benchmark is organised around three research questions, evaluated across four datasets presented in order of the diagnostic question they pose---CAMELYON16 detection, TCGA-UT typing, BRACS subtyping, PANDA grading:
+\begin{description}
+  \item[RQ1 --- Which mechanism helps?] Under a strong frozen foundation-model encoder, which class-imbalance mitigation mechanism---if any---improves over an unweighted no-mitigation baseline, and does the answer differ between the patch-feature and WSI-bag input regimes?
+  \item[RQ2 --- What governs the headroom?] Does the imbalance severity of the class distribution predict where mitigation helps, or is the governing property class separability in the frozen representation?
+  \item[RQ3 --- Does the measurement level matter?] How does the level at which imbalance is measured---patch/tile versus slide---change its interpretation and its relationship to mitigation headroom?
+\end{description}
+The four datasets span the difficulty--imbalance plane by design so that these questions can be separated. CAMELYON16 is severely imbalanced at patch level but separable; TCGA-UT is a mildly imbalanced many-class typing anchor; BRACS is mildly imbalanced but hard; and PANDA supplies two mildly imbalanced targets of different difficulty on the same biopsies. This spread decouples imbalance severity from class separability (RQ2): if the imbalance of the class distribution governed mitigation headroom, CAMELYON16 should show the largest gains; if class separability governs it, CAMELYON16 should show the smallest gains despite being the most imbalanced.
 
 % ============================================================
 \section{Datasets}
 \label{sec:data}
 % ============================================================
-The four datasets are summarised in Table~\ref{tab:dataset-overview}; this section states only what the benchmark consumes from each. Imbalance is quantified by an entropy-based measure. For empirical class proportions $p_1,\dots,p_K$ (with $\sum_i p_i = 1$), the Shannon entropy $H(p)=-\sum_{i=1}^{K} p_i \log p_i$ attains its maximum $\log K$ at the uniform distribution; normalising and complementing gives
-\begin{equation}
-  \label{eq:imbalance}
-  \Hnorm \;=\; 1 - \frac{-\sum_{i=1}^{K} p_i \log p_i}{\log K} \;\in\; [0,1],
-\end{equation}
-where \num{0} is a perfectly balanced distribution and values closer to \num{1} indicate stronger imbalance. Because the $\log K$ normalisation removes the dependence on the number of classes, the measure compares a two-class cohort against a thirty-two-class one fairly, unlike the raw head-to-tail (largest-to-smallest class support) ratio. It is reported separately at patch and slide level, because the two can differ sharply when patch labels are derived from masks rather than inherited from the slide; the full native class distributions are given in \citet{queisler2026datasets}. All benchmarks use frozen Virchow2 \num{2560}-dimensional features (concatenation of CLS token and mean patch token, cast to float32) and patient-disjoint train/validation/test splits across three random seeds \citep{vorontsov2024virchow,zimmermann2024virchow2}.
+The four datasets are summarised in Table~\ref{tab:dataset-overview}; this section states only what the benchmark consumes from each. Imbalance is quantified primarily by the head-to-tail ratio $\rho=N_{\max}/N_{\min}$ (the standard long-tailed-recognition imbalance factor), with the entropy-based $\Hnorm\in[0,1]$ as a class-count-invariant cross-check; both are reported separately at patch and slide level and defined in \S\ref{sec:imbalance-measure}. All benchmarks use frozen Virchow2 \num{2560}-dimensional features (concatenation of CLS token and mean patch token, cast to float32) and patient-disjoint train/validation/test splits ($70/15/15$) across three random seeds \citep{vorontsov2024virchow,zimmermann2024virchow2}.
 
 \begin{table}[ht]
   \centering
-  \small
-  \setlength{\tabcolsep}{5pt}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \renewcommand{\arraystretch}{1.25}
-  \begin{tabular}{@{}l l l r S[table-format=1.3] S[table-format=1.3]@{}}
+  \begin{tabularx}{\linewidth}{@{}l >{\raggedright\arraybackslash}X l r S[table-format=2.1] S[table-format=2.1] S[table-format=1.3] S[table-format=1.3]@{}}
     \toprule
-    & & & {Budget} & \multicolumn{2}{c}{Imbalance $\Hnorm$}\\
-    \cmidrule(l){5-6}
-    Dataset & Target label(s) & Split unit & {(med.\ tiles)} & {Patch} & {Slide}\\
+    & & & {Budget} & \multicolumn{2}{c}{Ratio $\rho$} & \multicolumn{2}{c}{$\Hnorm$}\\
+    \cmidrule(lr){5-6}\cmidrule(l){7-8}
+    Dataset & Target label(s) & Split unit & {(med.\ tiles)} & {Patch} & {Slide} & {Patch} & {Slide}\\
     \midrule
-    CAMELYON16 & Tumor/normal (patch); metastasis (WSI) & Slide $=$ patient & 7874 & 0.832 & 0.028\\
-    TCGA-UT    & 32 cancer types                        & Case (patient)   & 30   & 0.085 & 0.085\\
-    BRACS      & 7 breast-lesion subtypes               & Patient          & 360  & 0.072 & 0.018\\
-    PANDA      & Cancer/benign (patch); ISUP 0--5 (WSI) & Biopsy           & 421  & 0.332 & 0.043\\
+    CAMELYON16 & Tumor/normal (patch); metastasis (WSI) & Slide $=$ patient & 7874 & 39.2 & 1.5  & 0.832 & 0.028\\
+    TCGA-UT    & 32 cancer types                        & Case (patient)   & 30   & 28.1 & 28.3 & 0.085 & 0.085\\
+    BRACS      & 7 breast-lesion subtypes               & Patient          & 360  & 4.6  & 2.3  & 0.072 & 0.018\\
+    PANDA      & Cancer/benign (patch); ISUP 0--5 (WSI) & Biopsy           & 421  & 4.7  & 2.4  & 0.332 & 0.043\\
     \bottomrule
-  \end{tabular}
-  \caption{Benchmark dataset overview, in the order the datasets are discussed. The evidence budget is the per-slide cap (data-driven median of available tiles) used in both regimes. Imbalance is the entropy-based $\Hnorm$; for PANDA the patch and slide figures describe two different targets (binary cancer/benign vs.\ six-class ISUP).}
+  \end{tabularx}
+  \caption{Benchmark dataset overview, in the order the datasets are discussed. The evidence budget is the per-slide cap (data-driven median of available tiles) used in both regimes. Imbalance is reported primarily as the head-to-tail ratio $\rho=N_{\max}/N_{\min}$ (the long-tailed-recognition imbalance factor), with the entropy-based $\Hnorm$ as a class-count-invariant cross-check; for PANDA the patch and slide figures describe two different targets (binary cancer/benign vs.\ six-class ISUP).}
   \label{tab:dataset-overview}
 \end{table}
 
 \paragraph{CAMELYON16.}
-Binary labels are mask-derived: each tile is labelled tumor or normal by intersecting it with the published annotation mask. Of \num{399} slides, \num{398} have usable tile evidence; the \num{20} tumor slides whose annotations are not exhaustive are excluded from the patch regime but retained in the WSI-bag regime, where the reliable slide-level label is used. The per-slide evidence budget is the empirical median of available tissue tiles (\num{7874})---two orders of magnitude larger than TCGA-UT's 30-tile cap, reflecting that a whole lymph-node section yields far more tissue than a single lesion ROI or tumor-region crop. Each slide is its own patient, so slide-disjoint and patient-disjoint splits coincide. The severe patch imbalance ($\Hnorm\approx\num{0.832}$) is a within-slide effect: tumor tiles are scarce even on slides that do contain a metastasis, so the slide-level labels are nearly balanced ($\approx\num{0.028}$).
+Binary labels are mask-derived: each tile is labelled tumor or normal by intersecting it with the published annotation mask. Of \num{399} slides, \num{398} have usable tile evidence; the \num{20} tumor slides whose annotations are not exhaustive are excluded from the patch regime but retained in the WSI-bag regime, where the reliable slide-level label is used. The per-slide evidence budget is the empirical median of available tissue tiles (\num{7874})---two orders of magnitude larger than TCGA-UT's 30-tile cap, reflecting that a whole lymph-node section yields far more tissue than a single lesion ROI or tumor-region crop. Each slide is its own patient, so slide-disjoint and patient-disjoint splits coincide. The severe patch imbalance ($\rho\approx\num{39}$, $\Hnorm\approx\num{0.832}$)---the highest in the suite---is a within-slide effect: tumor tiles are scarce even on slides that do contain a metastasis, so the slide-level labels are nearly balanced ($\rho\approx\num{1.5}$, $\Hnorm\approx\num{0.028}$).
 
 \paragraph{TCGA-UT.}
-The dataset contains \num{1608060} patches from \num{8736} diagnostic slides across 32 cancer types \citep{tomczak2015reviewThe,komura2022universalEncoding}. Splits are assigned at the TCGA participant level (case-disjoint), using \num{5025} training, \num{1075} validation, and \num{1075} test cases per seed; all slides from one participant remain in one partition. Because every patch inherits its slide's cancer-type label, the patch and slide imbalance coincide ($\Hnorm\approx\num{0.085}$). The patch benchmark caps each slide at 30 deterministic patches (empirical median of available tiles at resolution level~0), yielding a controlled manifest shared by all patch methods; the WSI-bag benchmark applies the same 30-instance cap to each slide's feature bag.
+The dataset contains \num{1608060} patches from \num{8736} diagnostic slides across 32 cancer types \citep{tomczak2015reviewThe,komura2022universalEncoding}. Splits are assigned at the TCGA participant level (case-disjoint), using \num{5025} training, \num{1075} validation, and \num{1075} test cases per seed; all slides from one participant remain in one partition. Because every patch inherits its slide's cancer-type label, the patch and slide imbalance coincide ($\rho\approx\num{28}$, $\Hnorm\approx\num{0.085}$). The patch benchmark caps each slide at 30 deterministic patches (empirical median of available tiles at resolution level~0), yielding a controlled manifest shared by all patch methods; the WSI-bag benchmark applies the same 30-instance cap to each slide's feature bag.
 
 \paragraph{BRACS.}
-Evidence is derived from the ROI set: each annotated ROI is tiled into $256\times256$ RGB patches, and each slide's pooled ROI tiles are capped at the empirical median (\num{360} tiles per slide). This design preserves label fidelity because all instances originate from pathologist-selected lesion regions. Of \num{547} published WSIs, \num{387} contribute at least one ROI tile; the benchmark covers \num{151} patients and \num{99352} extracted patches over the seven-subtype target, a mild imbalance ($\Hnorm\approx\num{0.072}$ patch, $\approx\num{0.018}$ slide).
+Evidence is derived from the ROI set: each annotated ROI is tiled into $256\times256$ RGB patches, and each slide's pooled ROI tiles are capped at the empirical median (\num{360} tiles per slide). This design preserves label fidelity because all instances originate from pathologist-selected lesion regions. Of \num{547} published WSIs, \num{387} contribute at least one ROI tile; the benchmark covers \num{151} patients and \num{99352} extracted patches over the seven-subtype target, a mild imbalance ($\rho\approx\num{4.6}$, $\Hnorm\approx\num{0.072}$ patch; $\rho\approx\num{2.3}$, $\Hnorm\approx\num{0.018}$ slide).
 
 \paragraph{PANDA.}
-The WSI-bag regime uses the canonical six-class ISUP grade (0~=~benign, 1--5~=~increasing cancer grade groups; $\Hnorm\approx\num{0.043}$). The patch regime uses a provider-consistent binary cancer/benign target derived from pixel masks ($\Hnorm\approx\num{0.332}$); because Radboud and Karolinska masks use institution-dependent value semantics, collapsing both to cancer/benign is the only label the two providers share. To keep frozen-feature extraction tractable, the benchmark uses a stratified subset of approximately \num{2000} biopsies, sampled to preserve the joint distribution of ISUP grade and provider. The per-slide evidence budget is the empirical median number of tissue tiles per biopsy (\num{421}); biopsies without available masks are excluded from the patch regime but kept in the WSI-bag regime.
+The WSI-bag regime uses the canonical six-class ISUP grade (0~=~benign, 1--5~=~increasing cancer grade groups; $\rho\approx\num{2.4}$, $\Hnorm\approx\num{0.043}$). The patch regime uses a provider-consistent binary cancer/benign target derived from pixel masks ($\rho\approx\num{4.7}$, $\Hnorm\approx\num{0.332}$); because Radboud and Karolinska masks use institution-dependent value semantics, collapsing both to cancer/benign is the only label the two providers share. To keep frozen-feature extraction tractable, the benchmark uses a stratified subset of approximately \num{2000} biopsies, sampled to preserve the joint distribution of ISUP grade and provider. The per-slide evidence budget is the empirical median number of tissue tiles per biopsy (\num{421}); biopsies without available masks are excluded from the patch regime but kept in the WSI-bag regime.
 
-\paragraph{Native imbalance is mild at the level the benchmark evaluates.}
-Table~\ref{tab:dataset-overview} makes a second point beyond the per-dataset summaries above: at
-\emph{slide} level---the unit every diagnostic target in this benchmark is ultimately scored
-on---all four datasets are only mildly skewed ($\Hnorm\in[0.018,0.085]$). The two large values in
-the table (CAMELYON16 patch $0.832$, PANDA patch $0.332$) are within-slide, binary mask effects, not
-properties of the typing, subtyping, or grading targets themselves. Figure~\ref{fig:native-imbalance-regimes}
-places these eight numbers against the imbalance factors long-tailed CV benchmarks use to stress-test
-the very mitigation methods evaluated here: Cui et al.\ construct long-tailed CIFAR-10/100 by an
-exponential class-count decay at imbalance factor $\rho=N_{\max}/N_{\min}\in\{10,\dots,200\}$
-\citep{cui2019classBalanced}, and Buda et al.\ study step and linear imbalance at comparable ratios
-\citep{buda2018systematic}; at $\rho=100$ this places $\Hnorm$ at $0.29$ for CIFAR-10-LT and $0.13$
-for CIFAR-100-LT (shaded band). Every native slide-level target sits below this band, and three of
-the four sit below even the more conservative CIFAR-100-LT end. Benchmarking imbalance-mitigation
-methods on these native distributions therefore under-tests them: the methods were designed for,
-and validated on, a regime of imbalance the native slide-level targets do not reach. \S\ref{sec:controlled}
-proposes a controlled-imbalance construction that closes this gap for a future benchmark iteration.
+\subsection{Quantifying imbalance}
+\label{sec:imbalance-measure}
+Imbalance is reported primarily by the head-to-tail ratio, the imbalance factor standard to the
+long-tailed-recognition literature the evaluated methods come from:
+\begin{equation}
+  \label{eq:imbalance-ratio}
+  \rho \;=\; \frac{N_{\max}}{N_{\min}} \;\ge\; 1,
+\end{equation}
+the largest-to-smallest class support, with $\rho=1$ perfectly balanced and larger values more
+skewed. Cui et al.\ and Buda et al.\ parameterise their long-tailed benchmarks directly by $\rho$
+(imbalance factors up to \num{200}), so reporting $\rho$ places each dataset on the same axis as the
+methods' design regime and as the controlled construction of \S\ref{sec:controlled}
+\citep{cui2019classBalanced,buda2018systematic}.
+
+The ratio has one blind spot: it depends only on the two extreme classes and ignores the shape of
+the distribution between them, and it is not comparable across datasets with different class counts.
+As a class-count-invariant cross-check, an entropy-based measure is therefore also reported. For
+empirical class proportions $p_1,\dots,p_K$ (with $\sum_i p_i = 1$), the Shannon entropy
+$H(p)=-\sum_{i=1}^{K} p_i \log p_i$ attains its maximum $\log K$ at the uniform distribution;
+normalising and complementing gives
+\begin{equation}
+  \label{eq:imbalance}
+  \Hnorm \;=\; 1 - \frac{-\sum_{i=1}^{K} p_i \log p_i}{\log K} \;\in\; [0,1],
+\end{equation}
+with \num{0} perfectly balanced and values toward \num{1} more skewed. The $\log K$ normalisation
+removes the dependence on the number of classes, so $\Hnorm$ compares a two-class cohort against a
+thirty-two-class one on a common scale where $\rho$ cannot. Both are reported separately at patch
+and slide level, because the two levels can differ sharply when patch labels are derived from masks
+rather than inherited from the slide; the full native class distributions are given in
+\citet{queisler2026datasets}.
+
+\paragraph{The two measures answer different questions.}
+Because $\Hnorm$ is a $\log K$-normalised average deviation from uniformity, a fixed $\rho$ maps to
+very different $\Hnorm$ depending on $K$: CAMELYON16 patches ($\rho\approx\num{39}$, $K=2$) score
+$\Hnorm\approx\num{0.832}$, whereas TCGA-UT patches at a comparable ratio ($\rho\approx\num{28}$,
+$K=32$) score only $\Hnorm\approx\num{0.085}$. The reverse also holds: an artificially long-tailed
+distribution at imbalance factor $\rho=100$---a regime everyone agrees is severe---still scores a
+low $\Hnorm\approx\num{0.13}$ once it has a hundred classes, because entropy is then dominated by the
+bulk of moderately populated classes and is nearly insensitive to how extreme the single rarest
+class is. Neither behaviour is a defect: $\rho$ measures the extremity of the tail while $\Hnorm$
+measures how far the \emph{whole} distribution sits from uniform, and the two coincide only at $K=2$.
+Reading them together---$\rho$ as the headline, $\Hnorm$ as the $K$-invariant cross-check---avoids
+being misled by either the tail-blindness of the entropy measure or the class-count-blindness of the
+ratio.
+
+\paragraph{Native imbalance is mild relative to the regime these methods target.}
+At \emph{slide} level---the unit every diagnostic target in this benchmark is ultimately scored
+on---all four datasets are only mildly skewed, whether read as $\Hnorm\in[\num{0.018},\num{0.085}]$
+or as a head-to-tail ratio $\rho\le\num{28.3}$ (Table~\ref{tab:dataset-overview}). The two large
+$\Hnorm$ values in the table (CAMELYON16 patch $\num{0.832}$, PANDA patch $\num{0.332}$) are
+within-slide, binary mask effects over modest underlying ratios ($\rho\approx\num{39}$ and
+$\num{4.7}$), not properties of the typing, subtyping, or grading targets themselves. This matters
+because the long-tailed-recognition methods evaluated here were designed for, and validated at, far
+harsher imbalance: Cui et al.\ construct long-tailed benchmarks by exponential class-count decay at
+imbalance factors $\rho=N_{\max}/N_{\min}$ up to \num{200} \citep{cui2019classBalanced}, and Buda et
+al.\ study step and linear imbalance at comparable ratios \citep{buda2018systematic}.
+Figure~\ref{fig:native-imbalance-regimes} places the native ratios against this
+$\rho\in[\num{100},\num{200}]$ stress-test band: every slide-level target sits an order of magnitude
+below it. Benchmarking imbalance-mitigation methods on the native distributions therefore
+under-tests them, which motivates the controlled construction of \S\ref{sec:controlled}.
 
 \begin{figure}[ht]
   \centering
   \IfFileExists{outputs/figures/native_imbalance_regimes.png}{%
     \includegraphics[width=0.75\linewidth]{native_imbalance_regimes.png}%
   }{\emph{Native imbalance regime figure unavailable.}}
-  \caption{Native $\Hnorm$ at patch/tile and slide level for all four datasets, against a reference
-    band for CIFAR-10-LT/CIFAR-100-LT at imbalance factor $\rho=100$
-    \citep{cui2019classBalanced}. Every slide-level target---the unit each diagnostic
-    question is scored on---sits below the band.}
+  \caption{Native head-to-tail ratio $\rho=N_{\max}/N_{\min}$ at patch/tile and slide level for all
+    four datasets (log scale), against the $\rho\in[\num{100},\num{200}]$ regime at which the
+    evaluated long-tailed-recognition methods were designed and validated
+    \citep{cui2019classBalanced,buda2018systematic}. Every slide-level target---the unit each
+    diagnostic question is scored on---sits an order of magnitude below the band.}
   \label{fig:native-imbalance-regimes}
 \end{figure}
-
-\medskip\noindent
-All four datasets use three random seeds, deterministic per-slide evidence caps, and frozen Virchow2 features. Hyperparameters are selected independently per method: for each candidate configuration the validation macro F1 is averaged over the three seeds and the configuration with the highest mean is chosen (balanced accuracy as tie-breaker); a single configuration per method is then fixed before evaluating on the held-out test split. Results are reported as mean~$\pm$~standard deviation across seeds, and patch and WSI-bag methods are compared only within their own regime.
 
 % ============================================================
 \section{Experimental Setup}
@@ -143,78 +186,7 @@ The methods, training protocol, and tuning grids below are shared across all fou
   \label{tab:method-groups}
 \end{table}
 
-Both benchmarks share a fixed training protocol (Table~\ref{tab:training-protocol}): AdamW at learning rate $10^{-3}$, weight decay $10^{-4}$, 30 epochs with no early stopping, final-epoch model selection, and seeds 0--2. The only per-method degree of freedom is a single imbalance-specific control, swept on validation using the grids in Table~\ref{tab:tuning-grid}; identical grids are applied on all four datasets. ProGAN sweeps only the final-depth refinement epochs, with generator training following Table~\ref{tab:progan-generator}.
-
-\begin{table}[ht]
-  \centering
-  \small
-  \begin{tabular}{lll}
-    \toprule
-    Setting & Patch benchmark & WSI-bag benchmark\\
-    \midrule
-    Optimizer & AdamW & AdamW\\
-    Learning rate & $10^{-3}$ & $10^{-3}$\\
-    Weight decay & $10^{-4}$ & $10^{-4}$\\
-    Epochs & 30 & 30\\
-    Early stopping & none & none\\
-    Minibatch size & 256 patches & 32 slide bags\\
-    Model selection & final epoch & final epoch\\
-    Random seeds & 0, 1, 2 & 0, 1, 2\\
-    \bottomrule
-  \end{tabular}
-  \caption{Shared training protocol for both benchmarks. All methods within a benchmark use the same optimizer, schedule, and epoch budget unless noted in \citet{queisler2026imbalanceMethods}.}
-  \label{tab:training-protocol}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \footnotesize
-  \renewcommand{\arraystretch}{1.10}
-  \begin{tabularx}{\linewidth}{@{}p{0.13\linewidth}p{0.25\linewidth}p{0.22\linewidth}X@{}}
-    \toprule
-    Regime & Method & Reference default & Validation grid\\
-    \midrule
-    Patch & Weighted CE & Weight power $=1$ & $\{0.25,0.5,0.75,1\}$\\
-    WSI bag & Weighted CE & Weight power $=1$ & $\{0,0.125,0.25,0.5,0.75,1\}$\\
-    Patch, WSI & Balanced sampler & Sampler power $=1$ & $\{0.5,0.75,1\}$\\
-    Patch, WSI & Focal loss & $\gamma=2$ & $\gamma\in\{0.5,1,1.5,2\}$\\
-    Patch & CE + soft F1 & Metric-loss weight $=1$ & $\{0.25,0.5,1,2,4,8,16,32,64,256,512,1024\}$\\
-    Patch & CE + soft MCC & Metric-loss weight $=1$ & $\{0.25,0.5,1,2,8,32\}$\\
-    Patch & CFAL & $\gamma=2$, $\sigma=1$ & $\sigma\in\{0.25,1,4\}$\\
-    Patch & ProGAN augmentation & Final-depth epochs $=25$ & $\{10,25,50\}$\\
-    Patch & OKO & $k=1$ & $k\in\{1,2,3,4,5,6,8,12,20\}$\\
-    WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32,128\}$\\
-    WSI bag & SC-MIL & $\tau=1$ & $\tau\in\{0.05,0.1,0.2,0.5\}$\\
-    WSI bag & MDE-MIL & $\lambda_{\mathrm{con}}=0.25$ & $\lambda_{\mathrm{con}}\in\{0.1,0.25,0.3,0.5,1,2,4\}$\\
-    \bottomrule
-  \end{tabularx}
-  \caption{Method-specific imbalance controls. Each row varies one control on validation while retaining the shared budget in Table~\ref{tab:training-protocol}. Identical grids are applied on all four datasets.}
-  \label{tab:tuning-grid}
-\end{table}
-
-\begin{table}[ht]
-  \centering
-  \small
-  \begin{tabular}{ll}
-    \toprule
-    Setting & Value\\
-    \midrule
-    Resolution stages & $4\times4$ to $256\times256$ (seven stages)\\
-    Epochs per stage (depths 1--6) & 25\\
-    Final-depth ($256{\times}256$) refinement epochs & 25 (reference); validation selects from $\{10,25,50\}$\\
-    Fade-in fraction for new layers & \num{0.5} (pinned to the reference 25-epoch schedule)\\
-    Latent dimension & 128\\
-    Base channel width & 512\\
-    Adversarial loss & WGAN-GP ($\lambda=10$, drift $=10^{-3}$)\\
-    Equalized learning rate & Yes (weight $\sim\mathcal{N}(0,1)$, scale $\sqrt{2/\text{fan\_in}}$ at forward)\\
-    Optimizer & Adam, learning rate $2\times10^{-4}$, $\beta_1=\num{0.5}$\\
-    Real patches per class for GAN training & Up to \num{2048}, deterministic per-class subsample\\
-    Synthetic count per tail class & Head-class train count minus class train count\\
-    \bottomrule
-  \end{tabular}
-  \caption{ProGAN generator training settings (TCGA-UT patch regime only). Depths 1--6 use 25 epochs each; for the final depth one long run trains to 50 epochs, snapshotting the generator at epochs 10, 25, and 50, and validation selects the snapshot with the best mean macro F1 over seeds, reusing one GAN training run for all three sweep points.}
-  \label{tab:progan-generator}
-\end{table}
+Both benchmarks share a fixed training protocol (Table~\ref{tab:training-protocol}): AdamW at learning rate $10^{-3}$, weight decay $10^{-4}$, 30 epochs with no early stopping, final-epoch model selection, and seeds 0--2. The only per-method degree of freedom is a single imbalance-specific control, swept on validation using the grids in Table~\ref{tab:tuning-grid}; identical grids are applied on all four datasets. ProGAN sweeps only the final-depth refinement epochs, with generator training following Table~\ref{tab:progan-generator}. These three protocol tables are collected in Appendix~\ref{app:protocol}.
 
 The patch and WSI-bag classifier heads (Figure~\ref{fig:benchmark-models}) are shared across all datasets. The patch head is a two-layer MLP (linear map to 512 units, ReLU, dropout \num{0.1}, linear output to $C$ classes); CFAL keeps the trunk but replaces the final linear map with one learnable prototype per class and Gaussian affinity-based prediction. The WSI-bag head is an attention-based MIL network: each instance passes through a shared encoder ($2560\to 256$), instance weights come from a linear scorer with softmax over instances, the bag representation is their weighted sum, and slide logits come from a final linear map. SC-MIL adds a two-layer projection head of width 256; MDE-MIL keeps the attention pooling but uses two expert heads. The WSI-bag input is capped at the dataset-specific evidence budget (Table~\ref{tab:dataset-overview}).
 
@@ -280,13 +252,22 @@ The patch and WSI-bag classifier heads (Figure~\ref{fig:benchmark-models}) are s
 
 Macro F1 is the primary ranking metric within each regime because it weights classes equally and penalizes failure on rare classes; balanced accuracy and accuracy are reported alongside it. Three complementary probability-quality metrics---negative log likelihood (NLL), multiclass Brier score, and expected calibration error (ECE)---are reported on held-out softmax outputs, both before and after a unified post-hoc temperature-scaling protocol in which, for each method and seed, a single temperature is fit on validation by minimizing NLL and applied unchanged to the test scores. Full metric definitions and the temperature-scaling protocol are given in \citet{queisler2026imbalanceMethods}.
 
+All four datasets use three random seeds, deterministic per-slide evidence caps, and frozen Virchow2 features. Hyperparameters are selected independently per method: for each candidate configuration the validation macro F1 is averaged over the three seeds and the configuration with the highest mean is chosen (balanced accuracy as tie-breaker); a single configuration per method is then fixed before evaluating on the held-out test split. Results are reported as mean~$\pm$~standard deviation across seeds, and patch and WSI-bag methods are compared only within their own regime.
+
 \subsection{Controlled imbalance construction}
 \label{sec:controlled}
-Section~\ref{sec:data} showed that every slide-level target is only mildly imbalanced relative to
-the CIFAR-LT regime the evaluated mitigation methods were designed for. Rather than accepting that
-mismatch, each dataset can be restructured to a controlled, artificially skewed distribution using
-two constructions from the long-tailed-recognition literature, both of which enforce a hard minimum
-support $N_{\text{floor}}$ so that no class is starved below what is needed for stable evaluation.
+Section~\ref{sec:imbalance-measure} showed that every native target is only mildly imbalanced
+relative to the long-tail stress-test regime the evaluated mitigation methods were designed for.
+Rather than accepting that mismatch, each dataset can be restructured to a controlled, artificially
+skewed distribution, applied \emph{independently} at patch and slide level to the class distribution
+each regime is scored on. Three constructions from the long-tailed-recognition literature are
+used---truncated exponential decay, step imbalance, and (for binary targets) ratio downsampling---each
+enforcing a hard minimum per-class support $N_{\text{floor}}$ so that no class is starved below what
+stable evaluation requires. The floor is grounded in the shared $70/15/15$ patient-disjoint split: at
+slide level $N_{\text{floor}}=\num{20}$ leaves at least three held-out test slides per class
+($\num{0.15}\times\num{20}$), and at patch level $N_{\text{floor}}=\num{200}$ leaves at least thirty
+test patches, the minimum for a non-degenerate per-class recall averaged over three seeds. The
+constructions only ever downsample.
 
 \paragraph{Truncated exponential decay (Cui et al.).}
 Ranking classes by native support, the target count for the $i$-th ranked class ($i=0,\dots,K-1$) is
@@ -296,57 +277,73 @@ Ranking classes by native support, the target count for the $i$-th ranked class 
   \qquad \mu\in(0,1),
 \end{equation}
 with $\mu$ chosen to hit a target imbalance factor $\rho=N_{\max}/N_{\min}$ \citep{cui2019classBalanced}.
-Unlike the original CIFAR-LT construction, which lets the tail decay to as few as a handful of images,
-$N_{\text{floor}}$ caps the decay so every class retains enough slides for macro-averaged evaluation.
+The floor caps the decay so that every class retains enough examples for macro-averaged evaluation
+instead of thinning to a handful.
 
 \paragraph{Step imbalance (Buda et al.).}
 Classes are split into a head group, which keeps its native support, and a tail group, which is
 uniformly downsampled to $N_{\text{floor}}$ \citep{buda2018systematic}. This isolates rarity as a
 binary property (in the head group or not) rather than a continuous rank effect, and lets the tail
-group be chosen for clinical relevance rather than by native rank.
+group be chosen for clinical relevance rather than by native rank. For binary targets neither
+scheme applies, so the minority class is simply ratio-downsampled to a target $\rho$, floored.
 
 \paragraph{Per-dataset strategy.}
-Table~\ref{tab:controlled-targets} applies these constructions, plus simple ratio downsampling for
-the binary CAMELYON16 case, to each dataset's native slide counts:
+Table~\ref{tab:controlled-targets} lists the construction at both levels, in the order of
+Table~\ref{tab:dataset-overview}:
 \begin{itemize}
-  \item \textbf{TCGA-UT} (32 classes) uses exponential decay ranked by native support, floored at
-    $N_{\text{floor}}=20$, so rare types such as DLBC and cholangiocarcinoma remain evaluable while
-    the head-to-tail ratio widens well past its native $28.3$:1.
-  \item \textbf{PANDA} (6 ordinal ISUP grades) uses the same decay but fixed to the ordinal grade
-    order rather than re-ranked by support, so the artificial skew still respects grade order; the
-    aggressive ISUP~4--5 grades are floored at $N_{\text{floor}}=50$.
-  \item \textbf{BRACS} (7 subtypes) uses step imbalance: the benign/usual head group
-    $\{$N, PB, UDH, IC$\}$ keeps native support, while the clinically critical atypical/malignant
-    tail $\{$FEA, ADH, DCIS$\}$ is floored at $N_{\text{floor}}=30$.
-  \item \textbf{CAMELYON16} (binary) is downsampled to a fixed \num{10}:1 normal:tumor ratio, floored
-    at $N_{\text{floor}}=20$ tumor slides, simulating a low-prevalence screening scenario.
+  \item \textbf{CAMELYON16} (binary at both levels). Slides are ratio-downsampled to a \num{10}:1
+    normal:tumor prevalence (a low-prevalence screening scenario), which the small cohort caps near
+    $\rho\approx\num{10}$; tumor patches, being abundant, are ratio-downsampled all the way to the
+    stress regime ($\rho=\num{100}$).
+  \item \textbf{TCGA-UT} (32 types, shared by both levels) uses exponential decay ranked by support.
+    The slide target widens to $\rho\approx\num{40}$, but the patch target barely moves
+    ($\rho\approx\num{28}$): the rarest type (DLBC) has only \num{168} patches, so the patch floor
+    binds before the decay can steepen---an honest ceiling on how imbalanced the patch regime can be
+    made without starving a class below evaluability.
+  \item \textbf{BRACS} (7 subtypes, shared) uses step imbalance: the benign/usual head
+    $\{$N, PB, UDH, IC$\}$ keeps native support while the clinically critical atypical/malignant tail
+    $\{$FEA, ADH, DCIS$\}$ is downsampled to the floor, reaching $\rho\approx\num{10}$ (slide) and
+    $\rho\approx\num{149}$ (patch).
+  \item \textbf{PANDA} (6 ISUP grades on slides, binary cancer/benign on patches). The slide target
+    uses exponential decay fixed to the ordinal grade order (respecting grade order) on the full
+    \num{10616}-slide training cohort---not the \num{2000}-slide feature-extraction subset used for
+    the native baselines---driving $\rho$ to $\approx\num{145}$; patches are ratio-downsampled to the
+    stress regime ($\rho=\num{100}$).
 \end{itemize}
-Figure~\ref{fig:controlled-construction} shows the resulting native-versus-target support for all
-four datasets; Table~\ref{tab:controlled-targets} reports the resulting head-to-tail ratio and
-$\Hnorm$. This construction is proposed as the basis for a future benchmark iteration; the results
-in \S\ref{sec:results} still use the native distributions.
+Figure~\ref{fig:controlled-regimes} shows the resulting target ratios against the same stress-test
+band as the native Figure~\ref{fig:native-imbalance-regimes}: the construction lifts every
+dataset--level pair into or toward the regime the methods were designed for, the sole exception being
+the TCGA-UT patch target noted above. Table~\ref{tab:controlled-targets} lists the target support,
+ratio, and $\Hnorm$ at both levels, and Appendix~\ref{app:distributions} plots the full
+native-versus-target distributions. This construction is proposed as the basis for a future benchmark
+iteration; the results in \S\ref{sec:results} use the native distributions.
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{outputs/figures/controlled_imbalance_construction.png}{%
-    \includegraphics[width=0.85\linewidth]{controlled_imbalance_construction.png}%
-  }{\emph{Controlled imbalance construction figure unavailable.}}
-  \caption{Native (grey) versus proposed controlled-imbalance target (red) slide support per
-    dataset, with the hard floor $N_{\text{floor}}$ (dotted). TCGA-UT and PANDA use truncated
-    exponential decay (Equation~\ref{eq:exp-decay}), ranked by support and by ordinal grade
-    respectively; BRACS uses step imbalance; CAMELYON16 uses ratio downsampling.}
-  \label{fig:controlled-construction}
+  \IfFileExists{outputs/figures/controlled_imbalance_regimes.png}{%
+    \includegraphics[width=0.75\linewidth]{controlled_imbalance_regimes.png}%
+  }{\emph{Controlled imbalance regime figure unavailable.}}
+  \caption{Target head-to-tail ratio $\rho$ at patch and slide level after the controlled
+    construction, against the $\rho\in[\num{100},\num{200}]$ stress-test band---the target counterpart
+    of the native Figure~\ref{fig:native-imbalance-regimes}. The construction lifts every
+    dataset--level pair into or toward the regime the evaluated methods were designed for, except the
+    TCGA-UT patch target, whose rarest type is patch-scarce.}
+  \label{fig:controlled-regimes}
 \end{figure}
 
 \begin{table}[ht]
   \centering
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \IfFileExists{outputs/tables/controlled_imbalance_targets.tex}{%
-    \resizebox{\linewidth}{!}{\input{outputs/tables/controlled_imbalance_targets.tex}}%
+    \input{outputs/tables/controlled_imbalance_targets.tex}%
   }{\emph{Controlled imbalance targets table unavailable.}}
-  \caption{Per-dataset controlled-imbalance construction: method, class count $K$, floor
-    $N_{\text{floor}}$, and the resulting head-to-tail ratio and entropy-based imbalance, native
-    versus target.}
+  \caption{Per-dataset controlled-imbalance construction at patch and slide level, in the order of
+    Table~\ref{tab:dataset-overview}. Each of the Support, $\rho$, and $\Hnorm$ columns reads
+    native~$\to$~target; Support is the total class-summed count (patches or slides), with the
+    percentage of the native total retained after downsampling. PANDA slide counts are the full
+    \num{10616}-slide training cohort (its patch counts are the \num{2000}-slide feature-extraction
+    subset, which leaves the ratios unchanged).}
   \label{tab:controlled-targets}
 \end{table}
 
@@ -359,7 +356,7 @@ The four datasets are reported in the order of Table~\ref{tab:dataset-overview}.
 % -------- CAMELYON16 --------
 \subsection{CAMELYON16 --- metastasis detection}
 \label{sec:results-camelyon16}
-CAMELYON16 is the most imbalanced dataset at patch level ($\Hnorm\approx\num{0.832}$) yet nearly balanced at slide level ($\approx\num{0.028}$), and its detection task is the most separable in the suite. The same frozen features separate tumor from normal tissue almost perfectly, so despite the severe patch imbalance every method reaches near-ceiling discrimination in both regimes (Table~\ref{tab:camelyon16-results}).
+CAMELYON16 is the most imbalanced dataset at patch level ($\rho\approx\num{39}$, $\Hnorm\approx\num{0.832}$) yet nearly balanced at slide level ($\rho\approx\num{1.5}$, $\Hnorm\approx\num{0.028}$), and its detection task is the most separable in the suite. The same frozen features separate tumor from normal tissue almost perfectly, so despite the severe patch imbalance every method reaches near-ceiling discrimination in both regimes (Table~\ref{tab:camelyon16-results}).
 
 \begin{table}[ht]
   \centering
@@ -382,7 +379,7 @@ In the patch regime, balanced accuracy ranges from \num{0.956} to \num{0.986} an
 % -------- TCGA-UT --------
 \subsection{TCGA-UT --- pan-cancer typing}
 \label{sec:results-tcgaut}
-TCGA-UT widens the task to 32-class pan-cancer typing at a mild imbalance ($\Hnorm\approx\num{0.085}$, identical at patch and slide level because every patch inherits its slide label). It receives the study's deepest analysis: how much the selected control matters varies sharply across methods---across-configuration variation exceeds twice the seed standard deviation only for OKO and RankMix, while every single-knob resampling, reweighting, and focal mechanism produces variation within seed noise (Appendix~\ref{app:additional-results}).
+TCGA-UT widens the task to 32-class pan-cancer typing at a mild imbalance ($\rho\approx\num{28}$, $\Hnorm\approx\num{0.085}$, identical at patch and slide level because every patch inherits its slide label). It receives the study's deepest analysis: how much the selected control matters varies sharply across methods---across-configuration variation exceeds twice the seed standard deviation only for OKO and RankMix, while every single-knob resampling, reweighting, and focal mechanism produces variation within seed noise (Appendix~\ref{app:additional-results}).
 
 \begin{table}[ht]
   \centering
@@ -403,7 +400,7 @@ On WSI bags, RankMix has the highest mean balanced accuracy and MDE-MIL the high
 % -------- BRACS --------
 \subsection{BRACS --- breast-lesion subtyping}
 \label{sec:results-bracs}
-BRACS returns to a single organ but sharpens to fine-grained seven-subtype breast-lesion classification at a mild imbalance ($\Hnorm\approx\num{0.072}$ patch, $\approx\num{0.018}$ slide). Absolute scores are far lower than on TCGA-UT because the task is intrinsically harder and the breast-only training pool is smaller; even task-specific BRACS models report only mid-60\% weighted F1 \citep{pati2022hierarchical,stegmuller2023scorenet}, so a frozen-feature benchmark under a bounded budget should not approach TCGA-UT-level discrimination.
+BRACS returns to a single organ but sharpens to fine-grained seven-subtype breast-lesion classification at a mild imbalance ($\rho\approx\num{4.6}$, $\Hnorm\approx\num{0.072}$ patch; $\rho\approx\num{2.3}$, $\Hnorm\approx\num{0.018}$ slide). Absolute scores are far lower than on TCGA-UT because the task is intrinsically harder and the breast-only training pool is smaller; even task-specific BRACS models report only mid-60\% weighted F1 \citep{pati2022hierarchical,stegmuller2023scorenet}, so a frozen-feature benchmark under a bounded budget should not approach TCGA-UT-level discrimination.
 
 \begin{table}[ht]
   \centering
@@ -426,7 +423,7 @@ In the patch regime, OKO and CFAL are the only methods that visibly separate fro
 % -------- PANDA --------
 \subsection{PANDA --- prostate cancer grading}
 \label{sec:results-panda}
-PANDA poses two mildly imbalanced targets on the same biopsies at opposite ends of the difficulty axis: binary cancer/benign tile detection ($\Hnorm\approx\num{0.332}$, patch regime) and six-class ordinal ISUP grading ($\approx\num{0.043}$, WSI-bag regime), the latter a fine-grained ordinal problem on which even purpose-built challenge models reach only moderate agreement \citep{bulten2022panda}.
+PANDA poses two mildly imbalanced targets on the same biopsies at opposite ends of the difficulty axis: binary cancer/benign tile detection ($\rho\approx\num{4.7}$, $\Hnorm\approx\num{0.332}$, patch regime) and six-class ordinal ISUP grading ($\rho\approx\num{2.4}$, $\Hnorm\approx\num{0.043}$, WSI-bag regime), the latter a fine-grained ordinal problem on which even purpose-built challenge models reach only moderate agreement \citep{bulten2022panda}.
 
 \begin{table}[ht]
   \centering
@@ -484,7 +481,7 @@ In the patch regime, every method reaches balanced accuracy between \num{0.832} 
 
 Table~\ref{tab:headroom} and Figure~\ref{fig:mitigation-headroom} collapse the four datasets to the comparison the report is built on, and three findings run across them.
 
-\emph{Imbalance severity and mitigation headroom are decoupled---indeed inversely related here.} CAMELYON16 is by far the most imbalanced dataset at patch level ($\Hnorm\approx\num{0.832}$, an order of magnitude above the others) yet shows among the smallest mitigation deltas ($+\num{0.008}$ macro F1 at patch level), because its detection task is near-ceiling. The largest positive deltas appear instead where imbalance is \emph{mild} but the task is hard and classes are entangled: BRACS patch ($\Hnorm\approx\num{0.072}$, $\Delta=+\num{0.039}$) and PANDA WSI-bag ISUP grading ($\Hnorm\approx\num{0.043}$, $\Delta=+\num{0.025}$). Ranking these datasets by imbalance would predict the opposite of what is observed.
+\emph{Imbalance severity and mitigation headroom are decoupled---indeed inversely related here.} CAMELYON16 has the highest patch-level imbalance in the suite ($\rho\approx\num{39}$, $\Hnorm\approx\num{0.832}$) yet shows among the smallest mitigation deltas ($+\num{0.008}$ macro F1 at patch level), because its detection task is near-ceiling. The largest positive deltas appear instead where imbalance is \emph{mild} but the task is hard and classes are entangled: BRACS patch ($\rho\approx\num{4.6}$, $\Hnorm\approx\num{0.072}$, $\Delta=+\num{0.039}$) and PANDA WSI-bag ISUP grading ($\rho\approx\num{2.4}$, $\Hnorm\approx\num{0.043}$, $\Delta=+\num{0.025}$). Ranking these datasets by imbalance would predict the opposite of what is observed.
 
 \emph{The patch/slide distinction is decisive, not incidental.} CAMELYON16's severe imbalance is entirely a within-slide, patch-level effect; at slide level its labels are nearly balanced ($\Hnorm\approx\num{0.028}$) and the slide-level detection task is exactly where every method ceilings. A large patch-level imbalance therefore creates no headroom once the representation separates the two classes, which is why disambiguating patch- from slide-level imbalance is necessary before reading any single ratio as a difficulty signal.
 
@@ -499,7 +496,7 @@ Table~\ref{tab:headroom} and Figure~\ref{fig:mitigation-headroom} collapse the f
 Once a strong frozen pathology encoder is fixed, patch-level gains come from reshaping the decision head or objective rather than from resampling or reweighting. CFAL replaces the linear head with learnable class prototypes and a margin objective, pulling examples toward compact class centres and penalising confusion with nearby wrong-class prototypes. OKO constructs training sets with one matched pair and $k$ distractors; averaging per-example logits across set members implicitly regularises logit magnitude and suppresses the over-confidence that afflicts CE-trained classifiers, which explains its combination of high balanced accuracy and the best raw NLL and Brier among patch methods. The simpler reweighting and resampling variants remain within the CE overlap band, consistent with the interpretation that exposure corrections address only part of the error pattern when the representation already separates most classes. ProGAN augmentation does not deliver a clear advantage despite pixel-level FID comparable to the source study \citep{ruizcasado2024enhancingHistopathological}; the decisive difference is that the source method trains its classifier end-to-end on pixels, whereas this benchmark feeds synthetic patches through a frozen encoder that may map slightly off-manifold synthetic patches into embedding regions the head rarely sees for real data. On WSI bags, RankMix and MDE-MIL improve on plain MIL CE in every seed, because the bottleneck there includes instance selection and bag aggregation, which mixing informative subsequences (RankMix) and coupling natural and balanced branches with cross-expert consistency (MDE-MIL) can address even when the underlying features are strong.
 
 \paragraph{(b) Separability, not imbalance, is the bottleneck.}
-The four datasets show that the imbalance of the class distribution does not predict whether mitigation helps. BRACS is mildly imbalanced ($\Hnorm\approx\num{0.072}$ at patch level) but hard---fine-grained breast-lesion subtyping entangled in the frozen feature space---so only OKO and CFAL show a measurable patch-level lift. CAMELYON16 is severely imbalanced at patch level ($\Hnorm\approx\num{0.832}$) but easy---tumor and normal tiles are nearly separable in frozen Virchow2---so every method reaches near-ceiling discrimination and the unweighted baseline is competitive. PANDA provides the cleanest within-cohort control: two mildly imbalanced targets on the same biopsies diverge sharply in difficulty---binary detection (balanced accuracy $\approx\num{0.85}$) versus six-class ISUP grading (macro F1 $\approx\num{0.58}$)---while the no-mitigation baseline remains competitive in both. What governs the value of mitigation under a frozen-feature benchmark is thus class separability in the representation, not the imbalance of the distribution, and this is a direct caution against selecting or ranking imbalance-mitigation methods by imbalance ratio alone.
+The four datasets show that the imbalance of the class distribution does not predict whether mitigation helps. BRACS is mildly imbalanced ($\rho\approx\num{4.6}$, $\Hnorm\approx\num{0.072}$ at patch level) but hard---fine-grained breast-lesion subtyping entangled in the frozen feature space---so only OKO and CFAL show a measurable patch-level lift. CAMELYON16 is severely imbalanced at patch level ($\rho\approx\num{39}$, $\Hnorm\approx\num{0.832}$) but easy---tumor and normal tiles are nearly separable in frozen Virchow2---so every method reaches near-ceiling discrimination and the unweighted baseline is competitive. PANDA provides the cleanest within-cohort control: two mildly imbalanced targets on the same biopsies diverge sharply in difficulty---binary detection (balanced accuracy $\approx\num{0.85}$) versus six-class ISUP grading (macro F1 $\approx\num{0.58}$)---while the no-mitigation baseline remains competitive in both. What governs the value of mitigation under a frozen-feature benchmark is thus class separability in the representation, not the imbalance of the distribution, and this is a direct caution against selecting or ranking imbalance-mitigation methods by imbalance ratio alone.
 
 \paragraph{(c) ProGAN frozen-feature hypothesis.}
 ProGAN augmentation is informative on BRACS and PANDA: the mild native imbalances never create the tail-scarcity regime where synthetic minority augmentation helped on TCGA-UT at harsher constructed severities. On BRACS (BAcc \num{0.460} versus CE \num{0.451}) and PANDA (macro F1 \num{0.855} versus CE \num{0.859}), ProGAN lands within between-seed noise of the CE baseline, neither helping nor hurting. This is consistent with the frozen-feature explanation rather than a generator-quality failure: the generators reach reasonable pixel-level FID, but their outputs must pass through a frozen encoder that may map slightly off-manifold synthetic patches into embedding regions the head rarely sees for real data.
@@ -511,10 +508,111 @@ TCGA-UT patch labels come from pathologist-selected tumor regions; they are usef
 \section{Conclusion}
 \label{sec:conclusion}
 % ============================================================
-This report benchmarked representative class-imbalance mitigation methods on four histopathology datasets spanning the difficulty--imbalance plane, using frozen Virchow2 features, bounded per-slide evidence budgets, and patient-disjoint splits throughout, and characterising imbalance by the entropy-based $\Hnorm$ at both patch and slide level. On CAMELYON16 every method reaches near-ceiling and the unweighted baseline is competitive despite the most severe patch imbalance in the suite; on TCGA-UT, CFAL reaches the highest patch-level macro F1 and OKO the highest balanced accuracy with the best raw NLL and Brier among patch methods, while RankMix and MDE-MIL lead the WSI-bag regime; on BRACS only OKO and CFAL separate from the CE baseline; and on PANDA both mildly imbalanced regimes are won by the no-mitigation baseline within between-seed noise. The practical implication is that the value of imbalance mitigation under a frozen-feature benchmark is governed by class separability in the representation, not by the imbalance of the class distribution. Imbalance mitigation should therefore be evaluated in the native input regime and alongside classwise recall and calibration, not only by aggregate discrimination, and method rankings should not be transferred across datasets on the basis of imbalance ratio alone.
+This report benchmarked representative class-imbalance mitigation methods on four histopathology datasets spanning the difficulty--imbalance plane, using frozen Virchow2 features, bounded per-slide evidence budgets, and patient-disjoint splits throughout, and characterising imbalance by the head-to-tail ratio $\rho$ with the entropy-based $\Hnorm$ as a class-count-invariant cross-check, at both patch and slide level. On CAMELYON16 every method reaches near-ceiling and the unweighted baseline is competitive despite the most severe patch imbalance in the suite; on TCGA-UT, CFAL reaches the highest patch-level macro F1 and OKO the highest balanced accuracy with the best raw NLL and Brier among patch methods, while RankMix and MDE-MIL lead the WSI-bag regime; on BRACS only OKO and CFAL separate from the CE baseline; and on PANDA both mildly imbalanced regimes are won by the no-mitigation baseline within between-seed noise. The practical implication is that the value of imbalance mitigation under a frozen-feature benchmark is governed by class separability in the representation, not by the imbalance of the class distribution. Imbalance mitigation should therefore be evaluated in the native input regime and alongside classwise recall and calibration, not only by aggregate discrimination, and method rankings should not be transferred across datasets on the basis of imbalance ratio alone.
 
 \clearpage
 \appendix
+
+% ============================================================
+\section{Training and Tuning Protocol}
+\label{app:protocol}
+% ============================================================
+The shared training protocol (Table~\ref{tab:training-protocol}), per-method imbalance-control tuning
+grids (Table~\ref{tab:tuning-grid}), and ProGAN generator settings (Table~\ref{tab:progan-generator})
+referenced in Section~\ref{sec:setup}.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{lll}
+    \toprule
+    Setting & Patch benchmark & WSI-bag benchmark\\
+    \midrule
+    Optimizer & AdamW & AdamW\\
+    Learning rate & $10^{-3}$ & $10^{-3}$\\
+    Weight decay & $10^{-4}$ & $10^{-4}$\\
+    Epochs & 30 & 30\\
+    Early stopping & none & none\\
+    Minibatch size & 256 patches & 32 slide bags\\
+    Model selection & final epoch & final epoch\\
+    Random seeds & 0, 1, 2 & 0, 1, 2\\
+    \bottomrule
+  \end{tabular}
+  \caption{Shared training protocol for both benchmarks. All methods within a benchmark use the same optimizer, schedule, and epoch budget unless noted in \citet{queisler2026imbalanceMethods}.}
+  \label{tab:training-protocol}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.10}
+  \begin{tabularx}{\linewidth}{@{}p{0.13\linewidth}p{0.25\linewidth}p{0.22\linewidth}X@{}}
+    \toprule
+    Regime & Method & Reference default & Validation grid\\
+    \midrule
+    Patch & Weighted CE & Weight power $=1$ & $\{0.25,0.5,0.75,1\}$\\
+    WSI bag & Weighted CE & Weight power $=1$ & $\{0,0.125,0.25,0.5,0.75,1\}$\\
+    Patch, WSI & Balanced sampler & Sampler power $=1$ & $\{0.5,0.75,1\}$\\
+    Patch, WSI & Focal loss & $\gamma=2$ & $\gamma\in\{0.5,1,1.5,2\}$\\
+    Patch & CE + soft F1 & Metric-loss weight $=1$ & \{0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 256, 512, 1024\}\\
+    Patch & CE + soft MCC & Metric-loss weight $=1$ & $\{0.25,0.5,1,2,8,32\}$\\
+    Patch & CFAL & $\gamma=2$, $\sigma=1$ & $\sigma\in\{0.25,1,4\}$\\
+    Patch & ProGAN augmentation & Final-depth epochs $=25$ & $\{10,25,50\}$\\
+    Patch & OKO & $k=1$ & $k\in\{1,2,3,4,5,6,8,12,20\}$\\
+    WSI bag & RankMix & $\alpha=1$ & $\alpha\in\{0.2,0.5,1,2,4,8,16,32,128\}$\\
+    WSI bag & SC-MIL & $\tau=1$ & $\tau\in\{0.05,0.1,0.2,0.5\}$\\
+    WSI bag & MDE-MIL & $\lambda_{\mathrm{con}}=0.25$ & $\lambda_{\mathrm{con}}\in\{0.1,0.25,0.3,0.5,1,2,4\}$\\
+    \bottomrule
+  \end{tabularx}
+  \caption{Method-specific imbalance controls. Each row varies one control on validation while retaining the shared budget in Table~\ref{tab:training-protocol}. Identical grids are applied on all four datasets.}
+  \label{tab:tuning-grid}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{ll}
+    \toprule
+    Setting & Value\\
+    \midrule
+    Resolution stages & $4\times4$ to $256\times256$ (seven stages)\\
+    Epochs per stage (depths 1--6) & 25\\
+    Final-depth ($256{\times}256$) refinement epochs & 25 (reference); validation selects from $\{10,25,50\}$\\
+    Fade-in fraction for new layers & \num{0.5} (pinned to the reference 25-epoch schedule)\\
+    Latent dimension & 128\\
+    Base channel width & 512\\
+    Adversarial loss & WGAN-GP ($\lambda=10$, drift $=10^{-3}$)\\
+    Equalized learning rate & Yes (weight $\sim\mathcal{N}(0,1)$, scale $\sqrt{2/\text{fan\_in}}$ at forward)\\
+    Optimizer & Adam, learning rate $2\times10^{-4}$, $\beta_1=\num{0.5}$\\
+    Real patches per class for GAN training & Up to \num{2048}, deterministic per-class subsample\\
+    Synthetic count per tail class & Head-class train count minus class train count\\
+    \bottomrule
+  \end{tabular}
+  \caption{ProGAN generator training settings (TCGA-UT patch regime only). Depths 1--6 use 25 epochs each; for the final depth one long run trains to 50 epochs, snapshotting the generator at epochs 10, 25, and 50, and validation selects the snapshot with the best mean macro F1 over seeds, reusing one GAN training run for all three sweep points.}
+  \label{tab:progan-generator}
+\end{table}
+
+% ============================================================
+\section{Controlled-Imbalance Target Distributions}
+\label{app:distributions}
+% ============================================================
+Full native-versus-target class distributions for the controlled construction of
+\S\ref{sec:controlled}, at both patch and slide level for all four datasets
+(Figure~\ref{fig:controlled-construction}). These are the per-class detail behind the summary
+ratios of Figure~\ref{fig:controlled-regimes} and Table~\ref{tab:controlled-targets}.
+
+\begin{figure}[htbp]
+  \centering
+  \IfFileExists{outputs/figures/controlled_imbalance_construction.png}{%
+    \includegraphics[width=0.9\linewidth]{controlled_imbalance_construction.png}%
+  }{\emph{Controlled imbalance construction figure unavailable.}}
+  \caption{Native (grey) versus proposed controlled-imbalance target (red) support per class, at
+    patch (left) and slide (right) level, one row per dataset in the order of
+    Table~\ref{tab:dataset-overview}, with the floor $N_{\text{floor}}$ (dotted). CAMELYON16 and
+    PANDA-patch use binary ratio downsampling; TCGA-UT uses truncated exponential decay (rank plots,
+    log scale); BRACS uses step imbalance; PANDA-slide uses ordinal exponential decay.}
+  \label{fig:controlled-construction}
+\end{figure}
 
 % ============================================================
 \section{Additional TCGA-UT Analysis}
@@ -626,21 +724,7 @@ This appendix collects the deeper TCGA-UT diagnostics referenced in Section~\ref
 \section{Native-Dataset Calibration Tables}
 \label{app:calibration}
 % ============================================================
-Raw and temperature-scaled (TS) calibration for BRACS, CAMELYON16, and PANDA, referenced in Section~\ref{sec:results}. Each table gives ECE before and after scaling and the fitted temperature $T$, mean $\pm$ standard deviation across seeds.
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/bracs_calibration_patch.tex}{\input{outputs/tables/bracs_calibration_patch.tex}}{\emph{BRACS patch calibration table unavailable.}}
-  \caption{BRACS native patch-feature calibration.}
-  \label{tab:bracs-calibration-patch}
-\end{table}
-
-\begin{table}[ht]
-  \centering
-  \IfFileExists{outputs/tables/bracs_calibration_wsi_bag.tex}{\input{outputs/tables/bracs_calibration_wsi_bag.tex}}{\emph{BRACS WSI-bag calibration table unavailable.}}
-  \caption{BRACS native WSI-bag calibration.}
-  \label{tab:bracs-calibration-wsi}
-\end{table}
+Raw and temperature-scaled (TS) calibration for CAMELYON16, BRACS, and PANDA, referenced in Section~\ref{sec:results}. Each table gives ECE before and after scaling and the fitted temperature $T$, mean $\pm$ standard deviation across seeds.
 
 \begin{table}[ht]
   \centering
@@ -654,6 +738,20 @@ Raw and temperature-scaled (TS) calibration for BRACS, CAMELYON16, and PANDA, re
   \IfFileExists{outputs/tables/camelyon16_calibration_wsi_bag.tex}{\input{outputs/tables/camelyon16_calibration_wsi_bag.tex}}{\emph{CAMELYON16 WSI-bag calibration table unavailable.}}
   \caption{CAMELYON16 native WSI-bag calibration.}
   \label{tab:camelyon16-calibration-wsi}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/bracs_calibration_patch.tex}{\input{outputs/tables/bracs_calibration_patch.tex}}{\emph{BRACS patch calibration table unavailable.}}
+  \caption{BRACS native patch-feature calibration.}
+  \label{tab:bracs-calibration-patch}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \IfFileExists{outputs/tables/bracs_calibration_wsi_bag.tex}{\input{outputs/tables/bracs_calibration_wsi_bag.tex}}{\emph{BRACS WSI-bag calibration table unavailable.}}
+  \caption{BRACS native WSI-bag calibration.}
+  \label{tab:bracs-calibration-wsi}
 \end{table}
 
 \begin{table}[ht]
@@ -686,7 +784,8 @@ Raw and temperature-scaled (TS) calibration for BRACS, CAMELYON16, and PANDA, re
     \emph{Patch} & $256\times256$ H\&E crop from a selected region; patch labels inherit the slide-level class.\\
     \emph{Patch embedding} & Frozen Virchow2 vector for one controlled patch; input to the patch-level classifier head.\\
     \emph{WSI bag} & Set of patch-feature instances for one slide, consumed by the MIL model.\\
-    \emph{Imbalance $\Hnorm$} & Entropy-based class-imbalance measure in $[0,1]$ (\num{0} balanced, \num{1} maximally skewed); reported at patch and slide level \citep{queisler2026datasets}.\\
+    \emph{Imbalance factor $\rho$} & Head-to-tail ratio $N_{\max}/N_{\min}\ge 1$ (the long-tailed-recognition imbalance factor); primary imbalance measure, reported at patch and slide level.\\
+    \emph{Imbalance $\Hnorm$} & Entropy-based class-imbalance measure in $[0,1]$ (\num{0} balanced, \num{1} maximally skewed); class-count-invariant cross-check to $\rho$, reported at patch and slide level \citep{queisler2026datasets}.\\
     \emph{Head/body/tail class} & Fixed support tier from the full TCGA-UT slide distribution (8 each for head and tail; 16 body).\\
     \emph{Case-disjoint split} & Split rule preventing any participant's slides, patches, or features from crossing train, validation, and test.\\
     \emph{Evidence budget} & Per-slide cap on the number of patch or bag instances; dataset-specific, following a common data-driven median rule (Table~\ref{tab:dataset-overview}).\\
