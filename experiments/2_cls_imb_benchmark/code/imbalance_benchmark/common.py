@@ -41,7 +41,7 @@ EXPERIMENT_ROOT = REPO_ROOT / "experiments" / "2_cls_imb_benchmark"
 DEFAULT_CONFIG_PATH = EXPERIMENT_ROOT / "configs" / "default.yaml"
 RUN_RECORD_NAME = "run.json"
 EVAL_ARRAYS_NAME = "eval_arrays.npz"
-ARRAY_FIELDS = ("labels", "preds", "probabilities")
+ARRAY_FIELDS = ("labels", "preds", "probabilities", "logits")
 
 
 def load_config(path: str | Path | None = None) -> dict[str, Any]:

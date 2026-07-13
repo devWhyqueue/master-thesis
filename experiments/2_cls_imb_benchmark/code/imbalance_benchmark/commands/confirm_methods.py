@@ -7,6 +7,7 @@ from typing import Any
 
 import torch
 
+from imbalance_benchmark.analysis.metrics import classification_payload
 from imbalance_benchmark.common import write_run_record
 from imbalance_benchmark.data import TrainDataset
 from imbalance_benchmark.modeling.context import (
@@ -34,11 +35,13 @@ __all__ = [
 
 @dataclass
 class RunContext(Regime):
-    """Shared per-condition confirmation inputs: locked test loader, paths, and seeds."""
+    """Shared per-condition confirmation inputs: locked val/test loaders, paths, and seeds."""
 
+    val_loader: torch.utils.data.DataLoader
     test_loader: torch.utils.data.DataLoader
     paths: dict[str, Path]
     seeds: list[int]
+    class_names: list[str]
 
 
 def _timed_fit(fit_fn: Any, ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
@@ -61,19 +64,19 @@ def _cost_payload(
     }
 
 
-def _split_payload(res: dict[str, Any]) -> dict[str, Any]:
-    """Assemble one evaluated split's metrics and prediction arrays for the run record."""
-    return {
-        "accuracy": res["balanced_accuracy"],
-        "balanced_accuracy": res["balanced_accuracy"],
-        "macro_precision": res["balanced_accuracy"],
-        "macro_recall": res["balanced_accuracy"],
-        "macro_f1": res["macro_f1"],
-        "negative_log_likelihood": res["nll"],
-        "labels": res["targets"].tolist(),
-        "preds": res["preds"].tolist(),
-        "probabilities": res["probs"].tolist(),
-    }
+def _split_payload(res: dict[str, Any], class_names: list[str]) -> dict[str, Any]:
+    """Assemble one evaluated split's real classwise metrics and prediction arrays."""
+    payload = classification_payload(
+        res["targets"].tolist(),
+        res["preds"].tolist(),
+        res["probs"].tolist(),
+        class_names,
+    )
+    payload["labels"] = res["targets"].tolist()
+    payload["preds"] = res["preds"].tolist()
+    payload["probabilities"] = res["probs"].tolist()
+    payload["logits"] = res["logits"].tolist()
+    return payload
 
 
 def _run_and_record(
@@ -87,18 +90,27 @@ def _run_and_record(
     logit_adj_tau: float | None = None,
     class_priors_tensor: torch.Tensor | None = None,
 ) -> None:
-    """Evaluate a locked confirmation checkpoint once and write its run record."""
+    """Evaluate a locked confirmation checkpoint on validation and test, and write its run record."""
     model = ctx["model"]
     model.load_state_dict({k: v.to(run.device) for k, v in state.items()})
-    res = run_evaluation(
-        model,
-        run.test_loader,
-        run.device,
-        run.is_mil,
-        run.n_classes,
-        logit_adj_tau,
-        class_priors_tensor,
-    )
+    splits = {
+        split_name: _split_payload(
+            run_evaluation(
+                model,
+                loader,
+                run.device,
+                run.is_mil,
+                run.n_classes,
+                logit_adj_tau,
+                class_priors_tensor,
+            ),
+            run.class_names,
+        )
+        for split_name, loader in (
+            ("validation", run.val_loader),
+            ("test", run.test_loader),
+        )
+    }
     batch_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), batch_size)
     write_run_record(
@@ -108,9 +120,10 @@ def _run_and_record(
             "condition": cond,
             "method": method,
             "seed": ctx["seed"],
+            "class_names": run.class_names,
             "tuning_params": ctx["param_config"],
             "cost": _cost_payload(method, budget, batch_size, elapsed, model),
-            "splits": {"test": _split_payload(res)},
+            "splits": splits,
         },
     )
 

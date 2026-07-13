@@ -20,11 +20,11 @@ from imbalance_benchmark.modeling.losses import (
     ScholzCombinedLoss,
 )
 from imbalance_benchmark.analysis import (
-    compute_ece,
-    compute_brier_score,
-    run_paired_permutation_test,
+    expected_calibration_error,
+    brier_score,
     holm_adjust_pvalues,
 )
+from imbalance_benchmark.analysis.inference.permutation import paired_block_permutation_ba
 
 def test_split_cases():
     # Generate dummy patient/slide mapping
@@ -109,18 +109,22 @@ def test_calibration_and_permutation():
         [0.1, 0.1, 0.8]
     ])
     targets = np.array([0, 1, 2])
-    ece = compute_ece(probs, targets, n_bins=5)
+    ece = expected_calibration_error(targets, probs, n_bins=5)
     assert 0.0 <= ece <= 1.0
-    
-    brier = compute_brier_score(probs, targets, n_classes=3)
+
+    brier = brier_score(targets, probs, n_classes=3)
     assert brier >= 0.0
-    
-    # Permutation test
-    metrics_a = np.array([0.9, 0.8, 0.85, 0.9])
-    metrics_b = np.array([0.7, 0.6, 0.75, 0.65])
-    p_val = run_paired_permutation_test(metrics_a, metrics_b, n_permutations=100)
+
+    # Paired patient-block permutation test
+    labels = np.array([0, 1, 0, 1])
+    case_ids = np.array(["P0", "P1", "P2", "P3"])
+    method_preds = np.array([0, 1, 0, 1])
+    ce_preds = np.array([1, 0, 1, 0])
+    p_val = paired_block_permutation_ba(
+        labels, method_preds, ce_preds, case_ids, n_classes=2, n_permutations=100
+    )
     assert 0.0 <= p_val <= 1.0
-    
+
     # Holm adjustment
     p_vals = [0.01, 0.04, 0.02, 0.15]
     adj = holm_adjust_pvalues(p_vals)

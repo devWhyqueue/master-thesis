@@ -69,12 +69,23 @@ def _confirm_inputs(args: argparse.Namespace) -> tuple[dict[str, Any], RunContex
     test_ds = dataset_cls(
         paths["data"] / "manifest.csv", split_name="test", device=device
     )
-    test_ldr = torch.utils.data.DataLoader(
-        test_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
+    val_ds = dataset_cls(
+        paths["data"] / "manifest.csv", split_name="validation", device=device
     )
+    collate = bag_collate if is_mil else None
+    val_ldr = torch.utils.data.DataLoader(val_ds, batch_size=64, collate_fn=collate)
+    test_ldr = torch.utils.data.DataLoader(test_ds, batch_size=64, collate_fn=collate)
     seeds = [derive_seed(args.seed, role) for role in CONFIRMATION_SEED_ROLES]
     run = RunContext(
-        device, config, test_ds.get_n_classes(), is_mil, test_ldr, paths, seeds
+        device,
+        config,
+        test_ds.get_n_classes(),
+        is_mil,
+        val_ldr,
+        test_ldr,
+        paths,
+        seeds,
+        test_ds.classes,
     )
     return best_configs, run
 
