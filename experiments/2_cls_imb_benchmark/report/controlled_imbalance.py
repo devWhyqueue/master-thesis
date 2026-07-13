@@ -32,6 +32,7 @@ TARGET_COLOR = "#c8615a"
 PATCH_COLOR = "#4c78a8"
 SLIDE_COLOR = "#c8615a"
 STRESS_LOW, STRESS_HIGH = 100.0, 200.0
+PENDING_FULL_COHORT = {"PANDA"}
 
 
 def plot_target_regimes(targets: dict, path: Path) -> None:
@@ -113,6 +114,14 @@ def _row(name: str, level: str, panel: dict) -> str:
     )
 
 
+def _pending_rows(name: str) -> list[str]:
+    note = "Full-cohort supports and targets pending computation"
+    return [
+        f"{name} & Patch & \\multicolumn{{5}}{{l}}{{\\emph{{{note}}}}}\\\\",
+        f" & Slide & \\multicolumn{{5}}{{l}}{{\\emph{{{note}}}}}\\\\",
+    ]
+
+
 def write_targets_table(targets: dict, path: Path) -> None:
     """Write the both-levels construction summary as a booktabs LaTeX table."""
     header = (
@@ -122,6 +131,9 @@ def write_targets_table(targets: dict, path: Path) -> None:
     for i, (name, levels) in enumerate(targets.items()):
         if i:
             body.append("\\addlinespace")
+        if name in PENDING_FULL_COHORT:
+            body.extend(_pending_rows(name))
+            continue
         body.append(_row(name, "Patch", levels["patch"]))
         body.append(_row("", "Slide", levels["slide"]))
     body.extend(["\\bottomrule", "\\end{tabular}"])

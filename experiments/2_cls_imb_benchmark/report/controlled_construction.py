@@ -9,16 +9,17 @@ returned in the Table-1 order (CAMELYON16, TCGA-UT, BRACS, PANDA).
 
 from __future__ import annotations
 
-# Slide floor: the 70/15/15 split leaves >= 0.15*20 = 3 test slides per class.
-# Patch floor: >= 0.15*200 = 30 test patches per class for stable per-class recall.
+# For a 15% test split, support S bounds recall SE by 1/(2*sqrt(0.15*S)).
+# S=20 gives SE <= 0.29 and is near the cohort-limited slide maximum (DLBC: 28);
+# S=200 gives SE <= 0.10 from about 30 held-out patches per class.
 SLIDE_FLOOR = 20
 PATCH_FLOOR = 200
-# Binary patch targets are pushed to the long-tail stress-test regime (rho ~ 100).
+# Binary patch targets use the literature-validated stress-test band entry (rho=100).
 PATCH_RATIO = 100
 
-# PANDA's slide construction uses the FULL 10,616-slide cohort (train.csv), not the
-# 2000-slide feature-extraction subset; its patch counts are only the subset, but
-# rho and H_norm are proportion-based so the ratios are unaffected.
+# PANDA's slide construction uses the full 10,616-slide cohort (train.csv).
+# Its patch construction uses the 2,000-slide feature subset: 580,531 benign and
+# 122,751 cancer patches (the counts in outputs/counts/counts.json).
 PANDA_FULL_SLIDES = {
     "ISUP0": 2892,
     "ISUP1": 2666,
