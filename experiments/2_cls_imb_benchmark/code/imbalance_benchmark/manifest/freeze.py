@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 import numpy as np
 import pandas as pd
 
@@ -14,6 +15,8 @@ __all__ = [
     "build_tail_assignments",
     "verify_manifest_freeze",
 ]
+
+ClassKey = TypeVar("ClassKey", str, int)
 
 
 def normalized_entropy(counts: list[int]) -> float:
@@ -28,7 +31,7 @@ def normalized_entropy(counts: list[int]) -> float:
     return 1.0 - h / np.log(k)
 
 
-def achieved_rho(counts: dict[str, int]) -> float:
+def achieved_rho(counts: Mapping[ClassKey, int]) -> float:
     """Compute the realized head/tail imbalance ratio from per-class counts."""
     values = [c for c in counts.values() if c > 0]
     if not values:

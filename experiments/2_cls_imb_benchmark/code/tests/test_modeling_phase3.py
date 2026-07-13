@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import torch
 
-from imbalance_benchmark.data import BagFeatureDataset, ImbalanceDataset, bag_collate
+from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset, bag_collate
 from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID, get_grid_configs, roster_for_regime
 from imbalance_benchmark.modeling.losses import rankmix_bag_loss
 from imbalance_benchmark.modeling.models import (

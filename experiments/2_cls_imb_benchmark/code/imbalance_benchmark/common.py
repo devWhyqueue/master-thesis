@@ -48,9 +48,7 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
     """Load configuration from YAML."""
     config_path = Path(path) if path else DEFAULT_CONFIG_PATH
     if not config_path.exists():
-        fallback = EXPERIMENT_ROOT / "tcga_ut" / "configs" / "default.yaml"
-        if fallback.exists():
-            config_path = fallback
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
     with config_path.open("r", encoding="utf-8") as handle:
         config = yaml.safe_load(handle)
     if not isinstance(config, dict):

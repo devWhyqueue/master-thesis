@@ -14,7 +14,7 @@ from imbalance_benchmark.commands.confirm_methods import (
     confirm_post_hoc,
 )
 from imbalance_benchmark.common import ensure_dirs, load_config
-from imbalance_benchmark.data import (
+from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
     TrainDataset,

@@ -41,18 +41,18 @@ dev = [
 [tool.setuptools]
 include-package-data = false
 
-[tool.setuptools.package-dir]
-"" = ".agents/skills/bib/src"
-
 [tool.setuptools.packages.find]
-where = [".agents/skills/bib/src", "experiments/shared"]
+where = [".agents/skills/bib/src", "experiments/2_cls_imb_benchmark/code"]
 
 [tool.vulture]
 ignore_names = ["forward"]
 
 [tool.pytest.ini_options]
 addopts = "-s"
-testpaths = [".agents/skills/bib/tests"]
+testpaths = [
+    ".agents/skills/bib/tests",
+    "experiments/2_cls_imb_benchmark/code/tests",
+]
 
 [tool.uv.sources]
 torch = [

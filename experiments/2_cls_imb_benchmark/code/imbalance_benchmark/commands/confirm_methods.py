@@ -9,7 +9,7 @@ import torch
 
 from imbalance_benchmark.analysis.metrics import classification_payload
 from imbalance_benchmark.common import write_run_record
-from imbalance_benchmark.data import TrainDataset
+from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.modeling.context import (
     Regime,
     build_training_ctx,

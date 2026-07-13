@@ -1,16 +1,14 @@
 # master-thesis
 
-Master's thesis: class-imbalance mitigation in computational pathology, using frozen Virchow2 WSI feature bags on TCGA-UT.
+Master's thesis: controlled class-imbalance mitigation in computational pathology, using frozen Virchow2 features.
 
 ## Key paths
 
 | Path | Purpose |
 |---|---|
-| `experiments/class_imbalance/` | Active experiment — baselines + imbalance methods + GAN synthetic feature bridge |
-| `experiments/class_imbalance/report/main.pdf` | Class-imbalance paper draft |
-| `experiments/design_dataset/` | Dataset design experiment (code, report, visualizations) |
-| `experiments/design_dataset/report/main.pdf` | Dataset design paper draft |
-| `experiments/shared/` | Common code and tests shared across experiments |
+| `experiments/2_cls_imb_benchmark/` | Unified controlled class-imbalance benchmark |
+| `experiments/2_cls_imb_benchmark/code/` | Importable benchmark package and test suite |
+| `experiments/2_cls_imb_benchmark/report/main.pdf` | Controlled-benchmark report |
 | `papers/sources.bib` | Main bibliography (local `file` paths + screening metadata) |
 | `papers/` | PDFs organised by topic |
 | `docs/` | Thesis reference PDFs, glossary, FAQ |
@@ -42,6 +40,7 @@ uv run bib pdf-sync papers/sources.bib --pdf-dir papers --in-place
 
 ```bash
 uv run pytest .agents/skills/bib/tests
+uv run pytest experiments/2_cls_imb_benchmark/code/tests
 uv run pyright
 uv run ruff check .
 ```
@@ -55,6 +54,9 @@ uv run ruff check .
 
 ## Experiments
 
-See each experiment's own `README.md` for the Hydra runbook:
-- [`experiments/class_imbalance/README.md`](./experiments/class_imbalance/README.md)
-- [`experiments/design_dataset/`](./experiments/design_dataset/)
+The unified benchmark CLI is available after `uv sync`:
+
+```bash
+uv run python experiments/2_cls_imb_benchmark/code/__main__.py --help
+uv run python experiments/2_cls_imb_benchmark/code/__main__.py submit --dry-run
+```

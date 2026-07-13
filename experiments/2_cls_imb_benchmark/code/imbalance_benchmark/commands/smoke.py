@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
 
 import yaml
 
@@ -12,7 +11,7 @@ from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.commands.tuning import cmd_tune
-from imbalance_benchmark.common import cmd_submit
+from imbalance_benchmark.common import REPO_ROOT, cmd_submit
 
 __all__ = ["cmd_smoke"]
 
@@ -26,8 +25,8 @@ def cmd_smoke(args: argparse.Namespace) -> None:
         "paths": {"outputs": "experiments/2_cls_imb_benchmark/smoke_outputs"},
         "slurm": {"partition": "cpu-test", "container": "./environment.sif"},
     }
-    config_path = Path(
-        "experiments/2_cls_imb_benchmark/smoke_outputs/configs/default.yaml"
+    config_path = (
+        REPO_ROOT / "experiments/2_cls_imb_benchmark/smoke_outputs/configs/default.yaml"
     )
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with config_path.open("w", encoding="utf-8") as f:

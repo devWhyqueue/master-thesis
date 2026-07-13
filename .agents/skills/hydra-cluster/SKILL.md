@@ -39,9 +39,9 @@ Paths with spaces must be double-quoted in every shell layer.
 import subprocess, shlex
 from pathlib import Path
 
-SIF    = "/home/yannik.qu/master-thesis/experiments/class_imbalance/environment.sif"
-PYPATH = "/home/yannik.qu/master-thesis/experiments/shared:/home/yannik.qu/master-thesis/experiments/design_dataset/code"
-RESULTS = "/home/yannik.qu/master-thesis/experiments/design_dataset/results/full_scale"
+SIF = "/home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif"
+PYPATH = "/home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code"
+RESULTS = "/home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs"
 
 # Verify paths before submitting — a missing path gives an immediate failure
 for p in [SIF, RESULTS]:

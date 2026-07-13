@@ -8,7 +8,7 @@ import torch
 
 from imbalance_benchmark.common import ensure_dirs, load_config, write_json
 from imbalance_benchmark.construction import patient_equals_slide
-from imbalance_benchmark.data import BagFeatureDataset, ImbalanceDataset
+from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.manifest.pilot import (
     method_floor,
     pilot_levels_for,

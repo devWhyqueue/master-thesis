@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
-from imbalance_benchmark.data import bag_collate
+from imbalance_benchmark.datasets.data import bag_collate
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
@@ -60,7 +60,7 @@ def get_balanced_sampler(
     """Create a WeightedRandomSampler for class balancing."""
     w = 1.0 / np.maximum(np.bincount(labels), 1.0)
     return WeightedRandomSampler(
-        [float(w[l] ** strength) for l in labels],
+        [float(w[label] ** strength) for label in labels],
         len(labels),
         replacement=True,
         generator=torch.Generator().manual_seed(seed),

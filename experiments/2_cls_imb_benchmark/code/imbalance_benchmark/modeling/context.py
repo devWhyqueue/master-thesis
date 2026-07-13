@@ -6,7 +6,7 @@ from typing import Any
 
 import torch
 
-from imbalance_benchmark.data import TrainDataset
+from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.modeling.models import build_model
 
 __all__ = [

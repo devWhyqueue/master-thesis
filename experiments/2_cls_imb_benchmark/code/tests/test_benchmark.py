@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 import torch
 
 from imbalance_benchmark.construction import (
     split_cases,
     allocate_counts,
     select_patches_round_robin,
-    select_slides_round_robin,
 )
 from imbalance_benchmark.modeling.models import (
     MLP,
-    AttentionMil,
 )
 from imbalance_benchmark.modeling.losses import (
     FocalLoss,

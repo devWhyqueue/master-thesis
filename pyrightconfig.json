@@ -1,0 +1,10 @@
+{
+  "include": [
+    "experiments/2_cls_imb_benchmark/code"
+  ],
+  "extraPaths": [
+    "experiments/2_cls_imb_benchmark/code"
+  ],
+  "venvPath": ".",
+  "venv": ".venv_win"
+}

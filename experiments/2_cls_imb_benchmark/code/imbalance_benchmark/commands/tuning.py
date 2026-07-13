@@ -8,7 +8,7 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.common import ensure_dirs, load_config, write_json
-from imbalance_benchmark.data import (
+from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
     TrainDataset,

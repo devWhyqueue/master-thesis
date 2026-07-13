@@ -8,7 +8,11 @@ import torch
 import torch.nn as nn
 
 from imbalance_benchmark.construction import select_slides_round_robin
-from imbalance_benchmark.data import BagFeatureDataset, ImbalanceDataset, bag_collate
+from imbalance_benchmark.datasets.data import (
+    BagFeatureDataset,
+    ImbalanceDataset,
+    bag_collate,
+)
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import MLP, AttentionMil
 from imbalance_benchmark.modeling.training import fit_model
