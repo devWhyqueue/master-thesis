@@ -1,0 +1,42 @@
+# Unified configuration for experiments/2_cls_imb_benchmark/code/imbalance_benchmark.
+# Local paths only; scientific controls/grids are checked-in constants in the
+# package itself so this file cannot silently change the protocol.
+
+paths:
+  outputs: experiments/2_cls_imb_benchmark/outputs
+
+# Select and configure exactly one dataset adapter (imbalance_benchmark.datasets).
+# regime: patch | wsi
+dataset:
+  name: tcga_ut
+  regime: patch
+  seed: 0
+
+  # tcga_ut
+  raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
+  feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
+  feature_glob: "*.pt"
+  feature_suffix_pattern: "_[0-9]+"
+
+  # bracs
+  # root: /home/space/datasets/patho_ds/bracs
+  # metadata_csv:
+  # tile_root: /home/space/datasets/patho_ds/bracs/tiles
+  # tile_size: 256
+
+  # camelyon16
+  # root: /home/space/datasets/patho_ds/camelyon16
+
+  # panda
+  # selection_path: /home/space/datasets/patho_ds/panda/selected_slides.csv
+  # tiles_dir: /home/space/datasets/patho_ds/panda/tiles
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+slurm:
+  partition: gpu-2h
+  container: ./environment.sif

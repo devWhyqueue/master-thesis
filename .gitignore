@@ -10,6 +10,8 @@ pyrightconfig.json
 .ruff_cache/
 *.sqlite*
 .claude/
+smoke_outputs/
+logs/
 
 # LaTeX build outputs
 *.aux

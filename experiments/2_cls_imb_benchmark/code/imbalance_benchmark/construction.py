@@ -1,0 +1,227 @@
+from __future__ import annotations
+
+import logging
+from typing import cast
+import numpy as np
+import pandas as pd
+
+from imbalance_benchmark.common import compute_data_hash
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "split_cases",
+    "allocate_counts",
+    "select_patches_round_robin",
+    "select_slides_round_robin",
+    "build_manifest_hash",
+]
+
+
+def split_cases(
+    df: pd.DataFrame, seed: int, val_frac: float = 0.15, test_frac: float = 0.15
+) -> pd.DataFrame:
+    """Stratify patients disjointly into train, validation, and test splits."""
+    case_labels = df.groupby("case_id")["cancer_type"].first().reset_index()
+    rng = np.random.default_rng(seed)
+    assignments: dict[str, str] = {}
+    for _, group in case_labels.groupby("cancer_type"):
+        cases = group["case_id"].to_numpy().astype(str)
+        rng.shuffle(cases)
+        n = len(cases)
+        if n <= 2:
+            for idx, c in enumerate(cases):
+                assignments[c] = "train" if idx == 0 else "test"
+        else:
+            nt, nv = max(1, int(round(n * test_frac))), max(1, int(round(n * val_frac)))
+            if nt + nv >= n:
+                nt, nv = 1, 1
+            for c in cases[:nt]:
+                assignments[c] = "test"
+            for c in cases[nt : nt + nv]:
+                assignments[c] = "validation"
+            for c in cases[nt + nv :]:
+                assignments[c] = "train"
+    df_splits = df.copy()
+    df_splits["split"] = df_splits["case_id"].astype(str).map(assignments.get)
+    return df_splits
+
+
+def _adjust_alloc(
+    allocated: list[int],
+    available: list[int],
+    target: list[float],
+    diff: int,
+    min_support: int,
+) -> None:
+    """Adjust counts up or down to match target exactly."""
+    k = len(allocated)
+    if diff > 0:
+        while diff > 0:
+            cands = [i for i in range(k) if allocated[i] < available[i]]
+            if not cands:
+                break
+            cands.sort(key=lambda idx: target[idx] - allocated[idx], reverse=True)
+            allocated[cands[0]] += 1
+            diff -= 1
+    elif diff < 0:
+        while diff < 0:
+            cands = [i for i in range(k) if allocated[i] > min_support]
+            if not cands:
+                break
+            cands.sort(key=lambda idx: allocated[idx] - target[idx], reverse=True)
+            allocated[cands[0]] -= 1
+            diff += 1
+
+
+def allocate_counts(
+    available: list[int], total_t: int, rho: float, min_support: int
+) -> list[int]:
+    """Perform constrained integer allocation for class counts under exponential formula."""
+    k = len(available)
+    if k == 0:
+        return []
+    if k == 1:
+        return [min(total_t, available[0])]
+    w = [rho ** (-i / (k - 1)) for i in range(k)]
+    sum_w = sum(w)
+    target = [total_t * val / sum_w for val in w]
+    allocated = [
+        int(np.clip(round(t), min_support, avail))
+        for t, avail in zip(target, available)
+    ]
+    _adjust_alloc(allocated, available, target, total_t - sum(allocated), min_support)
+    return allocated
+
+
+def _build_patch_hierarchy(
+    df_class: pd.DataFrame, rng: np.random.Generator
+) -> tuple[list[str], dict[str, dict[str, list[int]]]]:
+    """Build nested randomized dictionary for patch sampling."""
+    patients = cast(np.ndarray, df_class["case_id"].unique())
+    rng.shuffle(patients)
+    h: dict[str, dict[str, list[int]]] = {}
+    for pat in patients:
+        h[pat] = {}
+        pat_df = cast(pd.DataFrame, df_class[df_class["case_id"] == pat])
+        slides = cast(np.ndarray, pat_df["slide_id"].unique())
+        rng.shuffle(slides)
+        for sld in slides:
+            pids = cast(np.ndarray, pat_df[pat_df["slide_id"] == sld].index.to_numpy())
+            rng.shuffle(pids)
+            h[pat][sld] = list(pids)
+    return list(patients), h
+
+
+def _loop_patches(
+    patients: list[str], h: dict, max_p: int, max_s: int, n: int
+) -> tuple[list[int], dict, dict]:
+    """Execute loop for round robin patch sampling."""
+    selected, pat_counts, sld_counts = [], {p: 0 for p in patients}, {}
+    prog = True
+    while len(selected) < n and prog:
+        prog = False
+        for p in patients:
+            if len(selected) >= n or pat_counts[p] >= max_p:
+                continue
+            for s in h[p]:
+                if len(selected) >= n or pat_counts[p] >= max_p:
+                    break
+                if sld_counts.get(s, 0) >= max_s or not h[p][s]:
+                    continue
+                selected.append(h[p][s].pop(0))
+                pat_counts[p] += 1
+                sld_counts[s] = sld_counts.get(s, 0) + 1
+                prog = True
+    return selected, pat_counts, sld_counts
+
+
+def select_patches_round_robin(
+    df_class: pd.DataFrame, n_patches: int, seed: int
+) -> pd.DataFrame:
+    """Sample patches with round-robin patient and slide caps (10% patient, 5% slide)."""
+    if df_class.empty or n_patches <= 0:
+        return pd.DataFrame()
+    rng = np.random.default_rng(seed)
+    patients, h = _build_patch_hierarchy(df_class, rng)
+    selected, _, _ = _loop_patches(
+        patients,
+        h,
+        max(1, int(round(n_patches * 0.10))),
+        max(1, int(round(n_patches * 0.05))),
+        n_patches,
+    )
+    if len(selected) < n_patches:
+        rem = [pid for p in h for s in h[p] for pid in h[p][s]]
+        if rem:
+            selected.extend(
+                rng.choice(
+                    rem, size=min(n_patches - len(selected), len(rem)), replace=False
+                )
+            )
+    return df_class.loc[selected]
+
+
+def _loop_slides(patients: list[str], h: dict, max_p: int, n: int) -> list[int]:
+    """Execute loop for round robin slide sampling."""
+    selected, pat_counts = [], {p: 0 for p in patients}
+    prog = True
+    while len(selected) < n and prog:
+        prog = False
+        for p in patients:
+            if len(selected) >= n or pat_counts[p] >= max_p:
+                continue
+            if h[p]:
+                selected.append(h[p].pop(0))
+                pat_counts[p] += 1
+                prog = True
+    return selected
+
+
+def _build_slide_hierarchy(
+    df_slides: pd.DataFrame, rng: np.random.Generator
+) -> tuple[list[str], dict[str, list[int]]]:
+    """Build a randomized per-patient slide-index dictionary."""
+    patients = list(cast(np.ndarray, df_slides["case_id"].unique()))
+    rng.shuffle(patients)
+    h = {
+        p: list(df_slides[df_slides["case_id"] == p].index.to_numpy()) for p in patients
+    }
+    for p in h:
+        rng.shuffle(h[p])
+    return patients, h
+
+
+def select_slides_round_robin(
+    df_class: pd.DataFrame, n_slides: int, seed: int
+) -> pd.DataFrame:
+    """Sample slides for MIL with round-robin patient caps (10%)."""
+    if df_class.empty or n_slides <= 0:
+        return pd.DataFrame()
+    rng = np.random.default_rng(seed)
+    df_slides = df_class.drop_duplicates("slide_id")
+    patients, h = _build_slide_hierarchy(df_slides, rng)
+    selected = _loop_slides(patients, h, max(1, int(round(n_slides * 0.10))), n_slides)
+    if len(selected) < n_slides:
+        rem = [sid for p in h for sid in h[p]]
+        if rem:
+            selected.extend(
+                rng.choice(
+                    rem, size=min(n_slides - len(selected), len(rem)), replace=False
+                )
+            )
+    return cast(
+        pd.DataFrame,
+        df_class[df_class["slide_id"].isin(df_slides.loc[selected, "slide_id"])],
+    )
+
+
+def build_manifest_hash(manifest_df: pd.DataFrame) -> str:
+    """Create a hash of key manifest columns for immutability verification."""
+    columns = cast(
+        pd.DataFrame, manifest_df[["case_id", "slide_id", "cancer_type", "split"]]
+    )
+    records = columns.sort_values(by=["split", "cancer_type", "slide_id"]).to_dict(
+        "records"
+    )
+    return compute_data_hash(records)
