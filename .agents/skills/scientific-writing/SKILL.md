@@ -38,6 +38,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 - For datasets, materials, or corpora, explain why they fit the research question and what limitations or biases matter, not only their basic counts or properties.
 - In methods prose, distinguish what is varied, what is held constant, and what each design choice is meant to isolate.
 - Maintain academic restraint. Avoid hype, marketing language, and unsupported novelty claims.
+- Match the authorial voice to the authorship. For single-author work, avoid the editorial "we"; prefer impersonal constructions ("this report", "the benchmark") or the passive voice so the prose does not imply multiple authors.
 - Make transitions explicit when moving between motivation, prior work, method, result, limitation, and implication.
 - Format numbers with a decimal point for fractional values and a comma as the thousands separator, e.g., `0.72` and `2,152`. In LaTeX documents that use `siunitx`, prefer `\num{...}` with a matching document-level setup so generated tables and prose remain consistent.
 - Preserve reader orientation in long sections with short signposting paragraphs rather than excessive headings.
