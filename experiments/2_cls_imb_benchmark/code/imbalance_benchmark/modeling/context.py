@@ -33,7 +33,7 @@ INPUT_DIM = 2560
 PATCH_HIDDEN_DIM = 512
 MIL_HIDDEN_DIM = 256
 DROPOUT = 0.1
-CONDITIONS = ("balanced", "moderate", "severe")
+CONDITIONS = ("natural", "balanced", "moderate", "severe")
 
 LEARNING_RATE_GRID: list[float] = [1e-4, 3e-4, 1e-3, 3e-3]
 
@@ -125,6 +125,11 @@ def build_training_ctx(
     val_loader: torch.utils.data.DataLoader | None = None,
 ) -> dict[str, Any]:
     """Build the shared training context for one method/config/seed trial."""
+    # Model initialization is part of the declared initialization-seed family.
+    # Set it before creating either model, including cRT/RankMix factories.
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     kwargs = model_kwargs(regime.is_mil)
     param = cfg.get("parameter")
 

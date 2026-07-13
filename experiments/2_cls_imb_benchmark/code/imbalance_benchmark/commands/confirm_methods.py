@@ -5,8 +5,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 
+from imbalance_benchmark.analysis.calibration import (
+    apply_target_prior_correction,
+    balanced_decision_logits,
+    estimate_prior,
+    softmax,
+)
 from imbalance_benchmark.analysis.metrics import classification_payload
 from imbalance_benchmark.common import write_run_record
 from imbalance_benchmark.datasets.data import TrainDataset
@@ -42,6 +49,7 @@ class RunContext(Regime):
     paths: dict[str, Path]
     seeds: list[int]
     class_names: list[str]
+    assignment: str
 
 
 def _timed_fit(fit_fn: Any, ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
@@ -64,18 +72,37 @@ def _cost_payload(
     }
 
 
-def _split_payload(res: dict[str, Any], class_names: list[str]) -> dict[str, Any]:
+def _split_payload(
+    res: dict[str, Any],
+    class_names: list[str],
+    method: str,
+    tau: float,
+    train_priors: torch.Tensor,
+    target_priors: np.ndarray,
+) -> dict[str, Any]:
     """Assemble one evaluated split's real classwise metrics and prediction arrays."""
+    raw_logits = res["logits"]
+    train_prior_array = train_priors.detach().cpu().numpy()
+    decision_logits = balanced_decision_logits(raw_logits, method, tau, train_prior_array)
+    target_logits = apply_target_prior_correction(
+        raw_logits, method, tau, train_prior_array, target_priors
+    )
+    decision_probs, target_probs = softmax(decision_logits), softmax(target_logits)
     payload = classification_payload(
         res["targets"].tolist(),
-        res["preds"].tolist(),
-        res["probs"].tolist(),
+        decision_probs.argmax(axis=1).tolist(),
+        target_probs.tolist(),
         class_names,
     )
     payload["labels"] = res["targets"].tolist()
-    payload["preds"] = res["preds"].tolist()
-    payload["probabilities"] = res["probs"].tolist()
-    payload["logits"] = res["logits"].tolist()
+    payload["preds"] = decision_probs.argmax(axis=1).tolist()
+    payload["probabilities"] = target_probs.tolist()
+    payload["logits"] = target_logits.tolist()
+    payload["raw_logits"] = raw_logits.tolist()
+    payload["raw_probabilities"] = res["probs"].tolist()
+    payload["balanced_decision_logits"] = decision_logits.tolist()
+    payload["target_prior_logits"] = target_logits.tolist()
+    payload["target_prior_probabilities"] = target_probs.tolist()
     return payload
 
 
@@ -87,41 +114,46 @@ def _run_and_record(
     state: dict[str, Any],
     run: RunContext,
     elapsed: float,
-    logit_adj_tau: float | None = None,
+    logit_adj_tau: float = 1.0,
     class_priors_tensor: torch.Tensor | None = None,
 ) -> None:
     """Evaluate a locked confirmation checkpoint on validation and test, and write its run record."""
     model = ctx["model"]
     model.load_state_dict({k: v.to(run.device) for k, v in state.items()})
+    if class_priors_tensor is None:
+        class_priors_tensor = class_priors(
+            ctx["train_labels"], run.n_classes, run.device
+        )
+    raw_results = {
+        name: run_evaluation(model, loader, run.device, run.is_mil, run.n_classes)
+        for name, loader in (("validation", run.val_loader), ("test", run.test_loader))
+    }
+    target_priors = estimate_prior(raw_results["validation"]["targets"], run.n_classes)
     splits = {
-        split_name: _split_payload(
-            run_evaluation(
-                model,
-                loader,
-                run.device,
-                run.is_mil,
-                run.n_classes,
-                logit_adj_tau,
-                class_priors_tensor,
-            ),
+        name: _split_payload(
+            result,
             run.class_names,
+            method,
+            logit_adj_tau,
+            class_priors_tensor,
+            target_priors,
         )
-        for split_name, loader in (
-            ("validation", run.val_loader),
-            ("test", run.test_loader),
-        )
+        for name, result in raw_results.items()
     }
     batch_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), batch_size)
     write_run_record(
-        run.paths["results"] / cond / method / f"seed={seed_idx}",
+        run.paths["results"] / f"assignment={run.assignment}" / cond / method / f"seed={seed_idx}",
         {
             "benchmark": "wsi" if run.is_mil else "patch",
             "condition": cond,
+            "assignment": run.assignment,
             "method": method,
             "seed": ctx["seed"],
             "class_names": run.class_names,
             "tuning_params": ctx["param_config"],
+            "train_priors": class_priors_tensor.detach().cpu().tolist(),
+            "target_priors": target_priors.tolist(),
             "cost": _cost_payload(method, budget, batch_size, elapsed, model),
             "splits": splits,
         },
@@ -134,7 +166,7 @@ def confirm_ce(
     """Fit CE for every confirmation seed; return its checkpoints for post-hoc reuse."""
     states = []
     for seed in run.seeds:
-        ctx = build_training_ctx("ce", train_ds, run, seed, cfg)
+        ctx = build_training_ctx("ce", train_ds, run, seed, cfg, run.val_loader)
         state, elapsed = _timed_fit(fit_method, ctx)
         states.append(state)
         _run_and_record(cond, "ce", len(states) - 1, ctx, state, run, elapsed)
@@ -152,7 +184,7 @@ def confirm_post_hoc(
     priors = class_priors(train_ds.get_int_targets(), run.n_classes, run.device)
     tau = float(cfg.get("parameter", 1.0))
     for i, (seed, state) in enumerate(zip(run.seeds, ce_states, strict=True)):
-        ctx = build_training_ctx("ce", train_ds, run, seed, {"lr": 1e-3})
+        ctx = build_training_ctx("ce", train_ds, run, seed, {"lr": 1e-3}, run.val_loader)
         _run_and_record(
             cond, "post_hoc_logit_adjustment", i, ctx, state, run, 0.0, tau, priors
         )
@@ -167,7 +199,7 @@ def confirm_crt(
 ) -> None:
     """Fit cRT (stage one inherits CE; stage two retrains only the classifier) per seed."""
     for i, seed in enumerate(run.seeds):
-        ctx = build_training_ctx("crt", train_ds, run, seed, cfg)
+        ctx = build_training_ctx("crt", train_ds, run, seed, cfg, run.val_loader)
         ctx["stage_one_config"] = stage_one_config
         state, elapsed = _timed_fit(fit_crt, ctx)
         _run_and_record(cond, "crt", i, ctx, state, run, elapsed)
@@ -178,6 +210,6 @@ def confirm_method(
 ) -> None:
     """Fit one ordinary (single-orchestration) roster method for every confirmation seed."""
     for i, seed in enumerate(run.seeds):
-        ctx = build_training_ctx(method, train_ds, run, seed, cfg)
+        ctx = build_training_ctx(method, train_ds, run, seed, cfg, run.val_loader)
         state, elapsed = _timed_fit(fit_method, ctx)
         _run_and_record(cond, method, i, ctx, state, run, elapsed)

@@ -211,6 +211,7 @@ def test_oko_set_sampling_respects_class_membership():
     )
     assert set_indices.shape == (20, 3)
     for row, pair_cls, odd_cls in zip(set_indices, pair_classes, odd_classes, strict=True):
+        assert row[0] != row[1]
         assert labels[row[0]] == pair_cls
         assert labels[row[1]] == pair_cls
         assert labels[row[2]] == odd_cls

@@ -80,6 +80,8 @@ def build_tail_assignments(
     native_order: list[str], seed: int, ordinal: bool
 ) -> dict[str, list[str]]:
     """Build the three locked tail assignments: native, reversed/rotated, and random."""
+    if len(native_order) == 2:
+        return {"native": list(native_order), "reversed": list(reversed(native_order))}
     rotated_or_reversed = (
         list(reversed(native_order)) if ordinal else native_order[1:] + native_order[:1]
     )
@@ -94,10 +96,13 @@ def build_tail_assignments(
 
 def verify_manifest_freeze(freeze_meta: dict[str, Any]) -> None:
     """Refuse to proceed if any frozen condition manifest no longer matches its hash."""
-    for name, info in freeze_meta.get("conditions", {}).items():
-        path = Path(info["path"])
-        if not path.exists() or compute_sha256(path) != info["sha256"]:
-            raise RuntimeError(
-                f"Manifest '{name}' at {path} no longer matches its frozen hash; "
-                "refusing to train on an altered condition."
-            )
+    condition_sets = [freeze_meta.get("conditions", {})]
+    condition_sets.extend(freeze_meta.get("assignment_conditions", {}).values())
+    for conditions in condition_sets:
+        for name, info in conditions.items():
+            path = Path(info["path"])
+            if not path.exists() or compute_sha256(path) != info["sha256"]:
+                raise RuntimeError(
+                    f"Manifest '{name}' at {path} no longer matches its frozen hash; "
+                    "refusing to train on an altered condition."
+                )

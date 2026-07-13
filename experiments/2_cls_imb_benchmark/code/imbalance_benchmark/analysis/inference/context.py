@@ -36,7 +36,16 @@ class BootstrapContext:
         self.case_ids = identity["case_id"].to_numpy()
         self.row_weights = expand_to_rows(unique_cases, patient_weights, self.case_ids)
         self.n_replicates = n_replicates
-        self.seed_rng = np.random.default_rng(seed + 1)
+        self._seed = seed
+        self._seed_indices: dict[int, np.ndarray] = {}
+
+    def _paired_seed_indices(self, n_seeds: int) -> np.ndarray:
+        """Return the one fixed seed resample shared by every matched comparison."""
+        if n_seeds not in self._seed_indices:
+            self._seed_indices[n_seeds] = resample_seed_indices(
+                n_seeds, self.n_replicates, np.random.default_rng(self._seed + n_seeds)
+            )
+        return self._seed_indices[n_seeds]
 
     def ba_distribution(
         self, labels: np.ndarray, preds_stack: np.ndarray, n_classes: int
@@ -50,10 +59,9 @@ class BootstrapContext:
                 for i in range(preds_stack.shape[0])
             ]
         )
-        seed_idx = resample_seed_indices(
-            preds_stack.shape[0], self.n_replicates, self.seed_rng
+        return gather_seed_resampled(
+            per_seed, self._paired_seed_indices(preds_stack.shape[0])
         )
-        return gather_seed_resampled(per_seed, seed_idx)
 
     def tail_nll_distribution(
         self, labels: np.ndarray, probs_stack: np.ndarray, tail_classes: list[int]
@@ -69,17 +77,18 @@ class BootstrapContext:
                 for i in range(probs_stack.shape[0])
             ]
         )
-        seed_idx = resample_seed_indices(
-            probs_stack.shape[0], self.n_replicates, self.seed_rng
+        return gather_seed_resampled(
+            per_seed, self._paired_seed_indices(probs_stack.shape[0])
         )
-        return gather_seed_resampled(per_seed, seed_idx)
 
 
-def _tail_classes(freeze: dict[str, Any], class_names: list[str]) -> list[int]:
+def _tail_classes(
+    freeze: dict[str, Any], class_names: list[str], assignment: str
+) -> list[int]:
     """Class indices assigned to the tail tier under the severe condition's allocated support."""
-    allocated = (
-        freeze.get("conditions", {}).get("severe", {}).get("allocated_counts", {})
-    )
+    allocated = freeze.get("assignment_conditions", {}).get(assignment, {}).get(
+        "severe", {}
+    ).get("allocated_counts", {})
     if not allocated:
         return []
     tiers = assign_tiers(class_names, allocated)
@@ -105,6 +114,7 @@ def balanced_baseline(
     freeze: dict[str, Any],
     n_replicates: int,
     seed: int,
+    assignment: str = "native",
 ) -> Baseline | None:
     """Load balanced CE's predictions and precompute its bootstrap BA/tail-NLL distributions."""
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
@@ -113,11 +123,11 @@ def balanced_baseline(
         return None
     ctx = BootstrapContext(paths, is_mil, n_replicates, seed)
     n_classes = len(balanced["class_names"])
-    tail_classes = _tail_classes(freeze, balanced["class_names"])
+    tail_classes = _tail_classes(freeze, balanced["class_names"], assignment)
     ba = ctx.ba_distribution(balanced["labels"], balanced["preds"], n_classes)
     tail_nll = ctx.tail_nll_distribution(
         balanced["labels"], balanced["probs"], tail_classes
     )
     return Baseline(
-        balanced, ctx, n_classes, tail_classes, min(n_replicates, 100_000), ba, tail_nll
+        balanced, ctx, n_classes, tail_classes, 100_000, ba, tail_nll
     )

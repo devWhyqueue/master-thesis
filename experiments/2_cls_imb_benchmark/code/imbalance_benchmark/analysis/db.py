@@ -75,13 +75,18 @@ def discover_result_dirs(results_root: Path) -> list[tuple[str, str, int, Path]]
     found = []
     if not results_root.exists():
         return found
-    for cond_dir in sorted(p for p in results_root.iterdir() if p.is_dir()):
-        for method_dir in sorted(p for p in cond_dir.iterdir() if p.is_dir()):
-            for seed_dir in sorted(method_dir.glob("seed=*")):
-                if not (seed_dir / "run.json").exists():
-                    continue
-                seed_idx = int(seed_dir.name.split("=", 1)[1])
-                found.append((cond_dir.name, method_dir.name, seed_idx, seed_dir))
+    for run_file in sorted(results_root.rglob("run.json")):
+        with run_file.open(encoding="utf-8") as handle:
+            record = json.load(handle)
+        seed_dir = run_file.parent
+        found.append(
+            (
+                str(record["condition"]),
+                str(record["method"]),
+                int(seed_dir.name.split("=", 1)[1]),
+                seed_dir,
+            )
+        )
     return found
 
 

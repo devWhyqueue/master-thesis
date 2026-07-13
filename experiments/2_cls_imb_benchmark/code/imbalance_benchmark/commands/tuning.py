@@ -127,12 +127,11 @@ def _tune_condition(
     val_loader: torch.utils.data.DataLoader,
     regime: Regime,
     seeds: list[int],
+    manifest_path: Path,
 ) -> dict[str, Any]:
     """Tune every roster method against one imbalance condition's training manifest."""
     dataset_cls = BagFeatureDataset if regime.is_mil else ImbalanceDataset
-    train_ds = dataset_cls(
-        paths["data"] / f"manifest_{condition}.csv", device=regime.device
-    )
+    train_ds = dataset_cls(manifest_path, device=regime.device)
     selections: dict[str, Any] = {}
     ce_state = None
     for method in methods:
@@ -181,10 +180,26 @@ def cmd_tune(args: argparse.Namespace) -> None:
     ]
     methods = roster_for_regime(regime.is_mil)
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
-    selections = {
-        cond: _tune_condition(cond, methods, paths, val_loader, regime, seeds)
-        for cond in conditions
-    }
+    freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+    selections: dict[str, dict[str, Any]] = {assignment: {} for assignment in assignments}
+    for cond in conditions:
+        scoped_assignments = ("native",) if cond in {"natural", "balanced"} else assignments
+        for assignment in scoped_assignments:
+            selections[assignment][cond] = _tune_condition(
+                cond,
+                methods,
+                paths,
+                val_loader,
+                regime,
+                seeds,
+                paths["data"]
+                / (
+                    f"manifest_{cond}.csv"
+                    if cond in {"natural", "balanced"}
+                    else f"manifest_{assignment}_{cond}.csv"
+                ),
+            )
     if getattr(args, "condition", None):
         write_json(
             paths["data"] / f"tuning_selections_{args.condition}.json", selections

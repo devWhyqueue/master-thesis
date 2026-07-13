@@ -172,6 +172,7 @@ def _build_train_loader(
         sampler=sampler,
         shuffle=sampler is None,
         collate_fn=bag_collate if is_mil else None,
+        generator=torch.Generator().manual_seed(ctx["seed"]),
     )
 
 

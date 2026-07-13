@@ -37,6 +37,7 @@ class _SeverityInputs:
     n_classes: int
     n_perm: int
     seed: int
+    assignment: str
 
 
 def _recovery_comparison(
@@ -71,8 +72,8 @@ def _method_discrimination_recovery(
         )
     p_val = paired_block_permutation_ba(
         inp.balanced["labels"],
-        method_rec["preds"][0],
-        inp.severity_ce["preds"][0],
+        method_rec["preds"],
+        inp.severity_ce["preds"],
         inp.ctx.case_ids,
         inp.n_classes,
         inp.n_perm,
@@ -103,8 +104,8 @@ def _method_calibration_recovery(
         )
     p_val = paired_block_permutation_tail_nll(
         inp.balanced["labels"],
-        method_rec["probs"][0],
-        inp.severity_ce["probs"][0],
+        method_rec["probs"],
+        inp.severity_ce["probs"],
         inp.ctx.case_ids,
         tail_classes,
         inp.n_perm,
@@ -127,11 +128,16 @@ def _method_recoveries(
 ) -> list[dict[str, Any]]:
     """Every non-CE method's discrimination/calibration recovery in one severity condition."""
     out: list[dict[str, Any]] = []
-    for method_dir in sorted((inp.paths["results"] / inp.severity).iterdir()):
+    results_dir = inp.paths["results"] / f"assignment={inp.assignment}" / inp.severity
+    if not results_dir.exists():
+        results_dir = inp.paths["results"] / inp.severity
+    if not results_dir.exists():
+        return out
+    for method_dir in sorted(results_dir.iterdir()):
         method = method_dir.name
         if method == "ce":
             continue
-        method_rec = load_seed_predictions(inp.paths, inp.severity, method)
+        method_rec = load_seed_predictions(inp.paths, inp.severity, method, inp.assignment)
         if method_rec is None:
             continue
         if disc_gate:
@@ -193,10 +199,10 @@ def _severity_comparisons(
 
 
 def _severity_result(
-    baseline: Baseline, paths: dict[str, Path], severity: str, seed: int
+    baseline: Baseline, paths: dict[str, Path], severity: str, seed: int, assignment: str
 ) -> list[dict[str, Any]]:
     """One severity's gate/recovery comparisons against the shared balanced-CE baseline."""
-    severity_ce = load_seed_predictions(paths, severity, "ce")
+    severity_ce = load_seed_predictions(paths, severity, "ce", assignment)
     if severity_ce is None:
         return []
     inp = _SeverityInputs(
@@ -208,6 +214,7 @@ def _severity_result(
         baseline.n_classes,
         baseline.n_perm,
         seed,
+        assignment,
     )
     return _severity_comparisons(
         inp, baseline.ba, baseline.tail_nll, baseline.tail_classes
@@ -223,15 +230,14 @@ def gates_and_recovery(
 ) -> list[dict[str, Any]]:
     """CE-only deficit gates, then bootstrap recovery + paired permutation p-values per method.
 
-    Scope note: the permutation p-value uses the first confirmation seed's
-    predictions as the representative pair rather than jointly permuting
-    across all five matched seeds (the bootstrap CIs above do resample all
-    five seeds as paired blocks, per report).
+    Both bootstrap and permutation calculations retain the complete matched
+    confirmation-seed block; no representative seed is substituted.
     """
-    baseline = balanced_baseline(paths, config, freeze, n_replicates, seed)
-    if baseline is None:
-        return []
     comparisons: list[dict[str, Any]] = []
-    for severity in ("moderate", "severe"):
-        comparisons += _severity_result(baseline, paths, severity, seed)
+    for assignment in freeze.get("tail_assignments", {"native": []}):
+        baseline = balanced_baseline(paths, config, freeze, n_replicates, seed, assignment)
+        if baseline is None:
+            continue
+        for severity in ("moderate", "severe"):
+            comparisons += _severity_result(baseline, paths, severity, seed, assignment)
     return comparisons

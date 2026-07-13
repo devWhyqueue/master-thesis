@@ -75,10 +75,11 @@ def load_test_identity(
 
 
 def load_seed_predictions(
-    paths: dict[str, Path], condition: str, method: str
+    paths: dict[str, Path], condition: str, method: str, assignment: str = "native"
 ) -> dict[str, Any] | None:
     """Stack one method's confirmed test-split predictions across its confirmation seeds."""
-    method_dir = paths["results"] / condition / method
+    assigned_dir = paths["results"] / f"assignment={assignment}" / condition / method
+    method_dir = assigned_dir if assigned_dir.exists() else paths["results"] / condition / method
     if not method_dir.exists():
         return None
     seed_dirs = sorted(

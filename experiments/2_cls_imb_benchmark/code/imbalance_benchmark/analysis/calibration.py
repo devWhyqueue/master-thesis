@@ -22,7 +22,9 @@ __all__ = [
 # Methods for which the report defines a target-prior correction (Eq.
 # posthoc-target-prior / train-time-target-prior); every other method's raw
 # score already is its balanced-decision score with no defined prior variant.
-_TARGET_PRIOR_METHODS = frozenset({"post_hoc_logit_adjustment", "logit_adjustment"})
+_TARGET_PRIOR_METHODS = frozenset(
+    {"ce", "post_hoc_logit_adjustment", "logit_adjustment"}
+)
 
 
 @dataclass(frozen=True)
@@ -107,15 +109,14 @@ def apply_target_prior_correction(
 ) -> np.ndarray:
     """Return target-prevalence logits per Eq. posthoc/train-time-target-prior.
 
-    Only ``post_hoc_logit_adjustment`` and ``logit_adjustment`` (train-time)
-    have a defined target-prior variant in the report; every other method's
-    target-prior-corrected output collapses to its raw score.
+    Ordinary CE, post-hoc adjustment, and train-time adjustment have defined
+    target-prior variants. Every other method retains its raw score.
     """
     if method not in _TARGET_PRIOR_METHODS:
         return logits
     log_train = np.log(np.clip(pi_train, 1e-12, 1.0))
     log_target = np.log(np.clip(pi_target, 1e-12, 1.0))
-    if method == "post_hoc_logit_adjustment":
+    if method in {"ce", "post_hoc_logit_adjustment"}:
         return logits - log_train + log_target
     return logits + (tau - 1.0) * log_train + log_target
 

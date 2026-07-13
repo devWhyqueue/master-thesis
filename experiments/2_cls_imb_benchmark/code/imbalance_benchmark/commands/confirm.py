@@ -30,13 +30,15 @@ CONFIRMATION_SEED_ROLES = [f"confirmation_initialization_{i}" for i in range(5)]
 
 
 def _confirm_condition(
-    cond: str, methods: tuple[str, ...], best_configs: dict[str, Any], run: RunContext
+    cond: str,
+    methods: tuple[str, ...],
+    best_configs: dict[str, Any],
+    run: RunContext,
 ) -> None:
     """Run confirmation training for every roster method within one imbalance condition."""
     dataset_cls = BagFeatureDataset if run.is_mil else ImbalanceDataset
-    train_ds: TrainDataset = dataset_cls(
-        run.paths["data"] / f"manifest_{cond}.csv", device=run.device
-    )
+    file_name = f"manifest_{cond}.csv" if cond in {"natural", "balanced"} else f"manifest_{run.assignment}_{cond}.csv"
+    train_ds: TrainDataset = dataset_cls(run.paths["data"] / file_name, device=run.device)
     cond_configs = best_configs.get(cond, {})
     ce_states: list[dict[str, Any]] | None = None
     for method in methods:
@@ -54,7 +56,9 @@ def _confirm_condition(
             confirm_method(cond, method, cfg, train_ds, run)
 
 
-def _confirm_inputs(args: argparse.Namespace) -> tuple[dict[str, Any], RunContext]:
+def _confirm_inputs(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Load config, best tuning selections, and the locked-test loader for confirmation."""
     config = load_config(args.config)
     paths = ensure_dirs(config)
@@ -80,24 +84,29 @@ def _confirm_inputs(args: argparse.Namespace) -> tuple[dict[str, Any], RunContex
     val_ldr = torch.utils.data.DataLoader(val_ds, batch_size=64, collate_fn=collate)
     test_ldr = torch.utils.data.DataLoader(test_ds, batch_size=64, collate_fn=collate)
     seeds = [derive_seed(args.seed, role) for role in CONFIRMATION_SEED_ROLES]
-    run = RunContext(
-        device,
-        config,
-        test_ds.get_n_classes(),
-        is_mil,
-        val_ldr,
-        test_ldr,
-        paths,
-        seeds,
-        test_ds.classes,
-    )
-    return best_configs, run
+    run_data = {
+        "device": device,
+        "config": config,
+        "n_classes": test_ds.get_n_classes(),
+        "is_mil": is_mil,
+        "val_loader": val_ldr,
+        "test_loader": test_ldr,
+        "paths": paths,
+        "seeds": seeds,
+        "class_names": test_ds.classes,
+    }
+    return best_configs, run_data, json.loads(freeze_path.read_text())
 
 
 def cmd_confirm(args: argparse.Namespace) -> None:
     """Fit every roster method's five confirmation seeds and emit locked test predictions."""
-    best_configs, run = _confirm_inputs(args)
-    methods = roster_for_regime(run.is_mil)
+    best_configs, run_data, freeze = _confirm_inputs(args)
+    methods = roster_for_regime(run_data["is_mil"])
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for cond in conditions:
-        _confirm_condition(cond, methods, best_configs, run)
+        scoped_assignments = ("native",) if cond in {"natural", "balanced"} else assignments
+        for assignment in scoped_assignments:
+            run = RunContext(**run_data, assignment=assignment)
+            selected = best_configs.get(assignment, {}).get(cond, {})
+            _confirm_condition(cond, methods, selected, run)

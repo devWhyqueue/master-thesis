@@ -17,6 +17,8 @@ from imbalance_benchmark.common import (
 from imbalance_benchmark.construction import (
     allocate_counts,
     build_manifest_hash,
+    effective_rho,
+    max_shared_total,
     select_patches_round_robin,
     select_slides_round_robin,
 )
@@ -69,10 +71,11 @@ def _write_condition(
     is_mil: bool,
     seed: int,
     data_dir: Path,
+    file_stem: str | None = None,
 ) -> dict[str, Any]:
     """Write one frozen condition manifest and report its realized statistics."""
     cond_df = pd.concat(selector_rows, ignore_index=True)
-    path = data_dir / f"manifest_{name}.csv"
+    path = data_dir / f"manifest_{file_stem or name}.csv"
     cond_df.to_csv(path, index=False)
     return {
         "path": str(path),
@@ -95,24 +98,57 @@ def _build_conditions(
     is_mil: bool,
     seed: int,
     data_dir: Path,
+    file_prefix: str = "",
+    condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
 ) -> dict[str, Any]:
     """Construct balanced/moderate/severe conditions sharing one master ordering."""
     counts = _class_support_counts(train_df, classes, is_mil)
     available = [counts[c] for c in classes]
     selector = select_slides_round_robin if is_mil else select_patches_round_robin
+    allocations = {
+        name: allocate_counts(
+            available,
+            shared_t,
+            effective_rho(available, CONDITION_RHOS[name], min_support),
+            min_support,
+        )
+        for name in condition_names
+    }
+    fixed_patch_pools = (
+        {
+            cls: selector(
+                cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+                max(allocated[idx] for allocated in allocations.values()),
+                seed=seed,
+            )
+            for idx, cls in enumerate(classes)
+        }
+        if not is_mil
+        else {}
+    )
     conditions = {}
-    for name, rho in CONDITION_RHOS.items():
-        allocated = allocate_counts(available, shared_t, rho, min_support)
+    for name in condition_names:
+        allocated = allocations[name]
         rows = [
             selector(
-                cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+                fixed_patch_pools.get(
+                    cls,
+                    cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+                ),
                 allocated[idx],
                 seed=seed,
             )
             for idx, cls in enumerate(classes)
         ]
         conditions[name] = _write_condition(
-            name, dict(zip(classes, allocated)), rows, train_df, is_mil, seed, data_dir
+            name,
+            dict(zip(classes, allocated)),
+            rows,
+            train_df,
+            is_mil,
+            seed,
+            data_dir,
+            f"{file_prefix}{name}",
         )
     return conditions
 
@@ -141,6 +177,33 @@ def _write_natural_condition(train_df: pd.DataFrame, data_dir: Path) -> dict[str
     """Write the descriptive full-training-set anchor, excluded from deficit estimands."""
     path = data_dir / "manifest_natural.csv"
     train_df.to_csv(path, index=False)
+    assignments = build_tail_assignments(
+        classes, derive_seed(args.seed, "assignment"), ordinal=False
+    )
+    assignment_conditions = {
+        assignment: _build_conditions(
+            train_df,
+            order,
+            shared_t,
+            min_support,
+            is_mil,
+            construction_seed,
+            paths["data"],
+            file_prefix=f"{assignment}_",
+            condition_names=("moderate", "severe"),
+        )
+        for assignment, order in assignments.items()
+    }
+    native_conditions = _build_conditions(
+        train_df,
+        classes,
+        shared_t,
+        min_support,
+        is_mil,
+        construction_seed,
+        paths["data"],
+        condition_names=("balanced",),
+    )
     return {
         "path": str(path),
         "sha256": compute_sha256(path),
@@ -181,18 +244,9 @@ def _freeze_meta(
         "requested_min_support": requested_min_support,
         "excluded": excluded,
         "construction_seed": construction_seed,
-        "conditions": _build_conditions(
-            train_df,
-            classes,
-            shared_t,
-            min_support,
-            is_mil,
-            construction_seed,
-            paths["data"],
-        ),
-        "tail_assignments": build_tail_assignments(
-            classes, derive_seed(args.seed, "assignment"), ordinal=False
-        ),
+        "conditions": native_conditions,
+        "assignment_conditions": assignment_conditions,
+        "tail_assignments": assignments,
         "natural": _write_natural_condition(train_df, paths["data"]),
     }
 
@@ -203,7 +257,10 @@ def cmd_freeze(args: argparse.Namespace) -> None:
     min_support, requested_min_support, excluded = _load_pilot_floor(
         paths["data"] / "pilot_report.json", is_mil, counts
     )
-    shared_t = len(classes) * min(counts[c] for c in classes)
+    if excluded:
+        logger.warning("Skipping definitive freeze because the pilot excluded this dataset-regime")
+        return
+    shared_t = max_shared_total([counts[c] for c in classes], min_support)
     meta = _freeze_meta(
         args,
         paths,

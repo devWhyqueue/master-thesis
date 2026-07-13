@@ -126,7 +126,7 @@ def _fit_pilot_model(
         else ImbalanceDataset(scratch_path, device=device)
     )
     model: nn.Module = (
-        AttentionMil(2560, 256, n_cls, 0.1) if is_mil else MLP(2560, 256, n_cls, 0.1)
+        AttentionMil(2560, 256, n_cls, 0.1) if is_mil else MLP(2560, 512, n_cls, 0.1)
     ).to(device)
     ctx = {
         "method": "ce",

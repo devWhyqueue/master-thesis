@@ -52,6 +52,23 @@ def _fill_column(
             set_indices[mask, column] = pool_arr[drawn]
 
 
+def _fill_distinct_pair_indices(
+    class_index: dict[int, list[int]],
+    pair_classes: np.ndarray,
+    set_indices: np.ndarray,
+    rng: np.random.Generator,
+) -> None:
+    """Fill the two same-class set positions without reusing an example."""
+    for class_id, pool in class_index.items():
+        rows = np.flatnonzero(pair_classes == class_id)
+        if not len(rows):
+            continue
+        if len(pool) < 2:
+            raise ValueError("OKO requires two distinct examples in every pair class")
+        for row in rows:
+            set_indices[row, :2] = rng.choice(pool, size=2, replace=False)
+
+
 def sample_oko_sets(
     class_index: dict[int, list[int]],
     n_classes: int,
@@ -66,7 +83,7 @@ def sample_oko_sets(
     """
     pair_classes = rng.integers(n_classes, size=n_sets)
     set_indices = np.empty((n_sets, k + 2), dtype=np.int64)
-    _fill_column(class_index, pair_classes, set_indices, [0, 1], rng)
+    _fill_distinct_pair_indices(class_index, pair_classes, set_indices, rng)
     first_odd = _sample_odd_classes(pair_classes, n_classes, rng)
     _fill_column(class_index, first_odd, set_indices, [2], rng)
     for slot in range(1, k):

@@ -90,6 +90,29 @@ def _p_value(observed: float, extremes: np.ndarray, enumerated: bool) -> float:
     return (exceed + 1) / (n + 1)
 
 
+def _as_seed_stack(values: np.ndarray) -> np.ndarray:
+    """Normalize one prediction vector or a matched seed stack to (seed, row, ...)."""
+    return values[None, ...] if values.ndim in (1, 2) else values
+
+
+def _seed_mean_ba(labels: np.ndarray, preds: np.ndarray, n_classes: int) -> np.ndarray:
+    """Compute one balanced-accuracy value per permutation after seed averaging."""
+    return np.mean(
+        [_balanced_accuracy_batch(labels, seed_preds, n_classes) for seed_preds in preds],
+        axis=0,
+    )
+
+
+def _seed_mean_tail_nll(
+    labels: np.ndarray, probs: np.ndarray, tail_classes: list[int]
+) -> np.ndarray:
+    """Compute tail NLL per permutation after averaging matched seed blocks."""
+    return np.mean(
+        [_tail_nll_batch(labels, seed_probs, len(labels), tail_classes) for seed_probs in probs],
+        axis=0,
+    )
+
+
 def paired_block_permutation_ba(
     labels: np.ndarray,
     method_preds: np.ndarray,
@@ -106,21 +129,22 @@ def paired_block_permutation_ba(
     balanced-accuracy difference is recomputed; two-sided p-value with the
     plus-one correction when permutations are sampled rather than enumerated.
     """
-    observed = (
-        _balanced_accuracy_batch(labels, method_preds[:, None], n_classes)[0]
-        - (_balanced_accuracy_batch(labels, ce_preds[:, None], n_classes)[0])
+    method_stack, ce_stack = _as_seed_stack(method_preds), _as_seed_stack(ce_preds)
+    if method_stack.shape != ce_stack.shape:
+        raise ValueError("Permutation pairs require equal seed and prediction shapes")
+    observed = float(
+        _seed_mean_ba(labels, method_stack[:, :, None], n_classes)[0]
+        - _seed_mean_ba(labels, ce_stack[:, :, None], n_classes)[0]
     )
     unique_cases = np.unique(case_ids)
     enumerated, batches = _swap_batches(len(unique_cases), n_permutations, seed)
     stats = []
     for swap_patients in batches:
         swap_rows = _expand_swap_to_rows(swap_patients, unique_cases, case_ids)
-        preds_a = np.where(swap_rows, ce_preds[:, None], method_preds[:, None])
-        preds_b = np.where(swap_rows, method_preds[:, None], ce_preds[:, None])
-        stats.append(
-            _balanced_accuracy_batch(labels, preds_a, n_classes)
-            - _balanced_accuracy_batch(labels, preds_b, n_classes)
-        )
+        swap = swap_rows[None, :, :]
+        preds_a = np.where(swap, ce_stack[:, :, None], method_stack[:, :, None])
+        preds_b = np.where(swap, method_stack[:, :, None], ce_stack[:, :, None])
+        stats.append(_seed_mean_ba(labels, preds_a, n_classes) - _seed_mean_ba(labels, preds_b, n_classes))
     return _p_value(float(observed), np.concatenate(stats), enumerated)
 
 
@@ -139,20 +163,22 @@ def paired_block_permutation_tail_nll(
     ``NLL_tail(CE) - NLL_tail(method)``.
     """
 
-    def _tail_nll(probs: np.ndarray) -> float:
-        stacked = probs[:, None, :]
-        return float(_tail_nll_batch(labels, stacked, len(labels), tail_classes)[0])
-
-    observed = _tail_nll(ce_probs) - _tail_nll(method_probs)
+    method_stack, ce_stack = _as_seed_stack(method_probs), _as_seed_stack(ce_probs)
+    if method_stack.shape != ce_stack.shape:
+        raise ValueError("Permutation pairs require equal seed and prediction shapes")
+    observed = float(
+        _seed_mean_tail_nll(labels, ce_stack[:, :, None, :], tail_classes)[0]
+        - _seed_mean_tail_nll(labels, method_stack[:, :, None, :], tail_classes)[0]
+    )
     unique_cases = np.unique(case_ids)
     enumerated, batches = _swap_batches(len(unique_cases), n_permutations, seed)
     stats = []
     for swap_patients in batches:
         swap_rows = _expand_swap_to_rows(swap_patients, unique_cases, case_ids)
-        swap3 = swap_rows[:, :, None]
-        probs_a = np.where(swap3, ce_probs[:, None, :], method_probs[:, None, :])
-        probs_b = np.where(swap3, method_probs[:, None, :], ce_probs[:, None, :])
-        nll_a = _tail_nll_batch(labels, probs_a, len(labels), tail_classes)
-        nll_b = _tail_nll_batch(labels, probs_b, len(labels), tail_classes)
+        swap3 = swap_rows[None, :, :, None]
+        probs_a = np.where(swap3, ce_stack[:, :, None, :], method_stack[:, :, None, :])
+        probs_b = np.where(swap3, method_stack[:, :, None, :], ce_stack[:, :, None, :])
+        nll_a = _seed_mean_tail_nll(labels, probs_a, tail_classes)
+        nll_b = _seed_mean_tail_nll(labels, probs_b, tail_classes)
         stats.append(nll_b - nll_a)
     return _p_value(float(observed), np.concatenate(stats), enumerated)

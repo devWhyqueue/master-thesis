@@ -6,13 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from imbalance_benchmark.analysis.calibration import (
-    apply_target_prior_correction,
-    apply_temperature,
-    balanced_decision_logits,
-    estimate_prior,
-    fit_temperature,
-)
+from imbalance_benchmark.analysis.calibration import apply_temperature, fit_temperature
 from imbalance_benchmark.analysis.db import discover_result_dirs, ingest_run
 from imbalance_benchmark.analysis.metrics import assign_tiers, negative_log_likelihood
 from imbalance_benchmark.common import read_run_record
@@ -37,31 +31,28 @@ def ingest_all_runs(
         tiers = (
             assign_tiers(class_names, allocated) if class_names and allocated else {}
         )
-        run_id = (
-            f"{record.get('benchmark', 'unknown')}:{condition}:{method}:seed={seed_idx}"
-        )
+        assignment = record.get("assignment", "native")
+        run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
         ingest_run(conn, run_id, result_dir, condition, method, seed_idx, record, tiers)
 
 
-def _run_calibration(record: dict[str, Any], method: str) -> dict[str, Any] | None:
+def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
     """Fit temperature on one run's validation logits; report raw vs. calibrated test NLL."""
     if "validation" not in record["splits"] or "test" not in record["splits"]:
         return None
     val, test = record["splits"]["validation"], record["splits"]["test"]
-    class_names = record.get("class_names", [])
-    val_logits, test_logits = np.array(val["logits"]), np.array(test["logits"])
-    tau = float(record.get("tuning_params", {}).get("parameter", 1.0))
-    if method in ("post_hoc_logit_adjustment", "logit_adjustment") and class_names:
-        pi_train = estimate_prior(np.array(val["labels"]), len(class_names))
-        val_logits = balanced_decision_logits(val_logits, method, tau, pi_train)
-        test_logits = apply_target_prior_correction(
-            test_logits, method, tau, pi_train, pi_train
-        )
+    val_logits = np.array(val.get("target_prior_logits", val["logits"]))
+    test_logits = np.array(test.get("target_prior_logits", test["logits"]))
     fit = fit_temperature(val_logits, np.array(val["labels"]))
     calibrated_probs = apply_temperature(test_logits, fit.temperature)
     return {
         "temperature": fit.temperature,
-        "raw_test_nll": test["negative_log_likelihood"],
+        "raw_test_nll": negative_log_likelihood(
+            np.array(test["labels"]), np.array(test.get("raw_probabilities", test["probabilities"]))
+        ),
+        "target_prior_test_nll": negative_log_likelihood(
+            np.array(test["labels"]), np.array(test["probabilities"])
+        ),
         "temperature_scaled_test_nll": negative_log_likelihood(
             np.array(test["labels"]), calibrated_probs
         ),
@@ -82,8 +73,9 @@ def calibration_summary(paths: dict[str, Path]) -> dict[str, Any]:
         record = read_run_record(result_dir)
         if record is None:
             continue
-        entry = _run_calibration(record, method)
+        entry = _run_calibration(record)
         if entry is not None:
-            run_id = f"{record.get('benchmark', 'unknown')}:{condition}:{method}:seed={seed_idx}"
+            assignment = record.get("assignment", "native")
+            run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
             summary[run_id] = entry
     return summary

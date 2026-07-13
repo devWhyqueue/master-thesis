@@ -13,6 +13,8 @@ __all__ = [
     "split_cases",
     "validate_split_leakage",
     "allocate_counts",
+    "effective_rho",
+    "max_shared_total",
     "select_patches_round_robin",
     "select_slides_round_robin",
     "build_manifest_hash",
@@ -111,6 +113,45 @@ def allocate_counts(
     return allocated
 
 
+def max_shared_total(
+    available: list[int], min_support: int, rhos: tuple[float, ...] = (1.0, 10.0, 100.0)
+) -> int:
+    """Return the largest total feasible for every requested condition.
+
+    The balanced maximum alone is insufficient: at that total an imbalanced
+    allocation can require more examples from its head class than are unique
+    in the training pool.  Search only totals that can meet every independent
+    support floor and require each constrained allocation to sum exactly.
+    """
+    if not available or min(available) < min_support:
+        raise ValueError("No shared total satisfies the independent-support floor")
+    effective_rhos = tuple(effective_rho(available, rho, min_support) for rho in rhos)
+    upper = len(available) * min(available)
+    for total in range(upper, len(available) * min_support - 1, -1):
+        allocations = [
+            allocate_counts(available, total, rho, min_support) for rho in effective_rhos
+        ]
+        retains_requested_skew = all(
+            max(counts) / min(counts)
+            >= rho
+            for rho, counts in zip(effective_rhos, allocations, strict=True)
+        )
+        if retains_requested_skew and all(sum(counts) == total for counts in allocations):
+            return total
+    raise ValueError("No shared total is feasible for every requested condition")
+
+
+def effective_rho(available: list[int], rho: float, min_support: int) -> float:
+    """Lower an infeasible requested ratio to the largest floor-compatible ratio.
+
+    The first class is the assigned head.  A head cannot exceed its unique
+    support and every tail must retain the independent-support floor.
+    """
+    if not available or min_support < 1:
+        raise ValueError("Support and floor must be positive")
+    return min(rho, available[0] / min_support)
+
+
 def _build_patch_hierarchy(
     df_class: pd.DataFrame, rng: np.random.Generator
 ) -> tuple[list[str], dict[str, dict[str, list[int]]]]:
@@ -153,6 +194,16 @@ def _loop_patches(
     return selected, pat_counts, sld_counts
 
 
+def _contribution_cap(n_examples: int, fraction: float, unit: str) -> int:
+    """Return an exact contribution cap, rejecting allocations below one unit."""
+    cap = int(np.floor(n_examples * fraction))
+    if cap < 1:
+        raise ValueError(
+            f"{n_examples} examples cannot satisfy the {fraction:.0%} {unit} cap"
+        )
+    return cap
+
+
 def select_patches_round_robin(
     df_class: pd.DataFrame, n_patches: int, seed: int
 ) -> pd.DataFrame:
@@ -164,18 +215,14 @@ def select_patches_round_robin(
     selected, _, _ = _loop_patches(
         patients,
         h,
-        max(1, int(round(n_patches * 0.10))),
-        max(1, int(round(n_patches * 0.05))),
+        _contribution_cap(n_patches, 0.10, "patient"),
+        _contribution_cap(n_patches, 0.05, "slide"),
         n_patches,
     )
     if len(selected) < n_patches:
-        rem = [pid for p in h for s in h[p] for pid in h[p][s]]
-        if rem:
-            selected.extend(
-                rng.choice(
-                    rem, size=min(n_patches - len(selected), len(rem)), replace=False
-                )
-            )
+        raise ValueError(
+            "Patch allocation is infeasible under the 10% patient and 5% slide caps"
+        )
     return df_class.loc[selected]
 
 
@@ -218,15 +265,11 @@ def select_slides_round_robin(
     rng = np.random.default_rng(seed)
     df_slides = df_class.drop_duplicates("slide_id")
     patients, h = _build_slide_hierarchy(df_slides, rng)
-    selected = _loop_slides(patients, h, max(1, int(round(n_slides * 0.10))), n_slides)
+    selected = _loop_slides(
+        patients, h, _contribution_cap(n_slides, 0.10, "patient"), n_slides
+    )
     if len(selected) < n_slides:
-        rem = [sid for p in h for sid in h[p]]
-        if rem:
-            selected.extend(
-                rng.choice(
-                    rem, size=min(n_slides - len(selected), len(rem)), replace=False
-                )
-            )
+        raise ValueError("Slide allocation is infeasible under the 10% patient cap")
     return cast(
         pd.DataFrame,
         df_class[df_class["slide_id"].isin(df_slides.loc[selected, "slide_id"])],

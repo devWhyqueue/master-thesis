@@ -99,7 +99,13 @@ class BagFeatureDataset(Dataset):
         df = pd.read_csv(manifest_path)
         if split_name is not None and "split" in df.columns:
             df = df[df["split"] == split_name].reset_index(drop=True)
-        self.df = df.groupby("slide_id").first().reset_index()
+        # A TCGA-UT slide may be represented by several feature chunks.  Keep
+        # all rows here so __getitem__ can concatenate them before capping.
+        self.df = (
+            df.groupby("slide_id", sort=False)
+            .agg({"case_id": "first", "cancer_type": "first", "feature_path": list})
+            .reset_index()
+        )
         self.classes = sorted(list(set(self.df["cancer_type"])))
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
 
@@ -120,7 +126,8 @@ class BagFeatureDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         """Get a single bag sample."""
         row = self.df.iloc[idx]
-        features = load_slide_features(str(row["feature_path"]))
+        paths = list(dict.fromkeys(str(path) for path in row["feature_path"]))
+        features = torch.cat([load_slide_features(path) for path in paths], dim=0)
         if self.max_instances is not None and len(features) > self.max_instances:
             features = features.index_select(
                 0, torch.linspace(0, len(features) - 1, self.max_instances).long()

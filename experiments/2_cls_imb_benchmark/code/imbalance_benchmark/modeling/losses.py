@@ -178,7 +178,7 @@ def _mix_ranked_bags(
     mix_lambda: float,
 ) -> torch.Tensor:
     """Interpolate two bags' teacher-ranked representative subsequences."""
-    keep = min(len(first_bag), len(second_bag))
+    keep = max(1, min(len(first_bag), len(second_bag)) // 2)
     first = _rank_representative_instances(teacher, first_bag, first_class, keep)
     second = _rank_representative_instances(teacher, second_bag, second_class, keep)
     return mix_lambda * first + (1.0 - mix_lambda) * second

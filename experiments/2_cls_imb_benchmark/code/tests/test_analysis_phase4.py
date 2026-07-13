@@ -99,7 +99,7 @@ def test_target_prior_correction_identity_for_unscoped_methods():
     logits = np.array([[1.0, 2.0, 3.0]])
     pi_train = np.array([0.5, 0.3, 0.2])
     pi_target = np.array([0.2, 0.3, 0.5])
-    out = apply_target_prior_correction(logits, "ce", 1.0, pi_train, pi_target)
+    out = apply_target_prior_correction(logits, "weighted_ce", 1.0, pi_train, pi_target)
     assert np.array_equal(out, logits)
 
 
