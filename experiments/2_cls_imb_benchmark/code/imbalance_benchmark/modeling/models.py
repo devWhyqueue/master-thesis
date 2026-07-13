@@ -13,6 +13,7 @@ __all__ = [
     "DualExpertMil",
     "OkoClassifier",
     "CfalPrototypeClassifier",
+    "build_model",
 ]
 
 
@@ -194,3 +195,35 @@ class CfalPrototypeClassifier(nn.Module):
         proto = F.normalize(self.prototypes, dim=-1, eps=1e-8)
         sq_dist = (emb.unsqueeze(1) - proto.unsqueeze(0)).square().sum(dim=-1)
         return torch.exp(-sq_dist / self.sigma)
+
+
+def build_model(
+    method: str,
+    is_mil: bool,
+    input_dim: int,
+    hidden_dim: int,
+    n_classes: int,
+    dropout: float,
+    param: float | None = None,
+) -> nn.Module:
+    """Construct the model class the roster's regime and method require.
+
+    CFAL's affinity bandwidth sigma is a model construction argument (the
+    tuned method-specific control), not a loss argument. MDE always uses the
+    dual-expert aggregator; every other WSI method uses attention MIL.
+    """
+    if method == "mde":
+        return DualExpertMil(input_dim, hidden_dim, n_classes, dropout)
+    if is_mil:
+        return AttentionMil(input_dim, hidden_dim, n_classes, dropout)
+    if method == "oko":
+        return OkoClassifier(input_dim, hidden_dim, n_classes, dropout)
+    if method == "cfal":
+        return CfalPrototypeClassifier(
+            input_dim,
+            hidden_dim,
+            n_classes,
+            dropout,
+            float(param) if param is not None else 1.0,
+        )
+    return MLP(input_dim, hidden_dim, n_classes, dropout)

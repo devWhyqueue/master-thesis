@@ -22,8 +22,6 @@ __all__ = [
     "compute_data_hash",
     "write_run_record",
     "read_run_record",
-    "get_grid_configs",
-    "GRIDS",
     "render_sbatch",
     "submit_sbatch",
     "cmd_submit",
@@ -44,31 +42,6 @@ DEFAULT_CONFIG_PATH = EXPERIMENT_ROOT / "configs" / "default.yaml"
 RUN_RECORD_NAME = "run.json"
 EVAL_ARRAYS_NAME = "eval_arrays.npz"
 ARRAY_FIELDS = ("labels", "preds", "probabilities")
-
-GRIDS: dict[str, list[float] | list[int]] = {
-    "weighted_ce": [0.25, 0.5, 0.75, 1.0],
-    "balanced_sampling": [0.25, 0.5, 0.75, 1.0],
-    "focal": [0.5, 1.0, 1.5, 2.0],
-    "logit_adjustment": [0.25, 0.5, 1.0, 2.0],
-    "ce_soft_f1": [0.25, 1.0, 4.0, 16.0],
-    "ce_soft_mcc": [0.25, 1.0, 4.0, 16.0],
-    "cfal": [0.25, 1.0, 2.0, 4.0],
-    "oko": [1, 2, 4, 8],
-    "rankmix": [0.5, 1.0, 2.0, 4.0],
-    "sc_mil": [0.05, 0.1, 0.2, 0.5],
-    "mde": [0.0, 0.1, 0.25, 0.5],
-}
-
-
-def get_grid_configs(method: str) -> list[dict[str, Any]]:
-    """Return 16 parameter configurations (4 hyperparams x 4 learning rates)."""
-    lrs = [1e-4, 3e-4, 1e-3, 3e-3]
-    if method in ("ce", "crt", "post_hoc_logit_adjustment"):
-        return [{"lr": lr} for lr in lrs]
-    key = next((k for k in GRIDS if k in method), None)
-    if not key:
-        return [{"lr": lr} for lr in lrs]
-    return [{"parameter": p, "lr": lr} for p in GRIDS[key] for lr in lrs]
 
 
 def load_config(path: str | Path | None = None) -> dict[str, Any]:

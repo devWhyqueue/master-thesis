@@ -2,100 +2,60 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 from typing import Any
 
 import torch
 
-from imbalance_benchmark.common import ensure_dirs, load_config, write_run_record
-from imbalance_benchmark.data import ImbalanceDataset
+from imbalance_benchmark.commands.confirm_methods import (
+    RunContext,
+    confirm_ce,
+    confirm_crt,
+    confirm_method,
+    confirm_post_hoc,
+)
+from imbalance_benchmark.common import ensure_dirs, load_config
+from imbalance_benchmark.data import (
+    BagFeatureDataset,
+    ImbalanceDataset,
+    TrainDataset,
+    bag_collate,
+)
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
-from imbalance_benchmark.modeling.models import MLP
-from imbalance_benchmark.modeling.training import fit_model, run_evaluation
+from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
 
 __all__ = ["cmd_confirm"]
 
-
-def _confirm_run(
-    cond: str,
-    method: str,
-    cfg: dict[str, Any],
-    train_ds: ImbalanceDataset,
-    test_ldr: torch.utils.data.DataLoader,
-    device: torch.device,
-    config: dict[str, Any],
-    paths: dict[str, Path],
-    n_cls: int,
-) -> None:
-    """Train confirmation models for a single condition-method configuration across 5 seeds."""
-    for seed in range(5):
-        model = MLP(2560, 256, n_cls, 0.1).to(device)
-        ctx = {
-            "method": method,
-            "model": model,
-            "train_dataset": train_ds,
-            "val_loader": None,
-            "device": device,
-            "config": config,
-            "param_config": cfg,
-            "seed": seed,
-            "is_mil": False,
-            "n_classes": n_cls,
-            "train_labels": train_ds.get_int_targets(),
-        }
-        fit_model(ctx)
-        res = run_evaluation(model, test_ldr, device, False, n_cls)
-        write_run_record(
-            paths["results"] / cond / method / f"seed={seed}",
-            {
-                "benchmark": "patch",
-                "method": method,
-                "seed": seed,
-                "tuning_params": cfg,
-                "splits": {
-                    "test": {
-                        "accuracy": res["balanced_accuracy"],
-                        "balanced_accuracy": res["balanced_accuracy"],
-                        "macro_precision": res["balanced_accuracy"],
-                        "macro_recall": res["balanced_accuracy"],
-                        "macro_f1": res["macro_f1"],
-                        "negative_log_likelihood": res["nll"],
-                        "labels": res["targets"].tolist(),
-                        "preds": res["preds"].tolist(),
-                        "probabilities": res["probs"].tolist(),
-                    }
-                },
-            },
-        )
+CONFIRMATION_SEED_ROLES = [f"confirmation_initialization_{i}" for i in range(5)]
 
 
 def _confirm_condition(
-    cond: str,
-    best_configs: dict[str, Any],
-    test_ldr: torch.utils.data.DataLoader,
-    device: torch.device,
-    config: dict[str, Any],
-    paths: dict[str, Path],
-    n_cls: int,
+    cond: str, methods: tuple[str, ...], best_configs: dict[str, Any], run: RunContext
 ) -> None:
-    """Run confirmation training for every method within one imbalance condition."""
-    train_ds = ImbalanceDataset(paths["data"] / f"manifest_{cond}.csv", device=device)
-    for method in ["ce", "weighted_ce"]:
-        _confirm_run(
-            cond,
-            method,
-            best_configs.get(method, {"lr": 1e-3}),
-            train_ds,
-            test_ldr,
-            device,
-            config,
-            paths,
-            n_cls,
-        )
+    """Run confirmation training for every roster method within one imbalance condition."""
+    dataset_cls = BagFeatureDataset if run.is_mil else ImbalanceDataset
+    train_ds: TrainDataset = dataset_cls(
+        run.paths["data"] / f"manifest_{cond}.csv", device=run.device
+    )
+    cond_configs = best_configs.get(cond, {})
+    ce_states: list[dict[str, Any]] | None = None
+    for method in methods:
+        cfg = cond_configs.get(method, {"lr": 1e-3})
+        if method == "ce":
+            ce_states = confirm_ce(cond, cfg, train_ds, run)
+        elif method == "post_hoc_logit_adjustment":
+            assert ce_states is not None, (
+                "CE must be confirmed before post-hoc adjustment"
+            )
+            confirm_post_hoc(cond, cfg, ce_states, train_ds, run)
+        elif method == "crt":
+            confirm_crt(cond, cfg, cond_configs.get("ce", {"lr": 1e-3}), train_ds, run)
+        else:
+            confirm_method(cond, method, cfg, train_ds, run)
 
 
-def cmd_confirm(args: argparse.Namespace) -> None:
-    """Train confirmation models."""
+def _confirm_inputs(args: argparse.Namespace) -> tuple[dict[str, Any], RunContext]:
+    """Load config, best tuning selections, and the locked-test loader for confirmation."""
     config = load_config(args.config)
     paths = ensure_dirs(config)
     freeze_path = paths["data"] / "manifest_freeze.json"
@@ -104,10 +64,24 @@ def cmd_confirm(args: argparse.Namespace) -> None:
     with (paths["data"] / "tuning_selections.json").open() as f:
         best_configs = json.load(f)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test_ds = ImbalanceDataset(
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    dataset_cls = BagFeatureDataset if is_mil else ImbalanceDataset
+    test_ds = dataset_cls(
         paths["data"] / "manifest.csv", split_name="test", device=device
     )
-    test_ldr = torch.utils.data.DataLoader(test_ds, batch_size=64)
-    n_cls = test_ds.get_n_classes()
-    for cond in ["balanced", "moderate"]:
-        _confirm_condition(cond, best_configs, test_ldr, device, config, paths, n_cls)
+    test_ldr = torch.utils.data.DataLoader(
+        test_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
+    )
+    seeds = [derive_seed(args.seed, role) for role in CONFIRMATION_SEED_ROLES]
+    run = RunContext(
+        device, config, test_ds.get_n_classes(), is_mil, test_ldr, paths, seeds
+    )
+    return best_configs, run
+
+
+def cmd_confirm(args: argparse.Namespace) -> None:
+    """Fit every roster method's five confirmation seeds and emit locked test predictions."""
+    best_configs, run = _confirm_inputs(args)
+    methods = roster_for_regime(run.is_mil)
+    for cond in CONDITIONS:
+        _confirm_condition(cond, methods, best_configs, run)

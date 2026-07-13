@@ -10,7 +10,12 @@ from torch.utils.data import DataLoader
 
 from imbalance_benchmark.modeling.models import AttentionMil, DualExpertMil
 
-__all__ = ["run_evaluation", "per_class_recall"]
+__all__ = [
+    "run_evaluation",
+    "per_class_recall",
+    "checkpoint_step",
+    "initial_checkpoint",
+]
 
 
 def per_class_recall(
@@ -95,3 +100,46 @@ def run_evaluation(
         "preds": probs.argmax(dim=-1).numpy(),
         "targets": targets.numpy(),
     }
+
+
+def checkpoint_step(
+    model: nn.Module,
+    val_loader: DataLoader | None,
+    device: torch.device,
+    is_mil: bool,
+    n_classes: int,
+    best: dict[str, Any],
+) -> dict[str, Any]:
+    """Evaluate the current model and keep it if it wins the BA -> F1 -> NLL tie-break."""
+    if val_loader is None:
+        return best
+    m = run_evaluation(model, val_loader, device, is_mil, n_classes)
+    acc, f1, nll = m["balanced_accuracy"], m["macro_f1"], m["nll"]
+    if acc > best["acc"] or (
+        abs(acc - best["acc"]) < 1e-6
+        and (f1 > best["f1"] or (abs(f1 - best["f1"]) < 1e-6 and nll < best["nll"]))
+    ):
+        return {
+            "state": {k: v.cpu().clone() for k, v in model.state_dict().items()},
+            "acc": acc,
+            "f1": f1,
+            "nll": nll,
+        }
+    return best
+
+
+def initial_checkpoint(
+    model: nn.Module,
+    val_loader: DataLoader | None,
+    device: torch.device,
+    is_mil: bool,
+    n_classes: int,
+) -> dict[str, Any]:
+    """Snapshot the untrained model as the initial best-checkpoint baseline."""
+    best = {
+        "state": {k: v.cpu().clone() for k, v in model.state_dict().items()},
+        "acc": -1.0,
+        "f1": -1.0,
+        "nll": float("inf"),
+    }
+    return checkpoint_step(model, val_loader, device, is_mil, n_classes, best)

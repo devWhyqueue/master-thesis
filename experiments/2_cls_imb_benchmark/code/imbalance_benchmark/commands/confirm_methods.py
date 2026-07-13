@@ -1,0 +1,170 @@
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import torch
+
+from imbalance_benchmark.common import write_run_record
+from imbalance_benchmark.data import TrainDataset
+from imbalance_benchmark.modeling.context import (
+    Regime,
+    build_training_ctx,
+    param_counts,
+    updates_for,
+)
+from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
+from imbalance_benchmark.modeling.training import (
+    class_priors,
+    resolve_batch_size,
+    run_evaluation,
+    update_budget,
+)
+
+__all__ = [
+    "RunContext",
+    "confirm_ce",
+    "confirm_post_hoc",
+    "confirm_crt",
+    "confirm_method",
+]
+
+
+@dataclass
+class RunContext(Regime):
+    """Shared per-condition confirmation inputs: locked test loader, paths, and seeds."""
+
+    test_loader: torch.utils.data.DataLoader
+    paths: dict[str, Path]
+    seeds: list[int]
+
+
+def _timed_fit(fit_fn: Any, ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
+    """Run one training orchestration and measure its wall-clock time."""
+    start = time.perf_counter()
+    state, _ = fit_fn(ctx)
+    return state, time.perf_counter() - start
+
+
+def _cost_payload(
+    method: str, budget: int, batch_size: int, elapsed: float, model: torch.nn.Module
+) -> dict[str, Any]:
+    """Assemble one confirmation run's update/example/timing/parameter cost record."""
+    updates = updates_for(method, budget)
+    return {
+        "updates": updates,
+        "processed_examples": updates * batch_size,
+        "wall_clock_seconds": elapsed,
+        **param_counts(model),
+    }
+
+
+def _split_payload(res: dict[str, Any]) -> dict[str, Any]:
+    """Assemble one evaluated split's metrics and prediction arrays for the run record."""
+    return {
+        "accuracy": res["balanced_accuracy"],
+        "balanced_accuracy": res["balanced_accuracy"],
+        "macro_precision": res["balanced_accuracy"],
+        "macro_recall": res["balanced_accuracy"],
+        "macro_f1": res["macro_f1"],
+        "negative_log_likelihood": res["nll"],
+        "labels": res["targets"].tolist(),
+        "preds": res["preds"].tolist(),
+        "probabilities": res["probs"].tolist(),
+    }
+
+
+def _run_and_record(
+    cond: str,
+    method: str,
+    seed_idx: int,
+    ctx: dict[str, Any],
+    state: dict[str, Any],
+    run: RunContext,
+    elapsed: float,
+    logit_adj_tau: float | None = None,
+    class_priors_tensor: torch.Tensor | None = None,
+) -> None:
+    """Evaluate a locked confirmation checkpoint once and write its run record."""
+    model = ctx["model"]
+    model.load_state_dict({k: v.to(run.device) for k, v in state.items()})
+    res = run_evaluation(
+        model,
+        run.test_loader,
+        run.device,
+        run.is_mil,
+        run.n_classes,
+        logit_adj_tau,
+        class_priors_tensor,
+    )
+    batch_size = resolve_batch_size(run.config, run.is_mil)
+    budget = update_budget(len(ctx["train_dataset"]), batch_size)
+    write_run_record(
+        run.paths["results"] / cond / method / f"seed={seed_idx}",
+        {
+            "benchmark": "wsi" if run.is_mil else "patch",
+            "condition": cond,
+            "method": method,
+            "seed": ctx["seed"],
+            "tuning_params": ctx["param_config"],
+            "cost": _cost_payload(method, budget, batch_size, elapsed, model),
+            "splits": {"test": _split_payload(res)},
+        },
+    )
+
+
+def confirm_ce(
+    cond: str, cfg: dict[str, Any], train_ds: TrainDataset, run: RunContext
+) -> list[dict[str, Any]]:
+    """Fit CE for every confirmation seed; return its checkpoints for post-hoc reuse."""
+    states = []
+    for seed in run.seeds:
+        ctx = build_training_ctx("ce", train_ds, run, seed, cfg)
+        state, elapsed = _timed_fit(fit_method, ctx)
+        states.append(state)
+        _run_and_record(cond, "ce", len(states) - 1, ctx, state, run, elapsed)
+    return states
+
+
+def confirm_post_hoc(
+    cond: str,
+    cfg: dict[str, Any],
+    ce_states: list[dict[str, Any]],
+    train_ds: TrainDataset,
+    run: RunContext,
+) -> None:
+    """Reuse each seed's locked CE checkpoint under a post-hoc target-prior shift."""
+    priors = class_priors(train_ds.get_int_targets(), run.n_classes, run.device)
+    tau = float(cfg.get("parameter", 1.0))
+    for i, (seed, state) in enumerate(zip(run.seeds, ce_states, strict=True)):
+        ctx = build_training_ctx("ce", train_ds, run, seed, {"lr": 1e-3})
+        _run_and_record(
+            cond, "post_hoc_logit_adjustment", i, ctx, state, run, 0.0, tau, priors
+        )
+
+
+def confirm_crt(
+    cond: str,
+    cfg: dict[str, Any],
+    stage_one_config: dict[str, Any],
+    train_ds: TrainDataset,
+    run: RunContext,
+) -> None:
+    """Fit cRT (stage one inherits CE; stage two retrains only the classifier) per seed."""
+    for i, seed in enumerate(run.seeds):
+        ctx = build_training_ctx("crt", train_ds, run, seed, cfg)
+        ctx["stage_one_config"] = stage_one_config
+        state, elapsed = _timed_fit(fit_crt, ctx)
+        _run_and_record(cond, "crt", i, ctx, state, run, elapsed)
+
+
+def confirm_method(
+    cond: str, method: str, cfg: dict[str, Any], train_ds: TrainDataset, run: RunContext
+) -> None:
+    """Fit one ordinary (single-orchestration) roster method for every confirmation seed."""
+    for i, seed in enumerate(run.seeds):
+        ctx = build_training_ctx(method, train_ds, run, seed, cfg)
+        state, elapsed = _timed_fit(fit_method, ctx)
+        _run_and_record(cond, method, i, ctx, state, run, elapsed)

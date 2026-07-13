@@ -12,7 +12,13 @@ from imbalance_benchmark.datasets.features import load_slide_features
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["load_feature_row", "ImbalanceDataset", "BagFeatureDataset", "bag_collate"]
+__all__ = [
+    "load_feature_row",
+    "ImbalanceDataset",
+    "BagFeatureDataset",
+    "bag_collate",
+    "TrainDataset",
+]
 
 
 def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:
@@ -41,11 +47,6 @@ class ImbalanceDataset(Dataset):
         self.df = df
         self.classes = sorted(list(set(self.df["cancer_type"])))
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
-
-    def get_class_sizes(self) -> np.ndarray:
-        """Get class sample sizes."""
-        targets = [self.class_to_idx[name] for name in self.df["cancer_type"]]
-        return np.bincount(targets, minlength=len(self.classes))
 
     def get_n_classes(self) -> int:
         """Get number of classes."""
@@ -102,11 +103,6 @@ class BagFeatureDataset(Dataset):
         self.classes = sorted(list(set(self.df["cancer_type"])))
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
 
-    def get_class_sizes(self) -> np.ndarray:
-        """Get class bag sizes."""
-        targets = [self.class_to_idx[name] for name in self.df["cancer_type"]]
-        return np.bincount(targets, minlength=len(self.classes))
-
     def get_n_classes(self) -> int:
         """Get number of classes."""
         return len(self.classes)
@@ -138,3 +134,6 @@ def bag_collate(
     """Collate variable-size bags without padding."""
     bags, labels = zip(*items, strict=False)
     return list(bags), torch.tensor(labels, dtype=torch.long)
+
+
+TrainDataset = ImbalanceDataset | BagFeatureDataset

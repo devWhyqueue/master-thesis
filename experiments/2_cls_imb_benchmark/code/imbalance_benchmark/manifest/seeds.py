@@ -13,6 +13,13 @@ SEED_ROLES = (
     "definitive_construction",
     "initialization",
     "resampling",
+    "tuning_initialization_0",
+    "tuning_initialization_1",
+    "confirmation_initialization_0",
+    "confirmation_initialization_1",
+    "confirmation_initialization_2",
+    "confirmation_initialization_3",
+    "confirmation_initialization_4",
 )
 
 
