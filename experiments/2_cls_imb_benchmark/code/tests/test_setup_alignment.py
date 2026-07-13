@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from argparse import Namespace
+import json
 
 import pandas as pd
 import numpy as np
@@ -10,9 +11,12 @@ import torch
 import yaml
 
 from imbalance_benchmark.analysis.inference.permutation import paired_block_permutation_ba
-from imbalance_benchmark.commands.confirm_methods import RunContext, confirm_ce
+from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
+from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
+from imbalance_benchmark.manifest.freeze import achieved_rho
+from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 
 
@@ -25,6 +29,15 @@ def test_shared_total_is_feasible_for_every_requested_ratio() -> None:
         allocation = allocate_counts(available, shared_total, ratio, min_support=10)
         assert sum(allocation) == shared_total
         assert all(count <= support for count, support in zip(allocation, available))
+
+
+def test_shared_total_never_flattens_a_requested_moderate_profile() -> None:
+    available = [100, 100, 100]
+    shared_total = max_shared_total(available, min_support=10)
+    moderate = allocate_counts(available, shared_total, 10.0, min_support=10)
+
+    assert shared_total == 142
+    assert achieved_rho(dict(enumerate(moderate))) == pytest.approx(10.0)
 
 
 def test_bag_dataset_concatenates_all_feature_chunks_before_capping(tmp_path: Path) -> None:
@@ -69,14 +82,14 @@ def test_confirmation_training_context_receives_the_validation_loader(
         return {"model": torch.nn.Linear(1, 1), "train_dataset": [0], "seed": 7, "param_config": {}}
 
     monkeypatch.setattr(
-        "imbalance_benchmark.commands.confirm_methods.build_training_ctx", fake_context
+        "imbalance_benchmark.modeling.workflows.confirmation.build_training_ctx", fake_context
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.commands.confirm_methods._timed_fit",
+        "imbalance_benchmark.modeling.workflows.confirmation._timed_fit",
         lambda _fit, _ctx: ({}, 0.0),
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.commands.confirm_methods._run_and_record", lambda *args: None
+        "imbalance_benchmark.modeling.workflows.confirmation._run_and_record", lambda *args: None
     )
 
     confirm_ce("balanced", {"lr": 1e-3}, object(), run)  # type: ignore[arg-type]
@@ -100,6 +113,43 @@ def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -
         not manifests[0][["case_id", "split"]].equals(frame[["case_id", "split"]])
         for frame in manifests[1:]
     )
+
+
+def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "paths": {"outputs": str(tmp_path / "outputs")},
+                "dataset": {"name": "synthetic", "regime": "patch"},
+                "analysis": {"bootstrap_replicates": 2},
+            }
+        ),
+        encoding="utf-8",
+    )
+    rows = [
+        {
+            "case_id": f"{cls}_{index}",
+            "slide_id": f"{cls}_{index}",
+            "patch_id": f"{cls}_{index}_patch",
+            "cancer_type": cls,
+            "split": "train" if index < 30 else "test",
+        }
+        for cls in ("A", "B")
+        for index in range(40)
+    ]
+    for split_index in range(3):
+        data_dir = tmp_path / "outputs" / f"split={split_index}" / "data"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame(rows).to_csv(data_dir / "manifest.csv", index=False)
+
+    cmd_freeze(Namespace(config=str(config_path), seed=7, split_index=0))
+
+    freeze = json.loads(
+        (tmp_path / "outputs" / "split=0" / "data" / "manifest_freeze.json").read_text()
+    )
+    preflight = json.loads(Path(freeze["bootstrap_preflight"]["path"]).read_text())
+    assert preflight["seed"] == derive_seed(7, "resampling")
 
 
 def test_two_seed_permutation_stack_is_not_mistaken_for_one_probability_matrix():

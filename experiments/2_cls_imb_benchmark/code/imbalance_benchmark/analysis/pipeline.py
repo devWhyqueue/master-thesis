@@ -28,10 +28,20 @@ def ingest_all_runs(
         allocated = (
             freeze.get("conditions", {}).get(condition, {}).get("allocated_counts", {})
         )
-        tiers = (
-            assign_tiers(class_names, allocated) if class_names and allocated else {}
-        )
         assignment = record.get("assignment", "native")
+        if not allocated:
+            allocated = (
+                freeze.get("assignment_conditions", {})
+                .get(assignment, {})
+                .get(condition, {})
+                .get("allocated_counts", {})
+            )
+        tie_order = freeze.get("tail_assignments", {}).get(assignment, class_names)
+        tiers = (
+            assign_tiers(class_names, allocated, tie_order)
+            if class_names and allocated
+            else {}
+        )
         run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
         ingest_run(conn, run_id, result_dir, condition, method, seed_idx, record, tiers)
 
@@ -48,7 +58,8 @@ def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
     return {
         "temperature": fit.temperature,
         "raw_test_nll": negative_log_likelihood(
-            np.array(test["labels"]), np.array(test.get("raw_probabilities", test["probabilities"]))
+            np.array(test["labels"]),
+            np.array(test.get("raw_probabilities", test["probabilities"])),
         ),
         "target_prior_test_nll": negative_log_likelihood(
             np.array(test["labels"]), np.array(test["probabilities"])

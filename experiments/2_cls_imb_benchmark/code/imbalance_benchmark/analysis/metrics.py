@@ -10,7 +10,8 @@ from sklearn.metrics import (
     confusion_matrix,
     precision_recall_fscore_support,
 )
-from imbalance_benchmark.analysis.ordinal import ordinal_metrics
+from imbalance_benchmark.analysis.predictors.ordinal_endpoints import ordinal_metrics
+from imbalance_benchmark.analysis.predictors.tier_summaries import tier_metrics
 
 __all__ = [
     "assign_tiers",
@@ -19,15 +20,14 @@ __all__ = [
     "expected_calibration_error",
     "classwise_nll",
     "classwise_brier",
-    "tier_metrics",
     "classification_payload",
 ]
 
-TIERS = ("head", "body", "tail")
-
 
 def assign_tiers(
-    class_names: list[str], allocated_counts: dict[str, int]
+    class_names: list[str],
+    allocated_counts: dict[str, int],
+    tie_order: list[str] | None = None,
 ) -> dict[str, str]:
     """Rank classes by allocated training support into head/body/tail (report Eq. ceil(K/3)).
 
@@ -39,10 +39,7 @@ def assign_tiers(
     """
     k = len(class_names)
     n_edge = math.ceil(k / 3)
-    order = sorted(
-        range(k),
-        key=lambda i: (-allocated_counts.get(class_names[i], 0), i),
-    )
+    order = _support_order(class_names, allocated_counts, tie_order)
     tiers = {}
     for rank, idx in enumerate(order):
         if rank < n_edge:
@@ -52,6 +49,22 @@ def assign_tiers(
         else:
             tiers[class_names[idx]] = "body"
     return tiers
+
+
+def _support_order(
+    class_names: list[str],
+    allocated_counts: dict[str, int],
+    tie_order: list[str] | None,
+) -> list[int]:
+    """Return class indices ranked by support and then by the locked assignment."""
+    locked_rank = {name: index for index, name in enumerate(tie_order or class_names)}
+    return sorted(
+        range(len(class_names)),
+        key=lambda index: (
+            -allocated_counts.get(class_names[index], 0),
+            locked_rank.get(class_names[index], index),
+        ),
+    )
 
 
 def negative_log_likelihood(labels: np.ndarray, probabilities: np.ndarray) -> float:
@@ -112,33 +125,6 @@ def classwise_brier(
     return out
 
 
-def tier_metrics(
-    class_names: list[str],
-    tiers: dict[str, str],
-    precision: np.ndarray,
-    recall: np.ndarray,
-    f1: np.ndarray,
-    support: np.ndarray,
-    cw_nll: np.ndarray,
-    cw_brier: np.ndarray,
-) -> dict[str, dict[str, Any]]:
-    """Average classwise precision/recall/f1/NLL/Brier within each locked tier."""
-    out: dict[str, dict[str, Any]] = {}
-    for tier in TIERS:
-        idx = [i for i, name in enumerate(class_names) if tiers.get(name) == tier]
-        if not idx:
-            continue
-        out[tier] = {
-            "precision": float(np.mean(precision[idx])),
-            "recall": float(np.mean(recall[idx])),
-            "f1": float(np.mean(f1[idx])),
-            "support": int(np.sum(support[idx])),
-            "nll": float(np.nanmean(cw_nll[idx])),
-            "brier": float(np.nanmean(cw_brier[idx])),
-        }
-    return out
-
-
 def _per_class_stats(
     y_true: np.ndarray, y_pred: np.ndarray, probs: np.ndarray, n_classes: int
 ) -> dict[str, np.ndarray]:
@@ -162,10 +148,11 @@ def _scalar_metrics(
     y_pred: np.ndarray,
     probs: np.ndarray,
     stats: dict[str, np.ndarray],
+    ordinal: bool,
 ) -> dict[str, Any]:
     """Aggregate scalar discrimination/calibration summaries for one evaluated split."""
     present = cast(np.ndarray, stats["support"] > 0)
-    return {
+    payload: dict[str, Any] = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
         "macro_precision": float(np.mean(stats["precision"][present])),
@@ -175,8 +162,10 @@ def _scalar_metrics(
         "macro_nll": float(np.nanmean(stats["nll"][present])),
         "brier_score": brier_score(y_true, probs, len(stats["support"])),
         "expected_calibration_error": expected_calibration_error(y_true, probs),
-        **ordinal_metrics(y_true, y_pred),
     }
+    if ordinal:
+        payload.update(ordinal_metrics(y_true, y_pred))
+    return payload
 
 
 def _array_fields(
@@ -209,28 +198,13 @@ def _coerce_arrays(
     )
 
 
-def _tier_payload(
-    class_names: list[str], tiers: dict[str, str], stats: dict[str, np.ndarray]
-) -> dict[str, dict[str, Any]]:
-    """Wrap ``tier_metrics`` with the stats dict's positional arguments it expects."""
-    return tier_metrics(
-        class_names,
-        tiers,
-        stats["precision"],
-        stats["recall"],
-        stats["f1"],
-        stats["support"],
-        stats["nll"],
-        stats["brier"],
-    )
-
-
 def classification_payload(
     labels: list[int] | np.ndarray,
     preds: list[int] | np.ndarray,
     probabilities: list[list[float]] | np.ndarray,
     class_names: list[str],
     tiers: dict[str, str] | None = None,
+    ordinal: bool = False,
 ) -> dict[str, Any]:
     """Full discrimination + calibration payload for one evaluated split.
 
@@ -242,8 +216,8 @@ def classification_payload(
     n_classes = len(class_names)
     y_true, y_pred, probs = _coerce_arrays(labels, preds, probabilities)
     stats = _per_class_stats(y_true, y_pred, probs, n_classes)
-    payload = _scalar_metrics(y_true, y_pred, probs, stats)
+    payload = _scalar_metrics(y_true, y_pred, probs, stats, ordinal)
     payload.update(_array_fields(y_true, y_pred, stats, n_classes))
     if tiers is not None:
-        payload["tier_metrics"] = _tier_payload(class_names, tiers, stats)
+        payload["tier_metrics"] = tier_metrics(class_names, tiers, stats)
     return payload

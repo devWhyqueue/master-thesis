@@ -117,7 +117,11 @@ def _tail_classes(
     )
     if not allocated:
         return []
-    tiers = assign_tiers(class_names, allocated)
+    tiers = assign_tiers(
+        class_names,
+        allocated,
+        freeze.get("tail_assignments", {}).get(assignment, class_names),
+    )
     return [i for i, name in enumerate(class_names) if tiers.get(name) == "tail"]
 
 

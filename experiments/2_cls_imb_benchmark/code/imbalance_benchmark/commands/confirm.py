@@ -6,7 +6,7 @@ from typing import Any
 
 import torch
 
-from imbalance_benchmark.commands.confirm_methods import (
+from imbalance_benchmark.modeling.workflows.confirmation import (
     RunContext,
     confirm_ce,
     confirm_crt,
@@ -67,7 +67,15 @@ def _confirm_inputs(
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Load config, best tuning selections, and the locked-test loader for confirmation."""
     config = load_config(args.config)
+    exclusion_path = paths["data"] / "confirmatory_exclusion.json"
+    if exclusion_path.exists():
+        exclusion = json.loads(exclusion_path.read_text())
+        raise RuntimeError(
+            f"Confirmatory analysis is excluded: {exclusion.get('reason', 'unknown reason')}"
+        )
     freeze_path = paths["data"] / "manifest_freeze.json"
+    if not freeze_path.exists():
+        raise FileNotFoundError("Run freeze successfully before confirmation")
     if freeze_path.exists():
         verify_manifest_freeze(json.loads(freeze_path.read_text()))
     condition = getattr(args, "condition", None)

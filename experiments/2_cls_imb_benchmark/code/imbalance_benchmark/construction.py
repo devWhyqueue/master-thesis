@@ -4,8 +4,11 @@ import logging
 from typing import cast
 import numpy as np
 import pandas as pd
-
-from imbalance_benchmark.common import compute_data_hash
+from imbalance_benchmark.construction_sampling import (
+    build_manifest_hash,
+    select_patches_round_robin,
+    select_slides_round_robin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -126,19 +129,51 @@ def max_shared_total(
     if not available or min(available) < min_support:
         raise ValueError("No shared total satisfies the independent-support floor")
     # Controlled conditions intentionally remain smaller than the complete
-    # eligible pool; the latter is the descriptive natural anchor.
+    # eligible pool; the latter is the descriptive natural anchor.  Do not
+    # silently clip an infeasible head or tail: that would turn a requested
+    # long-tailed condition into a near-balanced one.
     upper = min(len(available) * min(available), sum(available) - 1)
+    # A support floor can make the nominal 100:1 profile impossible.  In that
+    # case the condition is explicitly capped at the largest head:tail ratio
+    # the available head class can sustain; it is never weakened further just
+    # to keep more total examples.
+    attainable_rhos = tuple(min(rho, available[0] / min_support) for rho in rhos)
     for total in range(upper, len(available) * min_support - 1, -1):
-        effective_rhos = tuple(
-            effective_rho(available, rho, min_support, total) for rho in rhos
-        )
-        allocations = [
-            allocate_counts(available, total, rho, min_support)
-            for rho in effective_rhos
-        ]
-        if all(sum(counts) == total for counts in allocations):
+        if all(
+            _allocation_is_feasible(available, total, rho, min_support)
+            for rho in attainable_rhos
+        ):
             return total
-    raise ValueError("No shared total is feasible for every requested condition")
+    raise ValueError(
+        "No shared total can realize every requested imbalance ratio without "
+        "violating an availability or independent-support constraint"
+    )
+
+
+def _allocation_is_feasible(
+    available: list[int], total_t: int, rho: float, min_support: int
+) -> bool:
+    """Whether an un-clipped integer profile can realize ``rho`` at ``total_t``."""
+    k = len(available)
+    if k == 1:
+        return min_support <= total_t <= available[0]
+    weights = np.asarray([rho ** (-i / (k - 1)) for i in range(k)], dtype=float)
+    target = total_t * weights / weights.sum()
+    # Rounding is resolved below; a half-unit margin makes this exact for the
+    # integer allocation that ``allocate_counts`` will construct.
+    if any(
+        value < min_support - 0.5 or value > cap + 0.5
+        for value, cap in zip(target, available, strict=True)
+    ):
+        return False
+    allocated = [int(round(value)) for value in target]
+    _adjust_alloc(
+        allocated, available, target.tolist(), total_t - sum(allocated), min_support
+    )
+    return sum(allocated) == total_t and all(
+        min_support <= count <= cap
+        for count, cap in zip(allocated, available, strict=True)
+    )
 
 
 def effective_rho(
@@ -159,11 +194,7 @@ def effective_rho(
 
     def feasible(candidate: float) -> bool:
         """Whether the complete constrained allocation fits its requested total."""
-        allocation = allocate_counts(available, total_t, candidate, min_support)
-        return sum(allocation) == total_t and all(
-            min_support <= count <= cap
-            for count, cap in zip(allocation, available, strict=True)
-        )
+        return _allocation_is_feasible(available, total_t, candidate, min_support)
 
     if feasible(rho):
         return rho
@@ -179,138 +210,3 @@ def effective_rho(
         else:
             high = mid
     return low
-
-
-def _build_patch_hierarchy(
-    df_class: pd.DataFrame, rng: np.random.Generator
-) -> tuple[list[str], dict[str, dict[str, list[int]]]]:
-    """Build nested randomized dictionary for patch sampling."""
-    patients = cast(np.ndarray, df_class["case_id"].unique())
-    rng.shuffle(patients)
-    h: dict[str, dict[str, list[int]]] = {}
-    for pat in patients:
-        h[pat] = {}
-        pat_df = cast(pd.DataFrame, df_class[df_class["case_id"] == pat])
-        slides = cast(np.ndarray, pat_df["slide_id"].unique())
-        rng.shuffle(slides)
-        for sld in slides:
-            pids = cast(np.ndarray, pat_df[pat_df["slide_id"] == sld].index.to_numpy())
-            rng.shuffle(pids)
-            h[pat][sld] = list(pids)
-    return list(patients), h
-
-
-def _loop_patches(
-    patients: list[str], h: dict, max_p: int, max_s: int, n: int
-) -> tuple[list[int], dict, dict]:
-    """Execute loop for round robin patch sampling."""
-    selected, pat_counts, sld_counts = [], {p: 0 for p in patients}, {}
-    prog = True
-    while len(selected) < n and prog:
-        prog = False
-        for p in patients:
-            if len(selected) >= n or pat_counts[p] >= max_p:
-                continue
-            for s in h[p]:
-                if len(selected) >= n or pat_counts[p] >= max_p:
-                    break
-                if sld_counts.get(s, 0) >= max_s or not h[p][s]:
-                    continue
-                selected.append(h[p][s].pop(0))
-                pat_counts[p] += 1
-                sld_counts[s] = sld_counts.get(s, 0) + 1
-                prog = True
-    return selected, pat_counts, sld_counts
-
-
-def _contribution_cap(n_examples: int, fraction: float, unit: str) -> int:
-    """Return an exact contribution cap, rejecting allocations below one unit."""
-    cap = int(np.floor(n_examples * fraction))
-    if cap < 1:
-        raise ValueError(
-            f"{n_examples} examples cannot satisfy the {fraction:.0%} {unit} cap"
-        )
-    return cap
-
-
-def select_patches_round_robin(
-    df_class: pd.DataFrame, n_patches: int, seed: int
-) -> pd.DataFrame:
-    """Sample patches with round-robin patient and slide caps (10% patient, 5% slide)."""
-    if df_class.empty or n_patches <= 0:
-        return pd.DataFrame()
-    rng = np.random.default_rng(seed)
-    patients, h = _build_patch_hierarchy(df_class, rng)
-    selected, _, _ = _loop_patches(
-        patients,
-        h,
-        _contribution_cap(n_patches, 0.10, "patient"),
-        _contribution_cap(n_patches, 0.05, "slide"),
-        n_patches,
-    )
-    if len(selected) < n_patches:
-        raise ValueError(
-            "Patch allocation is infeasible under the 10% patient and 5% slide caps"
-        )
-    return df_class.loc[selected]
-
-
-def _loop_slides(patients: list[str], h: dict, max_p: int, n: int) -> list[int]:
-    """Execute loop for round robin slide sampling."""
-    selected, pat_counts = [], {p: 0 for p in patients}
-    prog = True
-    while len(selected) < n and prog:
-        prog = False
-        for p in patients:
-            if len(selected) >= n or pat_counts[p] >= max_p:
-                continue
-            if h[p]:
-                selected.append(h[p].pop(0))
-                pat_counts[p] += 1
-                prog = True
-    return selected
-
-
-def _build_slide_hierarchy(
-    df_slides: pd.DataFrame, rng: np.random.Generator
-) -> tuple[list[str], dict[str, list[int]]]:
-    """Build a randomized per-patient slide-index dictionary."""
-    patients = list(cast(np.ndarray, df_slides["case_id"].unique()))
-    rng.shuffle(patients)
-    h = {
-        p: list(df_slides[df_slides["case_id"] == p].index.to_numpy()) for p in patients
-    }
-    for p in h:
-        rng.shuffle(h[p])
-    return patients, h
-
-
-def select_slides_round_robin(
-    df_class: pd.DataFrame, n_slides: int, seed: int
-) -> pd.DataFrame:
-    """Sample slides for MIL with round-robin patient caps (10%)."""
-    if df_class.empty or n_slides <= 0:
-        return pd.DataFrame()
-    rng = np.random.default_rng(seed)
-    df_slides = df_class.drop_duplicates("slide_id")
-    patients, h = _build_slide_hierarchy(df_slides, rng)
-    selected = _loop_slides(
-        patients, h, _contribution_cap(n_slides, 0.10, "patient"), n_slides
-    )
-    if len(selected) < n_slides:
-        raise ValueError("Slide allocation is infeasible under the 10% patient cap")
-    return cast(
-        pd.DataFrame,
-        df_class[df_class["slide_id"].isin(df_slides.loc[selected, "slide_id"])],
-    )
-
-
-def build_manifest_hash(manifest_df: pd.DataFrame) -> str:
-    """Create a hash of key manifest columns for immutability verification."""
-    columns = cast(
-        pd.DataFrame, manifest_df[["case_id", "slide_id", "cancer_type", "split"]]
-    )
-    records = columns.sort_values(by=["split", "cancer_type", "slide_id"]).to_dict(
-        "records"
-    )
-    return compute_data_hash(records)

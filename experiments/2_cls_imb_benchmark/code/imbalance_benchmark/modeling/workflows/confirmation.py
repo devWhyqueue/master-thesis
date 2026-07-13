@@ -5,7 +5,7 @@ import platform
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -17,6 +17,9 @@ from imbalance_benchmark.analysis.calibration import (
     softmax,
 )
 from imbalance_benchmark.analysis.metrics import classification_payload
+from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
+    clustered_endpoints,
+)
 from imbalance_benchmark.common import write_run_record
 from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.modeling.context import (
@@ -32,6 +35,7 @@ from imbalance_benchmark.modeling.training import (
     run_evaluation,
     update_budget,
 )
+from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = [
     "RunContext",
@@ -56,21 +60,41 @@ class RunContext(Regime):
 
 def _timed_fit(fit_fn: Any, ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """Run one training orchestration and measure its wall-clock time."""
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
     state, _ = fit_fn(ctx)
     return state, time.perf_counter() - start
 
 
 def _cost_payload(
-    method: str, budget: int, batch_size: int, elapsed: float, model: torch.nn.Module
+    method: str,
+    budget: int,
+    batch_size: int,
+    elapsed: float,
+    model: torch.nn.Module,
+    n_unique_examples: int,
+    parameter: int | float | None,
 ) -> dict[str, Any]:
     """Assemble one confirmation run's update/example/timing/parameter cost record."""
     updates = updates_for(method, budget)
+    loader_multiplier = (
+        2 if method == "mde" else int(parameter or 0) + 2 if method == "oko" else 1
+    )
+    examples_per_update = batch_size * loader_multiplier
+    processed = updates * examples_per_update
+    peak_memory = (
+        int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
+    )
     return {
         "updates": updates,
-        "processed_examples": updates * batch_size,
+        "processed_examples": processed,
         "wall_clock_seconds": elapsed,
-        "examples_per_update": batch_size,
+        "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
+        "peak_accelerator_memory_bytes": peak_memory,
+        "examples_per_update": examples_per_update,
+        "effective_passes_through_unique_examples": processed
+        / max(n_unique_examples, 1),
         **param_counts(model),
     }
 
@@ -94,6 +118,8 @@ def _split_payload(
     tau: float,
     train_priors: torch.Tensor,
     target_priors: np.ndarray,
+    identity: Any,
+    bootstrap_seed: int,
 ) -> dict[str, Any]:
     """Assemble one evaluated split's real classwise metrics and prediction arrays."""
     raw_logits = res["logits"]
@@ -110,6 +136,8 @@ def _split_payload(
         decision_probs.argmax(axis=1).tolist(),
         target_probs.tolist(),
         class_names,
+        ordinal=bool(class_names)
+        and all(name.startswith("ISUP") for name in class_names),
     )
     payload["labels"] = res["targets"].tolist()
     payload["preds"] = decision_probs.argmax(axis=1).tolist()
@@ -120,6 +148,13 @@ def _split_payload(
     payload["balanced_decision_logits"] = decision_logits.tolist()
     payload["target_prior_logits"] = target_logits.tolist()
     payload["target_prior_probabilities"] = target_probs.tolist()
+    payload["clustered_endpoints"] = clustered_endpoints(
+        res["targets"],
+        decision_probs.argmax(axis=1),
+        target_probs,
+        identity,
+        bootstrap_seed,
+    )
     return payload
 
 
@@ -146,17 +181,20 @@ def _run_and_record(
         for name, loader in (("validation", run.val_loader), ("test", run.test_loader))
     }
     target_priors = estimate_prior(raw_results["validation"]["targets"], run.n_classes)
-    splits = {
-        name: _split_payload(
+    splits = {}
+    for name, result in raw_results.items():
+        loader = run.val_loader if name == "validation" else run.test_loader
+        identity = cast(Any, loader.dataset).df
+        splits[name] = _split_payload(
             result,
             run.class_names,
             method,
             logit_adj_tau,
             class_priors_tensor,
             target_priors,
+            identity,
+            derive_seed(ctx["seed"], "resampling"),
         )
-        for name, result in raw_results.items()
-    }
     batch_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), batch_size)
     write_run_record(
@@ -175,7 +213,15 @@ def _run_and_record(
             "tuning_params": ctx["param_config"],
             "train_priors": class_priors_tensor.detach().cpu().tolist(),
             "target_priors": target_priors.tolist(),
-            "cost": _cost_payload(method, budget, batch_size, elapsed, model),
+            "cost": _cost_payload(
+                method,
+                budget,
+                batch_size,
+                elapsed,
+                model,
+                len(ctx["train_dataset"]),
+                ctx["param_config"].get("parameter"),
+            ),
             "environment": _environment_payload(),
             "splits": splits,
         },

@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from imbalance_benchmark.modeling.rq3 import fit_rq3_model
+from imbalance_benchmark.analysis.predictors.hierarchical_models import fit_rq3_model
 
 __all__ = [
     "RQ3Cell",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,7 @@ from imbalance_benchmark.modeling.special_methods import (
     select_post_hoc_tau,
 )
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
-from imbalance_benchmark.commands.tuning_aggregate import (
+from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     TuningScope,
     tune_across_splits,
 )
@@ -176,6 +177,7 @@ def _tuning_inputs(
 
 def cmd_tune(args: argparse.Namespace) -> None:
     """Run the validation-only hyperparameter search for every roster method and condition."""
+    started = time.perf_counter()
     config = load_config(args.config)
     base_paths = ensure_dirs(config)
     if args.split_index is not None:
@@ -218,6 +220,7 @@ def cmd_tune(args: argparse.Namespace) -> None:
             else "tuning_selections.json"
         )
         write_json(paths["data"] / output_name, selections)
+        _write_tuning_cost(paths, started)
         return
     indices = range(3) if args.split_index is None else (args.split_index,)
     scoped = [_tuning_inputs(args, split_paths(base_paths, index)) for index in indices]
@@ -265,3 +268,19 @@ def cmd_tune(args: argparse.Namespace) -> None:
         output_name = "tuning_selections.json"
     for scope_paths, _, _ in scoped:
         write_json(scope_paths["data"] / output_name, selections)
+        _write_tuning_cost(scope_paths, started)
+
+
+def _write_tuning_cost(paths: dict[str, Path], started: float) -> None:
+    """Persist validation-search cost separately from locked confirmation fits."""
+    elapsed = time.perf_counter() - started
+    write_json(
+        paths["data"] / "tuning_search_cost.json",
+        {
+            "wall_clock_seconds": elapsed,
+            "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
+            "peak_accelerator_memory_bytes": int(torch.cuda.max_memory_allocated())
+            if torch.cuda.is_available()
+            else 0,
+        },
+    )

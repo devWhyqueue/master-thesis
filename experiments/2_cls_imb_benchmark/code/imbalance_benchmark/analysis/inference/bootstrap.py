@@ -22,9 +22,17 @@ def _contribution_vector(
     rows: pd.DataFrame, split_col: str | None
 ) -> tuple[tuple[str, str, int], ...]:
     """Encode one patient's observed split-by-class row counts deterministically."""
-    splits = rows[split_col].astype(str) if split_col else pd.Series("0", index=rows.index)
-    counts = pd.DataFrame({"split": splits, "class": rows["cancer_type"].astype(str)}).value_counts()
-    return tuple((str(split), str(cls), int(count)) for (split, cls), count in counts.sort_index().items())
+    splits = (
+        rows[split_col].astype(str) if split_col else pd.Series("0", index=rows.index)
+    )
+    counts = pd.DataFrame(
+        {"split": splits, "class": rows["cancer_type"].astype(str)}
+    ).value_counts()
+    records = []
+    for key, count in counts.sort_index().items():
+        split, cls = cast(tuple[Any, Any], key)
+        records.append((str(split), str(cls), int(count)))
+    return tuple(records)
 
 
 def build_strata(identity: pd.DataFrame) -> pd.Series:
@@ -198,28 +206,9 @@ def _preflight_row_weights(
 
 
 def bootstrap_preflight(
-    identity: pd.DataFrame,
-    n_replicates: int = 10_000,
-    seed: int = 0,
+    identity: pd.DataFrame, n_replicates: int = 10_000, seed: int = 0
 ) -> dict[str, Any]:
-    """Per split-frame, by-class preflight: unique resampled patients, Kish, max weight.
+    """Run the label-only bootstrap feasibility diagnostic."""
+    from imbalance_benchmark.analysis.inference.preflight import run_preflight
 
-    Kish and max-weight-fraction are averaged across replicates and flagged
-    descriptive-only when the mean Kish count is below five, or when one
-    patient supplies more than 50% of a class's weight in more than 5% of
-    replicates, per report §"Imbalance deficit, recovery, and inference".
-    """
-    row_weights = _preflight_row_weights(identity, n_replicates, seed)
-    class_col = identity["cancer_type"].to_numpy()
-    by_class = {
-        str(cls): _class_preflight(
-            rows["case_id"].to_numpy(), row_weights[class_col == cls, :], n_replicates
-        )
-        for cls, rows in identity.groupby("cancer_type")
-    }
-    return {
-        "n_replicates": n_replicates,
-        "seed": seed,
-        "by_class": by_class,
-        "is_descriptive_only": any(v["is_descriptive_only"] for v in by_class.values()),
-    }
+    return run_preflight(identity, n_replicates, seed)

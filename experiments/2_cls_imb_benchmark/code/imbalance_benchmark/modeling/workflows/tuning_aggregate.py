@@ -6,7 +6,11 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.datasets.data import TrainDataset
-from imbalance_benchmark.modeling.context import Regime, build_training_ctx, get_grid_configs
+from imbalance_benchmark.modeling.context import (
+    Regime,
+    build_training_ctx,
+    get_grid_configs,
+)
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
 
@@ -22,7 +26,9 @@ class TuningScope:
     train_ds: TrainDataset
 
 
-def _selection_key(metrics: list[tuple[float, float, float]]) -> tuple[float, float, float]:
+def _selection_key(
+    metrics: list[tuple[float, float, float]],
+) -> tuple[float, float, float]:
     """Aggregate every split and seed by BA, macro-F1, then lower NLL."""
     return (
         sum(metric[0] for metric in metrics) / len(metrics),
@@ -91,7 +97,9 @@ def _select_post_hoc(
     }
     for scope in scopes:
         priors = class_priors(
-            scope.train_ds.get_int_targets(), scope.regime.n_classes, scope.regime.device
+            scope.train_ds.get_int_targets(),
+            scope.regime.n_classes,
+            scope.regime.device,
         )
         for seed in seeds:
             state, _ = _evaluate("ce", ce_config, scope, seed)

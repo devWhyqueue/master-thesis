@@ -78,8 +78,13 @@ def test_classification_payload_shapes_and_macro_nll():
     assert payload["macro_nll"] == pytest.approx(
         float(np.mean([negative_log_likelihood(np.array(labels)[np.array(labels) == c], np.array(probs)[np.array(labels) == c]) for c in range(3)]))
     )
-    assert "quadratic_weighted_kappa" in payload
-    assert payload["ordinal_mean_absolute_error"] >= 0.0
+    assert "quadratic_weighted_kappa" not in payload
+    assert "ordinal_mean_absolute_error" not in payload
+    ordinal_payload = classification_payload(
+        labels, preds, probs, ["ISUP0", "ISUP1", "ISUP2"], ordinal=True
+    )
+    assert "quadratic_weighted_kappa" in ordinal_payload
+    assert ordinal_payload["ordinal_mean_absolute_error"] >= 0.0
 
 
 # --- calibration ----------------------------------------------------------------
@@ -458,11 +463,13 @@ def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_p
         }
         write_json(
             split_paths(paths, index)["data"] / "gates_and_recovery.json",
-            {"comparisons": [ce, method]},
+            # This ordering is the real failure case: balanced_sampling sorts
+            # before CE in grouped output, so CE gates must be resolved first.
+            {"comparisons": [{**method, "method": "balanced_sampling"}, ce]},
         )
     _aggregate_split_comparisons(paths)
     output = json.loads((paths["data"] / "cross_split_gates_and_recovery.json").read_text())
-    weighted = next(c for c in output["comparisons"] if c["method"] == "weighted_ce")
+    weighted = next(c for c in output["comparisons"] if c["method"] == "balanced_sampling")
     assert weighted["effect"] == pytest.approx(0.06)
     assert weighted["recovery"] == pytest.approx(1.0)
 
