@@ -18,6 +18,7 @@ __all__ = [
     "apply_temperature",
     "fit_temperature",
     "reliability_curve",
+    "seed_averaged_reliability_curve",
     "estimate_prior",
     "apply_target_prior_correction",
     "balanced_decision_logits",
@@ -96,32 +97,86 @@ def reliability_curve(
     )
 
 
+def seed_averaged_reliability_curve(
+    probability_stack: np.ndarray, labels: np.ndarray, n_bins: int = 10
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Average fixed-bin reliability summaries over initialization seeds."""
+    confidence = np.full((len(probability_stack), n_bins), np.nan)
+    accuracy = np.full_like(confidence, np.nan)
+    for seed, probabilities in enumerate(probability_stack):
+        centers, seed_confidence, seed_accuracy = reliability_curve(
+            probabilities, labels, n_bins
+        )
+        indices = (centers * n_bins).astype(int)
+        confidence[seed, indices] = seed_confidence
+        accuracy[seed, indices] = seed_accuracy
+    present = ~np.isnan(confidence).all(axis=0)
+    centers = (np.flatnonzero(present) + 0.5) / n_bins
+    return (
+        centers,
+        np.nanmean(confidence[:, present], axis=0),
+        np.nanmean(accuracy[:, present], axis=0),
+    )
+
+
+def _patient_block_ece_interval(
+    labels: np.ndarray, probabilities: np.ndarray, patient_ids: np.ndarray, seed: int
+) -> list[float]:
+    """Return a fixed-bin ECE interval from a patient-block bootstrap."""
+    patients = np.unique(patient_ids)
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(1_000):
+        sampled = rng.choice(patients, len(patients), replace=True)
+        rows = np.concatenate(
+            [np.flatnonzero(patient_ids == patient) for patient in sampled]
+        )
+        values.append(expected_calibration_error(labels[rows], probabilities[rows]))
+    return np.percentile(values, [2.5, 97.5]).tolist()
+
+
 def temperature_scaled_payload(
     validation_logits: np.ndarray,
     validation_labels: np.ndarray,
     test_logits: np.ndarray,
     test_labels: np.ndarray,
+    patient_ids: np.ndarray | None = None,
+    *,
+    seed: int = 0,
 ) -> dict[str, object]:
     """Fit validation temperature and retain every scaled test calibration output."""
     fit = fit_temperature(validation_logits, validation_labels)
     probabilities = apply_temperature(test_logits, fit.temperature)
+    if patient_ids is None:
+        patient_ids = np.arange(len(test_labels))
     centers, confidence, accuracy = reliability_curve(probabilities, test_labels)
+    metrics = _temperature_metrics(test_labels, probabilities, patient_ids, seed)
     return {
         "temperature": fit.temperature,
         "temperature_scaled_logits": (test_logits / fit.temperature).tolist(),
         "temperature_scaled_probabilities": probabilities.tolist(),
-        "temperature_scaled_nll": negative_log_likelihood(test_labels, probabilities),
-        "temperature_scaled_brier": brier_score(
-            test_labels, probabilities, probabilities.shape[1]
-        ),
-        "temperature_scaled_ece": expected_calibration_error(
-            test_labels, probabilities
-        ),
+        **metrics,
         "temperature_scaled_reliability": {
             "bin_centers": centers.tolist(),
             "mean_confidence": confidence.tolist(),
             "accuracy": accuracy.tolist(),
         },
+    }
+
+
+def _temperature_metrics(
+    labels: np.ndarray, probabilities: np.ndarray, patient_ids: np.ndarray, seed: int
+) -> dict[str, float | list[float]]:
+    """Return temperature-scaled calibration metrics and patient-block ECE uncertainty."""
+    return {
+        "temperature_scaled_nll": negative_log_likelihood(labels, probabilities),
+        "temperature_scaled_brier": brier_score(
+            labels, probabilities, probabilities.shape[1]
+        ),
+        "temperature_scaled_ece": expected_calibration_error(labels, probabilities),
+        "temperature_scaled_ece_ci": _patient_block_ece_interval(
+            labels, probabilities, patient_ids, seed
+        ),
     }
 
 

@@ -150,7 +150,7 @@ def allocate_counts(
 def max_shared_total(
     available: list[int], min_support: int, rhos: tuple[float, ...] = (1.0, 10.0, 100.0)
 ) -> int:
-    """Return the maximum total of an exactly balanced controlled condition.
+    """Return the maximum total of an approximately balanced controlled condition.
 
     Severity is deliberately excluded: requested ratios are lowered only
     after this shared total has been fixed. ``rhos`` is retained for
@@ -159,7 +159,8 @@ def max_shared_total(
     if not available or min(available) < min_support:
         raise ValueError("No shared total satisfies the independent-support floor")
     del rhos
-    return len(available) * min(available)
+    minimum = min(available)
+    return len(available) * minimum + sum(capacity > minimum for capacity in available)
 
 
 def _allocation_is_feasible(
@@ -171,14 +172,15 @@ def _allocation_is_feasible(
         return min_support <= total_t <= available[0]
     weights = np.asarray([rho ** (-i / (k - 1)) for i in range(k)], dtype=float)
     target = total_t * weights / weights.sum()
-    # Rounding is resolved below; a half-unit margin makes this exact for the
-    # integer allocation that ``allocate_counts`` will construct.
     if any(
-        value < min_support - 0.5 or value > cap + 0.5
-        for value, cap in zip(target, available, strict=True)
+        value < min_support - 0.5 or value >= capacity + 1.0
+        for value, capacity in zip(target, available, strict=True)
     ):
         return False
-    allocated = [int(round(value)) for value in target]
+    allocated = [
+        int(np.clip(round(value), min_support, capacity))
+        for value, capacity in zip(target, available, strict=True)
+    ]
     _adjust_alloc(
         allocated, available, target.tolist(), total_t - sum(allocated), min_support
     )

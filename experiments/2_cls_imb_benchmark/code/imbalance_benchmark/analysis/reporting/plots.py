@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from imbalance_benchmark.analysis.calibration import reliability_curve
+from imbalance_benchmark.analysis.calibration import seed_averaged_reliability_curve
 from imbalance_benchmark.analysis.metrics import assign_tiers
 from imbalance_benchmark.analysis.query import load_seed_predictions
 
@@ -15,6 +15,7 @@ __all__ = [
     "plot_confusion_matrix",
     "plot_reliability_diagram",
     "plot_tail_vs_support",
+    "allocated_training_support",
     "write_tail_reliability",
 ]
 
@@ -65,11 +66,49 @@ def plot_reliability_diagram(
     plt.close(fig)
 
 
-def plot_tail_vs_support(classwise: pd.DataFrame, path: Path) -> None:
+def allocated_training_support(
+    classwise: pd.DataFrame, freeze: dict[str, Any]
+) -> pd.Series:
+    """Return each classwise result's frozen allocated training count."""
+    counts = []
+    assignments = classwise["assignment"].astype(str).to_numpy()
+    condition_names = classwise["condition"].astype(str).to_numpy()
+    class_names = classwise["class_name"].astype(str).to_numpy()
+    for assignment, condition, class_name in zip(
+        assignments, condition_names, class_names, strict=True
+    ):
+        frozen_conditions = (
+            freeze.get("conditions", {})
+            if condition == "balanced"
+            else freeze.get("assignment_conditions", {}).get(assignment, {})
+        )
+        allocated = frozen_conditions.get(condition, {}).get("allocated_counts", {})
+        if class_name not in allocated:
+            raise ValueError(
+                f"Missing frozen allocation for {assignment}/{condition}/{class_name}"
+            )
+        counts.append(allocated[class_name])
+    return pd.Series(counts, index=classwise.index, dtype=np.int64)
+
+
+def plot_tail_vs_support(
+    classwise: pd.DataFrame, freeze: dict[str, Any], path: Path
+) -> None:
     """Tail-tier recall against allocated support, one point per (condition, method, class)."""
     fig, ax = plt.subplots(figsize=(6, 4.5))
-    for tier, group in classwise.groupby("tier"):
-        ax.scatter(group["support"], group["recall"], label=str(tier), alpha=0.7)
+    ranked = cast(
+        pd.DataFrame, classwise[classwise["tier"].isin(("head", "body", "tail"))]
+    )
+    data = ranked.assign(
+        allocated_training_count=allocated_training_support(ranked, freeze)
+    )
+    for tier, group in data.groupby("tier"):
+        ax.scatter(
+            group["allocated_training_count"],
+            group["recall"],
+            label=str(tier),
+            alpha=0.7,
+        )
     ax.set_xlabel("Support (allocated training count)")
     ax.set_ylabel("Recall")
     ax.legend(title="Tier")
@@ -92,8 +131,8 @@ def write_tail_reliability(
         src = load_seed_predictions(paths, "severe", "ce", assignment) or balanced
         mask = np.isin(src["labels"], tail)
         if mask.any():
-            p, y = src["probs"].mean(axis=0)[mask], src["labels"][mask]
-            centers, conf, acc = reliability_curve(p, y)
+            p, y = src["probs"][:, mask], src["labels"][mask]
+            centers, conf, acc = seed_averaged_reliability_curve(p, y)
             if len(centers):
                 fp = paths["figures"] / f"tail_reliability_{assignment}.png"
                 plot_reliability_diagram(centers, conf, acc, fp)

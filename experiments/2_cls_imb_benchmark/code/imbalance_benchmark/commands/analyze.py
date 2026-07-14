@@ -8,7 +8,7 @@ from typing import Any, cast
 
 import pandas as pd
 
-from imbalance_benchmark.analysis.calibration import reliability_curve
+from imbalance_benchmark.analysis.calibration import seed_averaged_reliability_curve
 from imbalance_benchmark.analysis.aggregate import (
     aggregate_split_comparisons,
     write_equal_split_endpoint_table,
@@ -102,11 +102,13 @@ def _write_figures(
     classwise = load_classwise(conn)
     classwise_test = cast(pd.DataFrame, classwise[classwise["split"] == "test"])
     if not classwise_test.empty:
-        plot_tail_vs_support(classwise_test, paths["figures"] / "tail_vs_support.png")
+        plot_tail_vs_support(
+            classwise_test, freeze, paths["figures"] / "tail_vs_support.png"
+        )
     balanced = load_seed_predictions(paths, "balanced", "ce")
     if balanced is not None:
-        centers, mean_conf, accuracy = reliability_curve(
-            balanced["probs"].mean(axis=0), balanced["labels"]
+        centers, mean_conf, accuracy = seed_averaged_reliability_curve(
+            balanced["probs"], balanced["labels"]
         )
         if len(centers):
             plot_reliability_diagram(

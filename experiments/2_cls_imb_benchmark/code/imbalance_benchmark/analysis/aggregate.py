@@ -15,6 +15,7 @@ from imbalance_benchmark.analysis.inference.gates import (
 )
 from imbalance_benchmark.analysis.inference.holm import apply_holm
 from imbalance_benchmark.analysis.query import load_eval_details
+from imbalance_benchmark.analysis.reporting.completeness import expected_comparison_keys
 from imbalance_benchmark.analysis.reporting.equal_split import (
     classwise_table,
     tier_table,
@@ -32,7 +33,9 @@ def aggregate_split_comparisons(
 ) -> None:
     """Recompute crossed, equal-split effects within each shared bootstrap replicate."""
     rows = _comparison_rows(base_paths)
-    require_complete_split_comparisons(rows)
+    require_complete_split_comparisons(
+        rows, expected_comparison_keys(base_paths, config)
+    )
     frame = pd.DataFrame(rows)
     keys = [key for key in ("assignment", "severity", "method", "gate") if key in frame]
     aggregate = [
@@ -63,10 +66,18 @@ def _comparison_rows(base_paths: dict[str, Path]) -> list[dict[str, Any]]:
     return rows
 
 
-def require_complete_split_comparisons(rows: list[dict[str, Any]]) -> None:
+def require_complete_split_comparisons(
+    rows: list[dict[str, Any]], expected: set[tuple[str, str, str, str]] | None = None
+) -> None:
     """Require every comparison, not merely some result, on all three locked splits."""
     keys = ("assignment", "severity", "method", "gate")
     frame = pd.DataFrame(rows)
+    observed = set(frame[list(keys)].itertuples(index=False, name=None))
+    missing = (expected or set()) - observed
+    if missing:
+        raise RuntimeError(
+            f"Expected comparisons are missing across all splits: {sorted(missing)}"
+        )
     for key, group in frame.groupby(list(keys), dropna=False):
         splits = set(group["patient_split"])
         if splits != {0, 1, 2} or len(group) != 3:

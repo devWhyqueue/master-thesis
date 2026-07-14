@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import balanced_accuracy_score, f1_score
+from sklearn.metrics import f1_score
 
 from imbalance_benchmark.analysis.metrics import expected_calibration_error
 
@@ -38,22 +38,25 @@ def _macro_classification(
     labels: np.ndarray, predictions: np.ndarray, groups: np.ndarray
 ) -> tuple[float, float]:
     """Equal-weight balanced accuracy and macro F1 after cluster aggregation."""
+    recalls = []
+    for label in np.unique(labels):
+        class_rows = labels == label
+        correct = predictions[class_rows] == labels[class_rows]
+        recalls.append(
+            float(
+                pd.Series(correct).groupby(groups[class_rows], sort=False).mean().mean()
+            )
+        )
     scores = [
-        (
-            balanced_accuracy_score(
-                labels[groups == group], predictions[groups == group]
-            ),
-            f1_score(
-                labels[groups == group],
-                predictions[groups == group],
-                average="macro",
-                zero_division=0,  # type: ignore
-            ),
+        f1_score(
+            labels[groups == group],
+            predictions[groups == group],
+            average="macro",
+            zero_division=0,  # type: ignore
         )
         for group in pd.unique(groups)
     ]
-    res = tuple(map(float, np.mean(scores, axis=0)))
-    return res[0], res[1]
+    return float(np.mean(recalls)), float(np.mean(scores))
 
 
 def _patient_bootstrap_ece(

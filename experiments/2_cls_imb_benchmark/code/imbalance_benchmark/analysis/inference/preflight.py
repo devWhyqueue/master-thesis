@@ -121,8 +121,8 @@ def run_preflight(
 ) -> dict[str, Any]:
     """Per split-frame, by-class preflight: unique resampled patients, Kish, max weight.
 
-    Kish and max-weight-fraction are averaged across replicates and flagged
-    descriptive-only when the mean Kish count is below five, or when one
+    Mean Kish and max-weight fractions are reported across replicates. Inference
+    is descriptive-only when any replicate's Kish count is below five, or when one
     patient supplies more than 50% of a class's weight in more than 5% of
     replicates, per report §"Imbalance deficit, recovery, and inference".
     """

@@ -67,6 +67,7 @@ def _canonical_endpoint_details(payload: dict[str, Any]) -> dict[str, Any]:
                 "temperature_scaled_nll",
                 "temperature_scaled_brier",
                 "temperature_scaled_ece",
+                "temperature_scaled_ece_ci",
             )
             if key in payload
         }
@@ -162,12 +163,32 @@ def load_seed_predictions(
     if not records:
         return None
     test_splits = [r["splits"]["test"] for r in records]
+    arrays = _stack_prediction_arrays(test_splits)
     return {
         "class_names": records[0].get("class_names", []),
         "labels": np.array(test_splits[0]["labels"]),
-        "preds": np.stack([np.array(s["preds"]) for s in test_splits]),
-        "probs": np.stack([np.array(s["probabilities"]) for s in test_splits]),
-        "logits": np.stack([np.array(s["logits"]) for s in test_splits]),
+        **arrays,
+    }
+
+
+def _stack_prediction_arrays(
+    test_splits: list[dict[str, Any]],
+) -> dict[str, np.ndarray]:
+    """Stack the seed-indexed prediction arrays retained in confirmed test runs."""
+    return {
+        "preds": np.stack([np.array(split["preds"]) for split in test_splits]),
+        "probs": np.stack([np.array(split["probabilities"]) for split in test_splits]),
+        "temperature_scaled_probs": np.stack(
+            [
+                np.array(
+                    split.get(
+                        "temperature_scaled_probabilities", split["probabilities"]
+                    )
+                )
+                for split in test_splits
+            ]
+        ),
+        "logits": np.stack([np.array(split["logits"]) for split in test_splits]),
     }
 
 

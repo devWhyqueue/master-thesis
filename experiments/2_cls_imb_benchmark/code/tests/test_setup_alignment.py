@@ -33,7 +33,7 @@ def test_shared_total_keeps_all_naturally_balanced_support() -> None:
         assert all(count <= support for count, support in zip(allocation, available))
 
 
-def test_shared_total_is_maximized_before_requested_ratio_is_lowered() -> None:
+def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_one() -> None:
     frame = pd.DataFrame(
         [
             {
@@ -55,7 +55,7 @@ def test_shared_total_is_maximized_before_requested_ratio_is_lowered() -> None:
         independent_floor=10,
     )
 
-    assert total == 300
+    assert total == 301
 
 
 def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:

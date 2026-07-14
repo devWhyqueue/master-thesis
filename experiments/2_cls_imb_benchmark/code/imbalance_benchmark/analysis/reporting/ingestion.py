@@ -113,6 +113,7 @@ def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
         "temperature_scaled_test_ece": expected_calibration_error(
             labels, calibrated_probs
         ),
+        "temperature_scaled_test_ece_ci": test.get("temperature_scaled_ece_ci"),
         "temperature_scaled_logits": calibrated_logits.tolist(),
         "temperature_scaled_probabilities": calibrated_probs.tolist(),
         "temperature_scaled_reliability": {

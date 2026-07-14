@@ -46,14 +46,14 @@ def _patches(class_name: str, n_patients: int = 20) -> pd.DataFrame:
     )
 
 
-def test_asymmetric_availability_keeps_the_largest_shared_total() -> None:
+def test_asymmetric_availability_keeps_the_largest_approximately_balanced_total() -> None:
     available = [1000, 500, 200]
 
     total = max_shared_total(available, min_support=20)
     rho = effective_rho(available, rho=100.0, min_support=20, total_t=total)
     allocation = allocate_counts(available, total, rho, min_support=20)
 
-    assert total == 600
+    assert total == 602
     assert 1.0 < rho < 100.0
     assert sum(allocation) == total
     assert min(allocation) >= 20

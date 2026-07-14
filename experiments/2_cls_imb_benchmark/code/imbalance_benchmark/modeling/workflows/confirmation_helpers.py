@@ -165,8 +165,8 @@ def _run_and_record(
             ctx["train_labels"], run.n_classes, run.device
         )
     raw_results = {
-        n: run_evaluation(model, l, run.device, run.is_mil, run.n_classes)
-        for n, l in (("validation", run.val_loader), ("test", run.test_loader))
+        name: run_evaluation(model, loader, run.device, run.is_mil, run.n_classes)
+        for name, loader in (("validation", run.val_loader), ("test", run.test_loader))
     }
     target_priors = estimate_prior(raw_results["validation"]["targets"], run.n_classes)
     tiers = _condition_tiers(run, cond)
@@ -184,7 +184,12 @@ def _run_and_record(
             derive_seed(ctx["seed"], "resampling"),
             tiers,
         )
-    _attach_temperature_scaled_test_outputs(splits)
+    test_identity = cast(Any, run.test_loader.dataset).df
+    _attach_temperature_scaled_test_outputs(
+        splits,
+        test_identity["case_id"].to_numpy(),
+        derive_seed(ctx["seed"], "resampling"),
+    )
     b_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), b_size)
     write_run_record(
@@ -222,7 +227,9 @@ def _run_and_record(
     )
 
 
-def _attach_temperature_scaled_test_outputs(splits: dict[str, dict[str, Any]]) -> None:
+def _attach_temperature_scaled_test_outputs(
+    splits: dict[str, dict[str, Any]], patient_ids: np.ndarray, seed: int
+) -> None:
     """Persist post-selection temperature outputs used by calibration reporting."""
     validation, test = splits["validation"], splits["test"]
     test.update(
@@ -231,5 +238,7 @@ def _attach_temperature_scaled_test_outputs(splits: dict[str, dict[str, Any]]) -
             np.asarray(validation["labels"]),
             np.asarray(test["target_prior_logits"]),
             np.asarray(test["labels"]),
+            patient_ids,
+            seed=seed,
         )
     )

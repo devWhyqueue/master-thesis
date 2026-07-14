@@ -79,6 +79,7 @@ def _tune_grid(
     )
     for cfg in get_grid_configs(method, regime.n_classes):
         metrics = []
+        candidate_state = None
         for index, seed in enumerate(seeds):
             ctx = build_training_ctx(method, train_ds, regime, seed, cfg, val_loader)
             state, _ = fit_method(ctx)
@@ -90,10 +91,12 @@ def _tune_grid(
                 (metric["balanced_accuracy"], metric["macro_f1"], metric["nll"])
             )
             if method == "ce" and index == 0:
-                representative_state = state
+                candidate_state = state
         key = _selection_key(metrics)
         if best_key is None or key > best_key:
             best_key, best_cfg = key, cfg
+            if method == "ce":
+                representative_state = candidate_state
     return best_cfg, representative_state
 
 
