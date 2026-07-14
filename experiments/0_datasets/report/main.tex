@@ -127,9 +127,12 @@ GPU memory \citep{song2023aiPathology,abels2019computationalPathology}.
 \end{table}
 
 The standard response to the size of a WSI is a divide-and-conquer strategy: the image is
-partitioned into small \emph{patches} (also called \emph{tiles}), for example $256\times256$ pixels,
-each processed independently and later aggregated into a slide- or patient-level prediction
-\citep{song2023aiPathology}. Figure~\ref{fig:pipeline} sketches the resulting pipeline, from stained
+partitioned into small \emph{patches} (also called \emph{tiles}), $256\times256$ pixels to match the
+input size of the Virchow2 encoder used throughout (Section~\ref{sec:learning}), each processed
+independently and later aggregated into a slide- or patient-level prediction
+\citep{song2023aiPathology}. How each dataset arrives at those tiles differs --- from author-supplied
+patches to on-the-fly tiling of raw slides --- and the magnification at which they are cut varies too;
+each dataset below states its own tiling. Figure~\ref{fig:pipeline} sketches the resulting pipeline, from stained
 slide to prediction, that every dataset in this report passes through.
 
 \begin{figure}[ht]
@@ -228,7 +231,12 @@ breast-cancer metastases \citep{bejnordi2017diagnostic,litjens2018gigascience}. 
 question is the most basic in oncology --- \emph{is cancer present?} --- and the label is binary:
 each slide is either \emph{normal} or contains \emph{tumor} (metastasis). Expert annotations are
 supplied as pixel-level masks marking tumour tissue, rather than as cropped regions, so individual
-tiles can be labelled by intersecting them with the mask.
+tiles can be labelled by intersecting them with the mask. The slides are tiled once into
+non-overlapping $256\times256$ patches at \num{20}x by the group's preprocessing pipeline, which keeps
+a patch only if it clears a tissue-foreground stack --- Otsu thresholding (at least \num{10}\%
+foreground), a standard-deviation filter (at least \num{8} gray levels), Canny edge detection, and an
+isolation filter that discards patches with fewer than two tissue neighbours. Each surviving patch is
+then labelled from the WSI mask (value \num{1} normal, \num{2} tumour).
 
 The benchmark uses \num{398} of the \num{399} published slides (\num{160} tumor, \num{238} normal)
 after excluding one slide without usable tile evidence; each slide is its own patient, so
@@ -292,8 +300,12 @@ Cancer Genome Atlas (TCGA), a pan-cancer resource linking molecular and clinical
 image collections \citep{tomczak2015reviewThe}. The TCGA-UT release turns this slide archive into a
 computational-pathology dataset by cropping H\&E tumour patches from pathologist-selected uniform
 tumour regions: \num{1608060} RGB patches of $256\times256$ pixels from \num{8736} diagnostic slides,
-across \num{32} cancer types \citep{komura2022universalEncoding}. Every patch carries the cancer-type
-label of the slide it was cropped from, so the patches are themselves labelled samples --- the unit
+across \num{32} cancer types \citep{komura2022universalEncoding}. These patches are not tiled here but
+supplied by the dataset authors: for each slide at least three uniform tumour regions were delineated
+as polygons by trained pathologists, and $256\times256$ patches were extracted from them across six
+magnifications (\num{0.5}--\num{1.0}~$\mu$m/px) and resized to $256\times256$ \citep{komura2022universalEncoding}.
+No tissue-foreground filter is applied, the regions already being curated tumour. Every patch carries
+the cancer-type label of the slide it was cropped from, so the patches are themselves labelled samples --- the unit
 of patch-level classification --- while their slide identities also allow grouping into slide-level
 bags. The labels are cancer types, not dense pixel masks or cell-level annotations, so the diagnostic
 question is \emph{what cancer is it?}, a nominal classification across 32 organs.
@@ -360,9 +372,11 @@ subtypes.
 
 The benchmark uses the seven-subtype target, which keeps clinically important but comparatively
 scarce precancers visible: the atypical lesions FEA and ADH would be hidden by collapsing to three
-lesion types. After deterministic ROI tiling into $256\times256$ patches, \num{387} of the
-\num{547} WSIs contribute at least one annotated tile; the prepared cohort spans \num{151} patients,
-the full \num{4539} ROI records, and \num{99352} patches. Counting the slides that contain each
+lesion types. The pathologist-drawn ROIs are supplied as \texttt{.png} crops at the slides'
+native \num{0.25}~$\mu$m/px (\num{40}x) resolution; each is gridded into non-overlapping
+$256\times256$ tiles with no tissue-foreground filter, the ROIs already being tissue. This yields
+\num{278028} tiles from the \num{4539} ROIs of \num{387} WSIs (\num{151} patients); \num{16} ROIs are
+too small for even one tile. Counting the slides that contain each
 subtype (a slide with several lesions counts under each), support ranges from PB (\num{196} slides)
 at the head to DCIS (\num{87} slides) at the tail (Table~\ref{tab:bracs-summary},
 Figure~\ref{fig:bracs-dist}). BRACS's difficulty comes from fine-grained morphology rather than a
@@ -388,7 +402,7 @@ steep tail.
       \midrule
       Patients & \num{151}\\
       WSIs with ROI tiles & \num{387}\\
-      ROI tiles & \num{99352}\\
+      ROI tiles & \num{278028}\\
       WSI-bag size (median tiles) & \num{360}\\
       Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
       \bottomrule
@@ -426,13 +440,20 @@ PANDA differs from the other three along every axis a generality check exercises
 (prostate), an ordinal rather than nominal or binary label, and a built-in source of heterogeneity,
 because the slides come from two institutions --- Radboud University Medical Center and Karolinska
 Institute --- that differ in staining, scanning, and annotation convention, and grade differently
-(Karolinska biopsies concentrate at low grades, Radboud spread more evenly). To keep frozen-feature
-extraction tractable on a cohort an order of magnitude larger than the others, the benchmark draws a
-stratified subset of approximately \num{2000} biopsies preserving the joint distribution of ISUP grade
-and provider. The ISUP distribution runs from ISUP\,0 (\num{544} biopsies) at the head to
-ISUP\,5 (\num{230}) at the tail. PANDA's masks additionally support a provider-consistent
-binary cancer/benign tile label --- the only labelling the two institutions share --- giving
-\num{580531} benign against \num{122751} cancer tiles, so the same biopsies furnish both an ordinal
+(Karolinska biopsies concentrate at low grades, Radboud spread more evenly). Across the full cohort of
+\num{10616} biopsies (Karolinska \num{5456}, Radboud \num{5160}), the ISUP distribution runs from
+ISUP\,0 (\num{2892} biopsies) at the head to ISUP\,5 (\num{1224}) at the tail --- a mild
+${\approx}\num{2.4}{:}1$ slide-level imbalance.
+
+Unlike the others, PANDA ships raw pyramidal biopsies rather than ready-made patches, so tiles are cut
+here: each biopsy is read at level~0, its native full resolution, divided into $256\times256$ tiles,
+and a luminance foreground filter keeps every tile that is at least \num{35}\% tissue (mean intensity
+below \num{210}), discarding glass and background. No per-slide cap is applied, so the counts reflect
+each biopsy's full available tissue. PANDA's masks additionally support a provider-consistent binary
+cancer/benign tile label --- the only labelling the two institutions share --- formed by collapsing the
+provider-specific mask codes and calling a tile \emph{cancer} when at least half of its mask cell
+carries a cancer value. Over the \num{10514} masked biopsies that yield labelled tissue this gives
+\num{3702544} benign against \num{803785} cancer tiles, so the same biopsies furnish both an ordinal
 slide-level grading target and a binary tile-level detection target (Table~\ref{tab:panda-summary},
 Figure~\ref{fig:panda-dist}).
 
@@ -451,14 +472,14 @@ share one task and differ only in prediction unit.
     \toprule
     Property & Value\\
     \midrule
-    WSIs (biopsies) & \num{2000}\\
-    Patch-labelled WSIs & \num{1984}\\
-    WSI-bag size (median tiles) & \num{421}\\
+    WSIs (biopsies) & \num{10616}\\
+    Patch-labelled WSIs & \num{10514}\\
+    WSI-bag size (median tiles) & \num{425}\\
     WSI labels / tile labels & ISUP 0--5 / benign, cancer\\
-    Benign / cancer tiles & \num{580531} / \num{122751}\\
+    Benign / cancer tiles & \num{3702544} / \num{803785}\\
     \bottomrule
   \end{tabular}
-  \caption{PANDA dataset properties after stratified subset selection and mask-based patch labelling.
+  \caption{PANDA dataset properties from full-cohort tiling and mask-based patch labelling.
   The WSI-bag size is the data-driven median of available tissue tiles per biopsy. Unlike the other
   datasets, the tile and slide regimes carry different labels (binary cancer/benign vs six-class
   ISUP), and so describe two different tasks.}
@@ -472,7 +493,7 @@ share one task and differ only in prediction unit.
   }{%
     \fbox{\parbox{0.7\linewidth}{\centering PANDA ISUP distribution figure unavailable.}}%
   }
-  \caption{PANDA WSI support by six-class ISUP grade after stratified subset selection, from
+  \caption{PANDA WSI support by six-class ISUP grade across the full \num{10616}-biopsy cohort, from
   ISUP\,0 at the head to ISUP\,5 at the tail.}
   \label{fig:panda-dist}
 \end{figure}
