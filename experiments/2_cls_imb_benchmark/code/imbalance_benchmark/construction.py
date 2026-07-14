@@ -4,8 +4,8 @@ import logging
 from typing import cast
 import numpy as np
 import pandas as pd
+from imbalance_benchmark.common import compute_data_hash
 from imbalance_benchmark.manifest.construction_sampling import (
-    build_manifest_hash,
     select_patches_round_robin,
     select_slides_round_robin,
 )
@@ -67,6 +67,17 @@ def validate_split_leakage(df: pd.DataFrame) -> None:
 def patient_equals_slide(df: pd.DataFrame) -> bool:
     """Return whether every case contributes at most one slide (e.g. CAMELYON16/PANDA)."""
     return bool(df.groupby("case_id")["slide_id"].nunique().max() <= 1)
+
+
+def build_manifest_hash(manifest_df: pd.DataFrame) -> str:
+    """Create a stable hash of the identifiers defining a frozen manifest."""
+    columns = ["case_id", "slide_id", "cancer_type", "split"]
+    records = (
+        cast(pd.DataFrame, manifest_df[columns])
+        .sort_values(by=["split", "cancer_type", "slide_id"])
+        .to_dict("records")
+    )
+    return compute_data_hash(records)
 
 
 def _adjust_alloc(

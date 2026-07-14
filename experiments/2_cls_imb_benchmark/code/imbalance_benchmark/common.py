@@ -161,6 +161,24 @@ def compute_data_hash(data: dict[str, Any] | list[Any]) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
 
 
+def dataset_provenance(dataset: dict[str, Any]) -> dict[str, Any]:
+    """Validate and normalize the required dataset provenance frozen with a run."""
+    version = dataset.get("version")
+    eligibility_rules = dataset.get("eligibility_rules")
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError("dataset.version is required before definitive freeze")
+    if not isinstance(eligibility_rules, dict) or not eligibility_rules:
+        raise ValueError(
+            "dataset.eligibility_rules are required before definitive freeze"
+        )
+    return {
+        "name": dataset.get("name"),
+        "regime": dataset.get("regime"),
+        "version": version,
+        "eligibility_rules": eligibility_rules,
+    }
+
+
 def write_run_record(
     result_dir: Path, record: dict[str, Any], keep_arrays: bool = True
 ) -> None:

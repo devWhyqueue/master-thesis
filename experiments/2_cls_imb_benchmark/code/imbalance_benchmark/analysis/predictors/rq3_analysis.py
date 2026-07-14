@@ -175,8 +175,7 @@ def run_rq3(
     and covariates each split contributes to that combined analysis.
     """
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    dataset = config.get("dataset", {})
-    group = f"{dataset.get('name', 'unknown')}:{dataset.get('regime', 'patch')}"
+    group = _rq3_group(config)
     cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
@@ -188,6 +187,17 @@ def run_rq3(
             "recovery": fit_recovery_model(recovery_cells),
         },
     }
+
+
+def _rq3_group(config: dict[str, Any]) -> str:
+    """Return the mandatory dataset-target random-intercept identifier."""
+    dataset = config.get("dataset", {})
+    target = dataset.get("target")
+    if not isinstance(target, str) or not target.strip():
+        raise ValueError(
+            "dataset.target is required to define an RQ3 dataset-target group"
+        )
+    return f"{dataset.get('name', 'unknown')}:{target}"
 
 
 def cross_dataset_rq3(cells: list[dict[str, Any]]) -> dict[str, Any]:

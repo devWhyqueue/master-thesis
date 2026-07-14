@@ -122,7 +122,12 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "paths": {"outputs": str(tmp_path / "outputs")},
-                "dataset": {"name": "synthetic", "regime": "patch"},
+                    "dataset": {
+                        "name": "synthetic",
+                        "regime": "patch",
+                        "version": "test-fixture-v1",
+                        "eligibility_rules": {"fixture": True},
+                    },
                 "analysis": {"bootstrap_replicates": 2},
             }
         ),

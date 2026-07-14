@@ -28,6 +28,9 @@ from imbalance_benchmark.datasets.data import (
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
+from imbalance_benchmark.modeling.workflows.balanced_reporting import (
+    copy_balanced_tier_summaries,
+)
 
 __all__ = ["cmd_confirm"]
 
@@ -131,6 +134,11 @@ def cmd_confirm(args: argparse.Namespace) -> None:
     paths = split_paths(ensure_dirs(config), args.split_index)
     if _is_excluded(paths):
         return
+    _confirm_split(args, paths)
+
+
+def _confirm_split(args: argparse.Namespace, paths: dict[str, Any]) -> None:
+    """Run every requested condition for one prepared patient split."""
     best_configs, run_data, freeze = _confirm_inputs(args, paths)
     methods = roster_for_regime(run_data["is_mil"])
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
@@ -143,3 +151,5 @@ def cmd_confirm(args: argparse.Namespace) -> None:
             run = RunContext(**run_data, assignment=assignment)
             selected = best_configs.get(assignment, {}).get(cond, {})
             _confirm_condition(cond, methods, selected, run)
+        if cond == "balanced":
+            copy_balanced_tier_summaries(paths, freeze)

@@ -73,6 +73,7 @@ def _aggregate_group(
     entry.update(
         effect=float(np.nanmean(effects)),
         ci=confidence_interval(effects),
+        bootstrap_effect=effects.tolist(),
         descriptive_only=bool(group["descriptive_only"].any())
         if "descriptive_only" in group
         else False,
@@ -102,7 +103,10 @@ def _add_recovery(entry: dict[str, Any], group: pd.DataFrame) -> None:
     with np.errstate(divide="ignore", invalid="ignore"):
         recovery = np.where(denominator != 0, numerator / denominator, np.nan)
     entry.update(
-        recovery=float(np.nanmean(recovery)), recovery_ci=confidence_interval(recovery)
+        recovery=float(np.nanmean(recovery)),
+        recovery_ci=confidence_interval(recovery),
+        bootstrap_numerator=numerator.tolist(),
+        bootstrap_denominator=denominator.tolist(),
     )
 
 

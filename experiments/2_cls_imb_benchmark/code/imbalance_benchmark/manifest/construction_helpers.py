@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from typing import Callable, cast
 
 from pathlib import Path
@@ -18,6 +19,8 @@ from imbalance_benchmark.manifest.construction_sampling import (
     select_patches_round_robin,
     select_slides_round_robin,
 )
+
+CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 
 
 def class_support_counts(train_df: pd.DataFrame, is_mil: bool) -> dict[str, int]:
@@ -56,19 +59,61 @@ def write_natural_condition(
     }
 
 
-def _all_rho_allocations(
-    available: list[int], total: int, min_support: int
-) -> list[list[int]]:
-    """Build allocations for the three canonical rho values."""
-    return [
-        allocate_counts(
-            available,
-            total,
-            effective_rho(available, rho, min_support, total),
-            min_support,
+def assignment_allocations(
+    train_df: pd.DataFrame,
+    assignments: Mapping[str, list[str]],
+    total: int,
+    minimum: int,
+    condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
+) -> dict[str, dict[str, dict[str, int]]]:
+    """Allocate every condition for every locked semantic-class assignment."""
+    supports = class_support_counts(train_df, is_mil=False)
+    return {
+        assignment: {
+            condition: dict(
+                zip(
+                    order,
+                    allocate_counts(
+                        [supports[name] for name in order],
+                        total,
+                        effective_rho(
+                            [supports[name] for name in order],
+                            CONDITION_RHOS[condition],
+                            minimum,
+                            total,
+                        ),
+                        minimum,
+                    ),
+                    strict=True,
+                )
+            )
+            for condition in condition_names
+        }
+        for assignment, order in assignments.items()
+    }
+
+
+def designate_shared_patch_pools(
+    train_df: pd.DataFrame,
+    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
+    independent_floor: int,
+    seed: int,
+) -> dict[str, pd.DataFrame]:
+    """Designate one per-class pool that can realize every locked allocation."""
+    maximums: dict[str, int] = {}
+    for condition_sets in allocations.values():
+        for counts in condition_sets.values():
+            for class_name, count in counts.items():
+                maximums[class_name] = max(maximums.get(class_name, 0), count)
+    return {
+        class_name: designate_patch_pool(
+            cast(pd.DataFrame, train_df[train_df["cancer_type"] == class_name]),
+            independent_floor,
+            class_construction_seed(seed, class_name),
+            maximum,
         )
-        for rho in (1.0, 10.0, 100.0)
-    ]
+        for class_name, maximum in maximums.items()
+    }
 
 
 def cap_feasible_shared_total(
@@ -78,6 +123,7 @@ def cap_feasible_shared_total(
     is_mil: bool,
     seed: int,
     independent_floor: int = 10,
+    assignments: Mapping[str, list[str]] | None = None,
 ) -> int:
     """Find the largest controlled total that satisfies the actual unit caps."""
     supports = class_support_counts(train_df, is_mil)
@@ -86,15 +132,15 @@ def cap_feasible_shared_total(
     for total in range(
         max_shared_total(available, min_support), len(classes) * min_support - 1, -1
     ):
-        allocations = _all_rho_allocations(available, total, min_support)
+        locked_assignments = assignments or {"native": classes}
         if _cap_feasible(
             train_df,
-            classes,
-            allocations,
+            locked_assignments,
+            total,
+            min_support,
             selector,
             is_mil,
             seed,
-            designate_patch_pool,
             independent_floor,
         ):
             return total
@@ -105,39 +151,38 @@ def cap_feasible_shared_total(
 
 def _cap_feasible(
     train_df: pd.DataFrame,
-    classes: list[str],
-    allocations: list[list[int]],
+    assignments: Mapping[str, list[str]],
+    total: int,
+    minimum: int,
     selector: Callable[..., pd.DataFrame],
     is_mil: bool,
     seed: int,
-    designate: Callable[..., pd.DataFrame],
     independent_floor: int,
 ) -> bool:
     """Probe every condition allocation on its designated fixed patch pool."""
     try:
+        allocations = assignment_allocations(train_df, assignments, total, minimum)
         pools = (
-            {
-                name: designate(
-                    cast(pd.DataFrame, train_df[train_df["cancer_type"] == name]),
-                    independent_floor,
-                    class_construction_seed(seed, name),
-                    max(counts[index] for counts in allocations),
-                    min(counts[index] for counts in allocations),
-                )
-                for index, name in enumerate(classes)
-            }
+            designate_shared_patch_pools(train_df, allocations, independent_floor, seed)
             if not is_mil
             else {}
         )
-        for counts in allocations:
-            for index, name in enumerate(classes):
-                selected = selector(
-                    pools.get(name, train_df[train_df["cancer_type"] == name]),
-                    counts[index],
-                    class_construction_seed(seed, name),
-                )
-                if not is_mil and not _retains_fixed_pool(selected, pools[name]):
-                    return False
+        for condition_sets in allocations.values():
+            for counts in condition_sets.values():
+                for name, count in counts.items():
+                    selected = selector(
+                        pools.get(
+                            name,
+                            cast(
+                                pd.DataFrame,
+                                train_df[train_df["cancer_type"] == name],
+                            ),
+                        ),
+                        count,
+                        class_construction_seed(seed, name),
+                    )
+                    if not is_mil and not _retains_fixed_pool(selected, pools[name]):
+                        return False
     except ValueError:
         return False
     return True

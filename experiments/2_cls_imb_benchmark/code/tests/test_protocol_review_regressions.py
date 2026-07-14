@@ -155,6 +155,97 @@ def test_patch_conditions_retain_every_independent_unit_in_the_fixed_pool(
         assert all(entry["pool_fraction_retained"] == 1.0 for entry in stats.values())
 
 
+def test_fixed_pool_expansion_adds_one_slide_per_patient_per_round() -> None:
+    """A fixed evidence pool expands breadth-first over its selected patients."""
+    from imbalance_benchmark.manifest.construction_sampling import designate_patch_pool
+
+    rows = []
+    for patient in range(10):
+        n_slides = 3 if patient == 0 else 2
+        for slide in range(n_slides):
+            for patch in range(10):
+                rows.append(
+                    {
+                        "case_id": f"patient_{patient}",
+                        "slide_id": f"patient_{patient}_slide_{slide}",
+                        "patch_id": f"patient_{patient}_{slide}_{patch}",
+                        "cancer_type": "A",
+                        "split": "train",
+                    }
+                )
+    pool = designate_patch_pool(
+        pd.DataFrame(rows), 10, seed=4, max_p=180, max_pool_units=20
+    )
+
+    assert pool.groupby("case_id")["slide_id"].nunique().eq(2).all()
+
+
+def test_freeze_uses_one_patch_pool_for_balanced_and_every_assignment(
+    tmp_path: Path,
+) -> None:
+    """A valid reversed assignment must reuse the balanced class pools."""
+    from argparse import Namespace
+
+    from imbalance_benchmark.manifest.freezing import _freeze_meta
+
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        "dataset:\n  name: synthetic\n  regime: patch\n  target: diagnosis\n",
+        encoding="utf-8",
+    )
+    rows = []
+    for class_name in ("A", "B"):
+        for patient in range(10):
+            n_slides = 3 if patient == 0 else 2
+            for slide in range(n_slides):
+                for patch in range(10):
+                    rows.append(
+                        {
+                            "case_id": f"{class_name}_{patient}",
+                            "slide_id": f"{class_name}_{patient}_{slide}",
+                            "patch_id": f"{class_name}_{patient}_{slide}_{patch}",
+                            "cancer_type": class_name,
+                            "split": "train",
+                        }
+                    )
+    meta = _freeze_meta(
+        Namespace(seed=4, config=config),
+        {"data": tmp_path},
+        pd.DataFrame(rows),
+        False,
+        ["A", "B"],
+        200,
+        20,
+        20,
+        False,
+        10,
+    )
+
+    pool_hashes = {
+        info["evidence_pool_hash"]
+        for conditions in [meta["conditions"], *meta["assignment_conditions"].values()]
+        for info in conditions.values()
+    }
+    assert len(pool_hashes) == 1
+
+
+def test_freeze_rejects_missing_dataset_provenance(tmp_path: Path) -> None:
+    """Definitive freezes cannot replace required provenance with placeholders."""
+    from imbalance_benchmark.commands.freeze_execution import _attach_provenance
+
+    pilot = tmp_path / "pilot_report.json"
+    manifest = tmp_path / "manifest.csv"
+    pilot.write_text("{}", encoding="utf-8")
+    manifest.write_text("case_id,split\nA,train\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dataset.version"):
+        _attach_provenance(
+            {},
+            {"data": tmp_path},
+            {"dataset": {"name": "synthetic", "regime": "patch"}},
+        )
+
+
 def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> None:
     """Patch pilot levels count patients; the slide floor must not become a 20-patient floor."""
     levels = [5, 10, 15, 20, 30]
@@ -650,14 +741,14 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     cells = _cells({"data": tmp_path}, comparisons, freeze, "panda:wsi", True)
     report = run_rq3(
         {"data": tmp_path},
-        {"dataset": {"name": "panda", "regime": "wsi"}},
+        {"dataset": {"name": "panda", "regime": "wsi", "target": "isup_grade"}},
         freeze,
         comparisons,
     )
 
     assert cells[0]["assignment"] == "native"
     assert cells[0]["severity"] == "severe"
-    assert report["cells"][0]["group"] == "panda:wsi"
+    assert report["cells"][0]["group"] == "panda:isup_grade"
 
 
 def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> None:
@@ -714,6 +805,45 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
     assert cells[0]["gate_passed"] is True
     assert cells[0]["recovery"] == pytest.approx(1.25)
     assert cells[0]["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
+
+
+def test_balanced_predictions_are_retiered_for_every_locked_assignment(
+    tmp_path: Path,
+) -> None:
+    """Balanced models are trained once but reported under each locked tier mapping."""
+    from imbalance_benchmark.common import read_run_record, write_run_record
+    from imbalance_benchmark.modeling.workflows.balanced_reporting import (
+        copy_balanced_tier_summaries,
+    )
+
+    paths = {"results": tmp_path / "results"}
+    native = paths["results"] / "assignment=native" / "balanced" / "ce" / "seed=0"
+    split = {
+        "precision_per_class": [0.1, 0.9],
+        "recall_per_class": [0.2, 0.8],
+        "f1_per_class": [0.15, 0.85],
+        "support_per_class": [10, 10],
+        "nll_per_class": [0.7, 0.3],
+        "brier_per_class": [0.4, 0.1],
+    }
+    write_run_record(
+        native,
+        {"assignment": "native", "class_names": ["A", "B"], "splits": {"test": split}},
+    )
+    freeze = {
+        "conditions": {"balanced": {"allocated_counts": {"A": 10, "B": 10}}},
+        "tail_assignments": {"native": ["A", "B"], "reversed": ["B", "A"]},
+    }
+
+    copy_balanced_tier_summaries(paths, freeze)
+
+    copied = read_run_record(
+        paths["results"] / "assignment=reversed" / "balanced" / "ce" / "seed=0"
+    )
+    assert copied is not None
+    assert copied["assignment"] == "reversed"
+    assert copied["splits"]["test"]["tier_metrics"]["head"]["recall"] == 0.8
+    assert copied["splits"]["test"]["tier_metrics"]["tail"]["recall"] == 0.2
 
 
 def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None:

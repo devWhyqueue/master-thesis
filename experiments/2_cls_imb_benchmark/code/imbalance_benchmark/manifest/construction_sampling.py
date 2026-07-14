@@ -5,8 +5,6 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from imbalance_benchmark.common import compute_data_hash
-
 
 def _build_patch_hierarchy(
     df_class: pd.DataFrame, rng: np.random.Generator
@@ -76,12 +74,15 @@ def _expand_pool(
     """Expand sel_p/sel_s breadth-first until the pool is ready or resources are exhausted."""
     pats, hier = pool_hierarchy
     patient_index = len(sel_p)
+    patient_cursor = 0
     while not _pool_is_ready(df, sel_p, sel_s, max_p) or not _pool_has_capacity(
         df, sel_p, sel_s, max_p, seed
     ):
         if max_pool_units is not None and len(sel_s) >= max_pool_units:
             break
-        patient = next((p for p in sel_p if remaining.get(p)), None)
+        patient, patient_cursor = _next_patient_with_remaining(
+            sel_p, remaining, patient_cursor
+        )
         if patient is not None:
             sel_s.append(remaining[patient].pop(0))
             continue
@@ -101,6 +102,18 @@ def _expand_pool(
         )
 
 
+def _next_patient_with_remaining(
+    patients: list[str], remaining: dict[str, list[str]], cursor: int
+) -> tuple[str | None, int]:
+    """Choose the next expandable patient in deterministic round-robin order."""
+    for offset in range(len(patients)):
+        index = (cursor + offset) % len(patients)
+        patient = patients[index]
+        if remaining.get(patient):
+            return patient, (index + 1) % len(patients)
+    return None, cursor
+
+
 def designate_patch_pool(
     df: pd.DataFrame,
     min_independent_units: int,
@@ -115,8 +128,6 @@ def designate_patch_pool(
     pats, hier = _build_patch_hierarchy(df, rng)
     if len(pats) < min_independent_units:
         raise ValueError("Eligible patches cannot meet the independent-patient floor")
-    # Assign one slide per patient first; expand breadth-first only as the
-    # largest allocation requires. Surplus slides are never designated.
     sel_p = pats[:min_independent_units]
     sel_s = [next(iter(hier[p])) for p in sel_p]
     remaining = {p: list(hier[p])[1:] for p in sel_p}
@@ -236,13 +247,3 @@ def select_slides_round_robin(
         pd.DataFrame,
         df_class[df_class["slide_id"].isin(df_slides.loc[selected, "slide_id"])],
     )
-
-
-def build_manifest_hash(manifest_df: pd.DataFrame) -> str:
-    """Create a hash of key manifest columns for immutability verification."""
-    cols = ["case_id", "slide_id", "cancer_type", "split"]
-    sub = cast(pd.DataFrame, manifest_df[cols])
-    records = sub.sort_values(by=["split", "cancer_type", "slide_id"]).to_dict(
-        "records"
-    )
-    return compute_data_hash(records)

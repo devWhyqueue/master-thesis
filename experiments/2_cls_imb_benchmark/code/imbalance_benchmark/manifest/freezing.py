@@ -18,14 +18,14 @@ from imbalance_benchmark.manifest.seeds import SEED_ROLES
 from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
 from imbalance_benchmark.modeling.training import resolve_batch_size, update_budget
 from imbalance_benchmark.manifest.construction_helpers import (
+    CONDITION_RHOS,
+    assignment_allocations,
     class_construction_seed,
     class_support_counts,
+    designate_shared_patch_pools,
     evidence_pool_hash,
     write_natural_condition,
 )
-from imbalance_benchmark.manifest.construction_sampling import designate_patch_pool
-
-CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 
 
 @dataclass(frozen=True)
@@ -65,6 +65,7 @@ def _build_conditions(
     file_prefix: str = "",
     condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
     independent_floor: int | None = None,
+    fixed_pools: dict[str, pd.DataFrame] | None = None,
 ) -> dict[str, Any]:
     """Construct cap-compliant controlled manifests from one fixed eligible pool."""
     counts = class_support_counts(train_df, is_mil)
@@ -79,20 +80,20 @@ def _build_conditions(
         )
         for name in condition_names
     }
-    fixed_pools = (
+    fixed_pools = fixed_pools or (
         {
-            cls: designate_patch_pool(
-                cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+            cls: designate_shared_patch_pools(
+                train_df,
+                {
+                    "current": {
+                        name: dict(zip(classes, allocation, strict=True))
+                        for name, allocation in allocations.items()
+                    }
+                },
                 independent_floor or 10,
-                class_construction_seed(seed, cls),
-                max(allocation[index] for allocation in allocations.values()),
-                (
-                    min(allocation[index] for allocation in allocations.values())
-                    if independent_floor is not None
-                    else None
-                ),
-            )
-            for index, cls in enumerate(classes)
+                seed,
+            )[cls]
+            for cls in classes
         }
         if not is_mil
         else {}
@@ -154,15 +155,26 @@ def _freeze_meta(
     requested_min_support: int,
     excluded: bool,
     independent_floor: int,
+    assignments: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the frozen analysis manifest: conditions, tail assignments, and provenance."""
     construction_seed = derive_seed(args.seed, "definitive_construction")
     config = load_config(args.config)
-    assignments = build_tail_assignments(
+    assignments = assignments or build_tail_assignments(
         classes,
         derive_seed(args.seed, "assignment"),
         ordinal=str(config.get("dataset", {}).get("name", "")) == "panda"
         and bool(config.get("dataset", {}).get("regime", "patch") == "wsi"),
+    )
+    shared_pools = (
+        designate_shared_patch_pools(
+            train_df,
+            assignment_allocations(train_df, assignments, shared_t, min_support),
+            independent_floor,
+            construction_seed,
+        )
+        if not is_mil
+        else None
     )
     assignment_conditions = {
         assignment: _build_conditions(
@@ -176,6 +188,7 @@ def _freeze_meta(
             file_prefix=f"{assignment}_",
             condition_names=("moderate", "severe"),
             independent_floor=independent_floor,
+            fixed_pools=shared_pools,
         )
         for assignment, order in assignments.items()
     }
@@ -189,6 +202,7 @@ def _freeze_meta(
         paths["data"],
         condition_names=("balanced",),
         independent_floor=independent_floor,
+        fixed_pools=shared_pools,
     )
     return {
         "shared_T": shared_t,

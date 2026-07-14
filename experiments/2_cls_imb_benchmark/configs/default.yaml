@@ -10,7 +10,13 @@ paths:
 dataset:
   name: tcga_ut
   regime: patch
+  target: cancer_type
   seed: 0
+
+  # Required before a definitive freeze: record the actual dataset release and
+  # the exact eligibility pipeline used for this run. Freeze rejects omissions.
+  # version:
+  # eligibility_rules:
 
   # tcga_ut
   raw_root: /home/space/datasets/patho_ds/tcga-ut/raw

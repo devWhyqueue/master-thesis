@@ -472,6 +472,9 @@ def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_p
     weighted = next(c for c in output["comparisons"] if c["method"] == "balanced_sampling")
     assert weighted["effect"] == pytest.approx(0.06)
     assert weighted["recovery"] == pytest.approx(1.0)
+    assert weighted["bootstrap_effect"] == pytest.approx([0.04, 0.08])
+    assert weighted["bootstrap_numerator"] == pytest.approx([0.04, 0.08])
+    assert weighted["bootstrap_denominator"] == pytest.approx([0.04, 0.08])
 
 
 def test_crossed_bootstrap_reuses_one_patient_weight_across_split_appearances(tmp_path: Path):

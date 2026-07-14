@@ -11,6 +11,7 @@ import pandas as pd
 from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
 from imbalance_benchmark.common import (
     compute_sha256,
+    dataset_provenance,
     ensure_dirs,
     load_config,
     sign_file,
@@ -21,7 +22,10 @@ from imbalance_benchmark.manifest.construction_helpers import (
     cap_feasible_shared_total,
     class_support_counts,
 )
-from imbalance_benchmark.manifest.freeze import lock_manifest_freeze
+from imbalance_benchmark.manifest.freeze import (
+    build_tail_assignments,
+    lock_manifest_freeze,
+)
 from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constraints
 from imbalance_benchmark.manifest.seeds import derive_seed
 
@@ -34,10 +38,7 @@ def _load_pilot_floor(
     """Read the pilot's floor and exclusion status, capped to what's actually available."""
     constraints = _pilot_constraints(pilot_report_path, is_mil)
     requested = constraints.patch_floor
-    # With a strict 5% per-slide patch cap, a patch condition needs at least
-    # 20 examples per class to admit even one patch from a slide.
-    required_floor = max(requested, 20) if not is_mil else requested
-    min_support = required_floor
+    min_support = max(requested, 20) if not is_mil else requested
     excluded = (
         json.loads(pilot_report_path.read_text()).get("excluded", False)
         if pilot_report_path.exists()
@@ -140,6 +141,13 @@ def _freeze_metadata(
     independent_floor: int,
 ) -> dict[str, Any]:
     """Build definitive metadata after the split has passed pilot eligibility."""
+    config = load_config(args.config)
+    assignments = build_tail_assignments(
+        classes,
+        derive_seed(args.seed, "assignment"),
+        ordinal=str(config.get("dataset", {}).get("name", "")) == "panda"
+        and config.get("dataset", {}).get("regime", "patch") == "wsi",
+    )
     total = cap_feasible_shared_total(
         train_df,
         classes,
@@ -147,6 +155,7 @@ def _freeze_metadata(
         is_mil,
         derive_seed(args.seed, "definitive_construction"),
         independent_floor,
+        assignments,
     )
     return _freeze_meta(
         args,
@@ -159,6 +168,7 @@ def _freeze_metadata(
         requested,
         excluded,
         independent_floor,
+        assignments,
     )
 
 
@@ -182,19 +192,18 @@ def _attach_preflight(
 def _attach_provenance(
     meta: dict[str, Any], paths: dict[str, Path], config: dict[str, Any]
 ) -> None:
-    """Lock pilot evidence and the full prepared train/validation/test manifest."""
-    pilot = paths["data"] / "pilot_report.json"
-    manifest = paths["data"] / "manifest.csv"
-    dataset = config.get("dataset", {})
+    """Lock required dataset provenance and prepared input artifacts."""
+    data = paths["data"]
     meta.update(
-        pilot_report={"path": str(pilot), "sha256": compute_sha256(pilot)},
-        prepared_manifest={"path": str(manifest), "sha256": compute_sha256(manifest)},
-        dataset_provenance={
-            "name": dataset.get("name"),
-            "regime": dataset.get("regime"),
-            "version": dataset.get("version", "unrecorded"),
-            "eligibility_rules": dataset.get("eligibility_rules", {}),
+        pilot_report={
+            "path": str(data / "pilot_report.json"),
+            "sha256": compute_sha256(data / "pilot_report.json"),
         },
+        prepared_manifest={
+            "path": str(data / "manifest.csv"),
+            "sha256": compute_sha256(data / "manifest.csv"),
+        },
+        dataset_provenance=dataset_provenance(config.get("dataset", {})),
     )
 
 
