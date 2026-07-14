@@ -6,7 +6,13 @@ from typing import Any, cast
 import pandas as pd
 import torch
 
-from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, write_json
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    load_config,
+    sign_file,
+    split_paths,
+    write_json,
+)
 from imbalance_benchmark.construction import patient_equals_slide
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.manifest.pilot import (
@@ -163,4 +169,6 @@ def cmd_pilot(args: argparse.Namespace) -> None:
         recall_by_seed,
         support,
     )
-    write_json(paths["data"] / "pilot_report.json", payload)
+    report_path = paths["data"] / "pilot_report.json"
+    write_json(report_path, payload)
+    sign_file(report_path)

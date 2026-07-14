@@ -18,6 +18,7 @@ from imbalance_benchmark.analysis.inference.gates import (
     discrimination_gate_comparison,
 )
 from imbalance_benchmark.analysis.query import load_seed_predictions
+from imbalance_benchmark.modeling.context import roster_for_regime
 
 __all__ = ["gates_and_recovery"]
 
@@ -31,16 +32,11 @@ def _method_recoveries(
     severity_ba: np.ndarray,
     severity_tail_nll: np.ndarray | None,
     tail_classes: list[int],
+    expected_methods: tuple[str, ...],
 ) -> list[dict[str, Any]]:
     """Every non-CE method's discrimination/calibration recovery in one severity condition."""
     out: list[dict[str, Any]] = []
-    results_dir = inp.paths["results"] / f"assignment={inp.assignment}" / inp.severity
-    if not results_dir.exists():
-        results_dir = inp.paths["results"] / inp.severity
-    if not results_dir.exists():
-        return out
-    for method_dir in sorted(results_dir.iterdir()):
-        method = method_dir.name
+    for method in expected_methods:
         if method == "ce":
             continue
         method_rec = load_seed_predictions(
@@ -76,6 +72,7 @@ def _severity_comparisons(
     balanced_ba: np.ndarray,
     balanced_tail_nll: np.ndarray | None,
     tail_classes: list[int],
+    expected_methods: tuple[str, ...],
 ) -> list[dict[str, Any]]:
     """CE-only gate checks for one severity, then every method's recovery if either gate opened."""
     severity_ba = inp.ctx.ba_distribution(
@@ -113,6 +110,7 @@ def _severity_comparisons(
         severity_ba,
         severity_tail_nll,
         tail_classes,
+        expected_methods,
     )
     for comparison in comparisons:
         comparison.setdefault("assignment", inp.assignment)
@@ -127,6 +125,7 @@ def _severity_result(
     seed: int,
     assignment: str,
     descriptive_only: bool,
+    expected_methods: tuple[str, ...],
 ) -> list[dict[str, Any]]:
     """One severity's gate/recovery comparisons against the shared balanced-CE baseline."""
     severity_ce = load_seed_predictions(paths, severity, "ce", assignment)
@@ -145,7 +144,7 @@ def _severity_result(
         descriptive_only,
     )
     return _severity_comparisons(
-        inp, baseline.ba, baseline.tail_nll, baseline.tail_classes
+        inp, baseline.ba, baseline.tail_nll, baseline.tail_classes, expected_methods
     )
 
 
@@ -161,6 +160,8 @@ def gates_and_recovery(
         freeze.get("bootstrap_preflight", {}).get("is_descriptive_only", False)
     )
     comparisons: list[dict[str, Any]] = []
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    expected_methods = roster_for_regime(is_mil)
     for assignment in freeze.get("tail_assignments", {"native": []}):
         baseline = balanced_baseline(
             paths, config, freeze, n_replicates, seed, assignment
@@ -169,6 +170,12 @@ def gates_and_recovery(
             continue
         for severity in ("moderate", "severe"):
             comparisons += _severity_result(
-                baseline, paths, severity, seed, assignment, descriptive_only
+                baseline,
+                paths,
+                severity,
+                seed,
+                assignment,
+                descriptive_only,
+                expected_methods,
             )
     return comparisons

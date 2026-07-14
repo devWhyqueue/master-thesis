@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,35 +17,115 @@ from imbalance_benchmark.common import (
     split_paths,
     write_json,
 )
-from imbalance_benchmark.manifest.freezing import (
-    _freeze_meta,
-    _load_pilot_floor,
-    _load_train_context,
+from imbalance_benchmark.manifest.construction_helpers import (
+    cap_feasible_shared_total,
+    class_support_counts,
 )
-from imbalance_benchmark.manifest.construction_helpers import cap_feasible_shared_total
 from imbalance_benchmark.manifest.freeze import lock_manifest_freeze
+from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constraints
 from imbalance_benchmark.manifest.seeds import derive_seed
+
+logger = logging.getLogger(__name__)
+
+
+def _load_pilot_floor(
+    pilot_report_path: Path, is_mil: bool, counts: dict[str, int]
+) -> tuple[int, int, bool, int]:
+    """Read the pilot's floor and exclusion status, capped to what's actually available."""
+    constraints = _pilot_constraints(pilot_report_path, is_mil)
+    requested = constraints.patch_floor
+    # With a strict 5% per-slide patch cap, a patch condition needs at least
+    # 20 examples per class to admit even one patch from a slide.
+    required_floor = max(requested, 20) if not is_mil else requested
+    min_support = required_floor
+    excluded = (
+        json.loads(pilot_report_path.read_text()).get("excluded", False)
+        if pilot_report_path.exists()
+        else False
+    )
+    if excluded:
+        logger.warning(
+            "Pilot marked this dataset-regime excluded (insufficient independent "
+            "units even for the balanced condition); freezing anyway for inspection "
+            "but downstream analysis must treat it as excluded."
+        )
+    if min(counts.values()) < min_support:
+        excluded = True
+    return min_support, requested, excluded, constraints.independent_floor
+
+
+def _load_train_context(
+    args: argparse.Namespace, paths: dict[str, Path]
+) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], dict[str, int]]:
+    """Load the training manifest and derive the regime, classes, and support counts."""
+    config = load_config(args.config)
+    df = pd.read_csv(paths["data"] / "manifest.csv")
+    train_df = cast(pd.DataFrame, df[df["split"] == "train"])
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    dataset_name = str(config.get("dataset", {}).get("name", ""))
+    observed = train_df["cancer_type"].astype(str).unique().tolist()
+    classes = observed
+    if dataset_name == "panda" and all(name.startswith("ISUP") for name in observed):
+        classes = sorted(observed, key=lambda name: int(name.removeprefix("ISUP")))
+    counts = class_support_counts(train_df, is_mil)
+    if dataset_name != "panda" or not all(name.startswith("ISUP") for name in observed):
+        classes = sorted(observed, key=lambda name: (-counts[name], name))
+        counts = class_support_counts(train_df, is_mil)
+    return paths, train_df, is_mil, classes, counts
+
+
+def _load_split_context(
+    args: argparse.Namespace, paths: dict[str, Path]
+) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], int, int, bool, int] | None:
+    """Load train context and pilot floor; return None if the split is excluded."""
+    paths, train_df, is_mil, classes, counts = _load_train_context(args, paths)
+    pilot_path = paths["data"] / "pilot_report.json"
+    if not pilot_path.exists():
+        raise RuntimeError(
+            "A signed pilot_report.json is required before definitive freeze"
+        )
+    min_sup, req_sup, excluded, independent_floor = _load_pilot_floor(
+        pilot_path, is_mil, counts
+    )
+    if excluded:
+        _write_exclusion(paths, min_sup, req_sup)
+        return None
+    return (
+        paths,
+        train_df,
+        is_mil,
+        classes,
+        min_sup,
+        req_sup,
+        excluded,
+        independent_floor,
+    )
 
 
 def freeze_split(args: argparse.Namespace) -> None:
     """Freeze one patient split's manifests, provenance, and label-only preflight."""
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
-    paths, train_df, is_mil, classes, counts = _load_train_context(args, paths)
-    min_sup, req_sup, excluded = _load_pilot_floor(
-        paths["data"] / "pilot_report.json", is_mil, counts
-    )
-    if excluded:
-        _write_exclusion(paths, min_sup, req_sup)
+    ctx = _load_split_context(args, paths)
+    if ctx is None:
         return
+    paths, train_df, is_mil, classes, min_sup, req_sup, excluded, independent_floor = (
+        ctx
+    )
     meta = _freeze_metadata(
-        args, paths, train_df, is_mil, classes, min_sup, req_sup, excluded
+        args,
+        paths,
+        train_df,
+        is_mil,
+        classes,
+        min_sup,
+        req_sup,
+        excluded,
+        independent_floor,
     )
     _attach_preflight(meta, paths, config, args.seed)
-    freeze_path = paths["data"] / "manifest_freeze.json"
-    meta["path"] = str(freeze_path)
-    write_json(freeze_path, lock_manifest_freeze(meta))
-    sign_file(freeze_path)
+    _attach_provenance(meta, paths, config)
+    _write_freeze_file(meta, paths["data"] / "manifest_freeze.json")
 
 
 def _freeze_metadata(
@@ -55,6 +137,7 @@ def _freeze_metadata(
     minimum: int,
     requested: int,
     excluded: bool,
+    independent_floor: int,
 ) -> dict[str, Any]:
     """Build definitive metadata after the split has passed pilot eligibility."""
     total = cap_feasible_shared_total(
@@ -63,9 +146,19 @@ def _freeze_metadata(
         minimum,
         is_mil,
         derive_seed(args.seed, "definitive_construction"),
+        independent_floor,
     )
     return _freeze_meta(
-        args, paths, train_df, is_mil, classes, total, minimum, requested, excluded
+        args,
+        paths,
+        train_df,
+        is_mil,
+        classes,
+        total,
+        minimum,
+        requested,
+        excluded,
+        independent_floor,
     )
 
 
@@ -84,6 +177,32 @@ def _attach_preflight(
         "sha256": compute_sha256(path),
         "is_descriptive_only": preflight["is_descriptive_only"],
     }
+
+
+def _attach_provenance(
+    meta: dict[str, Any], paths: dict[str, Path], config: dict[str, Any]
+) -> None:
+    """Lock pilot evidence and the full prepared train/validation/test manifest."""
+    pilot = paths["data"] / "pilot_report.json"
+    manifest = paths["data"] / "manifest.csv"
+    dataset = config.get("dataset", {})
+    meta.update(
+        pilot_report={"path": str(pilot), "sha256": compute_sha256(pilot)},
+        prepared_manifest={"path": str(manifest), "sha256": compute_sha256(manifest)},
+        dataset_provenance={
+            "name": dataset.get("name"),
+            "regime": dataset.get("regime"),
+            "version": dataset.get("version", "unrecorded"),
+            "eligibility_rules": dataset.get("eligibility_rules", {}),
+        },
+    )
+
+
+def _write_freeze_file(meta: dict[str, Any], freeze_path: Path) -> None:
+    """Persist and sign the locked freeze manifest."""
+    meta["path"] = str(freeze_path)
+    write_json(freeze_path, lock_manifest_freeze(meta))
+    sign_file(freeze_path)
 
 
 def _write_exclusion(paths: dict[str, Path], minimum: int, requested: int) -> None:

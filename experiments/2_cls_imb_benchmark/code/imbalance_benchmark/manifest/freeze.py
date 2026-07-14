@@ -128,15 +128,11 @@ def lock_manifest_freeze(freeze_meta: dict[str, Any]) -> dict[str, Any]:
     return {**locked, "content_sha256": compute_data_hash(locked)}
 
 
-def verify_manifest_freeze(meta: dict[str, Any]) -> None:
-    """Refuse altered frozen design metadata or condition/preflight artifacts."""
-    expected = meta.get("content_sha256")
-    actual = compute_data_hash({k: v for k, v in meta.items() if k != "content_sha256"})
-    if ("shared_T" in meta or expected) and expected != actual:
-        raise RuntimeError("Frozen manifest content no longer matches its lock.")
-    if p := meta.get("path"):
-        verify_signed_file(Path(p))
-    to_verify = []
+def _collect_artifacts_to_verify(
+    meta: dict[str, Any],
+) -> list[tuple[str, str, str | None]]:
+    """Gather (path, sha256, label) triples for all content-hashed artifacts."""
+    to_verify: list[tuple[str, str, str | None]] = []
     for conds in [
         meta.get("conditions", {}),
         *meta.get("assignment_conditions", {}).values(),
@@ -145,9 +141,29 @@ def verify_manifest_freeze(meta: dict[str, Any]) -> None:
             to_verify.append((info["path"], info["sha256"], name))
     if pf := meta.get("bootstrap_preflight"):
         to_verify.append((pf["path"], pf["sha256"], None))
-    for path_str, sha, name in to_verify:
+    if pilot := meta.get("pilot_report"):
+        verify_signed_file(Path(pilot["path"]))
+        to_verify.append((pilot["path"], pilot["sha256"], "pilot report"))
+    if manifest := meta.get("prepared_manifest"):
+        to_verify.append((manifest["path"], manifest["sha256"], "prepared manifest"))
+    return to_verify
+
+
+def verify_manifest_freeze(meta: dict[str, Any]) -> None:
+    """Refuse altered frozen design metadata or condition/preflight artifacts."""
+    expected = meta.get("content_sha256")
+    actual = compute_data_hash({k: v for k, v in meta.items() if k != "content_sha256"})
+    if ("shared_T" in meta or expected) and expected != actual:
+        raise RuntimeError("Frozen manifest content no longer matches its lock.")
+    if p := meta.get("path"):
+        verify_signed_file(Path(p))
+    for path_str, sha, name in _collect_artifacts_to_verify(meta):
         p = Path(path_str)
         if not p.exists() or compute_sha256(p) != sha:
+            if name == "prepared manifest":
+                raise RuntimeError("Prepared manifest altered")
+            if name == "pilot report":
+                raise RuntimeError("Pilot report altered")
             raise RuntimeError(
                 f"Manifest '{name}' altered" if name else "Preflight altered"
             )

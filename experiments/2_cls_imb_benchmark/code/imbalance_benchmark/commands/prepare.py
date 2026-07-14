@@ -6,7 +6,12 @@ from pathlib import Path
 import pandas as pd
 import torch
 
-from imbalance_benchmark.common import ensure_dirs, load_config, split_indices, split_paths
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    load_config,
+    split_indices,
+    split_paths,
+)
 from imbalance_benchmark.construction import split_cases
 from imbalance_benchmark.datasets import build_manifest
 from imbalance_benchmark.datasets.features import attach_extracted_features
@@ -67,7 +72,9 @@ def cmd_prepare(args: argparse.Namespace) -> None:
     df = _base_manifest(config, base_paths)
     for index in split_indices(args.split_index):
         paths = split_paths(base_paths, index)
-        split_df = split_cases(df, seed=derive_seed(args.seed, f"patient_split_{index}"))
+        split_df = split_cases(
+            df, seed=derive_seed(args.seed, f"patient_split_{index}")
+        )
         split_df.to_csv(paths["data"] / "manifest.csv", index=False)
         split_df.drop_duplicates("slide_id").to_csv(
             paths["data"] / "slide_manifest.csv", index=False

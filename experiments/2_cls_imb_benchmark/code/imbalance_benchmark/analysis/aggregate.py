@@ -14,7 +14,11 @@ from imbalance_benchmark.analysis.inference.gates import (
     discrimination_gate,
 )
 from imbalance_benchmark.analysis.inference.holm import apply_holm
-from imbalance_benchmark.analysis.query import load_classwise, load_eval_details
+from imbalance_benchmark.analysis.query import load_eval_details
+from imbalance_benchmark.analysis.reporting.equal_split import (
+    classwise_table,
+    tier_table,
+)
 from imbalance_benchmark.common import split_paths, write_json
 
 
@@ -145,52 +149,11 @@ def write_equal_split_endpoint_table(base_paths: dict[str, Path]) -> None:
     (base_paths["tables"] / "equal_split_endpoints.tex").write_text(
         _latex_endpoint_table(equal), encoding="utf-8"
     )
-    classwise = _equal_split_classwise(base_paths)
     (base_paths["tables"] / "equal_split_classwise_endpoints.tex").write_text(
-        _latex_classwise_table(classwise), encoding="utf-8"
+        classwise_table(base_paths), encoding="utf-8"
     )
-
-
-def _equal_split_classwise(base_paths: dict[str, Path]) -> pd.DataFrame:
-    """Per-class and tier endpoints averaged first within, then equally across, splits.
-
-    Per-class recall/F1/NLL/Brier are stored per run but were absent from the
-    canonical equal-split summary; this restores them alongside their locked
-    head/body/tail tier so classwise damage and recovery are reportable.
-    """
-    frames = []
-    for index in range(3):
-        paths = split_paths(base_paths, index)
-        if not paths["db"].exists():
-            raise RuntimeError(
-                "Every patient split must be analysed before aggregation"
-            )
-        conn = connect_db(paths["db"])
-        try:
-            frame = load_classwise(conn)
-        finally:
-            conn.close()
-        frame["patient_split"] = index
-        frames.append(frame[frame["split"] == "test"])
-    details = pd.concat(frames, ignore_index=True)
-    metrics = ["recall", "f1", "nll", "brier"]
-    keys = ["assignment", "condition", "method", "class_name", "tier"]
-    per_split = details.groupby([*keys, "patient_split"], as_index=False)[
-        metrics
-    ].mean()
-    return cast(
-        pd.DataFrame,
-        per_split.groupby(keys, as_index=False)[metrics].mean(),
-    )
-
-
-def _latex_classwise_table(classwise: pd.DataFrame) -> str:
-    """Render the canonical equal-split per-class/tier endpoint table as LaTeX."""
-    return (
-        "\\begin{table}[ht]\n\\centering\n"
-        + classwise.to_latex(index=False, float_format="%.3f")
-        + "\\caption{Equal-weight three-split per-class and tier test endpoints.}\n"
-        "\\label{tab:equal-split-classwise}\n\\end{table}\n"
+    (base_paths["tables"] / "equal_split_tier_endpoints.tex").write_text(
+        tier_table(base_paths), encoding="utf-8"
     )
 
 
@@ -228,6 +191,7 @@ def _equal_split_endpoints(base_paths: dict[str, Path]) -> pd.DataFrame:
         "patient_macro_nll",
         "slide_macro_brier",
         "patient_macro_brier",
+        *[column for column in details if column.startswith("tier_")],
     ]
     metrics = [metric for metric in metrics if metric in details.columns]
     per_split = details.groupby(

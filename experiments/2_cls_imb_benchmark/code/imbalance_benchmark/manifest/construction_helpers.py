@@ -56,12 +56,28 @@ def write_natural_condition(
     }
 
 
+def _all_rho_allocations(
+    available: list[int], total: int, min_support: int
+) -> list[list[int]]:
+    """Build allocations for the three canonical rho values."""
+    return [
+        allocate_counts(
+            available,
+            total,
+            effective_rho(available, rho, min_support, total),
+            min_support,
+        )
+        for rho in (1.0, 10.0, 100.0)
+    ]
+
+
 def cap_feasible_shared_total(
     train_df: pd.DataFrame,
     classes: list[str],
     min_support: int,
     is_mil: bool,
     seed: int,
+    independent_floor: int = 10,
 ) -> int:
     """Find the largest controlled total that satisfies the actual unit caps."""
     supports = class_support_counts(train_df, is_mil)
@@ -70,17 +86,16 @@ def cap_feasible_shared_total(
     for total in range(
         max_shared_total(available, min_support), len(classes) * min_support - 1, -1
     ):
-        allocations = [
-            allocate_counts(
-                available,
-                total,
-                effective_rho(available, rho, min_support, total),
-                min_support,
-            )
-            for rho in (1.0, 10.0, 100.0)
-        ]
+        allocations = _all_rho_allocations(available, total, min_support)
         if _cap_feasible(
-            train_df, classes, allocations, selector, is_mil, seed, designate_patch_pool
+            train_df,
+            classes,
+            allocations,
+            selector,
+            is_mil,
+            seed,
+            designate_patch_pool,
+            independent_floor,
         ):
             return total
     raise ValueError(
@@ -96,6 +111,7 @@ def _cap_feasible(
     is_mil: bool,
     seed: int,
     designate: Callable[..., pd.DataFrame],
+    independent_floor: int,
 ) -> bool:
     """Probe every condition allocation on its designated fixed patch pool."""
     try:
@@ -103,26 +119,32 @@ def _cap_feasible(
             {
                 name: designate(
                     cast(pd.DataFrame, train_df[train_df["cancer_type"] == name]),
-                    min(counts[index] for counts in allocations),
+                    independent_floor,
                     class_construction_seed(seed, name),
+                    max(counts[index] for counts in allocations),
+                    min(counts[index] for counts in allocations),
                 )
                 for index, name in enumerate(classes)
             }
             if not is_mil
             else {}
         )
-        if any(
-            pool["slide_id"].nunique() > min(counts[index] for counts in allocations)
-            for index, pool in enumerate(pools.values())
-        ):
-            return False
         for counts in allocations:
             for index, name in enumerate(classes):
-                selector(
+                selected = selector(
                     pools.get(name, train_df[train_df["cancer_type"] == name]),
                     counts[index],
                     class_construction_seed(seed, name),
                 )
+                if not is_mil and not _retains_fixed_pool(selected, pools[name]):
+                    return False
     except ValueError:
         return False
     return True
+
+
+def _retains_fixed_pool(selected: pd.DataFrame, pool: pd.DataFrame) -> bool:
+    """Whether a patch condition includes every designated patient and slide."""
+    return set(pool["case_id"]).issubset(selected["case_id"]) and set(
+        pool["slide_id"]
+    ).issubset(selected["slide_id"])

@@ -30,14 +30,7 @@ def _build_patch_hierarchy(
 def _loop_patches(
     patients: list[str], h: dict, max_p: int, max_s: int, n: int
 ) -> tuple[list[int], dict, dict]:
-    """Round-robin patches breadth-first: one patch per patient per pass.
-
-    Visiting every patient once (then every slide within a patient) before any
-    unit is revisited makes each smaller allocation a nested prefix of the
-    larger ones and maximizes patient/slide diversity: the fixed per-class
-    patient and slide pool is preserved across balanced and imbalanced
-    conditions rather than concentrating a small allocation into a few units.
-    """
+    """Round-robin patches breadth-first; each patient visited once per round."""
     selected, pat_counts, sld_counts = [], {p: 0 for p in patients}, {}
     slide_cursor = {p: 0 for p in patients}
     prog = True
@@ -70,30 +63,92 @@ def _contribution_cap(n_examples: int, fraction: float, unit: str) -> int:
     return cap
 
 
-def designate_patch_pool(
+def _expand_pool(
+    pool_hierarchy: tuple[list[str], dict],
+    sel_p: list[str],
+    sel_s: list[str],
+    remaining: dict,
     df: pd.DataFrame,
-    min_p: int,
+    max_p: int | None,
+    max_pool_units: int | None,
     seed: int,
-    max_p: int | None = None,
-) -> pd.DataFrame:
-    """Choose the fixed patient/slide pool used by every patch condition."""
-    if min_p < 20:
-        raise ValueError("Patch conditions need at least 20 patches per class")
-    rng = np.random.default_rng(seed)
-    pats, hier = _build_patch_hierarchy(df, rng)
-    sel_p, sel_s = [], []
-    for p in pats:
-        sel_p.append(p)
-        sel_s.extend(hier[p])
-        if _pool_is_ready(df, sel_p, sel_s, max_p):
+) -> None:
+    """Expand sel_p/sel_s breadth-first until the pool is ready or resources are exhausted."""
+    pats, hier = pool_hierarchy
+    patient_index = len(sel_p)
+    while not _pool_is_ready(df, sel_p, sel_s, max_p) or not _pool_has_capacity(
+        df, sel_p, sel_s, max_p, seed
+    ):
+        if max_pool_units is not None and len(sel_s) >= max_pool_units:
             break
-    else:
+        patient = next((p for p in sel_p if remaining.get(p)), None)
+        if patient is not None:
+            sel_s.append(remaining[patient].pop(0))
+            continue
+        if patient_index >= len(pats):
+            break
+        patient = pats[patient_index]
+        patient_index += 1
+        sel_p.append(patient)
+        slides = list(hier[patient])
+        sel_s.append(slides[0])
+        remaining[patient] = slides[1:]
+    if not _pool_is_ready(df, sel_p, sel_s, max_p) or not _pool_has_capacity(
+        df, sel_p, sel_s, max_p, seed
+    ):
         raise ValueError(
             "Eligible patches cannot form the required fixed evidence pool"
         )
+
+
+def designate_patch_pool(
+    df: pd.DataFrame,
+    min_independent_units: int,
+    seed: int,
+    max_p: int | None = None,
+    max_pool_units: int | None = None,
+) -> pd.DataFrame:
+    """Choose the fixed patient/slide pool used by every patch condition."""
+    if min_independent_units < 10:
+        raise ValueError("Patch conditions need at least 10 independent patients")
+    rng = np.random.default_rng(seed)
+    pats, hier = _build_patch_hierarchy(df, rng)
+    if len(pats) < min_independent_units:
+        raise ValueError("Eligible patches cannot meet the independent-patient floor")
+    # Assign one slide per patient first; expand breadth-first only as the
+    # largest allocation requires. Surplus slides are never designated.
+    sel_p = pats[:min_independent_units]
+    sel_s = [next(iter(hier[p])) for p in sel_p]
+    remaining = {p: list(hier[p])[1:] for p in sel_p}
+    _expand_pool((pats, hier), sel_p, sel_s, remaining, df, max_p, max_pool_units, seed)
     return cast(
         pd.DataFrame, df[df["case_id"].isin(sel_p) & df["slide_id"].isin(sel_s)]
     )
+
+
+def _pool_has_capacity(
+    df_class: pd.DataFrame,
+    patients: list[str],
+    slides: list[str],
+    maximum_patches: int | None,
+    seed: int,
+) -> bool:
+    """Check the real patient/slide caps, not merely the pool's raw row count."""
+    if maximum_patches is None:
+        return True
+    pool = cast(
+        pd.DataFrame,
+        df_class[
+            df_class["case_id"].isin(patients) & df_class["slide_id"].isin(slides)
+        ],
+    )
+    try:
+        return (
+            len(select_patches_round_robin(pool, maximum_patches, seed))
+            == maximum_patches
+        )
+    except ValueError:
+        return False
 
 
 def _pool_is_ready(
@@ -185,10 +240,9 @@ def select_slides_round_robin(
 
 def build_manifest_hash(manifest_df: pd.DataFrame) -> str:
     """Create a hash of key manifest columns for immutability verification."""
-    columns = cast(
-        pd.DataFrame, manifest_df[["case_id", "slide_id", "cancer_type", "split"]]
-    )
-    records = columns.sort_values(by=["split", "cancer_type", "slide_id"]).to_dict(
+    cols = ["case_id", "slide_id", "cancer_type", "split"]
+    sub = cast(pd.DataFrame, manifest_df[cols])
+    records = sub.sort_values(by=["split", "cancer_type", "slide_id"]).to_dict(
         "records"
     )
     return compute_data_hash(records)

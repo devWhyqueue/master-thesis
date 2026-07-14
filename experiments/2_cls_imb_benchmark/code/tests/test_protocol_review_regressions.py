@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -130,6 +131,30 @@ def test_patch_conditions_use_the_same_designated_patient_and_slide_pools(
     assert pools["balanced"].equals(pools["severe"])
 
 
+def test_patch_conditions_retain_every_independent_unit_in_the_fixed_pool(
+    tmp_path: Path,
+) -> None:
+    """Every condition keeps the pilot-required patients and slides, not just its hash."""
+    frame = pd.concat([_patches("A", 30), _patches("B", 30)], ignore_index=True)
+
+    conditions = _build_conditions(
+        frame,
+        ["A", "B"],
+        shared_t=200,
+        min_support=60,
+        is_mil=False,
+        seed=4,
+        data_dir=tmp_path,
+        independent_floor=30,
+    )
+
+    for info in conditions.values():
+        stats = info["contribution_stats"]
+        assert all(entry["n_patients"] >= 30 for entry in stats.values())
+        assert all(entry["n_slides"] >= 30 for entry in stats.values())
+        assert all(entry["pool_fraction_retained"] == 1.0 for entry in stats.values())
+
+
 def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> None:
     """Patch pilot levels count patients; the slide floor must not become a 20-patient floor."""
     levels = [5, 10, 15, 20, 30]
@@ -150,6 +175,24 @@ def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> 
     assert patch["excluded"] is False
     # MIL pilot counts slides -> slide floor 20 applies to the level dimension.
     assert mil["definitive_floor"] == 20
+
+
+def test_patch_pilot_patient_floor_is_preserved_as_an_independent_constraint(
+    tmp_path: Path,
+) -> None:
+    """A patient floor cannot be weakened into an equivalent patch count."""
+    from imbalance_benchmark.manifest.freezing import _pilot_constraints
+
+    report = tmp_path / "pilot_report.json"
+    report.write_text(
+        json.dumps({"definitive_floor": 30, "quotas": {"1": 2}, "excluded": False}),
+        encoding="utf-8",
+    )
+
+    constraints = _pilot_constraints(report, is_mil=False)
+
+    assert constraints.patch_floor == 60
+    assert constraints.independent_floor == 30
 
 
 def test_pilot_quota_is_frozen_across_construction_orderings() -> None:
@@ -531,12 +574,146 @@ def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) 
                 ]
             },
         )
+    write_json(
+        tmp_path / "data" / "cross_split_gates_and_recovery.json",
+        {
+            "comparisons": [
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "method": "ce",
+                    "gate": "discrimination",
+                    "gate_passed": True,
+                    "bootstrap_effect": [0.1, 0.2],
+                },
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "method": "ce",
+                    "gate": "discrimination",
+                    "gate_passed": True,
+                    "bootstrap_effect": [0.1, 0.2],
+                },
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "method": "ce",
+                    "gate": "discrimination",
+                    "gate_passed": True,
+                    "bootstrap_effect": [0.1, 0.2, 0.3],
+                }
+            ]
+        },
+    )
 
     cells = load_rq3_cells([tmp_path])
 
     assert len(cells) == 1
     assert cells[0]["group"] == "tcga-ut"
     assert cells[0]["deficit_ba"] == pytest.approx(0.2)
+
+
+def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """RQ3 cells retain their crossed identity and never merge a dataset's targets."""
+    from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells, run_rq3
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
+        lambda *_: {
+            "separability": 0.5,
+            "learnability": 0.4,
+            "log_min_support": 2.0,
+            "log_effective_support": 1.0,
+            "is_wsi": 1.0,
+        },
+    )
+    comparisons = [
+        {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+            "gate_passed": True,
+            "effect": 0.1,
+            "bootstrap_effect": [0.05, 0.15],
+        }
+    ]
+    freeze = {
+        "assignment_conditions": {
+            "native": {"severe": {"achieved_rho": 10.0, "contribution_stats": {}, "path": str(tmp_path / "x.csv")}}
+        }
+    }
+
+    cells = _cells({"data": tmp_path}, comparisons, freeze, "panda:wsi", True)
+    report = run_rq3(
+        {"data": tmp_path},
+        {"dataset": {"name": "panda", "regime": "wsi"}},
+        freeze,
+        comparisons,
+    )
+
+    assert cells[0]["assignment"] == "native"
+    assert cells[0]["severity"] == "severe"
+    assert report["cells"][0]["group"] == "panda:wsi"
+
+
+def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> None:
+    """RQ3 uses the equal-split gate and ratio distribution, not split-level averages."""
+    from imbalance_benchmark.analysis.predictors.rq3_analysis import load_rq3_cells
+    from imbalance_benchmark.common import write_json
+
+    cell = {
+        "group": "tcga-ut:patch",
+        "assignment": "native",
+        "severity": "severe",
+        "method": "weighted_ce",
+        "rho": 10.0,
+        "separability": 0.5,
+        "learnability": 0.4,
+        "log_min_support": 2.0,
+        "log_effective_support": 1.0,
+        "is_wsi": 0.0,
+        "gate_passed": False,
+        "deficit_ba": np.nan,
+        "deficit_se": np.nan,
+        "recovery": 0.2,
+        "recovery_se": 0.01,
+    }
+    for split in range(3):
+        write_json(tmp_path / f"split={split}" / "data" / "rq3.json", {"cells": [cell]})
+    write_json(
+        tmp_path / "data" / "cross_split_gates_and_recovery.json",
+        {
+            "comparisons": [
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "method": "ce",
+                    "gate": "discrimination",
+                    "gate_passed": True,
+                    "bootstrap_effect": [0.1, 0.2],
+                },
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "method": "weighted_ce",
+                    "gate": "discrimination",
+                    "gate_passed": True,
+                    "bootstrap_numerator": [1.0, 4.0],
+                    "bootstrap_denominator": [2.0, 2.0],
+                }
+            ]
+        },
+    )
+
+    cells = load_rq3_cells([tmp_path])
+
+    assert cells[0]["gate_passed"] is True
+    assert cells[0]["recovery"] == pytest.approx(1.25)
+    assert cells[0]["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
 
 def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None:
@@ -552,3 +729,69 @@ def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None
     p_value = crossed_block_permutation_tail_nll(blocks, [[2], [1]], n_permutations=32, seed=3)
 
     assert 0.0 <= p_value <= 1.0
+
+
+def test_mil_covariates_use_the_dataset_slide_identity_not_raw_chunk_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A slide represented by feature chunks still contributes one MIL identity row."""
+    from imbalance_benchmark.analysis.predictors.rq3_analysis import _covariates
+
+    manifest = tmp_path / "manifest.csv"
+    condition = tmp_path / "condition.csv"
+    rows = [
+        {"case_id": "p0", "slide_id": "s0", "cancer_type": "A", "feature_path": "a.pt"},
+        {"case_id": "p0", "slide_id": "s0", "cancer_type": "A", "feature_path": "b.pt"},
+        {"case_id": "p1", "slide_id": "s1", "cancer_type": "B", "feature_path": "c.pt"},
+    ]
+    pd.DataFrame(rows).to_csv(manifest, index=False)
+    pd.DataFrame(rows).to_csv(condition, index=False)
+
+    features = np.array([[1.0, 0.0], [0.0, 1.0]])
+    labels = np.array([0, 1])
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._feature_frame",
+        lambda *_: (features, labels),
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis.intrinsic_separability",
+        lambda *_: {"linear_probe_macro_recall": 0.5, "knn_macro_recall": 0.5, "per_class_nn_error": {}},
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis.condition_learnability",
+        lambda *_: {"linear_probe_macro_recall": 0.5},
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis.class_margin_cross_fit",
+        lambda *_: np.array([0.1, 0.2]),
+    )
+
+    result = _covariates(
+        {"data": tmp_path}, True, {"path": str(condition), "contribution_stats": {}}
+    )
+
+    assert np.isfinite(result["log_effective_support"])
+
+
+def test_freeze_verifies_pilot_and_prepared_manifest_artifacts(tmp_path: Path) -> None:
+    """Held-out manifest or pilot changes invalidate the frozen record."""
+    from imbalance_benchmark.common import compute_sha256, sign_file, write_json
+    from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
+
+    pilot = tmp_path / "pilot_report.json"
+    manifest = tmp_path / "manifest.csv"
+    write_json(pilot, {"definitive_floor": 10})
+    write_json(manifest, {"held_out": "locked"})
+    sign_file(pilot)
+    meta = {
+        "content_sha256": "",
+        "pilot_report": {"path": str(pilot), "sha256": compute_sha256(pilot)},
+        "prepared_manifest": {"path": str(manifest), "sha256": compute_sha256(manifest)},
+    }
+    from imbalance_benchmark.manifest.freeze import lock_manifest_freeze
+
+    frozen = lock_manifest_freeze(meta)
+    verify_manifest_freeze(frozen)
+    write_json(manifest, {"held_out": "changed"})
+    with pytest.raises(RuntimeError, match="Prepared manifest altered"):
+        verify_manifest_freeze(frozen)

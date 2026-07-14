@@ -41,13 +41,25 @@ def load_eval_details(conn: sqlite3.Connection) -> pd.DataFrame:
         "FROM runs r JOIN eval_results e ON r.run_id = e.run_id",
         conn,
     )
-    clustered = details["extended_json"].map(
-        lambda raw: json.loads(raw).get("clustered_endpoints", {}) if raw else {}
-    )
+    extended = details["extended_json"].map(lambda raw: json.loads(raw) if raw else {})
+    endpoint_details = extended.map(_canonical_endpoint_details)
     return pd.concat(
-        [details.drop(columns="extended_json"), pd.json_normalize(list(clustered))],
+        [
+            details.drop(columns="extended_json"),
+            pd.json_normalize(list(endpoint_details)),
+        ],
         axis=1,
     )
+
+
+def _canonical_endpoint_details(payload: dict[str, Any]) -> dict[str, Any]:
+    """Flatten clustered and locked-tier endpoints for equal-split reporting."""
+    out = dict(payload.get("clustered_endpoints", {}))
+    for tier, metrics in payload.get("tier_metrics", {}).items():
+        out.update(
+            {f"tier_{tier}_{metric}": value for metric, value in metrics.items()}
+        )
+    return out
 
 
 def load_classwise(conn: sqlite3.Connection) -> pd.DataFrame:

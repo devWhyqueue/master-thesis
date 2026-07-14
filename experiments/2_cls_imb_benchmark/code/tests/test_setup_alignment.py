@@ -17,6 +17,7 @@ from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
 from imbalance_benchmark.manifest.freeze import achieved_rho
 from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.common import sign_file
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 
 
@@ -142,6 +143,11 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
         data_dir = tmp_path / "outputs" / f"split={split_index}" / "data"
         data_dir.mkdir(parents=True)
         pd.DataFrame(rows).to_csv(data_dir / "manifest.csv", index=False)
+        (data_dir / "pilot_report.json").write_text(
+            json.dumps({"definitive_floor": 10, "quotas": {"0": 1}, "excluded": False}),
+            encoding="utf-8",
+        )
+        sign_file(data_dir / "pilot_report.json")
 
     cmd_freeze(Namespace(config=str(config_path), seed=7, split_index=0))
 

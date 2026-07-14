@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, cast
-import json
 
 import numpy as np
 import pandas as pd
 
+from imbalance_benchmark.analysis.predictors.rq3_cross_split import load_rq3_cells
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
     fit_gate_pass_model,
@@ -23,7 +23,7 @@ from imbalance_benchmark.analysis.predictors.separability import (
 )
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 
-__all__ = ["run_rq3", "cross_dataset_rq3"]
+__all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
 
 
 def _feature_frame(
@@ -51,6 +51,18 @@ def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
     return float(min(values)) if values else 1.0
 
 
+def _feature_identity(manifest: Path, split: str | None, is_mil: bool) -> pd.DataFrame:
+    """Return identities in the same one-row-per-observation order as features."""
+    dataset = (
+        BagFeatureDataset(manifest, split)
+        if is_mil
+        else ImbalanceDataset(manifest, split)
+    )
+    return cast(pd.DataFrame, dataset.df[["case_id", "slide_id"]]).reset_index(
+        drop=True
+    )
+
+
 def _covariates(
     paths: dict[str, Path], is_mil: bool, condition: dict[str, Any]
 ) -> dict[str, Any]:
@@ -71,7 +83,7 @@ def _covariates(
         raise RuntimeError(f"Missing frozen controlled manifest for RQ3: {cond_path}")
     cond_x, cond_y = _feature_frame(cond_path, None, is_mil)
     learnability = condition_learnability(cond_x, cond_y, val_x, val_y, n_classes)
-    frame = pd.read_csv(cond_path)
+    frame = _feature_identity(cond_path, None, is_mil)
     margins = class_margin_cross_fit(
         cond_x, cond_y, frame["case_id"].astype(str).to_numpy(), n_classes
     )
@@ -134,6 +146,8 @@ def _cells(
         cells.append(
             {
                 "group": group,
+                "assignment": row["assignment"],
+                "severity": row["severity"],
                 "rho": allocated["achieved_rho"],
                 "gate_passed": gate_map[(row["assignment"], row["severity"])],
                 "deficit_ba": row["effect"] if row["method"] == "ce" else np.nan,
@@ -161,7 +175,8 @@ def run_rq3(
     and covariates each split contributes to that combined analysis.
     """
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    group = str(config.get("dataset", {}).get("name", "unknown"))
+    dataset = config.get("dataset", {})
+    group = f"{dataset.get('name', 'unknown')}:{dataset.get('regime', 'patch')}"
     cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
@@ -198,27 +213,3 @@ def cross_dataset_rq3(cells: list[dict[str, Any]]) -> dict[str, Any]:
         if len(groups) > 1
         else {},
     }
-
-
-def load_rq3_cells(analysis_roots: list[Path]) -> list[dict[str, Any]]:
-    """Equal-average split repetitions before fitting dataset-target RQ3 cells."""
-    cells: list[dict[str, Any]] = []
-    for root in analysis_roots:
-        for index in range(3):
-            rq3_path = root / f"split={index}" / "data" / "rq3.json"
-            if rq3_path.exists():
-                cells.extend(json.loads(rq3_path.read_text()).get("cells", []))
-    if not cells:
-        return []
-    frame = pd.DataFrame(cells)
-    keys = ["group", "assignment", "severity", "method"]
-    bool_columns = ["gate_passed"]
-    numeric = [
-        column
-        for column in frame.select_dtypes(include=["number"]).columns
-        if column not in keys
-    ]
-    averaged = cast(pd.DataFrame, frame.groupby(keys, as_index=False)[numeric].mean())
-    for column in bool_columns:
-        averaged[column] = frame.groupby(keys)[column].all().to_numpy()
-    return averaged.to_dict(orient="records")

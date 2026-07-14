@@ -1,7 +1,7 @@
 from __future__ import annotations
 import argparse
-import logging
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 import pandas as pd
@@ -26,23 +26,32 @@ from imbalance_benchmark.manifest.construction_helpers import (
 from imbalance_benchmark.manifest.construction_sampling import designate_patch_pool
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
-logger = logging.getLogger(__name__)
 
 
-def _min_support_from_pilot(pilot_report_path: Path, is_mil: bool) -> int:
+@dataclass(frozen=True)
+class PilotConstraints:
+    """Allocation and independent-unit floors frozen from the pilot."""
+
+    patch_floor: int
+    independent_floor: int
+
+
+def _pilot_constraints(pilot_report_path: Path, is_mil: bool) -> PilotConstraints:
     """Translate the pilot's independent-unit floor into a patch/slide-count floor.
     MIL support is already counted in slides, matching the pilot's unit. Patch
     support is counted in patches, so the patient/slide floor is converted via
     the largest pilot quota (patches held constant per contributing patient).
     """
     if not pilot_report_path.exists():
-        return 10
+        return PilotConstraints(10, 10)
     report = json.loads(pilot_report_path.read_text())
     definitive_floor = report["definitive_floor"]
     if is_mil:
-        return definitive_floor
+        return PilotConstraints(definitive_floor, definitive_floor)
     quotas = [q for q in report["quotas"].values() if q is not None]
-    return definitive_floor * (max(quotas) if quotas else 1)
+    return PilotConstraints(
+        definitive_floor * (max(quotas) if quotas else 1), definitive_floor
+    )
 
 
 def _build_conditions(
@@ -55,6 +64,7 @@ def _build_conditions(
     data_dir: Path,
     file_prefix: str = "",
     condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
+    independent_floor: int | None = None,
 ) -> dict[str, Any]:
     """Construct cap-compliant controlled manifests from one fixed eligible pool."""
     counts = class_support_counts(train_df, is_mil)
@@ -73,9 +83,14 @@ def _build_conditions(
         {
             cls: designate_patch_pool(
                 cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
-                min(allocation[index] for allocation in allocations.values()),
+                independent_floor or 10,
                 class_construction_seed(seed, cls),
                 max(allocation[index] for allocation in allocations.values()),
+                (
+                    min(allocation[index] for allocation in allocations.values())
+                    if independent_floor is not None
+                    else None
+                ),
             )
             for index, cls in enumerate(classes)
         }
@@ -102,6 +117,16 @@ def _build_conditions(
             )
             for idx, cls in enumerate(classes)
         ]
+        if not is_mil and independent_floor is not None:
+            for cls, selected in zip(classes, rows, strict=True):
+                pool = fixed_pools[cls]
+                if not (
+                    set(pool["case_id"]).issubset(selected["case_id"])
+                    and set(pool["slide_id"]).issubset(selected["slide_id"])
+                ):
+                    raise ValueError(
+                        "Controlled patch allocation does not retain its fixed evidence pool"
+                    )
         conditions[name] = write_condition(
             name,
             dict(zip(classes, allocated)),
@@ -118,51 +143,6 @@ def _build_conditions(
     return conditions
 
 
-def _load_pilot_floor(
-    pilot_report_path: Path, is_mil: bool, counts: dict[str, int]
-) -> tuple[int, int, bool]:
-    """Read the pilot's floor and exclusion status, capped to what's actually available."""
-    requested = _min_support_from_pilot(pilot_report_path, is_mil)
-    # With a strict 5% per-slide patch cap, a patch condition needs at least
-    # 20 examples per class to admit even one patch from a slide.
-    required_floor = max(requested, 20) if not is_mil else requested
-    min_support = required_floor
-    excluded = (
-        json.loads(pilot_report_path.read_text()).get("excluded", False)
-        if pilot_report_path.exists()
-        else False
-    )
-    if excluded:
-        logger.warning(
-            "Pilot marked this dataset-regime excluded (insufficient independent "
-            "units even for the balanced condition); freezing anyway for inspection "
-            "but downstream analysis must treat it as excluded."
-        )
-    if min(counts.values()) < min_support:
-        excluded = True
-    return min_support, requested, excluded
-
-
-def _load_train_context(
-    args: argparse.Namespace, paths: dict[str, Path]
-) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], dict[str, int]]:
-    """Load the training manifest and derive the regime, classes, and support counts."""
-    config = load_config(args.config)
-    df = pd.read_csv(paths["data"] / "manifest.csv")
-    train_df = cast(pd.DataFrame, df[df["split"] == "train"])
-    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    dataset_name = str(config.get("dataset", {}).get("name", ""))
-    observed = train_df["cancer_type"].astype(str).unique().tolist()
-    classes = observed
-    if dataset_name == "panda" and all(name.startswith("ISUP") for name in observed):
-        classes = sorted(observed, key=lambda name: int(name.removeprefix("ISUP")))
-    counts = class_support_counts(train_df, is_mil)
-    if dataset_name != "panda" or not all(name.startswith("ISUP") for name in observed):
-        classes = sorted(observed, key=lambda name: (-counts[name], name))
-        counts = class_support_counts(train_df, is_mil)
-    return paths, train_df, is_mil, classes, counts
-
-
 def _freeze_meta(
     args: argparse.Namespace,
     paths: dict[str, Path],
@@ -173,6 +153,7 @@ def _freeze_meta(
     min_support: int,
     requested_min_support: int,
     excluded: bool,
+    independent_floor: int,
 ) -> dict[str, Any]:
     """Assemble the frozen analysis manifest: conditions, tail assignments, and provenance."""
     construction_seed = derive_seed(args.seed, "definitive_construction")
@@ -194,6 +175,7 @@ def _freeze_meta(
             paths["data"],
             file_prefix=f"{assignment}_",
             condition_names=("moderate", "severe"),
+            independent_floor=independent_floor,
         )
         for assignment, order in assignments.items()
     }
@@ -206,11 +188,13 @@ def _freeze_meta(
         construction_seed,
         paths["data"],
         condition_names=("balanced",),
+        independent_floor=independent_floor,
     )
     return {
         "shared_T": shared_t,
         "min_support": min_support,
         "requested_min_support": requested_min_support,
+        "independent_floor": independent_floor,
         "excluded": excluded,
         "construction_seed": construction_seed,
         "seed_roles": {role: derive_seed(args.seed, role) for role in SEED_ROLES},
