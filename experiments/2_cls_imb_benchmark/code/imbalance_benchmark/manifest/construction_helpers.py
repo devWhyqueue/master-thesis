@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import math
 from collections.abc import Mapping
 from typing import Callable, cast
 
 from pathlib import Path
 
 import pandas as pd
-import numpy as np
 
 from imbalance_benchmark.common import compute_data_hash, compute_sha256
 from imbalance_benchmark.construction import (
@@ -21,6 +19,7 @@ from imbalance_benchmark.manifest.construction_sampling import (
     select_patches_round_robin,
     select_slides_round_robin,
 )
+from imbalance_benchmark.manifest.statistics import support_statistics
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 
@@ -54,20 +53,16 @@ def write_natural_condition(
     """Write the descriptive full-training-set anchor outside controlled estimands."""
     path = data_dir / "manifest_natural.csv"
     train_df.to_csv(path, index=False)
-    counts = train_df["cancer_type"].value_counts().to_dict()
-    values = list(counts.values())
-    total = sum(values)
-    probabilities = np.asarray(values, dtype=float) / max(total, 1)
-    entropy = -float((probabilities * np.log(probabilities)).sum()) / math.log(
-        max(len(values), 2)
-    )
+    statistics = support_statistics(train_df)
+    primary = statistics["slide" if is_mil else "patch"]
     return {
         "path": str(path),
         "sha256": compute_sha256(path),
         "note": "descriptive anchor; excluded from imbalance deficit/recovery estimands",
-        "allocated_counts": counts,
-        "achieved_rho": max(values) / min(values) if values else 1.0,
-        "normalized_entropy": 1.0 - entropy if len(values) > 1 else 0.0,
+        "allocated_counts": primary["counts"],
+        "achieved_rho": primary["achieved_rho"],
+        "normalized_entropy": primary["normalized_entropy"],
+        "support_statistics": statistics,
         "contribution_stats": _natural_contribution_stats(train_df, is_mil),
     }
 

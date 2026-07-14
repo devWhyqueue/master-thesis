@@ -23,6 +23,7 @@ __all__ = [
 SENSITIVITY_COVARIATES = (
     "learnability",
     "log_min_support",
+    "log_min_patient_support",
     "log_effective_support",
     "is_wsi",
 )

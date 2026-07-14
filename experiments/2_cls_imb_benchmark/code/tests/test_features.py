@@ -52,7 +52,9 @@ def test_load_feature_row_requires_index_for_multirow(tmp_path) -> None:
     assert vector.shape == (2560,)
 
 
-def test_attach_extracted_features_writes_one_tensor_per_slide(tmp_path, monkeypatch) -> None:
+def test_attach_extracted_features_writes_one_tensor_per_slide(
+    tmp_path, monkeypatch
+) -> None:
     calls: list[list[str]] = []
 
     def fake_extract(image_paths, *args, **kwargs):

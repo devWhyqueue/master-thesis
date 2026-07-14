@@ -25,6 +25,25 @@ __all__ = [
 ]
 
 
+def _training_context(
+    method: str,
+    condition: str,
+    train_ds: TrainDataset,
+    run: RunContext,
+    seed: int,
+    cfg: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a confirmation context with the signed condition-level update budget."""
+    budget_kind = "natural" if condition == "natural" else "controlled"
+    budget = run.update_budgets.get(budget_kind)
+    args = (method, train_ds, run, seed, cfg, run.val_loader)
+    return (
+        build_training_ctx(*args)
+        if budget is None
+        else build_training_ctx(*args, budget)
+    )
+
+
 def _timed_fit(fit_fn: Any, ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """Run one training orchestration and measure its wall-clock time."""
     if torch.cuda.is_available():
@@ -40,7 +59,7 @@ def confirm_ce(
     """Fit CE for every confirmation seed; return its checkpoints for post-hoc reuse."""
     states = []
     for seed in run.seeds:
-        ctx = build_training_ctx("ce", train_ds, run, seed, cfg, run.val_loader)
+        ctx = _training_context("ce", cond, train_ds, run, seed, cfg)
         state, elapsed = _timed_fit(fit_method, ctx)
         states.append((state, int(ctx.get("selected_checkpoint_step", 0))))
         _run_and_record(cond, "ce", len(states) - 1, ctx, state, run, elapsed)
@@ -60,10 +79,9 @@ def confirm_post_hoc(
     for i, (seed, (state, checkpoint_step)) in enumerate(
         zip(run.seeds, ce_states, strict=True)
     ):
-        ctx = build_training_ctx(
-            "ce", train_ds, run, seed, {"parameter": tau}, run.val_loader
-        )
+        ctx = _training_context("ce", cond, train_ds, run, seed, {"parameter": tau})
         ctx["selected_checkpoint_step"] = checkpoint_step
+        ctx["peak_memory_bytes"] = 0
         _run_and_record(
             cond, "post_hoc_logit_adjustment", i, ctx, state, run, 0.0, tau, priors
         )
@@ -78,7 +96,7 @@ def confirm_crt(
 ) -> None:
     """Fit cRT (stage one inherits CE; stage two retrains only the classifier) per seed."""
     for i, seed in enumerate(run.seeds):
-        ctx = build_training_ctx("crt", train_ds, run, seed, cfg, run.val_loader)
+        ctx = _training_context("crt", cond, train_ds, run, seed, cfg)
         ctx["stage_one_config"] = stage_one_config
         state, elapsed = _timed_fit(fit_crt, ctx)
         _run_and_record(cond, "crt", i, ctx, state, run, elapsed)
@@ -93,7 +111,7 @@ def confirm_method(
 ) -> None:
     """Fit one ordinary (single-orchestration) roster method for every confirmation seed."""
     for i, seed in enumerate(run.seeds):
-        ctx = build_training_ctx(method, train_ds, run, seed, cfg, run.val_loader)
+        ctx = _training_context(method, cond, train_ds, run, seed, cfg)
         state, elapsed = _timed_fit(fit_method, ctx)
         _run_and_record(
             cond, method, i, ctx, state, run, elapsed, float(cfg.get("parameter", 1.0))

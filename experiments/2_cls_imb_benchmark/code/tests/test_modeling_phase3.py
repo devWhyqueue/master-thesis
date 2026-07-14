@@ -7,8 +7,17 @@ import pandas as pd
 import pytest
 import torch
 
-from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset, bag_collate
-from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID, get_grid_configs, roster_for_regime
+from imbalance_benchmark.datasets.data import (
+    BagFeatureDataset,
+    ImbalanceDataset,
+    bag_collate,
+)
+from imbalance_benchmark.modeling.context import (
+    GRIDS,
+    LEARNING_RATE_GRID,
+    get_grid_configs,
+    roster_for_regime,
+)
 from imbalance_benchmark.modeling.losses import rankmix_bag_loss
 from imbalance_benchmark.modeling.models import (
     AttentionMil,
@@ -18,8 +27,16 @@ from imbalance_benchmark.modeling.models import (
     OkoClassifier,
     build_model,
 )
-from imbalance_benchmark.modeling.oko import build_class_index, oko_set_loss, sample_oko_sets
-from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method, mde_bag_loss
+from imbalance_benchmark.modeling.oko import (
+    build_class_index,
+    oko_set_loss,
+    sample_oko_sets,
+)
+from imbalance_benchmark.modeling.special_methods import (
+    fit_crt,
+    fit_method,
+    mde_bag_loss,
+)
 from imbalance_benchmark.modeling.training import (
     ClassAwareBatchSampler,
     CHECKPOINT_INTERVAL,
@@ -30,7 +47,9 @@ from imbalance_benchmark.modeling.training import (
 DIM = 16
 
 
-def _write_patch_manifest(tmp_path: Path, n_classes: int = 3, per_class: int = 8) -> Path:
+def _write_patch_manifest(
+    tmp_path: Path, n_classes: int = 3, per_class: int = 8
+) -> Path:
     classes = [f"class_{i}" for i in range(n_classes)]
     rows = []
     for cls in classes:
@@ -72,13 +91,17 @@ def _write_bag_manifest(tmp_path: Path, n_classes: int = 3, per_class: int = 6) 
     return manifest_path
 
 
-def _patch_ctx(method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3) -> dict:
+def _patch_ctx(
+    method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3
+) -> dict:
     manifest = _write_patch_manifest(tmp_path, n_classes=n_classes)
     train_ds = ImbalanceDataset(manifest)
     model_kwargs = {"input_dim": DIM, "hidden_dim": 8, "dropout": 0.0}
 
     def model_factory() -> torch.nn.Module:
-        return build_model(method, False, n_classes=n_classes, param=param, **model_kwargs)
+        return build_model(
+            method, False, n_classes=n_classes, param=param, **model_kwargs
+        )
 
     return {
         "method": method,
@@ -88,7 +111,9 @@ def _patch_ctx(method: str, tmp_path: Path, param: float | None = None, n_classe
         "val_loader": torch.utils.data.DataLoader(train_ds, batch_size=8),
         "device": torch.device("cpu"),
         "config": {"patch_training": {"batch_size": 8}},
-        "param_config": {"lr": 1e-3, "parameter": param} if param is not None else {"lr": 1e-3},
+        "param_config": {"lr": 1e-3, "parameter": param}
+        if param is not None
+        else {"lr": 1e-3},
         "seed": 0,
         "is_mil": False,
         "n_classes": n_classes,
@@ -96,23 +121,31 @@ def _patch_ctx(method: str, tmp_path: Path, param: float | None = None, n_classe
     }
 
 
-def _bag_ctx(method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3) -> dict:
+def _bag_ctx(
+    method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3
+) -> dict:
     manifest = _write_bag_manifest(tmp_path, n_classes=n_classes)
     train_ds = BagFeatureDataset(manifest, max_instances=5)
     model_kwargs = {"input_dim": DIM, "hidden_dim": 8, "dropout": 0.0}
 
     def model_factory() -> torch.nn.Module:
-        return build_model(method, True, n_classes=n_classes, param=param, **model_kwargs)
+        return build_model(
+            method, True, n_classes=n_classes, param=param, **model_kwargs
+        )
 
     return {
         "method": method,
         "model": model_factory(),
         "model_factory": model_factory,
         "train_dataset": train_ds,
-        "val_loader": torch.utils.data.DataLoader(train_ds, batch_size=4, collate_fn=bag_collate),
+        "val_loader": torch.utils.data.DataLoader(
+            train_ds, batch_size=4, collate_fn=bag_collate
+        ),
         "device": torch.device("cpu"),
         "config": {"wsi_training": {"bag_batch_size": 4}},
-        "param_config": {"lr": 1e-3, "parameter": param} if param is not None else {"lr": 1e-3},
+        "param_config": {"lr": 1e-3, "parameter": param}
+        if param is not None
+        else {"lr": 1e-3},
         "seed": 0,
         "is_mil": True,
         "n_classes": n_classes,
@@ -127,8 +160,13 @@ def test_roster_for_regime_matches_report_table():
     patch = roster_for_regime(False)
     wsi = roster_for_regime(True)
     shared = {
-        "ce", "balanced_sampling", "weighted_ce", "focal",
-        "logit_adjustment", "post_hoc_logit_adjustment", "crt",
+        "ce",
+        "balanced_sampling",
+        "weighted_ce",
+        "focal",
+        "logit_adjustment",
+        "post_hoc_logit_adjustment",
+        "crt",
     }
     assert shared <= set(patch) and shared <= set(wsi)
     assert set(patch) - shared == {"ce_soft_f1", "ce_soft_mcc", "cfal", "oko"}
@@ -196,6 +234,16 @@ def test_training_restores_train_mode_after_validation_checkpoint(tmp_path):
     assert ctx["model"].training
 
 
+def test_training_uses_the_frozen_update_budget(tmp_path):
+    """A frozen budget controls fitting even if the runtime formula changes."""
+    ctx = _patch_ctx("ce", tmp_path, n_classes=2)
+    ctx["update_budget"] = 2
+
+    fit_model(ctx)
+
+    assert ctx["selected_checkpoint_step"] == 2
+
+
 # --- losses --------------------------------------------------------------------
 
 
@@ -205,7 +253,9 @@ def test_mde_zero_consistency_ablation_drops_cross_term():
     bags_b = [torch.randn(4, DIM), torch.randn(3, DIM)]
     targets_u = torch.tensor([0, 1])
     targets_b = torch.tensor([1, 2])
-    loss_zero = mde_bag_loss(model, bags_u, targets_u, bags_b, targets_b, lambda_con=0.0)
+    loss_zero = mde_bag_loss(
+        model, bags_u, targets_u, bags_b, targets_b, lambda_con=0.0
+    )
     loss_pos = mde_bag_loss(model, bags_u, targets_u, bags_b, targets_b, lambda_con=0.5)
     assert loss_zero.item() >= 0.0
     assert not torch.isclose(loss_zero, loss_pos)
@@ -233,7 +283,9 @@ def test_oko_set_sampling_respects_class_membership():
         class_index, n_classes=3, n_sets=20, k=1, rng=rng
     )
     assert set_indices.shape == (20, 3)
-    for row, pair_cls, odd_cls in zip(set_indices, pair_classes, odd_classes, strict=True):
+    for row, pair_cls, odd_cls in zip(
+        set_indices, pair_classes, odd_classes, strict=True
+    ):
         assert row[0] != row[1]
         assert labels[row[0]] == pair_cls
         assert labels[row[1]] == pair_cls
@@ -270,7 +322,9 @@ def test_supervised_contrastive_loss_reports_pairs_and_anchors():
     from imbalance_benchmark.modeling.losses import supervised_contrastive_loss
 
     embeddings = torch.randn(4, 8)
-    targets = torch.tensor([0, 0, 1, 1])  # four directed positive pairs, four valid anchors
+    targets = torch.tensor(
+        [0, 0, 1, 1]
+    )  # four directed positive pairs, four valid anchors
 
     loss, n_pairs, n_anchors = supervised_contrastive_loss(embeddings, targets, 0.1)
 
@@ -289,7 +343,14 @@ def test_oko_set_loss_finite_and_differentiable():
     features = torch.randn(5 * 3, DIM)
     pair_labels = torch.tensor([0, 1, 2, 0, 1])
     odd_labels = torch.tensor([1, 2, 0, 2, 0])
-    loss = oko_set_loss(model, features, batch_n=5, set_size=3, pair_labels=pair_labels, odd_labels=odd_labels)
+    loss = oko_set_loss(
+        model,
+        features,
+        batch_n=5,
+        set_size=3,
+        pair_labels=pair_labels,
+        odd_labels=odd_labels,
+    )
     assert torch.isfinite(loss)
     loss.backward()
     assert model.main_head.weight.grad is not None

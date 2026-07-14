@@ -13,6 +13,9 @@ from imbalance_benchmark.commands.confirm import require_tuning_configs
 from imbalance_benchmark.commands.freeze_execution import wsi_bootstrap_identity
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.modeling.context import cost_payload
+from imbalance_benchmark.modeling.workflows.confirmation_helpers import (
+    _environment_payload,
+)
 from imbalance_benchmark.modeling.training import _fit_step
 
 
@@ -137,8 +140,14 @@ def test_calibration_summary_retains_scaled_outputs_and_all_claimed_metrics() ->
     summary = _run_calibration(record)
 
     assert summary is not None
-    assert {"temperature_scaled_logits", "temperature_scaled_probabilities"} <= set(summary)
-    assert {"temperature_scaled_test_nll", "temperature_scaled_test_brier", "temperature_scaled_test_ece"} <= set(summary)
+    assert {"temperature_scaled_logits", "temperature_scaled_probabilities"} <= set(
+        summary
+    )
+    assert {
+        "temperature_scaled_test_nll",
+        "temperature_scaled_test_brier",
+        "temperature_scaled_test_ece",
+    } <= set(summary)
     assert "temperature_scaled_reliability" in summary
 
 
@@ -157,12 +166,65 @@ def test_cost_uses_actual_processed_examples_for_partial_batches() -> None:
     assert cost["effective_passes_through_unique_examples"] == 1.0
 
 
-def test_cross_split_aggregation_requires_every_comparison_in_all_three_splits() -> None:
+def test_post_hoc_cost_does_not_inherit_a_previous_gpu_memory_peak(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda: 123)
+
+    cost = cost_payload(
+        "post_hoc_logit_adjustment",
+        budget=0,
+        elapsed=0.0,
+        model=torch.nn.Linear(2, 2),
+        unique_examples=4,
+        exposed_examples=0,
+        processed_examples=0,
+        peak_memory_bytes=0,
+    )
+
+    assert cost["peak_accelerator_memory_bytes"] == 0
+
+
+def test_environment_payload_records_the_dependency_lock() -> None:
+    environment = _environment_payload()
+
+    assert environment["dependency_lock"]["path"] == "uv.lock"
+    assert len(environment["dependency_lock"]["sha256"]) == 64
+
+
+def test_cross_split_aggregation_requires_every_comparison_in_all_three_splits() -> (
+    None
+):
     rows = [
-        {"patient_split": 0, "assignment": "native", "severity": "severe", "method": "ce", "gate": "discrimination"},
-        {"patient_split": 1, "assignment": "native", "severity": "severe", "method": "ce", "gate": "discrimination"},
-        {"patient_split": 2, "assignment": "native", "severity": "severe", "method": "ce", "gate": "discrimination"},
-        {"patient_split": 0, "assignment": "native", "severity": "severe", "method": "focal", "gate": "discrimination"},
+        {
+            "patient_split": 0,
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+        },
+        {
+            "patient_split": 1,
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+        },
+        {
+            "patient_split": 2,
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+        },
+        {
+            "patient_split": 0,
+            "assignment": "native",
+            "severity": "severe",
+            "method": "focal",
+            "gate": "discrimination",
+        },
     ]
 
     with pytest.raises(RuntimeError, match="incomplete"):

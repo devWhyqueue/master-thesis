@@ -7,10 +7,10 @@ from typing import Any, cast
 import torch.nn as nn
 
 from imbalance_benchmark.modeling.models import AttentionMil, MLP
+from imbalance_benchmark.modeling.context import resolve_update_budget
 from imbalance_benchmark.modeling.training import (
     fit_model,
     resolve_batch_size,
-    update_budget,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ def _rankmix_footprint(teacher: nn.Module, student: nn.Module) -> int:
 def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """Train cRT's seeded CE stage, then its balanced frozen-representation stage."""
     batch_size = resolve_batch_size(ctx["config"], ctx["is_mil"])
-    budget = update_budget(len(ctx["train_dataset"]), batch_size)
+    budget = resolve_update_budget(ctx, batch_size)
     stage_one_context = {
         **ctx,
         "model": ctx["model"],
@@ -103,9 +103,7 @@ def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
 
 def fit_rankmix(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """Train a CE teacher, then a reinitialized RankMix-inspired student."""
-    budget = update_budget(
-        len(ctx["train_dataset"]), resolve_batch_size(ctx["config"], True)
-    )
+    budget = resolve_update_budget(ctx, resolve_batch_size(ctx["config"], True))
     teacher = ctx["model_factory"]()
     ctx["training_footprint_parameters"] = _rankmix_footprint(teacher, ctx["model"])
     teacher_context = {

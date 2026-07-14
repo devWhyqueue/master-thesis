@@ -13,7 +13,12 @@ from imbalance_benchmark.analysis.calibration import (
     balanced_decision_logits,
     fit_temperature,
 )
-from imbalance_benchmark.analysis.db import connect_db, discover_result_dirs, ingest_run, init_schema
+from imbalance_benchmark.analysis.db import (
+    connect_db,
+    discover_result_dirs,
+    ingest_run,
+    init_schema,
+)
 from imbalance_benchmark.analysis.inference.bootstrap import (
     build_strata,
     expand_to_rows,
@@ -35,8 +40,14 @@ from imbalance_benchmark.analysis.inference.holm import apply_holm, confirmatory
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_block_permutation_ba,
 )
-from imbalance_benchmark.analysis.inference.permutation import paired_block_permutation_ba
-from imbalance_benchmark.analysis.metrics import assign_tiers, classification_payload, negative_log_likelihood
+from imbalance_benchmark.analysis.inference.permutation import (
+    paired_block_permutation_ba,
+)
+from imbalance_benchmark.analysis.metrics import (
+    assign_tiers,
+    classification_payload,
+    negative_log_likelihood,
+)
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
     fit_gate_pass_model,
@@ -45,10 +56,20 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
 from imbalance_benchmark.analysis.predictors.hierarchical_models import _log_scale_prior
 from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells
 from imbalance_benchmark.analysis.predictors.rq3_cross_split import _comparison_maps
-from imbalance_benchmark.analysis.predictors.separability import effective_support, intraclass_correlation
-from imbalance_benchmark.analysis.query import load_classwise, load_eval_details, load_test_identity
+from imbalance_benchmark.analysis.predictors.separability import (
+    effective_support,
+    intraclass_correlation,
+)
+from imbalance_benchmark.analysis.query import (
+    load_classwise,
+    load_eval_details,
+    load_test_identity,
+)
 from imbalance_benchmark.analysis.reporting.ingestion import _ingest_discovered_run
-from imbalance_benchmark.analysis.reporting.tables import calibration_table, results_table
+from imbalance_benchmark.analysis.reporting.tables import (
+    calibration_table,
+    results_table,
+)
 from imbalance_benchmark.commands.analyze import _aggregate_split_comparisons
 from imbalance_benchmark.common import (
     ensure_dirs,
@@ -66,7 +87,15 @@ def test_assign_tiers_ceil_k_over_3_and_binary_case():
     classes = ["A", "B", "C", "D", "E", "F", "G"]
     allocated = {"A": 100, "B": 90, "C": 80, "D": 50, "E": 20, "F": 10, "G": 5}
     tiers = assign_tiers(classes, allocated)
-    assert [tiers[c] for c in classes] == ["head", "head", "head", "body", "tail", "tail", "tail"]
+    assert [tiers[c] for c in classes] == [
+        "head",
+        "head",
+        "head",
+        "body",
+        "tail",
+        "tail",
+        "tail",
+    ]
 
     binary_tiers = assign_tiers(["A", "B"], {"A": 10, "B": 5})
     assert binary_tiers == {"A": "head", "B": "tail"}
@@ -87,7 +116,17 @@ def test_classification_payload_shapes_and_macro_nll():
     assert payload["confusion_matrix"] == np.array(payload["confusion_matrix"]).tolist()
     assert len(payload["precision_per_class"]) == 3
     assert payload["macro_nll"] == pytest.approx(
-        float(np.mean([negative_log_likelihood(np.array(labels)[np.array(labels) == c], np.array(probs)[np.array(labels) == c]) for c in range(3)]))
+        float(
+            np.mean(
+                [
+                    negative_log_likelihood(
+                        np.array(labels)[np.array(labels) == c],
+                        np.array(probs)[np.array(labels) == c],
+                    )
+                    for c in range(3)
+                ]
+            )
+        )
     )
     assert "quadratic_weighted_kappa" not in payload
     assert "ordinal_mean_absolute_error" not in payload
@@ -114,7 +153,9 @@ def test_temperature_scaling_lowers_synthetic_overconfidence_nll():
     from imbalance_benchmark.analysis.calibration import apply_temperature
 
     raw_nll = negative_log_likelihood(labels, apply_temperature(logits, 1.0))
-    calibrated_nll = negative_log_likelihood(labels, apply_temperature(logits, fit.temperature))
+    calibrated_nll = negative_log_likelihood(
+        labels, apply_temperature(logits, fit.temperature)
+    )
     assert fit.temperature > 1.0
     assert calibrated_nll < raw_nll
 
@@ -131,10 +172,14 @@ def test_target_prior_correction_posthoc_formula():
     logits = np.array([[1.0, 2.0, 3.0]])
     pi_train = np.array([0.5, 0.3, 0.2])
     pi_target = np.array([0.2, 0.3, 0.5])
-    out = apply_target_prior_correction(logits, "post_hoc_logit_adjustment", 1.0, pi_train, pi_target)
+    out = apply_target_prior_correction(
+        logits, "post_hoc_logit_adjustment", 1.0, pi_train, pi_target
+    )
     expected = logits - np.log(pi_train) + np.log(pi_target)
     assert np.allclose(out, expected)
-    balanced = balanced_decision_logits(logits, "post_hoc_logit_adjustment", 0.5, pi_train)
+    balanced = balanced_decision_logits(
+        logits, "post_hoc_logit_adjustment", 0.5, pi_train
+    )
     assert np.allclose(balanced, logits - 0.5 * np.log(pi_train))
 
 
@@ -188,7 +233,13 @@ def _toy_identity(n_patients_per_class: int = 6) -> pd.DataFrame:
         for p in range(n_patients_per_class):
             case_id = f"{cls}_P{p}"
             for s in range(2):
-                rows.append({"case_id": case_id, "slide_id": f"{case_id}_S{s}", "cancer_type": cls})
+                rows.append(
+                    {
+                        "case_id": case_id,
+                        "slide_id": f"{case_id}_S{s}",
+                        "cancer_type": cls,
+                    }
+                )
     return pd.DataFrame(rows)
 
 
@@ -227,8 +278,14 @@ def test_crossed_strata_distinguish_complete_split_by_class_contributions():
 
 def test_bootstrap_preflight_flags_small_kish():
     # A single dominant patient per class should be flagged descriptive-only.
-    rows = [{"case_id": "DOMINANT_A", "slide_id": f"S{i}", "cancer_type": "A"} for i in range(20)]
-    rows += [{"case_id": f"B_P{i}", "slide_id": f"BS{i}", "cancer_type": "B"} for i in range(10)]
+    rows = [
+        {"case_id": "DOMINANT_A", "slide_id": f"S{i}", "cancer_type": "A"}
+        for i in range(20)
+    ]
+    rows += [
+        {"case_id": f"B_P{i}", "slide_id": f"BS{i}", "cancer_type": "B"}
+        for i in range(10)
+    ]
     identity = pd.DataFrame(rows)
     report = bootstrap_preflight(identity, n_replicates=200, seed=0)
     assert report["by_class"]["A"]["is_descriptive_only"] is True
@@ -245,7 +302,9 @@ def test_weighted_balanced_accuracy_matches_unweighted_when_weights_are_one():
 
 def test_seed_resample_gather_averages_correctly():
     per_seed_metric = np.array([[1.0, 2.0], [3.0, 4.0]])  # (n_seeds=2, n_replicates=2)
-    seed_idx = np.array([[0, 0], [1, 1]])  # replicate 0 picks seed0 twice, replicate1 picks seed1 twice
+    seed_idx = np.array(
+        [[0, 0], [1, 1]]
+    )  # replicate 0 picks seed0 twice, replicate1 picks seed1 twice
     out = gather_seed_resampled(per_seed_metric, seed_idx)
     assert np.allclose(out, [1.0, 4.0])
 
@@ -265,7 +324,9 @@ def test_permutation_p_value_is_one_when_predictions_identical():
     labels = np.array([0, 1, 0, 1])
     preds = np.array([0, 1, 0, 1])
     case_ids = np.array(["P0", "P1", "P2", "P3"])
-    p = paired_block_permutation_ba(labels, preds, preds, case_ids, n_classes=2, n_permutations=50)
+    p = paired_block_permutation_ba(
+        labels, preds, preds, case_ids, n_classes=2, n_permutations=50
+    )
     assert p == pytest.approx(1.0)
 
 
@@ -278,7 +339,9 @@ def test_permutation_block_swap_keeps_patient_rows_together():
     case_ids = np.array(["P0", "P0", "P1", "P1"])
     method_preds = np.array([0, 0, 1, 1])
     ce_preds = np.array([1, 1, 0, 0])
-    p = paired_block_permutation_ba(labels, method_preds, ce_preds, case_ids, n_classes=2, n_permutations=50)
+    p = paired_block_permutation_ba(
+        labels, method_preds, ce_preds, case_ids, n_classes=2, n_permutations=50
+    )
     assert 0.0 <= p <= 1.0
 
 
@@ -315,14 +378,19 @@ def test_holm_marks_gated_out_as_not_tested():
     assert by_method["weighted_ce"]["status"] == "tested"
     assert by_method["weighted_ce"]["family"] == "confirmatory"
     assert by_method["cfal"]["family"] == "exploratory"
-    assert by_method["weighted_ce"]["adjusted_p_value"] >= by_method["weighted_ce"]["p_value"]
+    assert (
+        by_method["weighted_ce"]["adjusted_p_value"]
+        >= by_method["weighted_ce"]["p_value"]
+    )
 
 
 # --- separability / effective support -------------------------------------------------
 
 
 def test_effective_support_reduces_to_n_when_icc_zero():
-    assert effective_support(n_c=100, mean_cluster_size=4.0, icc=0.0) == pytest.approx(100.0)
+    assert effective_support(n_c=100, mean_cluster_size=4.0, icc=0.0) == pytest.approx(
+        100.0
+    )
 
 
 def test_effective_support_shrinks_with_high_icc_and_clustering():
@@ -379,7 +447,14 @@ def test_rq3_gate_pass_and_deficit_and_recovery_models_run():
 
 def test_rq3_recovery_model_empty_when_no_gated_cells():
     cells = [
-        {"group": "g", "rho": 1.0, "separability": 0.0, "gate_passed": False, "recovery": 0.0, "recovery_se": 0.01}
+        {
+            "group": "g",
+            "rho": 1.0,
+            "separability": 0.0,
+            "gate_passed": False,
+            "recovery": 0.0,
+            "recovery_se": 0.01,
+        }
     ]
     assert fit_recovery_model(cells) == {}
 
@@ -391,9 +466,36 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
         lambda *_: {"separability": 0.5},
     )
     comparisons = [
-        {"assignment": "native", "severity": "severe", "method": "ce", "gate": "discrimination", "gate_passed": False, "effect": 0.01, "bootstrap_effect": [0.01, 0.02]},
-        {"assignment": "native", "severity": "severe", "method": "ce", "gate": "calibration", "gate_passed": True, "effect": 0.08, "bootstrap_effect": [0.08, 0.09]},
-        {"assignment": "native", "severity": "severe", "method": "weighted_ce", "gate": "calibration", "gate_passed": True, "effect": 0.04, "recovery": 0.5, "bootstrap_effect": [0.04, 0.05], "bootstrap_numerator": [0.04, 0.05], "bootstrap_denominator": [0.08, 0.10]},
+        {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+            "gate_passed": False,
+            "effect": 0.01,
+            "bootstrap_effect": [0.01, 0.02],
+        },
+        {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "calibration",
+            "gate_passed": True,
+            "effect": 0.08,
+            "bootstrap_effect": [0.08, 0.09],
+        },
+        {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "weighted_ce",
+            "gate": "calibration",
+            "gate_passed": True,
+            "effect": 0.04,
+            "recovery": 0.5,
+            "bootstrap_effect": [0.04, 0.05],
+            "bootstrap_numerator": [0.04, 0.05],
+            "bootstrap_denominator": [0.08, 0.10],
+        },
     ]
     freeze = {"assignment_conditions": {"native": {"severe": {"achieved_rho": 100.0}}}}
 
@@ -407,8 +509,21 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
 
 def test_cross_split_rq3_keeps_gate_specific_calibration_outcome():
     rows = [
-        {"assignment": "native", "severity": "severe", "method": "ce", "gate": "calibration", "gate_passed": True},
-        {"assignment": "native", "severity": "severe", "method": "weighted_ce", "gate": "calibration", "bootstrap_numerator": [0.04], "bootstrap_denominator": [0.08]},
+        {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "calibration",
+            "gate_passed": True,
+        },
+        {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "weighted_ce",
+            "gate": "calibration",
+            "bootstrap_numerator": [0.04],
+            "bootstrap_denominator": [0.08],
+        },
     ]
 
     gates, outcomes = _comparison_maps(rows)
@@ -427,14 +542,21 @@ def test_log_scale_prior_prevents_random_effect_scale_collapse():
 
 
 def _write_fake_run(
-    results_root: Path, condition: str, method: str, seed_idx: int, class_names: list[str], seed_offset: int
+    results_root: Path,
+    condition: str,
+    method: str,
+    seed_idx: int,
+    class_names: list[str],
+    seed_offset: int,
 ) -> None:
     rng = np.random.default_rng(seed_offset)
     n = 12
     labels = rng.integers(0, len(class_names), size=n)
     probs = rng.dirichlet(np.ones(len(class_names)), size=n)
     preds = probs.argmax(axis=1)
-    payload = classification_payload(labels.tolist(), preds.tolist(), probs.tolist(), class_names)
+    payload = classification_payload(
+        labels.tolist(), preds.tolist(), probs.tolist(), class_names
+    )
     payload["labels"] = labels.tolist()
     payload["preds"] = preds.tolist()
     payload["probabilities"] = probs.tolist()
@@ -460,7 +582,9 @@ def test_ingest_and_tables_end_to_end(tmp_path: Path):
     for cond in ("balanced", "moderate"):
         for method in ("ce", "weighted_ce"):
             for seed_idx in range(2):
-                _write_fake_run(results_root, cond, method, seed_idx, class_names, seed_idx)
+                _write_fake_run(
+                    results_root, cond, method, seed_idx, class_names, seed_idx
+                )
 
     conn = connect_db(tmp_path / "results.sqlite")
     init_schema(conn)
@@ -470,7 +594,16 @@ def test_ingest_and_tables_end_to_end(tmp_path: Path):
 
         record = read_run_record(result_dir)
         assert record is not None
-        ingest_run(conn, f"patch:{cond}:{method}:seed={seed_idx}", result_dir, cond, method, seed_idx, record, tiers)
+        ingest_run(
+            conn,
+            f"patch:{cond}:{method}:seed={seed_idx}",
+            result_dir,
+            cond,
+            method,
+            seed_idx,
+            record,
+            tiers,
+        )
 
     details = load_eval_details(conn)
     assert len(details) == 2 * 2 * 2 * 2  # conditions x methods x seeds x splits
@@ -529,8 +662,18 @@ def test_load_test_identity_matches_row_order(tmp_path: Path):
 def test_load_mil_test_identity_preserves_bag_dataset_order(tmp_path: Path):
     manifest = pd.DataFrame(
         [
-            {"case_id": "PAT_B", "slide_id": "slide_B", "cancer_type": "B", "split": "test"},
-            {"case_id": "PAT_A", "slide_id": "slide_A", "cancer_type": "A", "split": "test"},
+            {
+                "case_id": "PAT_B",
+                "slide_id": "slide_B",
+                "cancer_type": "B",
+                "split": "test",
+            },
+            {
+                "case_id": "PAT_A",
+                "slide_id": "slide_A",
+                "cancer_type": "A",
+                "split": "test",
+            },
         ]
     )
     manifest_path = tmp_path / "manifest.csv"
@@ -542,19 +685,32 @@ def test_load_mil_test_identity_preserves_bag_dataset_order(tmp_path: Path):
     assert identity["case_id"].tolist() == ["PAT_B", "PAT_A"]
 
 
-def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_path: Path):
+def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(
+    tmp_path: Path,
+):
     paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
     for index, effect in enumerate(([0.02, 0.04], [0.04, 0.08], [0.06, 0.12])):
         ce = {
-            "assignment": "native", "severity": "severe", "method": "ce",
-            "gate": "discrimination", "effect": float(np.mean(effect)),
-            "bootstrap_effect": effect, "gate_passed": True, "p_value": None,
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+            "effect": float(np.mean(effect)),
+            "bootstrap_effect": effect,
+            "gate_passed": True,
+            "p_value": None,
         }
         method = {
-            "assignment": "native", "severity": "severe", "method": "weighted_ce",
-            "gate": "discrimination", "effect": float(np.mean(effect)),
-            "bootstrap_effect": effect, "bootstrap_numerator": effect,
-            "bootstrap_denominator": effect, "gate_passed": True, "p_value": 0.1,
+            "assignment": "native",
+            "severity": "severe",
+            "method": "weighted_ce",
+            "gate": "discrimination",
+            "effect": float(np.mean(effect)),
+            "bootstrap_effect": effect,
+            "bootstrap_numerator": effect,
+            "bootstrap_denominator": effect,
+            "gate_passed": True,
+            "p_value": 0.1,
         }
         write_json(
             split_paths(paths, index)["data"] / "gates_and_recovery.json",
@@ -563,8 +719,12 @@ def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_p
             {"comparisons": [{**method, "method": "balanced_sampling"}, ce]},
         )
     _aggregate_split_comparisons(paths)
-    output = json.loads((paths["data"] / "cross_split_gates_and_recovery.json").read_text())
-    weighted = next(c for c in output["comparisons"] if c["method"] == "balanced_sampling")
+    output = json.loads(
+        (paths["data"] / "cross_split_gates_and_recovery.json").read_text()
+    )
+    weighted = next(
+        c for c in output["comparisons"] if c["method"] == "balanced_sampling"
+    )
     assert weighted["effect"] == pytest.approx(0.06)
     assert weighted["recovery"] == pytest.approx(1.0)
     assert weighted["bootstrap_effect"] == pytest.approx([0.04, 0.08])
@@ -572,16 +732,32 @@ def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_p
     assert weighted["bootstrap_denominator"] == pytest.approx([0.04, 0.08])
 
 
-def test_crossed_bootstrap_reuses_one_patient_weight_across_split_appearances(tmp_path: Path):
+def test_crossed_bootstrap_reuses_one_patient_weight_across_split_appearances(
+    tmp_path: Path,
+):
     paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
     for index in (0, 1):
         manifest = pd.DataFrame(
             [
-                {"case_id": "P0", "slide_id": f"P0_{index}", "cancer_type": "A", "split": "test"},
-                {"case_id": "P1", "slide_id": f"P1_{index}", "cancer_type": "B", "split": "test"},
+                {
+                    "case_id": "P0",
+                    "slide_id": f"P0_{index}",
+                    "cancer_type": "A",
+                    "split": "test",
+                },
+                {
+                    "case_id": "P1",
+                    "slide_id": f"P1_{index}",
+                    "cancer_type": "B",
+                    "split": "test",
+                },
             ]
         )
         manifest.to_csv(split_paths(paths, index)["data"] / "manifest.csv", index=False)
-    first = BootstrapContext(split_paths(paths, 0), is_mil=False, n_replicates=20, seed=4)
-    second = BootstrapContext(split_paths(paths, 1), is_mil=False, n_replicates=20, seed=4)
+    first = BootstrapContext(
+        split_paths(paths, 0), is_mil=False, n_replicates=20, seed=4
+    )
+    second = BootstrapContext(
+        split_paths(paths, 1), is_mil=False, n_replicates=20, seed=4
+    )
     assert np.array_equal(first.row_weights[0], second.row_weights[0])

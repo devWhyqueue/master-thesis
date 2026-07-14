@@ -73,7 +73,9 @@ def test_split_cases_are_case_disjoint() -> None:
             "cancer_type": ["LUAD"] * 6 + ["LUSC"] * 6,
         }
     )
-    assigned = slide_manifest.merge(split_cases(slide_manifest, 0), on="case_id", how="inner")
+    assigned = slide_manifest.merge(
+        split_cases(slide_manifest, 0), on="case_id", how="inner"
+    )
 
     assert_case_disjoint(assigned)
     assert set(assigned["split"]).issubset({"train", "validation", "test"})

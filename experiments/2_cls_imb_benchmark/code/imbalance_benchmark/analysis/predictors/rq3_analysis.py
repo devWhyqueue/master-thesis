@@ -30,11 +30,15 @@ from imbalance_benchmark.analysis.predictors.rq3_features import (
 __all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
 
 
-def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
-    """Return the smallest contributing-patient/slide support in one condition."""
-    key = "n_slides" if is_mil else "n_patients"
+def _min_support(condition: dict[str, Any], key: str) -> float:
+    """Return the smallest class-specific support for one manifest statistic."""
     values = [stats[key] for stats in condition["contribution_stats"].values()]
     return float(min(values)) if values else 1.0
+
+
+def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
+    """Return the smallest contributing-patient/slide support in one condition."""
+    return _min_support(condition, "n_slides" if is_mil else "n_patients")
 
 
 def _covariates(
@@ -65,6 +69,19 @@ def _covariates(
         raise RuntimeError(f"Missing frozen controlled manifest for RQ3: {cond_path}")
     cond_x, cond_y = _feature_frame(cond_path, None, is_mil, class_names, bag_kwargs)
     learnability = condition_learnability(cond_x, cond_y, val_x, val_y, n_classes)
+    covariates = {
+        "separability": float(intrinsic["linear_probe_macro_recall"]),
+        "knn_macro_recall": float(intrinsic["knn_macro_recall"]),
+        "per_class_nn_error": intrinsic["per_class_nn_error"],
+        "learnability": float(learnability["linear_probe_macro_recall"]),
+        "log_min_support": float(np.log(_min_independent_support(condition, is_mil))),
+        "is_wsi": 1.0 if is_mil else 0.0,
+    }
+    if is_mil:
+        covariates["log_min_patient_support"] = float(
+            np.log(_min_support(condition, "n_patients"))
+        )
+        return covariates
     reference_frame = _feature_identity(ref_path, None, is_mil, class_names, bag_kwargs)
     margins = class_margin_cross_fit(
         ref_x, ref_y, reference_frame["case_id"].astype(str).to_numpy(), n_classes
@@ -90,15 +107,8 @@ def _covariates(
                 intraclass_correlation(margins[reference_mask], reference_cases),
             )
         )
-    return {
-        "separability": float(intrinsic["linear_probe_macro_recall"]),
-        "knn_macro_recall": float(intrinsic["knn_macro_recall"]),
-        "per_class_nn_error": intrinsic["per_class_nn_error"],
-        "learnability": float(learnability["linear_probe_macro_recall"]),
-        "log_min_support": float(np.log(_min_independent_support(condition, is_mil))),
-        "log_effective_support": float(np.log(max(1.0, min(effective)))),
-        "is_wsi": 1.0 if is_mil else 0.0,
-    }
+    covariates["log_effective_support"] = float(np.log(max(1.0, min(effective))))
+    return covariates
 
 
 def _standard_error(comparison: dict[str, Any]) -> float:

@@ -10,7 +10,10 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate
-from imbalance_benchmark.modeling.context import set_training_mode
+from imbalance_benchmark.modeling.context import (
+    resolve_update_budget,
+    set_training_mode,
+)
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
@@ -239,11 +242,7 @@ def fit_model(
     set_training_mode(ctx)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     _prepare_training_context(ctx, param, device)
-    budget = (
-        max_steps
-        if max_steps is not None
-        else update_budget(len(ctx["train_dataset"]), b_size)
-    )
+    budget = max_steps if max_steps is not None else resolve_update_budget(ctx, b_size)
     best = _run_training_loop(opt, loader, ctx["val_loader"], ctx, budget, best)
     model.load_state_dict({k: v.to(device) for k, v in best["state"].items()})
     ctx["selected_checkpoint_step"] = best["step"]

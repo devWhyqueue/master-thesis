@@ -25,6 +25,7 @@ __all__ = [
     "get_grid_configs",
     "model_kwargs",
     "build_training_ctx",
+    "resolve_update_budget",
     "set_training_mode",
     "param_counts",
     "cost_payload",
@@ -121,6 +122,7 @@ class Regime:
     method_grids: dict[str, list[dict[str, Any]]] = field(
         default_factory=dict, kw_only=True
     )
+    update_budgets: dict[str, int] = field(default_factory=dict, kw_only=True)
 
 
 def build_training_ctx(
@@ -130,6 +132,7 @@ def build_training_ctx(
     seed: int,
     cfg: dict[str, Any],
     val_loader: torch.utils.data.DataLoader | None = None,
+    update_budget: int | None = None,
 ) -> dict[str, Any]:
     """Build the shared training context for one method/config/seed trial."""
     torch.manual_seed(seed)
@@ -154,7 +157,14 @@ def build_training_ctx(
         "exposed_indices": set(),
         "method_diagnostics": {},
         "processed_examples": 0,
+        **({"update_budget": int(update_budget)} if update_budget is not None else {}),
     }
+
+
+def resolve_update_budget(ctx: dict[str, Any], batch_size: int) -> int:
+    """Use the signed update budget when present, otherwise retain pilot fallback."""
+    fallback = 30 * math.ceil(len(ctx["train_dataset"]) / batch_size)
+    return int(ctx.get("update_budget", fallback))
 
 
 def set_training_mode(ctx: dict[str, Any]) -> None:
@@ -171,6 +181,13 @@ def param_counts(model: torch.nn.Module) -> dict[str, int]:
     return {"total_parameters": int(total), "trainable_parameters": int(trainable)}
 
 
+def _peak_memory(override: int | None) -> int:
+    """Return a measured peak unless a non-training method supplies its exact zero."""
+    if override is not None:
+        return int(override)
+    return int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
+
+
 def cost_payload(
     method: str,
     budget: int,
@@ -180,10 +197,11 @@ def cost_payload(
     exposed_examples: int,
     processed_examples: int,
     training_footprint_parameters: int | None = None,
+    peak_memory_bytes: int | None = None,
 ) -> dict[str, Any]:
     """Build an exact confirmation cost record from the examples actually consumed."""
     updates = updates_for(method, budget)
-    peak = int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
+    peak = _peak_memory(peak_memory_bytes)
     counts = param_counts(model)
     if method == "post_hoc_logit_adjustment":
         counts["trainable_parameters"] = 0

@@ -67,6 +67,7 @@ def _tuning_inputs(
         locked_class_names=list(freeze["class_names"]),
         bag_dataset_kwargs=bag_kwargs or {},
         method_grids=freeze.get("method_grids", {}),
+        update_budgets=freeze.get("update_budgets", {}),
     )
     return paths, regime, val_loader
 
@@ -175,6 +176,9 @@ def _combined_scopes(
                         bag_kwargs=regime.bag_dataset_kwargs,
                     ),
                     cost_records if cost_records is not None else [],
+                    regime.update_budgets.get(
+                        "natural" if condition == "natural" else "controlled"
+                    ),
                 )
             )
     return result

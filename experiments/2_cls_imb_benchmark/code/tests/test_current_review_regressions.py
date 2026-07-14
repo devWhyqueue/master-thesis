@@ -10,12 +10,16 @@ from imbalance_benchmark.analysis.calibration import (
     temperature_scaled_payload,
 )
 from imbalance_benchmark.analysis.inference.bootstrap import _class_preflight
-from imbalance_benchmark.analysis.reporting.clustered_endpoints import clustered_endpoints
+from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
+    clustered_endpoints,
+)
 from imbalance_benchmark.analysis.reporting.plots import (
     allocated_training_support,
     plot_tail_vs_support,
 )
 from imbalance_benchmark.construction import max_shared_total
+
+
 def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -> None:
     rows = [
         {
@@ -65,12 +69,17 @@ def test_reliability_bins_are_averaged_over_seeds_not_probabilities() -> None:
 
 def test_tail_support_plot_uses_frozen_training_allocation() -> None:
     classwise = pd.DataFrame(
-        [{"assignment": "native", "condition": "severe", "class_name": "A", "support": 99}]
+        [
+            {
+                "assignment": "native",
+                "condition": "severe",
+                "class_name": "A",
+                "support": 99,
+            }
+        ]
     )
     freeze = {
-        "assignment_conditions": {
-            "native": {"severe": {"allocated_counts": {"A": 7}}}
-        }
+        "assignment_conditions": {"native": {"severe": {"allocated_counts": {"A": 7}}}}
     }
 
     assert allocated_training_support(classwise, freeze).tolist() == [7]
@@ -81,18 +90,36 @@ def test_tail_support_plot_excludes_conditions_without_a_frozen_tier(
 ) -> None:
     classwise = pd.DataFrame(
         [
-            {"assignment": "native", "condition": "natural", "class_name": "A", "tier": None, "support": 99, "recall": 0.5},
-            {"assignment": "native", "condition": "severe", "class_name": "A", "tier": "tail", "support": 99, "recall": 0.5},
+            {
+                "assignment": "native",
+                "condition": "natural",
+                "class_name": "A",
+                "tier": None,
+                "support": 99,
+                "recall": 0.5,
+            },
+            {
+                "assignment": "native",
+                "condition": "severe",
+                "class_name": "A",
+                "tier": "tail",
+                "support": 99,
+                "recall": 0.5,
+            },
         ]
     )
-    freeze = {"assignment_conditions": {"native": {"severe": {"allocated_counts": {"A": 7}}}}}
+    freeze = {
+        "assignment_conditions": {"native": {"severe": {"allocated_counts": {"A": 7}}}}
+    }
 
     plot_tail_vs_support(classwise, freeze, tmp_path / "tail.png")
 
     assert (tmp_path / "tail.png").exists()
 
 
-def test_cluster_macro_balanced_accuracy_is_macro_recall_after_cluster_aggregation() -> None:
+def test_cluster_macro_balanced_accuracy_is_macro_recall_after_cluster_aggregation() -> (
+    None
+):
     labels = np.array([0, 0, 1])
     predictions = np.array([0, 0, 0])
     probabilities = np.eye(2)[predictions]

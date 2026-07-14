@@ -15,13 +15,13 @@ from imbalance_benchmark.modeling.evaluation import (
     _RecordingSampler,
 )
 from imbalance_benchmark.modeling.models import DualExpertMil
+from imbalance_benchmark.modeling.context import resolve_update_budget
 from imbalance_benchmark.modeling.oko import fit_oko
 from imbalance_benchmark.modeling.training import (
     CHECKPOINT_INTERVAL,
     fit_model,
     get_balanced_sampler,
     resolve_batch_size,
-    update_budget,
 )
 from imbalance_benchmark.modeling.workflows.multistage import fit_crt, fit_rankmix
 
@@ -134,7 +134,7 @@ def fit_mde(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     device = ctx["device"]
     model = cast(DualExpertMil, ctx["model"])
     b_size = resolve_batch_size(ctx["config"], True)
-    budget = update_budget(len(ctx["train_dataset"]), b_size)
+    budget = resolve_update_budget(ctx, b_size)
     lr = ctx["param_config"]["lr"]
     lambda_con = float(ctx["param_config"].get("parameter", 0.0))
     loader_u, loader_b = _build_mde_loaders(

@@ -33,20 +33,30 @@ from imbalance_benchmark.manifest.pilot import (
 def _patches(class_name: str, n_patients: int = 20) -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "case_id": [f"{class_name}_patient_{patient}" for patient in range(n_patients) for _ in range(10)],
+            "case_id": [
+                f"{class_name}_patient_{patient}"
+                for patient in range(n_patients)
+                for _ in range(10)
+            ],
             "slide_id": [
                 f"{class_name}_patient_{patient}_slide_{patch % 2}"
                 for patient in range(n_patients)
                 for patch in range(10)
             ],
-            "patch_id": [f"{class_name}_{patient}_{patch}" for patient in range(n_patients) for patch in range(10)],
+            "patch_id": [
+                f"{class_name}_{patient}_{patch}"
+                for patient in range(n_patients)
+                for patch in range(10)
+            ],
             "cancer_type": class_name,
             "split": "train",
         }
     )
 
 
-def test_asymmetric_availability_keeps_the_largest_approximately_balanced_total() -> None:
+def test_asymmetric_availability_keeps_the_largest_approximately_balanced_total() -> (
+    None
+):
     available = [1000, 500, 200]
 
     total = max_shared_total(available, min_support=20)
@@ -57,7 +67,9 @@ def test_asymmetric_availability_keeps_the_largest_approximately_balanced_total(
     assert 1.0 < rho < 100.0
     assert sum(allocation) == total
     assert min(allocation) >= 20
-    assert all(count <= capacity for count, capacity in zip(allocation, available, strict=True))
+    assert all(
+        count <= capacity for count, capacity in zip(allocation, available, strict=True)
+    )
 
 
 def test_evidence_seed_is_stable_when_a_semantic_class_changes_tail_rank(
@@ -70,11 +82,17 @@ def test_evidence_seed_is_stable_when_a_semantic_class_changes_tail_rank(
         observed.append((str(df["cancer_type"].iloc[0]), seed))
         return df.iloc[:n]
 
-    monkeypatch.setattr("imbalance_benchmark.manifest.freezing.select_patches_round_robin", selector)
-    _build_conditions(frame, ["A", "B"], 100, 20, False, 17, tmp_path, condition_names=("moderate",))
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.freezing.select_patches_round_robin", selector
+    )
+    _build_conditions(
+        frame, ["A", "B"], 100, 20, False, 17, tmp_path, condition_names=("moderate",)
+    )
     first = dict(observed)
     observed.clear()
-    _build_conditions(frame, ["B", "A"], 100, 20, False, 17, tmp_path, condition_names=("moderate",))
+    _build_conditions(
+        frame, ["B", "A"], 100, 20, False, 17, tmp_path, condition_names=("moderate",)
+    )
 
     assert dict(observed) == first
 
@@ -84,8 +102,14 @@ def test_patch_conditions_record_one_fixed_patient_slide_pool(tmp_path: Path) ->
 
     conditions = _build_conditions(frame, ["A", "B"], 80, 20, False, 8, tmp_path)
 
-    assert conditions["balanced"]["evidence_pool_hash"] == conditions["moderate"]["evidence_pool_hash"]
-    assert conditions["moderate"]["evidence_pool_hash"] == conditions["severe"]["evidence_pool_hash"]
+    assert (
+        conditions["balanced"]["evidence_pool_hash"]
+        == conditions["moderate"]["evidence_pool_hash"]
+    )
+    assert (
+        conditions["moderate"]["evidence_pool_hash"]
+        == conditions["severe"]["evidence_pool_hash"]
+    )
 
 
 def test_smaller_patch_allocation_is_a_nested_subset_of_the_larger_pool() -> None:
@@ -95,7 +119,9 @@ def test_smaller_patch_allocation_is_a_nested_subset_of_the_larger_pool() -> Non
     prefix of the larger one: its patients and slides are subsets and patient
     diversity is preserved, rather than concentrating into a few units.
     """
-    df_class = _patches("A", n_patients=20)  # 20 patients, 2 slides each, 10 patches each
+    df_class = _patches(
+        "A", n_patients=20
+    )  # 20 patients, 2 slides each, 10 patches each
 
     small = select_patches_round_robin(df_class, 20, seed=5)
     large = select_patches_round_robin(df_class, 40, seed=5)
@@ -115,9 +141,7 @@ def test_patch_conditions_use_the_same_designated_patient_and_slide_pools(
     """Controlled patch conditions must retain one explicit, identical evidence pool."""
     frame = pd.concat([_patches("A", 30), _patches("B", 30)], ignore_index=True)
 
-    conditions = _build_conditions(
-        frame, ["A", "B"], 80, 20, False, 4, tmp_path
-    )
+    conditions = _build_conditions(frame, ["A", "B"], 80, 20, False, 4, tmp_path)
     pools = {
         name: pd.read_csv(info["path"])
         .groupby("cancer_type")[["case_id", "slide_id"]]
@@ -411,9 +435,15 @@ def test_missing_confirmation_method_is_not_silently_skipped(tmp_path: Path) -> 
 
 
 def test_method_floor_requires_patients_and_slides_together() -> None:
-    assert not meets_method_floor({"patients": 9, "slides": 100}, patient_equals_slide=False)
-    assert not meets_method_floor({"patients": 100, "slides": 19}, patient_equals_slide=False)
-    assert meets_method_floor({"patients": 10, "slides": 20}, patient_equals_slide=False)
+    assert not meets_method_floor(
+        {"patients": 9, "slides": 100}, patient_equals_slide=False
+    )
+    assert not meets_method_floor(
+        {"patients": 100, "slides": 19}, patient_equals_slide=False
+    )
+    assert meets_method_floor(
+        {"patients": 10, "slides": 20}, patient_equals_slide=False
+    )
 
 
 def test_preflight_is_descriptive_when_any_split_class_fails_kish_threshold() -> None:
@@ -451,7 +481,9 @@ def test_descriptive_only_cell_never_opens_a_gate_or_permutes() -> None:
     """A preflight descriptive-only cell must skip gates and permutation p-values."""
     from imbalance_benchmark.analysis.aggregate import _apply_gates
 
-    def fake_p_value(entry, base_paths, config, seed):  # pragma: no cover - must not run
+    def fake_p_value(
+        entry, base_paths, config, seed
+    ):  # pragma: no cover - must not run
         raise AssertionError("descriptive-only cells must not be permutation tested")
 
     descriptive = [_ce_gate_entry(descriptive_only=True)]
@@ -487,7 +519,10 @@ def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
 def test_freeze_metadata_is_content_locked(tmp_path: Path) -> None:
     """Changing a frozen design field must be detected even without a CSV edit."""
     from imbalance_benchmark.common import write_json
-    from imbalance_benchmark.manifest.freeze import lock_manifest_freeze, verify_manifest_freeze
+    from imbalance_benchmark.manifest.freeze import (
+        lock_manifest_freeze,
+        verify_manifest_freeze,
+    )
 
     freeze_path = tmp_path / "manifest_freeze.json"
     write_json(freeze_path, {"shared_T": 100, "conditions": {}})
@@ -500,10 +535,24 @@ def test_freeze_metadata_is_content_locked(tmp_path: Path) -> None:
 
 
 def test_test_prediction_hash_is_prediction_sensitive() -> None:
-    from imbalance_benchmark.modeling.workflows.confirmation import _test_prediction_hash
+    from imbalance_benchmark.modeling.workflows.confirmation import (
+        _test_prediction_hash,
+    )
 
-    base = {"test": {"labels": [0, 1], "preds": [0, 1], "probabilities": [[0.9, 0.1], [0.2, 0.8]]}}
-    flipped = {"test": {"labels": [0, 1], "preds": [1, 0], "probabilities": [[0.9, 0.1], [0.2, 0.8]]}}
+    base = {
+        "test": {
+            "labels": [0, 1],
+            "preds": [0, 1],
+            "probabilities": [[0.9, 0.1], [0.2, 0.8]],
+        }
+    }
+    flipped = {
+        "test": {
+            "labels": [0, 1],
+            "preds": [1, 0],
+            "probabilities": [[0.9, 0.1], [0.2, 0.8]],
+        }
+    }
 
     assert _test_prediction_hash(base) == _test_prediction_hash(base)
     assert _test_prediction_hash(base) != _test_prediction_hash(flipped)
@@ -711,7 +760,7 @@ def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) 
                     "gate": "discrimination",
                     "gate_passed": True,
                     "bootstrap_effect": [0.1, 0.2, 0.3],
-                }
+                },
             ]
         },
     )
@@ -759,7 +808,13 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     ]
     freeze = {
         "assignment_conditions": {
-            "native": {"severe": {"achieved_rho": 10.0, "contribution_stats": {}, "path": str(tmp_path / "x.csv")}}
+            "native": {
+                "severe": {
+                    "achieved_rho": 10.0,
+                    "contribution_stats": {},
+                    "path": str(tmp_path / "x.csv"),
+                }
+            }
         }
     }
 
@@ -828,7 +883,7 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
                     "gate_passed": True,
                     "bootstrap_numerator": [1.0, 4.0],
                     "bootstrap_denominator": [2.0, 2.0],
-                }
+                },
             ]
         },
     )
@@ -840,7 +895,9 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
     assert cells[0]["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
 
-def test_balanced_predictions_use_one_unassigned_result_directory(tmp_path: Path) -> None:
+def test_balanced_predictions_use_one_unassigned_result_directory(
+    tmp_path: Path,
+) -> None:
     """Assignment-specific analyses reuse one balanced record rather than copies."""
     paths = {"results": tmp_path / "results"}
     balanced = paths["results"] / "assignment=unassigned" / "balanced" / "ce"
@@ -862,15 +919,17 @@ def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None
         (labels, methods, ce, np.array([f"b{index}" for index in range(6)])),
     ]
 
-    p_value = crossed_block_permutation_tail_nll(blocks, [[2], [1]], n_permutations=32, seed=3)
+    p_value = crossed_block_permutation_tail_nll(
+        blocks, [[2], [1]], n_permutations=32, seed=3
+    )
 
     assert 0.0 <= p_value <= 1.0
 
 
-def test_mil_covariates_use_the_dataset_slide_identity_not_raw_chunk_rows(
+def test_mil_covariates_exclude_patch_effective_support(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A slide represented by feature chunks still contributes one MIL identity row."""
+    """Effective support is a patch-only sensitivity covariate."""
     from imbalance_benchmark.analysis.predictors.rq3_analysis import _covariates
 
     manifest = tmp_path / "manifest.csv"
@@ -893,7 +952,11 @@ def test_mil_covariates_use_the_dataset_slide_identity_not_raw_chunk_rows(
     )
     monkeypatch.setattr(
         "imbalance_benchmark.analysis.predictors.rq3_analysis.intrinsic_separability",
-        lambda *_: {"linear_probe_macro_recall": 0.5, "knn_macro_recall": 0.5, "per_class_nn_error": {}},
+        lambda *_: {
+            "linear_probe_macro_recall": 0.5,
+            "knn_macro_recall": 0.5,
+            "per_class_nn_error": {},
+        },
     )
     monkeypatch.setattr(
         "imbalance_benchmark.analysis.predictors.rq3_analysis.condition_learnability",
@@ -908,7 +971,7 @@ def test_mil_covariates_use_the_dataset_slide_identity_not_raw_chunk_rows(
         {"data": tmp_path}, True, {"path": str(condition), "contribution_stats": {}}
     )
 
-    assert np.isfinite(result["log_effective_support"])
+    assert "log_effective_support" not in result
 
 
 def test_freeze_verifies_pilot_and_prepared_manifest_artifacts(tmp_path: Path) -> None:
@@ -924,7 +987,10 @@ def test_freeze_verifies_pilot_and_prepared_manifest_artifacts(tmp_path: Path) -
     meta = {
         "content_sha256": "",
         "pilot_report": {"path": str(pilot), "sha256": compute_sha256(pilot)},
-        "prepared_manifest": {"path": str(manifest), "sha256": compute_sha256(manifest)},
+        "prepared_manifest": {
+            "path": str(manifest),
+            "sha256": compute_sha256(manifest),
+        },
     }
     from imbalance_benchmark.manifest.freeze import lock_manifest_freeze
 

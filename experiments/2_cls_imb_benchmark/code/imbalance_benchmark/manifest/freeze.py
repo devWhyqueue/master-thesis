@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
 
@@ -13,37 +13,21 @@ from imbalance_benchmark.common import (
     verify_signed_file,
 )
 from imbalance_benchmark.construction import build_manifest_hash
+from imbalance_benchmark.manifest.statistics import (
+    achieved_rho,
+    normalized_entropy,
+    support_statistics,
+)
 
 __all__ = [
     "normalized_entropy",
     "achieved_rho",
+    "support_statistics",
     "contribution_stats",
     "build_tail_assignments",
     "lock_manifest_freeze",
     "verify_manifest_freeze",
 ]
-
-ClassKey = TypeVar("ClassKey", str, int)
-
-
-def normalized_entropy(counts: list[int]) -> float:
-    """Compute the report's inverted normalized entropy, 1 - H/log(K) (Eq. 2)."""
-    k = len(counts)
-    total = sum(counts)
-    if k <= 1 or total <= 0:
-        return 0.0
-    p = np.asarray(counts, dtype=float) / total
-    p = p[p > 0]
-    h = float(-(p * np.log(p)).sum())
-    return 1.0 - h / np.log(k)
-
-
-def achieved_rho(counts: Mapping[ClassKey, int]) -> float:
-    """Compute the realized head/tail imbalance ratio from per-class counts."""
-    values = [c for c in counts.values() if c > 0]
-    if not values:
-        return 1.0
-    return max(values) / min(values)
 
 
 def _class_contribution_stats(
@@ -211,15 +195,18 @@ def write_condition(
     path = data_dir / f"manifest_{stem or name}.csv"
     condition.to_csv(path, index=False)
     limited, binding = _get_constraints(name, allocated, available, minimum)
+    statistics = support_statistics(condition)
+    primary = statistics["slide" if is_mil else "patch"]
     return {
         "path": str(path),
         "sha256": compute_sha256(path),
         "requested_rho": {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}.get(
             name, 1.0
         ),
-        "achieved_rho": achieved_rho(allocated),
-        "normalized_entropy": normalized_entropy(list(allocated.values())),
-        "allocated_counts": allocated,
+        "achieved_rho": primary["achieved_rho"],
+        "normalized_entropy": primary["normalized_entropy"],
+        "allocated_counts": primary["counts"],
+        "support_statistics": statistics,
         "manifest_hash": build_manifest_hash(condition),
         "contribution_stats": contribution_stats(condition, pool, is_mil),
         "construction_seed": seed,

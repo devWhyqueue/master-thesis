@@ -26,13 +26,16 @@ from imbalance_benchmark.analysis.metrics import (
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
-from imbalance_benchmark.common import write_run_record
-from imbalance_benchmark.modeling.context import Regime, cost_payload
+from imbalance_benchmark.common import REPO_ROOT, compute_sha256, write_run_record
+from imbalance_benchmark.modeling.context import (
+    Regime,
+    cost_payload,
+    resolve_update_budget,
+)
 from imbalance_benchmark.modeling.training import (
     class_priors,
     resolve_batch_size,
     run_evaluation,
-    update_budget,
 )
 
 
@@ -72,6 +75,7 @@ def _test_prediction_hash(splits: dict[str, Any]) -> str:
 
 def _environment_payload() -> dict[str, Any]:
     """Capture the executable environment required to reproduce a confirmation run."""
+    lock_path = REPO_ROOT / "uv.lock"
     return {
         "python": sys.version,
         "platform": platform.platform(),
@@ -79,6 +83,10 @@ def _environment_payload() -> dict[str, Any]:
         "cuda_available": torch.cuda.is_available(),
         "cuda_version": torch.version.cuda,
         "device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
+        "dependency_lock": {
+            "path": "uv.lock",
+            "sha256": compute_sha256(lock_path) if lock_path.is_file() else None,
+        },
     }
 
 
@@ -181,7 +189,7 @@ def _run_and_record(
         )
     _attach_temperature_scaled_test_outputs(splits)
     b_size = resolve_batch_size(run.config, run.is_mil)
-    budget = update_budget(len(ctx["train_dataset"]), b_size)
+    budget = resolve_update_budget(ctx, b_size)
     write_run_record(
         run.paths["results"]
         / f"assignment={run.assignment}"
@@ -210,6 +218,7 @@ def _run_and_record(
                 len(ctx.get("exposed_indices", set())),
                 int(ctx.get("processed_examples", 0)),
                 ctx.get("training_footprint_parameters"),
+                ctx.get("peak_memory_bytes"),
             ),
             "method_diagnostics": ctx.get("method_diagnostics", {}),
             "environment": _environment_payload(),

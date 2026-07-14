@@ -20,7 +20,10 @@ from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     _select_trainable,
     summarize_tuning_cost,
 )
-from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_method
+from imbalance_benchmark.modeling.workflows.confirmation import (
+    RunContext,
+    confirm_method,
+)
 
 
 def test_train_time_logit_adjustment_confirmation_preserves_selected_tau(
@@ -77,11 +80,14 @@ def test_pilot_training_receives_the_configured_wsi_evidence_controls(
     monkeypatch.setattr(
         "imbalance_benchmark.manifest.pilot_training.BagFeatureDataset", Dataset
     )
+
     def fit_model(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
         observed["context"] = ctx
         return {}, 0.5
 
-    monkeypatch.setattr("imbalance_benchmark.manifest.pilot_training.fit_model", fit_model)
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot_training.fit_model", fit_model
+    )
 
     fit_pilot_model(
         tmp_path / "pilot.csv",
@@ -113,7 +119,9 @@ def test_bracs_wsi_is_rejected_when_only_annotated_rois_are_available(
     )
 
     with pytest.raises(ValueError, match="annotated ROI"):
-        dataset_adapters._build_bracs({"dataset": {"root": str(tmp_path), "regime": "wsi"}})
+        dataset_adapters._build_bracs(
+            {"dataset": {"root": str(tmp_path), "regime": "wsi"}}
+        )
 
 
 def test_camelyon16_wsi_rows_do_not_require_or_read_a_mask(
@@ -163,7 +171,9 @@ def test_tuning_uses_the_frozen_candidate_grid(
     )
     scope = TuningScope(regime, object(), object())
 
-    def evaluate(_: str, cfg: dict[str, Any], *__: object) -> tuple[dict[str, Any], dict[str, float]]:
+    def evaluate(
+        _: str, cfg: dict[str, Any], *__: object
+    ) -> tuple[dict[str, Any], dict[str, float]]:
         observed.append(cfg)
         return {}, {"balanced_accuracy": 0.5, "macro_f1": 0.5, "nll": 0.5}
 
@@ -249,6 +259,7 @@ def test_tuning_cost_summarizes_parameter_counts_and_effective_passes() -> None:
                 "processed_examples": 12,
                 "unique_training_examples": 6,
                 "total_parameters": 10,
+                "trainable_parameters": 8,
                 "training_footprint_parameters": 20,
             }
         ]
@@ -256,4 +267,5 @@ def test_tuning_cost_summarizes_parameter_counts_and_effective_passes() -> None:
 
     assert cost["effective_passes_through_unique_examples"] == 2.0
     assert cost["maximum_total_parameters"] == 10
+    assert cost["maximum_trainable_parameters"] == 8
     assert cost["maximum_training_footprint_parameters"] == 20

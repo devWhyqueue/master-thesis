@@ -17,6 +17,7 @@ from imbalance_benchmark.manifest.freeze import (
     normalized_entropy,
     verify_manifest_freeze,
 )
+from imbalance_benchmark.manifest.construction_helpers import write_natural_condition
 from imbalance_benchmark.manifest.pilot import (
     build_patch_pilot_manifest,
     compute_pilot_quota,
@@ -29,7 +30,9 @@ from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.commands.freeze import _build_conditions
 
 
-def _patch_frame(n_patients: int, slides_per_patient: int, patches_per_slide: int) -> pd.DataFrame:
+def _patch_frame(
+    n_patients: int, slides_per_patient: int, patches_per_slide: int
+) -> pd.DataFrame:
     rows = []
     for p in range(n_patients):
         for s in range(slides_per_patient):
@@ -68,7 +71,9 @@ def test_validate_split_leakage_passes_when_disjoint():
 
 def test_patient_equals_slide_detection():
     one_to_one = pd.DataFrame({"case_id": ["A", "B"], "slide_id": ["A", "B"]})
-    one_to_many = pd.DataFrame({"case_id": ["A", "A", "B"], "slide_id": ["A1", "A2", "B1"]})
+    one_to_many = pd.DataFrame(
+        {"case_id": ["A", "A", "B"], "slide_id": ["A1", "A2", "B1"]}
+    )
     assert patient_equals_slide(one_to_one)
     assert not patient_equals_slide(one_to_many)
 
@@ -162,6 +167,24 @@ def test_contribution_stats_reports_pool_fraction():
     assert stats["class_A"]["n_patches"] == 20
 
 
+def test_natural_mil_statistics_are_reported_at_slide_and_patch_levels(tmp_path):
+    """WSI anchors count allocated support by slides while retaining patch statistics."""
+    rows = pd.DataFrame(
+        [
+            {"case_id": "p1", "slide_id": "s1", "cancer_type": "A"},
+            {"case_id": "p1", "slide_id": "s1", "cancer_type": "A"},
+            {"case_id": "p2", "slide_id": "s2", "cancer_type": "A"},
+            {"case_id": "p3", "slide_id": "s3", "cancer_type": "B"},
+        ]
+    )
+
+    natural = write_natural_condition(rows, tmp_path, is_mil=True)
+
+    assert natural["allocated_counts"] == {"A": 2, "B": 1}
+    assert natural["support_statistics"]["patch"]["counts"] == {"A": 3, "B": 1}
+    assert natural["support_statistics"]["slide"]["counts"] == {"A": 2, "B": 1}
+
+
 def test_patch_conditions_respect_caps_at_each_condition_size(tmp_path):
     pool = pd.concat(
         [
@@ -180,8 +203,12 @@ def test_patch_conditions_respect_caps_at_each_condition_size(tmp_path):
         frame = pd.read_csv(condition["path"])
         for cls, n_patches in condition["allocated_counts"].items():
             rows = frame[frame["cancer_type"] == cls]
-            assert pd.Series(rows["case_id"]).value_counts().max() <= int(n_patches * 0.10)
-            assert pd.Series(rows["slide_id"]).value_counts().max() <= int(n_patches * 0.05)
+            assert pd.Series(rows["case_id"]).value_counts().max() <= int(
+                n_patches * 0.10
+            )
+            assert pd.Series(rows["slide_id"]).value_counts().max() <= int(
+                n_patches * 0.05
+            )
 
 
 def test_verify_manifest_freeze_detects_tampering(tmp_path):
@@ -189,7 +216,9 @@ def test_verify_manifest_freeze_detects_tampering(tmp_path):
     pd.DataFrame({"a": [1, 2, 3]}).to_csv(path, index=False)
     from imbalance_benchmark.common import compute_sha256
 
-    meta = {"conditions": {"balanced": {"path": str(path), "sha256": compute_sha256(path)}}}
+    meta = {
+        "conditions": {"balanced": {"path": str(path), "sha256": compute_sha256(path)}}
+    }
     verify_manifest_freeze(meta)  # must not raise
     pd.DataFrame({"a": [1, 2, 999]}).to_csv(path, index=False)
     with pytest.raises(RuntimeError, match="balanced"):
@@ -203,7 +232,9 @@ def test_derive_seed_keeps_families_disjoint_and_deterministic():
     assert len(set(pilot_seeds)) == 3
     assert definitive_seed not in pilot_seeds
     assert derive_seed(base, "patient_split") != derive_seed(base, "assignment")
-    assert derive_seed(base, "pilot_construction_0") == derive_seed(base, "pilot_construction_0")
+    assert derive_seed(base, "pilot_construction_0") == derive_seed(
+        base, "pilot_construction_0"
+    )
     with pytest.raises(ValueError):
         derive_seed(base, "not_a_real_role")
 

@@ -10,7 +10,9 @@ import pytest
 import torch
 import yaml
 
-from imbalance_benchmark.analysis.inference.permutation import paired_block_permutation_ba
+from imbalance_benchmark.analysis.inference.permutation import (
+    paired_block_permutation_ba,
+)
 from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.prepare import cmd_prepare
@@ -33,7 +35,9 @@ def test_shared_total_keeps_all_naturally_balanced_support() -> None:
         assert all(count <= support for count, support in zip(allocation, available))
 
 
-def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_one() -> None:
+def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_one() -> (
+    None
+):
     frame = pd.DataFrame(
         [
             {
@@ -85,15 +89,27 @@ def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:
     assert total == 60
 
 
-def test_bag_dataset_concatenates_all_feature_chunks_before_capping(tmp_path: Path) -> None:
+def test_bag_dataset_concatenates_all_feature_chunks_before_capping(
+    tmp_path: Path,
+) -> None:
     first, second = tmp_path / "first.pt", tmp_path / "second.pt"
     torch.save(torch.ones(3, 4), first)
     torch.save(torch.full((4, 4), 2.0), second)
     manifest = tmp_path / "manifest.csv"
     pd.DataFrame(
         [
-            {"case_id": "case", "slide_id": "slide", "cancer_type": "A", "feature_path": first},
-            {"case_id": "case", "slide_id": "slide", "cancer_type": "A", "feature_path": second},
+            {
+                "case_id": "case",
+                "slide_id": "slide",
+                "cancer_type": "A",
+                "feature_path": first,
+            },
+            {
+                "case_id": "case",
+                "slide_id": "slide",
+                "cancer_type": "A",
+                "feature_path": second,
+            },
         ]
     ).to_csv(manifest, index=False)
 
@@ -124,17 +140,24 @@ def test_confirmation_training_context_receives_the_validation_loader(
 
     def fake_context(*args: object) -> dict[str, object]:
         seen.append(args[-1])
-        return {"model": torch.nn.Linear(1, 1), "train_dataset": [0], "seed": 7, "param_config": {}}
+        return {
+            "model": torch.nn.Linear(1, 1),
+            "train_dataset": [0],
+            "seed": 7,
+            "param_config": {},
+        }
 
     monkeypatch.setattr(
-        "imbalance_benchmark.modeling.workflows.confirmation.build_training_ctx", fake_context
+        "imbalance_benchmark.modeling.workflows.confirmation.build_training_ctx",
+        fake_context,
     )
     monkeypatch.setattr(
         "imbalance_benchmark.modeling.workflows.confirmation._timed_fit",
         lambda _fit, _ctx: ({}, 0.0),
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.modeling.workflows.confirmation._run_and_record", lambda *args: None
+        "imbalance_benchmark.modeling.workflows.confirmation._run_and_record",
+        lambda *args: None,
     )
 
     confirm_ce("balanced", {"lr": 1e-3}, object(), run)  # type: ignore[arg-type]
@@ -153,7 +176,9 @@ def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -
         pd.read_csv(tmp_path / "outputs" / f"split={index}" / "data" / "manifest.csv")
         for index in range(3)
     ]
-    assert all(set(frame["split"]) == {"train", "validation", "test"} for frame in manifests)
+    assert all(
+        set(frame["split"]) == {"train", "validation", "test"} for frame in manifests
+    )
     assert any(
         not manifests[0][["case_id", "split"]].equals(frame[["case_id", "split"]])
         for frame in manifests[1:]
@@ -166,13 +191,13 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "paths": {"outputs": str(tmp_path / "outputs")},
-                    "dataset": {
-                        "name": "synthetic",
-                        "regime": "patch",
-                        "target": "synthetic_target",
-                        "version": "test-fixture-v1",
-                        "eligibility_rules": {"fixture": True},
-                    },
+                "dataset": {
+                    "name": "synthetic",
+                    "regime": "patch",
+                    "target": "synthetic_target",
+                    "version": "test-fixture-v1",
+                    "eligibility_rules": {"fixture": True},
+                },
                 "analysis": {"bootstrap_replicates": 2},
             }
         ),

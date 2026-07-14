@@ -130,6 +130,7 @@ def _confirm_inputs(
         "paths": paths,
         "seeds": seeds,
         "bag_dataset_kwargs": bag_kwargs or {},
+        "update_budgets": freeze["update_budgets"],
     }
     return best_configs, run_data, freeze
 

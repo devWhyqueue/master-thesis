@@ -14,7 +14,7 @@ from imbalance_benchmark.datasets.data import (
 )
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
-from imbalance_benchmark.manifest.floors import (
+from imbalance_benchmark.manifest.pilot_training import (
     meets_method_floor,
     method_floor,
     stability_floor_from_curve,

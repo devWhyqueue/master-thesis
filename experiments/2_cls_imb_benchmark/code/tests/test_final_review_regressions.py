@@ -148,6 +148,56 @@ def test_rq3_effective_support_uses_condition_support(
     assert result["log_effective_support"] == pytest.approx(0.0)
 
 
+def test_rq3_wsi_records_patient_support_without_patch_effective_support(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """WSI RQ3 uses slide support plus patient support, never patch sensitivity."""
+    balanced = tmp_path / "manifest_balanced.csv"
+    condition = tmp_path / "manifest_native_severe.csv"
+    validation = tmp_path / "manifest.csv"
+    for path in (balanced, condition, validation):
+        path.write_text("placeholder", encoding="utf-8")
+    features = np.array([[1.0], [2.0], [3.0], [4.0]])
+    labels = np.array([0, 0, 1, 1])
+    monkeypatch.setattr(rq3_analysis, "_feature_frame", lambda *_: (features, labels))
+    monkeypatch.setattr(
+        rq3_analysis,
+        "intrinsic_separability",
+        lambda *_: {
+            "linear_probe_macro_recall": 0.5,
+            "knn_macro_recall": 0.5,
+            "per_class_nn_error": {},
+        },
+    )
+    monkeypatch.setattr(
+        rq3_analysis,
+        "condition_learnability",
+        lambda *_: {"linear_probe_macro_recall": 0.5},
+    )
+    monkeypatch.setattr(
+        rq3_analysis,
+        "_feature_identity",
+        lambda *_: (_ for _ in ()).throw(AssertionError("WSI must not compute N_eff")),
+    )
+
+    result = rq3_analysis._covariates(
+        {"data": tmp_path},
+        True,
+        {
+            "path": str(condition),
+            "contribution_stats": {
+                "A": {"n_slides": 4, "n_patients": 2},
+                "B": {"n_slides": 6, "n_patients": 3},
+            },
+        },
+        {"class_names": ["A", "B"]},
+    )
+
+    assert result["log_min_support"] == pytest.approx(np.log(4))
+    assert result["log_min_patient_support"] == pytest.approx(np.log(2))
+    assert "log_effective_support" not in result
+
+
 def test_tuning_rejects_a_single_split_as_a_definitive_selection() -> None:
     args = argparse.Namespace(split_index=0, config=None, seed=0)
 

@@ -13,7 +13,9 @@ from imbalance_benchmark.datasets.camelyon16 import (
 
 def test_camelyon16_patch_labels_decode_column_major_cells() -> None:
     mask = np.zeros((CELL * 2, CELL * 2), dtype=np.uint8)
-    mask[0:CELL, 0:CELL] = 2  # row=0, col=0 -> patch_id 0 (n_rows=2: col,row=divmod(0,2)=(0,0))
+    mask[0:CELL, 0:CELL] = (
+        2  # row=0, col=0 -> patch_id 0 (n_rows=2: col,row=divmod(0,2)=(0,0))
+    )
     mask[CELL:, CELL:] = 2  # row=1, col=1 -> patch_id = col*n_rows + row = 1*2+1 = 3
 
     labels = patch_labels(mask, [0, 1, 2, 3])

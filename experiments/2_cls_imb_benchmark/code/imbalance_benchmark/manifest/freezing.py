@@ -132,7 +132,7 @@ def _build_conditions(
             name,
             dict(zip(classes, allocated)),
             rows,
-            pool_df,
+            train_df,
             is_mil,
             seed,
             data_dir,

@@ -25,6 +25,7 @@ class TuningScope:
     val_loader: torch.utils.data.DataLoader
     train_ds: TrainDataset
     cost_records: list[dict[str, int]] = field(default_factory=list)
+    update_budget: int | None = None
 
 
 def _frozen_grid(regime: Regime, method: str) -> list[dict[str, Any]]:
@@ -44,6 +45,9 @@ def summarize_tuning_cost(cost_records: list[dict[str, int]]) -> dict[str, float
         "effective_passes_through_unique_examples": processed / max(unique, 1),
         "maximum_total_parameters": max(
             (record["total_parameters"] for record in cost_records), default=0
+        ),
+        "maximum_trainable_parameters": max(
+            (record["trainable_parameters"] for record in cost_records), default=0
         ),
         "maximum_training_footprint_parameters": max(
             (record["training_footprint_parameters"] for record in cost_records),
@@ -72,7 +76,13 @@ def _evaluate(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Fit one candidate/seed/split and return its checkpoint plus validation metrics."""
     ctx = build_training_ctx(
-        method, scope.train_ds, scope.regime, seed, cfg, scope.val_loader
+        method,
+        scope.train_ds,
+        scope.regime,
+        seed,
+        cfg,
+        scope.val_loader,
+        scope.update_budget,
     )
     if stage_one_config is not None:
         ctx["stage_one_config"] = stage_one_config
@@ -85,6 +95,7 @@ def _evaluate(
             "processed_examples": int(ctx["processed_examples"]),
             "unique_training_examples": len(ctx["train_dataset"]),
             "total_parameters": counts["total_parameters"],
+            "trainable_parameters": counts["trainable_parameters"],
             "training_footprint_parameters": int(
                 ctx.get("training_footprint_parameters", counts["total_parameters"])
             ),
