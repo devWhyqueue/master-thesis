@@ -1,0 +1,52 @@
+# PANDA patch-classification cell.
+
+paths:
+  outputs: experiments/2_cls_imb_benchmark/outputs/panda/patch
+
+dataset:
+  name: panda
+  regime: patch
+  target: cancer_presence
+  seed: 0
+  version: panda-kaggle-2020
+  eligibility_rules:
+    source: official_train_csv_slides_with_nonempty_tissue_tile_manifest
+    tiled_evidence: panda_native_tiles_20x_256_full_cohort
+    masks: released_provider_specific_mask_required
+    labels: at_least_50_percent_provider_specific_cancer_mask_values
+    classes: benign_or_cancer
+    split_unit: biopsy
+  selection_path: /home/space/datasets/panda/native_tiles_20x_256/selected_slides.csv
+  tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/tiles
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+evidence:
+  patch_per_slide_cap: 500
+
+wsi_training:
+  max_instances: 500
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch
+  partition: gpu-2h
+  test_partition: gpu-test
+  container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
+  resources:
+    prepare: {partition: gpu-2h, gpus: 1, cpus: 8, time: "05:00:00"}
+    pilot: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
+    freeze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "00:30:00"}
+    tune: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
+    confirm: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
+    analyze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
+    smoke: {partition: gpu-test, gpus: 1, cpus: 4, time: "00:15:00"}
+  squashfs:
+    - source: /home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs
+      mount: /home/space/datasets/panda/native_tiles_20x_256
+      stages: [prepare]

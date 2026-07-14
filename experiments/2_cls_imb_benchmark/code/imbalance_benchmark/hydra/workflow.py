@@ -72,13 +72,13 @@ def build_workflow(config: dict[str, Any], smoke: bool = False) -> list[SlurmJob
     return [p, pi, fr, tu, co, an]
 
 
-def _config_argument(config_path: str | None) -> str:
-    return f" --config {shlex.quote(config_path)}" if config_path else ""
-
-
-def _stage_images(config: dict[str, Any]) -> list[tuple[str, str]]:
+def _stage_images(config: dict[str, Any], stage: str) -> list[tuple[str, str]]:
     imgs = config.get("slurm", {}).get("squashfs", [])
-    return [(str(i["source"]), str(i["mount"])) for i in imgs]
+    return [
+        (str(image["source"]), str(image["mount"]))
+        for image in imgs
+        if stage in image.get("stages", ("prepare",))
+    ]
 
 
 def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
@@ -89,16 +89,16 @@ def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
         'mkdir -p "$STAGE_DIR"',
     ]
     for idx, (src, mt) in enumerate(images):
-        loc = f'"$STAGE_DIR/{idx}.sqfs"'
+        loc = f"$STAGE_DIR/{idx}.sqfs"
         lines.extend(
-            [f"cp {shlex.quote(src)} {loc}", f'BINDS+=("{loc}:{mt}:image-src=/")']
+            [f'cp {shlex.quote(src)} "{loc}"', f'BINDS+=("{loc}:{mt}:image-src=/")']
         )
     return lines
 
 
 def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
     """Build the benchmark command, mapping each array task to one condition."""
-    cfg_arg = _config_argument(config_path)
+    cfg_arg = f" --config {shlex.quote(config_path)}" if config_path else ""
     prefix = f"python {shlex.quote(code_dir)}/__main__.py{cfg_arg}"
     command = f"{prefix} {job.command}"
     if not job.array_splits and not job.array_conditions:
@@ -209,7 +209,9 @@ def render_sbatch(
     r, c, o, co = _cluster_paths(config)
     cmd = _command(job, config_path, c)
     lines = _directives(job, r)
-    lines.extend(_execution_lines(job, r, c, o, co, cmd, _stage_images(config)))
+    lines.extend(
+        _execution_lines(job, r, c, o, co, cmd, _stage_images(config, job.name))
+    )
     return "\n".join(lines)
 
 

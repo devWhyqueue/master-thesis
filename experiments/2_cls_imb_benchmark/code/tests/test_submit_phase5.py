@@ -8,6 +8,9 @@ from imbalance_benchmark.hydra.workflow import (
     submit_workflow,
 )
 
+SQUASHFS_SOURCE = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
+SQUASHFS_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
+
 
 def _config() -> dict[str, object]:
     return {
@@ -16,6 +19,13 @@ def _config() -> dict[str, object]:
             "code_dir": "/home/example/master-thesis/experiments/2_cls_imb_benchmark/code",
             "container": "/home/example/environment.sif",
             "test_partition": "gpu-test",
+            "squashfs": [
+                {
+                    "source": SQUASHFS_SOURCE,
+                    "mount": SQUASHFS_MOUNT,
+                    "stages": ["prepare"],
+                }
+            ],
         }
     }
 
@@ -65,6 +75,22 @@ def test_submit_links_actual_job_ids() -> None:
     }
     assert "#SBATCH --dependency=afterok:4" in submitted_scripts[4]
     assert "#SBATCH --dependency=afterok:5" in submitted_scripts[5]
+
+
+def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
+    """Large image copies must not be repeated across downstream array jobs."""
+    scripts = {
+        job.name: render_sbatch(job, _config(), "config.yaml")
+        for job in build_workflow(_config())
+    }
+
+    assert f"cp {SQUASHFS_SOURCE}" in scripts["prepare"]
+    assert (
+        f'BINDS+=("$STAGE_DIR/0.sqfs:{SQUASHFS_MOUNT}:image-src=/")'
+        in scripts["prepare"]
+    )
+    for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
+        assert SQUASHFS_SOURCE not in scripts[stage]
 
 
 def test_smoke_workflow_uses_test_partition() -> None:

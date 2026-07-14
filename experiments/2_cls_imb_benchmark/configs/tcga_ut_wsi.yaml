@@ -1,15 +1,11 @@
-# Unified configuration for experiments/2_cls_imb_benchmark/code/imbalance_benchmark.
-# Local paths only; scientific controls/grids are checked-in constants in the
-# package itself so this file cannot silently change the protocol.
+# TCGA-UT WSI-level MIL cell.
 
 paths:
-  outputs: experiments/2_cls_imb_benchmark/outputs/tcga_ut/patch
+  outputs: experiments/2_cls_imb_benchmark/outputs/tcga_ut/wsi
 
-# Select and configure exactly one dataset adapter (imbalance_benchmark.datasets).
-# regime: patch | wsi
 dataset:
   name: tcga_ut
-  regime: patch
+  regime: wsi
   target: cancer_type
   seed: 0
   version: tcga-ut-komura-2022
@@ -18,7 +14,6 @@ dataset:
     labels: 32_cancer_types_from_source_slide
     evidence: readable_virchow2_cls_patchmean_feature_chunks
     split_unit: tcga_participant
-
   raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
   feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
   feature_glob: "*.pt"
@@ -31,18 +26,15 @@ feature_extraction:
   device: auto
 
 evidence:
-  # Fixed before patch-condition construction; this is not the 5% allocation cap.
   patch_per_slide_cap: 500
 
 wsi_training:
-  # Fixed before pilot, tuning, confirmation, and RQ3 feature summaries.
   max_instances: 500
 
 slurm:
-  # Absolute Hydra paths: jobs execute from the checkout on the cluster, not this PC.
   project_root: /home/yannik.qu/master-thesis
   code_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/patch
+  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/wsi
   partition: gpu-2h
   test_partition: gpu-test
   container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
@@ -54,7 +46,4 @@ slurm:
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
     analyze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4, time: "00:15:00"}
-
-  # Optional datasets with many small files. Each image is copied to /tmp per job
-  # and mounted at its adapter-visible path before Apptainer starts.
   squashfs: []

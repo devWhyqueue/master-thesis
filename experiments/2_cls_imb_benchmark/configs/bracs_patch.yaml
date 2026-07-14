@@ -1,0 +1,49 @@
+# BRACS ROI patch-classification cell.
+
+paths:
+  outputs: experiments/2_cls_imb_benchmark/outputs/bracs/patch
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+  seed: 0
+  version: bracs-official-release
+  eligibility_rules:
+    metadata: official_BRACS_xlsx_rows_with_patient_slide_roi_and_subtype
+    images: roi_filename_stem_matches_released_image
+    labels: seven_class_official_roi_subtype
+    tiling: non_overlapping_full_256x256_tiles
+    split_unit: patient
+  root: /home/space/datasets/patho_ds/BRACS
+  tile_root: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/bracs/patch/prepared/roi_tiles
+  tile_size: 256
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+evidence:
+  patch_per_slide_cap: 500
+
+wsi_training:
+  max_instances: 500
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/bracs/patch
+  partition: gpu-2h
+  test_partition: gpu-test
+  container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
+  resources:
+    prepare: {partition: gpu-2h, gpus: 1, cpus: 8, time: "05:00:00"}
+    pilot: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
+    freeze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "00:30:00"}
+    tune: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
+    confirm: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
+    analyze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
+    smoke: {partition: gpu-test, gpus: 1, cpus: 4, time: "00:15:00"}
+  squashfs: []
