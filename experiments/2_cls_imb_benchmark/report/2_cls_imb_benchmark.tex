@@ -6,6 +6,8 @@
 \usepackage{booktabs}
 \usepackage{float}
 \usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage[hidelinks]{hyperref}
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
@@ -24,7 +26,7 @@ Across Histopathology Patch Classification and WSI-Level MIL}
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
-\noindent This study evaluates methods for mitigating class imbalance in computational pathology, covering patch classification and whole-slide multiple-instance learning (MIL) in CAMELYON16, TCGA-UT, BRACS, and PANDA, all represented with frozen Virchow2 features. Patient-disjoint splits are created before imbalance is manipulated, and only training support changes: a full natural anchor is accompanied by size-matched balanced, moderate ($\rho=10$), and severe ($\rho=100$ where feasible) conditions. Validation and test patients, held-out prevalence, training-set size, model family, and numbers of optimizer updates remain fixed. Patch conditions retain a common independent-unit pool and manipulate patch allocation within it; MIL conditions report the independent slides and patients removed to create imbalance. The primary discrimination endpoint is balanced accuracy, evaluated alongside a co-primary tail-calibration endpoint so that imbalance harm to either axis qualifies a cell for mitigation analysis. The analysis first asks what predicts the existence and magnitude of the CE imbalance deficit across all cells, then evaluates mitigation recovery conditional on prespecified discrimination and calibration deficit gates. Secondary analyses address classwise discrimination, tail-sensitive calibration, computational cost, intrinsic separability, and condition-specific learnability.
+\noindent This study evaluates methods for mitigating class imbalance in computational pathology, covering patch classification and whole-slide multiple-instance learning (MIL) in CAMELYON16, TCGA-UT, BRACS, and PANDA, all represented with frozen Virchow2 features. Patient-disjoint splits are created before imbalance is manipulated, and only training support changes: a full natural anchor is accompanied by size-matched balanced, moderate ($\rho=10$), and severe ($\rho=100$ where feasible) conditions. Validation and test patients, held-out prevalence, training-set size, model family, and numbers of optimizer updates remain fixed. Patch conditions retain a common patient and slide pool while changing patch allocation; MIL conditions vary slide support and report the resulting change in patient diversity. The primary discrimination endpoint is balanced accuracy, evaluated alongside a co-primary tail-calibration endpoint. Mitigation recovery is assessed only when prespecified thresholds show a meaningful imbalance-induced deficit on the corresponding endpoint. Secondary analyses address classwise discrimination, tail-sensitive calibration, computational cost, intrinsic separability, and condition-specific learnability.
 \par
 \endgroup
 \end{abstract}
@@ -42,17 +44,17 @@ The study addresses three research questions:
 \begin{description}
   \item[RQ1.] \textbf{Effect of imbalance.} At fixed task, patient split, encoder, training-set size, and evaluation set, how does increasing training imbalance affect tail-class discrimination and calibration in patch classification and WSI-level MIL?
   \item[RQ2.] \textbf{Mitigation effectiveness.} Which mitigation methods recover performance lost specifically to training imbalance, and what are their calibration and computational costs?
-  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Across all cells, do intrinsic class separability, condition-specific learnability, and independent support predict whether and how strongly imbalance damages CE performance? Conditional on demonstrated damage, do the same quantities predict mitigation recovery?
+  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Across all controlled comparisons, do intrinsic class separability, condition-specific learnability, and independent support predict whether and how strongly imbalance damages CE performance? Conditional on demonstrated damage, do the same quantities predict mitigation recovery?
 \end{description}
-RQ1 establishes whether a recoverable problem exists. RQ2 conditions claims on that deficit. RQ3 separates an all-cell model of CE damage from a gate-conditional model of recovery and uses no test-derived predictor. Only TCGA-UT uses the same label definition in both regimes. CAMELYON16 and PANDA change label granularity, whereas BRACS predicts an ROI-specific subtype for patches and the official most-aggressive-lesion subtype for WSIs. All RQ3 regressions and regime interactions are therefore exploratory. The datasets and preprocessing provenance are documented in the companion dataset report, and all detailed method objectives and variants are defined in the companion methods report \citep{queisler2026datasets,queisler2026imbalanceMethods}.
+RQ1 establishes whether a recoverable problem exists, and RQ2 asks which methods address that demonstrated deficit. RQ3 first models CE damage across every controlled comparison and then models recovery only where the corresponding deficit is large and precise enough to interpret. It uses no test-derived predictor. Only TCGA-UT uses the same label definition in both regimes. CAMELYON16 and PANDA change label granularity, whereas BRACS predicts an ROI-specific subtype for patches and the official most-aggressive-lesion subtype for WSIs. All RQ3 regressions and regime interactions are therefore exploratory. The datasets and preprocessing provenance are documented in the companion dataset report, and all detailed method objectives and variants are defined in the companion methods report \citep{queisler2026datasets,queisler2026imbalanceMethods}.
 
 \section{Experimental Design}
 \label{sec:design}
-The study varies training class support while holding the representation, prediction task, held-out cohorts, model family, and evaluation procedure fixed. The design comprises the datasets and prediction regimes, controlled data construction, a common mitigation roster, standardized training and selection, and explicit scope constraints.
+A controlled imbalance experiment is informative only when the balanced and imbalanced models differ in their training class allocation rather than in their data source, representation, or evaluation cohort. The design therefore establishes the patient split, frozen features, and held-out examples once, then constructs several training distributions at a common support budget. The following subsections define the two prediction regimes, explain how their evidence is controlled, and specify how mitigation methods are trained and compared.
 
 \subsection{Datasets and prediction regimes}
 \label{sec:data}
-Table~\ref{tab:datasets} defines the prediction example and label in each available dataset--regime. A \emph{patch-level example} is one eligible $256\times256$ crop and receives the label specified in the second column. A \emph{bag-level example} is one WSI represented by its eligible frozen patch embeddings under the fixed instance cap and receives one label for the entire WSI. A patient or case is assigned to exactly one partition before any examples are selected. Where one patient contributes multiple slides, all slides follow the patient assignment. A fixed eligibility pipeline removes unusable samples before splitting and is identical across imbalance conditions.
+Table~\ref{tab:datasets} defines the prediction example and label in each available dataset--regime. A \emph{patch-level example} is one eligible $256\times256$ crop and receives the label specified in the second column. A \emph{bag-level example} is one WSI represented by up to \num{500} frozen patch embeddings and receives one label for the entire WSI. This model-input cap is fixed before the support pilot and is distinct from any dataset-specific median tile budget applied during preprocessing. A patient or case is assigned to exactly one partition before any examples are selected. Where one patient contributes multiple slides, all slides follow the patient assignment. A fixed eligibility pipeline removes unusable samples before splitting and is identical across imbalance conditions.
 
 \begin{table}[ht]
   \centering
@@ -72,15 +74,42 @@ Table~\ref{tab:datasets} defines the prediction example and label in each availa
 \end{table}
 
 \paragraph{Patch classification.}
-Eligible patches are embedded once with frozen Virchow2. Concatenating the CLS token and mean patch token gives 2560 input features \citep{vorontsov2024virchow,zimmermann2024virchow2}. For CAMELYON16 and PANDA, a patch label is derived from the spatially aligned expert mask and can differ from the WSI label. A TCGA-UT patch inherits the cancer-type label of the diagnostic WSI from which the dataset authors cropped it. A BRACS patch inherits the subtype of its pathologist-annotated ROI: normal (N), pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma in situ (DCIS), or invasive carcinoma (IC). Patch eligibility, spatial sampling, label derivation, and the deterministic per-slide evidence cap are fixed before condition-specific training subsampling. The common classifier is a two-layer MLP with a 512-unit hidden representation, ReLU, dropout, and a linear class output, except where a method definition requires a different head.
+Eligible patches are embedded once with frozen Virchow2. Concatenating the CLS token and mean patch token gives 2560 input features \citep{vorontsov2024virchow,zimmermann2024virchow2}. For CAMELYON16 and PANDA, a patch label is derived from the spatially aligned expert mask and can differ from the WSI label. A TCGA-UT patch inherits the cancer-type label of the diagnostic WSI from which the dataset authors cropped it. A BRACS patch inherits the subtype of its pathologist-annotated ROI: normal (N), pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma in situ (DCIS), or invasive carcinoma (IC). Patch eligibility, spatial sampling, label derivation, and the deterministic per-slide evidence cap are fixed before condition-specific training subsampling. The common classifier is a two-layer multilayer perceptron (MLP) with a 512-unit hidden representation, rectified linear unit (ReLU) activation, dropout, and a linear class output. CFAL alone replaces the linear output with a prototype-based affinity head; OKO adds a training-only auxiliary head that is discarded for evaluation.
 
 \paragraph{WSI-level MIL.}
-A slide is one bag of frozen patch embeddings; a patch is an instance, not a separately labelled training example in this regime. CAMELYON16 bags use the slide diagnosis (metastasis-bearing or normal), TCGA-UT bags use the diagnostic WSI's cancer type, and PANDA bags use the biopsy's ordinal ISUP grade from \num{0} to \num{5}. A BRACS bag uses the official WSI annotation N, PB, UDH, FEA, ADH, DCIS, or IC, which the dataset defines from the most aggressive lesion detected in the slide. This label is read from the official WSI metadata rather than reconstructed as the maximum ROI subtype, so WSIs without released ROIs remain eligible and no project-specific severity ordering can alter the target. Eligible tissue instances are selected by the same deterministic pipeline used for the other WSI datasets. A common attention-MIL model maps instances to a 256-dimensional space, assigns normalized attention weights, and classifies the weighted bag representation. The per-slide instance cap and deterministic instance-selection seed are fixed across conditions. Slide labels are the only supervision; patch labels, ROI labels, and masks are not used by the primary MIL training runs \citep{brancati2022bracs,queisler2026datasets}.
+A slide is one bag of frozen patch embeddings; here, an \emph{instance} means one patch representation inside that bag, not a separately labelled training example. CAMELYON16 bags use the slide diagnosis (metastasis-bearing or normal), TCGA-UT bags use the diagnostic WSI's cancer type, and PANDA bags use the biopsy's ordinal ISUP grade from \num{0} to \num{5}. A BRACS bag uses the official WSI annotation N, PB, UDH, FEA, ADH, DCIS, or IC, which the dataset defines from the most aggressive lesion detected in the slide. This label is read from the official WSI metadata rather than reconstructed as the maximum ROI subtype, so WSIs without released ROIs remain eligible and no project-specific severity ordering can alter the target. Eligible tissue instances are selected by the same deterministic pipeline used for the other WSI datasets. The common attention-MIL model maps instances to a 256-dimensional space, assigns normalized attention weights, and classifies their weighted average. At most \num{500} instances enter each bag; the cap and deterministic selection seed are fixed across conditions. SC-MIL adds a training projection head for its contrastive objective, and MDE-inspired MIL replaces the single classifier with two expert heads. Slide labels are the only supervision; patch labels, ROI labels, and masks are not used by the primary MIL training runs \citep{brancati2022bracs,queisler2026datasets}.
 
 \paragraph{Comparative scope.}
 Only TCGA-UT permits a direct patch-versus-WSI comparison. Both regimes predict the same cancer-type label within the same participant-disjoint cohort. In CAMELYON16, patch classification detects tumor tissue, whereas a WSI bag is classified as metastasis-bearing or normal. In PANDA, patch classification detects cancer tissue, whereas a WSI bag predicts the biopsy's ISUP grade. In BRACS, a patch predicts its ROI-specific subtype, whereas a WSI bag predicts the official most-aggressive-lesion subtype for the complete slide. The CAMELYON16, PANDA, and BRACS regimes are therefore separate dataset--target groups rather than paired measurements of one task.
 
 \subsection{Controlled construction}
+The controlled construction asks a simple counterfactual question: how would the same prediction task perform if its fixed training budget were distributed evenly across classes rather than concentrated in a head class? Figure~\ref{fig:controlled-construction} separates the choices that are made once from the class allocation that is deliberately varied. Validation and test data remain natural throughout; only the controlled training manifest changes.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, font=\small, text width=3.15cm, minimum height=1.15cm},
+    fixed/.style={box, fill=gray!10},
+    varied/.style={box, fill=blue!7},
+    note/.style={box, fill=white, text width=5.2cm, minimum height=1.0cm},
+    arrow/.style={-{Latex[length=2mm]}, thick}
+  ]
+    \node[fixed] (split) {1. Split patients once\\training / validation / test};
+    \node[fixed, right=0.35cm of split] (freeze) {2. Freeze representation\\eligibility and evidence caps};
+    \node[varied, right=0.35cm of freeze] (construct) {3. Redistribute training support\\balanced, $\rho=10$, $\rho=100$};
+    \node[fixed, right=0.35cm of construct] (evaluate) {4. Compare on the same\\natural held-out cases};
+    \node[note, below=0.55cm of freeze, xshift=-0.5cm] (patch) {\textbf{Patch regime:} keep the same patients and slides; change how many patches each class contributes.};
+    \node[note, below=0.55cm of construct, xshift=1.5cm] (wsi) {\textbf{WSI regime:} change the number of labelled slides per class; record the accompanying patient diversity.};
+    \draw[arrow] (split) -- (freeze);
+    \draw[arrow] (freeze) -- (construct);
+    \draw[arrow] (construct) -- (evaluate);
+    \draw[arrow] (construct.south) -- (patch.north);
+    \draw[arrow] (construct.south) -- (wsi.north);
+  \end{tikzpicture}
+  \caption{Controlled construction of the benchmark. Gray steps are fixed within a split; the blue step is the intended intervention. Patch imbalance redistributes patches within a common independent-unit pool, whereas WSI imbalance changes labelled slide support.}
+  \label{fig:controlled-construction}
+\end{figure}
+
 For class supports $N_1,\ldots,N_K$, the headline imbalance ratio is
 \begin{equation}
   \rho=\frac{N_{\max}}{N_{\min}}.
@@ -109,9 +138,36 @@ The balanced, moderate, and severe conditions contain the same total training su
 
 The independent-evidence rule differs by regime. For patch classification, a fixed per-class patient pool and, within it, a fixed slide pool are shared by the balanced and all imbalanced conditions. Sampling first visits patients, then slides within patients, and only then patches. No patient may supply more than 10\% of a class's patch allocation and no slide more than 5\%; a deterministic round-robin pass through the contributing units enforces these caps before any unit is revisited. Thus patch imbalance changes patch allocation while preserving the available patient and slide diversity. For MIL, a slide is itself the labelled example, so changing slide support necessarily changes independent diversity. MIL selection first visits patients and then takes slide prefixes within them; each slide contributes once, and no patient supplies more than 10\% of a class's slide allocation. Each manifest therefore reports, by class, unique patients, unique slides, patches, the largest patient and slide contribution, and the fraction of the eligible independent pool retained. RQ1 interprets MIL contrasts as the effect of controlled slide-support imbalance, including its induced change in patient diversity, rather than as a patch-count effect alone.
 
-Minimum tail support is fixed from a training-only support-stability study conducted before definitive fitting. In the patch regime, an independent pilot unit is a patient, or a slide where patient and slide coincide. Every selected unit contributes a fixed quota $q_{\mathrm{patch}}$ of patches, apportioned as evenly as possible over its eligible slides. The quota is the largest common per-patient count feasible for every class at the largest available pilot level, subject to the contribution caps except for the documented five-patient pilot exception; it is determined from training inventories and then held constant across pilot support levels. In the MIL regime, the independent pilot unit is one slide represented by one capped bag, while patients contributing multiple slides remain identified for clustering.
+Very small tail classes can make both training and evaluation unstable, so the definitive experiment first estimates how much independent support each class needs. A \emph{pilot level} is a candidate number of independent training units per class used in a small, balanced CE fit; it is not an optimization stage and its examples never enter the definitive comparison automatically. In the patch regime, one unit is a patient, or a slide where patient and slide coincide. Every selected unit contributes a fixed quota $q_{\mathrm{patch}}$ of patches, apportioned as evenly as possible over its eligible slides. The quota is the largest common per-patient count feasible for every class at the largest candidate pilot level, subject to the contribution caps except for the documented five-patient exception. It is determined from training inventories and then held constant across pilot levels. In the MIL regime, one pilot unit is a labelled slide represented by one bag of at most \num{500} instances, while patients contributing multiple slides remain identified for clustering.
 
-Within each split and regime, nested balanced CE pilots use candidate independent-unit counts of $5,10,15,20,30$, or all available units when fewer exist. At the five-patient patch level, the \num{10}\% patient cap is arithmetically infeasible; the \num{5}\% slide cap can also be infeasible when the selected patients contribute too few slides. The pilot therefore selects five distinct patients with equal quotas and records this level-specific contribution-cap exception. At the five-slide MIL level, the \num{10}\% patient cap is likewise arithmetically infeasible: the pilot selects one slide from each of five distinct patients and records its level-specific exception. These five-unit pilots are used only for the support-stability curve, never as definitive training allocations. Three pilot construction seeds create three independent patient--slide--patch master orderings. Within an ordering, every candidate is a prefix of the next candidate and uses the same held-out cohort, so support-level contrasts are paired and nested. The \emph{stability floor} is the smallest count for which the increase at the next candidate is below \num{0.01} in mean natural-validation balanced accuracy and below \num{0.02} for every class across the three pilot orderings; if no candidate satisfies this rule, the largest candidate is used. The definitive minimum for every class is the maximum of this stability floor and the method floor. The method floor is two independent same-class examples per set or batch and at least 10 distinct contributing patients and 20 slides for patch training, or 10 patients and 20 slides for MIL, except where patient and slide coincide, in which case 20 slides are required. Every class-aware batch is constructed with at least two distinct same-class independent units. These are eligibility constraints, not examples created by replacement. A requested severity is lowered to the largest allocation satisfying both floors; a dataset--regime is excluded rather than run as a few-example experiment if even the balanced condition fails them. Pilot quotas, results, seeds, and resulting floors are frozen before definitive training and reported with the manifests.
+Within each split and regime, the nested balanced pilots compare $5,10,15,20,30$ independent units per class, or all available units when fewer exist. Figure~\ref{fig:pilot-floor} shows the intended reading: the support floor is the first level after which adding the next block produces little further validation improvement. The candidates are nested within each of three construction orderings and use the same natural-validation cohort, making adjacent levels paired rather than unrelated experiments.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    level/.style={draw, circle, minimum size=0.75cm, inner sep=1pt, font=\small},
+    arrow/.style={-{Latex[length=2mm]}, thick},
+    label/.style={align=center, font=\small}
+  ]
+    \node[level] (n5) at (0,0) {$5$};
+    \node[level] (n10) at (2.1,0) {$10$};
+    \node[level, fill=blue!10, thick] (n15) at (4.2,0) {$15$};
+    \node[level] (n20) at (6.3,0) {$20$};
+    \node[level] (n30) at (8.4,0) {$30$};
+    \node[label, right=0.6cm of n30] {independent units\\per class};
+    \draw[arrow] (n5) -- (n10);
+    \draw[arrow] (n10) -- (n15);
+    \draw[arrow] (n15) -- (n20);
+    \draw[arrow] (n20) -- (n30);
+    \draw[thick, blue!70!black] (n15.south) -- ++(0,-0.65) node[below, label] {example stability floor:\\next increase is negligible};
+  \end{tikzpicture}
+  \caption{Interpretation of a pilot level and the stability floor. The highlighted level is illustrative; the selected level is estimated separately for each split and regime from the prespecified validation thresholds.}
+  \label{fig:pilot-floor}
+\end{figure}
+
+At the five-patient patch level, the \num{10}\% patient cap is arithmetically infeasible; the \num{5}\% slide cap can also be infeasible when the selected patients contribute too few slides. The pilot therefore selects five distinct patients with equal quotas and records this level-specific exception. The five-slide MIL pilot likewise selects one slide from each of five patients because a \num{10}\% patient cap is impossible with only five slides. These five-unit pilots inform only the support-stability curve and are never definitive training allocations.
+
+The \emph{stability floor} is the smallest count for which the increase at the next candidate is below \num{0.01} in mean natural-validation balanced accuracy and below \num{0.02} for every class across the three pilot orderings; if no candidate satisfies this rule, the largest candidate is used. The definitive minimum is the larger of this empirical floor and the \emph{method floor}, which ensures that every tested method has enough distinct examples to form its required batches or sets. Specifically, a class-aware set or batch contains at least two distinct same-class independent units, and the training manifest contains at least 10 contributing patients and 20 slides for patch training, or 10 patients and 20 slides for MIL. Where patient and slide coincide, 20 slides are required. These are eligibility constraints, not examples created by replacement. A requested severity is lowered to the largest allocation satisfying both floors; a dataset--regime is excluded rather than treated as a few-example experiment if even the balanced condition fails them. Pilot quotas, results, seeds, and resulting floors are frozen before definitive training and reported with the manifests.
 
 For a $K$-class exponential construction, an assigned class order receives weights
 \begin{equation}
@@ -137,20 +193,18 @@ Table~\ref{tab:roster} is intentionally compact. Equations, assumptions, default
 \begin{table}[ht]
   \centering
   \footnotesize
-  \begin{tabularx}{\linewidth}{@{}p{0.25\linewidth}Xl@{}}
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.23\linewidth}>{\raggedright\arraybackslash}p{0.43\linewidth}>{\raggedright\arraybackslash}X@{}}
     \toprule
     Family & Tested methods & Regime \\
     \midrule
-    Reference & CE; MIL CE & Patch; WSI \\
-    Sampling & Balanced sampling & Both \\
-    Loss and prior correction & Weighted CE; focal loss; train-time and post-hoc logit adjustment; CFAL & Both, except CFAL patch only \\
-    Hybrid objective & CE + soft F1; CE + soft MCC; OKO set learning & Patch \\
-    Feature mixing & RankMix-inspired feature mixing & WSI \\
-    Representation/classifier & cRT; SC-MIL & Both for cRT; WSI for SC-MIL \\
-    Dual expert & MDE-inspired dual-expert MIL, including no-consistency ablation & WSI \\
+    No-mitigation reference & CE; MIL CE & Patch; WSI \\
+    Data-level sampling and augmentation & Balanced sampling; RankMix-inspired feature mixing & Both for sampling; WSI for RankMix-inspired \\
+    Losses and prior correction & Weighted CE; focal loss; train-time and post-hoc logit adjustment; CFAL & Both, except CFAL patch only \\
+    Hybrid sampling--loss & CE + soft F1; CE + soft MCC; OKO set learning; MDE-inspired dual-expert MIL & Patch for CE hybrids and OKO; WSI for MDE-inspired \\
+    Representation and architecture & cRT; SC-MIL & Both for cRT; WSI for SC-MIL \\
     \bottomrule
   \end{tabularx}
-  \caption{Prespecified method roster. ``Both'' means the patch and WSI implementations defined in the companion methods report, not a comparison of their raw scores.}
+  \caption{Prespecified method roster, using the same intervention-level taxonomy as the companion methods report. ``Both'' means the patch and WSI implementations defined there, not a comparison of their raw scores.}
   \label{tab:roster}
 \end{table}
 
@@ -181,9 +235,25 @@ The design isolates training-distribution effects under frozen Virchow2 represen
 Evaluation separates predictive discrimination, probability quality, mitigation recovery, and exploratory predictors of damage and recovery. All estimands and inferential families are defined before test evaluation.
 
 \subsection{Endpoints and aggregation units}
-The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Quadratic-weighted kappa and ordinal mean absolute error are additional secondary outcomes for PANDA ISUP grade. Overall accuracy is descriptive. Patch predictions are summarized in two ways: patch-micro estimates treat eligible patches as predictions while uncertainty remains patient-clustered, and slide/patient-macro estimates first aggregate the metric contribution within each slide or patient so that heavily tiled slides do not dominate. WSI outcomes are slide-level with patient clustering where patients contribute multiple slides.
+The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Overall accuracy is descriptive. Patch predictions are summarized in two ways: patch-micro estimates treat eligible patches as predictions while uncertainty remains patient-clustered, and slide/patient-macro estimates first aggregate the metric contribution within each slide or patient so that heavily tiled slides do not dominate. WSI outcomes are slide-level with patient clustering where patients contribute multiple slides.
 
 Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$. Probability quality is assessed at natural-prevalence and class-balanced weightings.
+
+\paragraph{Ordinal agreement and error.}
+PANDA WSI labels are ordered ISUP grades, so an error of one grade should count less than an error spanning several grades. Let $O_{ab}$ be the observed confusion-matrix count for true grade $a$ and predicted grade $b$. The count expected under independent true and predicted grades is $E_{ab}=O_{a\cdot}O_{\cdot b}/N$, which retains the observed marginal grade frequencies. With $a,b\in\{0,\ldots,C-1\}$ and quadratic disagreement weight $w_{ab}=(a-b)^2/(C-1)^2$, quadratic-weighted kappa is
+\begin{equation}
+  \kappa_{\mathrm{QW}}
+  =1-\frac{\sum_{a=0}^{C-1}\sum_{b=0}^{C-1}w_{ab}O_{ab}}
+  {\sum_{a=0}^{C-1}\sum_{b=0}^{C-1}w_{ab}E_{ab}}.
+  \label{eq:qwk}
+\end{equation}
+\noindent A value of 1 denotes perfect grade agreement, 0 is the agreement expected from the marginal grade frequencies, and negative values indicate more weighted disagreement than expected by chance. Ordinal mean absolute error (MAE) is
+\begin{equation}
+  \mathrm{MAE}_{\mathrm{ord}}
+  =\frac{1}{N}\sum_{i=1}^{N}|g_i-\widehat g_i|,
+  \label{eq:ordinal-mae}
+\end{equation}
+\noindent where $g_i$ and $\widehat g_i$ are the true and predicted ISUP grades. It reports the average distance in grade levels and is lower-is-better. Both measures are secondary outcomes for PANDA; kappa emphasizes agreement beyond the observed marginals, whereas MAE has the direct interpretation of grades missed per biopsy.
 
 \paragraph{Negative log likelihood.}
 Natural-prevalence negative log likelihood (NLL), also called multiclass log loss, is
@@ -237,6 +307,8 @@ Scores for balanced decisions are kept distinct from probabilities for the natur
 
 \subsection{Imbalance deficit, recovery, and inference}
 \label{sec:recovery}
+Recovery is meaningful only when imbalance has first caused a measurable loss. The analysis therefore proceeds in two stages: compare size-matched balanced and imbalanced CE, then evaluate mitigation only on an endpoint that shows sufficiently large and statistically supported harm. One \emph{comparison unit} is a fixed dataset, prediction regime, imbalance severity, and tail assignment. A \emph{gate} is the prespecified eligibility rule that routes such a unit to the relevant recovery analysis; it is not a learned model component.
+
 For a higher-is-better metric $M$, define the imbalance-induced deficit and recovery fraction at each imbalanced condition as
 \begin{equation}
   \begin{aligned}
@@ -248,11 +320,41 @@ For a higher-is-better metric $M$, define the imbalance-induced deficit and reco
 \end{equation}
 $R_M=0$ denotes no recovery, $R_M=1$ recovery to the size-matched balanced CE reference, $R_M<0$ further deterioration, and $R_M>1$ performance beyond that reference. Because the balanced reference draws more unique tail independent units than any imbalanced condition at the same $T$, methods that only reweight or recalibrate the imbalanced manifest cannot restore tail evidence that was never sampled; for that family $R_M<1$ may reflect an information ceiling rather than method failure, whereas resampling and synthesis methods are the only family for which $R_M=1$ is mechanically attainable. The full natural condition is descriptive and never enters $D_M$ or $R_M$.
 
-Mitigation effectiveness is evaluated through two prespecified co-primary gates, so that imbalance harm to either discrimination or tail probability quality qualifies a cell. The \emph{discrimination gate} opens a dataset--regime--severity--assignment cell when the CE balanced-accuracy deficit is at least \num{0.02} and its paired 95\% confidence interval excludes zero. The \emph{calibration gate} opens the same cell when the CE tail-group macro-NLL deficit, $\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$, is at least \num{0.05} nats with a paired 95\% confidence interval excluding zero. Both gates are computed from CE runs on the same held-out cases before any mitigation method is compared. A cell entering through the discrimination gate is evaluated for balanced-accuracy recovery; a cell entering through the calibration gate is evaluated for tail-calibration recovery; a cell may enter through both. Separating the gates prevents the common regime in which strong frozen features leave balanced accuracy nearly intact while imbalance still biases tail probabilities, which a single balanced-accuracy gate would silently exclude even though prior-correction methods are expected to act there. Both gates prevent unstable recovery ratios when there is no evidenced damage to recover, and all CE deficits on both axes are reported, including gated-out cells. For the lower-is-better calibration axis the recovery fraction uses the sign-corrected deficit $D_{\mathrm{cal}}=\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$ as denominator and the method's tail-NLL improvement over imbalanced CE as numerator, so the interpretation of Equation~\eqref{eq:recovery} carries over. Recovery for other secondary metrics remains descriptive and does not reopen a cell that fails both gates.
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, font=\small, text width=4.3cm, minimum height=1.0cm},
+    start/.style={box, fill=gray!10, text width=5.4cm},
+    route/.style={box, fill=blue!7},
+    result/.style={box, fill=green!7},
+    arrow/.style={-{Latex[length=2mm]}, thick}
+  ]
+    \node[start] (contrast) {Same held-out cases\\balanced CE versus imbalanced CE};
+    \node[route, below left=0.8cm and 0.45cm of contrast] (ba) {Balanced-accuracy deficit\\$D_{\mathrm{BA}}\geq0.02$ and CI excludes 0};
+    \node[route, below right=0.8cm and 0.45cm of contrast] (cal) {Tail macro-NLL deficit\\$D_{\mathrm{cal}}\geq0.05$ nats and CI excludes 0};
+    \node[result, below=0.7cm of ba] (barec) {Discrimination gate opens\\evaluate balanced-accuracy recovery};
+    \node[result, below=0.7cm of cal] (calrec) {Calibration gate opens\\evaluate tail-NLL recovery};
+    \draw[arrow] (contrast) -- (ba);
+    \draw[arrow] (contrast) -- (cal);
+    \draw[arrow] (ba) -- (barec);
+    \draw[arrow] (cal) -- (calrec);
+  \end{tikzpicture}
+  \caption{Routing from an imbalance deficit to mitigation analysis. A comparison unit can enter through either gate or both. If neither rule is met, its CE deficits are still reported, but a recovery ratio is not interpreted. CI denotes the paired 95\% confidence interval.}
+  \label{fig:gate-routing}
+\end{figure}
+
+The \emph{discrimination gate} opens when the CE balanced-accuracy deficit is at least \num{0.02} and its paired 95\% confidence interval excludes zero. The \emph{calibration gate} opens when the CE tail-group macro-NLL deficit, $\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$, is at least \num{0.05} nats with a paired 95\% confidence interval excluding zero. Both rules are computed from CE runs on the same held-out cases before any mitigation method is compared. A comparison unit entering through the discrimination gate is evaluated for balanced-accuracy recovery; one entering through the calibration gate is evaluated for tail-calibration recovery; it may enter through both.
+
+The two routes preserve an important distinction. Strong frozen features may leave balanced accuracy nearly intact while imbalance still biases tail probabilities, in which case a single discrimination rule would exclude methods designed to correct class priors. Conversely, the gates avoid unstable recovery ratios when no meaningful damage exists to recover. All CE deficits on both axes remain reported, including units that fail both rules. For the lower-is-better calibration axis, the sign-corrected deficit $D_{\mathrm{cal}}=\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$ is the denominator and the method's tail-NLL improvement over imbalanced CE is the numerator, so Equation~\eqref{eq:recovery} retains the same interpretation. Recovery for other secondary metrics is descriptive and does not reopen a comparison unit that fails both gates.
 
 Confidence intervals use a class-preserving crossed paired bootstrap. Before model training, \num{10000} label-only replicates are generated from the locked test manifests. Each patient is assigned a stratum defined by its complete split-by-class contribution vector across all test appearances; this vector can contain several classes for patch targets. Within every nonempty stratum, the observed number of patients is resampled with replacement. A selected patient's multiplicity is then applied to all of that patient's slides and patches in every split, so overlapping test appearances never become independent people. When patient and slide coincide, slides are the resampling units. Preserving every observed contribution stratum guarantees that each class represented in an original split remains represented in every replicate; an uncomputable split-level metric is treated as an implementation failure and the analysis stops rather than silently discarding the replicate.
 
-The label-only preflight verifies class representation, computability of every split-level metric, and identical patient multiplicities across split appearances. It also records, by split and class, the number of unique resampled patients, Kish effective patient count, and largest normalized patient weight. If the Kish count falls below five in any replicate, or one patient supplies more than 50\% of a class's bootstrap weight in more than 5\% of replicates, inference for that dataset--regime is designated descriptive before training. The diagnostic report and resampling seed are frozen with the analysis manifest.
+The label-only preflight verifies class representation, computability of every split-level metric, and identical patient multiplicities across split appearances. It also checks whether a nominally large bootstrap replicate is effectively dominated by only a few patients. If patient $i$ has class-specific bootstrap weight $v_i$, its \emph{Kish effective patient count} is
+\begin{equation}
+  n_{\mathrm{Kish}}=\frac{\left(\sum_i v_i\right)^2}{\sum_i v_i^2}.
+  \label{eq:kish}
+\end{equation}
+\noindent This equals the number of resampled patients when their weights are equal and becomes smaller as the weight concentrates on a few patients. The preflight records this count, the number of unique resampled patients, and the largest normalized patient weight by split and class. If $n_{\mathrm{Kish}}<5$ in any replicate, or one patient supplies more than 50\% of a class's bootstrap weight in more than 5\% of replicates, inference for that dataset--regime is designated descriptive before training. The diagnostic report and resampling seed are frozen with the analysis manifest.
 
 In the model-based bootstrap, the three split seeds are fixed design repetitions and are averaged with equal weight, not resampled as independent cohorts. Tail assignments remain separate unless an explicitly assignment-averaged estimand is reported. Within each replicate, the five matched confirmation initialization indices are resampled as paired algorithmic-noise blocks and averaged before split aggregation; they never increase the patient sample size. Balanced CE, imbalanced CE, and each method use the same patient and initialization draws. The shared balanced baseline is loaded once and receives the same bootstrap weights in every assignment-specific deficit. The full deficit and recovery ratio in Equation~\eqref{eq:recovery}, including its numerator and denominator, is recomputed inside every replicate. Patches are never bootstrapped independently. Percentile 95\% intervals are reported with the number of replicates and seed fixed in the analysis manifest.
 
@@ -261,18 +363,43 @@ The tested effect is gate-specific. On the discrimination axis it is the raw bal
 To keep the confirmatory family commensurate with the available independent-patient evidence, a prespecified \emph{primary} method set is confirmatory and the remaining roster is exploratory. The primary set contains the loss-reweighting, prior-correction, and resampling references that directly target tail support and are shared across both regimes: weighted CE, focal loss, train-time logit adjustment, and balanced sampling. The confirmatory family for Holm adjustment is every primary-method $\times$ gate $\times$ severity $\times$ tail-assignment comparison within a dataset and regime; severities are not separate families, and each co-primary gate contributes its own statistic. Holm's procedure adjusts the permutation $p$-values across that family, with gated-out comparisons recorded as not tested. All other methods (hybrid objectives, CFAL, OKO, cRT, RankMix-inspired, SC-MIL, MDE-inspired, and post-hoc logit adjustment) are reported with the same effect estimates and intervals but form a separate exploratory family outside the confirmatory correction. Effect estimates and intervals remain primary throughout; adjusted $p$-values are supporting evidence. Secondary classwise, calibration, and cost analyses are exploratory unless explicitly prespecified above.
 
 \subsection{Predictors of damage and mitigation headroom}
-Two distinct frozen-feature measurements are made before mitigation fitting. \emph{Intrinsic separability} is measured once per dataset, regime, and split using a fixed balanced reference subset drawn from the eligible training pool and shared by every condition. \emph{Condition-specific learnability} uses the actual controlled training manifest as its neighbour reference or probe-fitting set. Both use (i) balanced $k$-nearest-neighbour macro recall, (ii) a class-balanced linear probe, and (iii) per-class nearest-neighbour error, measured on the unchanged natural-validation set. They never use test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of the capped instances, fixed non-learned summaries that do not inherit the attention-MIL model being explained.
+Two distinct frozen-feature measurements are made before mitigation fitting. \emph{Intrinsic separability} asks whether the classes are distinguishable in the shared Virchow2 representation before a benchmark classifier is trained. It is measured once per dataset, regime, and split using a fixed balanced reference subset drawn from the eligible training pool and shared by every condition. \emph{Condition-specific learnability} instead asks how informative the representation remains under the exact support available in one controlled training manifest. It uses that manifest as its neighbour reference or probe-fitting set.
 
-Effective sample size accounts for clustered patch evidence:
+Both concepts are summarized on the unchanged validation set, which retains its natural class distribution. Balanced $k$-nearest-neighbour (kNN) macro recall predicts from the labels of the $k$ closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on frozen embeddings; it measures information accessible without a flexible nonlinear head. Per-class nearest-neighbour error exposes which classes overlap locally. These diagnostics never use test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of the capped instances, fixed non-learned summaries that do not inherit the attention-MIL model being explained.
+
+Many patches from one patient are not equivalent to the same number of independent patients. The patch sensitivity analysis therefore estimates a one-way random-effects intraclass correlation (ICC) of the cross-fitted class margin. For class $c$, let $G_c$ be the number of patient or slide clusters, $m_{gc}$ their sizes, and $N_c=\sum_gm_{gc}$. With between-cluster and within-cluster mean squares $\mathrm{MS}_{B,c}$ and $\mathrm{MS}_{W,c}$, the unequal-cluster-size correction and ICC are
+\begin{equation}
+  m_{0,c}=\frac{N_c-\sum_{g=1}^{G_c}m_{gc}^2/N_c}{G_c-1},
+  \qquad
+  \operatorname{ICC}_c=
+  \frac{\mathrm{MS}_{B,c}-\mathrm{MS}_{W,c}}
+  {\mathrm{MS}_{B,c}+(m_{0,c}-1)\mathrm{MS}_{W,c}}.
+  \label{eq:icc}
+\end{equation}
+\noindent The estimate is clipped to $[0,1]$: zero means that patches within a cluster are no more alike than patches from different clusters, whereas one indicates complete within-cluster redundancy. The corresponding effective sample size is
 \begin{equation}
   N_{\mathrm{eff},c}=\frac{N_c}{1+(\overline m_c-1)\operatorname{ICC}_c},
   \label{eq:neff}
 \end{equation}
-where $\overline m_c$ is mean cluster size and $\operatorname{ICC}_c$ is the within-patient or within-slide intraclass correlation of a scalar class margin. That margin is the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit, evaluated on training-pool embeddings by cross-fitting so an observation is not scored by a probe fitted on itself. Unique patient and slide counts are the primary support measures. Equation~\eqref{eq:neff} is a secondary sensitivity measure for patch targets, not a replacement for independent-unit counts. Slide count itself is used for WSI targets, with patient count also entered when patients contribute multiple slides.
+\noindent where $\overline m_c$ is the arithmetic mean cluster size. The scalar margin is the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}: each observation is scored only by a probe trained without it. Unique patient and slide counts remain the primary support measures. Equations~\eqref{eq:icc}--\eqref{eq:neff} provide a secondary sensitivity measure for patch targets, not a replacement for independent-unit counts. Slide count itself is used for WSI targets, with patient count also entered when patients contribute multiple slides.
 
-RQ3 uses three linked exploratory analyses rather than a hurdle model for the signed deficit. First, a logistic model describes whether a cell passes either prespecified deficit gate in Section~\ref{sec:recovery}. Second, a continuous model uses $D_{\mathrm{BA}}$ from every cell, including negative deficits. Its observation model incorporates the bootstrap standard error $s_{D,j}$, so $\widehat D_j$ is modeled with variance $s_{D,j}^2+\sigma^2$ rather than treating estimated deficits as error-free. Third, recovery is modeled only among gated cells and is explicitly interpreted as conditional on demonstrated damage.
+RQ3 uses three linked exploratory analyses. Let $G_j=1$ when comparison unit $j$ passes either gate, let $\widehat D_j$ be its estimated balanced-accuracy deficit with bootstrap standard error $s_{D,j}$, and let $R_j$ be recovery for a gated unit. With standardized log imbalance $x_{\rho,j}$, standardized intrinsic separability $x_{S,j}$, and dataset--target random intercept $b_{g[j]}$, the models have the common structure
+\begin{equation}
+  \begin{aligned}
+    \operatorname{logit}\Pr(G_j=1)
+      &=\alpha_G+b_{G,g[j]}+\beta_{G,\rho}x_{\rho,j}+\beta_{G,S}x_{S,j},\\
+    \widehat D_j
+      &\sim\mathcal{N}\!\left(\alpha_D+b_{D,g[j]}+\beta_{D,\rho}x_{\rho,j}+\beta_{D,S}x_{S,j},\ s_{D,j}^2+\sigma_D^2\right),\\
+    R_j\mid G_j=1
+      &\sim\mathcal{N}\!\left(\alpha_R+b_{R,g[j]}+\beta_{R,\rho}x_{\rho,j}+\beta_{R,S}x_{S,j},\ \sigma_R^2\right).
+  \end{aligned}
+  \label{eq:rq3-models}
+\end{equation}
+\noindent The first line models whether measurable damage occurs, the second uses every signed deficit---including negative values---and the third describes recovery only after damage has been demonstrated. Adding $s_{D,j}^2$ to the residual variance prevents a noisy estimated deficit from being treated as an exact observation. This sequence is used instead of forcing occurrence, magnitude, and recovery into one hurdle model.
 
-Because the independent unit for RQ3 is the dataset--target group and only a few exist, the analyses are deliberately restricted rather than predictive. Each model uses a minimal two-predictor set chosen from a prior hypothesis: $\log\rho$ and intrinsic separability, both standardized. Condition-specific learnability, log minimum independent support (patients for patch targets and slides for MIL targets), and the patch-versus-WSI indicator are reported as descriptive covariates and entered only in prespecified single-predictor sensitivity fits, never jointly, because with so few groups they are collinear with the two primary predictors and with each other. Dataset--target groups receive random intercepts rather than fixed dummy effects; the recovery model uses the same two predictors and deliberately omits per-method effects, which the available gated cells cannot identify. Zero-centered unit-scale Gaussian priors on standardized slopes and on the log standard deviations of the random intercept and residual terms provide proper MAP regularization, and no interactions are fitted. Leave-one-dataset--target-group-out cross-validation is reported only as a coarse stability check: with this small group count, held-out predictions collapse toward the marginalized population intercept, so RQ3 is interpreted as hypothesis-generating description of association rather than a validated predictive model. TCGA-UT supplies the only genuine paired-regime evidence; the CAMELYON16, PANDA, and BRACS targets differ by regime. Model definitions, priors, and covariate roles are frozen before recovery outcomes are inspected, and all RQ3 results remain exploratory.
+Because the independent unit for RQ3 is the dataset--target group and only a few such groups exist, the analyses are deliberately restricted rather than predictive. Each model uses only the two predictors shown in Equation~\eqref{eq:rq3-models}. Condition-specific learnability, log minimum independent support (patients for patch targets and slides for MIL targets), and the patch-versus-WSI indicator are reported descriptively and entered only in prespecified one-predictor sensitivity fits. They are not combined because, with so few groups, they are strongly confounded with the primary predictors and with one another. Random intercepts allow each dataset--target group to have a different baseline without estimating a separate unrestricted fixed effect. The recovery model deliberately omits per-method effects, which the available gated units cannot identify.
+
+Maximum a posteriori (MAP) estimation combines model fit with weak zero-centered, unit-scale Gaussian priors on standardized slopes and on the log standard deviations of the random intercept and residual terms. These priors regularize extreme estimates in the small sample; no interactions are fitted. Leave-one-dataset--target-group-out cross-validation repeatedly withholds one complete group and is reported only as a coarse stability check. With this small group count, held-out predictions shrink toward the population-average intercept, so RQ3 remains a hypothesis-generating description of association rather than a validated predictive model. TCGA-UT supplies the only genuine paired-regime evidence; the CAMELYON16, PANDA, and BRACS targets differ by regime. Model definitions, priors, and covariate roles are frozen before recovery outcomes are inspected, and all RQ3 results remain exploratory.
 
 \appendix
 \section{Experimental Controls}
@@ -313,9 +440,14 @@ For every realized condition, the experiment record contains dataset version; el
   \item[Natural anchor.] The full eligible natural training partition. It is descriptive and may have a different size from controlled conditions.
   \item[Size-matched balanced reference.] A training subset with total support $T$ and approximately equal class counts; it defines the counterfactual reference in $D_M$.
   \item[Imbalance severity.] The requested training allocation summarized by $\rho$; achieved severity is computed from realized integer counts.
+  \item[Pilot level.] A candidate number of independent training units per class used in the balanced CE support-stability study.
   \item[Tail assignment.] The locked mapping from semantic classes to positions in the constructed support profile.
+  \item[Comparison unit.] One dataset, prediction regime, imbalance severity, and tail assignment evaluated together.
+  \item[Deficit gate.] A prespecified threshold rule that determines whether an observed discrimination or calibration deficit is large and precise enough for recovery analysis.
   \item[Imbalance deficit.] The paired balanced-CE minus imbalanced-CE difference at common $T$ and on the same held-out cases.
   \item[Recovery.] A method's improvement over imbalanced CE divided by the evidenced imbalance deficit.
+  \item[Kish effective patient count.] The equally weighted patient count with the same weight concentration as one bootstrap replicate.
+  \item[Intraclass correlation.] The estimated similarity of class margins from patches belonging to the same patient or slide cluster.
   \item[Patch-micro estimate.] A metric computed over eligible patch predictions, with patient-clustered uncertainty.
   \item[Patient-macro estimate.] An equal-weight aggregation over slides or patients, limiting domination by heavily tiled cases.
 \end{description}
