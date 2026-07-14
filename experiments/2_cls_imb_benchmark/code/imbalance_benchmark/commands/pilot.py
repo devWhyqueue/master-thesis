@@ -161,6 +161,11 @@ def _pilot_report_payload(
         "pilot_exceptions": (
             ["five-slide MIL pilot uses one slide from each of five distinct patients"]
             if is_mil and 5 in levels
+            else [
+                "five-patient patch pilot uses equal patient quotas and records "
+                "the level-specific contribution-cap exception"
+            ]
+            if 5 in levels
             else []
         ),
         "excluded": levels[-1] < definitive_floor or not floor_met,

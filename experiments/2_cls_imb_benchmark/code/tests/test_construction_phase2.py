@@ -262,6 +262,30 @@ def test_mil_pilot_level_five_uses_one_slide_per_patient():
     assert manifest["case_id"].nunique() == 5
 
 
+def test_patch_pilot_level_five_records_the_unavoidable_patient_cap_exception():
+    """Five equal patient quotas imply 20% patient support while retaining slide caps."""
+    rows = [
+        {
+            "case_id": f"PAT_{patient}",
+            "slide_id": f"PAT_{patient}_SLIDE_{slide}",
+            "patch_id": f"PAT_{patient}_SLIDE_{slide}_PATCH_{patch}",
+            "cancer_type": "class_A",
+        }
+        for patient in range(10)
+        for slide in range(4)
+        for patch in range(2)
+    ]
+    frame = pd.DataFrame(rows)
+
+    quota = compute_pilot_quota(frame, ["class_A"], level=5, seed=0)
+    manifest = build_patch_pilot_manifest(frame, ["class_A"], 5, quota, seed=0)
+
+    assert manifest["case_id"].value_counts().max() / len(manifest) == pytest.approx(
+        0.2
+    )
+    assert manifest["slide_id"].value_counts().max() / len(manifest) <= 0.05
+
+
 def test_compute_pilot_quota_is_feasible_for_every_class():
     df = pd.concat(
         [

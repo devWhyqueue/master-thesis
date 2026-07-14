@@ -38,6 +38,7 @@ __all__ = [
 ]
 
 PILOT_CANDIDATE_LEVELS = (5, 10, 15, 20, 30)
+PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL = 5
 
 
 def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
@@ -69,16 +70,23 @@ def compute_pilot_quota(
             raise ValueError("Pilot ordering failed.")
         for q in range(int(counts.min()), 0, -1):
             sel = _apportion_quota(c_df, pats, q, seed)
-            n = len(sel)
-            if (
-                sel["case_id"].value_counts().max() / n <= 0.10
-                and sel["slide_id"].value_counts().max() / n <= 0.05
-            ):
+            if _patch_pilot_caps_hold(sel, level):
                 quotas.append(q)
                 break
         else:
             raise ValueError("Pilot inventory cannot satisfy patient and slide caps")
     return max(1, min(quotas))
+
+
+def _patch_pilot_caps_hold(selection: pd.DataFrame, level: int) -> bool:
+    """Apply contribution caps except at the recorded five-patient pilot exception."""
+    if level == PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL:
+        return True
+    total = len(selection)
+    return (
+        selection["case_id"].value_counts().max() / total <= 0.10
+        and selection["slide_id"].value_counts().max() / total <= 0.05
+    )
 
 
 def frozen_pilot_quota(
@@ -125,6 +133,10 @@ def build_patch_pilot_manifest(
         v = sel["case_id"].value_counts()
         if len(v) != level or not (v == quota).all():
             raise ValueError("Pilot quota is not feasible for every selected patient")
+        if not _patch_pilot_caps_hold(sel, level):
+            raise ValueError(
+                "Pilot manifest violates the patient or slide contribution cap"
+            )
         parts.append(sel)
     return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
