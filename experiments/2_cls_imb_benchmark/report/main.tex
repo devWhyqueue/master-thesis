@@ -183,7 +183,43 @@ Evaluation separates predictive discrimination, probability quality, mitigation 
 \subsection{Endpoints and aggregation units}
 The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Quadratic-weighted kappa and ordinal mean absolute error are additional secondary outcomes for PANDA ISUP grade. Overall accuracy is descriptive. Patch predictions are summarized in two ways: patch-micro estimates treat eligible patches as predictions while uncertainty remains patient-clustered, and slide/patient-macro estimates first aggregate the metric contribution within each slide or patient so that heavily tiled slides do not dominate. WSI outcomes are slide-level with patient clustering where patients contribute multiple slides.
 
-Probability quality is assessed at two weightings. Natural-prevalence NLL and multiclass Brier score are deployment-facing summaries for the held-out cohort. Macro NLL, defined as the unweighted mean of class-conditional NLL, and classwise Brier scores are tail-sensitive summaries; Brier scores are additionally averaged within the locked head, body, and tail groups. Reliability diagrams are shown overall and for the tail group. ECE is secondary because it depends on binning and can be unstable with small classwise samples \citep{brier1950verification,naeini2015obtaining}. The number and boundaries of confidence bins are fixed before evaluation, and uncertainty accompanies ECE. Because checkpoints and hyperparameters are selected for natural-validation balanced accuracy, all probability-quality results describe the calibration of discrimination-selected models rather than of models optimized for calibration; temperature scaling and the target-prior correction are the only calibration-specific adjustments applied after selection.
+Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$. Probability quality is assessed at natural-prevalence and class-balanced weightings.
+
+\paragraph{Negative log likelihood.}
+Natural-prevalence negative log likelihood (NLL), also called multiclass log loss, is
+\begin{equation}
+  \mathrm{NLL}=-\frac{1}{N}\sum_{i=1}^{N}\log \hat{p}_{i,y_i}.
+  \label{eq:nll}
+\end{equation}
+\noindent Lower NLL indicates that more probability mass is assigned to the true class. The implementation clips $\hat{p}_{i,y_i}$ to $[10^{-12},1]$ before taking the logarithm. To prevent common classes from dominating probability-quality summaries, class-conditional NLL and macro NLL are
+\begin{equation}
+  \mathrm{NLL}_c=-\frac{1}{N_c}\sum_{i:y_i=c}\log \hat{p}_{ic},
+  \qquad
+  \mathrm{NLL}_{\mathrm{macro}}=\frac{1}{C}\sum_{c=1}^{C}\mathrm{NLL}_c,
+  \label{eq:macro-nll}
+\end{equation}
+\noindent where $N_c$ is the number of held-out predictions from class $c$. Natural-prevalence NLL is the deployment-facing summary for the observed held-out cohort; macro NLL and unweighted head, body, and tail averages of $\mathrm{NLL}_c$ are tail-sensitive summaries.
+
+\paragraph{Multiclass Brier score.}
+The multiclass Brier score penalizes squared error across the full predicted distribution \citep{brier1950verification}:
+\begin{equation}
+  \mathrm{BS}=\frac{1}{N}\sum_{i=1}^{N}
+  \left\|\hat{\mathbf{p}}_i-Y_i\right\|_2^2.
+  \label{eq:brier}
+\end{equation}
+\noindent Lower values indicate better probability quality. The natural-prevalence score averages this error over the complete held-out cohort. Classwise scores apply the same full-distribution error only to predictions with $y_i=c$. Their unweighted averages provide head, body, and tail summaries.
+
+\paragraph{Expected calibration error.}
+For each prediction, let $\hat{y}_i=\arg\max_c\hat{p}_{ic}$ and $q_i=\max_c\hat{p}_{ic}$. Expected calibration error (ECE) partitions confidence into $B=10$ fixed equal-width bins on $[0,1]$ and compares mean confidence with empirical accuracy in each nonempty bin \citep{naeini2015obtaining}:
+\begin{equation}
+  \mathrm{ECE}=\sum_{b=1}^{B}\frac{|I_b|}{N}
+  \left|\frac{1}{|I_b|}\sum_{i\in I_b}\mathbb{1}[\hat{y}_i=y_i]
+  -\frac{1}{|I_b|}\sum_{i\in I_b}q_i\right|,
+  \label{eq:ece}
+\end{equation}
+\noindent where $I_b$ contains the predictions assigned to bin $b$. ECE is secondary because it depends on binning and can be unstable with small classwise samples; its bootstrap uncertainty uses the same fixed bins and patient weights as the other endpoints. Reliability diagrams show the binwise confidence--accuracy relation overall and for the tail group.
+
+Because checkpoints and hyperparameters are selected for natural-validation balanced accuracy, all probability-quality results describe discrimination-selected models rather than models optimized for calibration. Temperature scaling and target-prior correction are the only calibration-specific adjustments applied after selection.
 
 Scores for balanced decisions are kept distinct from probabilities for the natural target prevalence. For an ordinary CE score $z_c^{\mathrm{CE}}$ and realized training prior $\pi_c^{\mathrm{train}}$, post-hoc logit adjustment uses $z_c^{\mathrm{CE}}-\tau\log\pi_c^{\mathrm{train}}$ for balanced-accuracy decisions. It is not reported as a naturally calibrated probability. Under the prior-shift assumption, target-prevalence probabilities instead normalize
 \begin{equation}

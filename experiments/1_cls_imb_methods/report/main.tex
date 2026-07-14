@@ -13,8 +13,8 @@
 \usetikzlibrary{arrows.meta,positioning}
 \sisetup{group-separator={,}, group-minimum-digits=4}
 
-\title{Class Imbalance Mitigation:\\
-Methods and Evaluation Framework}
+\title{Class-Imbalance Mitigation in Computational Pathology:\\
+Methods for Patch Classification and WSI-Level MIL}
 \author{Yannik Queisler}
 \date{\today}
 
@@ -22,7 +22,7 @@ Methods and Evaluation Framework}
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report is the authoritative method reference for the class-imbalance benchmark. It defines sampling, loss, prior-correction, decoupled-classifier, set-learning, feature-mixing, contrastive-MIL, and dual-expert interventions in the input form each consumes, with cross-entropy as the no-mitigation reference. It also distinguishes faithful source implementations from deliberately adapted variants and defines the discrimination and calibration quantities used by the companion protocol.
+\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report is the authoritative method reference for the class-imbalance benchmark. It defines sampling, loss, prior-correction, decoupled-classifier, set-learning, feature-mixing, contrastive-MIL, and dual-expert interventions in the input form each consumes, with cross-entropy as the no-mitigation reference. It also distinguishes faithful source implementations from deliberately adapted variants and states the output semantics and assumptions needed to interpret each intervention.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -34,7 +34,7 @@ Class imbalance changes what a pathology classifier is rewarded for learning. Wh
 
 Imbalance methods often assume a specific prediction unit. Image-level methods use labeled images, image embeddings, or directly generated image samples, whereas WSI-level methods use weak labels over bags of instances together with attention, instance ranking, or bag-level representation learning. Each method family is therefore described in the input form it is designed to consume. The broader computational-pathology pipeline these regimes sit in---whole-slide imaging, patching into tiles, and weakly supervised multiple-instance learning over frozen foundation-model features---is introduced in the companion datasets report \citep{queisler2026datasets}.
 
-This report has two purposes. Section~\ref{sec:methods} introduces the class-imbalance mitigation methods themselves, organized by the level at which they intervene and stated in enough mathematical detail to make the imbalance mechanism explicit. Section~\ref{sec:evaluation} then introduces the evaluation framework: the discrimination metrics used to rank methods and the probability-quality metrics used to judge whether their reported confidences are trustworthy. The aim is not to introduce a new mitigation method, but to fix the method definitions and evaluation protocol used when instantiating these methods on specific pathology datasets.
+This report defines the class-imbalance mitigation methods themselves, organized by the level at which they intervene and stated in enough mathematical detail to make the imbalance mechanism explicit. The aim is not to introduce a new mitigation method, but to fix the method definitions, assumptions, and fidelity qualifications used when instantiating these methods on specific pathology datasets. The companion experimental protocol defines the controlled datasets, validation grids, evaluation endpoints, calibration procedure, aggregation units, and statistical analysis.
 
 \paragraph{Prediction regimes.}
 Two prediction regimes recur throughout the benchmarks. In the \emph{patch} regime, each labeled crop is an independent example: a frozen foundation-model encoder such as Virchow2 embeds the patch once, and a lightweight classifier head is trained on the resulting embedding \citep{zimmermann2024virchow2,vorontsov2024virchow}. In the \emph{WSI-bag} regime, a slide is represented as a bag of frozen patch-feature instances that share one weak slide-level label, and an attention-based MIL head aggregates the instances into a slide prediction. Both regimes consume embeddings from the same pathology foundation-model family but differ in supervision unit. Freezing the encoder isolates imbalance interventions from end-to-end backbone learning. Each non-baseline method exposes one imbalance-specific control; the concrete validation grids are reported in the companion experimental protocol.
@@ -394,56 +394,9 @@ At validation and test time, each slide bag is evaluated once in natural order w
 \end{equation}
 \noindent MDE-inspired dual-expert MIL is categorized as a hybrid WSI method because it couples two sampling distributions with an optional consistency regularizer rather than changing only the sampler or only the per-example loss.
 
-\section{Evaluation Framework}
-\label{sec:evaluation}
-Methods are compared within a regime, never by treating patch and WSI-bag predictions as exchangeable. Balanced accuracy (equivalently macro recall in single-label multiclass classification) is the primary endpoint because it gives every class equal weight. Macro F1, classwise precision/recall/F1, and class-group head/body/tail recall are secondary discrimination outcomes. These quantities do not by themselves establish whether reported probabilities are trustworthy. The framework therefore also reports NLL and multiclass Brier score, reliability diagrams, and ECE as a bin-dependent secondary summary \citep{mosquera2024classImbalance}.
-
-Let $N$ denote the number of held-out examples in one benchmark split, $C$ the number of cancer types, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the corresponding softmax probability vector with $\sum_c \hat{p}_{ic}=1$. Write $Y_i\in\{0,1\}^C$ for the one-hot encoding of $y_i$. The same three metrics are computed once from raw final-epoch probabilities and once after the post-hoc temperature-scaling protocol.
-
-\paragraph{Negative log likelihood.}
-Cross-entropy training optimizes the log-probability of the correct class. A natural held-out analogue is the average negative log likelihood (NLL), also called multiclass log loss:
-\begin{equation}
-  \mathrm{NLL} =
-  -\frac{1}{N}\sum_{i=1}^{N}\log \hat{p}_{i,y_i}.
-  \label{eq:nll}
-\end{equation}
-\noindent Lower NLL means the model assigns higher probability mass to the true class on average. NLL therefore measures both whether the top prediction is correct and how sharply probability is placed on that class: a correct but overconfident model and a correct but cautious model can have different NLL even when their hard-error rates match. In implementation, $\hat{p}_{i,y_i}$ is clipped to $[10^{-12},1]$ before taking the logarithm so that numerical underflow does not dominate the score when a class receives extremely small probability.
-
-\paragraph{Multiclass Brier score.}
-The Brier score was introduced for probabilistic forecasts and penalizes the entire predicted distribution rather than only the argmax label \citep{brier1950verification}. For multiclass problems it is the mean squared error between $\hat{\mathbf{p}}_i$ and $Y_i$:
-\begin{equation}
-  \mathrm{BS} =
-  \frac{1}{N}\sum_{i=1}^{N}\sum_{c=1}^{C}
-  \bigl(\hat{p}_{ic}-\mathbb{1}[y_i=c]\bigr)^2
-  =
-  \frac{1}{N}\sum_{i=1}^{N}\|\hat{\mathbf{p}}_i-Y_i\|_2^2.
-  \label{eq:brier}
-\end{equation}
-\noindent Lower BS is better. The score is minimized when $\hat{\mathbf{p}}_i$ equals the true class indicator and increases when probability leaks into incorrect classes. Unlike NLL, BS is bounded and symmetric in probability errors across classes, so it is less dominated by a single very small $\hat{p}_{i,y_i}$. Together, NLL and BS evaluate overall distributional fit on the test split.
-
-\paragraph{Expected calibration error.}
-Discrimination and distributional fit can still leave confidence misaligned with empirical accuracy. Expected calibration error (ECE) measures that gap using confidence bins \citep{naeini2015obtaining,guo2017calibration}. For each example define the predicted class $\hat{y}_i=\arg\max_c \hat{p}_{ic}$ and the confidence $c_i=\max_c \hat{p}_{ic}$. Partition examples into $B=10$ equal-width bins on $[0,1]$ with edges $\tau_0=0<\tau_1<\cdots<\tau_{10}=1$ and intervals $(\tau_{b-1},\tau_b]$. Let $B_b=\{i: c_i\in(\tau_{b-1},\tau_b]\}$. The bin accuracy and mean confidence are
-\begin{equation}
-  \mathrm{acc}(B_b)=\frac{1}{|B_b|}\sum_{i\in B_b}\mathbb{1}[\hat{y}_i=y_i],
-  \qquad
-  \overline{c}(B_b)=\frac{1}{|B_b|}\sum_{i\in B_b} c_i.
-  \label{eq:ece-bin}
-\end{equation}
-\noindent ECE is the size-weighted average absolute gap between these quantities:
-\begin{equation}
-  \mathrm{ECE} =
-  \sum_{b=1}^{B}\frac{|B_b|}{N}
-  \left|\mathrm{acc}(B_b)-\overline{c}(B_b)\right|.
-  \label{eq:ece}
-\end{equation}
-\noindent Lower ECE is better. Intuitively, if a model reports $c_i\approx 0.9$ on many examples, then roughly 90\% of those examples should be correct; large systematic deviations indicate over- or under-confidence. ECE is coarse---it depends on binning and uses only the maximum predicted probability---but it is useful here because it separates confidence alignment from headline discrimination and highlights cases where a method improves macro F1 without improving the reliability of its reported probabilities. Reliability diagrams plot empirical accuracy against mean predicted confidence within each bin and make systematic over- or under-confidence visible as departures from the diagonal.
-
-\paragraph{Post-hoc temperature calibration.}
-Calibration is evaluated with one unified post-hoc protocol for every method. For each method and seed, a single positive temperature $T$ is fit on the validation split by minimizing NLL, then applied unchanged to that seed's held-out test score matrix before softmax \citep{guo2017calibration}. The temperature-scaled table is the decision-facing probability comparison; the raw final-epoch probabilities are retained only as a diagnostic of the uncalibrated model outputs. Temperature scaling leaves argmax rankings unchanged but corrects confidence scale, which is especially important for CFAL because its affinity outputs are ranking scores rather than likelihood-trained probabilities.
-
 \section{Summary}
 \label{sec:summary}
-This report defines the benchmark's no-mitigation references (CE and MIL CE) and its retained interventions: balanced sampling, class-weighted CE, focal loss, train-time and post-hoc logit adjustment, soft-F1, soft-MCC, CFAL, OKO, RankMix-inspired feature mixing, cRT, SC-MIL, and MDE-inspired dual-expert MIL. Balanced Softmax is recorded as related prior-correction literature rather than an additional tested method. The definitions make the tested adaptations and ablations explicit and establish balanced accuracy as the primary endpoint, with discrimination and calibration evaluated jointly in the companion experimental protocol.
+This report defines the benchmark's no-mitigation references (CE and MIL CE) and its retained interventions: balanced sampling, class-weighted CE, focal loss, train-time and post-hoc logit adjustment, soft-F1, soft-MCC, CFAL, OKO, RankMix-inspired feature mixing, cRT, SC-MIL, and MDE-inspired dual-expert MIL. Balanced Softmax is recorded as related prior-correction literature rather than an additional tested method. The definitions make the tested adaptations, output semantics, and ablations explicit; the companion experimental protocol defines how their discrimination, probability quality, and mitigation recovery are evaluated.
 
 \clearpage
 \bibliographystyle{plainnat}
