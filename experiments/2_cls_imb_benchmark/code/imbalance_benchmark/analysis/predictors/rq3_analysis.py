@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 import json
 
 import numpy as np
+import pandas as pd
 
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
     fit_gate_pass_model,
+    fit_linked_sensitivity_models,
     fit_recovery_model,
-    fit_sensitivity_models,
     leave_one_group_out,
 )
 from imbalance_benchmark.analysis.predictors.separability import (
+    class_margin_cross_fit,
     condition_learnability,
+    effective_support,
     intrinsic_separability,
+    intraclass_correlation,
 )
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 
@@ -40,17 +44,15 @@ def _feature_frame(
     return np.asarray(features), dataset.get_int_targets()
 
 
-def _min_independent_support(freeze: dict[str, Any]) -> float:
-    """Smallest realized per-class allocated support across the balanced condition."""
-    allocated = (
-        freeze.get("conditions", {}).get("balanced", {}).get("allocated_counts", {})
-    )
-    values = [v for v in allocated.values() if v]
+def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
+    """Return the smallest contributing-patient/slide support in one condition."""
+    key = "n_slides" if is_mil else "n_patients"
+    values = [stats[key] for stats in condition["contribution_stats"].values()]
     return float(min(values)) if values else 1.0
 
 
 def _covariates(
-    paths: dict[str, Path], is_mil: bool, freeze: dict[str, Any]
+    paths: dict[str, Path], is_mil: bool, condition: dict[str, Any]
 ) -> dict[str, Any]:
     """Frozen-feature RQ3 covariates measured before mitigation fitting.
 
@@ -64,16 +66,34 @@ def _covariates(
     val_x, val_y = _feature_frame(paths["data"] / "manifest.csv", "validation", is_mil)
     n_classes = len(np.unique(ref_y))
     intrinsic = intrinsic_separability(ref_x, ref_y, val_x, val_y, n_classes)
-    severe = paths["data"] / "manifest_severe.csv"
-    cond_path = severe if severe.exists() else paths["data"] / "manifest_balanced.csv"
+    cond_path = Path(condition["path"])
+    if not cond_path.exists():
+        raise RuntimeError(f"Missing frozen controlled manifest for RQ3: {cond_path}")
     cond_x, cond_y = _feature_frame(cond_path, None, is_mil)
     learnability = condition_learnability(cond_x, cond_y, val_x, val_y, n_classes)
+    frame = pd.read_csv(cond_path)
+    margins = class_margin_cross_fit(
+        cond_x, cond_y, frame["case_id"].astype(str).to_numpy(), n_classes
+    )
+    effective = []
+    for class_index in range(n_classes):
+        mask = cond_y == class_index
+        class_cases = frame.loc[mask, "case_id"].astype(str).to_numpy()
+        counts = pd.Series(class_cases).value_counts()
+        effective.append(
+            effective_support(
+                int(mask.sum()),
+                float(counts.mean()),
+                intraclass_correlation(margins[mask], class_cases),
+            )
+        )
     return {
         "separability": float(intrinsic["linear_probe_macro_recall"]),
         "knn_macro_recall": float(intrinsic["knn_macro_recall"]),
         "per_class_nn_error": intrinsic["per_class_nn_error"],
         "learnability": float(learnability["linear_probe_macro_recall"]),
-        "log_min_support": float(np.log(_min_independent_support(freeze))),
+        "log_min_support": float(np.log(_min_independent_support(condition, is_mil))),
+        "log_effective_support": float(np.log(max(1.0, min(effective)))),
         "is_wsi": 1.0 if is_mil else 0.0,
     }
 
@@ -95,10 +115,11 @@ def _recovery_standard_error(comparison: dict[str, Any]) -> float:
 
 
 def _cells(
+    paths: dict[str, Path],
     comparisons: list[dict[str, Any]],
     freeze: dict[str, Any],
     group: str,
-    covariates: dict[str, Any],
+    is_mil: bool,
 ) -> list[dict[str, Any]]:
     """Turn gate/recovery output into the three linked RQ3 observation sets."""
     gate_map = {(row["assignment"], row["severity"]): False for row in comparisons}
@@ -120,7 +141,7 @@ def _cells(
                 "recovery": row.get("recovery", np.nan),
                 "recovery_se": _recovery_standard_error(row),
                 "method": row["method"],
-                **covariates,
+                **_covariates(paths, is_mil, allocated),
             }
         )
     return cells
@@ -140,8 +161,8 @@ def run_rq3(
     and covariates each split contributes to that combined analysis.
     """
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    group = f"{config.get('dataset', {}).get('name', 'unknown')}:{'wsi' if is_mil else 'patch'}"
-    cells = _cells(comparisons, freeze, group, _covariates(paths, is_mil, freeze))
+    group = str(config.get("dataset", {}).get("name", "unknown"))
+    cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
     return {
@@ -168,7 +189,11 @@ def cross_dataset_rq3(cells: list[dict[str, Any]]) -> dict[str, Any]:
             "deficit": fit_deficit_model(deficit_cells) if deficit_cells else {},
             "recovery": fit_recovery_model(recovery_cells),
         },
-        "sensitivity": fit_sensitivity_models(deficit_cells) if deficit_cells else {},
+        "sensitivity": (
+            fit_linked_sensitivity_models(deficit_cells, recovery_cells)
+            if deficit_cells
+            else {}
+        ),
         "leave_one_group_out": leave_one_group_out(deficit_cells)
         if len(groups) > 1
         else {},
@@ -176,11 +201,24 @@ def cross_dataset_rq3(cells: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def load_rq3_cells(analysis_roots: list[Path]) -> list[dict[str, Any]]:
-    """Gather every analyzed dataset-regime's RQ3 cells for the combined fit."""
+    """Equal-average split repetitions before fitting dataset-target RQ3 cells."""
     cells: list[dict[str, Any]] = []
     for root in analysis_roots:
         for index in range(3):
             rq3_path = root / f"split={index}" / "data" / "rq3.json"
             if rq3_path.exists():
                 cells.extend(json.loads(rq3_path.read_text()).get("cells", []))
-    return cells
+    if not cells:
+        return []
+    frame = pd.DataFrame(cells)
+    keys = ["group", "assignment", "severity", "method"]
+    bool_columns = ["gate_passed"]
+    numeric = [
+        column
+        for column in frame.select_dtypes(include=["number"]).columns
+        if column not in keys
+    ]
+    averaged = cast(pd.DataFrame, frame.groupby(keys, as_index=False)[numeric].mean())
+    for column in bool_columns:
+        averaged[column] = frame.groupby(keys)[column].all().to_numpy()
+    return averaged.to_dict(orient="records")

@@ -22,6 +22,7 @@ from imbalance_benchmark.construction import (
 from imbalance_benchmark.manifest.freeze import build_tail_assignments
 from imbalance_benchmark.manifest.freezing import _build_conditions
 from imbalance_benchmark.manifest.pilot import (
+    build_patch_pilot_manifest,
     compute_pilot_quota,
     frozen_pilot_quota,
     meets_method_floor,
@@ -80,7 +81,7 @@ def test_evidence_seed_is_stable_when_a_semantic_class_changes_tail_rank(
 def test_patch_conditions_record_one_fixed_patient_slide_pool(tmp_path: Path) -> None:
     frame = pd.concat([_patches("A"), _patches("B")], ignore_index=True)
 
-    conditions = _build_conditions(frame, ["A", "B"], 200, 20, False, 8, tmp_path)
+    conditions = _build_conditions(frame, ["A", "B"], 80, 20, False, 8, tmp_path)
 
     assert conditions["balanced"]["evidence_pool_hash"] == conditions["moderate"]["evidence_pool_hash"]
     assert conditions["moderate"]["evidence_pool_hash"] == conditions["severe"]["evidence_pool_hash"]
@@ -105,6 +106,28 @@ def test_smaller_patch_allocation_is_a_nested_subset_of_the_larger_pool() -> Non
     assert set(small["case_id"]) <= set(large["case_id"])
     assert set(small["slide_id"]) <= set(large["slide_id"])
     assert small["case_id"].nunique() == large["case_id"].nunique()
+
+
+def test_patch_conditions_use_the_same_designated_patient_and_slide_pools(
+    tmp_path: Path,
+) -> None:
+    """Controlled patch conditions must retain one explicit, identical evidence pool."""
+    frame = pd.concat([_patches("A", 30), _patches("B", 30)], ignore_index=True)
+
+    conditions = _build_conditions(
+        frame, ["A", "B"], 80, 20, False, 4, tmp_path
+    )
+    pools = {
+        name: pd.read_csv(info["path"])
+        .groupby("cancer_type")[["case_id", "slide_id"]]
+        .agg(lambda values: frozenset(values))
+        for name, info in conditions.items()
+    }
+
+    # The fixed design pool is retained in every condition, rather than merely
+    # making smaller selections nested subsets of the larger one.
+    assert pools["balanced"].equals(pools["moderate"])
+    assert pools["balanced"].equals(pools["severe"])
 
 
 def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> None:
@@ -155,6 +178,29 @@ def test_pilot_quota_is_frozen_across_construction_orderings() -> None:
     assert all(frozen <= value for value in per_seed)
 
 
+def test_pilot_quota_respects_the_slide_contribution_cap() -> None:
+    """A pilot cannot put 10% of its patches on one slide when the cap is 5%."""
+    rows = []
+    for patient in range(10):
+        for slide, count in enumerate((9, 1)):
+            rows.extend(
+                {
+                    "case_id": f"p{patient}",
+                    "slide_id": f"p{patient}_s{slide}",
+                    "cancer_type": "A",
+                    "split": "train",
+                }
+                for _ in range(count)
+            )
+    frame = pd.DataFrame(rows)
+
+    quota = compute_pilot_quota(frame, ["A"], level=10, seed=0)
+    manifest = build_patch_pilot_manifest(frame, ["A"], 10, quota, seed=0)
+
+    assert quota < 10
+    assert manifest["slide_id"].value_counts().max() / len(manifest) <= 0.05
+
+
 @pytest.mark.parametrize("seed", range(60))
 def test_random_tail_assignment_is_distinct_from_native_and_rotated(seed: int) -> None:
     """The random permutation must not duplicate the native or rotated assignment."""
@@ -203,6 +249,12 @@ def test_complete_confirmation_block_stacks_all_five_seeds(tmp_path: Path) -> No
 
     assert stacked is not None
     assert stacked["preds"].shape[0] == 5
+
+
+def test_missing_confirmation_method_is_not_silently_skipped(tmp_path: Path) -> None:
+    """A roster method with no directory is a failed confirmation block."""
+    with pytest.raises(RuntimeError, match="missing"):
+        load_seed_predictions({"results": tmp_path}, "severe", "weighted_ce", "native")
 
 
 def test_method_floor_requires_patients_and_slides_together() -> None:
@@ -279,6 +331,21 @@ def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
         verify_signed_file(unsigned)
 
 
+def test_freeze_metadata_is_content_locked(tmp_path: Path) -> None:
+    """Changing a frozen design field must be detected even without a CSV edit."""
+    from imbalance_benchmark.common import write_json
+    from imbalance_benchmark.manifest.freeze import lock_manifest_freeze, verify_manifest_freeze
+
+    freeze_path = tmp_path / "manifest_freeze.json"
+    write_json(freeze_path, {"shared_T": 100, "conditions": {}})
+    freeze = lock_manifest_freeze({"shared_T": 100, "conditions": {}})
+    verify_manifest_freeze(freeze)
+
+    freeze["shared_T"] = 200
+    with pytest.raises(RuntimeError, match="content"):
+        verify_manifest_freeze(freeze)
+
+
 def test_test_prediction_hash_is_prediction_sensitive() -> None:
     from imbalance_benchmark.modeling.workflows.confirmation import _test_prediction_hash
 
@@ -307,6 +374,10 @@ def test_clustered_endpoints_report_slide_and_patient_macro_nll_and_brier() -> N
     out = clustered_endpoints(labels, predictions, probabilities, identity, seed=0)
 
     for key in (
+        "slide_macro_balanced_accuracy",
+        "patient_macro_balanced_accuracy",
+        "slide_macro_f1",
+        "patient_macro_f1",
         "slide_macro_nll",
         "patient_macro_nll",
         "slide_macro_brier",
@@ -428,6 +499,44 @@ def test_cross_dataset_rq3_pools_groups_and_reports_stability() -> None:
     assert len(report["models"]["deficit"]["rand_intercepts"]) == 4
     assert set(report["sensitivity"]) == {"learnability", "log_min_support", "is_wsi"}
     assert set(report["leave_one_group_out"]) == set(report["groups"])
+
+
+def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) -> None:
+    """Three patient splits are fixed repetitions, not independent RQ3 cells."""
+    from imbalance_benchmark.analysis.predictors.rq3_analysis import load_rq3_cells
+    from imbalance_benchmark.common import write_json
+
+    for split, deficit in enumerate((0.1, 0.2, 0.3)):
+        write_json(
+            tmp_path / f"split={split}" / "data" / "rq3.json",
+            {
+                "cells": [
+                    {
+                        "group": "tcga-ut",
+                        "assignment": "native",
+                        "severity": "severe",
+                        "method": "ce",
+                        "rho": 10.0,
+                        "separability": 0.5,
+                        "learnability": 0.4,
+                        "log_min_support": 2.0,
+                        "log_effective_support": 1.0,
+                        "is_wsi": 0.0,
+                        "gate_passed": True,
+                        "deficit_ba": deficit,
+                        "deficit_se": 0.01,
+                        "recovery": np.nan,
+                        "recovery_se": np.nan,
+                    }
+                ]
+            },
+        )
+
+    cells = load_rq3_cells([tmp_path])
+
+    assert len(cells) == 1
+    assert cells[0]["group"] == "tcga-ut"
+    assert cells[0]["deficit_ba"] == pytest.approx(0.2)
 
 
 def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None:

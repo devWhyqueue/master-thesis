@@ -14,12 +14,18 @@ __all__ = [
     "fit_deficit_model",
     "fit_recovery_model",
     "fit_sensitivity_models",
+    "fit_linked_sensitivity_models",
     "leave_one_group_out",
 ]
 
 # Descriptive covariates entered only as single-predictor sensitivity fits, never
 # jointly with the two primary predictors (report §"Predictors of damage...").
-SENSITIVITY_COVARIATES = ("learnability", "log_min_support", "is_wsi")
+SENSITIVITY_COVARIATES = (
+    "learnability",
+    "log_min_support",
+    "log_effective_support",
+    "is_wsi",
+)
 
 
 class RQ3Cell(dict):
@@ -87,6 +93,45 @@ def fit_sensitivity_models(cells: list[dict[str, Any]]) -> dict[str, Any]:
         x = np.array([[float(c[name])] for c in cells], dtype=np.float64)
         out[name] = fit_rq3_model(y, x, groups, s_errors, is_logistic=False)
     return out
+
+
+def fit_linked_sensitivity_models(
+    deficit_cells: list[dict[str, Any]], recovery_cells: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Fit every descriptive sensitivity predictor for all three linked outcomes."""
+    out: dict[str, Any] = {}
+    for name in SENSITIVITY_COVARIATES:
+        if not all(name in cell for cell in deficit_cells):
+            continue
+        out[name] = {
+            "gate_pass": _sensitivity_fit(deficit_cells, name, "gate_pass"),
+            "deficit": _sensitivity_fit(deficit_cells, name, "deficit"),
+            "recovery": _sensitivity_fit(recovery_cells, name, "recovery"),
+        }
+    return out
+
+
+def _sensitivity_fit(
+    cells: list[dict[str, Any]], name: str, outcome: str
+) -> dict[str, Any]:
+    """Fit one sensitivity covariate for one linked RQ3 outcome."""
+    selected = (
+        cells if outcome != "recovery" else [c for c in cells if c["gate_passed"]]
+    )
+    if not selected:
+        return {}
+    x = np.array([[float(cell[name])] for cell in selected], dtype=np.float64)
+    groups = np.array([cell["group"] for cell in selected])
+    if outcome == "gate_pass":
+        y = np.array([float(cell["gate_passed"]) for cell in selected])
+        errors, logistic = np.zeros(len(selected)), True
+    else:
+        value = "deficit_ba" if outcome == "deficit" else "recovery"
+        error = "deficit_se" if outcome == "deficit" else "recovery_se"
+        y = np.array([cell[value] for cell in selected])
+        errors = np.array([np.nan_to_num(cell[error]) for cell in selected])
+        logistic = False
+    return fit_rq3_model(y, x, groups, errors, is_logistic=logistic)
 
 
 def leave_one_group_out(cells: list[dict[str, Any]]) -> dict[str, Any]:

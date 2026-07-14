@@ -7,13 +7,19 @@ from typing import Any, TypeVar, cast
 import numpy as np
 import pandas as pd
 
-from imbalance_benchmark.common import compute_sha256
+from imbalance_benchmark.common import (
+    compute_data_hash,
+    compute_sha256,
+    verify_signed_file,
+)
+from imbalance_benchmark.construction import build_manifest_hash
 
 __all__ = [
     "normalized_entropy",
     "achieved_rho",
     "contribution_stats",
     "build_tail_assignments",
+    "lock_manifest_freeze",
     "verify_manifest_freeze",
 ]
 
@@ -115,23 +121,93 @@ def build_tail_assignments(
     }
 
 
-def verify_manifest_freeze(freeze_meta: dict[str, Any]) -> None:
-    """Refuse to proceed if any frozen condition manifest no longer matches its hash."""
-    condition_sets = [freeze_meta.get("conditions", {})]
-    condition_sets.extend(freeze_meta.get("assignment_conditions", {}).values())
-    for conditions in condition_sets:
-        for name, info in conditions.items():
-            path = Path(info["path"])
-            if not path.exists() or compute_sha256(path) != info["sha256"]:
-                raise RuntimeError(
-                    f"Manifest '{name}' at {path} no longer matches its frozen hash; "
-                    "refusing to train on an altered condition."
-                )
-    preflight = freeze_meta.get("bootstrap_preflight")
-    if preflight:
-        path = Path(preflight["path"])
-        if not path.exists() or compute_sha256(path) != preflight["sha256"]:
+def lock_manifest_freeze(freeze_meta: dict[str, Any]) -> dict[str, Any]:
+    """Attach a stable content lock to frozen design metadata."""
+    locked = dict(freeze_meta)
+    locked.pop("content_sha256", None)
+    return {**locked, "content_sha256": compute_data_hash(locked)}
+
+
+def verify_manifest_freeze(meta: dict[str, Any]) -> None:
+    """Refuse altered frozen design metadata or condition/preflight artifacts."""
+    expected = meta.get("content_sha256")
+    actual = compute_data_hash({k: v for k, v in meta.items() if k != "content_sha256"})
+    if ("shared_T" in meta or expected) and expected != actual:
+        raise RuntimeError("Frozen manifest content no longer matches its lock.")
+    if p := meta.get("path"):
+        verify_signed_file(Path(p))
+    to_verify = []
+    for conds in [
+        meta.get("conditions", {}),
+        *meta.get("assignment_conditions", {}).values(),
+    ]:
+        for name, info in conds.items():
+            to_verify.append((info["path"], info["sha256"], name))
+    if pf := meta.get("bootstrap_preflight"):
+        to_verify.append((pf["path"], pf["sha256"], None))
+    for path_str, sha, name in to_verify:
+        p = Path(path_str)
+        if not p.exists() or compute_sha256(p) != sha:
             raise RuntimeError(
-                "Frozen bootstrap preflight no longer matches its recorded hash; "
-                "refusing to train or analyse an altered design."
+                f"Manifest '{name}' altered" if name else "Preflight altered"
             )
+
+
+def _get_constraints(
+    name: str, allocated: dict[str, int], available: list[int], minimum: int
+) -> tuple[str | None, str | None]:
+    values = list(allocated.values())
+    limited = next(
+        (
+            k
+            for (k, c), cap in zip(allocated.items(), available, strict=True)
+            if c in (minimum, cap)
+        ),
+        None,
+    )
+    if name == "balanced":
+        return limited, None
+    binding = (
+        "independent-support floor"
+        if min(values) == minimum
+        else "unique-support availability"
+        if any(c == cap for c, cap in zip(values, available, strict=True))
+        else None
+    )
+    return limited, binding
+
+
+def write_condition(
+    name: str,
+    allocated: dict[str, int],
+    rows: list[pd.DataFrame],
+    pool: pd.DataFrame,
+    is_mil: bool,
+    seed: int,
+    data_dir: Path,
+    stem: str | None,
+    pool_hash: str | None,
+    available: list[int],
+    minimum: int,
+) -> dict[str, Any]:
+    """Write one controlled manifest and its construction metadata."""
+    condition = pd.concat(rows, ignore_index=True)
+    path = data_dir / f"manifest_{stem or name}.csv"
+    condition.to_csv(path, index=False)
+    limited, binding = _get_constraints(name, allocated, available, minimum)
+    return {
+        "path": str(path),
+        "sha256": compute_sha256(path),
+        "requested_rho": {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}.get(
+            name, 1.0
+        ),
+        "achieved_rho": achieved_rho(allocated),
+        "normalized_entropy": normalized_entropy(list(allocated.values())),
+        "allocated_counts": allocated,
+        "manifest_hash": build_manifest_hash(condition),
+        "contribution_stats": contribution_stats(condition, pool, is_mil),
+        "construction_seed": seed,
+        "evidence_pool_hash": pool_hash,
+        "limiting_class": limited,
+        "binding_independent_support_constraint": binding,
+    }

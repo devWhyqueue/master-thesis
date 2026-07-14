@@ -5,23 +5,14 @@ import json
 from pathlib import Path
 from typing import Any, cast
 import pandas as pd
-from imbalance_benchmark.common import (
-    compute_sha256,
-    load_config,
-)
+from imbalance_benchmark.common import load_config
 from imbalance_benchmark.construction import (
     allocate_counts,
-    build_manifest_hash,
     effective_rho,
     select_patches_round_robin,
     select_slides_round_robin,
 )
-from imbalance_benchmark.manifest.freeze import (
-    achieved_rho,
-    build_tail_assignments,
-    contribution_stats,
-    normalized_entropy,
-)
+from imbalance_benchmark.manifest.freeze import build_tail_assignments, write_condition
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.manifest.seeds import SEED_ROLES
 from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
@@ -32,6 +23,7 @@ from imbalance_benchmark.manifest.construction_helpers import (
     evidence_pool_hash,
     write_natural_condition,
 )
+from imbalance_benchmark.manifest.construction_sampling import designate_patch_pool
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 logger = logging.getLogger(__name__)
@@ -53,35 +45,6 @@ def _min_support_from_pilot(pilot_report_path: Path, is_mil: bool) -> int:
     return definitive_floor * (max(quotas) if quotas else 1)
 
 
-def _write_condition(
-    name: str,
-    allocated: dict[str, int],
-    selector_rows: list[pd.DataFrame],
-    train_df: pd.DataFrame,
-    is_mil: bool,
-    seed: int,
-    data_dir: Path,
-    file_stem: str | None = None,
-    evidence_pool_hash: str | None = None,
-) -> dict[str, Any]:
-    """Write one frozen condition manifest and report its realized statistics."""
-    cond_df = pd.concat(selector_rows, ignore_index=True)
-    path = data_dir / f"manifest_{file_stem or name}.csv"
-    cond_df.to_csv(path, index=False)
-    return {
-        "path": str(path),
-        "sha256": compute_sha256(path),
-        "requested_rho": CONDITION_RHOS.get(name, 1.0),
-        "achieved_rho": achieved_rho(allocated),
-        "normalized_entropy": normalized_entropy(list(allocated.values())),
-        "allocated_counts": allocated,
-        "manifest_hash": build_manifest_hash(cond_df),
-        "contribution_stats": contribution_stats(cond_df, train_df, is_mil),
-        "construction_seed": seed,
-        "evidence_pool_hash": evidence_pool_hash,
-    }
-
-
 def _build_conditions(
     train_df: pd.DataFrame,
     classes: list[str],
@@ -97,7 +60,6 @@ def _build_conditions(
     counts = class_support_counts(train_df, is_mil)
     available = [counts[c] for c in classes]
     selector = select_slides_round_robin if is_mil else select_patches_round_robin
-    pool_hash = evidence_pool_hash(train_df, classes, is_mil)
     allocations = {
         name: allocate_counts(
             available,
@@ -107,31 +69,51 @@ def _build_conditions(
         )
         for name in condition_names
     }
+    fixed_pools = (
+        {
+            cls: designate_patch_pool(
+                cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+                min(allocation[index] for allocation in allocations.values()),
+                class_construction_seed(seed, cls),
+                max(allocation[index] for allocation in allocations.values()),
+            )
+            for index, cls in enumerate(classes)
+        }
+        if not is_mil
+        else {}
+    )
+    pool_df = (
+        pd.concat(fixed_pools.values(), ignore_index=True) if fixed_pools else train_df
+    )
+    pool_hash = evidence_pool_hash(pool_df, classes, is_mil)
     conditions = {}
     for name in condition_names:
         allocated = allocations[name]
         rows = [
             selector(
-                cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+                fixed_pools.get(
+                    cls,
+                    cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+                ),
                 allocated[idx],
-                # The class-specific stream fixes the eligible patient/slide
-                # pool across conditions while each requested size is sampled
-                # under its own 10%/5% caps (a prefix of a large capped sample
-                # is not generally capped at the smaller size).
+                # Each condition samples from this same explicit patient/slide
+                # pool; its hash records the actual designated units.
                 seed=class_construction_seed(seed, cls),
             )
             for idx, cls in enumerate(classes)
         ]
-        conditions[name] = _write_condition(
+        conditions[name] = write_condition(
             name,
             dict(zip(classes, allocated)),
             rows,
-            train_df,
+            pool_df,
             is_mil,
             seed,
             data_dir,
             f"{file_prefix}{name}",
             pool_hash,
+            available,
+            min_support,
         )
     return conditions
 

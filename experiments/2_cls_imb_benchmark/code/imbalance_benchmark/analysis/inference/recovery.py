@@ -48,23 +48,26 @@ def _method_recoveries(
         )
         if method_rec is None:
             continue
-        out.append(
-            _method_discrimination_recovery(
-                inp, ba_deficit_dist, severity_ba, method, method_rec, disc_gate
-            )
+        discrimination = _method_discrimination_recovery(
+            inp, ba_deficit_dist, severity_ba, method, method_rec, disc_gate
         )
+        ece_dist = inp.ctx.ece_distribution(method_rec["labels"], method_rec["probs"])
+        discrimination["ece"] = float(np.nanmean(ece_dist))
+        discrimination["ece_ci"] = confidence_interval(ece_dist)
+        out.append(discrimination)
         if cal_deficit_dist is not None and severity_tail_nll is not None:
-            out.append(
-                _method_calibration_recovery(
-                    inp,
-                    cal_deficit_dist,
-                    severity_tail_nll,
-                    tail_classes,
-                    method,
-                    method_rec,
-                    cal_gate,
-                )
+            calibration = _method_calibration_recovery(
+                inp,
+                cal_deficit_dist,
+                severity_tail_nll,
+                tail_classes,
+                method,
+                method_rec,
+                cal_gate,
             )
+            calibration["ece"] = float(np.nanmean(ece_dist))
+            calibration["ece_ci"] = confidence_interval(ece_dist)
+            out.append(calibration)
     return out
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -32,13 +33,20 @@ def load_runs_frame(conn: sqlite3.Connection) -> pd.DataFrame:
 
 def load_eval_details(conn: sqlite3.Connection) -> pd.DataFrame:
     """Load ``runs`` joined with ``eval_results``, one row per run x split."""
-    return pd.read_sql_query(
+    details = pd.read_sql_query(
         "SELECT r.*, e.split, e.accuracy, e.balanced_accuracy, e.macro_precision, "
         "e.macro_recall, e.macro_f1, e.macro_nll, e.negative_log_likelihood, "
         "e.brier_score, e.expected_calibration_error, e.quadratic_weighted_kappa, "
         "e.ordinal_mean_absolute_error, e.extended_json "
         "FROM runs r JOIN eval_results e ON r.run_id = e.run_id",
         conn,
+    )
+    clustered = details["extended_json"].map(
+        lambda raw: json.loads(raw).get("clustered_endpoints", {}) if raw else {}
+    )
+    return pd.concat(
+        [details.drop(columns="extended_json"), pd.json_normalize(list(clustered))],
+        axis=1,
     )
 
 
@@ -114,17 +122,17 @@ def load_seed_predictions(
     paths: dict[str, Path], condition: str, method: str, assignment: str = "native"
 ) -> dict[str, Any] | None:
     """Stack one method's confirmed test-split predictions across its confirmation seeds."""
-    assigned_dir = paths["results"] / f"assignment={assignment}" / condition / method
-    method_dir = (
-        assigned_dir if assigned_dir.exists() else paths["results"] / condition / method
-    )
+    method_dir = _confirmation_dir(paths, condition, method, assignment)
     if not method_dir.exists():
-        return None
+        raise RuntimeError(
+            f"Required confirmation method '{method}' is missing for "
+            f"{assignment}/{condition}: {method_dir}"
+        )
     seed_dirs = sorted(
         method_dir.glob("seed=*"), key=lambda p: int(p.name.split("=")[1])
     )
     if not seed_dirs:
-        return None
+        raise RuntimeError(f"Confirmation block is missing seed runs: {method_dir}")
     _require_complete_confirmation_block(method_dir, seed_dirs)
     records = [r for d in seed_dirs if (r := read_run_record(d)) is not None]
     if not records:
@@ -137,3 +145,11 @@ def load_seed_predictions(
         "probs": np.stack([np.array(s["probabilities"]) for s in test_splits]),
         "logits": np.stack([np.array(s["logits"]) for s in test_splits]),
     }
+
+
+def _confirmation_dir(
+    paths: dict[str, Path], condition: str, method: str, assignment: str
+) -> Path:
+    """Resolve one assignment-aware confirmation directory."""
+    assigned = paths["results"] / f"assignment={assignment}" / condition / method
+    return assigned if assigned.exists() else paths["results"] / condition / method

@@ -218,7 +218,18 @@ def _equal_split_endpoints(base_paths: dict[str, Path]) -> pd.DataFrame:
         "macro_nll",
         "brier_score",
         "expected_calibration_error",
+        "quadratic_weighted_kappa",
+        "ordinal_mean_absolute_error",
+        "slide_macro_balanced_accuracy",
+        "patient_macro_balanced_accuracy",
+        "slide_macro_f1",
+        "patient_macro_f1",
+        "slide_macro_nll",
+        "patient_macro_nll",
+        "slide_macro_brier",
+        "patient_macro_brier",
     ]
+    metrics = [metric for metric in metrics if metric in details.columns]
     per_split = details.groupby(
         ["patient_split", "assignment", "condition", "method"], as_index=False
     )[metrics].mean()

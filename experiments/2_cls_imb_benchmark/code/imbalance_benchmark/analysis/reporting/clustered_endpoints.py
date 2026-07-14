@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import balanced_accuracy_score, f1_score
 
 from imbalance_benchmark.analysis.metrics import expected_calibration_error
 
@@ -33,6 +34,28 @@ def _macro_mean(contribution: np.ndarray, groups: np.ndarray) -> float:
     return float(pd.Series(contribution).groupby(groups, sort=False).mean().mean())
 
 
+def _macro_classification(
+    labels: np.ndarray, predictions: np.ndarray, groups: np.ndarray
+) -> tuple[float, float]:
+    """Equal-weight balanced accuracy and macro F1 after cluster aggregation."""
+    scores = [
+        (
+            balanced_accuracy_score(
+                labels[groups == group], predictions[groups == group]
+            ),
+            f1_score(
+                labels[groups == group],
+                predictions[groups == group],
+                average="macro",
+                zero_division=0,  # type: ignore
+            ),
+        )
+        for group in pd.unique(groups)
+    ]
+    res = tuple(map(float, np.mean(scores, axis=0)))
+    return res[0], res[1]
+
+
 def _patient_bootstrap_ece(
     labels: np.ndarray, probabilities: np.ndarray, case_ids: np.ndarray, seed: int
 ) -> tuple[float, float]:
@@ -61,10 +84,9 @@ def clustered_endpoints(
     ece = expected_calibration_error(labels, probabilities)
     nll = _sample_nll(labels, probabilities)
     brier = _sample_brier(labels, probabilities)
+    endpoints = _cluster_discrimination(labels, predictions, case_ids, slide_ids)
     return {
-        "patch_micro_accuracy": float(np.mean(predictions == labels)),
-        "slide_macro_accuracy": _macro_accuracy(predictions, labels, slide_ids),
-        "patient_macro_accuracy": _macro_accuracy(predictions, labels, case_ids),
+        **endpoints,
         # Probability-quality contributions aggregated within each slide/patient
         # first, so heavily tiled slides do not dominate the summary.
         "slide_macro_nll": _macro_mean(nll, slide_ids),
@@ -75,4 +97,24 @@ def clustered_endpoints(
         "expected_calibration_error_ci": list(
             _patient_bootstrap_ece(labels, probabilities, case_ids, seed)
         ),
+    }
+
+
+def _cluster_discrimination(
+    labels: np.ndarray,
+    predictions: np.ndarray,
+    case_ids: np.ndarray,
+    slide_ids: np.ndarray,
+) -> dict[str, float]:
+    """Compute micro and cluster-macro discrimination endpoints."""
+    slide_ba, slide_f1 = _macro_classification(labels, predictions, slide_ids)
+    patient_ba, patient_f1 = _macro_classification(labels, predictions, case_ids)
+    return {
+        "patch_micro_accuracy": float(np.mean(predictions == labels)),
+        "slide_macro_accuracy": _macro_accuracy(predictions, labels, slide_ids),
+        "patient_macro_accuracy": _macro_accuracy(predictions, labels, case_ids),
+        "slide_macro_balanced_accuracy": slide_ba,
+        "patient_macro_balanced_accuracy": patient_ba,
+        "slide_macro_f1": slide_f1,
+        "patient_macro_f1": patient_f1,
     }

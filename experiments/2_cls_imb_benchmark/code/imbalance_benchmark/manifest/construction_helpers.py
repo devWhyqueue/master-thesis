@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import hashlib
-from typing import cast
+from typing import Callable, cast
 
 from pathlib import Path
 
 import pandas as pd
 
 from imbalance_benchmark.common import compute_data_hash, compute_sha256
+from imbalance_benchmark.construction import (
+    allocate_counts,
+    effective_rho,
+    max_shared_total,
+)
+from imbalance_benchmark.manifest.construction_sampling import (
+    designate_patch_pool,
+    select_patches_round_robin,
+    select_slides_round_robin,
+)
 
 
 def class_support_counts(train_df: pd.DataFrame, is_mil: bool) -> dict[str, int]:
@@ -44,3 +54,75 @@ def write_natural_condition(
         "sha256": compute_sha256(path),
         "note": "descriptive anchor; excluded from imbalance deficit/recovery estimands",
     }
+
+
+def cap_feasible_shared_total(
+    train_df: pd.DataFrame,
+    classes: list[str],
+    min_support: int,
+    is_mil: bool,
+    seed: int,
+) -> int:
+    """Find the largest controlled total that satisfies the actual unit caps."""
+    supports = class_support_counts(train_df, is_mil)
+    available = [supports[name] for name in classes]
+    selector = select_slides_round_robin if is_mil else select_patches_round_robin
+    for total in range(
+        max_shared_total(available, min_support), len(classes) * min_support - 1, -1
+    ):
+        allocations = [
+            allocate_counts(
+                available,
+                total,
+                effective_rho(available, rho, min_support, total),
+                min_support,
+            )
+            for rho in (1.0, 10.0, 100.0)
+        ]
+        if _cap_feasible(
+            train_df, classes, allocations, selector, is_mil, seed, designate_patch_pool
+        ):
+            return total
+    raise ValueError(
+        "No shared total satisfies the independent-support and contribution caps"
+    )
+
+
+def _cap_feasible(
+    train_df: pd.DataFrame,
+    classes: list[str],
+    allocations: list[list[int]],
+    selector: Callable[..., pd.DataFrame],
+    is_mil: bool,
+    seed: int,
+    designate: Callable[..., pd.DataFrame],
+) -> bool:
+    """Probe every condition allocation on its designated fixed patch pool."""
+    try:
+        pools = (
+            {
+                name: designate(
+                    cast(pd.DataFrame, train_df[train_df["cancer_type"] == name]),
+                    min(counts[index] for counts in allocations),
+                    class_construction_seed(seed, name),
+                )
+                for index, name in enumerate(classes)
+            }
+            if not is_mil
+            else {}
+        )
+        if any(
+            pool["slide_id"].nunique() > min(counts[index] for counts in allocations)
+            for index, pool in enumerate(pools.values())
+        ):
+            return False
+        for counts in allocations:
+            for index, name in enumerate(classes):
+                selector(
+                    pools.get(name, train_df[train_df["cancer_type"] == name]),
+                    counts[index],
+                    class_construction_seed(seed, name),
+                )
+    except ValueError:
+        return False
+    return True

@@ -70,6 +70,47 @@ def _contribution_cap(n_examples: int, fraction: float, unit: str) -> int:
     return cap
 
 
+def designate_patch_pool(
+    df: pd.DataFrame,
+    min_p: int,
+    seed: int,
+    max_p: int | None = None,
+) -> pd.DataFrame:
+    """Choose the fixed patient/slide pool used by every patch condition."""
+    if min_p < 20:
+        raise ValueError("Patch conditions need at least 20 patches per class")
+    rng = np.random.default_rng(seed)
+    pats, hier = _build_patch_hierarchy(df, rng)
+    sel_p, sel_s = [], []
+    for p in pats:
+        sel_p.append(p)
+        sel_s.extend(hier[p])
+        if _pool_is_ready(df, sel_p, sel_s, max_p):
+            break
+    else:
+        raise ValueError(
+            "Eligible patches cannot form the required fixed evidence pool"
+        )
+    return cast(
+        pd.DataFrame, df[df["case_id"].isin(sel_p) & df["slide_id"].isin(sel_s)]
+    )
+
+
+def _pool_is_ready(
+    df_class: pd.DataFrame,
+    patients: list[str],
+    slides: list[str],
+    maximum_patches: int | None,
+) -> bool:
+    """Whether a hierarchy prefix meets fixed-pool diversity and capacity."""
+    selected = df_class[df_class["slide_id"].isin(slides)]
+    return (
+        len(patients) >= 10
+        and len(slides) >= 20
+        and (maximum_patches is None or len(selected) >= maximum_patches)
+    )
+
+
 def select_patches_round_robin(
     df_class: pd.DataFrame, n_patches: int, seed: int
 ) -> pd.DataFrame:
