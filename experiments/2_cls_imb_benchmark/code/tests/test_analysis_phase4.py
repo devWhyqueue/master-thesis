@@ -54,7 +54,11 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_recovery_model,
 )
 from imbalance_benchmark.analysis.predictors.hierarchical_models import _log_scale_prior
-from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells
+from imbalance_benchmark.analysis.predictors.rq3_analysis import (
+    _cells,
+    _covariates,
+    _has_multiple_slides_per_patient,
+)
 from imbalance_benchmark.analysis.predictors.rq3_cross_split import _comparison_maps
 from imbalance_benchmark.analysis.predictors.separability import (
     effective_support,
@@ -396,6 +400,55 @@ def test_effective_support_reduces_to_n_when_icc_zero():
 def test_effective_support_shrinks_with_high_icc_and_clustering():
     n_eff = effective_support(n_c=100, mean_cluster_size=4.0, icc=1.0)
     assert n_eff == pytest.approx(25.0)
+
+
+def test_wsi_patient_support_sensitivity_requires_multi_slide_patients(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    one_slide_per_patient = {
+        "contribution_stats": {
+            "A": {"n_patients": 10, "n_slides": 10},
+            "B": {"n_patients": 10, "n_slides": 10},
+        }
+    }
+    multiple_slides_per_patient = {
+        "contribution_stats": {
+            "A": {"n_patients": 10, "n_slides": 12},
+            "B": {"n_patients": 10, "n_slides": 10},
+        }
+    }
+
+    assert not _has_multiple_slides_per_patient(one_slide_per_patient)
+    assert _has_multiple_slides_per_patient(multiple_slides_per_patient)
+
+    def feature_frame(*_args: object) -> tuple[np.ndarray, np.ndarray]:
+        return np.array([[0.0, 0.0], [1.0, 1.0]]), np.array([0, 1])
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._feature_frame",
+        feature_frame,
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis.intrinsic_separability",
+        lambda *_args: {
+            "linear_probe_macro_recall": 0.5,
+            "knn_macro_recall": 0.5,
+            "per_class_nn_error": {},
+        },
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis.condition_learnability",
+        lambda *_args: {"linear_probe_macro_recall": 0.5},
+    )
+    paths = {"data": tmp_path}
+    for condition in (one_slide_per_patient, multiple_slides_per_patient):
+        condition["path"] = str(tmp_path)
+
+    one_slide_covariates = _covariates(paths, True, one_slide_per_patient)
+    multi_slide_covariates = _covariates(paths, True, multiple_slides_per_patient)
+
+    assert "log_min_patient_support" not in one_slide_covariates
+    assert "log_min_patient_support" in multi_slide_covariates
 
 
 def test_intraclass_correlation_zero_when_no_between_cluster_variance():

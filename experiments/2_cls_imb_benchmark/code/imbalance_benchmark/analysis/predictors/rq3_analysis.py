@@ -41,6 +41,14 @@ def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
     return _min_support(condition, "n_slides" if is_mil else "n_patients")
 
 
+def _has_multiple_slides_per_patient(condition: dict[str, Any]) -> bool:
+    """Whether any class's WSI condition includes repeat patient contributions."""
+    return any(
+        stats["n_slides"] > stats["n_patients"]
+        for stats in condition["contribution_stats"].values()
+    )
+
+
 def _covariates(
     paths: dict[str, Path],
     is_mil: bool,
@@ -78,9 +86,10 @@ def _covariates(
         "is_wsi": 1.0 if is_mil else 0.0,
     }
     if is_mil:
-        covariates["log_min_patient_support"] = float(
-            np.log(_min_support(condition, "n_patients"))
-        )
+        if _has_multiple_slides_per_patient(condition):
+            covariates["log_min_patient_support"] = float(
+                np.log(_min_support(condition, "n_patients"))
+            )
         return covariates
     reference_frame = _feature_identity(ref_path, None, is_mil, class_names, bag_kwargs)
     margins = class_margin_cross_fit(

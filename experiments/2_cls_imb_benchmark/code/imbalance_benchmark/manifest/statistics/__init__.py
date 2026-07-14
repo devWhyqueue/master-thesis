@@ -30,7 +30,9 @@ def achieved_rho(counts: Mapping[ClassKey, int]) -> float:
 
 
 def _distribution_statistics(rows: pd.DataFrame, level: str) -> dict[str, Any]:
-    frame = rows if level == "patch" else rows.drop_duplicates("slide_id")
+    frame = (
+        rows if level == "patch" else rows.drop_duplicates(["slide_id", "cancer_type"])
+    )
     counts = {
         str(name): int(count)
         for name, count in frame["cancer_type"].value_counts().items()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -17,7 +19,11 @@ from imbalance_benchmark.analysis.reporting.plots import (
     allocated_training_support,
     plot_tail_vs_support,
 )
+from imbalance_benchmark.analysis.predictors.rq3_wiring import (
+    fit_linked_sensitivity_models,
+)
 from imbalance_benchmark.construction import max_shared_total
+from imbalance_benchmark.manifest.statistics import support_statistics
 
 
 def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -> None:
@@ -144,3 +150,62 @@ def test_kish_preflight_is_descriptive_when_any_replicate_is_below_five() -> Non
 
 def test_balanced_reference_uses_the_largest_approximately_equal_total() -> None:
     assert max_shared_total([10, 10, 11], min_support=5) == 31
+
+
+def test_rq3_regime_specific_sensitivities_fit_their_eligible_cells(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Patch and WSI support sensitivities retain their respective regimes."""
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_wiring.fit_rq3_model",
+        lambda y, x, *_args, **_kwargs: {
+            "n_observations": len(y),
+            "values": x.ravel().tolist(),
+        },
+    )
+    patch_cells = [
+        {
+            "group": "patch",
+            "gate_passed": True,
+            "deficit_ba": 0.1,
+            "deficit_se": 0.01,
+            "recovery": 0.5,
+            "recovery_se": 0.02,
+            "log_effective_support": value,
+        }
+        for value in (2.0, 3.0)
+    ]
+    wsi_cells = [
+        {
+            "group": "wsi",
+            "gate_passed": True,
+            "deficit_ba": 0.1,
+            "deficit_se": 0.01,
+            "recovery": 0.5,
+            "recovery_se": 0.02,
+            "log_min_patient_support": value,
+        }
+        for value in (4.0, 5.0)
+    ]
+
+    sensitivity = fit_linked_sensitivity_models(
+        patch_cells + wsi_cells, patch_cells + wsi_cells
+    )
+
+    assert sensitivity["log_effective_support"]["deficit"]["values"] == [2.0, 3.0]
+    assert sensitivity["log_min_patient_support"]["deficit"]["values"] == [4.0, 5.0]
+
+
+def test_slide_statistics_count_mixed_label_slides_once_per_class() -> None:
+    rows = pd.DataFrame(
+        [
+            {"slide_id": "s1", "cancer_type": "normal"},
+            {"slide_id": "s1", "cancer_type": "tumor"},
+            {"slide_id": "s2", "cancer_type": "normal"},
+        ]
+    )
+
+    statistics = support_statistics(rows)
+
+    assert statistics["patch"]["counts"] == {"normal": 2, "tumor": 1}
+    assert statistics["slide"]["counts"] == {"normal": 2, "tumor": 1}

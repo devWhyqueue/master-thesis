@@ -84,14 +84,15 @@ def fit_recovery_model(cells: list[dict[str, Any]]) -> dict[str, Any]:
 
 def fit_sensitivity_models(cells: list[dict[str, Any]]) -> dict[str, Any]:
     """One single-predictor deficit fit per descriptive covariate (never entered jointly)."""
-    groups = np.array([c["group"] for c in cells])
-    y = np.array([c["deficit_ba"] for c in cells])
-    s_errors = np.array([c["deficit_se"] for c in cells])
     out: dict[str, Any] = {}
     for name in SENSITIVITY_COVARIATES:
-        if not all(name in c for c in cells):
+        eligible = [cell for cell in cells if name in cell]
+        if not eligible:
             continue
-        x = np.array([[float(c[name])] for c in cells], dtype=np.float64)
+        x = np.array([[float(cell[name])] for cell in eligible], dtype=np.float64)
+        groups = np.array([cell["group"] for cell in eligible])
+        y = np.array([cell["deficit_ba"] for cell in eligible])
+        s_errors = np.array([cell["deficit_se"] for cell in eligible])
         out[name] = fit_rq3_model(y, x, groups, s_errors, is_logistic=False)
     return out
 
@@ -102,11 +103,13 @@ def fit_linked_sensitivity_models(
     """Fit every descriptive sensitivity predictor for all three linked outcomes."""
     out: dict[str, Any] = {}
     for name in SENSITIVITY_COVARIATES:
-        if not all(name in cell for cell in deficit_cells):
+        gate_pass = _sensitivity_fit(deficit_cells, name, "gate_pass")
+        deficit = _sensitivity_fit(deficit_cells, name, "deficit")
+        if not gate_pass and not deficit:
             continue
         out[name] = {
-            "gate_pass": _sensitivity_fit(deficit_cells, name, "gate_pass"),
-            "deficit": _sensitivity_fit(deficit_cells, name, "deficit"),
+            "gate_pass": gate_pass,
+            "deficit": deficit,
             "recovery": _sensitivity_fit(recovery_cells, name, "recovery"),
         }
     return out
@@ -116,9 +119,11 @@ def _sensitivity_fit(
     cells: list[dict[str, Any]], name: str, outcome: str
 ) -> dict[str, Any]:
     """Fit one sensitivity covariate for one linked RQ3 outcome."""
-    selected = (
-        cells if outcome != "recovery" else [c for c in cells if c["gate_passed"]]
-    )
+    selected = [
+        cell
+        for cell in cells
+        if name in cell and (outcome != "recovery" or cell["gate_passed"])
+    ]
     if not selected:
         return {}
     x = np.array([[float(cell[name])] for cell in selected], dtype=np.float64)
