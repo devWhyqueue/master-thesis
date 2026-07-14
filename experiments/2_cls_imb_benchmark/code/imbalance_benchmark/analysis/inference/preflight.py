@@ -136,3 +136,10 @@ def run_preflight(
         by_split_class,
         _multiplicities_match(identity, row_weights),
     )
+
+
+def bootstrap_preflight(
+    identity: pd.DataFrame, n_replicates: int = 10_000, seed: int = 0
+) -> dict[str, Any]:
+    """Run the label-only bootstrap feasibility diagnostic."""
+    return run_preflight(identity, n_replicates, seed)

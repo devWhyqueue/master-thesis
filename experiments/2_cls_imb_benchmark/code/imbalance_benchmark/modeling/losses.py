@@ -141,15 +141,21 @@ def cfal_loss(
 
 def supervised_contrastive_loss(
     embeddings: torch.Tensor, targets: torch.Tensor, temperature: float = 0.1
-) -> tuple[torch.Tensor, int]:
-    """Supervised contrastive loss for SC-MIL."""
+) -> tuple[torch.Tensor, int, int]:
+    """Supervised contrastive loss for SC-MIL.
+
+    Also returns the number of valid same-class positive pairs and the number of
+    valid anchors (samples with at least one same-class positive), which the
+    report requires SC-MIL to record rather than discard.
+    """
     logits = torch.matmul(embeddings, embeddings.T) / temperature
     pos = (targets.unsqueeze(0) == targets.unsqueeze(1)) & ~torch.eye(
         len(targets), dtype=torch.bool, device=targets.device
     )
     n_pairs = int(pos.sum().item())
+    n_anchors = int((pos.sum(dim=1) > 0).sum().item())
     if n_pairs == 0:
-        return torch.tensor(0.0, device=embeddings.device), 0
+        return torch.tensor(0.0, device=embeddings.device), 0, 0
     log_prob = logits - torch.logsumexp(
         logits.masked_fill(
             torch.eye(len(targets), dtype=torch.bool, device=targets.device), -1e9
@@ -157,7 +163,7 @@ def supervised_contrastive_loss(
         dim=1,
         keepdim=True,
     )
-    return -(log_prob * pos.float()).sum() / pos.float().sum(), n_pairs
+    return -(log_prob * pos.float()).sum() / pos.float().sum(), n_pairs, n_anchors
 
 
 def _rank_representative_instances(

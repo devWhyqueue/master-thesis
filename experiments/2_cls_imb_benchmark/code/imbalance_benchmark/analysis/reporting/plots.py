@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-__all__ = ["plot_confusion_matrix", "plot_reliability_diagram", "plot_tail_vs_support"]
+from imbalance_benchmark.analysis.calibration import reliability_curve
+from imbalance_benchmark.analysis.metrics import assign_tiers
+from imbalance_benchmark.analysis.query import load_seed_predictions
+
+__all__ = [
+    "plot_confusion_matrix",
+    "plot_reliability_diagram",
+    "plot_tail_vs_support",
+    "write_tail_reliability",
+]
 
 # Headless rendering: figures are only ever saved to disk, never shown interactively.
 plt.switch_backend("Agg")
@@ -67,3 +77,23 @@ def plot_tail_vs_support(classwise: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=150)
     plt.close(fig)
+
+
+def write_tail_reliability(
+    paths: dict[str, Path], freeze: dict[str, Any], balanced: dict[str, Any]
+) -> None:
+    """Write reliability diagrams for tail classes."""
+    for assignment, conditions in freeze.get("assignment_conditions", {}).items():
+        allocated = conditions.get("severe", {}).get("allocated_counts", {})
+        names = balanced["class_names"]
+        order = freeze.get("tail_assignments", {}).get(assignment, names)
+        tiers = assign_tiers(names, allocated, order)
+        tail = [i for i, n in enumerate(names) if tiers.get(n) == "tail"]
+        src = load_seed_predictions(paths, "severe", "ce", assignment) or balanced
+        mask = np.isin(src["labels"], tail)
+        if mask.any():
+            p, y = src["probs"].mean(axis=0)[mask], src["labels"][mask]
+            centers, conf, acc = reliability_curve(p, y)
+            if len(centers):
+                fp = paths["figures"] / f"tail_reliability_{assignment}.png"
+                plot_reliability_diagram(centers, conf, acc, fp)

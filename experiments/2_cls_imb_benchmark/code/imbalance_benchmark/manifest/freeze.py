@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TypeVar, cast
@@ -76,6 +77,25 @@ def contribution_stats(
     }
 
 
+def _distinct_random_order(
+    native_order: list[str], taken: list[list[str]], seed: int
+) -> list[str]:
+    """Draw one random permutation distinct from the already-locked assignments.
+
+    A random permutation may coincide with the native or reversed/rotated
+    assignment; class identity would then be confounded with tail status.
+    Resample deterministically until the draw is distinct, unless every
+    permutation is already taken (too few classes for a third assignment).
+    """
+    rng = np.random.default_rng(seed)
+    feasible = math.factorial(len(native_order)) > len(taken)
+    for _ in range(1000):
+        candidate = list(rng.permutation(native_order))
+        if not feasible or candidate not in taken:
+            return candidate
+    return list(rng.permutation(native_order))
+
+
 def build_tail_assignments(
     native_order: list[str], seed: int, ordinal: bool
 ) -> dict[str, list[str]]:
@@ -85,8 +105,9 @@ def build_tail_assignments(
     rotated_or_reversed = (
         list(reversed(native_order)) if ordinal else native_order[1:] + native_order[:1]
     )
-    rng = np.random.default_rng(seed)
-    random_order = list(rng.permutation(native_order))
+    random_order = _distinct_random_order(
+        list(native_order), [list(native_order), rotated_or_reversed], seed
+    )
     return {
         "native": list(native_order),
         "reversed_or_rotated": rotated_or_reversed,

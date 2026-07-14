@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from imbalance_benchmark.analysis.inference.bootstrap import (
-    bootstrap_preflight,
     build_strata,
     expand_to_rows,
     gather_seed_resampled,
@@ -11,6 +10,7 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
     weighted_balanced_accuracy,
     weighted_macro_nll,
 )
+from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
 from imbalance_benchmark.analysis.inference.gates import (
     calibration_gate,
     ci_excludes_zero,

@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import pandas as pd
 
-from imbalance_benchmark.analysis.inference.bootstrap import bootstrap_preflight
+from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
 from imbalance_benchmark.common import (
     compute_sha256,
     ensure_dirs,

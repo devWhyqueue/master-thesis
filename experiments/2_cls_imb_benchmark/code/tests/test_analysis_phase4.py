@@ -14,7 +14,6 @@ from imbalance_benchmark.analysis.calibration import (
 )
 from imbalance_benchmark.analysis.db import connect_db, discover_result_dirs, ingest_run, init_schema
 from imbalance_benchmark.analysis.inference.bootstrap import (
-    bootstrap_preflight,
     build_strata,
     expand_to_rows,
     gather_seed_resampled,
@@ -22,6 +21,7 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
     resample_patient_weights,
     weighted_balanced_accuracy,
 )
+from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import (
     calibration_gate,

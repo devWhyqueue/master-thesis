@@ -10,6 +10,7 @@ from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, wr
 from imbalance_benchmark.construction import patient_equals_slide
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.manifest.pilot import (
+    frozen_pilot_quota,
     meets_method_floor,
     method_floor,
     pilot_levels_for,
@@ -76,10 +77,25 @@ def _run_all_pilot_seeds(
     scratch_dir.mkdir(parents=True, exist_ok=True)
     n_cls = len(classes)
     pilot_seeds = [derive_seed(base_seed, f"pilot_construction_{i}") for i in range(3)]
+    # One frozen patch quota is shared by every ordering; MIL has no quota.
+    quota = (
+        None
+        if is_mil
+        else frozen_pilot_quota(train_df, classes, levels[-1], pilot_seeds)
+    )
     quotas, ba_by_seed, recall_by_seed = {}, {}, {}
     for seed in pilot_seeds:
-        quota, ba_curve, recall_curve = run_pilot_seed(
-            train_df, classes, levels, seed, val_ds, device, n_cls, is_mil, scratch_dir
+        _, ba_curve, recall_curve = run_pilot_seed(
+            train_df,
+            classes,
+            levels,
+            seed,
+            val_ds,
+            device,
+            n_cls,
+            is_mil,
+            scratch_dir,
+            quota,
         )
         quotas[seed], ba_by_seed[seed], recall_by_seed[seed] = (
             quota,
@@ -91,6 +107,7 @@ def _run_all_pilot_seeds(
 
 def _pilot_report_payload(
     levels: list[int],
+    is_mil: bool,
     eq_slide: bool,
     pilot_seeds: list[int],
     quotas: dict[int, int | None],
@@ -101,7 +118,13 @@ def _pilot_report_payload(
     """Assemble the frozen pilot report: floors, curves, seeds, and exclusion status."""
     stability_floor = stability_floor_from_curve(levels, ba_by_seed, recall_by_seed)
     floor = method_floor(eq_slide)
-    definitive_floor = max(stability_floor, max(floor.values()))
+    # Pilot levels count the regime's independent unit (slides for MIL or when
+    # patient==slide, otherwise patients). The definitive floor combines the
+    # stability floor with only the method floor for *that* unit; the second
+    # unit's floor (e.g. 20 slides for patch patients) is enforced separately
+    # by ``meets_method_floor`` and must not collapse onto the level count.
+    level_unit = "slides" if (is_mil or eq_slide) else "patients"
+    definitive_floor = max(stability_floor, floor[level_unit])
     floor_met = all(meets_method_floor(values, eq_slide) for values in support.values())
     return {
         "levels": levels,
@@ -122,7 +145,7 @@ def cmd_pilot(args: argparse.Namespace) -> None:
     """Run the nested support-stability pilot and freeze the definitive floors."""
     if args.split_index is None:
         for index in range(3):
-            cmd_pilot(argparse.Namespace(**vars(args), split_index=index))
+            cmd_pilot(argparse.Namespace(**{**vars(args), "split_index": index}))
         return
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
@@ -131,6 +154,13 @@ def cmd_pilot(args: argparse.Namespace) -> None:
         train_df, classes, levels, is_mil, args.seed, paths
     )
     payload = _pilot_report_payload(
-        levels, eq_slide, pilot_seeds, quotas, ba_by_seed, recall_by_seed, support
+        levels,
+        is_mil,
+        eq_slide,
+        pilot_seeds,
+        quotas,
+        ba_by_seed,
+        recall_by_seed,
+        support,
     )
     write_json(paths["data"] / "pilot_report.json", payload)

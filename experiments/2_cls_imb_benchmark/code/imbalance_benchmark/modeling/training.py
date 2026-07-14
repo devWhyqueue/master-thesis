@@ -7,13 +7,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Sampler, WeightedRandomSampler
+from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
     run_evaluation,
+    ClassAwareBatchSampler,
+    _RecordingSampler,
+    _RecordingBatchSampler,
 )
 from imbalance_benchmark.modeling.losses import (
     FocalLoss,
@@ -68,61 +71,12 @@ def get_balanced_sampler(
     )
 
 
-class ClassAwareBatchSampler(Sampler[list[int]]):
-    """Yield batches with at least two independent bags from every sampled class.
-
-    SC-MIL's supervised contrastive term has no same-class positive pair when
-    a class appears once.  This sampler forms paired class draws first, then
-    fills each batch with independently sampled bags from those classes.
-    """
-
-    def __init__(self, labels: np.ndarray, batch_size: int, seed: int) -> None:
-        if batch_size < 2:
-            raise ValueError("SC-MIL requires a batch size of at least two")
-        self.batch_size = batch_size
-        self.seed = seed
-        self.class_indices = {
-            int(cls): np.flatnonzero(labels == cls)
-            for cls in np.unique(labels)
-            if int(np.sum(labels == cls)) >= 2
-        }
-        if not self.class_indices:
-            raise ValueError(
-                "SC-MIL requires two independent bags in at least one class"
-            )
-        self.n_batches = math.ceil(len(labels) / batch_size)
-
-    def __iter__(self):
-        rng = np.random.default_rng(self.seed)
-        classes = np.array(sorted(self.class_indices))
-        for _ in range(self.n_batches):
-            n_pairs = min(len(classes), self.batch_size // 2)
-            selected_classes = rng.choice(classes, size=n_pairs, replace=False)
-            batch = [
-                int(index)
-                for cls in selected_classes
-                for index in rng.choice(
-                    self.class_indices[int(cls)], size=2, replace=False
-                )
-            ]
-            fill_classes = selected_classes if len(selected_classes) else classes
-            while len(batch) < self.batch_size:
-                cls = int(rng.choice(fill_classes))
-                batch.append(int(rng.choice(self.class_indices[cls])))
-            rng.shuffle(batch)
-            yield batch
-
-    def __len__(self) -> int:
-        return self.n_batches
-
-
 def class_priors(
     labels: np.ndarray, n_classes: int, device: torch.device
 ) -> torch.Tensor:
     """Compute the realized per-class training prior."""
-    return torch.tensor(
-        np.bincount(labels, minlength=n_classes) / len(labels), dtype=torch.float32
-    ).to(device)
+    p = np.bincount(labels, minlength=n_classes) / len(labels)
+    return torch.tensor(p, dtype=torch.float32).to(device)
 
 
 def update_budget(support: int, batch_size: int) -> int:
@@ -132,51 +86,9 @@ def update_budget(support: int, batch_size: int) -> int:
 
 def resolve_batch_size(cfg: dict[str, Any], is_mil: bool) -> int:
     """Resolve the regime's locked batch size from config."""
-    key, size_key = (
-        ("wsi_training", "bag_batch_size")
-        if is_mil
-        else ("patch_training", "batch_size")
-    )
-    return cfg.get(key, {}).get(size_key, 32 if is_mil else 128)
-
-
-def _fit_step(
-    batch_data: Any, ctx: dict[str, Any], step: int, max_steps: int
-) -> torch.Tensor:
-    """Execute a single forward-backward update step for single-loader methods."""
-    is_mil, method, device = ctx["is_mil"], ctx["method"], ctx["device"]
-    model, criterion, param = ctx["model"], ctx["criterion"], ctx["param"]
-    if is_mil:
-        bags, targets = batch_data
-        bags, targets = [b.to(device) for b in bags], targets.to(device)
-        if method == "rankmix":
-            loss, _ = rankmix_bag_loss(model, ctx["teacher"], bags, targets, param)
-            return loss
-        if method == "sc_mil":
-            logits, emb, _ = model.forward_bags(bags)
-            cont, _ = supervised_contrastive_loss(
-                model.project_bag_embeddings(emb), targets, temperature=param
-            )
-            return (1.0 - (step / max_steps)) * cont + (
-                step / max_steps
-            ) * F.cross_entropy(logits, targets)
-        logits, _, _ = model.forward_bags(bags)
-        if method == "logit_adjustment" and param is not None:
-            return F.cross_entropy(
-                logits + param * torch.log(ctx["priors"] + 1e-8), targets
-            )
-        return criterion(logits, targets)
-    features, targets = (
-        batch_data["features"].to(device),
-        batch_data["target"].to(device),
-    )
-    if method == "cfal":
-        return cfal_loss(model, features, targets, ctx["class_counts"])
-    if method == "logit_adjustment" and param is not None:
-        return F.cross_entropy(
-            model(features) + param * torch.log(ctx["priors"] + 1e-8), targets
-        )
-    return criterion(model(features), targets)
+    k = "wsi_training" if is_mil else "patch_training"
+    sk = "bag_batch_size" if is_mil else "batch_size"
+    return cfg.get(k, {}).get(sk, 32 if is_mil else 128)
 
 
 def _init_criterion(
@@ -186,18 +98,58 @@ def _init_criterion(
     train_labels: np.ndarray,
     device: torch.device,
 ) -> nn.Module:
-    """Initialize the loss criterion for training."""
-    if method == "weighted_ce" and param is not None:
-        return nn.CrossEntropyLoss(
-            weight=get_class_weights(train_labels, n_classes, strength=param).to(device)
-        )
-    if method == "focal" and param is not None:
-        return FocalLoss(gamma=param)
-    if method in ("ce_soft_f1", "ce_soft_mcc") and param is not None:
-        return ScholzCombinedLoss(
-            n_classes, metric="f1" if "f1" in method else "mcc", weight=param
-        )
+    """Instantiate the loss function according to the method config."""
+    if method == "weighted_ce":
+        w = get_class_weights(train_labels, n_classes, float(param or 1.0))
+        return nn.CrossEntropyLoss(weight=w.to(device))
+    if method == "focal":
+        return FocalLoss(gamma=float(param or 1.0))
+    if method in ("ce_soft_f1", "ce_soft_mcc"):
+        metric = "f1" if "f1" in method else "mcc"
+        return ScholzCombinedLoss(n_classes, metric=metric, weight=float(param or 1.0))
     return nn.CrossEntropyLoss()
+
+
+def _fit_step(
+    batch_data: Any, ctx: dict[str, Any], step: int, max_steps: int
+) -> torch.Tensor:
+    """Execute a single forward-backward update step for single-loader methods."""
+    is_mil, method, device = ctx["is_mil"], ctx["method"], ctx["device"]
+    model, criterion, param = ctx["model"], ctx["criterion"], ctx["param"]
+    if is_mil:
+        bags, targets = [b.to(device) for b in batch_data[0]], batch_data[1].to(device)
+        if method == "rankmix":
+            return rankmix_bag_loss(model, ctx["teacher"], bags, targets, param)[0]
+        if method == "sc_mil":
+            logits, emb, _ = model.forward_bags(bags)
+            cont, n_pairs, n_anchors = supervised_contrastive_loss(
+                model.project_bag_embeddings(emb), targets, temperature=param
+            )
+            diag = ctx.setdefault("method_diagnostics", {})
+            for k, v in [
+                ("sc_mil_positive_pairs", n_pairs),
+                ("sc_mil_valid_anchors", n_anchors),
+                ("sc_mil_batches", 1),
+            ]:
+                diag[k] = diag.get(k, 0) + v
+            return (1.0 - (step / max_steps)) * cont + (
+                step / max_steps
+            ) * F.cross_entropy(logits, targets)
+        logits, _, _ = model.forward_bags(bags)
+        if method == "logit_adjustment" and param is not None:
+            logits = logits + param * torch.log(ctx["priors"] + 1e-8)
+        return criterion(logits, targets)
+    inputs, targets = batch_data["features"].to(device), batch_data["target"].to(device)
+    if method == "cfal":
+        return cfal_loss(
+            model, inputs, targets, ctx["class_counts"], margin=float(param or 1.0)
+        )
+    logits = model(inputs)
+    if method == "logit_adjustment" and param is not None:
+        logits = logits + param * torch.log(ctx["priors"] + 1e-8)
+    if method == "mde":
+        return criterion(model.encode(inputs), logits, targets)
+    return criterion(logits, targets)
 
 
 def _build_train_loader(
@@ -207,27 +159,28 @@ def _build_train_loader(
     b_size: int,
     is_mil: bool,
 ) -> DataLoader:
-    """Build the training loader, applying the balanced sampler when required."""
-    method = ctx["method"]
+    method, exposed = ctx["method"], ctx.setdefault("exposed_indices", set())
     if method == "sc_mil":
+        sampler = _RecordingBatchSampler(
+            ClassAwareBatchSampler(train_labels, b_size, ctx["seed"]), exposed
+        )
         return DataLoader(
             ctx["train_dataset"],
-            batch_sampler=ClassAwareBatchSampler(train_labels, b_size, ctx["seed"]),
+            batch_sampler=sampler,
             collate_fn=bag_collate if is_mil else None,
         )
+    gen = torch.Generator().manual_seed(ctx["seed"])
     if method == "balanced_sampling" and param:
-        sampler = get_balanced_sampler(train_labels, param, ctx["seed"])
+        base = get_balanced_sampler(train_labels, param, ctx["seed"])
     elif method in FIXED_BALANCED_SAMPLER_METHODS:
-        sampler = get_balanced_sampler(train_labels, 1.0, ctx["seed"])
+        base = get_balanced_sampler(train_labels, 1.0, ctx["seed"])
     else:
-        sampler = None
+        base = RandomSampler(ctx["train_dataset"], generator=gen)
     return DataLoader(
         ctx["train_dataset"],
         batch_size=b_size,
-        sampler=sampler,
-        shuffle=sampler is None,
+        sampler=_RecordingSampler(base, exposed),
         collate_fn=bag_collate if is_mil else None,
-        generator=torch.Generator().manual_seed(ctx["seed"]),
     )
 
 
@@ -240,8 +193,7 @@ def _run_training_loop(
     best: dict[str, Any],
 ) -> dict[str, Any]:
     """Execute the update-budgeted training loop, checkpointing on the tie-break rule."""
-    step = 0
-    device, is_mil, n_classes = ctx["device"], ctx["is_mil"], ctx["n_classes"]
+    step, device, is_mil, n_classes = 0, ctx["device"], ctx["is_mil"], ctx["n_classes"]
     while step < max_steps:
         for batch in train_loader:
             if step >= max_steps:
@@ -279,14 +231,12 @@ def fit_model(
     lr, param = param_config["lr"], param_config.get("parameter")
     b_size = resolve_batch_size(ctx["config"], is_mil)
     loader = _build_train_loader(ctx, train_labels, param, b_size, is_mil)
-
     best = initial_checkpoint(
         model, ctx["val_loader"], device, is_mil, ctx["n_classes"]
     )
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     _prepare_training_context(ctx, param, device)
-
     budget = (
         max_steps
         if max_steps is not None

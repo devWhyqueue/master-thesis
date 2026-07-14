@@ -13,7 +13,12 @@ from imbalance_benchmark.modeling.workflows.confirmation import (
     confirm_method,
     confirm_post_hoc,
 )
-from imbalance_benchmark.common import ensure_dirs, load_config, split_paths
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    load_config,
+    split_paths,
+    verify_signed_file,
+)
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
@@ -81,7 +86,9 @@ def _confirm_inputs(
     selection_name = (
         f"tuning_selections_{condition}.json" if condition else "tuning_selections.json"
     )
-    with (paths["data"] / selection_name).open() as f:
+    selection_path = paths["data"] / selection_name
+    verify_signed_file(selection_path)
+    with selection_path.open() as f:
         best_configs = json.load(f)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
@@ -118,7 +125,7 @@ def cmd_confirm(args: argparse.Namespace) -> None:
         if any(_is_excluded(split_paths(base_paths, index)) for index in range(3)):
             return
         for index in range(3):
-            cmd_confirm(argparse.Namespace(**vars(args), split_index=index))
+            cmd_confirm(argparse.Namespace(**{**vars(args), "split_index": index}))
         return
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)

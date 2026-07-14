@@ -13,6 +13,7 @@ from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
     run_evaluation,
+    _RecordingSampler,
 )
 from imbalance_benchmark.modeling.models import AttentionMil, DualExpertMil, MLP
 from imbalance_benchmark.modeling.oko import fit_oko
@@ -129,20 +130,29 @@ def mde_bag_loss(
 
 
 def _build_mde_loaders(
-    dataset: Any, train_labels: np.ndarray, b_size: int, seed: int
+    dataset: Any,
+    train_labels: np.ndarray,
+    b_size: int,
+    seed: int,
+    exposed: set[int] | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     """Build MDE's natural and class-balanced bag loaders over the same training pool."""
+    exposed = set() if exposed is None else exposed
+    natural = torch.utils.data.RandomSampler(
+        dataset, generator=torch.Generator().manual_seed(seed)
+    )
     loader_u = DataLoader(
         dataset,
         batch_size=b_size,
-        shuffle=True,
+        sampler=_RecordingSampler(natural, exposed),
         collate_fn=bag_collate,
-        generator=torch.Generator().manual_seed(seed),
     )
     loader_b = DataLoader(
         dataset,
         batch_size=b_size,
-        sampler=get_balanced_sampler(train_labels, 1.0, seed + 1),
+        sampler=_RecordingSampler(
+            get_balanced_sampler(train_labels, 1.0, seed + 1), exposed
+        ),
         collate_fn=bag_collate,
     )
     return loader_u, loader_b
@@ -194,9 +204,12 @@ def fit_mde(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     budget = update_budget(len(ctx["train_dataset"]), b_size)
     lr = ctx["param_config"]["lr"]
     lambda_con = float(ctx["param_config"].get("parameter", 0.0))
-
     loader_u, loader_b = _build_mde_loaders(
-        ctx["train_dataset"], ctx["train_labels"], b_size, ctx["seed"]
+        ctx["train_dataset"],
+        ctx["train_labels"],
+        b_size,
+        ctx["seed"],
+        ctx.setdefault("exposed_indices", set()),
     )
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     best = initial_checkpoint(model, ctx["val_loader"], device, True, ctx["n_classes"])

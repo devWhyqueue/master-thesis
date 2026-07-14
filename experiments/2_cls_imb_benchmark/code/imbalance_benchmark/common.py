@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import logging
-import subprocess
 from pathlib import Path
 from typing import Any, cast
 import numpy as np
@@ -21,12 +19,11 @@ __all__ = [
     "split_indices",
     "write_json",
     "compute_sha256",
+    "sign_file",
+    "verify_signed_file",
     "compute_data_hash",
     "write_run_record",
     "read_run_record",
-    "render_sbatch",
-    "submit_sbatch",
-    "cmd_submit",
 ]
 
 
@@ -137,6 +134,28 @@ def compute_sha256(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def sign_file(path: Path) -> Path:
+    """Write a ``.sha256`` sidecar locking a file's content, and return its path."""
+    sidecar = path.with_suffix(path.suffix + ".sha256")
+    sidecar.write_text(compute_sha256(path), encoding="utf-8")
+    return sidecar
+
+
+def verify_signed_file(path: Path) -> None:
+    """Refuse to proceed if a signed file is missing its lock or no longer matches it."""
+    sidecar = path.with_suffix(path.suffix + ".sha256")
+    if not sidecar.exists():
+        raise RuntimeError(
+            f"Tuning selection {path.name} has no signed post-tuning lock; "
+            "re-run tuning to sign it before confirmation."
+        )
+    if sidecar.read_text(encoding="utf-8").strip() != compute_sha256(path):
+        raise RuntimeError(
+            f"Tuning selection {path.name} no longer matches its signed lock; "
+            "refusing to confirm on altered tuning selections."
+        )
+
+
 def compute_data_hash(data: dict[str, Any] | list[Any]) -> str:
     """Compute SHA-256 of JSON-serialized data."""
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
@@ -184,60 +203,3 @@ def read_run_record(result_dir: Path) -> dict[str, Any] | None:
                     if f"{split}_{f}" in arrays:
                         payload[f] = arrays[f"{split}_{f}"].tolist()
     return record
-
-
-def render_sbatch(config: dict[str, Any], job_name: str, python_command: str) -> str:
-    """Render a standard SLURM SBATCH script based on config."""
-    sl_cfg = config.get("slurm", {})
-    partition = sl_cfg.get("partition", "gpu-2h")
-    container = sl_cfg.get("container", "./environment.sif")
-    return "\n".join(
-        [
-            "#!/bin/bash",
-            f"#SBATCH --job-name={job_name}",
-            f"#SBATCH --partition={partition}",
-            "#SBATCH --output=logs/%x-%j.out",
-            "#SBATCH --error=logs/%x-%j.err",
-            "",
-            "set -euo pipefail",
-            "mkdir -p logs",
-            "",
-            f'CONTAINER="{container}"',
-            f'COMMAND="python -m imbalance_benchmark {python_command}"',
-            "",
-            'if [ -f "$CONTAINER" ]; then',
-            '  apptainer exec --nv "$CONTAINER" $COMMAND',
-            "else",
-            "  eval $COMMAND",
-            "fi\n",
-        ]
-    )
-
-
-def submit_sbatch(sbatch_content: str, dry_run: bool = False) -> str | None:
-    """Save the SBATCH script and submit to sbatch. Return job ID."""
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    script_path = logs_dir / "temp_job.sbatch"
-    script_path.write_text(sbatch_content, encoding="utf-8")
-    if dry_run:
-        logger.info("=== Dry-run SBATCH Script ===\n%s", sbatch_content)
-        return "dry-run-job-id"
-    try:
-        res = subprocess.run(
-            ["sbatch", str(script_path)], capture_output=True, text=True, check=True
-        )
-        output = res.stdout.strip()
-        logger.info("Submitted job: %s", output)
-        return output.split()[-1] if output.split() else None
-    except Exception as e:
-        logger.warning(
-            "Failed to submit to SLURM (sbatch not available or error): %s", e
-        )
-    return None
-
-
-def cmd_submit(args: argparse.Namespace) -> None:
-    """Generate/submit SLURM jobs."""
-    config = load_config(args.config)
-    submit_sbatch(render_sbatch(config, "imbalance_job", "tune"), dry_run=args.dry_run)

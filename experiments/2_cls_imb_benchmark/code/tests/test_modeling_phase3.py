@@ -226,6 +226,49 @@ def test_oko_set_sampling_respects_class_membership():
         assert odd_cls != pair_cls
 
 
+def test_oko_pair_examples_come_from_distinct_independent_units():
+    """OKO's two same-class positions must be two distinct patients/slides, not two patches."""
+    labels = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+    # Both class-0 patches 0,1 share unit u0; patches 2,3 share u1 (two units total).
+    units = np.array(["u0", "u0", "u1", "u1", "v0", "v0", "v1", "v1"])
+    class_index = build_class_index(labels)
+    rng = np.random.default_rng(0)
+
+    _, set_indices, _ = sample_oko_sets(
+        class_index, n_classes=2, n_sets=40, k=1, rng=rng, units=units
+    )
+
+    for row in set_indices:
+        assert units[row[0]] != units[row[1]]
+
+
+def test_oko_rejects_a_pair_class_with_a_single_independent_unit():
+    labels = np.array([0, 0, 1, 1])
+    units = np.array(["u0", "u0", "v0", "v1"])  # class 0 has only one unit
+    rng = np.random.default_rng(0)
+
+    with pytest.raises(ValueError, match="distinct same-class independent units"):
+        sample_oko_sets(build_class_index(labels), 2, 10, 1, rng, units=units)
+
+
+def test_supervised_contrastive_loss_reports_pairs_and_anchors():
+    from imbalance_benchmark.modeling.losses import supervised_contrastive_loss
+
+    embeddings = torch.randn(4, 8)
+    targets = torch.tensor([0, 0, 1, 1])  # four directed positive pairs, four valid anchors
+
+    loss, n_pairs, n_anchors = supervised_contrastive_loss(embeddings, targets, 0.1)
+
+    assert n_pairs == 4  # (0,1),(1,0),(2,3),(3,2)
+    assert n_anchors == 4
+    assert torch.isfinite(loss)
+
+    _, no_pairs, no_anchors = supervised_contrastive_loss(
+        torch.randn(2, 8), torch.tensor([0, 1]), 0.1
+    )
+    assert no_pairs == 0 and no_anchors == 0
+
+
 def test_oko_set_loss_finite_and_differentiable():
     model = OkoClassifier(DIM, 8, 3, 0.0)
     features = torch.randn(5 * 3, DIM)

@@ -22,6 +22,7 @@ __all__ = [
     "PILOT_CANDIDATE_LEVELS",
     "pilot_levels_for",
     "compute_pilot_quota",
+    "frozen_pilot_quota",
     "build_patch_pilot_manifest",
     "mil_pilot_manifest",
     "evaluate_pilot_candidate",
@@ -37,12 +38,10 @@ PILOT_CANDIDATE_LEVELS = (5, 10, 15, 20, 30)
 def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
     """Return nested candidate independent-unit counts capped by the scarcest class."""
     cap = min(available_per_class.values())
-    if cap >= PILOT_CANDIDATE_LEVELS[-1]:
-        return list(PILOT_CANDIDATE_LEVELS)
     levels = [c for c in PILOT_CANDIDATE_LEVELS if c <= cap]
-    if not levels or levels[-1] != cap:
-        levels.append(cap)
-    return levels
+    if cap >= PILOT_CANDIDATE_LEVELS[-1] or (levels and levels[-1] == cap):
+        return levels
+    return levels + [cap]
 
 
 def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
@@ -58,15 +57,20 @@ def compute_pilot_quota(
     """Largest per-patient patch quota feasible for every class at one pilot level."""
     quotas = []
     for cls in classes:
-        df_class = cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls])
-        patients = _patient_order(df_class, seed)[:level]
-        per_patient = (
-            df_class[df_class["case_id"].isin(patients)].groupby("case_id").size()
-        )
-        if len(per_patient) != level:
+        df = cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls])
+        pats = _patient_order(df, seed)[:level]
+        counts = df[df["case_id"].isin(pats)].groupby("case_id").size()
+        if len(counts) != level:
             raise ValueError("Pilot ordering did not retain every requested patient")
-        quotas.append(int(per_patient.min()))
+        quotas.append(int(counts.min()))
     return max(1, min(quotas))
+
+
+def frozen_pilot_quota(
+    train_df: pd.DataFrame, classes: list[str], level: int, seeds: list[int]
+) -> int:
+    """Determine the maximum patch quota feasible across all seeds."""
+    return min(compute_pilot_quota(train_df, classes, level, seed) for seed in seeds)
 
 
 def _apportion_quota(
@@ -100,12 +104,12 @@ def build_patch_pilot_manifest(
     parts = []
     for cls in classes:
         df_class = cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls])
-        patients = _patient_order(df_class, seed)[:level]
-        selected = _apportion_quota(df_class, patients, quota, seed)
-        counts = selected["case_id"].value_counts()
+        pat = _patient_order(df_class, seed)[:level]
+        sel = _apportion_quota(df_class, pat, quota, seed)
+        counts = sel["case_id"].value_counts()
         if len(counts) != level or not (counts == quota).all():
             raise ValueError("Pilot quota is not feasible for every selected patient")
-        parts.append(selected)
+        parts.append(sel)
     return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
 
@@ -115,9 +119,9 @@ def mil_pilot_manifest(
     """Build one nested MIL pilot manifest of `level` slides per class."""
     parts = [
         select_slides_round_robin(
-            cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]), level, seed
+            cast(pd.DataFrame, train_df[train_df["cancer_type"] == c]), level, seed
         )
-        for cls in classes
+        for c in classes
     ]
     return pd.concat(parts, ignore_index=True)
 
@@ -130,18 +134,18 @@ def _fit_pilot_model(
     val_loader: torch.utils.data.DataLoader,
 ) -> tuple[nn.Module, float]:
     """Instantiate and fit one balanced-CE pilot candidate model."""
-    train_ds: ImbalanceDataset | BagFeatureDataset = (
+    ds = (
         BagFeatureDataset(scratch_path, device=device)
         if is_mil
         else ImbalanceDataset(scratch_path, device=device)
     )
-    model: nn.Module = (
+    model = (
         AttentionMil(2560, 256, n_cls, 0.1) if is_mil else MLP(2560, 512, n_cls, 0.1)
     ).to(device)
     ctx = {
         "method": "ce",
         "model": model,
-        "train_dataset": train_ds,
+        "train_dataset": ds,
         "val_loader": val_loader,
         "device": device,
         "config": {},
@@ -149,7 +153,7 @@ def _fit_pilot_model(
         "seed": 0,
         "is_mil": is_mil,
         "n_classes": n_cls,
-        "train_labels": train_ds.get_int_targets(),
+        "train_labels": ds.get_int_targets(),
     }
     _, best_acc = fit_model(ctx)
     return model, best_acc
@@ -157,7 +161,7 @@ def _fit_pilot_model(
 
 def _pilot_val_predictions(
     model: nn.Module,
-    val_loader: torch.utils.data.DataLoader,
+    loader: torch.utils.data.DataLoader,
     device: torch.device,
     is_mil: bool,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -165,12 +169,11 @@ def _pilot_val_predictions(
     model.eval()
     preds, targets = [], []
     with torch.no_grad():
-        for batch in val_loader:
+        for batch in loader:
             if is_mil:
                 bags, tgt = batch
-                logits = cast(AttentionMil, model).forward_bags(
-                    [b.to(device) for b in bags]
-                )[0]
+                dev_bags = [b.to(device) for b in bags]
+                logits = cast(AttentionMil, model).forward_bags(dev_bags)[0]
             else:
                 logits, tgt = model(batch["features"].to(device)), batch["target"]
             preds.append(logits.softmax(-1).argmax(-1).cpu())
@@ -188,11 +191,11 @@ def evaluate_pilot_candidate(
 ) -> tuple[float, list[float]]:
     """Fit one balanced-CE pilot candidate and return its validation BA and recalls."""
     manifest_df.to_csv(scratch_path, index=False)
-    val_loader = torch.utils.data.DataLoader(
+    loader = torch.utils.data.DataLoader(
         val_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
     )
-    model, best_acc = _fit_pilot_model(scratch_path, device, n_cls, is_mil, val_loader)
-    preds, targets = _pilot_val_predictions(model, val_loader, device, is_mil)
+    model, best_acc = _fit_pilot_model(scratch_path, device, n_cls, is_mil, loader)
+    preds, targets = _pilot_val_predictions(model, loader, device, is_mil)
     return best_acc, per_class_recall(preds, targets, n_cls)
 
 
@@ -206,25 +209,19 @@ def run_pilot_seed(
     n_cls: int,
     is_mil: bool,
     scratch_dir: Path,
+    quota: int | None,
 ) -> tuple[int | None, list[float], list[list[float]]]:
-    """Run every nested candidate level for one pilot construction seed."""
+    """Run every nested candidate level for one pilot construction seed at the frozen quota."""
     ba_curve, recall_curve = [], []
-    quota = None if is_mil else compute_pilot_quota(train_df, classes, levels[-1], seed)
     for level in levels:
-        manifest = (
-            mil_pilot_manifest(train_df, classes, level, seed)
-            if is_mil
-            else build_patch_pilot_manifest(
-                train_df, classes, level, cast(int, quota), seed
-            )
-        )
+        if is_mil:
+            manifest = mil_pilot_manifest(train_df, classes, level, seed)
+        else:
+            q = cast(int, quota)
+            manifest = build_patch_pilot_manifest(train_df, classes, level, q, seed)
+        path = scratch_dir / f"pilot_seed={seed}_level={level}.csv"
         ba, recalls = evaluate_pilot_candidate(
-            manifest,
-            val_ds,
-            device,
-            n_cls,
-            is_mil,
-            scratch_dir / f"pilot_seed={seed}_level={level}.csv",
+            manifest, val_ds, device, n_cls, is_mil, path
         )
         ba_curve.append(ba)
         recall_curve.append(recalls)

@@ -24,6 +24,7 @@ logs/
 *.run.xml
 *.synctex.gz
 *.toc
+coverage.xml
 .latex-build/
 
 # Built on Hydra; do not commit.

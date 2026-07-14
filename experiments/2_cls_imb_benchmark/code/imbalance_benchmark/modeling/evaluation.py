@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from typing import Any, cast
+import math
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
 
 from imbalance_benchmark.modeling.models import AttentionMil, DualExpertMil
 
@@ -15,6 +16,9 @@ __all__ = [
     "per_class_recall",
     "checkpoint_step",
     "initial_checkpoint",
+    "ClassAwareBatchSampler",
+    "_RecordingSampler",
+    "_RecordingBatchSampler",
 ]
 
 
@@ -75,6 +79,27 @@ def _gather_and_eval(
     )
 
 
+def _compute_metrics(
+    preds: torch.Tensor, targets: torch.Tensor, logits: torch.Tensor, n_classes: int
+) -> dict[str, float]:
+    recalls = [
+        float((preds[targets == c] == c).sum().item())
+        / max(1, (targets == c).sum().item())
+        for c in range(n_classes)
+    ]
+    f1s = []
+    for c in range(n_classes):
+        tp = float(((preds == c) & (targets == c)).sum().item())
+        fp = float(((preds == c) & (targets != c)).sum().item())
+        fn = float(((preds != c) & (targets == c)).sum().item())
+        f1s.append(2 * tp / max(1.0, 2 * tp + fp + fn))
+    return {
+        "balanced_accuracy": float(np.mean(recalls)),
+        "macro_f1": float(np.mean(f1s)),
+        "nll": float(F.cross_entropy(logits, targets).item()),
+    }
+
+
 def run_evaluation(
     model: nn.Module,
     loader: DataLoader,
@@ -92,21 +117,9 @@ def run_evaluation(
         logits = logits - logit_adj_tau * torch.log(class_priors.cpu() + 1e-8)
     probs = torch.softmax(logits, dim=-1)
     preds = probs.argmax(dim=-1)
-    recalls = [
-        float((preds[targets == c] == c).sum().item())
-        / max(1, (targets == c).sum().item())
-        for c in range(n_classes)
-    ]
-    f1s = []
-    for c in range(n_classes):
-        tp = float(((preds == c) & (targets == c)).sum().item())
-        fp = float(((preds == c) & (targets != c)).sum().item())
-        fn = float(((preds != c) & (targets == c)).sum().item())
-        f1s.append(2 * tp / max(1.0, 2 * tp + fp + fn))
+    metrics = _compute_metrics(preds, targets, logits, n_classes)
     return {
-        "balanced_accuracy": float(np.mean(recalls)),
-        "macro_f1": float(np.mean(f1s)),
-        "nll": float(F.cross_entropy(logits, targets).item()),
+        **metrics,
         "logits": logits.numpy(),
         "probs": probs.numpy(),
         "preds": preds.numpy(),
@@ -155,3 +168,78 @@ def initial_checkpoint(
         "nll": float("inf"),
     }
     return checkpoint_step(model, val_loader, device, is_mil, n_classes, best)
+
+
+class ClassAwareBatchSampler(Sampler[list[int]]):
+    """Yield batches with at least two independent bags from every sampled class."""
+
+    def __init__(self, labels: np.ndarray, batch_size: int, seed: int) -> None:
+        if batch_size < 2:
+            raise ValueError("SC-MIL requires a batch size of at least two")
+        self.batch_size = batch_size
+        self.seed = seed
+        self.class_indices = {
+            int(cls): np.flatnonzero(labels == cls)
+            for cls in np.unique(labels)
+            if int(np.sum(labels == cls)) >= 2
+        }
+        if not self.class_indices:
+            raise ValueError(
+                "SC-MIL requires two independent bags in at least one class"
+            )
+        self.n_batches = math.ceil(len(labels) / batch_size)
+
+    def __iter__(self):
+        rng = np.random.default_rng(self.seed)
+        classes = np.array(sorted(self.class_indices))
+        for _ in range(self.n_batches):
+            n_pairs = min(len(classes), self.batch_size // 2)
+            selected_classes = rng.choice(classes, size=n_pairs, replace=False)
+            batch = [
+                int(index)
+                for cls in selected_classes
+                for index in rng.choice(
+                    self.class_indices[int(cls)], size=2, replace=False
+                )
+            ]
+            fill_classes = selected_classes if len(selected_classes) else classes
+            while len(batch) < self.batch_size:
+                cls = int(rng.choice(fill_classes))
+                batch.append(int(rng.choice(self.class_indices[cls])))
+            rng.shuffle(batch)
+            yield batch
+
+    def __len__(self) -> int:
+        return self.n_batches
+
+
+class _RecordingSampler(Sampler[int]):
+    """Wrap an index sampler, recording every yielded index as an actual exposure."""
+
+    def __init__(self, base: Sampler[int], exposed: set[int]) -> None:
+        self.base = base
+        self.exposed = exposed
+
+    def __iter__(self):
+        for index in self.base:
+            self.exposed.add(int(index))
+            yield index
+
+    def __len__(self) -> int:
+        return len(cast(Any, self.base))
+
+
+class _RecordingBatchSampler(Sampler[list[int]]):
+    """Wrap a batch sampler, recording every yielded index as an actual exposure."""
+
+    def __init__(self, base: Sampler[list[int]], exposed: set[int]) -> None:
+        self.base = base
+        self.exposed = exposed
+
+    def __iter__(self):
+        for batch in self.base:
+            self.exposed.update(int(index) for index in batch)
+            yield batch
+
+    def __len__(self) -> int:
+        return len(cast(Any, self.base))

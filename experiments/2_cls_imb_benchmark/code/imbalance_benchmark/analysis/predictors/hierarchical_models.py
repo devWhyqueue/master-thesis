@@ -53,6 +53,31 @@ def _standardize(x: np.ndarray) -> torch.Tensor:
     )
 
 
+def _fit_map(
+    x_std: torch.Tensor,
+    y: np.ndarray,
+    s_errors: np.ndarray,
+    groups: np.ndarray,
+    g: dict[str, int],
+    is_logistic: bool,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    b0, b, u = [torch.zeros(s, requires_grad=True) for s in (1, x_std.shape[1], len(g))]
+    l_su, l_s = [torch.zeros(1, requires_grad=True) for _ in range(2)]
+    _optimize_rq3(
+        b0,
+        b,
+        u,
+        l_su,
+        l_s,
+        x_std,
+        torch.tensor(y, dtype=torch.float32),
+        torch.tensor(s_errors, dtype=torch.float32),
+        torch.tensor([g[gp] for gp in groups], dtype=torch.long),
+        is_logistic,
+    )
+    return b0, b, u, l_su, l_s
+
+
 def fit_rq3_model(
     y: np.ndarray,
     x: np.ndarray,
@@ -62,20 +87,8 @@ def fit_rq3_model(
 ) -> dict[str, Any]:
     """Fit a Bayesian hierarchical random intercept model using PyTorch autograd (MAP)."""
     g = {gp: i for i, gp in enumerate(np.unique(groups))}
-    b0, b, u = [torch.zeros(shape, requires_grad=True) for shape in (1, 2, len(g))]
-    l_su, l_s = [torch.zeros(1, requires_grad=True) for _ in range(2)]
-    _optimize_rq3(
-        b0,
-        b,
-        u,
-        l_su,
-        l_s,
-        _standardize(x),
-        torch.tensor(y, dtype=torch.float32),
-        torch.tensor(s_errors, dtype=torch.float32),
-        torch.tensor([g[gp] for gp in groups], dtype=torch.long),
-        is_logistic,
-    )
+    x_std = _standardize(np.atleast_2d(x.T).T if x.ndim == 1 else x)
+    b0, b, u, l_su, l_s = _fit_map(x_std, y, s_errors, groups, g, is_logistic)
     return {
         "intercept": float(b0.item()),
         "slopes": b.detach().numpy().tolist(),

@@ -25,6 +25,14 @@ def build_class_index(labels: np.ndarray) -> dict[int, list[int]]:
     return index
 
 
+def _independent_units(dataset: Any) -> np.ndarray | None:
+    """Independent-unit id (patient, or slide) per patch, aligned to dataset order."""
+    frame = getattr(dataset, "df", None)
+    if frame is None or "case_id" not in getattr(frame, "columns", []):
+        return None
+    return frame["case_id"].to_numpy()
+
+
 def _sample_odd_classes(
     pair_classes: np.ndarray, n_classes: int, rng: np.random.Generator
 ) -> np.ndarray:
@@ -52,16 +60,57 @@ def _fill_column(
             set_indices[mask, column] = pool_arr[drawn]
 
 
+def _class_unit_pools(
+    class_index: dict[int, list[int]], units: np.ndarray
+) -> dict[int, dict[Any, list[int]]]:
+    """Group each class's example indices by their independent unit (patient/slide)."""
+    pools: dict[int, dict[Any, list[int]]] = {}
+    for class_id, indices in class_index.items():
+        by_unit: dict[Any, list[int]] = {}
+        for idx in indices:
+            by_unit.setdefault(units[idx], []).append(idx)
+        pools[class_id] = by_unit
+    return pools
+
+
+def _draw_distinct_unit_pair(
+    by_unit: dict[Any, list[int]], rng: np.random.Generator
+) -> tuple[int, int]:
+    """Draw two same-class examples from two distinct independent units."""
+    unit_keys = list(by_unit)
+    first_unit, second_unit = rng.choice(len(unit_keys), size=2, replace=False)
+    first = rng.choice(by_unit[unit_keys[first_unit]])
+    second = rng.choice(by_unit[unit_keys[second_unit]])
+    return int(first), int(second)
+
+
 def _fill_distinct_pair_indices(
     class_index: dict[int, list[int]],
     pair_classes: np.ndarray,
     set_indices: np.ndarray,
     rng: np.random.Generator,
+    units: np.ndarray | None = None,
 ) -> None:
-    """Fill the two same-class set positions without reusing an example."""
+    """Fill the two same-class positions from two distinct independent units.
+
+    The report requires class-aware batches to hold two distinct same-class
+    *independent units* (patients/slides), not merely two distinct example
+    indices which could be two patches from the same patient/slide. When no unit
+    map is supplied the two examples are only guaranteed distinct.
+    """
+    unit_pools = _class_unit_pools(class_index, units) if units is not None else None
     for class_id, pool in class_index.items():
         rows = np.flatnonzero(pair_classes == class_id)
         if not len(rows):
+            continue
+        if unit_pools is not None:
+            by_unit = unit_pools[class_id]
+            if len(by_unit) < 2:
+                raise ValueError(
+                    "OKO requires two distinct same-class independent units"
+                )
+            for row in rows:
+                set_indices[row, :2] = _draw_distinct_unit_pair(by_unit, rng)
             continue
         if len(pool) < 2:
             raise ValueError("OKO requires two distinct examples in every pair class")
@@ -75,15 +124,18 @@ def sample_oko_sets(
     n_sets: int,
     k: int,
     rng: np.random.Generator,
+    units: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Sample n_sets odd-k-out sets (Algorithm 1, Muttenthaler et al. 2024).
 
     Returns (pair_classes, set_indices of shape (n_sets, k+2), first_odd_classes);
-    the auxiliary loss uses only the first odd slot when k > 1.
+    the auxiliary loss uses only the first odd slot when k > 1. When ``units`` is
+    given, each set's two same-class examples come from distinct independent
+    units (patients/slides).
     """
     pair_classes = rng.integers(n_classes, size=n_sets)
     set_indices = np.empty((n_sets, k + 2), dtype=np.int64)
-    _fill_distinct_pair_indices(class_index, pair_classes, set_indices, rng)
+    _fill_distinct_pair_indices(class_index, pair_classes, set_indices, rng, units)
     first_odd = _sample_odd_classes(pair_classes, n_classes, rng)
     _fill_column(class_index, first_odd, set_indices, [2], rng)
     for slot in range(1, k):
@@ -116,12 +168,16 @@ def _oko_step_loss(
     b_size: int,
     rng: np.random.Generator,
     device: torch.device,
+    units: np.ndarray | None = None,
+    exposed: set[int] | None = None,
 ) -> torch.Tensor:
     """Sample one batch of odd-k-out sets and compute their joint OKO loss."""
     pair_classes, set_indices, odd_classes = sample_oko_sets(
-        class_index, n_classes, b_size, k, rng
+        class_index, n_classes, b_size, k, rng, units
     )
     flat_idx = set_indices.reshape(-1)
+    if exposed is not None:
+        exposed.update(int(i) for i in flat_idx)
     features = torch.stack([dataset[int(i)]["features"] for i in flat_idx]).to(device)
     pair_t = torch.from_numpy(pair_classes).long().to(device)
     odd_t = torch.from_numpy(odd_classes).long().to(device)
@@ -129,23 +185,31 @@ def _oko_step_loss(
 
 
 def _oko_train_loop(
-    model: OkoClassifier,
-    dataset: Any,
-    class_index: dict[int, list[int]],
-    n_classes: int,
-    k: int,
-    b_size: int,
     opt: torch.optim.Optimizer,
     ctx: dict[str, Any],
     budget: int,
-    rng: np.random.Generator,
     best: dict[str, Any],
+    class_index: dict[int, list[int]],
+    units: np.ndarray | None,
+    rng: np.random.Generator,
 ) -> dict[str, Any]:
     """Run OKO's update-budgeted training loop, checkpointing on the tie-break rule."""
-    device = ctx["device"]
+    model, dataset, n_classes = ctx["model"], ctx["train_dataset"], ctx["n_classes"]
+    device, exposed = ctx["device"], ctx.setdefault("exposed_indices", set())
+    k = int(ctx["param_config"]["parameter"])
+    b_size = resolve_batch_size(ctx["config"], False)
     for step in range(1, budget + 1):
         loss = _oko_step_loss(
-            model, dataset, class_index, n_classes, k, b_size, rng, device
+            model,
+            dataset,
+            class_index,
+            n_classes,
+            k,
+            b_size,
+            rng,
+            device,
+            units,
+            exposed,
         )
         opt.zero_grad()
         loss.backward()
@@ -164,14 +228,12 @@ def fit_oko(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     k, lr = int(ctx["param_config"]["parameter"]), ctx["param_config"]["lr"]
     b_size = resolve_batch_size(ctx["config"], False)
     budget = update_budget(len(dataset), b_size)
-
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     class_index = build_class_index(ctx["train_labels"])
+    units = _independent_units(dataset)
     rng = np.random.default_rng(ctx["seed"])
     best = initial_checkpoint(model, ctx["val_loader"], device, False, n_classes)
     model.train()
-    best = _oko_train_loop(
-        model, dataset, class_index, n_classes, k, b_size, opt, ctx, budget, rng, best
-    )
+    best = _oko_train_loop(opt, ctx, budget, best, class_index, units, rng)
     model.load_state_dict({k2: v.to(device) for k2, v in best["state"].items()})
     return best["state"], best["acc"]

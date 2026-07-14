@@ -14,6 +14,7 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
     resample_patient_weights,
     resample_seed_indices,
     weighted_balanced_accuracy,
+    weighted_ece,
     weighted_macro_nll,
 )
 from imbalance_benchmark.analysis.metrics import assign_tiers
@@ -97,6 +98,20 @@ class BootstrapContext:
                 weighted_macro_nll(
                     labels, probs_stack[i], self.row_weights, tail_classes
                 )
+                for i in range(probs_stack.shape[0])
+            ]
+        )
+        return gather_seed_resampled(
+            per_seed, self._paired_seed_indices(probs_stack.shape[0])
+        )
+
+    def ece_distribution(
+        self, labels: np.ndarray, probs_stack: np.ndarray
+    ) -> np.ndarray:
+        """Per-replicate fixed-bin ECE from the frozen crossed patient bootstrap."""
+        per_seed = np.stack(
+            [
+                weighted_ece(labels, probs_stack[i], self.row_weights)
                 for i in range(probs_stack.shape[0])
             ]
         )

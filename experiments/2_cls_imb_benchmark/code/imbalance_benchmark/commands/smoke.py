@@ -11,7 +11,8 @@ from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.commands.tuning import cmd_tune
-from imbalance_benchmark.common import REPO_ROOT, cmd_submit
+from imbalance_benchmark.common import REPO_ROOT
+from imbalance_benchmark.hydra import cmd_submit
 
 __all__ = ["cmd_smoke"]
 
@@ -31,7 +32,9 @@ def cmd_smoke(args: argparse.Namespace) -> None:
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with config_path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(mock_config, f)
-    ns = argparse.Namespace(config=str(config_path), seed=0, dry_run=True)
+    ns = argparse.Namespace(
+        config=str(config_path), seed=0, dry_run=True, split_index=None
+    )
     cmd_prepare(ns)
     cmd_pilot(ns)
     cmd_freeze(ns)

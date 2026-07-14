@@ -33,119 +33,110 @@ class SlurmJob:
 
 def _resources(config: dict[str, Any], stage: str, gpu: bool) -> dict[str, Any]:
     """Return resource settings for a workflow stage with safe defaults."""
-    slurm = config.get("slurm", {})
-    stage_resources = slurm.get("resources", {}).get(stage, {})
+    sl = config.get("slurm", {})
+    sr = sl.get("resources", {}).get(stage, {})
+    part = sr.get("partition", sl.get("partition", "gpu-2h" if gpu else "cpu-2h"))
     return {
-        "partition": stage_resources.get(
-            "partition", slurm.get("partition", "gpu-2h" if gpu else "cpu-2h")
-        ),
-        "gpus": int(stage_resources.get("gpus", 1 if gpu else 0)),
-        "cpus": int(stage_resources.get("cpus", 4)),
-        "time_limit": str(stage_resources.get("time", "02:00:00")),
+        "partition": part,
+        "gpus": int(sr.get("gpus", 1 if gpu else 0)),
+        "cpus": int(sr.get("cpus", 4)),
+        "time_limit": str(sr.get("time", "02:00:00")),
     }
 
 
-def _job(config: dict[str, Any], stage: str, command: str, gpu: bool) -> SlurmJob:
-    """Create a stage job using the configured SLURM resources."""
-    return SlurmJob(stage, command, **_resources(config, stage, gpu))
+def _job(
+    config: dict[str, Any], stage: str, cmd: str, gpu: bool, dep: str | None = None
+) -> SlurmJob:
+    return SlurmJob(stage, cmd, dependency=dep, **_resources(config, stage, gpu))
 
 
 def build_workflow(config: dict[str, Any], smoke: bool = False) -> list[SlurmJob]:
     """Build the benchmark DAG, or its test-partition synthetic smoke variant."""
     if smoke:
-        resources = _resources(config, "smoke", True)
-        resources["partition"] = config.get("slurm", {}).get(
-            "test_partition", "gpu-test"
-        )
-        return [SlurmJob("smoke", "smoke", **resources)]
-    split_array = (0, 1, 2)
-    prepare = replace(_job(config, "prepare", "prepare", gpu=True), array_splits=split_array)
-    pilot = replace(_job(config, "pilot", "pilot", gpu=False), array_splits=split_array)
-    freeze = replace(_job(config, "freeze", "freeze", gpu=False), array_splits=split_array)
-    tune = _job(config, "tune", "tune", gpu=True)
-    confirm = replace(_job(config, "confirm", "confirm", gpu=True), array_splits=split_array)
-    analyze = _job(config, "analyze", "analyze", gpu=False)
-    return [
-        prepare,
-        replace(pilot, dependency=prepare.name),
-        replace(freeze, dependency=pilot.name),
-        replace(tune, dependency=freeze.name, array_conditions=CONDITIONS),
-        replace(confirm, dependency=tune.name, array_conditions=CONDITIONS),
-        replace(analyze, dependency=confirm.name),
-    ]
+        res = _resources(config, "smoke", True)
+        res["partition"] = config.get("slurm", {}).get("test_partition", "gpu-test")
+        return [SlurmJob("smoke", "smoke", **res)]
+    arr = (0, 1, 2)
+    p = _job(config, "prepare", "prepare", True)
+    pi = replace(_job(config, "pilot", "pilot", False, p.name), array_splits=arr)
+    fr = replace(_job(config, "freeze", "freeze", False, pi.name), array_splits=arr)
+    tu = replace(
+        _job(config, "tune", "tune", True, fr.name), array_conditions=CONDITIONS
+    )
+    co = replace(
+        _job(config, "confirm", "confirm", True, tu.name),
+        array_splits=arr,
+        array_conditions=CONDITIONS,
+    )
+    an = _job(config, "analyze", "analyze", False, co.name)
+    return [p, pi, fr, tu, co, an]
 
 
 def _config_argument(config_path: str | None) -> str:
-    """Return the optional CLI fragment selecting a non-default configuration."""
     return f" --config {shlex.quote(config_path)}" if config_path else ""
 
 
 def _stage_images(config: dict[str, Any]) -> list[tuple[str, str]]:
-    """Validate configured SquashFS source/mount pairs before rendering a job."""
-    images = config.get("slurm", {}).get("squashfs", [])
-    pairs = []
-    for image in images:
-        if not isinstance(image, dict) or not {"source", "mount"} <= image.keys():
-            raise ValueError("Each slurm.squashfs entry needs source and mount fields")
-        pairs.append((str(image["source"]), str(image["mount"])))
-    return pairs
+    imgs = config.get("slurm", {}).get("squashfs", [])
+    return [(str(i["source"]), str(i["mount"])) for i in imgs]
 
 
 def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
-    """Stage SquashFS images to job-local storage and bind their requested mounts."""
     if not images:
         return []
     lines = [
         'STAGE_DIR="/tmp/imbalance-benchmark-${SLURM_JOB_ID}"',
         'mkdir -p "$STAGE_DIR"',
     ]
-    for index, (source, mount) in enumerate(images):
-        local = f'"$STAGE_DIR/{index}.sqfs"'
+    for idx, (src, mt) in enumerate(images):
+        loc = f'"$STAGE_DIR/{idx}.sqfs"'
         lines.extend(
-            [
-                f"cp {shlex.quote(source)} {local}",
-                f'BINDS+=("{local}:{mount}:image-src=/")',
-            ]
+            [f"cp {shlex.quote(src)} {loc}", f'BINDS+=("{loc}:{mt}:image-src=/")']
         )
     return lines
 
 
 def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
     """Build the benchmark command, mapping each array task to one condition."""
-    prefix = f"python {shlex.quote(code_dir)}/__main__.py{_config_argument(config_path)}"
+    cfg_arg = _config_argument(config_path)
+    prefix = f"python {shlex.quote(code_dir)}/__main__.py{cfg_arg}"
     command = f"{prefix} {job.command}"
     if not job.array_splits and not job.array_conditions:
         return command
     lines = []
     if job.array_splits:
-        values = " ".join(str(value) for value in job.array_splits)
-        lines.append(f"SPLITS=({values})")
+        lines.append(f"SPLITS=({' '.join(str(v) for v in job.array_splits)})")
     if job.array_conditions:
-        values = " ".join(shlex.quote(value) for value in job.array_conditions)
-        lines.append(f"CONDITIONS=({values})")
+        lines.append(
+            f"CONDITIONS=({' '.join(shlex.quote(v) for v in job.array_conditions)})"
+        )
     if job.array_splits and job.array_conditions:
+        cmd_run = f'{prefix} --split-index "$SPLIT_INDEX" {job.command}'
         lines.extend(
             [
                 f"N_CONDITIONS={len(job.array_conditions)}",
                 'SPLIT_INDEX="${SPLITS[$SLURM_ARRAY_TASK_ID / $N_CONDITIONS]}"',
                 'CONDITION="${CONDITIONS[$SLURM_ARRAY_TASK_ID % $N_CONDITIONS]}"',
-                f'{prefix} --split-index "$SPLIT_INDEX" {job.command} --condition "$CONDITION"',
+                f'{cmd_run} --condition "$CONDITION"',
             ]
         )
     elif job.array_splits:
-        lines.append(f'{prefix} --split-index "${{SPLITS[$SLURM_ARRAY_TASK_ID]}}" {job.command}')
+        lines.append(
+            f'{prefix} --split-index "${{SPLITS[$SLURM_ARRAY_TASK_ID]}}" {job.command}'
+        )
     else:
         lines.append(f'{command} --condition "${{CONDITIONS[$SLURM_ARRAY_TASK_ID]}}"')
     return "\n".join(lines)
 
 
 def _array_size(job: SlurmJob) -> int:
-    """Return the number of scheduler tasks needed for a split/condition grid."""
     return max(1, len(job.array_splits)) * max(1, len(job.array_conditions))
 
 
 def _directives(job: SlurmJob, root: str) -> list[str]:
     """Render scheduler directives, including array and dependency metadata."""
+    q = shlex.quote(root)
+    log_dir = f"{q}/experiments/2_cls_imb_benchmark/outputs/logs"
     lines = [
         "#!/bin/bash",
         f"#SBATCH --job-name=imb-{job.name}",
@@ -153,8 +144,8 @@ def _directives(job: SlurmJob, root: str) -> list[str]:
         f"#SBATCH --gpus-per-node={job.gpus}",
         f"#SBATCH --cpus-per-task={job.cpus}",
         f"#SBATCH --time={job.time_limit}",
-        f"#SBATCH --output={shlex.quote(root)}/experiments/2_cls_imb_benchmark/outputs/logs/%x-%A_%a.out",
-        f"#SBATCH --error={shlex.quote(root)}/experiments/2_cls_imb_benchmark/outputs/logs/%x-%A_%a.err",
+        f"#SBATCH --output={log_dir}/%x-%A_%a.out",
+        f"#SBATCH --error={log_dir}/%x-%A_%a.err",
     ]
     if job.array_splits or job.array_conditions:
         lines.append(f"#SBATCH --array=0-{_array_size(job) - 1}")
@@ -173,22 +164,27 @@ def _execution_lines(
     images: list[tuple[str, str]],
 ) -> list[str]:
     """Render the container and local fallback execution blocks."""
+    r, c = shlex.quote(root), shlex.quote(code_dir)
+    o, co = shlex.quote(output_dir), shlex.quote(container)
+    cmd = shlex.quote(command)
     lines = [
         "",
         "set -euo pipefail",
-        f"cd {shlex.quote(root)}",
-        f"mkdir -p {shlex.quote(output_dir)}/logs",
-        f"export APPTAINERENV_PYTHONPATH={shlex.quote(code_dir)}",
+        f"cd {r}",
+        f"mkdir -p {o}/logs",
+        f"export APPTAINERENV_PYTHONPATH={c}",
         "BINDS=()",
     ]
     lines.extend(_staging_lines(images))
-    apptainer = f'apptainer exec {"--nv " if job.gpus else ""}-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" "${{BINDS[@]}}" {shlex.quote(container)} bash -lc {shlex.quote(command)}'
+    nv = "--nv " if job.gpus else ""
+    binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw"'
+    app = f'apptainer exec {nv}{binds} "${{BINDS[@]}}" {co} bash -lc {cmd}'
     lines.extend(
         [
-            f"if [ -f {shlex.quote(container)} ]; then",
-            f"  {apptainer}",
+            f"if [ -f {co} ]; then",
+            f"  {app}",
             "else",
-            f"  PYTHONPATH={shlex.quote(code_dir)}${{PYTHONPATH:+:$PYTHONPATH}} bash -lc {shlex.quote(command)}",
+            f"  PYTHONPATH={c}${{PYTHONPATH:+:$PYTHONPATH}} bash -lc {cmd}",
             "fi",
             "",
         ]
@@ -197,50 +193,32 @@ def _execution_lines(
 
 
 def _cluster_paths(config: dict[str, Any]) -> tuple[str, str, str, str]:
-    """Resolve POSIX paths used by jobs running on the Hydra cluster."""
-    slurm = config.get("slurm", {})
-    root = str(slurm.get("project_root", EXPERIMENT_ROOT.parent.parent))
-    benchmark = posixpath.join(root, "experiments/2_cls_imb_benchmark")
-    code_dir = str(slurm.get("code_dir", posixpath.join(benchmark, "code")))
-    output_dir = str(slurm.get("output_dir", posixpath.join(benchmark, "outputs")))
-    container = str(
-        slurm.get("container", posixpath.join(benchmark, "environment.sif"))
-    )
-    return root, code_dir, output_dir, container
+    sl = config.get("slurm", {})
+    r = str(sl.get("project_root", EXPERIMENT_ROOT.parent.parent))
+    b = posixpath.join(r, "experiments/2_cls_imb_benchmark")
+    c = str(sl.get("code_dir", posixpath.join(b, "code")))
+    o = str(sl.get("output_dir", posixpath.join(b, "outputs")))
+    co = str(sl.get("container", posixpath.join(b, "environment.sif")))
+    return r, c, o, co
 
 
 def render_sbatch(
     job: SlurmJob, config: dict[str, Any], config_path: str | None = None
 ) -> str:
     """Render one self-contained, job-ID-logged Apptainer SLURM script."""
-    root, code_dir, output_dir, container = _cluster_paths(config)
-    lines = _directives(job, root)
-    lines.extend(
-        _execution_lines(
-            job,
-            root,
-            code_dir,
-            output_dir,
-            container,
-            _command(job, config_path, code_dir),
-            _stage_images(config),
-        )
-    )
+    r, c, o, co = _cluster_paths(config)
+    cmd = _command(job, config_path, c)
+    lines = _directives(job, r)
+    lines.extend(_execution_lines(job, r, c, o, co, cmd, _stage_images(config)))
     return "\n".join(lines)
 
 
 def _submit_script(script: str, dry_run: bool) -> str:
-    """Submit a rendered script, or return a deterministic dry-run job identifier."""
     if dry_run:
         return "dry-run"
-    result = subprocess.run(
-        ["sbatch", "--parsable"],
-        input=script,
-        text=True,
-        check=True,
-        capture_output=True,
-    )
-    return result.stdout.strip().split(";", maxsplit=1)[0]
+    cmd = ["sbatch", "--parsable"]
+    res = subprocess.run(cmd, input=script, text=True, check=True, capture_output=True)
+    return res.stdout.strip().split(";", maxsplit=1)[0]
 
 
 def submit_workflow(
@@ -253,20 +231,18 @@ def submit_workflow(
     """Render and submit the workflow in topological order, returning job IDs by stage."""
     submitted: dict[str, str] = {}
     for job in build_workflow(config, smoke):
-        dependency = submitted.get(job.dependency) if job.dependency else None
-        scheduled = replace(
-            job, dependency=f"afterok:{dependency}" if dependency else None
-        )
+        dep = submitted.get(job.dependency) if job.dependency else None
+        scheduled = replace(job, dependency=f"afterok:{dep}" if dep else None)
         script = render_sbatch(scheduled, config, config_path)
-        job_id = f"dry-run-{job.name}" if dry_run else submit(script, False)
-        submitted[job.name] = job_id
-        logger.info("%s: %s", job.name, job_id)
+        jid = f"dry-run-{job.name}" if dry_run else submit(script, False)
+        submitted[job.name] = jid
+        logger.info("%s: %s", job.name, jid)
         if dry_run:
             logger.info("%s", script)
     return submitted
 
 
 def cmd_submit(args: argparse.Namespace) -> None:
-    """Render or submit the full Hydra workflow from the selected configuration."""
+    """Submit the Hydra workflow."""
     config = load_config(args.config)
     submit_workflow(config, args.config, args.dry_run, getattr(args, "smoke", False))

@@ -30,23 +30,33 @@ def _build_patch_hierarchy(
 def _loop_patches(
     patients: list[str], h: dict, max_p: int, max_s: int, n: int
 ) -> tuple[list[int], dict, dict]:
-    """Execute loop for round robin patch sampling."""
+    """Round-robin patches breadth-first: one patch per patient per pass.
+
+    Visiting every patient once (then every slide within a patient) before any
+    unit is revisited makes each smaller allocation a nested prefix of the
+    larger ones and maximizes patient/slide diversity: the fixed per-class
+    patient and slide pool is preserved across balanced and imbalanced
+    conditions rather than concentrating a small allocation into a few units.
+    """
     selected, pat_counts, sld_counts = [], {p: 0 for p in patients}, {}
+    slide_cursor = {p: 0 for p in patients}
     prog = True
     while len(selected) < n and prog:
         prog = False
         for p in patients:
             if len(selected) >= n or pat_counts[p] >= max_p:
                 continue
-            for s in h[p]:
-                if len(selected) >= n or pat_counts[p] >= max_p:
-                    break
+            slides = list(h[p])
+            for offset in range(len(slides)):
+                s = slides[(slide_cursor[p] + offset) % len(slides)]
                 if sld_counts.get(s, 0) >= max_s or not h[p][s]:
                     continue
                 selected.append(h[p][s].pop(0))
                 pat_counts[p] += 1
                 sld_counts[s] = sld_counts.get(s, 0) + 1
+                slide_cursor[p] = (slides.index(s) + 1) % len(slides)
                 prog = True
+                break
     return selected, pat_counts, sld_counts
 
 

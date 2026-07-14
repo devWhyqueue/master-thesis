@@ -27,19 +27,23 @@ def _to_latex(df: pd.DataFrame, caption: str, label: str) -> str:
 def _with_tail_recall(
     summary: pd.DataFrame, conn: sqlite3.Connection, split: str
 ) -> pd.DataFrame:
-    """Merge in each condition/method's mean tail-tier recall, when classwise rows exist."""
+    """Merge in each assignment/condition/method's mean tail-tier recall.
+
+    Tail status is assignment-specific, so tail recall must be grouped by
+    ``assignment`` as well; grouping only by condition/method would average
+    tail recall across assignments and copy that average into every row.
+    """
     classwise = load_classwise(conn)
     classwise = cast(pd.DataFrame, classwise[classwise["split"] == split])
     if classwise.empty:
         return summary
+    keys = ["assignment", "condition", "method"]
     tail_series = cast(
         pd.Series,
-        classwise[classwise["tier"] == "tail"]
-        .groupby(["condition", "method"])["recall"]
-        .mean(),
+        classwise[classwise["tier"] == "tail"].groupby(keys)["recall"].mean(),
     )
     tail = tail_series.rename("tail_recall").reset_index()
-    return summary.merge(tail, on=["condition", "method"], how="left")
+    return summary.merge(tail, on=keys, how="left")
 
 
 def results_table(conn: sqlite3.Connection, split: str = "test") -> str:

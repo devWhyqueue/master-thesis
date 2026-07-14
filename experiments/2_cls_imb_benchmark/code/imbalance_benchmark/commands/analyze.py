@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
-import numpy as np
 
 from imbalance_benchmark.analysis.calibration import reliability_curve
 from imbalance_benchmark.analysis.aggregate import (
@@ -26,7 +25,11 @@ from imbalance_benchmark.analysis.reporting.ingestion import (
     ingest_all_runs,
     write_diagnostics,
 )
-from imbalance_benchmark.analysis.predictors.rq3_analysis import run_rq3
+from imbalance_benchmark.analysis.predictors.rq3_analysis import (
+    cross_dataset_rq3,
+    load_rq3_cells,
+    run_rq3,
+)
 from imbalance_benchmark.analysis.query import (
     load_classwise,
     load_seed_predictions,
@@ -35,6 +38,7 @@ from imbalance_benchmark.analysis.query import (
 from imbalance_benchmark.analysis.reporting.plots import (
     plot_reliability_diagram,
     plot_tail_vs_support,
+    write_tail_reliability,
 )
 from imbalance_benchmark.analysis.reporting.tables import (
     calibration_table,
@@ -42,10 +46,29 @@ from imbalance_benchmark.analysis.reporting.tables import (
     rq3_table,
     results_table,
 )
-from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, write_json
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    load_config,
+    output_root,
+    split_paths,
+    write_json,
+)
 from imbalance_benchmark.manifest.seeds import derive_seed
 
-__all__ = ["cmd_analyze"]
+__all__ = ["cmd_analyze", "cmd_combine_rq3"]
+
+
+def cmd_combine_rq3(args: argparse.Namespace) -> None:
+    """Fit the combined cross-dataset RQ3 analysis over every listed dataset-regime."""
+    config = load_config(args.config)
+    roots = [Path(r) for r in config.get("rq3", {}).get("dataset_roots", [])] or [
+        output_root(config)
+    ]
+    base_paths = ensure_dirs(config)
+    write_json(
+        base_paths["data"] / "cross_dataset_rq3.json",
+        cross_dataset_rq3(load_rq3_cells(roots)),
+    )
 
 
 def _load_freeze(paths: dict[str, Path]) -> dict[str, Any]:
@@ -62,18 +85,13 @@ def _write_tables(
 ) -> None:
     """Replace the placeholder LaTeX tables with real DB-driven results."""
     paths["tables"].mkdir(parents=True, exist_ok=True)
-    (paths["tables"] / "results_table.tex").write_text(
-        results_table(conn), encoding="utf-8"
-    )
-    (paths["tables"] / "calibration_table.tex").write_text(
-        calibration_table(conn), encoding="utf-8"
-    )
-    (paths["tables"] / "confirmatory_table.tex").write_text(
-        confirmatory_table(apply_holm(comparisons)), encoding="utf-8"
-    )
-    (paths["tables"] / "rq3_table.tex").write_text(
-        rq3_table(rq3["models"]), encoding="utf-8"
-    )
+    for name, text in [
+        ("results_table.tex", results_table(conn)),
+        ("calibration_table.tex", calibration_table(conn)),
+        ("confirmatory_table.tex", confirmatory_table(apply_holm(comparisons))),
+        ("rq3_table.tex", rq3_table(rq3["models"])),
+    ]:
+        (paths["tables"] / name).write_text(text, encoding="utf-8")
 
 
 def _write_figures(
@@ -97,36 +115,7 @@ def _write_figures(
                 accuracy,
                 paths["figures"] / "reliability_diagram.png",
             )
-        for assignment, conditions in freeze.get("assignment_conditions", {}).items():
-            allocated = conditions.get("severe", {}).get("allocated_counts", {})
-            tiers = assign_tiers(
-                balanced["class_names"],
-                allocated,
-                freeze.get("tail_assignments", {}).get(
-                    assignment, balanced["class_names"]
-                ),
-            )
-            tail = [
-                index
-                for index, name in enumerate(balanced["class_names"])
-                if tiers.get(name) == "tail"
-            ]
-            imbalanced = load_seed_predictions(paths, "severe", "ce", assignment)
-            reliability_source = imbalanced or balanced
-            mask = np.isin(reliability_source["labels"], tail)
-            if not mask.any():
-                continue
-            centers, mean_conf, accuracy = reliability_curve(
-                reliability_source["probs"].mean(axis=0)[mask],
-                reliability_source["labels"][mask],
-            )
-            if len(centers):
-                plot_reliability_diagram(
-                    centers,
-                    mean_conf,
-                    accuracy,
-                    paths["figures"] / f"tail_reliability_{assignment}.png",
-                )
+        write_tail_reliability(paths, freeze, balanced)
 
 
 def _crossed_p_value(
@@ -150,13 +139,15 @@ def _crossed_p_value(
         if method is None or ce is None:
             return None
         method_data = method
-        identity = load_test_identity(paths["data"] / "manifest.csv", is_mil)
-        values = (
-            method["preds"] if entry["gate"] == "discrimination" else method["probs"]
-        )
-        reference = ce["preds"] if entry["gate"] == "discrimination" else ce["probs"]
+        id_df = load_test_identity(paths["data"] / "manifest.csv", is_mil)
+        is_disc = entry["gate"] == "discrimination"
         blocks.append(
-            (method["labels"], values, reference, identity["case_id"].to_numpy())
+            (
+                method["labels"],
+                method["preds"] if is_disc else method["probs"],
+                ce["preds"] if is_disc else ce["probs"],
+                id_df["case_id"].to_numpy(),
+            )
         )
     if method_data is None:
         return None
@@ -165,24 +156,19 @@ def _crossed_p_value(
             blocks, len(method_data["class_names"]), seed=seed
         )
     tail_classes = []
-    for index in range(3):
-        freeze = _load_freeze(split_paths(base_paths, index))
-        allocated = freeze["assignment_conditions"][entry["assignment"]]["severe"][
+    for i in range(3):
+        fz = _load_freeze(split_paths(base_paths, i))
+        alloc = fz["assignment_conditions"][entry["assignment"]]["severe"][
             "allocated_counts"
         ]
+        c_names = method_data["class_names"]
+        tiers = assign_tiers(
+            c_names,
+            alloc,
+            fz.get("tail_assignments", {}).get(entry["assignment"], c_names),
+        )
         tail_classes.append(
-            [
-                class_index
-                for class_index, name in enumerate(method_data["class_names"])
-                if assign_tiers(
-                    method_data["class_names"],
-                    allocated,
-                    freeze.get("tail_assignments", {}).get(
-                        entry["assignment"], method_data["class_names"]
-                    ),
-                ).get(name)
-                == "tail"
-            ]
+            [idx for idx, name in enumerate(c_names) if tiers.get(name) == "tail"]
         )
     return crossed_block_permutation_tail_nll(blocks, tail_classes, seed=seed)
 
@@ -207,11 +193,9 @@ def _analyze_all_splits(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     base_paths = ensure_dirs(config)
     excluded = [
-        index
-        for index in range(3)
-        if (
-            split_paths(base_paths, index)["data"] / "confirmatory_exclusion.json"
-        ).exists()
+        i
+        for i in range(3)
+        if (split_paths(base_paths, i)["data"] / "confirmatory_exclusion.json").exists()
     ]
     if excluded:
         write_json(
@@ -220,7 +204,7 @@ def _analyze_all_splits(args: argparse.Namespace) -> None:
         )
         return
     for index in range(3):
-        _analyze_one_split(argparse.Namespace(**vars(args), split_index=index))
+        _analyze_one_split(argparse.Namespace(**{**vars(args), "split_index": index}))
     _aggregate_split_comparisons(
         base_paths, config, derive_seed(args.seed, "resampling")
     )
@@ -236,11 +220,9 @@ def _analyze_one_split(args: argparse.Namespace) -> None:
     freeze = _load_freeze(paths)
     n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
     seed = derive_seed(int(getattr(args, "seed", 0) or 0), "resampling")
-
     conn = connect_db(paths["db"])
     init_schema(conn)
     ingest_all_runs(conn, paths, freeze)
-
     comparisons = gates_and_recovery(paths, config, freeze, n_replicates, seed)
     rq3 = run_rq3(paths, config, freeze, comparisons)
     write_diagnostics(paths, comparisons)

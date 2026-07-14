@@ -10,9 +10,22 @@ from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_block_permutation_tail_nll,
 )
 from imbalance_benchmark.analysis.inference.preflight import run_preflight
-from imbalance_benchmark.construction import allocate_counts, effective_rho, max_shared_total
+from imbalance_benchmark.analysis.query import load_seed_predictions
+from imbalance_benchmark.commands.pilot import _pilot_report_payload
+from imbalance_benchmark.common import write_run_record
+from imbalance_benchmark.construction import (
+    allocate_counts,
+    effective_rho,
+    max_shared_total,
+    select_patches_round_robin,
+)
+from imbalance_benchmark.manifest.freeze import build_tail_assignments
 from imbalance_benchmark.manifest.freezing import _build_conditions
-from imbalance_benchmark.manifest.pilot import meets_method_floor
+from imbalance_benchmark.manifest.pilot import (
+    compute_pilot_quota,
+    frozen_pilot_quota,
+    meets_method_floor,
+)
 
 
 def _patches(class_name: str, n_patients: int = 20) -> pd.DataFrame:
@@ -73,6 +86,125 @@ def test_patch_conditions_record_one_fixed_patient_slide_pool(tmp_path: Path) ->
     assert conditions["moderate"]["evidence_pool_hash"] == conditions["severe"]["evidence_pool_hash"]
 
 
+def test_smaller_patch_allocation_is_a_nested_subset_of_the_larger_pool() -> None:
+    """A smaller allocation must reuse the larger one's fixed patient/slide pool.
+
+    Breadth-first round-robin makes every smaller patch allocation a nested
+    prefix of the larger one: its patients and slides are subsets and patient
+    diversity is preserved, rather than concentrating into a few units.
+    """
+    df_class = _patches("A", n_patients=20)  # 20 patients, 2 slides each, 10 patches each
+
+    small = select_patches_round_robin(df_class, 20, seed=5)
+    large = select_patches_round_robin(df_class, 40, seed=5)
+
+    # Every pool patient contributes before any patch is doubled up: 20 patches
+    # spread one-per-patient over all 20 patients rather than 10 patients x 2.
+    assert small["case_id"].nunique() == 20
+    assert set(small.index) <= set(large.index)
+    assert set(small["case_id"]) <= set(large["case_id"])
+    assert set(small["slide_id"]) <= set(large["slide_id"])
+    assert small["case_id"].nunique() == large["case_id"].nunique()
+
+
+def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> None:
+    """Patch pilot levels count patients; the slide floor must not become a 20-patient floor."""
+    levels = [5, 10, 15, 20, 30]
+    flat_ba = {seed: [0.5] * len(levels) for seed in (0, 1, 2)}
+    flat_recall = {seed: [[0.5, 0.5]] * len(levels) for seed in (0, 1, 2)}
+    support = {"A": {"patients": 12, "slides": 25}, "B": {"patients": 12, "slides": 25}}
+
+    patch = _pilot_report_payload(
+        levels, False, False, [0, 1, 2], {}, flat_ba, flat_recall, support
+    )
+    mil = _pilot_report_payload(
+        levels, True, False, [0, 1, 2], {}, flat_ba, flat_recall, support
+    )
+
+    # Patch pilot counts patients -> patient floor 10, not the 20-slide floor.
+    assert patch["stability_floor"] == 5
+    assert patch["definitive_floor"] == 10
+    assert patch["excluded"] is False
+    # MIL pilot counts slides -> slide floor 20 applies to the level dimension.
+    assert mil["definitive_floor"] == 20
+
+
+def test_pilot_quota_is_frozen_across_construction_orderings() -> None:
+    """One quota is shared by every pilot ordering, not recomputed per seed."""
+    patients = []
+    for patient in range(12):
+        n_patches = 4 + patient  # varying inventory so per-seed selection matters
+        patients.append(
+            pd.DataFrame(
+                {
+                    "case_id": [f"A_{patient}"] * n_patches,
+                    "slide_id": [f"A_{patient}_s{p % 2}" for p in range(n_patches)],
+                    "cancer_type": "A",
+                    "split": "train",
+                }
+            )
+        )
+    df = pd.concat(patients, ignore_index=True)
+    seeds = [11, 22, 33]
+
+    frozen = frozen_pilot_quota(df, ["A"], level=10, seeds=seeds)
+
+    per_seed = [compute_pilot_quota(df, ["A"], level=10, seed=seed) for seed in seeds]
+    assert frozen == min(per_seed)
+    # Feasible for every ordering: no selected patient can fall short of it.
+    assert all(frozen <= value for value in per_seed)
+
+
+@pytest.mark.parametrize("seed", range(60))
+def test_random_tail_assignment_is_distinct_from_native_and_rotated(seed: int) -> None:
+    """The random permutation must not duplicate the native or rotated assignment."""
+    assignments = build_tail_assignments(["A", "B", "C"], seed=seed, ordinal=False)
+
+    orders = [tuple(order) for order in assignments.values()]
+    assert len(set(orders)) == 3
+
+
+def _write_seed_record(method_dir: Path, seed_idx: int) -> None:
+    write_run_record(
+        method_dir / f"seed={seed_idx}",
+        {
+            "benchmark": "patch",
+            "class_names": ["A", "B"],
+            "splits": {
+                "test": {
+                    "labels": [0, 1],
+                    "preds": [0, 1],
+                    "probabilities": [[0.9, 0.1], [0.2, 0.8]],
+                    "logits": [[2.0, 0.0], [0.0, 2.0]],
+                }
+            },
+        },
+    )
+
+
+def test_partial_confirmation_block_is_rejected(tmp_path: Path) -> None:
+    """Fewer than five valid confirmation seeds must stop inference, not be averaged."""
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    for seed_idx in range(3):  # only three of the required five present
+        _write_seed_record(method_dir, seed_idx)
+
+    with pytest.raises(RuntimeError, match="incomplete"):
+        load_seed_predictions(paths, "severe", "weighted_ce", "native")
+
+
+def test_complete_confirmation_block_stacks_all_five_seeds(tmp_path: Path) -> None:
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    for seed_idx in range(5):
+        _write_seed_record(method_dir, seed_idx)
+
+    stacked = load_seed_predictions(paths, "severe", "weighted_ce", "native")
+
+    assert stacked is not None
+    assert stacked["preds"].shape[0] == 5
+
+
 def test_method_floor_requires_patients_and_slides_together() -> None:
     assert not meets_method_floor({"patients": 9, "slides": 100}, patient_equals_slide=False)
     assert not meets_method_floor({"patients": 100, "slides": 19}, patient_equals_slide=False)
@@ -96,6 +228,206 @@ def test_preflight_is_descriptive_when_any_split_class_fails_kish_threshold() ->
 
     assert result["by_split_class"]["0"]["A"]["kish_effective_count"] < 5
     assert result["is_descriptive_only"]
+
+
+def _ce_gate_entry(descriptive_only: bool) -> dict[str, object]:
+    return {
+        "method": "ce",
+        "gate": "discrimination",
+        "assignment": "native",
+        "severity": "severe",
+        "effect": 0.2,  # well above the 0.02 discrimination threshold
+        "ci": (0.1, 0.3),  # excludes zero
+        "descriptive_only": descriptive_only,
+    }
+
+
+def test_descriptive_only_cell_never_opens_a_gate_or_permutes() -> None:
+    """A preflight descriptive-only cell must skip gates and permutation p-values."""
+    from imbalance_benchmark.analysis.aggregate import _apply_gates
+
+    def fake_p_value(entry, base_paths, config, seed):  # pragma: no cover - must not run
+        raise AssertionError("descriptive-only cells must not be permutation tested")
+
+    descriptive = [_ce_gate_entry(descriptive_only=True)]
+    _apply_gates(descriptive, {}, {"dataset": {}}, 0, fake_p_value)
+    assert descriptive[0]["gate_passed"] is False
+    assert descriptive[0]["p_value"] is None
+
+    confirmatory = [_ce_gate_entry(descriptive_only=False)]
+    _apply_gates(confirmatory, {}, {"dataset": {}}, 0, lambda *_: 0.01)
+    assert confirmatory[0]["gate_passed"] is True
+    assert confirmatory[0]["p_value"] == 0.01
+
+
+def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
+    from imbalance_benchmark.common import sign_file, verify_signed_file, write_json
+
+    selection = tmp_path / "tuning_selections.json"
+    write_json(selection, {"native": {"severe": {"weighted_ce": {"lr": 1e-3}}}})
+    sign_file(selection)
+
+    verify_signed_file(selection)  # unaltered: passes
+
+    write_json(selection, {"native": {"severe": {"weighted_ce": {"lr": 3e-3}}}})
+    with pytest.raises(RuntimeError, match="no longer matches"):
+        verify_signed_file(selection)
+
+    unsigned = tmp_path / "tuning_selections_severe.json"
+    write_json(unsigned, {})
+    with pytest.raises(RuntimeError, match="no signed post-tuning lock"):
+        verify_signed_file(unsigned)
+
+
+def test_test_prediction_hash_is_prediction_sensitive() -> None:
+    from imbalance_benchmark.modeling.workflows.confirmation import _test_prediction_hash
+
+    base = {"test": {"labels": [0, 1], "preds": [0, 1], "probabilities": [[0.9, 0.1], [0.2, 0.8]]}}
+    flipped = {"test": {"labels": [0, 1], "preds": [1, 0], "probabilities": [[0.9, 0.1], [0.2, 0.8]]}}
+
+    assert _test_prediction_hash(base) == _test_prediction_hash(base)
+    assert _test_prediction_hash(base) != _test_prediction_hash(flipped)
+
+
+def test_clustered_endpoints_report_slide_and_patient_macro_nll_and_brier() -> None:
+    from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
+        clustered_endpoints,
+    )
+
+    labels = np.array([0, 0, 1, 1])
+    probabilities = np.array([[0.8, 0.2], [0.6, 0.4], [0.3, 0.7], [0.1, 0.9]])
+    predictions = probabilities.argmax(axis=1)
+    identity = pd.DataFrame(
+        {
+            "case_id": ["p0", "p0", "p1", "p1"],
+            "slide_id": ["s0", "s1", "s2", "s3"],
+        }
+    )
+
+    out = clustered_endpoints(labels, predictions, probabilities, identity, seed=0)
+
+    for key in (
+        "slide_macro_nll",
+        "patient_macro_nll",
+        "slide_macro_brier",
+        "patient_macro_brier",
+    ):
+        assert key in out and np.isfinite(out[key])
+
+
+def test_weighted_ece_matches_scalar_ece_at_unit_weights() -> None:
+    """The crossed-bootstrap ECE reduces to the scalar fixed-bin ECE at unit weights."""
+    from imbalance_benchmark.analysis.inference.bootstrap import weighted_ece
+    from imbalance_benchmark.analysis.metrics import expected_calibration_error
+
+    rng = np.random.default_rng(0)
+    labels = rng.integers(0, 3, size=50)
+    probs = rng.dirichlet(np.ones(3), size=50)
+    row_weights = np.ones((50, 1), dtype=np.int64)
+
+    weighted = weighted_ece(labels, probs, row_weights)[0]
+
+    assert weighted == pytest.approx(expected_calibration_error(labels, probs))
+
+
+def test_tail_recall_is_grouped_by_assignment(tmp_path: Path) -> None:
+    """Tail recall must not be averaged across tail assignments and copied per row."""
+    import sqlite3
+
+    from imbalance_benchmark.analysis.db import init_schema
+    from imbalance_benchmark.analysis.reporting.tables import _with_tail_recall
+
+    conn = sqlite3.connect(":memory:")
+    init_schema(conn)
+    # Same class 'C' is tail under assignment 'a' with recall 0.2 and under 'b'
+    # with recall 0.8; grouping without assignment would report 0.5 for both.
+    conn.executemany(
+        "INSERT INTO runs (run_id, result_dir, benchmark, condition, assignment, method, seed_index) "
+        "VALUES (?,?,?,?,?,?,?)",
+        [
+            ("run_a", "d", "patch", "severe", "a", "weighted_ce", 0),
+            ("run_b", "d", "patch", "severe", "b", "weighted_ce", 0),
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO eval_classwise (run_id, split, class_name, tier, precision, recall, f1, support, nll, brier) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        [
+            ("run_a", "test", "C", "tail", 0.0, 0.2, 0.0, 5, 0.0, 0.0),
+            ("run_b", "test", "C", "tail", 0.0, 0.8, 0.0, 5, 0.0, 0.0),
+        ],
+    )
+    conn.commit()
+
+    summary = pd.DataFrame(
+        {
+            "assignment": ["a", "b"],
+            "condition": ["severe", "severe"],
+            "method": ["weighted_ce", "weighted_ce"],
+        }
+    )
+    merged = _with_tail_recall(summary, conn, "test").set_index("assignment")
+
+    assert merged.loc["a", "tail_recall"] == pytest.approx(0.2)
+    assert merged.loc["b", "tail_recall"] == pytest.approx(0.8)
+
+
+def test_recovery_standard_error_uses_the_recovery_distribution() -> None:
+    """recovery_se must come from numerator/denominator, not the raw effect spread."""
+    from imbalance_benchmark.analysis.predictors.rq3_analysis import (
+        _recovery_standard_error,
+        _standard_error,
+    )
+
+    rng = np.random.default_rng(1)
+    numerator = rng.normal(0.3, 0.05, size=500)
+    denominator = rng.normal(0.5, 0.05, size=500)
+    comparison = {
+        "bootstrap_effect": numerator.tolist(),
+        "bootstrap_numerator": numerator.tolist(),
+        "bootstrap_denominator": denominator.tolist(),
+    }
+
+    recovery_se = _recovery_standard_error(comparison)
+    effect_se = _standard_error(comparison)
+
+    expected = float(np.nanstd(numerator / denominator, ddof=1))
+    assert recovery_se == pytest.approx(expected)
+    assert recovery_se != pytest.approx(effect_se)
+
+
+def _rq3_cell(group: str, method: str, rho: float, deficit: float, gate: bool) -> dict:
+    return {
+        "group": group,
+        "method": method,
+        "rho": rho,
+        "separability": 0.5,
+        "learnability": 0.4,
+        "log_min_support": 3.0,
+        "is_wsi": 0.0 if "patch" in group else 1.0,
+        "gate_passed": gate,
+        "deficit_ba": deficit,
+        "deficit_se": 0.01,
+        "recovery": 0.5,
+        "recovery_se": 0.1,
+    }
+
+
+def test_cross_dataset_rq3_pools_groups_and_reports_stability() -> None:
+    """RQ3's combined fit spans dataset-target groups with LODO and sensitivity fits."""
+    from imbalance_benchmark.analysis.predictors.rq3_analysis import cross_dataset_rq3
+
+    cells = []
+    for i, group in enumerate(["tcga:patch", "tcga:wsi", "bracs:patch", "panda:wsi"]):
+        cells.append(_rq3_cell(group, "ce", 10.0 + i, 0.05 + 0.01 * i, gate=True))
+        cells.append(_rq3_cell(group, "weighted_ce", 10.0 + i, np.nan, gate=True))
+
+    report = cross_dataset_rq3(cells)
+
+    assert report["n_groups"] == 4
+    assert len(report["models"]["deficit"]["rand_intercepts"]) == 4
+    assert set(report["sensitivity"]) == {"learnability", "log_min_support", "is_wsi"}
+    assert set(report["leave_one_group_out"]) == set(report["groups"])
 
 
 def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None:

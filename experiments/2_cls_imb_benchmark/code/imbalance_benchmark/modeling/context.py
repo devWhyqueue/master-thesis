@@ -125,23 +125,18 @@ def build_training_ctx(
     val_loader: torch.utils.data.DataLoader | None = None,
 ) -> dict[str, Any]:
     """Build the shared training context for one method/config/seed trial."""
-    # Model initialization is part of the declared initialization-seed family.
-    # Set it before creating either model, including cRT/RankMix factories.
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     kwargs = model_kwargs(regime.is_mil)
     param = cfg.get("parameter")
-
-    def _model_factory() -> torch.nn.Module:
-        return build_model(
-            method, regime.is_mil, n_classes=regime.n_classes, param=param, **kwargs
-        ).to(regime.device)
-
+    _factory = lambda: build_model(
+        method, regime.is_mil, n_classes=regime.n_classes, param=param, **kwargs
+    ).to(regime.device)
     return {
         "method": method,
-        "model": _model_factory(),
-        "model_factory": _model_factory,
+        "model": _factory(),
+        "model_factory": _factory,
         "train_dataset": train_ds,
         "val_loader": val_loader,
         "device": regime.device,
@@ -151,6 +146,8 @@ def build_training_ctx(
         "is_mil": regime.is_mil,
         "n_classes": regime.n_classes,
         "train_labels": train_ds.get_int_targets(),
+        "exposed_indices": set(),
+        "method_diagnostics": {},
     }
 
 

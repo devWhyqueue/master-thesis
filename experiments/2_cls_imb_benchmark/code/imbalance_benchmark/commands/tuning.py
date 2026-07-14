@@ -8,7 +8,13 @@ from typing import Any
 
 import torch
 
-from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, write_json
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    load_config,
+    sign_file,
+    split_paths,
+    write_json,
+)
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
@@ -97,7 +103,9 @@ def _tune_split(args: argparse.Namespace, started: float) -> None:
     paths, regime, loader = _tuning_inputs(args, paths)
     freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
     selections = _split_selections(paths, regime, loader, freeze, args)
-    write_json(paths["data"] / _output_name(args), selections)
+    selection_path = paths["data"] / _output_name(args)
+    write_json(selection_path, selections)
+    sign_file(selection_path)
     _write_tuning_cost(paths, started, getattr(args, "condition", None))
 
 
@@ -137,7 +145,9 @@ def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
         return
     selections = _combined_selections(scopes, args)
     for paths, _, _ in scopes:
-        write_json(paths["data"] / _output_name(args), selections)
+        selection_path = paths["data"] / _output_name(args)
+        write_json(selection_path, selections)
+        sign_file(selection_path)
         _write_tuning_cost(paths, started, getattr(args, "condition", None))
 
 

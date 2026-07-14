@@ -11,9 +11,9 @@ __all__ = [
     "expand_to_rows",
     "resample_seed_indices",
     "kish_effective_count",
-    "bootstrap_preflight",
     "weighted_balanced_accuracy",
     "weighted_macro_nll",
+    "weighted_ece",
     "gather_seed_resampled",
 ]
 
@@ -171,6 +171,36 @@ def weighted_macro_nll(
     return out / max(counted, 1)
 
 
+def weighted_ece(
+    labels: np.ndarray,
+    probabilities: np.ndarray,
+    row_weights: np.ndarray,
+    n_bins: int = 10,
+) -> np.ndarray:
+    """Fixed-binning ECE per replicate under the shared crossed patient weights."""
+    confidence = probabilities.max(axis=1)
+    correct = (probabilities.argmax(axis=1) == labels).astype(np.float64)
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_of_row = np.clip(np.digitize(confidence, edges[1:-1]), 0, n_bins - 1)
+    n_replicates = row_weights.shape[1]
+    total = row_weights.sum(axis=0)
+    out = np.zeros(n_replicates, dtype=np.float64)
+    for b in range(n_bins):
+        mask = bin_of_row == b
+        if not mask.any():
+            continue
+        w = row_weights[mask, :]
+        bin_weight = w.sum(axis=0)
+        acc = (w * correct[mask, None]).sum(axis=0)
+        conf = (w * confidence[mask, None]).sum(axis=0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            gap = np.where(
+                bin_weight > 0, np.abs(acc - conf) / np.maximum(bin_weight, 1e-12), 0.0
+            )
+            out += np.where(total > 0, gap * bin_weight / np.maximum(total, 1e-12), 0.0)
+    return out
+
+
 def _class_preflight(
     case_of_row: np.ndarray, class_row_weights: np.ndarray, n_replicates: int
 ) -> dict[str, Any]:
@@ -203,12 +233,3 @@ def _preflight_row_weights(
     rng = np.random.default_rng(seed)
     case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)
     return expand_to_rows(case_ids, patient_weights, identity["case_id"].to_numpy())
-
-
-def bootstrap_preflight(
-    identity: pd.DataFrame, n_replicates: int = 10_000, seed: int = 0
-) -> dict[str, Any]:
-    """Run the label-only bootstrap feasibility diagnostic."""
-    from imbalance_benchmark.analysis.inference.preflight import run_preflight
-
-    return run_preflight(identity, n_replicates, seed)

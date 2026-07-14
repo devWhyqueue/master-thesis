@@ -16,7 +16,13 @@ __all__ = [
     "load_split_payload",
     "load_test_identity",
     "load_seed_predictions",
+    "EXPECTED_CONFIRMATION_SEEDS",
 ]
+
+# Every locked patient split and tail assignment is repeated with exactly five
+# disjoint confirmation initialization seeds (report §"Training, selection, and
+# replication"). Inference must not proceed on a silently truncated seed block.
+EXPECTED_CONFIRMATION_SEEDS = 5
 
 
 def load_runs_frame(conn: sqlite3.Connection) -> pd.DataFrame:
@@ -75,6 +81,35 @@ def load_test_identity(
     )
 
 
+def _require_complete_confirmation_block(
+    method_dir: Path, seed_dirs: list[Path]
+) -> None:
+    """Refuse to stack a partial confirmation block; report missing/failed seeds.
+
+    A method directory that exists must carry exactly the five confirmation
+    seeds, each with a readable ``test`` split. Missing or unreadable seeds are
+    an implementation failure the analysis must surface, not silently average
+    over (report §"Training, selection, and replication").
+    """
+    present = {int(d.name.split("=")[1]) for d in seed_dirs}
+    expected = set(range(EXPECTED_CONFIRMATION_SEEDS))
+    unreadable = {
+        int(d.name.split("=")[1])
+        for d in seed_dirs
+        if (record := read_run_record(d)) is None
+        or "test" not in record.get("splits", {})
+    }
+    missing = sorted((expected - present) | unreadable)
+    extra = sorted(present - expected)
+    if missing or extra:
+        raise RuntimeError(
+            f"Confirmation block at {method_dir} is incomplete: "
+            f"expected seeds {sorted(expected)}, "
+            f"missing/failed {missing}, unexpected {extra}. "
+            "Inference requires exactly five valid confirmation runs."
+        )
+
+
 def load_seed_predictions(
     paths: dict[str, Path], condition: str, method: str, assignment: str = "native"
 ) -> dict[str, Any] | None:
@@ -88,8 +123,10 @@ def load_seed_predictions(
     seed_dirs = sorted(
         method_dir.glob("seed=*"), key=lambda p: int(p.name.split("=")[1])
     )
-    records = [read_run_record(d) for d in seed_dirs]
-    records = [r for r in records if r is not None and "test" in r.get("splits", {})]
+    if not seed_dirs:
+        return None
+    _require_complete_confirmation_block(method_dir, seed_dirs)
+    records = [r for d in seed_dirs if (r := read_run_record(d)) is not None]
     if not records:
         return None
     test_splits = [r["splits"]["test"] for r in records]
