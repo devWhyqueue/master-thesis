@@ -34,7 +34,6 @@ from imbalance_benchmark.modeling.training import (
     run_evaluation,
     update_budget,
 )
-from imbalance_benchmark.manifest.seeds import derive_seed
 
 
 @dataclass
@@ -111,7 +110,6 @@ def _split_payload(
     train_priors: torch.Tensor,
     target_priors: np.ndarray,
     identity: Any,
-    bootstrap_seed: int,
     tiers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Assemble one evaluated split's real classwise metrics and prediction arrays."""
@@ -139,9 +137,7 @@ def _split_payload(
         balanced_decision_logits=dec_l.tolist(),
         target_prior_logits=tar_l.tolist(),
         target_prior_probabilities=probs,
-        clustered_endpoints=clustered_endpoints(
-            res["targets"], preds, probs, identity, bootstrap_seed
-        ),
+        clustered_endpoints=clustered_endpoints(res["targets"], preds, probs, identity),
     )
     return payload
 
@@ -181,15 +177,9 @@ def _run_and_record(
             class_priors_tensor,
             target_priors,
             cast(Any, loader.dataset).df,
-            derive_seed(ctx["seed"], "resampling"),
             tiers,
         )
-    test_identity = cast(Any, run.test_loader.dataset).df
-    _attach_temperature_scaled_test_outputs(
-        splits,
-        test_identity["case_id"].to_numpy(),
-        derive_seed(ctx["seed"], "resampling"),
-    )
+    _attach_temperature_scaled_test_outputs(splits)
     b_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), b_size)
     write_run_record(
@@ -227,9 +217,7 @@ def _run_and_record(
     )
 
 
-def _attach_temperature_scaled_test_outputs(
-    splits: dict[str, dict[str, Any]], patient_ids: np.ndarray, seed: int
-) -> None:
+def _attach_temperature_scaled_test_outputs(splits: dict[str, dict[str, Any]]) -> None:
     """Persist post-selection temperature outputs used by calibration reporting."""
     validation, test = splits["validation"], splits["test"]
     test.update(
@@ -238,7 +226,5 @@ def _attach_temperature_scaled_test_outputs(
             np.asarray(validation["labels"]),
             np.asarray(test["target_prior_logits"]),
             np.asarray(test["labels"]),
-            patient_ids,
-            seed=seed,
         )
     )

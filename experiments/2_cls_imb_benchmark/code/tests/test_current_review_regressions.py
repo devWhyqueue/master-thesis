@@ -36,17 +36,15 @@ def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -
         require_complete_split_comparisons(rows, expected)
 
 
-def test_temperature_scaled_ece_has_a_patient_block_interval() -> None:
+def test_temperature_scaled_ece_is_computed_without_a_per_run_bootstrap() -> None:
     payload = temperature_scaled_payload(
         np.array([[2.0, 0.0], [0.0, 2.0]]),
         np.array([0, 1]),
         np.array([[1.0, 0.0], [0.0, 1.0]]),
         np.array([0, 1]),
-        np.array(["p1", "p2"]),
-        seed=3,
     )
 
-    assert len(payload["temperature_scaled_ece_ci"]) == 2
+    assert "temperature_scaled_ece_ci" not in payload
 
 
 def test_reliability_bins_are_averaged_over_seeds_not_probabilities() -> None:
@@ -102,7 +100,7 @@ def test_cluster_macro_balanced_accuracy_is_macro_recall_after_cluster_aggregati
         {"case_id": ["p0", "p1", "p2"], "slide_id": ["s0", "s1", "s2"]}
     )
 
-    endpoints = clustered_endpoints(labels, predictions, probabilities, identity, 0)
+    endpoints = clustered_endpoints(labels, predictions, probabilities, identity)
 
     assert endpoints["slide_macro_balanced_accuracy"] == pytest.approx(0.5)
 

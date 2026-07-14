@@ -193,29 +193,3 @@ def test_feature_cache_rejects_metadata_from_a_different_encoder_config(
 
     with pytest.raises(ValueError, match="provenance"):
         features.attach_extracted_features(frame, root, dtype="float32")
-
-
-def test_calibration_table_includes_patient_block_ece_intervals(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        tables,
-        "load_eval_details",
-        lambda _: pd.DataFrame(
-            {
-                "split": ["test"],
-                "assignment": ["native"],
-                "condition": ["severe"],
-                "method": ["ce"],
-                "negative_log_likelihood": [0.2],
-                "brier_score": [0.1],
-                "expected_calibration_error": [0.05],
-                "expected_calibration_error_ci": [[0.03, 0.07]],
-            }
-        ),
-    )
-
-    latex = tables.calibration_table(None)
-
-    assert "ECE 95\\% CI" in latex
-    assert "[0.030, 0.070]" in latex

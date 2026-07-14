@@ -59,29 +59,15 @@ def _macro_classification(
     return float(np.mean(recalls)), float(np.mean(scores))
 
 
-def _patient_bootstrap_ece(
-    labels: np.ndarray, probabilities: np.ndarray, case_ids: np.ndarray, seed: int
-) -> tuple[float, float]:
-    """Return a patient-block percentile interval for fixed-bin ECE."""
-    patients = np.unique(case_ids)
-    rng = np.random.default_rng(seed)
-    samples = []
-    for _ in range(1_000):
-        draws = rng.choice(patients, len(patients), replace=True)
-        rows = np.concatenate([np.flatnonzero(case_ids == case) for case in draws])
-        samples.append(expected_calibration_error(labels[rows], probabilities[rows]))
-    interval = np.percentile(samples, [2.5, 97.5])
-    return float(interval[0]), float(interval[1])
-
-
 def clustered_endpoints(
     labels: np.ndarray,
     predictions: np.ndarray,
     probabilities: np.ndarray,
     identity: pd.DataFrame,
-    seed: int,
-) -> dict[str, float | list[float]]:
+    seed: int | None = None,
+) -> dict[str, float]:
     """Compute patch-micro, slide/patient-macro, and clustered-ECE endpoints."""
+    del seed
     case_ids = identity["case_id"].astype(str).to_numpy()
     slide_ids = identity["slide_id"].astype(str).to_numpy()
     ece = expected_calibration_error(labels, probabilities)
@@ -97,9 +83,6 @@ def clustered_endpoints(
         "slide_macro_brier": _macro_mean(brier, slide_ids),
         "patient_macro_brier": _macro_mean(brier, case_ids),
         "expected_calibration_error": ece,
-        "expected_calibration_error_ci": list(
-            _patient_bootstrap_ece(labels, probabilities, case_ids, seed)
-        ),
     }
 
 

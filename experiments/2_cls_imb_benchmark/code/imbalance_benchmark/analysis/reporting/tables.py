@@ -99,38 +99,9 @@ def calibration_table(conn: sqlite3.Connection, split: str = "test") -> str:
         )
         .reset_index()
     )
-    keys = ["assignment", "condition", "method"]
-    summary = _add_ece_intervals(summary, cast(pd.DataFrame, details), keys)
     return _to_latex(
         summary, "Raw and temperature-scaled calibration summary", "tab:calibration"
     )
-
-
-def _add_ece_intervals(
-    summary: pd.DataFrame, details: pd.DataFrame, keys: list[str]
-) -> pd.DataFrame:
-    """Add mean patient-block ECE intervals without dropping absent legacy fields."""
-    for source, column in (
-        ("expected_calibration_error_ci", "ECE 95% CI"),
-        ("temperature_scaled_ece_ci", "Temperature ECE 95% CI"),
-    ):
-        if source not in details:
-            continue
-        intervals = cast(
-            pd.Series, details.groupby(keys)[source].apply(_mean_interval)
-        ).rename(column)
-        summary = summary.merge(intervals.reset_index(), on=keys, how="left")
-    return summary
-
-
-def _mean_interval(values: pd.Series) -> str | None:
-    """Format the mean lower and upper patient-block interval bounds."""
-    pairs = [value for value in values if isinstance(value, list) and len(value) == 2]
-    if not pairs:
-        return None
-    lower = sum(float(pair[0]) for pair in pairs) / len(pairs)
-    upper = sum(float(pair[1]) for pair in pairs) / len(pairs)
-    return f"[{lower:.3f}, {upper:.3f}]"
 
 
 def confirmatory_table(comparisons: list[dict[str, Any]]) -> str:

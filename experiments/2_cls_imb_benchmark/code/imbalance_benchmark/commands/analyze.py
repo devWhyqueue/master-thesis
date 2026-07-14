@@ -46,6 +46,9 @@ from imbalance_benchmark.analysis.reporting.tables import (
     rq3_table,
     results_table,
 )
+from imbalance_benchmark.analysis.reporting.calibration_intervals import (
+    write_crossed_calibration_table,
+)
 from imbalance_benchmark.common import (
     ensure_dirs,
     load_config,
@@ -208,6 +211,9 @@ def _analyze_all_splits(args: argparse.Namespace) -> None:
     for index in range(3):
         _analyze_one_split(argparse.Namespace(**{**vars(args), "split_index": index}))
     _aggregate_split_comparisons(
+        base_paths, config, derive_seed(args.seed, "resampling")
+    )
+    write_crossed_calibration_table(
         base_paths, config, derive_seed(args.seed, "resampling")
     )
     write_equal_split_endpoint_table(base_paths)
