@@ -11,9 +11,9 @@ from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_block_permutation_tail_nll,
 )
 from imbalance_benchmark.analysis.inference.preflight import run_preflight
-from imbalance_benchmark.analysis.query import load_seed_predictions
+from imbalance_benchmark.analysis.query import _confirmation_dir, load_seed_predictions
 from imbalance_benchmark.commands.pilot import _pilot_report_payload
-from imbalance_benchmark.common import write_run_record
+from imbalance_benchmark.common import dataset_provenance, write_run_record
 from imbalance_benchmark.construction import (
     allocate_counts,
     effective_rho,
@@ -244,6 +244,22 @@ def test_freeze_rejects_missing_dataset_provenance(tmp_path: Path) -> None:
             {"data": tmp_path},
             {"dataset": {"name": "synthetic", "regime": "patch"}},
         )
+
+
+def test_dataset_provenance_requires_a_frozen_target() -> None:
+    dataset = {
+        "name": "panda",
+        "regime": "wsi",
+        "version": "v1",
+        "eligibility_rules": {"slide_qc": "pass"},
+    }
+
+    with pytest.raises(ValueError, match="dataset.target"):
+        dataset_provenance(dataset)
+
+    provenance = dataset_provenance({**dataset, "target": "isup_grade"})
+
+    assert provenance["target"] == "isup_grade"
 
 
 def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> None:
@@ -711,15 +727,21 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     """RQ3 cells retain their crossed identity and never merge a dataset's targets."""
     from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells, run_rq3
 
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
-        lambda *_: {
+    observed_regimes: list[bool] = []
+
+    def covariates(_: dict, is_mil: bool, __: dict) -> dict[str, float]:
+        observed_regimes.append(is_mil)
+        return {
             "separability": 0.5,
             "learnability": 0.4,
             "log_min_support": 2.0,
             "log_effective_support": 1.0,
             "is_wsi": 1.0,
-        },
+        }
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
+        covariates,
     )
     comparisons = [
         {
@@ -741,14 +763,22 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     cells = _cells({"data": tmp_path}, comparisons, freeze, "panda:wsi", True)
     report = run_rq3(
         {"data": tmp_path},
-        {"dataset": {"name": "panda", "regime": "wsi", "target": "isup_grade"}},
-        freeze,
+        {"dataset": {"name": "panda", "regime": "patch", "target": "changed_target"}},
+        {
+            **freeze,
+            "dataset_provenance": {
+                "name": "panda",
+                "regime": "wsi",
+                "target": "isup_grade",
+            },
+        },
         comparisons,
     )
 
     assert cells[0]["assignment"] == "native"
     assert cells[0]["severity"] == "severe"
     assert report["cells"][0]["group"] == "panda:isup_grade"
+    assert observed_regimes[-1] is True
 
 
 def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> None:
@@ -807,43 +837,16 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
     assert cells[0]["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
 
-def test_balanced_predictions_are_retiered_for_every_locked_assignment(
-    tmp_path: Path,
-) -> None:
-    """Balanced models are trained once but reported under each locked tier mapping."""
-    from imbalance_benchmark.common import read_run_record, write_run_record
-    from imbalance_benchmark.modeling.workflows.balanced_reporting import (
-        copy_balanced_tier_summaries,
-    )
-
+def test_balanced_predictions_use_one_unassigned_result_directory(tmp_path: Path) -> None:
+    """Assignment-specific analyses reuse one balanced record rather than copies."""
     paths = {"results": tmp_path / "results"}
-    native = paths["results"] / "assignment=native" / "balanced" / "ce" / "seed=0"
-    split = {
-        "precision_per_class": [0.1, 0.9],
-        "recall_per_class": [0.2, 0.8],
-        "f1_per_class": [0.15, 0.85],
-        "support_per_class": [10, 10],
-        "nll_per_class": [0.7, 0.3],
-        "brier_per_class": [0.4, 0.1],
-    }
-    write_run_record(
-        native,
-        {"assignment": "native", "class_names": ["A", "B"], "splits": {"test": split}},
-    )
-    freeze = {
-        "conditions": {"balanced": {"allocated_counts": {"A": 10, "B": 10}}},
-        "tail_assignments": {"native": ["A", "B"], "reversed": ["B", "A"]},
-    }
+    balanced = paths["results"] / "assignment=unassigned" / "balanced" / "ce"
+    balanced.mkdir(parents=True)
 
-    copy_balanced_tier_summaries(paths, freeze)
+    resolved = _confirmation_dir(paths, "balanced", "ce", "reversed")
 
-    copied = read_run_record(
-        paths["results"] / "assignment=reversed" / "balanced" / "ce" / "seed=0"
-    )
-    assert copied is not None
-    assert copied["assignment"] == "reversed"
-    assert copied["splits"]["test"]["tier_metrics"]["head"]["recall"] == 0.8
-    assert copied["splits"]["test"]["tier_metrics"]["tail"]["recall"] == 0.2
+    assert resolved == balanced
+    assert not (paths["results"] / "assignment=reversed" / "balanced").exists()
 
 
 def test_crossed_tail_permutation_accepts_a_locked_tail_for_each_split() -> None:

@@ -15,30 +15,74 @@ from imbalance_benchmark.modeling.workflows.confirmation import RunContext, conf
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
+from imbalance_benchmark.manifest.construction_helpers import cap_feasible_shared_total
 from imbalance_benchmark.manifest.freeze import achieved_rho
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.common import sign_file
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 
 
-def test_shared_total_is_feasible_for_every_requested_ratio() -> None:
+def test_shared_total_keeps_all_naturally_balanced_support() -> None:
     available = [100, 100, 100]
     shared_total = max_shared_total(available, min_support=10)
 
-    assert shared_total < sum(available)
+    assert shared_total == sum(available)
     for ratio in (1.0, 10.0, 100.0):
         allocation = allocate_counts(available, shared_total, ratio, min_support=10)
         assert sum(allocation) == shared_total
         assert all(count <= support for count, support in zip(allocation, available))
 
 
-def test_shared_total_never_flattens_a_requested_moderate_profile() -> None:
-    available = [100, 100, 100]
-    shared_total = max_shared_total(available, min_support=10)
-    moderate = allocate_counts(available, shared_total, 10.0, min_support=10)
+def test_shared_total_is_maximized_before_requested_ratio_is_lowered() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "case_id": f"{name}_{index}",
+                "slide_id": f"{name}_{index}",
+                "cancer_type": name,
+            }
+            for name, support in (("A", 200), ("B", 100), ("C", 100))
+            for index in range(support)
+        ]
+    )
 
-    assert shared_total == 142
-    assert achieved_rho(dict(enumerate(moderate))) == pytest.approx(10.0)
+    total = cap_feasible_shared_total(
+        frame,
+        ["A", "B", "C"],
+        min_support=20,
+        is_mil=True,
+        seed=1,
+        independent_floor=10,
+    )
+
+    assert total == 300
+
+
+def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "case_id": f"{name}_{slide}",
+                "slide_id": f"{name}_{slide}",
+                "feature_path": f"{name}_{slide}_{chunk}.pt",
+                "cancer_type": name,
+            }
+            for name in ("A", "B")
+            for slide in range(30)
+            for chunk in range(2)
+        ]
+    )
+
+    total = cap_feasible_shared_total(
+        frame,
+        ["A", "B"],
+        min_support=20,
+        is_mil=True,
+        seed=1,
+        independent_floor=10,
+    )
+
+    assert total == 60
 
 
 def test_bag_dataset_concatenates_all_feature_chunks_before_capping(tmp_path: Path) -> None:
@@ -125,6 +169,7 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
                     "dataset": {
                         "name": "synthetic",
                         "regime": "patch",
+                        "target": "synthetic_target",
                         "version": "test-fixture-v1",
                         "eligibility_rules": {"fixture": True},
                     },

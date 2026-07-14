@@ -174,8 +174,8 @@ def run_rq3(
     inferential unit (see :func:`cross_dataset_rq3`). This still emits the cells
     and covariates each split contributes to that combined analysis.
     """
-    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    group = _rq3_group(config)
+    is_mil = freeze.get("dataset_provenance", {}).get("regime") == "wsi"
+    group = _rq3_group(freeze)
     cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
@@ -189,13 +189,13 @@ def run_rq3(
     }
 
 
-def _rq3_group(config: dict[str, Any]) -> str:
-    """Return the mandatory dataset-target random-intercept identifier."""
-    dataset = config.get("dataset", {})
+def _rq3_group(freeze: dict[str, Any]) -> str:
+    """Return the frozen dataset-target random-intercept identifier."""
+    dataset = freeze.get("dataset_provenance", {})
     target = dataset.get("target")
     if not isinstance(target, str) or not target.strip():
         raise ValueError(
-            "dataset.target is required to define an RQ3 dataset-target group"
+            "Frozen dataset.target is required to define an RQ3 dataset-target group"
         )
     return f"{dataset.get('name', 'unknown')}:{target}"
 

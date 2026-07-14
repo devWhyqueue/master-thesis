@@ -112,6 +112,8 @@ def _environment_payload() -> dict[str, Any]:
 
 def _condition_tiers(run: RunContext, cond: str) -> dict[str, str] | None:
     """Head/body/tail tiers for one condition from the frozen allocation and assignment."""
+    if cond == "balanced":
+        return None
     fp = run.paths["data"] / "manifest_freeze.json"
     if not fp.exists():
         return None

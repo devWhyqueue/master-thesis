@@ -64,10 +64,11 @@ def assignment_allocations(
     assignments: Mapping[str, list[str]],
     total: int,
     minimum: int,
+    is_mil: bool = False,
     condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
 ) -> dict[str, dict[str, dict[str, int]]]:
     """Allocate every condition for every locked semantic-class assignment."""
-    supports = class_support_counts(train_df, is_mil=False)
+    supports = class_support_counts(train_df, is_mil)
     return {
         assignment: {
             condition: dict(
@@ -161,7 +162,9 @@ def _cap_feasible(
 ) -> bool:
     """Probe every condition allocation on its designated fixed patch pool."""
     try:
-        allocations = assignment_allocations(train_df, assignments, total, minimum)
+        allocations = assignment_allocations(
+            train_df, assignments, total, minimum, is_mil=is_mil
+        )
         pools = (
             designate_shared_patch_pools(train_df, allocations, independent_floor, seed)
             if not is_mil

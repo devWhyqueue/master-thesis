@@ -162,6 +162,11 @@ def load_seed_predictions(
 def _confirmation_dir(
     paths: dict[str, Path], condition: str, method: str, assignment: str
 ) -> Path:
-    """Resolve one assignment-aware confirmation directory."""
+    """Resolve one assignment-aware directory, sharing the unassigned baseline."""
     assigned = paths["results"] / f"assignment={assignment}" / condition / method
-    return assigned if assigned.exists() else paths["results"] / condition / method
+    unassigned = paths["results"] / "assignment=unassigned" / condition / method
+    if assigned.exists():
+        return assigned
+    if unassigned.exists():
+        return unassigned
+    return paths["results"] / condition / method

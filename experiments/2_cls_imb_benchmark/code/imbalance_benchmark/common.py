@@ -165,15 +165,19 @@ def dataset_provenance(dataset: dict[str, Any]) -> dict[str, Any]:
     """Validate and normalize the required dataset provenance frozen with a run."""
     version = dataset.get("version")
     eligibility_rules = dataset.get("eligibility_rules")
+    target = dataset.get("target")
     if not isinstance(version, str) or not version.strip():
         raise ValueError("dataset.version is required before definitive freeze")
     if not isinstance(eligibility_rules, dict) or not eligibility_rules:
         raise ValueError(
             "dataset.eligibility_rules are required before definitive freeze"
         )
+    if not isinstance(target, str) or not target.strip():
+        raise ValueError("dataset.target is required before definitive freeze")
     return {
         "name": dataset.get("name"),
         "regime": dataset.get("regime"),
+        "target": target,
         "version": version,
         "eligibility_rules": eligibility_rules,
     }

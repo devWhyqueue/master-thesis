@@ -28,9 +28,6 @@ from imbalance_benchmark.datasets.data import (
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
-from imbalance_benchmark.modeling.workflows.balanced_reporting import (
-    copy_balanced_tier_summaries,
-)
 
 __all__ = ["cmd_confirm"]
 
@@ -145,11 +142,10 @@ def _confirm_split(args: argparse.Namespace, paths: dict[str, Any]) -> None:
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for cond in conditions:
         scoped_assignments = (
-            ("native",) if cond in {"natural", "balanced"} else assignments
+            ("unassigned",) if cond in {"natural", "balanced"} else assignments
         )
         for assignment in scoped_assignments:
             run = RunContext(**run_data, assignment=assignment)
-            selected = best_configs.get(assignment, {}).get(cond, {})
+            selected_assignment = "native" if assignment == "unassigned" else assignment
+            selected = best_configs.get(selected_assignment, {}).get(cond, {})
             _confirm_condition(cond, methods, selected, run)
-        if cond == "balanced":
-            copy_balanced_tier_summaries(paths, freeze)

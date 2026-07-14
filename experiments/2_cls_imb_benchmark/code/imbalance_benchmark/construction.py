@@ -130,39 +130,16 @@ def allocate_counts(
 def max_shared_total(
     available: list[int], min_support: int, rhos: tuple[float, ...] = (1.0, 10.0, 100.0)
 ) -> int:
-    """Return the largest total feasible for every requested condition.
+    """Return the maximum total of an exactly balanced controlled condition.
 
-    The balanced maximum alone is insufficient: at that total an imbalanced
-    allocation can require more examples from its head class than are unique
-    in the training pool.  Search only totals that can meet every independent
-    support floor and require each constrained allocation to sum exactly.
+    Severity is deliberately excluded: requested ratios are lowered only
+    after this shared total has been fixed. ``rhos`` is retained for
+    compatibility with older callers.
     """
     if not available or min(available) < min_support:
         raise ValueError("No shared total satisfies the independent-support floor")
-    upper = min(len(available) * min(available), sum(available) - 1)
-    required = rhos[:-1] if len(rhos) > 1 else rhos
-    matched = _first_feasible_total(available, min_support, upper, required)
-    if matched is not None:
-        return matched
-    fallback = _first_feasible_total(available, min_support, upper, (1.0,))
-    if fallback is not None:
-        return fallback
-    raise ValueError(
-        "No shared total can realize every requested imbalance ratio without "
-        "violating an availability or independent-support constraint"
-    )
-
-
-def _first_feasible_total(
-    available: list[int], min_support: int, upper: int, rhos: tuple[float, ...]
-) -> int | None:
-    """Find the largest shared total preserving the supplied severity targets."""
-    for total in range(upper, len(available) * min_support - 1, -1):
-        if all(
-            _allocation_is_feasible(available, total, rho, min_support) for rho in rhos
-        ):
-            return total
-    return None
+    del rhos
+    return len(available) * min(available)
 
 
 def _allocation_is_feasible(
