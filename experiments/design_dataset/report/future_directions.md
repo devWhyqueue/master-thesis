@@ -1,6 +1,6 @@
 # Design-Dataset Report — Future Directions
 
-Notes on what the current report (`main.tex`) does *not* yet cover, relative to
+Notes on what the current report (`design_dataset.tex`) does *not* yet cover, relative to
 the original draft (`Dataset TCGA_UT.pdf`), plus a clean methodology for the
 class-difficulty axis if/when we pick it back up.
 

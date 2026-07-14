@@ -19,13 +19,14 @@
 - TeX Live is installed on Windows (`C:\texlive\2026\bin\windows\`). Use it via PowerShell — the WSL `/mnt/c/texlive` mount is not available.
 - Compile from the directory containing the `.tex` file. Use a temporary build directory and copy out only the final PDF:
   ```powershell
+  $reportName = "class_imbalance" # Replace with the report filename stem.
   New-Item -ItemType Directory -Force .latex-build | Out-Null
   Copy-Item *.bib .latex-build\
-  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" main.tex
-  Set-Location .latex-build; & "C:\texlive\2026\bin\windows\bibtex.exe" main; Set-Location ..
-  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" main.tex
-  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" main.tex
-  Copy-Item .latex-build\main.pdf main.pdf; Remove-Item -Recurse -Force .latex-build
+  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" "$reportName.tex"
+  Set-Location .latex-build; & "C:\texlive\2026\bin\windows\bibtex.exe" $reportName; Set-Location ..
+  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" "$reportName.tex"
+  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "-output-directory=.latex-build" "$reportName.tex"
+  Copy-Item ".latex-build\$reportName.pdf" "$reportName.pdf"; Remove-Item -Recurse -Force .latex-build
   ```
 - Do not leave LaTeX auxiliary files in the worktree.
 - When writing in academic reports, use the `/scientific-writing` skill.

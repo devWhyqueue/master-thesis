@@ -31,7 +31,7 @@ of only being reachable via `smoke`; fix that gating in Phase 1.
   - `tcga_ut/code/data/prep/wsi_bag_cache.py` → WSI bag cache builder
 - Fix `commands.py:cmd_prepare` so it dispatches to the real per-dataset adapter selected
   by config, with `_gen_mock` reachable only from `cmd_smoke`.
-- Verify against report/main.tex: exact per-dataset targets and patient/case split units,
+- Verify against report/2_cls_imb_benchmark.tex: exact per-dataset targets and patient/case split units,
   patient-disjoint splitting, deterministic eligibility/tiling.
 - Discard: `native/code/data/progan/*`, `tcga_ut/code/data/progan/*`,
   `common_code/progan/*`, `tcga_ut/code/data/prep/export/synthetic.py`,
@@ -225,7 +225,7 @@ Scope notes:
   configuration to reference only the unified benchmark package.
 - Leave `experiments/class_imbalance/` and `experiments/design_dataset/` untouched; just
   remove the benchmark's dependencies on them.
-- Compile `report/main.tex` through the prescribed temporary build directory and verify
+- Compile `report/2_cls_imb_benchmark.tex` through the prescribed temporary build directory and verify
   no auxiliary files remain in the worktree.
 - Run Ruff, Pyright, scoped Vulture, the clean-code audit, and the complete test suite.
 
@@ -235,7 +235,7 @@ Scope notes:
 
 ### Summary
 
-Replace `native/`, `tcga_ut/`, and `experiments/shared/` with one self-contained implementation under `experiments/2_cls_imb_benchmark/code/`. Selectively port only code that matches the protocol in `report/main.tex`; remove ProGAN, raw-image classifier experiments, duplicated orchestration, obsolete analyses, and legacy outputs.
+Replace `native/`, `tcga_ut/`, and `experiments/shared/` with one self-contained implementation under `experiments/2_cls_imb_benchmark/code/`. Selectively port only code that matches the protocol in `report/2_cls_imb_benchmark.tex`; remove ProGAN, raw-image classifier experiments, duplicated orchestration, obsolete analyses, and legacy outputs.
 
 The resulting pipeline will reproduce the experiment from raw dataset metadata/images through frozen Virchow2 features, controlled construction, tuning, confirmation runs, statistical analysis, and report artifacts.
 
@@ -261,7 +261,7 @@ The resulting pipeline will reproduce the experiment from raw dataset metadata/i
   - `smoke`: run a synthetic end-to-end validation without external datasets.
 - Use one versioned YAML configuration for dataset paths, evidence caps, environment/container paths, and SLURM resources. Keep scientific controls and grids as checked-in typed constants so local configuration cannot silently change the protocol.
 - Store manifests as CSV plus metadata JSON, run records as JSON with compressed prediction sidecars, and derive the analysis SQLite database reproducibly from those records.
-- Move the four computational report-helper scripts into the package's construction/analysis modules; keep `report/` limited to `main.tex`, bibliography, generated report outputs, and `main.pdf`.
+- Move the four computational report-helper scripts into the package's construction/analysis modules; keep `report/` limited to `2_cls_imb_benchmark.tex`, bibliography, generated report outputs, and `main.pdf`.
 
 #### Protocol-aligned data construction
 
@@ -316,12 +316,12 @@ The resulting pipeline will reproduce the experiment from raw dataset metadata/i
 - Test metrics, prior corrections, temperature scaling, gates, recovery signs, patient-clustered aggregation, bootstrap invariants, permutation pairing, Holm families, and synthetic known-effect cases.
 - Run a synthetic end-to-end smoke workflow locally and render the full SLURM dependency graph without submission.
 - Run Ruff, Pyright, scoped Vulture, the project clean-code audit, and the complete benchmark test suite.
-- Compile `report/main.tex` through the prescribed temporary TeX build directory and verify that no auxiliary files remain in the worktree.
+- Compile `report/2_cls_imb_benchmark.tex` through the prescribed temporary TeX build directory and verify that no auxiliary files remain in the worktree.
 - Before deleting the legacy trees, verify that no imports, configuration paths, documentation links, or generated commands reference `native`, `tcga_ut`, `common_code`, ProGAN, `experiments/shared`, `class_imbalance`, or `design_dataset`.
 
 ### Assumptions
 
-- `report/main.tex` is the authoritative, frozen protocol; implementation discrepancies are resolved in favor of the report.
+- `report/2_cls_imb_benchmark.tex` is the authoritative, frozen protocol; implementation discrepancies are resolved in favor of the report.
 - This is a clean replacement with no compatibility wrappers for legacy commands, result schemas, or output paths.
 - Obsolete figures, tables, selection records, and ProGAN artifacts are deleted rather than archived; the report source, bibliography, and compiled `main.pdf` remain.
 - Frozen feature extraction is part of reproducibility but remains excluded from per-method computational-cost comparisons, as specified in the report.

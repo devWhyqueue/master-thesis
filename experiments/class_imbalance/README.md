@@ -1,6 +1,6 @@
 # TCGA-UT Class-Imbalance Experiment
 
-Controlled class-imbalance benchmarks on TCGA-UT: patch-level classifier and WSI attention-MIL, with a ProGAN synthetic augmentation bridge. Paper source: `report/main.tex`.
+Controlled class-imbalance benchmarks on TCGA-UT: patch-level classifier and WSI attention-MIL, with a ProGAN synthetic augmentation bridge. Paper source: `report/class_imbalance.tex`.
 
 ## Key paths
 
@@ -15,7 +15,7 @@ Controlled class-imbalance benchmarks on TCGA-UT: patch-level classifier and WSI
 | `outputs/results.sqlite` | Generated: benchmark results DB (after `aggregate`) |
 | `outputs/tables/` | Generated: paper-facing LaTeX tables |
 | `outputs/figures/` | Generated: paper-facing figures |
-| `report/main.tex` | Paper source |
+| `report/class_imbalance.tex` | Paper source |
 | `report/main.pdf` | Current paper draft |
 | `tests/` | `test_benchmarks.py`, `conftest.py` |
 
