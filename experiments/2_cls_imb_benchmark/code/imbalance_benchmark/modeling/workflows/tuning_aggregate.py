@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import torch
@@ -9,12 +9,12 @@ from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.modeling.context import (
     Regime,
     build_training_ctx,
-    get_grid_configs,
+    param_counts,
 )
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
 
-__all__ = ["TuningScope", "tune_across_splits"]
+__all__ = ["TuningScope", "tune_across_splits", "summarize_tuning_cost"]
 
 
 @dataclass
@@ -24,6 +24,32 @@ class TuningScope:
     regime: Regime
     val_loader: torch.utils.data.DataLoader
     train_ds: TrainDataset
+    cost_records: list[dict[str, int]] = field(default_factory=list)
+
+
+def _frozen_grid(regime: Regime, method: str) -> list[dict[str, Any]]:
+    """Return one method's signed pre-tuning grid, refusing live-source fallback."""
+    grid = regime.method_grids.get(method)
+    if not grid:
+        raise RuntimeError(f"Frozen candidate grid missing for method: {method}")
+    return grid
+
+
+def summarize_tuning_cost(cost_records: list[dict[str, int]]) -> dict[str, float | int]:
+    """Aggregate realized search work across every candidate, split, and seed fit."""
+    processed = sum(record["processed_examples"] for record in cost_records)
+    unique = sum(record["unique_training_examples"] for record in cost_records)
+    return {
+        "processed_examples": processed,
+        "effective_passes_through_unique_examples": processed / max(unique, 1),
+        "maximum_total_parameters": max(
+            (record["total_parameters"] for record in cost_records), default=0
+        ),
+        "maximum_training_footprint_parameters": max(
+            (record["training_footprint_parameters"] for record in cost_records),
+            default=0,
+        ),
+    }
 
 
 def _selection_key(
@@ -53,6 +79,17 @@ def _evaluate(
         state, _ = fit_crt(ctx)
     else:
         state, _ = fit_method(ctx)
+    counts = param_counts(ctx["model"])
+    scope.cost_records.append(
+        {
+            "processed_examples": int(ctx["processed_examples"]),
+            "unique_training_examples": len(ctx["train_dataset"]),
+            "total_parameters": counts["total_parameters"],
+            "training_footprint_parameters": int(
+                ctx.get("training_footprint_parameters", counts["total_parameters"])
+            ),
+        }
+    )
     ctx["model"].load_state_dict(state)
     metrics = run_evaluation(
         ctx["model"],
@@ -71,7 +108,7 @@ def _select_trainable(
     stage_one_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Select a trainable method's configuration across all required observations."""
-    configs = get_grid_configs(method, scopes[0].regime.n_classes)
+    configs = _frozen_grid(scopes[0].regime, method)
     best_cfg, best_key = configs[0], None
     for cfg in configs:
         observations = []
@@ -91,7 +128,10 @@ def _select_post_hoc(
     ce_config: dict[str, Any], scopes: list[TuningScope], seeds: list[int]
 ) -> dict[str, Any]:
     """Select one post-hoc strength from all selected CE checkpoints."""
-    taus = [cfg["parameter"] for cfg in get_grid_configs("post_hoc_logit_adjustment")]
+    taus = [
+        cfg["parameter"]
+        for cfg in _frozen_grid(scopes[0].regime, "post_hoc_logit_adjustment")
+    ]
     observations: dict[float, list[tuple[float, float, float]]] = {
         tau: [] for tau in taus
     }

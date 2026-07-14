@@ -54,7 +54,7 @@ def _class_contribution_stats(
     n_units = n_slides if is_mil else len(rows)
     slide_rows = rows.drop_duplicates("slide_id") if is_mil else rows
     patient_share = slide_rows["case_id"].value_counts().iloc[0] / max(1, n_units)
-    slide_share = rows["slide_id"].value_counts().iloc[0] / max(1, len(rows))
+    slide_share = slide_rows["slide_id"].value_counts().iloc[0] / max(1, n_units)
     pool_denominator = (
         pool_cls["slide_id"].nunique() if is_mil else pool_cls["case_id"].nunique()
     )

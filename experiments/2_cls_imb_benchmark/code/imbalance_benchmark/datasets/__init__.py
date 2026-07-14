@@ -43,6 +43,11 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
     dataset_cfg = config["dataset"]
     root = Path(dataset_cfg["root"])
     regime = dataset_cfg.get("regime", "patch")
+    if regime == "wsi":
+        raise ValueError(
+            "BRACS supplies annotated ROI crops only; it cannot implement the "
+            "report's slide-label-only WSI estimand."
+        )
     metadata_csv = dataset_cfg.get("metadata_csv")
     tile_root = Path(dataset_cfg.get("tile_root", root / "tiles"))
     tile_size = int(dataset_cfg.get("tile_size", 256))
@@ -58,8 +63,6 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
     bracs.assert_patient_disjoint(tagged)
     tagged["patch_label"] = tagged["cancer_type"]
     tagged["slide_label"] = tagged["cancer_type"]
-    if regime == "wsi":
-        tagged["cancer_type"] = tagged["slide_label"]
     return tagged
 
 
@@ -72,15 +75,26 @@ def _build_camelyon16(config: dict[str, Any]) -> pd.DataFrame:
         slide
         for slide in camelyon16.slides_with_patches(data_root)
         if slide in slide_labels
-        and (data_root / "masks" / f"{slide}_mask.npy").is_file()
     ]
+    if regime == "patch":
+        slides = [
+            slide
+            for slide in slides
+            if (data_root / "masks" / f"{slide}_mask.npy").is_file()
+        ]
     if not slides:
         raise RuntimeError("No usable CAMELYON16 slides found.")
     bag_size = int(
         np.median([len(camelyon16.list_slide_patches(data_root, s)) for s in slides])
     )
     parts = [
-        _camelyon16_slide_rows(data_root, slide, slide_labels[slide], bag_size)
+        _camelyon16_slide_rows(
+            data_root,
+            slide,
+            slide_labels[slide],
+            bag_size,
+            include_patch_labels=regime == "patch",
+        )
         for slide in slides
     ]
     frame = pd.concat(parts, ignore_index=True)
@@ -99,29 +113,32 @@ def _build_camelyon16(config: dict[str, Any]) -> pd.DataFrame:
 
 
 def _camelyon16_slide_rows(
-    data_root: Path, slide_id: str, slide_label: str, bag_size: int
+    data_root: Path,
+    slide_id: str,
+    slide_label: str,
+    bag_size: int,
+    *,
+    include_patch_labels: bool,
 ) -> pd.DataFrame:
     patches = camelyon16.list_slide_patches(data_root, slide_id)
     if len(patches) > bag_size:
         keep = np.linspace(0, len(patches) - 1, bag_size).astype(int)
         patches = [patches[index] for index in keep]
     patch_ids = [pid for pid, _ in patches]
-    labels = camelyon16.patch_labels(
-        camelyon16.load_mask(data_root, slide_id), patch_ids
-    )
-    exhaustive = slide_id not in camelyon16.NON_EXHAUSTIVE_TUMOR
-    return pd.DataFrame(
-        {
-            "dataset": "camelyon16",
-            "case_id": slide_id,
-            "slide_id": slide_id,
-            "patch_id": patch_ids,
-            "slide_label": slide_label,
-            "patch_label": labels,
-            "image_path": [str(path) for _, path in patches],
-            "exhaustive": exhaustive,
-        }
-    )
+    rows: dict[str, Any] = {
+        "dataset": "camelyon16",
+        "case_id": slide_id,
+        "slide_id": slide_id,
+        "patch_id": patch_ids,
+        "slide_label": slide_label,
+        "image_path": [str(path) for _, path in patches],
+    }
+    if include_patch_labels:
+        rows["patch_label"] = camelyon16.patch_labels(
+            camelyon16.load_mask(data_root, slide_id), patch_ids
+        )
+        rows["exhaustive"] = slide_id not in camelyon16.NON_EXHAUSTIVE_TUMOR
+    return pd.DataFrame(rows)
 
 
 def _build_panda(config: dict[str, Any]) -> pd.DataFrame:

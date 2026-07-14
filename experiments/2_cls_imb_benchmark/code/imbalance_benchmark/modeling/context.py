@@ -118,6 +118,9 @@ class Regime:
     is_mil: bool
     locked_class_names: list[str] = field(default_factory=list, kw_only=True)
     bag_dataset_kwargs: dict[str, int] = field(default_factory=dict, kw_only=True)
+    method_grids: dict[str, list[dict[str, Any]]] = field(
+        default_factory=dict, kw_only=True
+    )
 
 
 def build_training_ctx(
@@ -176,10 +179,16 @@ def cost_payload(
     unique_examples: int,
     exposed_examples: int,
     processed_examples: int,
+    training_footprint_parameters: int | None = None,
 ) -> dict[str, Any]:
     """Build an exact confirmation cost record from the examples actually consumed."""
     updates = updates_for(method, budget)
     peak = int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
+    counts = param_counts(model)
+    if method == "post_hoc_logit_adjustment":
+        counts["trainable_parameters"] = 0
+    if training_footprint_parameters is not None:
+        counts["training_footprint_parameters"] = training_footprint_parameters
     return {
         "updates": updates,
         "processed_examples": processed_examples,
@@ -191,7 +200,7 @@ def cost_payload(
         "unique_examples_exposed": exposed_examples,
         "effective_passes_through_unique_examples": processed_examples
         / max(unique_examples, 1),
-        **param_counts(model),
+        **counts,
     }
 
 

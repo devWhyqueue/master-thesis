@@ -26,7 +26,6 @@ from imbalance_benchmark.datasets.data import (
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
-from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
 
 __all__ = ["cmd_confirm"]
@@ -94,8 +93,9 @@ def _confirm_inputs(
     with selection_path.open() as f:
         best_configs = json.load(f)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     freeze = json.loads(freeze_path.read_text())
+    config = freeze["runtime_config"]
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     class_names = list(freeze["class_names"])
     bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
     test_ds = load_training_dataset(
@@ -117,7 +117,8 @@ def _confirm_inputs(
     collate = bag_collate if is_mil else None
     val_ldr = torch.utils.data.DataLoader(val_ds, batch_size=64, collate_fn=collate)
     test_ldr = torch.utils.data.DataLoader(test_ds, batch_size=64, collate_fn=collate)
-    seeds = [derive_seed(args.seed, role) for role in CONFIRMATION_SEED_ROLES]
+    seed_roles = freeze.get("seed_roles", {})
+    seeds = [int(seed_roles[role]) for role in CONFIRMATION_SEED_ROLES]
     run_data = {
         "device": device,
         "config": config,

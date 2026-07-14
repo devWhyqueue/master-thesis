@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from collections.abc import Mapping
 from typing import Callable, cast
 
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from imbalance_benchmark.common import compute_data_hash, compute_sha256
 from imbalance_benchmark.construction import (
@@ -47,16 +49,50 @@ def evidence_pool_hash(train_df: pd.DataFrame, classes: list[str], is_mil: bool)
 
 
 def write_natural_condition(
-    train_df: pd.DataFrame, data_dir: Path
+    train_df: pd.DataFrame, data_dir: Path, is_mil: bool
 ) -> dict[str, object]:
     """Write the descriptive full-training-set anchor outside controlled estimands."""
     path = data_dir / "manifest_natural.csv"
     train_df.to_csv(path, index=False)
+    counts = train_df["cancer_type"].value_counts().to_dict()
+    values = list(counts.values())
+    total = sum(values)
+    probabilities = np.asarray(values, dtype=float) / max(total, 1)
+    entropy = -float((probabilities * np.log(probabilities)).sum()) / math.log(
+        max(len(values), 2)
+    )
     return {
         "path": str(path),
         "sha256": compute_sha256(path),
         "note": "descriptive anchor; excluded from imbalance deficit/recovery estimands",
+        "allocated_counts": counts,
+        "achieved_rho": max(values) / min(values) if values else 1.0,
+        "normalized_entropy": 1.0 - entropy if len(values) > 1 else 0.0,
+        "contribution_stats": _natural_contribution_stats(train_df, is_mil),
     }
+
+
+def _natural_contribution_stats(
+    train_df: pd.DataFrame, is_mil: bool
+) -> dict[str, dict[str, float | int]]:
+    """Report full-eligible-pool support and largest-unit contributions by class."""
+    stats = {}
+    for class_name, rows in train_df.groupby("cancer_type"):
+        slide_rows = rows.drop_duplicates("slide_id") if is_mil else rows
+        n_units = len(slide_rows) if is_mil else len(rows)
+        stats[str(class_name)] = {
+            "n_patients": int(rows["case_id"].nunique()),
+            "n_slides": int(rows["slide_id"].nunique()),
+            "n_patches": int(len(rows)),
+            "max_patient_contribution": float(
+                slide_rows["case_id"].value_counts().iloc[0] / max(1, n_units)
+            ),
+            "max_slide_contribution": float(
+                slide_rows["slide_id"].value_counts().iloc[0] / max(1, n_units)
+            ),
+            "pool_fraction_retained": 1.0,
+        }
+    return stats
 
 
 def assignment_allocations(

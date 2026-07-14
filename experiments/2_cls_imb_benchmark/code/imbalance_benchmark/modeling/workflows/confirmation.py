@@ -95,4 +95,6 @@ def confirm_method(
     for i, seed in enumerate(run.seeds):
         ctx = build_training_ctx(method, train_ds, run, seed, cfg, run.val_loader)
         state, elapsed = _timed_fit(fit_method, ctx)
-        _run_and_record(cond, method, i, ctx, state, run, elapsed)
+        _run_and_record(
+            cond, method, i, ctx, state, run, elapsed, float(cfg.get("parameter", 1.0))
+        )

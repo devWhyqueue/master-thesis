@@ -78,17 +78,18 @@ def _run_all_pilot_seeds(
 ]:
     """Run every pilot construction seed and collect its candidate-level curves."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    bag_kwargs = (
+        bag_dataset_kwargs(config, seed=derive_seed(base_seed, "instance_selection"))
+        if is_mil
+        else None
+    )
     val_ds: ImbalanceDataset | BagFeatureDataset = load_training_dataset(
         paths["data"] / "manifest.csv",
         is_mil,
         "validation",
         device=device,
         class_names=classes,
-        bag_kwargs=bag_dataset_kwargs(
-            config, seed=derive_seed(base_seed, "instance_selection")
-        )
-        if is_mil
-        else None,
+        bag_kwargs=bag_kwargs,
     )
     scratch_dir = paths["data"] / "pilot"
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -114,6 +115,8 @@ def _run_all_pilot_seeds(
             scratch_dir,
             quota,
             initialization_seed=derive_seed(base_seed, "initialization"),
+            config=config,
+            bag_kwargs=bag_kwargs,
         )
         quotas[seed], ba_by_seed[seed], recall_by_seed[seed] = (
             quota,

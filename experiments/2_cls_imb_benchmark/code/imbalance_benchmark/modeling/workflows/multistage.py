@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, cast
 
@@ -11,6 +12,8 @@ from imbalance_benchmark.modeling.training import (
     resolve_batch_size,
     update_budget,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _freeze_and_reinit_classifier(
@@ -61,6 +64,18 @@ def _freeze_teacher(teacher: nn.Module) -> None:
         parameter.requires_grad_(False)
 
 
+def _load_state(model: nn.Module, state: dict[str, Any], device: Any) -> None:
+    """Load a checkpoint state onto the active training device."""
+    model.load_state_dict({key: value.to(device) for key, value in state.items()})
+
+
+def _rankmix_footprint(teacher: nn.Module, student: nn.Module) -> int:
+    """Return the joint teacher-plus-student parameter footprint used for RankMix."""
+    return sum(parameter.numel() for parameter in teacher.parameters()) + sum(
+        parameter.numel() for parameter in student.parameters()
+    )
+
+
 def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """Train cRT's seeded CE stage, then its balanced frozen-representation stage."""
     batch_size = resolve_batch_size(ctx["config"], ctx["is_mil"])
@@ -73,9 +88,7 @@ def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     }
     state, _ = fit_model(stage_one_context, max_steps=budget)
     model = ctx["model"]
-    model.load_state_dict(
-        {key: value.to(ctx["device"]) for key, value in state.items()}
-    )
+    _load_state(model, state, ctx["device"])
     stage_two_context = {
         **ctx,
         "model": model,
@@ -94,6 +107,7 @@ def fit_rankmix(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
         len(ctx["train_dataset"]), resolve_batch_size(ctx["config"], True)
     )
     teacher = ctx["model_factory"]()
+    ctx["training_footprint_parameters"] = _rankmix_footprint(teacher, ctx["model"])
     teacher_context = {
         **ctx,
         "model": teacher,
@@ -101,9 +115,7 @@ def fit_rankmix(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
         "param_config": {"lr": ctx["param_config"]["lr"]},
     }
     teacher_state, _ = fit_model(teacher_context, max_steps=budget)
-    teacher.load_state_dict(
-        {key: value.to(ctx["device"]) for key, value in teacher_state.items()}
-    )
+    _load_state(teacher, teacher_state, ctx["device"])
     _freeze_teacher(teacher)
     student_context = {
         **ctx,

@@ -230,8 +230,9 @@ def _freeze_meta(
             "wsi_instances": config.get("wsi_training", {}).get("max_instances", 500),
         },
         "instance_selection_seed": derive_seed(args.seed, "instance_selection"),
+        "runtime_config": config,
         "conditions": native_conditions,
         "assignment_conditions": assignment_conditions,
         "tail_assignments": assignments,
-        "natural": write_natural_condition(train_df, paths["data"]),
+        "natural": write_natural_condition(train_df, paths["data"], is_mil),
     }

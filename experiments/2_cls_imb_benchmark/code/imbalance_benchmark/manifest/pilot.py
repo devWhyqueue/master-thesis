@@ -14,7 +14,11 @@ from imbalance_benchmark.datasets.data import (
 )
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
-from imbalance_benchmark.manifest.floors import meets_method_floor, method_floor
+from imbalance_benchmark.manifest.floors import (
+    meets_method_floor,
+    method_floor,
+    stability_floor_from_curve,
+)
 from imbalance_benchmark.manifest.pilot_training import fit_pilot_model
 
 ValDataset = ImbalanceDataset | BagFeatureDataset
@@ -171,6 +175,8 @@ def evaluate_pilot_candidate(
     is_mil: bool,
     scratch: Path,
     initialization_seed: int,
+    config: dict[str, object] | None = None,
+    bag_kwargs: dict[str, int] | None = None,
 ) -> tuple[float, list[float]]:
     """Fit one balanced-CE pilot candidate and return its validation BA and recalls."""
     df.to_csv(scratch, index=False)
@@ -178,7 +184,14 @@ def evaluate_pilot_candidate(
         val_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
     )
     model, best_acc = fit_pilot_model(
-        scratch, device, n_cls, is_mil, loader, initialization_seed=initialization_seed
+        scratch,
+        device,
+        n_cls,
+        is_mil,
+        loader,
+        initialization_seed=initialization_seed,
+        config=config,
+        bag_kwargs=bag_kwargs,
     )
     preds, targets = _pilot_val_predictions(model, loader, device, is_mil)
     return best_acc, per_class_recall(preds, targets, n_cls)
@@ -197,6 +210,8 @@ def run_pilot_seed(
     quota: int | None,
     *,
     initialization_seed: int,
+    config: dict[str, object] | None = None,
+    bag_kwargs: dict[str, int] | None = None,
 ) -> tuple[int | None, list[float], list[list[float]]]:
     """Run every nested candidate level for one pilot construction seed at the frozen quota."""
     ba_curve, recall_curve = [], []
@@ -215,24 +230,9 @@ def run_pilot_seed(
             is_mil,
             p,
             initialization_seed=initialization_seed,
+            config=config,
+            bag_kwargs=bag_kwargs,
         )
         ba_curve.append(ba)
         recall_curve.append(recalls)
     return quota, ba_curve, recall_curve
-
-
-def stability_floor_from_curve(
-    levels: list[int], ba: dict[int, list[float]], rcs: dict[int, list[list[float]]]
-) -> int:
-    """Smallest level whose next-level gain is below the mean/per-class stability rule."""
-    mean_ba = np.mean(np.stack(list(ba.values())), axis=0)
-    for idx in range(len(levels) - 1):
-        g = abs(float(mean_ba[idx + 1] - mean_ba[idx]))
-        cg = max(
-            abs(rc[idx + 1][c] - rc[idx][c])
-            for rc in rcs.values()
-            for c in range(len(rc[idx]))
-        )
-        if g < 0.01 and cg < 0.02:
-            return levels[idx]
-    return levels[-1]

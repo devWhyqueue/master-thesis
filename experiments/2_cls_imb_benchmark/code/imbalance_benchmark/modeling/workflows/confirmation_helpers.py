@@ -209,6 +209,7 @@ def _run_and_record(
                 len(ctx["train_dataset"]),
                 len(ctx.get("exposed_indices", set())),
                 int(ctx.get("processed_examples", 0)),
+                ctx.get("training_footprint_parameters"),
             ),
             "method_diagnostics": ctx.get("method_diagnostics", {}),
             "environment": _environment_payload(),

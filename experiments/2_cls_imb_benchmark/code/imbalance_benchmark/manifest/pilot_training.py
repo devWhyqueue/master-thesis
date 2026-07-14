@@ -11,6 +11,24 @@ from imbalance_benchmark.modeling.models import AttentionMil, MLP
 from imbalance_benchmark.modeling.training import fit_model
 
 
+def _pilot_dataset(
+    scratch_path: Path,
+    device: torch.device,
+    is_mil: bool,
+    bag_kwargs: dict[str, int] | None,
+) -> BagFeatureDataset | ImbalanceDataset:
+    """Load the pilot's training manifest with the regime's fixed evidence controls."""
+    if is_mil:
+        controls = bag_kwargs or {}
+        return BagFeatureDataset(
+            scratch_path,
+            max_instances=controls.get("max_instances", 500),
+            instance_selection_seed=controls.get("instance_selection_seed", 0),
+            device=device,
+        )
+    return ImbalanceDataset(scratch_path, device=device)
+
+
 def fit_pilot_model(
     scratch_path: Path,
     device: torch.device,
@@ -18,10 +36,11 @@ def fit_pilot_model(
     is_mil: bool,
     val_loader: torch.utils.data.DataLoader,
     initialization_seed: int,
+    config: dict[str, Any] | None = None,
+    bag_kwargs: dict[str, int] | None = None,
 ) -> tuple[nn.Module, float]:
     """Construct reproducible pilot weights and fit the fixed CE baseline."""
-    dataset_class = BagFeatureDataset if is_mil else ImbalanceDataset
-    dataset = dataset_class(scratch_path, device=device)
+    dataset = _pilot_dataset(scratch_path, device, is_mil, bag_kwargs)
     torch.manual_seed(initialization_seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(initialization_seed)
@@ -35,7 +54,7 @@ def fit_pilot_model(
         "train_dataset": dataset,
         "val_loader": val_loader,
         "device": device,
-        "config": {},
+        "config": config or {},
         "param_config": {"lr": 1e-3},
         "seed": initialization_seed,
         "is_mil": is_mil,

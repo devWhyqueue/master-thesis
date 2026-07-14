@@ -21,10 +21,10 @@ from imbalance_benchmark.datasets.data import (
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
-from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     TuningScope,
+    summarize_tuning_cost,
     tune_across_splits,
 )
 
@@ -44,6 +44,7 @@ def _tuning_inputs(
     freeze_path = paths["data"] / "manifest_freeze.json"
     freeze = json.loads(freeze_path.read_text())
     verify_manifest_freeze(freeze)
+    config = freeze["runtime_config"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
@@ -65,6 +66,7 @@ def _tuning_inputs(
         is_mil,
         locked_class_names=list(freeze["class_names"]),
         bag_dataset_kwargs=bag_kwargs or {},
+        method_grids=freeze.get("method_grids", {}),
     )
     return paths, regime, val_loader
 
@@ -80,9 +82,10 @@ def cmd_tune(args: argparse.Namespace) -> None:
     _tune_all_splits(args, started)
 
 
-def _tuning_seeds(seed: int) -> list[int]:
+def _tuning_seeds(freeze: dict[str, Any]) -> list[int]:
     """Return the two locked initialization seeds used for every candidate."""
-    return [derive_seed(seed, f"tuning_initialization_{index}") for index in range(2)]
+    roles = freeze.get("seed_roles", {})
+    return [int(roles[f"tuning_initialization_{index}"]) for index in range(2)]
 
 
 def _conditions(args: argparse.Namespace) -> tuple[str, ...]:
@@ -116,18 +119,20 @@ def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
     ]
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
-    selections = _combined_selections(scopes, args)
+    selections, search_cost = _combined_selections(scopes, args)
     for paths, _, _ in scopes:
         selection_path = paths["data"] / _output_name(args)
         write_json(selection_path, selections)
         sign_file(selection_path)
-        _write_tuning_cost(paths, started, getattr(args, "condition", None))
+        _write_tuning_cost(
+            paths, started, search_cost, getattr(args, "condition", None)
+        )
 
 
 def _combined_selections(
     scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
     args: argparse.Namespace,
-) -> dict[str, dict[str, Any]]:
+) -> tuple[dict[str, dict[str, Any]], dict[str, float | int]]:
     """Fit the shared configuration-selection objective across all three splits."""
     paths, regime, _ = scopes[0]
     freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
@@ -135,22 +140,24 @@ def _combined_selections(
     selections: dict[str, dict[str, Any]] = {
         assignment: {} for assignment in assignments
     }
+    cost_records: list[dict[str, int]] = []
     for condition in _conditions(args):
         scoped = ("native",) if condition in {"natural", "balanced"} else assignments
         selected = tune_across_splits(
             roster_for_regime(regime.is_mil),
-            _combined_scopes(scopes, condition, scoped),
-            _tuning_seeds(args.seed),
+            _combined_scopes(scopes, condition, scoped, cost_records),
+            _tuning_seeds(freeze),
         )
         for assignment in scoped:
             selections[assignment][condition] = selected
-    return selections
+    return selections, summarize_tuning_cost(cost_records)
 
 
 def _combined_scopes(
     scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
     condition: str,
     assignments: tuple[str, ...],
+    cost_records: list[dict[str, int]] | None = None,
 ) -> list[TuningScope]:
     """Build the split/assignment training datasets for one shared selection."""
     result = []
@@ -167,13 +174,17 @@ def _combined_scopes(
                         class_names=regime.locked_class_names,
                         bag_kwargs=regime.bag_dataset_kwargs,
                     ),
+                    cost_records if cost_records is not None else [],
                 )
             )
     return result
 
 
 def _write_tuning_cost(
-    paths: dict[str, Path], started: float, condition: str | None = None
+    paths: dict[str, Path],
+    started: float,
+    search_cost: dict[str, float | int],
+    condition: str | None = None,
 ) -> None:
     """Persist validation-search cost separately from locked confirmation fits."""
     elapsed = time.perf_counter() - started
@@ -190,5 +201,6 @@ def _write_tuning_cost(
             "peak_accelerator_memory_bytes": int(torch.cuda.max_memory_allocated())
             if torch.cuda.is_available()
             else 0,
+            **search_cost,
         },
     )
