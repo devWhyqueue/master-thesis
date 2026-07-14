@@ -29,6 +29,11 @@ __all__ = ["cmd_confirm"]
 CONFIRMATION_SEED_ROLES = [f"confirmation_initialization_{i}" for i in range(5)]
 
 
+def _is_excluded(paths: dict[str, Any]) -> bool:
+    """Return whether this split belongs to a recorded confirmatory exclusion."""
+    return (paths["data"] / "confirmatory_exclusion.json").exists()
+
+
 def _confirm_condition(
     cond: str,
     methods: tuple[str, ...],
@@ -67,12 +72,6 @@ def _confirm_inputs(
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Load config, best tuning selections, and the locked-test loader for confirmation."""
     config = load_config(args.config)
-    exclusion_path = paths["data"] / "confirmatory_exclusion.json"
-    if exclusion_path.exists():
-        exclusion = json.loads(exclusion_path.read_text())
-        raise RuntimeError(
-            f"Confirmatory analysis is excluded: {exclusion.get('reason', 'unknown reason')}"
-        )
     freeze_path = paths["data"] / "manifest_freeze.json"
     if not freeze_path.exists():
         raise FileNotFoundError("Run freeze successfully before confirmation")
@@ -114,11 +113,17 @@ def _confirm_inputs(
 def cmd_confirm(args: argparse.Namespace) -> None:
     """Fit every roster method's five confirmation seeds and emit locked test predictions."""
     if args.split_index is None:
+        config = load_config(args.config)
+        base_paths = ensure_dirs(config)
+        if any(_is_excluded(split_paths(base_paths, index)) for index in range(3)):
+            return
         for index in range(3):
             cmd_confirm(argparse.Namespace(**vars(args), split_index=index))
         return
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
+    if _is_excluded(paths):
+        return
     best_configs, run_data, freeze = _confirm_inputs(args, paths)
     methods = roster_for_regime(run_data["is_mil"])
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS

@@ -12,146 +12,23 @@ from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, wr
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
-    TrainDataset,
     bag_collate,
 )
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.manifest.seeds import derive_seed
-from imbalance_benchmark.modeling.context import (
-    CONDITIONS,
-    Regime,
-    build_training_ctx,
-    get_grid_configs,
-    roster_for_regime,
-)
-from imbalance_benchmark.modeling.special_methods import (
-    fit_crt,
-    fit_method,
-    select_post_hoc_tau,
-)
-from imbalance_benchmark.modeling.training import class_priors, run_evaluation
+from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     TuningScope,
     tune_across_splits,
 )
+from imbalance_benchmark.modeling.workflows.tuning_search import tune_condition
 
 __all__ = ["cmd_tune"]
 
 
-def _tune_method(
-    method: str,
-    train_ds: TrainDataset,
-    val_loader: torch.utils.data.DataLoader,
-    regime: Regime,
-    seeds: list[int],
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """Sweep a method's candidate grid over the tuning seeds; select by BA -> F1 -> NLL."""
-    configs = get_grid_configs(method, regime.n_classes)
-    best_cfg, best_key = configs[0], None
-    representative_state = None
-    for cfg in configs:
-        metrics = []
-        for i, seed in enumerate(seeds):
-            ctx = build_training_ctx(method, train_ds, regime, seed, cfg, val_loader)
-            state, _ = fit_method(ctx)
-            ctx["model"].load_state_dict(state)
-            m = run_evaluation(
-                ctx["model"], val_loader, regime.device, regime.is_mil, regime.n_classes
-            )
-            metrics.append((m["balanced_accuracy"], m["macro_f1"], m["nll"]))
-            if method == "ce" and i == 0:
-                representative_state = state
-        mean_ba = sum(x[0] for x in metrics) / len(metrics)
-        mean_f1 = sum(x[1] for x in metrics) / len(metrics)
-        mean_nll = sum(x[2] for x in metrics) / len(metrics)
-        key = (mean_ba, mean_f1, -mean_nll)
-        if best_key is None or key > best_key:
-            best_key, best_cfg = key, cfg
-    return best_cfg, representative_state
-
-
-def _tune_crt(
-    stage_one_config: dict[str, Any],
-    train_ds: TrainDataset,
-    val_loader: torch.utils.data.DataLoader,
-    regime: Regime,
-    seeds: list[int],
-) -> dict[str, Any]:
-    """Select cRT's stage-two classifier learning rate; stage one inherits the CE config."""
-    best_cfg, best_key = None, None
-    for cfg in get_grid_configs("crt"):
-        metrics = []
-        for seed in seeds:
-            ctx = build_training_ctx("crt", train_ds, regime, seed, cfg, val_loader)
-            ctx["stage_one_config"] = stage_one_config
-            state, _ = fit_crt(ctx)
-            ctx["model"].load_state_dict(state)
-            m = run_evaluation(
-                ctx["model"], val_loader, regime.device, regime.is_mil, regime.n_classes
-            )
-            metrics.append((m["balanced_accuracy"], m["macro_f1"], m["nll"]))
-        mean_ba = sum(x[0] for x in metrics) / len(metrics)
-        mean_f1 = sum(x[1] for x in metrics) / len(metrics)
-        mean_nll = sum(x[2] for x in metrics) / len(metrics)
-        key = (mean_ba, mean_f1, -mean_nll)
-        if best_key is None or key > best_key:
-            best_key, best_cfg = key, cfg
-    assert best_cfg is not None
-    return best_cfg
-
-
-def _tune_post_hoc(
-    ce_state: dict[str, Any] | None,
-    train_ds: TrainDataset,
-    val_loader: torch.utils.data.DataLoader,
-    regime: Regime,
-) -> dict[str, Any]:
-    """Select tau for post-hoc logit adjustment on the selected CE model; no retraining."""
-    if ce_state is None:
-        return {"parameter": 1.0}
-    ctx = build_training_ctx("ce", train_ds, regime, 0, {"lr": 1e-3}, val_loader)
-    ctx["model"].load_state_dict(ce_state)
-    priors = class_priors(train_ds.get_int_targets(), regime.n_classes, regime.device)
-    taus = [c["parameter"] for c in get_grid_configs("post_hoc_logit_adjustment")]
-    best_tau, _ = select_post_hoc_tau(
-        ctx["model"],
-        val_loader,
-        regime.device,
-        regime.is_mil,
-        regime.n_classes,
-        priors,
-        taus,
-    )
-    return {"parameter": best_tau}
-
-
-def _tune_condition(
-    condition: str,
-    methods: tuple[str, ...],
-    paths: dict[str, Path],
-    val_loader: torch.utils.data.DataLoader,
-    regime: Regime,
-    seeds: list[int],
-    manifest_path: Path,
-) -> dict[str, Any]:
-    """Tune every roster method against one imbalance condition's training manifest."""
-    dataset_cls = BagFeatureDataset if regime.is_mil else ImbalanceDataset
-    train_ds = dataset_cls(manifest_path, device=regime.device)
-    selections: dict[str, Any] = {}
-    ce_state = None
-    for method in methods:
-        if method == "crt":
-            selections["crt"] = _tune_crt(
-                selections["ce"], train_ds, val_loader, regime, seeds
-            )
-        elif method == "post_hoc_logit_adjustment":
-            selections[method] = _tune_post_hoc(ce_state, train_ds, val_loader, regime)
-        else:
-            cfg, state = _tune_method(method, train_ds, val_loader, regime, seeds)
-            selections[method] = cfg
-            if method == "ce":
-                ce_state = state
-    return selections
+def _is_excluded(paths: dict[str, Path]) -> bool:
+    """Return whether a failed pilot/freeze excludes this confirmatory workflow."""
+    return (paths["data"] / "confirmatory_exclusion.json").exists()
 
 
 def _tuning_inputs(
@@ -178,104 +55,150 @@ def _tuning_inputs(
 def cmd_tune(args: argparse.Namespace) -> None:
     """Run the validation-only hyperparameter search for every roster method and condition."""
     started = time.perf_counter()
-    config = load_config(args.config)
-    base_paths = ensure_dirs(config)
     if args.split_index is not None:
-        paths, regime, val_loader = _tuning_inputs(
-            args, split_paths(base_paths, args.split_index)
-        )
-        seeds = [
-            derive_seed(args.seed, "tuning_initialization_0"),
-            derive_seed(args.seed, "tuning_initialization_1"),
-        ]
-        methods = roster_for_regime(regime.is_mil)
-        conditions = (
-            (args.condition,) if getattr(args, "condition", None) else CONDITIONS
-        )
-        freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
-        assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-        selections = {assignment: {} for assignment in assignments}
-        for cond in conditions:
-            scoped_assignments = (
-                ("native",) if cond in {"natural", "balanced"} else assignments
-            )
-            for assignment in scoped_assignments:
-                manifest_name = (
-                    f"manifest_{cond}.csv"
-                    if cond in {"natural", "balanced"}
-                    else f"manifest_{assignment}_{cond}.csv"
-                )
-                selections[assignment][cond] = _tune_condition(
-                    cond,
-                    methods,
-                    paths,
-                    val_loader,
-                    regime,
-                    seeds,
-                    paths["data"] / manifest_name,
-                )
-        output_name = (
-            f"tuning_selections_{args.condition}.json"
-            if getattr(args, "condition", None)
-            else "tuning_selections.json"
-        )
-        write_json(paths["data"] / output_name, selections)
-        _write_tuning_cost(paths, started)
+        _tune_split(args, started)
         return
-    indices = range(3) if args.split_index is None else (args.split_index,)
-    scoped = [_tuning_inputs(args, split_paths(base_paths, index)) for index in indices]
-    paths, regime, _ = scoped[0]
-    seeds = [
-        derive_seed(args.seed, "tuning_initialization_0"),
-        derive_seed(args.seed, "tuning_initialization_1"),
+    _tune_all_splits(args, started)
+
+
+def _tuning_seeds(seed: int) -> list[int]:
+    """Return the two locked initialization seeds used for every candidate."""
+    return [derive_seed(seed, f"tuning_initialization_{index}") for index in range(2)]
+
+
+def _conditions(args: argparse.Namespace) -> tuple[str, ...]:
+    """Return the requested condition scope, defaulting to the whole roster."""
+    return (args.condition,) if getattr(args, "condition", None) else CONDITIONS
+
+
+def _output_name(args: argparse.Namespace) -> str:
+    """Return the condition-safe tuning selection output name."""
+    return (
+        f"tuning_selections_{args.condition}.json"
+        if getattr(args, "condition", None)
+        else "tuning_selections.json"
+    )
+
+
+def _manifest_name(condition: str, assignment: str) -> str:
+    """Resolve one condition/assignment's frozen training manifest name."""
+    return (
+        f"manifest_{condition}.csv"
+        if condition in {"natural", "balanced"}
+        else f"manifest_{assignment}_{condition}.csv"
+    )
+
+
+def _tune_split(args: argparse.Namespace, started: float) -> None:
+    """Tune independently within one explicit patient split."""
+    paths = split_paths(ensure_dirs(load_config(args.config)), args.split_index)
+    if _is_excluded(paths):
+        return
+    paths, regime, loader = _tuning_inputs(args, paths)
+    freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
+    selections = _split_selections(paths, regime, loader, freeze, args)
+    write_json(paths["data"] / _output_name(args), selections)
+    _write_tuning_cost(paths, started, getattr(args, "condition", None))
+
+
+def _split_selections(
+    paths: dict[str, Path],
+    regime: Regime,
+    loader: torch.utils.data.DataLoader,
+    freeze: dict[str, Any],
+    args: argparse.Namespace,
+) -> dict[str, dict[str, Any]]:
+    """Tune every requested condition and tail assignment for one split."""
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+    selections: dict[str, dict[str, Any]] = {
+        assignment: {} for assignment in assignments
+    }
+    methods, seeds = roster_for_regime(regime.is_mil), _tuning_seeds(args.seed)
+    for condition in _conditions(args):
+        scoped = ("native",) if condition in {"natural", "balanced"} else assignments
+        for assignment in scoped:
+            selections[assignment][condition] = tune_condition(
+                methods,
+                loader,
+                regime,
+                seeds,
+                paths["data"] / _manifest_name(condition, assignment),
+            )
+    return selections
+
+
+def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
+    """Tune one configuration against the equal-weight three-split objective."""
+    base_paths = ensure_dirs(load_config(args.config))
+    scopes = [
+        _tuning_inputs(args, split_paths(base_paths, index)) for index in range(3)
     ]
-    methods = roster_for_regime(regime.is_mil)
-    conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
+    if any(_is_excluded(paths) for paths, _, _ in scopes):
+        return
+    selections = _combined_selections(scopes, args)
+    for paths, _, _ in scopes:
+        write_json(paths["data"] / _output_name(args), selections)
+        _write_tuning_cost(paths, started, getattr(args, "condition", None))
+
+
+def _combined_selections(
+    scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
+    args: argparse.Namespace,
+) -> dict[str, dict[str, Any]]:
+    """Fit the shared configuration-selection objective across all three splits."""
+    paths, regime, _ = scopes[0]
     freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     selections: dict[str, dict[str, Any]] = {
         assignment: {} for assignment in assignments
     }
-    for cond in conditions:
-        scoped_assignments = (
-            ("native",) if cond in {"natural", "balanced"} else assignments
+    for condition in _conditions(args):
+        scoped = ("native",) if condition in {"natural", "balanced"} else assignments
+        selected = tune_across_splits(
+            roster_for_regime(regime.is_mil),
+            _combined_scopes(scopes, condition, scoped),
+            _tuning_seeds(args.seed),
         )
-        combined_scopes: list[TuningScope] = []
-        for assignment in scoped_assignments:
+        for assignment in scoped:
+            selections[assignment][condition] = selected
+    return selections
+
+
+def _combined_scopes(
+    scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
+    condition: str,
+    assignments: tuple[str, ...],
+) -> list[TuningScope]:
+    """Build the split/assignment training datasets for one shared selection."""
+    result = []
+    for assignment in assignments:
+        for paths, regime, loader in scopes:
             dataset_cls = BagFeatureDataset if regime.is_mil else ImbalanceDataset
-            combined_scopes.extend(
+            result.append(
                 TuningScope(
-                    scope_regime,
-                    scope_loader,
+                    regime,
+                    loader,
                     dataset_cls(
-                        scope_paths["data"]
-                        / (
-                            f"manifest_{cond}.csv"
-                            if cond in {"natural", "balanced"}
-                            else f"manifest_{assignment}_{cond}.csv"
-                        ),
-                        device=scope_regime.device,
+                        paths["data"] / _manifest_name(condition, assignment),
+                        device=regime.device,
                     ),
                 )
-                for scope_paths, scope_regime, scope_loader in scoped
             )
-        selected = tune_across_splits(methods, combined_scopes, seeds)
-        for assignment in scoped_assignments:
-            selections[assignment][cond] = selected
-    if getattr(args, "condition", None):
-        output_name = f"tuning_selections_{args.condition}.json"
-    else:
-        output_name = "tuning_selections.json"
-    for scope_paths, _, _ in scoped:
-        write_json(scope_paths["data"] / output_name, selections)
-        _write_tuning_cost(scope_paths, started)
+    return result
 
 
-def _write_tuning_cost(paths: dict[str, Path], started: float) -> None:
+def _write_tuning_cost(
+    paths: dict[str, Path], started: float, condition: str | None = None
+) -> None:
     """Persist validation-search cost separately from locked confirmation fits."""
     elapsed = time.perf_counter() - started
     write_json(
-        paths["data"] / "tuning_search_cost.json",
+        paths["data"]
+        / (
+            f"tuning_search_cost_{condition}.json"
+            if condition
+            else "tuning_search_cost.json"
+        ),
         {
             "wall_clock_seconds": elapsed,
             "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,

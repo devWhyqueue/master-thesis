@@ -16,6 +16,7 @@ from imbalance_benchmark.datasets.data import (
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import MLP, AttentionMil
 from imbalance_benchmark.modeling.training import fit_model
+from imbalance_benchmark.manifest.floors import meets_method_floor, method_floor
 
 __all__ = [
     "PILOT_CANDIDATE_LEVELS",
@@ -26,6 +27,7 @@ __all__ = [
     "evaluate_pilot_candidate",
     "run_pilot_seed",
     "method_floor",
+    "meets_method_floor",
     "stability_floor_from_curve",
 ]
 
@@ -227,13 +229,6 @@ def run_pilot_seed(
         ba_curve.append(ba)
         recall_curve.append(recalls)
     return quota, ba_curve, recall_curve
-
-
-def method_floor(patient_equals_slide: bool) -> dict[str, int]:
-    """Return the fixed method-floor independent-unit minimums per class."""
-    if patient_equals_slide:
-        return {"slides": 20}
-    return {"patients": 10, "slides": 20}
 
 
 def stability_floor_from_curve(

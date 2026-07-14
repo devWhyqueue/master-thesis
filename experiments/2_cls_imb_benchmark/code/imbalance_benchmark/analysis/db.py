@@ -10,7 +10,7 @@ __all__ = ["connect_db", "init_schema", "discover_result_dirs", "ingest_run"]
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY, result_dir TEXT NOT NULL, benchmark TEXT NOT NULL,
-    condition TEXT NOT NULL, method TEXT NOT NULL, seed_index INTEGER NOT NULL,
+    condition TEXT NOT NULL, assignment TEXT NOT NULL DEFAULT 'native', method TEXT NOT NULL, seed_index INTEGER NOT NULL,
     seed INTEGER, class_names_json TEXT, tuning_params_json TEXT, cost_json TEXT,
     smoke INTEGER NOT NULL DEFAULT 0, created_at TEXT
 );
@@ -71,6 +71,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for name in ("quadratic_weighted_kappa", "ordinal_mean_absolute_error"):
         if name not in columns:
             conn.execute(f"ALTER TABLE eval_results ADD COLUMN {name} REAL")
+    run_columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+    if "assignment" not in run_columns:
+        conn.execute(
+            "ALTER TABLE runs ADD COLUMN assignment TEXT NOT NULL DEFAULT 'native'"
+        )
     conn.commit()
 
 
@@ -111,14 +116,15 @@ def _ingest_run_meta(
     """Helper to insert runs metadata."""
     conn.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
     conn.execute(
-        "INSERT INTO runs (run_id, result_dir, benchmark, condition, method, seed_index, "
+        "INSERT INTO runs (run_id, result_dir, benchmark, condition, assignment, method, seed_index, "
         "seed, class_names_json, tuning_params_json, cost_json, smoke, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         (
             run_id,
             str(result_dir),
             record.get("benchmark", "unknown"),
             condition,
+            record.get("assignment", "native"),
             method,
             seed_index,
             record.get("seed"),

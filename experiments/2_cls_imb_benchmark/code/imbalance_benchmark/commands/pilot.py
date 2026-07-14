@@ -10,6 +10,7 @@ from imbalance_benchmark.common import ensure_dirs, load_config, split_paths, wr
 from imbalance_benchmark.construction import patient_equals_slide
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.manifest.pilot import (
+    meets_method_floor,
     method_floor,
     pilot_levels_for,
     run_pilot_seed,
@@ -22,7 +23,7 @@ __all__ = ["cmd_pilot"]
 
 def _pilot_setup(
     paths: dict[str, Any], config: dict[str, Any]
-) -> tuple[pd.DataFrame, list[str], bool, bool, list[int]]:
+) -> tuple[pd.DataFrame, list[str], bool, bool, list[int], dict[str, dict[str, int]]]:
     """Load the training manifest and derive the regime, unit type, and candidate levels."""
     df = pd.read_csv(paths["data"] / "manifest.csv")
     train_df = cast(pd.DataFrame, df[df["split"] == "train"])
@@ -31,7 +32,22 @@ def _pilot_setup(
     eq_slide = patient_equals_slide(train_df)
     unit_col = "slide_id" if (is_mil or eq_slide) else "case_id"
     available = train_df.groupby("cancer_type")[unit_col].nunique().to_dict()
-    return train_df, classes, is_mil, eq_slide, pilot_levels_for(available)
+    support = {
+        cls: {
+            "patients": int(
+                cast(
+                    pd.Series, train_df[train_df["cancer_type"] == cls]["case_id"]
+                ).nunique()
+            ),
+            "slides": int(
+                cast(
+                    pd.Series, train_df[train_df["cancer_type"] == cls]["slide_id"]
+                ).nunique()
+            ),
+        }
+        for cls in classes
+    }
+    return train_df, classes, is_mil, eq_slide, pilot_levels_for(available), support
 
 
 def _run_all_pilot_seeds(
@@ -80,13 +96,13 @@ def _pilot_report_payload(
     quotas: dict[int, int | None],
     ba_by_seed: dict[int, list[float]],
     recall_by_seed: dict[int, list[list[float]]],
+    support: dict[str, dict[str, int]],
 ) -> dict[str, Any]:
     """Assemble the frozen pilot report: floors, curves, seeds, and exclusion status."""
     stability_floor = stability_floor_from_curve(levels, ba_by_seed, recall_by_seed)
     floor = method_floor(eq_slide)
-    definitive_floor = max(
-        stability_floor, floor.get("patients", floor.get("slides", 0))
-    )
+    definitive_floor = max(stability_floor, max(floor.values()))
+    floor_met = all(meets_method_floor(values, eq_slide) for values in support.values())
     return {
         "levels": levels,
         "pilot_construction_seeds": pilot_seeds,
@@ -97,7 +113,8 @@ def _pilot_report_payload(
         "method_floor": floor,
         "definitive_floor": definitive_floor,
         "patient_equals_slide": eq_slide,
-        "excluded": levels[-1] < definitive_floor,
+        "available_independent_support": support,
+        "excluded": levels[-1] < definitive_floor or not floor_met,
     }
 
 
@@ -109,11 +126,11 @@ def cmd_pilot(args: argparse.Namespace) -> None:
         return
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
-    train_df, classes, is_mil, eq_slide, levels = _pilot_setup(paths, config)
+    train_df, classes, is_mil, eq_slide, levels, support = _pilot_setup(paths, config)
     pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
         train_df, classes, levels, is_mil, args.seed, paths
     )
     payload = _pilot_report_payload(
-        levels, eq_slide, pilot_seeds, quotas, ba_by_seed, recall_by_seed
+        levels, eq_slide, pilot_seeds, quotas, ba_by_seed, recall_by_seed, support
     )
     write_json(paths["data"] / "pilot_report.json", payload)

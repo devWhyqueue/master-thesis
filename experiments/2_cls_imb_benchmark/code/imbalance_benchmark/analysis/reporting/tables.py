@@ -49,7 +49,7 @@ def results_table(conn: sqlite3.Connection, split: str = "test") -> str:
     if details.empty:
         return _to_latex(pd.DataFrame(), "Confirmation results", "tab:results")
     summary = (
-        details.groupby(["condition", "method"])
+        details.groupby(["assignment", "condition", "method"])
         .agg(
             balanced_accuracy=("balanced_accuracy", "mean"),
             macro_f1=("macro_f1", "mean"),
@@ -74,7 +74,7 @@ def calibration_table(conn: sqlite3.Connection, split: str = "test") -> str:
     if details.empty:
         return _to_latex(pd.DataFrame(), "Calibration summary", "tab:calibration")
     summary = (
-        details.groupby(["condition", "method"])
+        details.groupby(["assignment", "condition", "method"])
         .agg(
             negative_log_likelihood=("negative_log_likelihood", "mean"),
             brier_score=("brier_score", "mean"),

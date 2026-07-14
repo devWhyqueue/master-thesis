@@ -8,10 +8,11 @@ import numpy as np
 
 from imbalance_benchmark.analysis.calibration import apply_temperature, fit_temperature
 from imbalance_benchmark.analysis.db import discover_result_dirs, ingest_run
+from imbalance_benchmark.analysis.inference.holm import apply_holm
 from imbalance_benchmark.analysis.metrics import assign_tiers, negative_log_likelihood
-from imbalance_benchmark.common import read_run_record
+from imbalance_benchmark.common import read_run_record, write_json
 
-__all__ = ["ingest_all_runs", "calibration_summary"]
+__all__ = ["ingest_all_runs", "calibration_summary", "write_diagnostics"]
 
 
 def ingest_all_runs(
@@ -24,26 +25,55 @@ def ingest_all_runs(
         record = read_run_record(result_dir)
         if record is None:
             continue
-        class_names = record.get("class_names", [])
+        _ingest_discovered_run(
+            conn, freeze, condition, method, seed_idx, result_dir, record
+        )
+
+
+def _ingest_discovered_run(
+    conn: sqlite3.Connection,
+    freeze: dict[str, Any],
+    condition: str,
+    method: str,
+    seed_idx: int,
+    result_dir: Path,
+    record: dict[str, Any],
+) -> None:
+    """Add one run with tiers derived from its frozen assignment allocation."""
+    class_names = record.get("class_names", [])
+    assignment = record.get("assignment", "native")
+    allocated = (
+        freeze.get("conditions", {}).get(condition, {}).get("allocated_counts", {})
+    )
+    if not allocated:
         allocated = (
-            freeze.get("conditions", {}).get(condition, {}).get("allocated_counts", {})
+            freeze.get("assignment_conditions", {})
+            .get(assignment, {})
+            .get(condition, {})
+            .get("allocated_counts", {})
         )
-        assignment = record.get("assignment", "native")
-        if not allocated:
-            allocated = (
-                freeze.get("assignment_conditions", {})
-                .get(assignment, {})
-                .get(condition, {})
-                .get("allocated_counts", {})
-            )
-        tie_order = freeze.get("tail_assignments", {}).get(assignment, class_names)
-        tiers = (
-            assign_tiers(class_names, allocated, tie_order)
-            if class_names and allocated
-            else {}
+    tiers = (
+        assign_tiers(
+            class_names,
+            allocated,
+            freeze.get("tail_assignments", {}).get(assignment, class_names),
         )
-        run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
-        ingest_run(conn, run_id, result_dir, condition, method, seed_idx, record, tiers)
+        if class_names and allocated
+        else {}
+    )
+    run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
+    ingest_run(conn, run_id, result_dir, condition, method, seed_idx, record, tiers)
+
+
+def write_diagnostics(
+    paths: dict[str, Path], comparisons: list[dict[str, Any]]
+) -> None:
+    """Persist gate/recovery and calibration diagnostics for one analyzed split."""
+    write_json(
+        paths["data"] / "gates_and_recovery.json",
+        {"comparisons": apply_holm(comparisons)},
+    )
+    write_json(paths["data"] / "calibration_summary.json", calibration_summary(paths))
 
 
 def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:

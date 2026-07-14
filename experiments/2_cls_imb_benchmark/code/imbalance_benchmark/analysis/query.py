@@ -39,7 +39,7 @@ def load_eval_details(conn: sqlite3.Connection) -> pd.DataFrame:
 def load_classwise(conn: sqlite3.Connection) -> pd.DataFrame:
     """Load ``eval_classwise`` joined with ``runs`` identity columns."""
     return pd.read_sql_query(
-        "SELECT r.run_id, r.benchmark, r.condition, r.method, r.seed_index, c.split, "
+        "SELECT r.run_id, r.benchmark, r.condition, r.assignment, r.method, r.seed_index, c.split, "
         "c.class_name, c.tier, c.precision, c.recall, c.f1, c.support, c.nll, c.brier "
         "FROM eval_classwise c JOIN runs r ON r.run_id = c.run_id",
         conn,

@@ -4,7 +4,7 @@ import logging
 from typing import cast
 import numpy as np
 import pandas as pd
-from imbalance_benchmark.construction_sampling import (
+from imbalance_benchmark.manifest.construction_sampling import (
     build_manifest_hash,
     select_patches_round_robin,
     select_slides_round_robin,
@@ -128,26 +128,30 @@ def max_shared_total(
     """
     if not available or min(available) < min_support:
         raise ValueError("No shared total satisfies the independent-support floor")
-    # Controlled conditions intentionally remain smaller than the complete
-    # eligible pool; the latter is the descriptive natural anchor.  Do not
-    # silently clip an infeasible head or tail: that would turn a requested
-    # long-tailed condition into a near-balanced one.
     upper = min(len(available) * min(available), sum(available) - 1)
-    # A support floor can make the nominal 100:1 profile impossible.  In that
-    # case the condition is explicitly capped at the largest head:tail ratio
-    # the available head class can sustain; it is never weakened further just
-    # to keep more total examples.
-    attainable_rhos = tuple(min(rho, available[0] / min_support) for rho in rhos)
-    for total in range(upper, len(available) * min_support - 1, -1):
-        if all(
-            _allocation_is_feasible(available, total, rho, min_support)
-            for rho in attainable_rhos
-        ):
-            return total
+    required = rhos[:-1] if len(rhos) > 1 else rhos
+    matched = _first_feasible_total(available, min_support, upper, required)
+    if matched is not None:
+        return matched
+    fallback = _first_feasible_total(available, min_support, upper, (1.0,))
+    if fallback is not None:
+        return fallback
     raise ValueError(
         "No shared total can realize every requested imbalance ratio without "
         "violating an availability or independent-support constraint"
     )
+
+
+def _first_feasible_total(
+    available: list[int], min_support: int, upper: int, rhos: tuple[float, ...]
+) -> int | None:
+    """Find the largest shared total preserving the supplied severity targets."""
+    for total in range(upper, len(available) * min_support - 1, -1):
+        if all(
+            _allocation_is_feasible(available, total, rho, min_support) for rho in rhos
+        ):
+            return total
+    return None
 
 
 def _allocation_is_feasible(
@@ -192,20 +196,23 @@ def effective_rho(
     if total_t < len(available) * min_support:
         raise ValueError("Shared total cannot satisfy the independent-support floor")
 
-    def feasible(candidate: float) -> bool:
-        """Whether the complete constrained allocation fits its requested total."""
-        return _allocation_is_feasible(available, total_t, candidate, min_support)
-
-    if feasible(rho):
+    if _allocation_is_feasible(available, total_t, rho, min_support):
         return rho
+    return _largest_feasible_rho(available, total_t, rho, min_support)
+
+
+def _largest_feasible_rho(
+    available: list[int], total_t: int, rho: float, min_support: int
+) -> float:
+    """Binary-search the largest realizable severity at a frozen shared total."""
     low, high = 1.0, rho
-    if not feasible(low):
+    if not _allocation_is_feasible(available, total_t, low, min_support):
         raise ValueError(
             "No shared total satisfies all availability and support constraints"
         )
     for _ in range(48):
         mid = (low + high) / 2.0
-        if feasible(mid):
+        if _allocation_is_feasible(available, total_t, mid, min_support):
             low = mid
         else:
             high = mid

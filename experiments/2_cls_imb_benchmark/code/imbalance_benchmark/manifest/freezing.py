@@ -1,5 +1,6 @@
 from __future__ import annotations
 import argparse
+import logging
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -22,17 +23,18 @@ from imbalance_benchmark.manifest.freeze import (
     normalized_entropy,
 )
 from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.manifest.seeds import SEED_ROLES
+from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
+from imbalance_benchmark.modeling.training import resolve_batch_size, update_budget
+from imbalance_benchmark.manifest.construction_helpers import (
+    class_construction_seed,
+    class_support_counts,
+    evidence_pool_hash,
+    write_natural_condition,
+)
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
-
-
-def _class_support_counts(
-    train_df: pd.DataFrame, classes: list[str], is_mil: bool
-) -> dict[str, int]:
-    """Return each class's available allocation pool: unique slides for MIL, patch rows otherwise."""
-    if is_mil:
-        return train_df.groupby("cancer_type")["slide_id"].nunique().to_dict()
-    return train_df["cancer_type"].value_counts().to_dict()
+logger = logging.getLogger(__name__)
 
 
 def _min_support_from_pilot(pilot_report_path: Path, is_mil: bool) -> int:
@@ -60,6 +62,7 @@ def _write_condition(
     seed: int,
     data_dir: Path,
     file_stem: str | None = None,
+    evidence_pool_hash: str | None = None,
 ) -> dict[str, Any]:
     """Write one frozen condition manifest and report its realized statistics."""
     cond_df = pd.concat(selector_rows, ignore_index=True)
@@ -75,6 +78,7 @@ def _write_condition(
         "manifest_hash": build_manifest_hash(cond_df),
         "contribution_stats": contribution_stats(cond_df, train_df, is_mil),
         "construction_seed": seed,
+        "evidence_pool_hash": evidence_pool_hash,
     }
 
 
@@ -90,9 +94,10 @@ def _build_conditions(
     condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
 ) -> dict[str, Any]:
     """Construct cap-compliant controlled manifests from one fixed eligible pool."""
-    counts = _class_support_counts(train_df, classes, is_mil)
+    counts = class_support_counts(train_df, is_mil)
     available = [counts[c] for c in classes]
     selector = select_slides_round_robin if is_mil else select_patches_round_robin
+    pool_hash = evidence_pool_hash(train_df, classes, is_mil)
     allocations = {
         name: allocate_counts(
             available,
@@ -113,7 +118,7 @@ def _build_conditions(
                 # pool across conditions while each requested size is sampled
                 # under its own 10%/5% caps (a prefix of a large capped sample
                 # is not generally capped at the smaller size).
-                seed=derive_seed(seed, "definitive_construction") ^ idx,
+                seed=class_construction_seed(seed, cls),
             )
             for idx, cls in enumerate(classes)
         ]
@@ -126,6 +131,7 @@ def _build_conditions(
             seed,
             data_dir,
             f"{file_prefix}{name}",
+            pool_hash,
         )
     return conditions
 
@@ -155,17 +161,6 @@ def _load_pilot_floor(
     return min_support, requested, excluded
 
 
-def _write_natural_condition(train_df: pd.DataFrame, data_dir: Path) -> dict[str, Any]:
-    """Write the descriptive full-training-set anchor, excluded from deficit estimands."""
-    path = data_dir / "manifest_natural.csv"
-    train_df.to_csv(path, index=False)
-    return {
-        "path": str(path),
-        "sha256": compute_sha256(path),
-        "note": "descriptive anchor; excluded from imbalance deficit/recovery estimands",
-    }
-
-
 def _load_train_context(
     args: argparse.Namespace, paths: dict[str, Path]
 ) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], dict[str, int]]:
@@ -176,19 +171,13 @@ def _load_train_context(
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     dataset_name = str(config.get("dataset", {}).get("name", ""))
     observed = train_df["cancer_type"].astype(str).unique().tolist()
-    # PANDA ISUP is clinical ordinal order; other tasks retain native support
-    # order (with lexical ties only for determinism), never alphabetical order.
+    classes = observed
     if dataset_name == "panda" and all(name.startswith("ISUP") for name in observed):
         classes = sorted(observed, key=lambda name: int(name.removeprefix("ISUP")))
-    else:
-        classes = sorted(
-            observed,
-            key=lambda name: (
-                -int(train_df[train_df["cancer_type"] == name].shape[0]),
-                name,
-            ),
-        )
-    counts = _class_support_counts(train_df, classes, is_mil)
+    counts = class_support_counts(train_df, is_mil)
+    if dataset_name != "panda" or not all(name.startswith("ISUP") for name in observed):
+        classes = sorted(observed, key=lambda name: (-counts[name], name))
+        counts = class_support_counts(train_df, is_mil)
     return paths, train_df, is_mil, classes, counts
 
 
@@ -242,8 +231,17 @@ def _freeze_meta(
         "requested_min_support": requested_min_support,
         "excluded": excluded,
         "construction_seed": construction_seed,
+        "seed_roles": {role: derive_seed(args.seed, role) for role in SEED_ROLES},
+        "method_grids": {
+            method: get_grid_configs(method, len(classes))
+            for method in roster_for_regime(is_mil)
+        },
+        "update_budgets": {
+            "controlled": update_budget(shared_t, resolve_batch_size(config, is_mil)),
+            "natural": update_budget(len(train_df), resolve_batch_size(config, is_mil)),
+        },
         "conditions": native_conditions,
         "assignment_conditions": assignment_conditions,
         "tail_assignments": assignments,
-        "natural": _write_natural_condition(train_df, paths["data"]),
+        "natural": write_natural_condition(train_df, paths["data"]),
     }

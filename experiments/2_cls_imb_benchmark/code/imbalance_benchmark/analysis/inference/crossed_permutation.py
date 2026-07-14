@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+from typing import cast
 
 from imbalance_benchmark.analysis.inference.permutation import (
     _as_seed_stack,
@@ -65,41 +66,48 @@ def crossed_block_permutation_ba(
 
 
 def _nll_statistics(
-    prepared: list[Block], swaps: np.ndarray, cases: np.ndarray, tails: list[int]
+    prepared: list[Block], swaps: np.ndarray, cases: np.ndarray, tails: list[list[int]]
 ) -> np.ndarray:
     """Evaluate equal-split tail-NLL differences for one batch of shared swaps."""
     values = []
-    for labels, method, ce, case_ids in prepared:
+    for (labels, method, ce, case_ids), split_tails in zip(
+        prepared, tails, strict=True
+    ):
         swap = _expand_swap_to_rows(swaps, cases, case_ids)[None, :, :, None]
         first = np.where(swap, ce[:, :, None, :], method[:, :, None, :])
         second = np.where(swap, method[:, :, None, :], ce[:, :, None, :])
         values.append(
-            _seed_mean_tail_nll(labels, second, tails)
-            - _seed_mean_tail_nll(labels, first, tails)
+            _seed_mean_tail_nll(labels, second, split_tails)
+            - _seed_mean_tail_nll(labels, first, split_tails)
         )
     return np.mean(values, axis=0)
 
 
 def crossed_block_permutation_tail_nll(
     blocks: list[Block],
-    tail_classes: list[int],
+    tail_classes: list[int] | list[list[int]],
     n_permutations: int = 100_000,
     seed: int = 0,
 ) -> float:
     """Permute paired blocks while recomputing the equal-split tail-NLL mean."""
+    split_tails: list[list[int]]
+    if tail_classes and isinstance(tail_classes[0], list):
+        split_tails = cast(list[list[int]], tail_classes)
+    else:
+        split_tails = [cast(list[int], tail_classes)] * len(blocks)
     cases, prepared = (
         np.unique(np.concatenate([block[3] for block in blocks])),
         _prepare(blocks, 2),
     )
     observed = np.mean(
         [
-            _seed_mean_tail_nll(y, c[:, :, None, :], tail_classes)[0]
-            - _seed_mean_tail_nll(y, m[:, :, None, :], tail_classes)[0]
-            for y, m, c, _ in prepared
+            _seed_mean_tail_nll(y, c[:, :, None, :], tails)[0]
+            - _seed_mean_tail_nll(y, m[:, :, None, :], tails)[0]
+            for (y, m, c, _), tails in zip(prepared, split_tails, strict=True)
         ]
     )
     enumerated, batches = _swap_batches(len(cases), n_permutations, seed)
     statistics = [
-        _nll_statistics(prepared, swaps, cases, tail_classes) for swaps in batches
+        _nll_statistics(prepared, swaps, cases, split_tails) for swaps in batches
     ]
     return _p_value(float(observed), np.concatenate(statistics), enumerated)
