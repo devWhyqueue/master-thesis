@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 import numpy as np
 import pandas as pd
 import torch
@@ -17,8 +17,50 @@ __all__ = [
     "ImbalanceDataset",
     "BagFeatureDataset",
     "bag_collate",
+    "slide_level_identity",
     "TrainDataset",
 ]
+
+
+def _class_names(values: pd.Series) -> list[str]:
+    """Return the canonical semantic class order used by every data split."""
+    names = sorted(values.astype(str).unique().tolist())
+    return (
+        sorted(names, key=lambda name: int(name.removeprefix("ISUP")))
+        if names and all(name.startswith("ISUP") for name in names)
+        else names
+    )
+
+
+def _validate_class_names(df: pd.DataFrame, class_names: list[str]) -> None:
+    unexpected = sorted(set(df["cancer_type"].astype(str)) - set(class_names))
+    if unexpected:
+        raise ValueError(
+            f"Manifest contains classes absent from the locked target: {unexpected}"
+        )
+
+
+def slide_level_identity(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse feature chunks to one labelled row per slide after consistency checks."""
+    label_counts = cast(
+        pd.Series, df.groupby("slide_id", sort=False)["cancer_type"].nunique()
+    )
+    mixed = cast(pd.Series, label_counts[label_counts != 1])
+    if not mixed.empty:
+        mixed_slides = list(cast(Any, mixed.index))[:5]
+        raise ValueError(
+            f"Each WSI must have exactly one class; mixed labels: {mixed_slides}"
+        )
+    case_counts = cast(
+        pd.Series, df.groupby("slide_id", sort=False)["case_id"].nunique()
+    )
+    inconsistent_cases = cast(pd.Series, case_counts[case_counts != 1])
+    if not inconsistent_cases.empty:
+        inconsistent_slides = list(cast(Any, inconsistent_cases.index))[:5]
+        raise ValueError(
+            f"Each WSI must have exactly one patient; inconsistent slides: {inconsistent_slides}"
+        )
+    return df.drop_duplicates("slide_id", keep="first").reset_index(drop=True)
 
 
 def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:
@@ -37,15 +79,23 @@ class ImbalanceDataset(Dataset):
         manifest_path: str | Path,
         split_name: str | None = None,
         device: str | torch.device = "cpu",
+        class_names: list[str] | None = None,
     ) -> None:
         """Initialize the ImbalanceDataset."""
         super().__init__()
         self.device = device
-        df = pd.read_csv(manifest_path)
+        df = cast(pd.DataFrame, pd.read_csv(manifest_path))
         if split_name is not None and "split" in df.columns:
-            df = df[df["split"] == split_name].reset_index(drop=True)
+            df = cast(
+                pd.DataFrame, df[df["split"] == split_name].reset_index(drop=True)
+            )
         self.df = df
-        self.classes = sorted(list(set(self.df["cancer_type"])))
+        self.classes = (
+            list(class_names)
+            if class_names is not None
+            else _class_names(cast(pd.Series, self.df["cancer_type"]))
+        )
+        _validate_class_names(self.df, self.classes)
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
 
     def get_n_classes(self) -> int:
@@ -91,22 +141,34 @@ class BagFeatureDataset(Dataset):
         split_name: str | None = None,
         max_instances: int = 500,
         device: str | torch.device = "cpu",
+        class_names: list[str] | None = None,
     ) -> None:
         """Initialize the BagFeatureDataset."""
         super().__init__()
         self.device = device
         self.max_instances = max_instances
-        df = pd.read_csv(manifest_path)
+        df = cast(pd.DataFrame, pd.read_csv(manifest_path))
         if split_name is not None and "split" in df.columns:
-            df = df[df["split"] == split_name].reset_index(drop=True)
+            df = cast(
+                pd.DataFrame, df[df["split"] == split_name].reset_index(drop=True)
+            )
         # A TCGA-UT slide may be represented by several feature chunks.  Keep
         # all rows here so __getitem__ can concatenate them before capping.
-        self.df = (
-            df.groupby("slide_id", sort=False)
-            .agg({"case_id": "first", "cancer_type": "first", "feature_path": list})
-            .reset_index()
+        slide_rows = slide_level_identity(df)
+        self.df = cast(
+            pd.DataFrame,
+            (
+                df.groupby("slide_id", sort=False)
+                .agg({"case_id": "first", "cancer_type": "first", "feature_path": list})
+                .reset_index()
+            ),
         )
-        self.classes = sorted(list(set(self.df["cancer_type"])))
+        self.classes = (
+            list(class_names)
+            if class_names is not None
+            else _class_names(cast(pd.Series, slide_rows["cancer_type"]))
+        )
+        _validate_class_names(self.df, self.classes)
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
 
     def get_n_classes(self) -> int:

@@ -59,6 +59,18 @@ def _canonical_endpoint_details(payload: dict[str, Any]) -> dict[str, Any]:
         out.update(
             {f"tier_{tier}_{metric}": value for metric, value in metrics.items()}
         )
+    out.update(
+        {
+            key: payload[key]
+            for key in (
+                "temperature",
+                "temperature_scaled_nll",
+                "temperature_scaled_brier",
+                "temperature_scaled_ece",
+            )
+            if key in payload
+        }
+    )
     return out
 
 

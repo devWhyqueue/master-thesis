@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate
+from imbalance_benchmark.modeling.context import set_training_mode
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
@@ -118,6 +119,7 @@ def _fit_step(
     model, criterion, param = ctx["model"], ctx["criterion"], ctx["param"]
     if is_mil:
         bags, targets = [b.to(device) for b in batch_data[0]], batch_data[1].to(device)
+        ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
         if method == "rankmix":
             return rankmix_bag_loss(model, ctx["teacher"], bags, targets, param)[0]
         if method == "sc_mil":
@@ -140,10 +142,9 @@ def _fit_step(
             logits = logits + param * torch.log(ctx["priors"] + 1e-8)
         return criterion(logits, targets)
     inputs, targets = batch_data["features"].to(device), batch_data["target"].to(device)
+    ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
     if method == "cfal":
-        return cfal_loss(
-            model, inputs, targets, ctx["class_counts"], margin=float(param or 1.0)
-        )
+        return cfal_loss(model, inputs, targets, ctx["class_counts"])
     logits = model(inputs)
     if method == "logit_adjustment" and param is not None:
         logits = logits + param * torch.log(ctx["priors"] + 1e-8)
@@ -199,12 +200,13 @@ def _run_training_loop(
             if step >= max_steps:
                 break
             optimizer.zero_grad()
+            set_training_mode(ctx)
             _fit_step(batch, ctx, step, max_steps).backward()
             optimizer.step()
             step += 1
             if step % CHECKPOINT_INTERVAL == 0 or step == max_steps:
                 best = checkpoint_step(
-                    ctx["model"], val_loader, device, is_mil, n_classes, best
+                    ctx["model"], val_loader, device, is_mil, n_classes, best, step
                 )
     return best
 
@@ -234,7 +236,7 @@ def fit_model(
     best = initial_checkpoint(
         model, ctx["val_loader"], device, is_mil, ctx["n_classes"]
     )
-    model.train()
+    set_training_mode(ctx)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     _prepare_training_context(ctx, param, device)
     budget = (
@@ -244,4 +246,5 @@ def fit_model(
     )
     best = _run_training_loop(opt, loader, ctx["val_loader"], ctx, budget, best)
     model.load_state_dict({k: v.to(device) for k, v in best["state"].items()})
+    ctx["selected_checkpoint_step"] = best["step"]
     return best["state"], best["acc"]

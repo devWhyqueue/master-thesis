@@ -355,7 +355,9 @@ def test_fit_crt_freezes_representation_and_reinits_classifier(tmp_path):
     ctx["model_factory"] = tracking_factory
     state, acc = fit_crt(ctx)
     assert 0.0 <= acc <= 1.0
-    assert len(built_models) == 1
-    stage_one_model = built_models[0]
+    # cRT must reuse the already-seeded context model for stage one rather
+    # than creating a second, differently initialized model.
+    assert len(built_models) == 0
+    stage_one_model = ctx["model"]
     assert not stage_one_model.net[0].weight.requires_grad
     assert stage_one_model.net[-1].weight.requires_grad

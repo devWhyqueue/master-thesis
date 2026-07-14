@@ -109,7 +109,6 @@ def cfal_loss(
     features: torch.Tensor,
     targets: torch.Tensor,
     class_counts: np.ndarray,
-    margin: float = 1.0,
     gamma: float = 2.0,
     beta: float = 0.999,
 ) -> torch.Tensor:
@@ -121,7 +120,7 @@ def cfal_loss(
 
     aff = model(features)
     true_aff = aff[torch.arange(len(targets), device=targets.device), targets]
-    margins = torch.relu(margin + aff - true_aff.unsqueeze(1))
+    margins = torch.relu(1.0 + aff - true_aff.unsqueeze(1))
     margin_term = margins.masked_fill(
         F.one_hot(targets, num_classes=aff.shape[1]).bool(), 0.0
     ).sum(dim=1)

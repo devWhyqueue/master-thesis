@@ -36,13 +36,13 @@ def _timed_fit(fit_fn: Any, ctx: dict[str, Any]) -> tuple[dict[str, Any], float]
 
 def confirm_ce(
     cond: str, cfg: dict[str, Any], train_ds: TrainDataset, run: RunContext
-) -> list[dict[str, Any]]:
+) -> list[tuple[dict[str, Any], int]]:
     """Fit CE for every confirmation seed; return its checkpoints for post-hoc reuse."""
     states = []
     for seed in run.seeds:
         ctx = build_training_ctx("ce", train_ds, run, seed, cfg, run.val_loader)
         state, elapsed = _timed_fit(fit_method, ctx)
-        states.append(state)
+        states.append((state, int(ctx.get("selected_checkpoint_step", 0))))
         _run_and_record(cond, "ce", len(states) - 1, ctx, state, run, elapsed)
     return states
 
@@ -50,17 +50,20 @@ def confirm_ce(
 def confirm_post_hoc(
     cond: str,
     cfg: dict[str, Any],
-    ce_states: list[dict[str, Any]],
+    ce_states: list[tuple[dict[str, Any], int]],
     train_ds: TrainDataset,
     run: RunContext,
 ) -> None:
     """Reuse each seed's locked CE checkpoint under a post-hoc target-prior shift."""
     priors = class_priors(train_ds.get_int_targets(), run.n_classes, run.device)
     tau = float(cfg.get("parameter", 1.0))
-    for i, (seed, state) in enumerate(zip(run.seeds, ce_states, strict=True)):
+    for i, (seed, (state, checkpoint_step)) in enumerate(
+        zip(run.seeds, ce_states, strict=True)
+    ):
         ctx = build_training_ctx(
             "ce", train_ds, run, seed, {"parameter": tau}, run.val_loader
         )
+        ctx["selected_checkpoint_step"] = checkpoint_step
         _run_and_record(
             cond, "post_hoc_logit_adjustment", i, ctx, state, run, 0.0, tau, priors
         )

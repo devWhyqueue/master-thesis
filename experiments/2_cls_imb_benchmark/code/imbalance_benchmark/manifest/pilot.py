@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
 
 from imbalance_benchmark.construction import select_slides_round_robin
 from imbalance_benchmark.datasets.data import (
@@ -14,9 +13,9 @@ from imbalance_benchmark.datasets.data import (
     bag_collate,
 )
 from imbalance_benchmark.modeling.evaluation import per_class_recall
-from imbalance_benchmark.modeling.models import MLP, AttentionMil
-from imbalance_benchmark.modeling.training import fit_model
+from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.manifest.floors import meets_method_floor, method_floor
+from imbalance_benchmark.manifest.pilot_training import fit_pilot_model
 
 ValDataset = ImbalanceDataset | BagFeatureDataset
 
@@ -142,30 +141,8 @@ def mil_pilot_manifest(
     return pd.concat(parts, ignore_index=True)
 
 
-def _fit_pilot_model(
-    scratch_path: Path,
-    device: torch.device,
-    n_cls: int,
-    is_mil: bool,
-    val_loader: torch.utils.data.DataLoader,
-) -> tuple[nn.Module, float]:
-    ds_cls = BagFeatureDataset if is_mil else ImbalanceDataset
-    ds = ds_cls(scratch_path, device=device)
-    dim = 256 if is_mil else 512
-    model = (AttentionMil if is_mil else MLP)(2560, dim, n_cls, 0.1).to(device)
-    ctx: dict[str, Any] = dict(
-        method="ce", model=model, train_dataset=ds, val_loader=val_loader, device=device
-    )
-    ctx |= dict(
-        config={}, param_config={"lr": 1e-3}, seed=0, is_mil=is_mil, n_classes=n_cls
-    )
-    ctx["train_labels"] = ds.get_int_targets()
-    _, best_acc = fit_model(ctx)
-    return model, best_acc
-
-
 def _pilot_val_predictions(
-    model: nn.Module,
+    model: torch.nn.Module,
     loader: torch.utils.data.DataLoader,
     device: torch.device,
     is_mil: bool,
@@ -193,13 +170,16 @@ def evaluate_pilot_candidate(
     n_cls: int,
     is_mil: bool,
     scratch: Path,
+    initialization_seed: int,
 ) -> tuple[float, list[float]]:
     """Fit one balanced-CE pilot candidate and return its validation BA and recalls."""
     df.to_csv(scratch, index=False)
     loader = torch.utils.data.DataLoader(
         val_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
     )
-    model, best_acc = _fit_pilot_model(scratch, device, n_cls, is_mil, loader)
+    model, best_acc = fit_pilot_model(
+        scratch, device, n_cls, is_mil, loader, initialization_seed=initialization_seed
+    )
     preds, targets = _pilot_val_predictions(model, loader, device, is_mil)
     return best_acc, per_class_recall(preds, targets, n_cls)
 
@@ -226,7 +206,7 @@ def run_pilot_seed(
         )
         p = scratch_dir / f"pilot_seed={seed}_level={level}.csv"
         ba, recalls = evaluate_pilot_candidate(
-            manifest, val_ds, device, n_cls, is_mil, p
+            manifest, val_ds, device, n_cls, is_mil, p, initialization_seed=seed
         )
         ba_curve.append(ba)
         recall_curve.append(recalls)

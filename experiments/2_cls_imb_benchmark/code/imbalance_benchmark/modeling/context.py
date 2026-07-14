@@ -25,7 +25,9 @@ __all__ = [
     "get_grid_configs",
     "model_kwargs",
     "build_training_ctx",
+    "set_training_mode",
     "param_counts",
+    "cost_payload",
     "updates_for",
 ]
 
@@ -126,8 +128,6 @@ def build_training_ctx(
 ) -> dict[str, Any]:
     """Build the shared training context for one method/config/seed trial."""
     torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
     kwargs = model_kwargs(regime.is_mil)
     param = cfg.get("parameter")
     _factory = lambda: build_model(
@@ -148,7 +148,15 @@ def build_training_ctx(
         "train_labels": train_ds.get_int_targets(),
         "exposed_indices": set(),
         "method_diagnostics": {},
+        "processed_examples": 0,
     }
+
+
+def set_training_mode(ctx: dict[str, Any]) -> None:
+    """Enable training while preserving deterministic frozen cRT modules."""
+    ctx["model"].train()
+    for module in ctx.get("frozen_eval_modules", ()):
+        module.eval()
 
 
 def param_counts(model: torch.nn.Module) -> dict[str, int]:
@@ -156,6 +164,33 @@ def param_counts(model: torch.nn.Module) -> dict[str, int]:
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return {"total_parameters": int(total), "trainable_parameters": int(trainable)}
+
+
+def cost_payload(
+    method: str,
+    budget: int,
+    elapsed: float,
+    model: torch.nn.Module,
+    unique_examples: int,
+    exposed_examples: int,
+    processed_examples: int,
+) -> dict[str, Any]:
+    """Build an exact confirmation cost record from the examples actually consumed."""
+    updates = updates_for(method, budget)
+    peak = int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
+    return {
+        "updates": updates,
+        "processed_examples": processed_examples,
+        "wall_clock_seconds": elapsed,
+        "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
+        "peak_accelerator_memory_bytes": peak,
+        "examples_per_update": processed_examples / updates if updates else 0.0,
+        "unique_training_examples": unique_examples,
+        "unique_examples_exposed": exposed_examples,
+        "effective_passes_through_unique_examples": processed_examples
+        / max(unique_examples, 1),
+        **param_counts(model),
+    }
 
 
 def updates_for(method: str, budget: int) -> int:

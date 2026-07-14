@@ -9,6 +9,12 @@ from imbalance_benchmark.analysis.query import load_classwise, load_eval_details
 
 __all__ = ["results_table", "calibration_table", "confirmatory_table", "rq3_table"]
 
+_TEMPERATURE_COLUMNS = (
+    "temperature_scaled_nll",
+    "temperature_scaled_brier",
+    "temperature_scaled_ece",
+)
+
 
 def _to_latex(df: pd.DataFrame, caption: str, label: str) -> str:
     """Render a small results frame as a captioned LaTeX table."""
@@ -72,21 +78,29 @@ def results_table(conn: sqlite3.Connection, split: str = "test") -> str:
 
 
 def calibration_table(conn: sqlite3.Connection, split: str = "test") -> str:
-    """Raw vs. temperature-scaled NLL/Brier/ECE by condition x method."""
+    """Raw and temperature-scaled NLL/Brier/ECE by condition and method."""
     details = load_eval_details(conn)
     details = details[details["split"] == split]
     if details.empty:
         return _to_latex(pd.DataFrame(), "Calibration summary", "tab:calibration")
+    for column in _TEMPERATURE_COLUMNS:
+        if column not in details:
+            details[column] = float("nan")
     summary = (
         details.groupby(["assignment", "condition", "method"])
         .agg(
             negative_log_likelihood=("negative_log_likelihood", "mean"),
             brier_score=("brier_score", "mean"),
             expected_calibration_error=("expected_calibration_error", "mean"),
+            temperature_scaled_nll=("temperature_scaled_nll", "mean"),
+            temperature_scaled_brier=("temperature_scaled_brier", "mean"),
+            temperature_scaled_ece=("temperature_scaled_ece", "mean"),
         )
         .reset_index()
     )
-    return _to_latex(summary, "Raw calibration summary", "tab:calibration")
+    return _to_latex(
+        summary, "Raw and temperature-scaled calibration summary", "tab:calibration"
+    )
 
 
 def confirmatory_table(comparisons: list[dict[str, Any]]) -> str:

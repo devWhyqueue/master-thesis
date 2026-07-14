@@ -216,7 +216,7 @@ def _oko_train_loop(
         opt.step()
         if step % CHECKPOINT_INTERVAL == 0 or step == budget:
             best = checkpoint_step(
-                model, ctx["val_loader"], device, False, n_classes, best
+                model, ctx["val_loader"], device, False, n_classes, best, step
             )
     return best
 
@@ -236,4 +236,6 @@ def fit_oko(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     model.train()
     best = _oko_train_loop(opt, ctx, budget, best, class_index, units, rng)
     model.load_state_dict({k2: v.to(device) for k2, v in best["state"].items()})
+    ctx["processed_examples"] = budget * b_size * (k + 2)
+    ctx["selected_checkpoint_step"] = best["step"]
     return best["state"], best["acc"]

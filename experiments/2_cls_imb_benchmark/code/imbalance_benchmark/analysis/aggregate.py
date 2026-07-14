@@ -32,6 +32,7 @@ def aggregate_split_comparisons(
 ) -> None:
     """Recompute crossed, equal-split effects within each shared bootstrap replicate."""
     rows = _comparison_rows(base_paths)
+    require_complete_split_comparisons(rows)
     frame = pd.DataFrame(rows)
     keys = [key for key in ("assignment", "severity", "method", "gate") if key in frame]
     aggregate = [
@@ -60,6 +61,18 @@ def _comparison_rows(base_paths: dict[str, Path]) -> list[dict[str, Any]]:
             "Exactly three completed patient splits are required for confirmatory aggregation"
         )
     return rows
+
+
+def require_complete_split_comparisons(rows: list[dict[str, Any]]) -> None:
+    """Require every comparison, not merely some result, on all three locked splits."""
+    keys = ("assignment", "severity", "method", "gate")
+    frame = pd.DataFrame(rows)
+    for key, group in frame.groupby(list(keys), dropna=False):
+        splits = set(group["patient_split"])
+        if splits != {0, 1, 2} or len(group) != 3:
+            raise RuntimeError(
+                f"Comparison {key} is incomplete across patient splits: {sorted(splits)}"
+            )
 
 
 def _aggregate_group(

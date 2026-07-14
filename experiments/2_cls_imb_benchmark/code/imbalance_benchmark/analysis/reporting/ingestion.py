@@ -6,10 +6,19 @@ from typing import Any
 
 import numpy as np
 
-from imbalance_benchmark.analysis.calibration import apply_temperature, fit_temperature
+from imbalance_benchmark.analysis.calibration import (
+    apply_temperature,
+    fit_temperature,
+    reliability_curve,
+)
 from imbalance_benchmark.analysis.db import discover_result_dirs, ingest_run
 from imbalance_benchmark.analysis.inference.holm import apply_holm
-from imbalance_benchmark.analysis.metrics import assign_tiers, negative_log_likelihood
+from imbalance_benchmark.analysis.metrics import (
+    assign_tiers,
+    brier_score,
+    expected_calibration_error,
+    negative_log_likelihood,
+)
 from imbalance_benchmark.common import read_run_record, write_json
 
 __all__ = ["ingest_all_runs", "calibration_summary", "write_diagnostics"]
@@ -82,19 +91,35 @@ def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
     val_logits = np.array(val.get("target_prior_logits", val["logits"]))
     test_logits = np.array(test.get("target_prior_logits", test["logits"]))
     fit = fit_temperature(val_logits, np.array(val["labels"]))
+    labels = np.array(test["labels"])
+    raw_probs = np.array(test.get("probabilities", []))
+    calibrated_logits = test_logits / fit.temperature
     calibrated_probs = apply_temperature(test_logits, fit.temperature)
+    centers, confidence, accuracy = reliability_curve(calibrated_probs, labels)
+    n_classes = calibrated_probs.shape[1]
     return {
         "temperature": fit.temperature,
         "raw_test_nll": negative_log_likelihood(
-            np.array(test["labels"]),
-            np.array(test.get("raw_probabilities", test["probabilities"])),
+            labels,
+            np.array(test.get("raw_probabilities", raw_probs)),
         ),
-        "target_prior_test_nll": negative_log_likelihood(
-            np.array(test["labels"]), np.array(test["probabilities"])
-        ),
+        "target_prior_test_nll": negative_log_likelihood(labels, raw_probs),
         "temperature_scaled_test_nll": negative_log_likelihood(
-            np.array(test["labels"]), calibrated_probs
+            labels, calibrated_probs
         ),
+        "temperature_scaled_test_brier": brier_score(
+            labels, calibrated_probs, n_classes
+        ),
+        "temperature_scaled_test_ece": expected_calibration_error(
+            labels, calibrated_probs
+        ),
+        "temperature_scaled_logits": calibrated_logits.tolist(),
+        "temperature_scaled_probabilities": calibrated_probs.tolist(),
+        "temperature_scaled_reliability": {
+            "bin_centers": centers.tolist(),
+            "mean_confidence": confidence.tolist(),
+            "accuracy": accuracy.tolist(),
+        },
     }
 
 

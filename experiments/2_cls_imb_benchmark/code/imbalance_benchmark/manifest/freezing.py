@@ -28,6 +28,19 @@ from imbalance_benchmark.manifest.construction_helpers import (
 )
 
 
+def locked_class_names(df: pd.DataFrame) -> list[str]:
+    """Return the global label order and reject held-out splits missing a target class."""
+    classes = sorted(df["cancer_type"].astype(str).unique().tolist())
+    if classes and all(name.startswith("ISUP") for name in classes):
+        classes = sorted(classes, key=lambda name: int(name.removeprefix("ISUP")))
+    expected = set(classes)
+    for split, frame in df.groupby("split", sort=False):
+        missing = sorted(expected - set(frame["cancer_type"].astype(str)))
+        if missing:
+            raise ValueError(f"Split '{split}' lacks locked target classes: {missing}")
+    return classes
+
+
 @dataclass(frozen=True)
 class PilotConstraints:
     """Allocation and independent-unit floors frozen from the pilot."""
@@ -205,6 +218,8 @@ def _freeze_meta(
         fixed_pools=shared_pools,
     )
     return {
+        "class_names": classes,
+        "label_to_index": {name: index for index, name in enumerate(classes)},
         "shared_T": shared_t,
         "min_support": min_support,
         "requested_min_support": requested_min_support,
@@ -218,8 +233,16 @@ def _freeze_meta(
         },
         "update_budgets": {
             "controlled": update_budget(shared_t, resolve_batch_size(config, is_mil)),
-            "natural": update_budget(len(train_df), resolve_batch_size(config, is_mil)),
+            "natural": update_budget(
+                sum(class_support_counts(train_df, is_mil).values()),
+                resolve_batch_size(config, is_mil),
+            ),
         },
+        "evidence_caps": {
+            "patch": config.get("evidence", {}).get("patch_per_slide_cap"),
+            "wsi_instances": config.get("wsi_training", {}).get("max_instances", 500),
+        },
+        "instance_selection_seed": derive_seed(args.seed, "instance_selection"),
         "conditions": native_conditions,
         "assignment_conditions": assignment_conditions,
         "tail_assignments": assignments,

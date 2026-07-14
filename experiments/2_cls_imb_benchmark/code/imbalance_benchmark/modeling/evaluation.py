@@ -136,6 +136,7 @@ def checkpoint_step(
     is_mil: bool,
     n_classes: int,
     best: dict[str, Any],
+    step: int = 0,
 ) -> dict[str, Any]:
     """Evaluate the current model and keep it if it wins the BA -> F1 -> NLL tie-break."""
     if val_loader is None:
@@ -151,6 +152,7 @@ def checkpoint_step(
             "acc": acc,
             "f1": f1,
             "nll": nll,
+            "step": step,
         }
     return best
 
@@ -168,6 +170,7 @@ def initial_checkpoint(
         "acc": -1.0,
         "f1": -1.0,
         "nll": float("inf"),
+        "step": 0,
     }
     return checkpoint_step(model, val_loader, device, is_mil, n_classes, best)
 

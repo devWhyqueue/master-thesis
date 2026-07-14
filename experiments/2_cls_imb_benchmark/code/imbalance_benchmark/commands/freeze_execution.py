@@ -27,7 +27,9 @@ from imbalance_benchmark.manifest.freeze import (
     lock_manifest_freeze,
 )
 from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constraints
+from imbalance_benchmark.manifest.freezing import locked_class_names
 from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.datasets.data import slide_level_identity
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +65,8 @@ def _load_train_context(
     df = pd.read_csv(paths["data"] / "manifest.csv")
     train_df = cast(pd.DataFrame, df[df["split"] == "train"])
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    dataset_name = str(config.get("dataset", {}).get("name", ""))
-    observed = train_df["cancer_type"].astype(str).unique().tolist()
-    classes = observed
-    if dataset_name == "panda" and all(name.startswith("ISUP") for name in observed):
-        classes = sorted(observed, key=lambda name: int(name.removeprefix("ISUP")))
+    classes = locked_class_names(df)
     counts = class_support_counts(train_df, is_mil)
-    if dataset_name != "panda" or not all(name.startswith("ISUP") for name in observed):
-        classes = sorted(observed, key=lambda name: (-counts[name], name))
-        counts = class_support_counts(train_df, is_mil)
     return paths, train_df, is_mil, classes, counts
 
 
@@ -204,6 +199,7 @@ def _attach_provenance(
             "sha256": compute_sha256(data / "manifest.csv"),
         },
         dataset_provenance=dataset_provenance(config.get("dataset", {})),
+        feature_encoder=dict(config.get("feature_extraction", {})),
     )
 
 
@@ -234,11 +230,10 @@ def _preflight(config: dict[str, Any], seed: int) -> dict[str, Any]:
         manifest = split_paths(ensure_dirs(config), index)["data"] / "manifest.csv"
         if manifest.exists():
             frame = pd.read_csv(manifest)
-            frames.append(
-                cast(pd.DataFrame, frame[frame["split"] == "test"]).assign(
-                    patient_split=index
-                )
-            )
+            test = cast(pd.DataFrame, frame[frame["split"] == "test"])
+            if config.get("dataset", {}).get("regime", "patch") == "wsi":
+                test = wsi_bootstrap_identity(test)
+            frames.append(test.assign(patient_split=index))
     if len(frames) != 3:
         raise RuntimeError(
             "Exactly three prepared patient splits are required before a definitive freeze"
@@ -248,3 +243,8 @@ def _preflight(config: dict[str, Any], seed: int) -> dict[str, Any]:
         int(config.get("analysis", {}).get("bootstrap_replicates", 10_000)),
         derive_seed(seed, "resampling"),
     )
+
+
+def wsi_bootstrap_identity(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return WSI bootstrap identities at the same one-row-per-slide unit as inference."""
+    return slide_level_identity(frame)

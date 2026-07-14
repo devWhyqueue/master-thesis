@@ -5,7 +5,11 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from imbalance_benchmark.analysis.metrics import negative_log_likelihood
+from imbalance_benchmark.analysis.metrics import (
+    brier_score,
+    expected_calibration_error,
+    negative_log_likelihood,
+)
 
 __all__ = [
     "TemperatureFit",
@@ -17,6 +21,7 @@ __all__ = [
     "estimate_prior",
     "apply_target_prior_correction",
     "balanced_decision_logits",
+    "temperature_scaled_payload",
 ]
 
 # Methods for which the report defines a target-prior correction (Eq.
@@ -89,6 +94,35 @@ def reliability_curve(
         np.asarray(mean_confidence, dtype=np.float64),
         np.asarray(accuracy, dtype=np.float64),
     )
+
+
+def temperature_scaled_payload(
+    validation_logits: np.ndarray,
+    validation_labels: np.ndarray,
+    test_logits: np.ndarray,
+    test_labels: np.ndarray,
+) -> dict[str, object]:
+    """Fit validation temperature and retain every scaled test calibration output."""
+    fit = fit_temperature(validation_logits, validation_labels)
+    probabilities = apply_temperature(test_logits, fit.temperature)
+    centers, confidence, accuracy = reliability_curve(probabilities, test_labels)
+    return {
+        "temperature": fit.temperature,
+        "temperature_scaled_logits": (test_logits / fit.temperature).tolist(),
+        "temperature_scaled_probabilities": probabilities.tolist(),
+        "temperature_scaled_nll": negative_log_likelihood(test_labels, probabilities),
+        "temperature_scaled_brier": brier_score(
+            test_labels, probabilities, probabilities.shape[1]
+        ),
+        "temperature_scaled_ece": expected_calibration_error(
+            test_labels, probabilities
+        ),
+        "temperature_scaled_reliability": {
+            "bin_centers": centers.tolist(),
+            "mean_confidence": confidence.tolist(),
+            "accuracy": accuracy.tolist(),
+        },
+    }
 
 
 def estimate_prior(labels: np.ndarray, n_classes: int) -> np.ndarray:

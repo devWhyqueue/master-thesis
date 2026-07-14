@@ -55,10 +55,10 @@ def _confirm_condition(
     train_ds: TrainDataset = dataset_cls(
         run.paths["data"] / file_name, device=run.device
     )
-    cond_configs = best_configs
-    ce_states: list[dict[str, Any]] | None = None
+    cond_configs = require_tuning_configs(best_configs, methods)
+    ce_states: list[tuple[dict[str, Any], int]] | None = None
     for method in methods:
-        cfg = cond_configs.get(method, {"lr": 1e-3})
+        cfg = cond_configs[method]
         if method == "ce":
             ce_states = confirm_ce(cond, cfg, train_ds, run)
         elif method == "post_hoc_logit_adjustment":
@@ -67,7 +67,7 @@ def _confirm_condition(
             )
             confirm_post_hoc(cond, cfg, ce_states, train_ds, run)
         elif method == "crt":
-            confirm_crt(cond, cfg, cond_configs.get("ce", {"lr": 1e-3}), train_ds, run)
+            confirm_crt(cond, cfg, cond_configs["ce"], train_ds, run)
         else:
             confirm_method(cond, method, cfg, train_ds, run)
 
@@ -93,11 +93,19 @@ def _confirm_inputs(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     dataset_cls = BagFeatureDataset if is_mil else ImbalanceDataset
+    freeze = json.loads(freeze_path.read_text())
+    class_names = list(freeze["class_names"])
     test_ds = dataset_cls(
-        paths["data"] / "manifest.csv", split_name="test", device=device
+        paths["data"] / "manifest.csv",
+        split_name="test",
+        device=device,
+        class_names=class_names,
     )
     val_ds = dataset_cls(
-        paths["data"] / "manifest.csv", split_name="validation", device=device
+        paths["data"] / "manifest.csv",
+        split_name="validation",
+        device=device,
+        class_names=class_names,
     )
     collate = bag_collate if is_mil else None
     val_ldr = torch.utils.data.DataLoader(val_ds, batch_size=64, collate_fn=collate)
@@ -106,15 +114,27 @@ def _confirm_inputs(
     run_data = {
         "device": device,
         "config": config,
-        "n_classes": test_ds.get_n_classes(),
+        "n_classes": len(class_names),
         "is_mil": is_mil,
         "val_loader": val_ldr,
         "test_loader": test_ldr,
         "paths": paths,
         "seeds": seeds,
-        "class_names": test_ds.classes,
+        "class_names": class_names,
     }
-    return best_configs, run_data, json.loads(freeze_path.read_text())
+    return best_configs, run_data, freeze
+
+
+def require_tuning_configs(
+    configs: dict[str, Any], methods: tuple[str, ...]
+) -> dict[str, Any]:
+    """Refuse confirmation if a prespecified method lacks its signed selection."""
+    missing = [
+        method for method in methods if not isinstance(configs.get(method), dict)
+    ]
+    if missing:
+        raise RuntimeError(f"missing tuning selection for methods: {missing}")
+    return configs
 
 
 def cmd_confirm(args: argparse.Namespace) -> None:

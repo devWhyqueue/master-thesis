@@ -17,13 +17,17 @@ from imbalance_benchmark.analysis.calibration import (
     balanced_decision_logits,
     estimate_prior,
     softmax,
+    temperature_scaled_payload,
 )
-from imbalance_benchmark.analysis.metrics import assign_tiers, classification_payload
+from imbalance_benchmark.analysis.metrics import (
+    assign_tiers,
+    classification_payload,
+)
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
 from imbalance_benchmark.common import write_run_record
-from imbalance_benchmark.modeling.context import Regime, param_counts, updates_for
+from imbalance_benchmark.modeling.context import Regime, cost_payload
 from imbalance_benchmark.modeling.training import (
     class_priors,
     resolve_batch_size,
@@ -43,37 +47,6 @@ class RunContext(Regime):
     seeds: list[int]
     class_names: list[str]
     assignment: str
-
-
-def _cost_payload(
-    method: str,
-    budget: int,
-    batch_size: int,
-    elapsed: float,
-    model: torch.nn.Module,
-    n_unique_examples: int,
-    parameter: int | float | None,
-    n_unique_exposed: int,
-) -> dict[str, Any]:
-    """Assemble one confirmation run's update/example/timing/parameter cost record."""
-    updates = updates_for(method, budget)
-    mult = 2 if method == "mde" else int(parameter or 0) + 2 if method == "oko" else 1
-    epu = batch_size * mult
-    processed = updates * epu
-    peak = int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
-    return {
-        "updates": updates,
-        "processed_examples": processed,
-        "wall_clock_seconds": elapsed,
-        "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
-        "peak_accelerator_memory_bytes": peak,
-        "examples_per_update": epu,
-        "unique_training_examples": n_unique_examples,
-        "unique_examples_exposed": n_unique_exposed,
-        "effective_passes_through_unique_examples": processed
-        / max(n_unique_examples, 1),
-        **param_counts(model),
-    }
 
 
 def _checkpoint_hash(state: dict[str, Any]) -> str:
@@ -211,6 +184,7 @@ def _run_and_record(
             derive_seed(ctx["seed"], "resampling"),
             tiers,
         )
+    _attach_temperature_scaled_test_outputs(splits)
     b_size = resolve_batch_size(run.config, run.is_mil)
     budget = update_budget(len(ctx["train_dataset"]), b_size)
     write_run_record(
@@ -228,21 +202,34 @@ def _run_and_record(
             "class_names": run.class_names,
             "tuning_params": ctx["param_config"],
             "selected_checkpoint_sha256": _checkpoint_hash(state),
+            "selected_checkpoint_step": ctx.get("selected_checkpoint_step", 0),
             "test_prediction_sha256": _test_prediction_hash(splits),
             "train_priors": class_priors_tensor.detach().cpu().tolist(),
             "target_priors": target_priors.tolist(),
-            "cost": _cost_payload(
+            "cost": cost_payload(
                 method,
                 budget,
-                b_size,
                 elapsed,
                 model,
                 len(ctx["train_dataset"]),
-                ctx["param_config"].get("parameter"),
                 len(ctx.get("exposed_indices", set())),
+                int(ctx.get("processed_examples", 0)),
             ),
             "method_diagnostics": ctx.get("method_diagnostics", {}),
             "environment": _environment_payload(),
             "splits": splits,
         },
+    )
+
+
+def _attach_temperature_scaled_test_outputs(splits: dict[str, dict[str, Any]]) -> None:
+    """Persist post-selection temperature outputs used by calibration reporting."""
+    validation, test = splits["validation"], splits["test"]
+    test.update(
+        temperature_scaled_payload(
+            np.asarray(validation["target_prior_logits"]),
+            np.asarray(validation["labels"]),
+            np.asarray(test["target_prior_logits"]),
+            np.asarray(test["labels"]),
+        )
     )
