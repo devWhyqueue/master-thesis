@@ -8,6 +8,11 @@ import torch
 __all__ = ["fit_rq3_model"]
 
 
+def _log_scale_prior(log_scale: torch.Tensor) -> torch.Tensor:
+    """Return the proper zero-centered unit-scale Gaussian log-scale penalty."""
+    return 0.5 * torch.sum(log_scale.square())
+
+
 def _optimize_rq3(
     beta_0: torch.Tensor,
     beta: torch.Tensor,
@@ -41,6 +46,8 @@ def _optimize_rq3(
                 + torch.log(torch.exp(l_su).square())
             )
             + 0.5 * torch.sum(beta.square())
+            + _log_scale_prior(l_su)
+            + (0.0 if is_logistic else _log_scale_prior(l_s))
         )
         loss.backward()
         opt.step()

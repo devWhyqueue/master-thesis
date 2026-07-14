@@ -282,6 +282,9 @@ def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> 
     assert patch["excluded"] is False
     # MIL pilot counts slides -> slide floor 20 applies to the level dimension.
     assert mil["definitive_floor"] == 20
+    assert mil["pilot_exceptions"] == [
+        "five-slide MIL pilot uses one slide from each of five distinct patients"
+    ]
 
 
 def test_patch_pilot_patient_floor_is_preserved_as_an_independent_constraint(

@@ -95,7 +95,7 @@ def load_test_identity(
     df = pd.read_csv(manifest_path)
     df = cast(pd.DataFrame, df[df["split"] == split_name]).reset_index(drop=True)
     if is_mil:
-        df = df.groupby("slide_id").first().reset_index()
+        df = df.groupby("slide_id", sort=False).first().reset_index()
     return cast(pd.DataFrame, df[["case_id", "slide_id", "cancer_type"]]).reset_index(
         drop=True
     )

@@ -140,7 +140,8 @@ def _cells(
             gate_map[(row["assignment"], row["severity"])] |= bool(row["gate_passed"])
     cells = []
     for row in comparisons:
-        if row["gate"] != "discrimination":
+        is_deficit_cell = row["method"] == "ce"
+        if is_deficit_cell and row["gate"] != "discrimination":
             continue
         allocated = freeze["assignment_conditions"][row["assignment"]][row["severity"]]
         cells.append(
@@ -148,9 +149,14 @@ def _cells(
                 "group": group,
                 "assignment": row["assignment"],
                 "severity": row["severity"],
+                "gate": row["gate"],
                 "rho": allocated["achieved_rho"],
-                "gate_passed": gate_map[(row["assignment"], row["severity"])],
-                "deficit_ba": row["effect"] if row["method"] == "ce" else np.nan,
+                "gate_passed": (
+                    gate_map[(row["assignment"], row["severity"])]
+                    if is_deficit_cell
+                    else bool(row["gate_passed"])
+                ),
+                "deficit_ba": row["effect"] if is_deficit_cell else np.nan,
                 "deficit_se": _standard_error(row),
                 "recovery": row.get("recovery", np.nan),
                 "recovery_se": _recovery_standard_error(row),

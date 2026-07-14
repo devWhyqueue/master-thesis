@@ -21,6 +21,7 @@ from imbalance_benchmark.manifest.pilot import (
     build_patch_pilot_manifest,
     compute_pilot_quota,
     method_floor,
+    mil_pilot_manifest,
     pilot_levels_for,
     stability_floor_from_curve,
 )
@@ -215,6 +216,19 @@ def test_pilot_levels_for_caps_at_scarcest_class():
 def test_pilot_levels_for_uses_standard_candidates_when_plentiful():
     levels = pilot_levels_for({"class_A": 100, "class_B": 100})
     assert levels == [5, 10, 15, 20, 30]
+
+
+def test_mil_pilot_level_five_uses_one_slide_per_patient():
+    """The report's first MIL pilot level needs an explicit small-count cap exception."""
+    rows = [
+        {"case_id": f"PAT_{index}", "slide_id": f"SLIDE_{index}", "cancer_type": "A"}
+        for index in range(10)
+    ]
+
+    manifest = mil_pilot_manifest(pd.DataFrame(rows), ["A"], level=5, seed=1)
+
+    assert len(manifest) == 5
+    assert manifest["case_id"].nunique() == 5
 
 
 def test_compute_pilot_quota_is_feasible_for_every_class():

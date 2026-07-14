@@ -20,7 +20,12 @@ from imbalance_benchmark.modeling.models import (
 )
 from imbalance_benchmark.modeling.oko import build_class_index, oko_set_loss, sample_oko_sets
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method, mde_bag_loss
-from imbalance_benchmark.modeling.training import ClassAwareBatchSampler, update_budget
+from imbalance_benchmark.modeling.training import (
+    ClassAwareBatchSampler,
+    CHECKPOINT_INTERVAL,
+    fit_model,
+    update_budget,
+)
 
 DIM = 16
 
@@ -179,6 +184,16 @@ def test_build_model_dispatches_by_method_and_regime():
     cfal = build_model("cfal", False, DIM, 8, 3, 0.0, param=2.0)
     assert isinstance(cfal, CfalPrototypeClassifier)
     assert cfal.sigma == 2.0
+
+
+def test_training_restores_train_mode_after_validation_checkpoint(tmp_path):
+    """Dropout must remain active for updates after the first validation checkpoint."""
+    ctx = _patch_ctx("ce", tmp_path, n_classes=2)
+    ctx["model"] = MLP(DIM, 8, 2, dropout=0.5)
+
+    fit_model(ctx, max_steps=CHECKPOINT_INTERVAL + 1)
+
+    assert ctx["model"].training
 
 
 # --- losses --------------------------------------------------------------------

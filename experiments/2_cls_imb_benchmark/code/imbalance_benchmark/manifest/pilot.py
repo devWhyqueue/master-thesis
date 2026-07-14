@@ -49,9 +49,8 @@ def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
 
 
 def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
-    pats = list(df_class["case_id"].unique())
-    np.random.default_rng(seed).shuffle(pats)
-    return pats
+    patients = cast(np.ndarray, df_class["case_id"].unique())
+    return list(np.random.default_rng(seed).permutation(patients))
 
 
 def compute_pilot_quota(
@@ -133,7 +132,10 @@ def mil_pilot_manifest(
     """Build one nested MIL pilot manifest of `level` slides per class."""
     parts = [
         select_slides_round_robin(
-            cast(pd.DataFrame, df[df["cancer_type"] == c]), level, seed
+            cast(pd.DataFrame, df[df["cancer_type"] == c]),
+            level,
+            seed,
+            allow_small_count_cap_exception=True,
         )
         for c in classes
     ]

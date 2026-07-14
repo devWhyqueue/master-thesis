@@ -9,7 +9,6 @@ import pandas as pd
 def _build_patch_hierarchy(
     df_class: pd.DataFrame, rng: np.random.Generator
 ) -> tuple[list[str], dict[str, dict[str, list[int]]]]:
-    """Build nested randomized dictionary for patch sampling."""
     patients = cast(np.ndarray, df_class["case_id"].unique())
     rng.shuffle(patients)
     h: dict[str, dict[str, list[int]]] = {}
@@ -28,7 +27,6 @@ def _build_patch_hierarchy(
 def _loop_patches(
     patients: list[str], h: dict, max_p: int, max_s: int, n: int
 ) -> tuple[list[int], dict, dict]:
-    """Round-robin patches breadth-first; each patient visited once per round."""
     selected, pat_counts, sld_counts = [], {p: 0 for p in patients}, {}
     slide_cursor = {p: 0 for p in patients}
     prog = True
@@ -52,7 +50,6 @@ def _loop_patches(
 
 
 def _contribution_cap(n_examples: int, fraction: float, unit: str) -> int:
-    """Return an exact contribution cap, rejecting allocations below one unit."""
     cap = int(np.floor(n_examples * fraction))
     if cap < 1:
         raise ValueError(
@@ -105,7 +102,6 @@ def _expand_pool(
 def _next_patient_with_remaining(
     patients: list[str], remaining: dict[str, list[str]], cursor: int
 ) -> tuple[str | None, int]:
-    """Choose the next expandable patient in deterministic round-robin order."""
     for offset in range(len(patients)):
         index = (cursor + offset) % len(patients)
         patient = patients[index]
@@ -200,7 +196,6 @@ def select_patches_round_robin(
 
 
 def _loop_slides(patients: list[str], h: dict, max_p: int, n: int) -> list[int]:
-    """Execute loop for round robin slide sampling."""
     selected, pat_counts = [], {p: 0 for p in patients}
     prog = True
     while len(selected) < n and prog:
@@ -230,17 +225,23 @@ def _build_slide_hierarchy(
 
 
 def select_slides_round_robin(
-    df_class: pd.DataFrame, n_slides: int, seed: int
+    df_class: pd.DataFrame,
+    n_slides: int,
+    seed: int,
+    allow_small_count_cap_exception: bool = False,
 ) -> pd.DataFrame:
-    """Sample slides for MIL with round-robin patient caps (10%)."""
+    """Sample MIL slides under the patient cap, with an explicit sub-10 pilot exception."""
     if df_class.empty or n_slides <= 0:
         return pd.DataFrame()
     rng = np.random.default_rng(seed)
     df_slides = df_class.drop_duplicates("slide_id")
     patients, h = _build_slide_hierarchy(df_slides, rng)
-    selected = _loop_slides(
-        patients, h, _contribution_cap(n_slides, 0.10, "patient"), n_slides
+    patient_cap = (
+        1
+        if allow_small_count_cap_exception and n_slides < 10
+        else _contribution_cap(n_slides, 0.10, "patient")
     )
+    selected = _loop_slides(patients, h, patient_cap, n_slides)
     if len(selected) < n_slides:
         raise ValueError("Slide allocation is infeasible under the 10% patient cap")
     return cast(

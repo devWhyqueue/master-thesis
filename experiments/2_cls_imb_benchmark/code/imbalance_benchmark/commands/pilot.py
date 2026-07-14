@@ -143,6 +143,11 @@ def _pilot_report_payload(
         "definitive_floor": definitive_floor,
         "patient_equals_slide": eq_slide,
         "available_independent_support": support,
+        "pilot_exceptions": (
+            ["five-slide MIL pilot uses one slide from each of five distinct patients"]
+            if is_mil and 5 in levels
+            else []
+        ),
         "excluded": levels[-1] < definitive_floor or not floor_met,
     }
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from imbalance_benchmark.analysis.calibration import (
     apply_target_prior_correction,
@@ -41,6 +42,9 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_gate_pass_model,
     fit_recovery_model,
 )
+from imbalance_benchmark.analysis.predictors.hierarchical_models import _log_scale_prior
+from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells
+from imbalance_benchmark.analysis.predictors.rq3_cross_split import _comparison_maps
 from imbalance_benchmark.analysis.predictors.separability import effective_support, intraclass_correlation
 from imbalance_benchmark.analysis.query import load_classwise, load_eval_details, load_test_identity
 from imbalance_benchmark.analysis.reporting.ingestion import _ingest_discovered_run
@@ -380,6 +384,45 @@ def test_rq3_recovery_model_empty_when_no_gated_cells():
     assert fit_recovery_model(cells) == {}
 
 
+def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatch):
+    """A calibration-only cell must use tail-NLL recovery, not BA recovery."""
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
+        lambda *_: {"separability": 0.5},
+    )
+    comparisons = [
+        {"assignment": "native", "severity": "severe", "method": "ce", "gate": "discrimination", "gate_passed": False, "effect": 0.01, "bootstrap_effect": [0.01, 0.02]},
+        {"assignment": "native", "severity": "severe", "method": "ce", "gate": "calibration", "gate_passed": True, "effect": 0.08, "bootstrap_effect": [0.08, 0.09]},
+        {"assignment": "native", "severity": "severe", "method": "weighted_ce", "gate": "calibration", "gate_passed": True, "effect": 0.04, "recovery": 0.5, "bootstrap_effect": [0.04, 0.05], "bootstrap_numerator": [0.04, 0.05], "bootstrap_denominator": [0.08, 0.10]},
+    ]
+    freeze = {"assignment_conditions": {"native": {"severe": {"achieved_rho": 100.0}}}}
+
+    cells = _cells({}, comparisons, freeze, "dataset:target", False)
+
+    recovery = next(cell for cell in cells if cell["method"] == "weighted_ce")
+    assert recovery["gate"] == "calibration"
+    assert recovery["gate_passed"] is True
+    assert recovery["recovery"] == pytest.approx(0.5)
+
+
+def test_cross_split_rq3_keeps_gate_specific_calibration_outcome():
+    rows = [
+        {"assignment": "native", "severity": "severe", "method": "ce", "gate": "calibration", "gate_passed": True},
+        {"assignment": "native", "severity": "severe", "method": "weighted_ce", "gate": "calibration", "bootstrap_numerator": [0.04], "bootstrap_denominator": [0.08]},
+    ]
+
+    gates, outcomes = _comparison_maps(rows)
+
+    assert gates[("native", "severe", "calibration")]
+    assert ("native", "severe", "weighted_ce", "calibration") in outcomes
+
+
+def test_log_scale_prior_prevents_random_effect_scale_collapse():
+    collapsed = _log_scale_prior(torch.tensor([-20.0]))
+    centered = _log_scale_prior(torch.tensor([0.0]))
+    assert collapsed > centered
+
+
 # --- db / query / tables end-to-end ----------------------------------------------------
 
 
@@ -481,6 +524,22 @@ def test_load_test_identity_matches_row_order(tmp_path: Path):
     manifest.to_csv(manifest_path, index=False)
     identity = load_test_identity(manifest_path, is_mil=False)
     assert identity["case_id"].tolist() == ["P0", "P1"]
+
+
+def test_load_mil_test_identity_preserves_bag_dataset_order(tmp_path: Path):
+    manifest = pd.DataFrame(
+        [
+            {"case_id": "PAT_B", "slide_id": "slide_B", "cancer_type": "B", "split": "test"},
+            {"case_id": "PAT_A", "slide_id": "slide_A", "cancer_type": "A", "split": "test"},
+        ]
+    )
+    manifest_path = tmp_path / "manifest.csv"
+    manifest.to_csv(manifest_path, index=False)
+
+    identity = load_test_identity(manifest_path, is_mil=True)
+
+    assert identity["slide_id"].tolist() == ["slide_B", "slide_A"]
+    assert identity["case_id"].tolist() == ["PAT_B", "PAT_A"]
 
 
 def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(tmp_path: Path):

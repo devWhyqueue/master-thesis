@@ -17,7 +17,9 @@ def load_rq3_cells(analysis_roots: list[Path]) -> list[dict[str, Any]]:
     if not cells:
         return []
     frame = pd.DataFrame(cells)
-    keys = ["group", "assignment", "severity", "method"]
+    if "gate" not in frame:
+        frame["gate"] = "discrimination"
+    keys = ["group", "assignment", "severity", "method", "gate"]
     numeric = [
         column
         for column in frame.select_dtypes(include=["number"])
@@ -58,29 +60,44 @@ def _attach_crossed_outcomes(
 
 def _comparison_maps(
     rows: list[dict[str, Any]],
-) -> tuple[dict[tuple[str, str], bool], dict[tuple[str, str, str], dict[str, Any]]]:
-    gates: dict[tuple[str, str], bool] = {}
+) -> tuple[
+    dict[tuple[str, str, str], bool], dict[tuple[str, str, str, str], dict[str, Any]]
+]:
+    gates: dict[tuple[str, str, str], bool] = {}
     outcomes = {}
     for row in rows:
-        assignment, severity = row["assignment"], row["severity"]
+        assignment, severity, gate = row["assignment"], row["severity"], row["gate"]
         if row["method"] == "ce":
-            gates[(assignment, severity)] = gates.get(
-                (assignment, severity), False
+            gates[(assignment, severity, gate)] = gates.get(
+                (assignment, severity, gate), False
             ) or bool(row.get("gate_passed"))
-        if row.get("gate") == "discrimination":
-            outcomes[(assignment, severity, row["method"])] = row
+        outcomes[(assignment, severity, row["method"], gate)] = row
     return gates, outcomes
 
 
-def _key(cell: dict[str, Any]) -> tuple[str, str, str]:
-    return cell["assignment"], cell["severity"], cell["method"]
+def _key(cell: dict[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        cell["assignment"],
+        cell["severity"],
+        cell["method"],
+        cell.get("gate", "discrimination"),
+    )
 
 
 def _crossed_cell(
-    cell: dict[str, Any], gates: dict[tuple[str, str], bool], row: dict[str, Any]
+    cell: dict[str, Any], gates: dict[tuple[str, str, str], bool], row: dict[str, Any]
 ) -> dict[str, Any]:
     updated = dict(cell)
-    updated["gate_passed"] = gates[(cell["assignment"], cell["severity"])]
+    gate_key = cell["assignment"], cell["severity"], cell.get("gate", "discrimination")
+    updated["gate_passed"] = (
+        any(
+            passed
+            for (assignment, severity, _), passed in gates.items()
+            if (assignment, severity) == gate_key[:2]
+        )
+        if cell["method"] == "ce"
+        else gates[gate_key]
+    )
     if cell["method"] == "ce":
         effects = np.asarray(row["bootstrap_effect"], dtype=float)
         updated["deficit_ba"] = float(np.nanmean(effects))

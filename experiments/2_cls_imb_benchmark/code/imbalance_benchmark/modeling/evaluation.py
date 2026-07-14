@@ -40,6 +40,7 @@ def _gather_and_eval(
     n_classes: int,
 ) -> tuple[float, float, float, torch.Tensor, torch.Tensor]:
     """Gather logits and compute balanced accuracy and F1."""
+    was_training = model.training
     model.eval()
     all_logits, all_targets = [], []
     with torch.no_grad():
@@ -57,6 +58,7 @@ def _gather_and_eval(
                 logits, targets = model(batch["features"].to(device)), batch["target"]
             all_logits.append(logits.cpu())
             all_targets.append(targets)
+    model.train(was_training)
     logits, targets = torch.cat(all_logits, dim=0), torch.cat(all_targets, dim=0).long()
     preds = logits.softmax(dim=-1).argmax(dim=-1)
     recalls = [
