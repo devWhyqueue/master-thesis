@@ -52,15 +52,13 @@ def _ingest_discovered_run(
             .get(condition, {})
             .get("allocated_counts", {})
         )
-    tiers = (
-        assign_tiers(
+    tiers = {}
+    if condition != "balanced" and class_names and allocated:
+        tiers = assign_tiers(
             class_names,
             allocated,
             freeze.get("tail_assignments", {}).get(assignment, class_names),
         )
-        if class_names and allocated
-        else {}
-    )
     run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
     ingest_run(conn, run_id, result_dir, condition, method, seed_idx, record, tiers)
 

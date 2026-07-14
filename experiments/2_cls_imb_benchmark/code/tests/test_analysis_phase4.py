@@ -43,9 +43,16 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
 )
 from imbalance_benchmark.analysis.predictors.separability import effective_support, intraclass_correlation
 from imbalance_benchmark.analysis.query import load_classwise, load_eval_details, load_test_identity
+from imbalance_benchmark.analysis.reporting.ingestion import _ingest_discovered_run
 from imbalance_benchmark.analysis.reporting.tables import calibration_table, results_table
 from imbalance_benchmark.commands.analyze import _aggregate_split_comparisons
-from imbalance_benchmark.common import ensure_dirs, split_paths, write_json, write_run_record
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    read_run_record,
+    split_paths,
+    write_json,
+    write_run_record,
+)
 
 
 # --- metrics ------------------------------------------------------------------
@@ -431,6 +438,35 @@ def test_ingest_and_tables_end_to_end(tmp_path: Path):
     assert "balanced" in table and "ce" in table
     cal_table = calibration_table(conn)
     assert "negative_log_likelihood" not in cal_table or "\\begin{tabular}" in cal_table
+
+
+def test_balanced_ingestion_leaves_classwise_tiers_null(tmp_path: Path):
+    """Balanced runs have no tail assignment, so classwise tiers stay undefined."""
+    class_names = ["A", "B"]
+    results_root = tmp_path / "results"
+    _write_fake_run(results_root, "balanced", "ce", 0, class_names, 0)
+    result_dir = results_root / "balanced" / "ce" / "seed=0"
+    record = read_run_record(result_dir)
+    assert record is not None
+    record["assignment"] = "unassigned"
+    conn = connect_db(tmp_path / "results.sqlite")
+    init_schema(conn)
+
+    _ingest_discovered_run(
+        conn,
+        {"conditions": {"balanced": {"allocated_counts": {"A": 10, "B": 10}}}},
+        "balanced",
+        "ce",
+        0,
+        result_dir,
+        record,
+    )
+
+    n_rows = conn.execute("SELECT COUNT(*) FROM eval_classwise").fetchone()[0]
+    null_tiers = conn.execute(
+        "SELECT COUNT(*) FROM eval_classwise WHERE tier IS NULL"
+    ).fetchone()[0]
+    assert null_tiers == n_rows == 4
 
 
 def test_load_test_identity_matches_row_order(tmp_path: Path):
