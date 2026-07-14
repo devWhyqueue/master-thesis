@@ -14,7 +14,7 @@ from imbalance_benchmark.common import (
     split_paths,
     write_json,
 )
-from imbalance_benchmark.construction import patient_equals_slide
+from imbalance_benchmark.construction import locked_class_names, patient_equals_slide
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
@@ -39,7 +39,7 @@ def _pilot_setup(
     """Load the training manifest and derive the regime, unit type, and candidate levels."""
     df = pd.read_csv(paths["data"] / "manifest.csv")
     train_df = cast(pd.DataFrame, df[df["split"] == "train"])
-    classes = sorted(train_df["cancer_type"].unique())
+    classes = locked_class_names(df)
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     eq_slide = patient_equals_slide(train_df)
     unit_col = "slide_id" if (is_mil or eq_slide) else "case_id"
@@ -83,6 +83,7 @@ def _run_all_pilot_seeds(
         is_mil,
         "validation",
         device=device,
+        class_names=classes,
         bag_kwargs=bag_dataset_kwargs(
             config, seed=derive_seed(base_seed, "instance_selection")
         )

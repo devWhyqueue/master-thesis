@@ -116,6 +116,7 @@ class Regime:
     config: dict[str, Any]
     n_classes: int
     is_mil: bool
+    locked_class_names: list[str] = field(default_factory=list, kw_only=True)
     bag_dataset_kwargs: dict[str, int] = field(default_factory=dict, kw_only=True)
 
 

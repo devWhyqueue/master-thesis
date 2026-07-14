@@ -16,48 +16,6 @@ from imbalance_benchmark.analysis.reporting.plots import (
     plot_tail_vs_support,
 )
 from imbalance_benchmark.construction import max_shared_total
-from imbalance_benchmark.modeling.workflows import tuning_search
-
-
-def test_single_split_post_hoc_uses_the_selected_ce_checkpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The post-hoc checkpoint must belong to the winning CE configuration."""
-    configs = [{"lr": 1.0}, {"lr": 2.0}]
-
-    class Model:
-        state: dict[str, float]
-
-        def load_state_dict(self, state: dict[str, float]) -> None:
-            self.state = state
-
-    def context(*args: object) -> dict[str, object]:
-        return {"model": Model(), "config": args[4], "seed": args[3]}
-
-    def fit(ctx: dict[str, object]) -> tuple[dict[str, float], object]:
-        return {"lr": float(ctx["config"]["lr"]), "seed": float(ctx["seed"])}, None
-
-    def evaluate(model: Model, *args: object) -> dict[str, float]:
-        return {
-            "balanced_accuracy": 1.0 if model.state["lr"] == 1.0 else 0.0,
-            "macro_f1": 0.0,
-            "nll": 1.0,
-        }
-
-    monkeypatch.setattr(tuning_search, "get_grid_configs", lambda *_: configs)
-    monkeypatch.setattr(tuning_search, "build_training_ctx", context)
-    monkeypatch.setattr(tuning_search, "fit_method", fit)
-    monkeypatch.setattr(tuning_search, "run_evaluation", evaluate)
-
-    regime = type(
-        "Regime", (), {"n_classes": 2, "device": None, "is_mil": False}
-    )()
-    selected, state = tuning_search._tune_grid("ce", None, None, regime, [0, 1])
-
-    assert selected == {"lr": 1.0}
-    assert state == {"lr": 1.0, "seed": 0.0}
-
-
 def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -> None:
     rows = [
         {

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
-from collections import defaultdict
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
@@ -17,6 +15,14 @@ from timm.data.transforms_factory import create_transform
 from timm.layers.mlp import SwiGLUPacked
 from torch.utils.data import DataLoader, Dataset
 
+from imbalance_benchmark.datasets.feature_provenance import (
+    FEATURE_DIM,
+    VIRCHOW2_MODEL,
+    patch_sort_key,
+    resolve_feature_provenance,
+    validate_feature_cache,
+)
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -24,19 +30,10 @@ __all__ = [
     "embed_image_batch",
     "extract_slide_features",
     "attach_extracted_features",
-    "SlideFeatureStore",
     "load_slide_features",
     "load_feature_row",
     "patch_sort_key",
 ]
-
-FEATURE_DIM = 2560
-
-
-def patch_sort_key(item: str) -> tuple[int, int]:
-    """Sort patch identifiers by region and patch index."""
-    region, index = item.split("_")[:2]
-    return int(region), int(index)
 
 
 def load_feature_model(
@@ -93,7 +90,7 @@ class _ImagePathDataset(Dataset):  # type: ignore[type-arg]
 
 def extract_slide_features(
     image_paths: list[str],
-    model_name: str = "hf-hub:paige-ai/Virchow2",
+    model_name: str = VIRCHOW2_MODEL,
     batch_size: int = 64,
     dtype: str = "float16",
     device: torch.device | None = None,
@@ -133,6 +130,8 @@ def attach_extracted_features(
     rather than re-extracted.
     """
     feature_root.mkdir(parents=True, exist_ok=True)
+    provenance = resolve_feature_provenance({"model_name": model_name, "dtype": dtype})
+    validate_feature_cache(feature_root, provenance)
     enriched = frame.copy()
     feature_paths = pd.Series(index=enriched.index, dtype=object)
     feature_indices = pd.Series(index=enriched.index, dtype=object)
@@ -184,64 +183,3 @@ def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:
         f"Feature file {path} has {features.shape[0]} rows; "
         "provide feature_index for multi-row tensors."
     )
-
-
-class SlideFeatureStore:
-    """Index chunked per-slide feature tensors and resolve manifest patches to rows."""
-
-    def __init__(
-        self,
-        feature_dir: str,
-        suffix_pattern: str = r"_[0-9]+$",
-        patches_per_chunk: int = 30,
-    ) -> None:
-        self.feature_dir = Path(feature_dir)
-        if not self.feature_dir.is_dir():
-            raise FileNotFoundError(f"Feature directory not found: {feature_dir}")
-        self.patches_per_chunk = patches_per_chunk
-        self._chunks_by_slide = _index_slide_chunks(self.feature_dir, suffix_pattern)
-
-    def patch_index(self, patch_ids: list[str], patch_id: str) -> int:
-        """Return the row index for one patch after deterministic sorting."""
-        return _ordered_patch_indices(tuple(patch_ids))[patch_id]
-
-    def resolve_patch(
-        self, slide_id: str, patch_ids: list[str], patch_id: str
-    ) -> tuple[str, int]:
-        """Return the chunk path and row index for one manifest patch."""
-        patch_index = self.patch_index(patch_ids, patch_id)
-        chunk_index = patch_index // self.patches_per_chunk
-        row_index = patch_index % self.patches_per_chunk
-        chunk_path = self._chunks_by_slide[slide_id][chunk_index]
-        return str(chunk_path), row_index
-
-    def load_patch_feature(
-        self, slide_id: str, patch_ids: list[str], patch_id: str
-    ) -> torch.Tensor:
-        """Load one patch embedding from the matching chunk tensor."""
-        path, index = self.resolve_patch(slide_id, patch_ids, patch_id)
-        return load_feature_row(path, index)
-
-
-@lru_cache(maxsize=512)
-def _ordered_patch_indices(patch_ids: tuple[str, ...]) -> dict[str, int]:
-    ordered = sorted(patch_ids, key=patch_sort_key)
-    return {patch: index for index, patch in enumerate(ordered)}
-
-
-def _index_slide_chunks(
-    feature_dir: Path, suffix_pattern: str
-) -> dict[str, list[Path]]:
-    grouped: dict[str, list[tuple[int, Path]]] = defaultdict(list)
-    for path in sorted(feature_dir.glob("*.pt")):
-        stem = path.stem
-        slide_id = re.sub(f"{suffix_pattern}$", "", stem)
-        suffix = stem[len(slide_id) :]
-        chunk_index = int(suffix.lstrip("_")) if suffix else 0
-        grouped[slide_id].append((chunk_index, path))
-    if not grouped:
-        raise RuntimeError(f"No .pt features found under {feature_dir}")
-    return {
-        slide_id: [path for _, path in sorted(items, key=lambda item: item[0])]
-        for slide_id, items in grouped.items()
-    }

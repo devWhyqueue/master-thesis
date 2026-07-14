@@ -55,6 +55,7 @@ def _confirm_condition(
         run.paths["data"] / file_name,
         run.is_mil,
         device=run.device,
+        class_names=run.class_names,
         bag_kwargs=run.bag_dataset_kwargs,
     )
     cond_configs = require_tuning_configs(best_configs, methods)
@@ -122,11 +123,11 @@ def _confirm_inputs(
         "config": config,
         "n_classes": len(class_names),
         "is_mil": is_mil,
+        "class_names": class_names,
         "val_loader": val_ldr,
         "test_loader": test_ldr,
         "paths": paths,
         "seeds": seeds,
-        "class_names": class_names,
         "bag_dataset_kwargs": bag_kwargs or {},
     }
     return best_configs, run_data, freeze

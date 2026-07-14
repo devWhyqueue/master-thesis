@@ -30,6 +30,7 @@ from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constrain
 from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.datasets.data import slide_level_identity
+from imbalance_benchmark.datasets.features import resolve_feature_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,6 @@ logger = logging.getLogger(__name__)
 def _load_pilot_floor(
     pilot_report_path: Path, is_mil: bool, counts: dict[str, int]
 ) -> tuple[int, int, bool, int]:
-    """Read the pilot's floor and exclusion status, capped to what's actually available."""
     constraints = _pilot_constraints(pilot_report_path, is_mil)
     requested = constraints.patch_floor
     min_support = max(requested, 20) if not is_mil else requested
@@ -60,7 +60,6 @@ def _load_pilot_floor(
 def _load_train_context(
     args: argparse.Namespace, paths: dict[str, Path]
 ) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], dict[str, int]]:
-    """Load the training manifest and derive the regime, classes, and support counts."""
     config = load_config(args.config)
     df = pd.read_csv(paths["data"] / "manifest.csv")
     train_df = cast(pd.DataFrame, df[df["split"] == "train"])
@@ -73,7 +72,6 @@ def _load_train_context(
 def _load_split_context(
     args: argparse.Namespace, paths: dict[str, Path]
 ) -> tuple[dict[str, Path], pd.DataFrame, bool, list[str], int, int, bool, int] | None:
-    """Load train context and pilot floor; return None if the split is excluded."""
     paths, train_df, is_mil, classes, counts = _load_train_context(args, paths)
     pilot_path = paths["data"] / "pilot_report.json"
     if not pilot_path.exists():
@@ -199,7 +197,9 @@ def _attach_provenance(
             "sha256": compute_sha256(data / "manifest.csv"),
         },
         dataset_provenance=dataset_provenance(config.get("dataset", {})),
-        feature_encoder=dict(config.get("feature_extraction", {})),
+        feature_encoder=resolve_feature_provenance(
+            config.get("feature_extraction", {})
+        ),
     )
 
 

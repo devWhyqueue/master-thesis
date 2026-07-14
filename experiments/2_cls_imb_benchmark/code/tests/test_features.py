@@ -5,11 +5,10 @@ import torch
 
 from imbalance_benchmark.datasets import features as feature_lib
 from imbalance_benchmark.datasets.features import (
-    SlideFeatureStore,
+    _virchow2_pool,
     load_feature_row,
     load_slide_features,
     patch_sort_key,
-    _virchow2_pool,
 )
 
 
@@ -51,30 +50,6 @@ def test_load_feature_row_requires_index_for_multirow(tmp_path) -> None:
         raise AssertionError("Expected multi-row tensor to require an index.")
     vector = load_feature_row(str(path), 1)
     assert vector.shape == (2560,)
-
-
-def test_slide_feature_store_resolves_sorted_patch(tmp_path) -> None:
-    slide_id = "TCGA-XX-0001"
-    chunk = torch.stack([torch.randn(2560), torch.randn(2560), torch.randn(2560)])
-    torch.save(chunk, tmp_path / f"{slide_id}_0.pt")
-    store = SlideFeatureStore(str(tmp_path))
-
-    vector = store.load_patch_feature(slide_id, ["1_2", "0_9", "1_0"], "1_0")
-
-    assert vector.shape == (2560,)
-    assert torch.allclose(vector, load_feature_row(str(tmp_path / f"{slide_id}_0.pt"), 1))
-
-
-def test_slide_feature_store_spans_multiple_chunks(tmp_path) -> None:
-    slide_id = "TCGA-XX-0002"
-    torch.save(torch.stack([torch.full((4,), float(i)) for i in range(30)]), tmp_path / f"{slide_id}_0.pt")
-    torch.save(torch.stack([torch.full((4,), float(30 + i)) for i in range(5)]), tmp_path / f"{slide_id}_1.pt")
-    patch_ids = [f"0_{i}" for i in range(35)]
-    store = SlideFeatureStore(str(tmp_path))
-
-    vector = store.load_patch_feature(slide_id, patch_ids, "0_32")
-
-    assert torch.allclose(vector, torch.full((4,), 32.0))
 
 
 def test_attach_extracted_features_writes_one_tensor_per_slide(tmp_path, monkeypatch) -> None:

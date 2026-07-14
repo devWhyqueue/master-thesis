@@ -16,7 +16,10 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.construction import split_cases
 from imbalance_benchmark.datasets import build_manifest
-from imbalance_benchmark.datasets.features import attach_extracted_features
+from imbalance_benchmark.datasets.features import (
+    attach_extracted_features,
+    resolve_feature_provenance,
+)
 from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_prepare"]
@@ -86,12 +89,13 @@ def _base_manifest(config: dict[str, object], paths: dict[str, Path]) -> pd.Data
     dataset_name = dataset_cfg.get("name", "synthetic")
     if dataset_name == "synthetic":
         return _synthetic_manifest(paths)
-    df = build_manifest(config)
-    if "image_path" not in df.columns or "feature_path" in df.columns:
-        return df
     feature_cfg = config.get("feature_extraction", {})
     if not isinstance(feature_cfg, dict):
         raise ValueError("feature_extraction config must be a mapping")
+    resolve_feature_provenance(feature_cfg)
+    df = build_manifest(config)
+    if "image_path" not in df.columns or "feature_path" in df.columns:
+        return df
     return attach_extracted_features(
         df,
         paths["data"] / "features" / str(dataset_name),

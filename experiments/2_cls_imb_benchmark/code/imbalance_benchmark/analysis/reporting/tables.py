@@ -55,10 +55,11 @@ def _with_tail_recall(
 def results_table(conn: sqlite3.Connection, split: str = "test") -> str:
     """Real BA/macro-F1/tail-recall/NLL/macro-NLL table by condition x method (replaces the placeholder)."""
     details = load_eval_details(conn)
-    details = details[details["split"] == split]
+    details = cast(pd.DataFrame, details[details["split"] == split])
     if details.empty:
         return _to_latex(pd.DataFrame(), "Confirmation results", "tab:results")
-    summary = (
+    summary = cast(
+        pd.DataFrame,
         details.groupby(["assignment", "condition", "method"])
         .agg(
             balanced_accuracy=("balanced_accuracy", "mean"),
@@ -69,7 +70,7 @@ def results_table(conn: sqlite3.Connection, split: str = "test") -> str:
             ordinal_mean_absolute_error=("ordinal_mean_absolute_error", "mean"),
             n_seeds=("seed_index", "nunique"),
         )
-        .reset_index()
+        .reset_index(),
     )
     summary = _with_tail_recall(summary, conn, split)
     return _to_latex(
@@ -98,9 +99,38 @@ def calibration_table(conn: sqlite3.Connection, split: str = "test") -> str:
         )
         .reset_index()
     )
+    keys = ["assignment", "condition", "method"]
+    summary = _add_ece_intervals(summary, cast(pd.DataFrame, details), keys)
     return _to_latex(
         summary, "Raw and temperature-scaled calibration summary", "tab:calibration"
     )
+
+
+def _add_ece_intervals(
+    summary: pd.DataFrame, details: pd.DataFrame, keys: list[str]
+) -> pd.DataFrame:
+    """Add mean patient-block ECE intervals without dropping absent legacy fields."""
+    for source, column in (
+        ("expected_calibration_error_ci", "ECE 95% CI"),
+        ("temperature_scaled_ece_ci", "Temperature ECE 95% CI"),
+    ):
+        if source not in details:
+            continue
+        intervals = cast(
+            pd.Series, details.groupby(keys)[source].apply(_mean_interval)
+        ).rename(column)
+        summary = summary.merge(intervals.reset_index(), on=keys, how="left")
+    return summary
+
+
+def _mean_interval(values: pd.Series) -> str | None:
+    """Format the mean lower and upper patient-block interval bounds."""
+    pairs = [value for value in values if isinstance(value, list) and len(value) == 2]
+    if not pairs:
+        return None
+    lower = sum(float(pair[0]) for pair in pairs) / len(pairs)
+    upper = sum(float(pair[1]) for pair in pairs) / len(pairs)
+    return f"[{lower:.3f}, {upper:.3f}]"
 
 
 def confirmatory_table(comparisons: list[dict[str, Any]]) -> str:

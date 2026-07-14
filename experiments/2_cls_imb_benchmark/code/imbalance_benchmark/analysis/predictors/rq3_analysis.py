@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -22,37 +22,12 @@ from imbalance_benchmark.analysis.predictors.separability import (
     intrinsic_separability,
     intraclass_correlation,
 )
-from imbalance_benchmark.datasets.data import (
-    BagFeatureDataset,
-    ImbalanceDataset,
+from imbalance_benchmark.analysis.predictors.rq3_features import (
+    feature_frame as _feature_frame,
+    feature_identity as _feature_identity,
 )
-from imbalance_benchmark.datasets.data import load_training_dataset
 
 __all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
-
-
-def _feature_frame(
-    manifest: Path,
-    split: str | None,
-    is_mil: bool,
-    bag_kwargs: dict[str, int] | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Load fixed embeddings and integer targets from one frozen manifest partition."""
-    if is_mil:
-        dataset = cast(
-            BagFeatureDataset,
-            load_training_dataset(manifest, True, split, bag_kwargs=bag_kwargs),
-        )
-        features = []
-        for index in range(len(dataset)):
-            bag, _ = dataset[index]
-            features.append(np.r_[bag.mean(0).cpu(), bag.std(0).cpu()])
-    else:
-        dataset = cast(ImbalanceDataset, load_training_dataset(manifest, False, split))
-        features = [
-            dataset[index]["features"].cpu().numpy() for index in range(len(dataset))
-        ]
-    return np.asarray(features), dataset.get_int_targets()
 
 
 def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
@@ -60,19 +35,6 @@ def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
     key = "n_slides" if is_mil else "n_patients"
     values = [stats[key] for stats in condition["contribution_stats"].values()]
     return float(min(values)) if values else 1.0
-
-
-def _feature_identity(
-    manifest: Path,
-    split: str | None,
-    is_mil: bool,
-    bag_kwargs: dict[str, int] | None = None,
-) -> pd.DataFrame:
-    """Return identities in the same one-row-per-observation order as features."""
-    dataset = load_training_dataset(manifest, is_mil, split, bag_kwargs=bag_kwargs)
-    return cast(pd.DataFrame, dataset.df[["case_id", "slide_id"]]).reset_index(
-        drop=True
-    )
 
 
 def _covariates(
@@ -90,32 +52,42 @@ def _covariates(
     fits only.
     """
     bag_kwargs = bag_dataset_kwargs({}, freeze) if is_mil else None
+    class_names = list((freeze or {}).get("class_names", [])) or None
     ref_path = paths["data"] / "manifest_balanced.csv"
-    ref_x, ref_y = _feature_frame(ref_path, None, is_mil, bag_kwargs)
+    ref_x, ref_y = _feature_frame(ref_path, None, is_mil, class_names, bag_kwargs)
     val_x, val_y = _feature_frame(
-        paths["data"] / "manifest.csv", "validation", is_mil, bag_kwargs
+        paths["data"] / "manifest.csv", "validation", is_mil, class_names, bag_kwargs
     )
     n_classes = len(np.unique(ref_y))
     intrinsic = intrinsic_separability(ref_x, ref_y, val_x, val_y, n_classes)
     cond_path = Path(condition["path"])
     if not cond_path.exists():
         raise RuntimeError(f"Missing frozen controlled manifest for RQ3: {cond_path}")
-    cond_x, cond_y = _feature_frame(cond_path, None, is_mil, bag_kwargs)
+    cond_x, cond_y = _feature_frame(cond_path, None, is_mil, class_names, bag_kwargs)
     learnability = condition_learnability(cond_x, cond_y, val_x, val_y, n_classes)
-    frame = _feature_identity(ref_path, None, is_mil, bag_kwargs)
+    reference_frame = _feature_identity(ref_path, None, is_mil, class_names, bag_kwargs)
     margins = class_margin_cross_fit(
-        ref_x, ref_y, frame["case_id"].astype(str).to_numpy(), n_classes
+        ref_x, ref_y, reference_frame["case_id"].astype(str).to_numpy(), n_classes
+    )
+    condition_frame = _feature_identity(
+        cond_path, None, is_mil, class_names, bag_kwargs
     )
     effective = []
     for class_index in range(n_classes):
-        mask = ref_y == class_index
-        class_cases = frame.loc[mask, "case_id"].astype(str).to_numpy()
-        counts = pd.Series(class_cases).value_counts()
+        reference_mask = ref_y == class_index
+        condition_mask = cond_y == class_index
+        reference_cases = (
+            reference_frame.loc[reference_mask, "case_id"].astype(str).to_numpy()
+        )
+        condition_cases = (
+            condition_frame.loc[condition_mask, "case_id"].astype(str).to_numpy()
+        )
+        counts = pd.Series(condition_cases).value_counts()
         effective.append(
             effective_support(
-                int(mask.sum()),
+                int(condition_mask.sum()),
                 float(counts.mean()),
-                intraclass_correlation(margins[mask], class_cases),
+                intraclass_correlation(margins[reference_mask], reference_cases),
             )
         )
     return {

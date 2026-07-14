@@ -27,7 +27,6 @@ from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     TuningScope,
     tune_across_splits,
 )
-from imbalance_benchmark.modeling.workflows.tuning_search import tune_condition
 
 __all__ = ["cmd_tune"]
 
@@ -53,6 +52,7 @@ def _tuning_inputs(
         is_mil,
         "validation",
         device=device,
+        class_names=list(freeze["class_names"]),
         bag_kwargs=bag_kwargs,
     )
     val_loader = torch.utils.data.DataLoader(
@@ -63,6 +63,7 @@ def _tuning_inputs(
         config,
         val_ds.get_n_classes(),
         is_mil,
+        locked_class_names=list(freeze["class_names"]),
         bag_dataset_kwargs=bag_kwargs or {},
     )
     return paths, regime, val_loader
@@ -72,8 +73,10 @@ def cmd_tune(args: argparse.Namespace) -> None:
     """Run the validation-only hyperparameter search for every roster method and condition."""
     started = time.perf_counter()
     if args.split_index is not None:
-        _tune_split(args, started)
-        return
+        raise ValueError(
+            "Definitive tuning selects one configuration across all three patient splits; "
+            "do not pass --split-index."
+        )
     _tune_all_splits(args, started)
 
 
@@ -103,46 +106,6 @@ def _manifest_name(condition: str, assignment: str) -> str:
         if condition in {"natural", "balanced"}
         else f"manifest_{assignment}_{condition}.csv"
     )
-
-
-def _tune_split(args: argparse.Namespace, started: float) -> None:
-    """Tune independently within one explicit patient split."""
-    paths = split_paths(ensure_dirs(load_config(args.config)), args.split_index)
-    if _is_excluded(paths):
-        return
-    paths, regime, loader = _tuning_inputs(args, paths)
-    freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
-    selections = _split_selections(paths, regime, loader, freeze, args)
-    selection_path = paths["data"] / _output_name(args)
-    write_json(selection_path, selections)
-    sign_file(selection_path)
-    _write_tuning_cost(paths, started, getattr(args, "condition", None))
-
-
-def _split_selections(
-    paths: dict[str, Path],
-    regime: Regime,
-    loader: torch.utils.data.DataLoader,
-    freeze: dict[str, Any],
-    args: argparse.Namespace,
-) -> dict[str, dict[str, Any]]:
-    """Tune every requested condition and tail assignment for one split."""
-    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    selections: dict[str, dict[str, Any]] = {
-        assignment: {} for assignment in assignments
-    }
-    methods, seeds = roster_for_regime(regime.is_mil), _tuning_seeds(args.seed)
-    for condition in _conditions(args):
-        scoped = ("native",) if condition in {"natural", "balanced"} else assignments
-        for assignment in scoped:
-            selections[assignment][condition] = tune_condition(
-                methods,
-                loader,
-                regime,
-                seeds,
-                paths["data"] / _manifest_name(condition, assignment),
-            )
-    return selections
 
 
 def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
@@ -201,6 +164,7 @@ def _combined_scopes(
                         paths["data"] / _manifest_name(condition, assignment),
                         regime.is_mil,
                         device=regime.device,
+                        class_names=regime.locked_class_names,
                         bag_kwargs=regime.bag_dataset_kwargs,
                     ),
                 )
