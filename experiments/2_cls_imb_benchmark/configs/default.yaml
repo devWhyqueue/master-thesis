@@ -26,6 +26,8 @@ dataset:
 
   # bracs
   # root: /home/space/datasets/patho_ds/bracs
+  # wsi_metadata_csv: /home/space/datasets/patho_ds/bracs/wsi_metadata.csv
+  # wsi_tile_root: /home/space/datasets/patho_ds/bracs/tiles/wsi
   # metadata_csv:
   # tile_root: /home/space/datasets/patho_ds/bracs/tiles
   # tile_size: 256

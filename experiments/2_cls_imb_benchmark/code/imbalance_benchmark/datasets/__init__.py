@@ -1,11 +1,6 @@
-"""Dataset adapters producing a unified manifest schema.
+"""Dataset adapters producing unified case, slide, and target manifests.
 
-Every adapter returns a frame with ``case_id``, ``slide_id``, ``cancer_type``,
-and ``split`` columns. Patch-regime rows from BRACS/CAMELYON16/PANDA also carry
-``image_path`` for downstream Virchow2 feature extraction (see
-``imbalance_benchmark.datasets.features``); TCGA-UT rows already carry
-``feature_path``/``feature_index`` because its features are pre-extracted on
-the cluster.
+Image-backed rows carry paths; pre-extracted TCGA rows carry feature references.
 """
 
 from __future__ import annotations
@@ -16,7 +11,12 @@ from typing import Any, Callable, cast
 import numpy as np
 import pandas as pd
 
-from imbalance_benchmark.datasets import bracs, bracs_tiling, camelyon16, panda, tcga_ut
+from imbalance_benchmark.datasets import (
+    bracs,
+    camelyon16,
+    panda,
+    tcga_ut,
+)
 from imbalance_benchmark.datasets import features as feature_lib
 
 __all__ = ["DATASET_NAMES", "build_manifest"]
@@ -44,9 +44,12 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
     root = Path(dataset_cfg["root"])
     regime = dataset_cfg.get("regime", "patch")
     if regime == "wsi":
-        raise ValueError(
-            "BRACS supplies annotated ROI crops only; it cannot implement the "
-            "report's slide-label-only WSI estimand."
+        metadata_csv = dataset_cfg.get("wsi_metadata_csv")
+        return bracs.build_wsi_manifest(
+            root,
+            Path(dataset_cfg.get("wsi_tile_root", root / "tiles" / "wsi")),
+            int(dataset_cfg.get("seed", 0)),
+            Path(metadata_csv) if metadata_csv else None,
         )
     metadata_csv = dataset_cfg.get("metadata_csv")
     tile_root = Path(dataset_cfg.get("tile_root", root / "tiles"))
@@ -55,7 +58,7 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
         root, Path(metadata_csv) if metadata_csv else None
     )
     image_index = bracs.index_roi_images(root)
-    tiled, _ = bracs_tiling.tile_rois(roi_frame, image_index, tile_root, tile_size)
+    tiled, _ = bracs.tile_rois(roi_frame, image_index, tile_root, tile_size)
     if tiled.empty:
         raise RuntimeError("No BRACS ROI tiles were generated.")
     assignment = bracs.split_cases(tiled, int(dataset_cfg.get("seed", 0)))

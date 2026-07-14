@@ -1,4 +1,4 @@
-"""BRACS ROI metadata, deterministic tiling, and patient-disjoint splitting."""
+"""BRACS ROI metadata and patient-disjoint splitting."""
 
 from __future__ import annotations
 

@@ -108,20 +108,48 @@ def test_pilot_training_receives_the_configured_wsi_evidence_controls(
     assert observed["context"]["config"]["wsi_training"]["max_instances"] == 17
 
 
-def test_bracs_wsi_is_rejected_when_only_annotated_rois_are_available(
+def test_bracs_wsi_uses_official_slide_metadata_without_roi_supervision(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Annotated ROI crops cannot stand in for slide-label-only WSI bags."""
+    """BRACS WSI bags use official slide labels and never inspect ROI metadata."""
+    tile = tmp_path / "tile.jpg"
+    tile.touch()
     monkeypatch.setattr(
         dataset_adapters.bracs,
         "load_roi_metadata",
-        lambda *_: pd.DataFrame(),
+        lambda *_: (_ for _ in ()).throw(AssertionError("WSI must not read ROIs")),
+    )
+    monkeypatch.setattr(
+        dataset_adapters.bracs.wsi,
+        "load_wsi_metadata",
+        lambda *_: pd.DataFrame(
+            {
+                "dataset": ["bracs"],
+                "case_id": ["patient_1"],
+                "slide_id": ["BRACS_1"],
+                "slide_label": ["DCIS"],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        dataset_adapters.bracs.wsi,
+        "list_slide_tiles",
+        lambda *_: [tile],
     )
 
-    with pytest.raises(ValueError, match="annotated ROI"):
-        dataset_adapters._build_bracs(
-            {"dataset": {"root": str(tmp_path), "regime": "wsi"}}
-        )
+    rows = dataset_adapters._build_bracs(
+        {
+            "dataset": {
+                "root": str(tmp_path),
+                "wsi_tile_root": str(tmp_path),
+                "regime": "wsi",
+            }
+        }
+    )
+
+    assert rows["cancer_type"].tolist() == ["DCIS"]
+    assert rows["slide_label"].tolist() == ["DCIS"]
+    assert "patch_label" not in rows
 
 
 def test_camelyon16_wsi_rows_do_not_require_or_read_a_mask(

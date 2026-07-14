@@ -5,10 +5,12 @@ from PIL import Image
 
 from imbalance_benchmark.datasets.bracs import (
     assert_patient_disjoint,
+    list_slide_tiles,
+    load_wsi_metadata,
     normalize_label,
     split_cases,
+    tile_rois,
 )
-from imbalance_benchmark.datasets.bracs_tiling import tile_rois
 
 
 def test_bracs_label_normalization_maps_seven_subtypes() -> None:
@@ -92,3 +94,39 @@ def test_bracs_tiling_caps_each_wsi_at_median(tmp_path) -> None:
     per_wsi = tiled.groupby("slide_id")["patch_id"].count()
     assert per_wsi.max() <= bag_size
     assert per_wsi.to_dict() == {"s1": 2, "s2": 3, "s3": 3}
+
+
+def test_bracs_wsi_metadata_uses_official_labels_without_roi_derivation(
+    tmp_path,
+) -> None:
+    metadata_path = tmp_path / "wsi_metadata.csv"
+    pd.DataFrame(
+        {
+            "Patient ID": ["p1", "p2"],
+            "WSI Filename": ["BRACS_1.svs", "BRACS_2.svs"],
+            "WSI Label": ["ADH", "Invasive Carcinoma"],
+            "Number of RoIs": [3, 0],
+        }
+    ).to_csv(metadata_path, index=False)
+
+    metadata = load_wsi_metadata(tmp_path, metadata_path)
+
+    assert metadata[["slide_id", "case_id", "slide_label"]].to_dict("records") == [
+        {"slide_id": "BRACS_1", "case_id": "p1", "slide_label": "ADH"},
+        {"slide_id": "BRACS_2", "case_id": "p2", "slide_label": "IC"},
+    ]
+
+
+def test_bracs_wsi_tiles_have_deterministic_order(tmp_path) -> None:
+    slide_dir = tmp_path / "BRACS_1"
+    slide_dir.mkdir()
+    for name in ("patch_10.jpg", "patch_02.jpg", "patch_01.jpg"):
+        Image.new("RGB", (256, 256)).save(slide_dir / name)
+
+    tiles = list_slide_tiles(tmp_path, "BRACS_1")
+
+    assert [path.name for path in tiles] == [
+        "patch_01.jpg",
+        "patch_02.jpg",
+        "patch_10.jpg",
+    ]
