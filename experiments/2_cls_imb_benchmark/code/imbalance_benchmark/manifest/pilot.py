@@ -195,6 +195,8 @@ def run_pilot_seed(
     is_mil: bool,
     scratch_dir: Path,
     quota: int | None,
+    *,
+    initialization_seed: int,
 ) -> tuple[int | None, list[float], list[list[float]]]:
     """Run every nested candidate level for one pilot construction seed at the frozen quota."""
     ba_curve, recall_curve = [], []
@@ -206,7 +208,13 @@ def run_pilot_seed(
         )
         p = scratch_dir / f"pilot_seed={seed}_level={level}.csv"
         ba, recalls = evaluate_pilot_candidate(
-            manifest, val_ds, device, n_cls, is_mil, p, initialization_seed=seed
+            manifest,
+            val_ds,
+            device,
+            n_cls,
+            is_mil,
+            p,
+            initialization_seed=initialization_seed,
         )
         ba_curve.append(ba)
         recall_curve.append(recalls)

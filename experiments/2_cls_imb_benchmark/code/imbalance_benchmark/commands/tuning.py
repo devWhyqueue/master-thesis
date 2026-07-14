@@ -9,6 +9,7 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.common import (
+    bag_dataset_kwargs,
     ensure_dirs,
     load_config,
     sign_file,
@@ -16,10 +17,9 @@ from imbalance_benchmark.common import (
     write_json,
 )
 from imbalance_benchmark.datasets.data import (
-    BagFeatureDataset,
-    ImbalanceDataset,
     bag_collate,
 )
+from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
@@ -43,18 +43,28 @@ def _tuning_inputs(
     """Load config, the natural-validation loader, and the regime for the tuning sweep."""
     config = load_config(args.config)
     freeze_path = paths["data"] / "manifest_freeze.json"
-    if freeze_path.exists():
-        verify_manifest_freeze(json.loads(freeze_path.read_text()))
+    freeze = json.loads(freeze_path.read_text())
+    verify_manifest_freeze(freeze)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    dataset_cls = BagFeatureDataset if is_mil else ImbalanceDataset
-    val_ds = dataset_cls(
-        paths["data"] / "manifest.csv", split_name="validation", device=device
+    bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
+    val_ds = load_training_dataset(
+        paths["data"] / "manifest.csv",
+        is_mil,
+        "validation",
+        device=device,
+        bag_kwargs=bag_kwargs,
     )
     val_loader = torch.utils.data.DataLoader(
         val_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
     )
-    regime = Regime(device, config, val_ds.get_n_classes(), is_mil)
+    regime = Regime(
+        device,
+        config,
+        val_ds.get_n_classes(),
+        is_mil,
+        bag_dataset_kwargs=bag_kwargs or {},
+    )
     return paths, regime, val_loader
 
 
@@ -183,14 +193,15 @@ def _combined_scopes(
     result = []
     for assignment in assignments:
         for paths, regime, loader in scopes:
-            dataset_cls = BagFeatureDataset if regime.is_mil else ImbalanceDataset
             result.append(
                 TuningScope(
                     regime,
                     loader,
-                    dataset_cls(
+                    load_training_dataset(
                         paths["data"] / _manifest_name(condition, assignment),
+                        regime.is_mil,
                         device=regime.device,
+                        bag_kwargs=regime.bag_dataset_kwargs,
                     ),
                 )
             )

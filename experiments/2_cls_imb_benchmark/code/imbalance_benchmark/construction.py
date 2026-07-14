@@ -5,6 +5,7 @@ from typing import cast
 import numpy as np
 import pandas as pd
 from imbalance_benchmark.common import compute_data_hash
+from imbalance_benchmark.datasets.bracs import LABELS as BRACS_LABELS
 from imbalance_benchmark.manifest.construction_sampling import (
     select_patches_round_robin,
     select_slides_round_robin,
@@ -22,7 +23,26 @@ __all__ = [
     "select_slides_round_robin",
     "build_manifest_hash",
     "patient_equals_slide",
+    "locked_class_names",
 ]
+
+
+def locked_class_names(df: pd.DataFrame) -> list[str]:
+    """Return the semantic native order and require every target in each split."""
+    classes = sorted(df["cancer_type"].astype(str).unique().tolist())
+    if set(classes) == set(BRACS_LABELS):
+        classes = list(BRACS_LABELS)
+    elif classes and all(name.startswith("ISUP") for name in classes):
+        classes = sorted(classes, key=lambda name: int(name.removeprefix("ISUP")))
+    else:
+        counts = df.loc[df["split"] == "train", "cancer_type"].value_counts()
+        classes = sorted(classes, key=lambda name: (-int(counts.get(name, 0)), name))
+    expected = set(classes)
+    for split, frame in df.groupby("split", sort=False):
+        missing = sorted(expected - set(frame["cancer_type"].astype(str)))
+        if missing:
+            raise ValueError(f"Split '{split}' lacks locked target classes: {missing}")
+    return [str(name) for name in classes]
 
 
 def split_cases(

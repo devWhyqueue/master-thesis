@@ -24,6 +24,7 @@ __all__ = [
     "compute_data_hash",
     "write_run_record",
     "read_run_record",
+    "bag_dataset_kwargs",
 ]
 
 
@@ -33,6 +34,24 @@ def find_repo_root() -> Path:
         if (parent / ".git").exists():
             return parent
     return Path(__file__).resolve().parents[4]
+
+
+def bag_dataset_kwargs(
+    config: dict[str, Any],
+    freeze: dict[str, Any] | None = None,
+    seed: int | None = None,
+) -> dict[str, int]:
+    """Return the WSI evidence controls recorded for a training workflow."""
+    caps = freeze.get("evidence_caps", {}) if freeze else {}
+    training = config.get("wsi_training", {})
+    if not isinstance(training, dict) or not isinstance(caps, dict):
+        raise ValueError("WSI evidence controls must be mappings")
+    max_instances = caps.get("wsi_instances", training.get("max_instances", 500))
+    selection_seed = freeze.get("instance_selection_seed") if freeze else seed
+    return {
+        "max_instances": int(max_instances),
+        "instance_selection_seed": int(selection_seed or 0),
+    }
 
 
 REPO_ROOT = find_repo_root()

@@ -28,19 +28,6 @@ from imbalance_benchmark.manifest.construction_helpers import (
 )
 
 
-def locked_class_names(df: pd.DataFrame) -> list[str]:
-    """Return the global label order and reject held-out splits missing a target class."""
-    classes = sorted(df["cancer_type"].astype(str).unique().tolist())
-    if classes and all(name.startswith("ISUP") for name in classes):
-        classes = sorted(classes, key=lambda name: int(name.removeprefix("ISUP")))
-    expected = set(classes)
-    for split, frame in df.groupby("split", sort=False):
-        missing = sorted(expected - set(frame["cancer_type"].astype(str)))
-        if missing:
-            raise ValueError(f"Split '{split}' lacks locked target classes: {missing}")
-    return classes
-
-
 @dataclass(frozen=True)
 class PilotConstraints:
     """Allocation and independent-unit floors frozen from the pilot."""

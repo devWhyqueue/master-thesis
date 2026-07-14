@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -18,6 +20,40 @@ from imbalance_benchmark.datasets.features import attach_extracted_features
 from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_prepare"]
+
+
+def _apply_patch_evidence_cap(
+    frame: pd.DataFrame, patch_per_slide_cap: int | None, seed: int
+) -> pd.DataFrame:
+    """Deterministically cap eligible patch evidence before patient splitting."""
+    if patch_per_slide_cap is None:
+        return frame
+    if patch_per_slide_cap < 1:
+        raise ValueError("evidence.patch_per_slide_cap must be positive")
+    selected = []
+    for slide_id, group in frame.groupby("slide_id", sort=False):
+        if len(group) <= patch_per_slide_cap:
+            selected.append(group)
+            continue
+        digest = hashlib.sha256(f"{seed}:{slide_id}".encode()).digest()
+        rng = np.random.default_rng(int.from_bytes(digest[:8], "big"))
+        positions = np.sort(rng.choice(len(group), patch_per_slide_cap, replace=False))
+        selected.append(group.iloc[positions])
+    return pd.concat(selected, ignore_index=True)
+
+
+def _apply_evidence_controls(
+    frame: pd.DataFrame, config: dict[str, object], seed: int
+) -> pd.DataFrame:
+    """Apply regime-specific evidence limits to the eligible pool once."""
+    dataset = config.get("dataset", {})
+    if not isinstance(dataset, dict) or dataset.get("regime", "patch") != "patch":
+        return frame
+    evidence = config.get("evidence", {})
+    if not isinstance(evidence, dict):
+        raise ValueError("evidence config must be a mapping")
+    cap = evidence.get("patch_per_slide_cap")
+    return _apply_patch_evidence_cap(frame, None if cap is None else int(cap), seed)
 
 
 def _synthetic_manifest(paths: dict[str, Path]) -> pd.DataFrame:
@@ -69,7 +105,11 @@ def cmd_prepare(args: argparse.Namespace) -> None:
     """Create exactly three disjoint patient-split manifests from one eligible pool."""
     config = load_config(args.config)
     base_paths = ensure_dirs(config)
-    df = _base_manifest(config, base_paths)
+    df = _apply_evidence_controls(
+        _base_manifest(config, base_paths),
+        config,
+        derive_seed(args.seed, "instance_selection"),
+    )
     for index in split_indices(args.split_index):
         paths = split_paths(base_paths, index)
         split_df = split_cases(

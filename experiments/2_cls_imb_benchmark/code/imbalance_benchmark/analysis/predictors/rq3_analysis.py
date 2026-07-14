@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from imbalance_benchmark.analysis.predictors.rq3_cross_split import load_rq3_cells
+from imbalance_benchmark.common import bag_dataset_kwargs
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
     fit_gate_pass_model,
@@ -21,23 +22,33 @@ from imbalance_benchmark.analysis.predictors.separability import (
     intrinsic_separability,
     intraclass_correlation,
 )
-from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
+from imbalance_benchmark.datasets.data import (
+    BagFeatureDataset,
+    ImbalanceDataset,
+)
+from imbalance_benchmark.datasets.data import load_training_dataset
 
 __all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
 
 
 def _feature_frame(
-    manifest: Path, split: str | None, is_mil: bool
+    manifest: Path,
+    split: str | None,
+    is_mil: bool,
+    bag_kwargs: dict[str, int] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Load fixed embeddings and integer targets from one frozen manifest partition."""
     if is_mil:
-        dataset = BagFeatureDataset(manifest, split)
+        dataset = cast(
+            BagFeatureDataset,
+            load_training_dataset(manifest, True, split, bag_kwargs=bag_kwargs),
+        )
         features = []
         for index in range(len(dataset)):
             bag, _ = dataset[index]
             features.append(np.r_[bag.mean(0).cpu(), bag.std(0).cpu()])
     else:
-        dataset = ImbalanceDataset(manifest, split)
+        dataset = cast(ImbalanceDataset, load_training_dataset(manifest, False, split))
         features = [
             dataset[index]["features"].cpu().numpy() for index in range(len(dataset))
         ]
@@ -51,20 +62,24 @@ def _min_independent_support(condition: dict[str, Any], is_mil: bool) -> float:
     return float(min(values)) if values else 1.0
 
 
-def _feature_identity(manifest: Path, split: str | None, is_mil: bool) -> pd.DataFrame:
+def _feature_identity(
+    manifest: Path,
+    split: str | None,
+    is_mil: bool,
+    bag_kwargs: dict[str, int] | None = None,
+) -> pd.DataFrame:
     """Return identities in the same one-row-per-observation order as features."""
-    dataset = (
-        BagFeatureDataset(manifest, split)
-        if is_mil
-        else ImbalanceDataset(manifest, split)
-    )
+    dataset = load_training_dataset(manifest, is_mil, split, bag_kwargs=bag_kwargs)
     return cast(pd.DataFrame, dataset.df[["case_id", "slide_id"]]).reset_index(
         drop=True
     )
 
 
 def _covariates(
-    paths: dict[str, Path], is_mil: bool, condition: dict[str, Any]
+    paths: dict[str, Path],
+    is_mil: bool,
+    condition: dict[str, Any],
+    freeze: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Frozen-feature RQ3 covariates measured before mitigation fitting.
 
@@ -74,22 +89,26 @@ def _covariates(
     indicator) are descriptive covariates for the single-predictor sensitivity
     fits only.
     """
-    ref_x, ref_y = _feature_frame(paths["data"] / "manifest_balanced.csv", None, is_mil)
-    val_x, val_y = _feature_frame(paths["data"] / "manifest.csv", "validation", is_mil)
+    bag_kwargs = bag_dataset_kwargs({}, freeze) if is_mil else None
+    ref_path = paths["data"] / "manifest_balanced.csv"
+    ref_x, ref_y = _feature_frame(ref_path, None, is_mil, bag_kwargs)
+    val_x, val_y = _feature_frame(
+        paths["data"] / "manifest.csv", "validation", is_mil, bag_kwargs
+    )
     n_classes = len(np.unique(ref_y))
     intrinsic = intrinsic_separability(ref_x, ref_y, val_x, val_y, n_classes)
     cond_path = Path(condition["path"])
     if not cond_path.exists():
         raise RuntimeError(f"Missing frozen controlled manifest for RQ3: {cond_path}")
-    cond_x, cond_y = _feature_frame(cond_path, None, is_mil)
+    cond_x, cond_y = _feature_frame(cond_path, None, is_mil, bag_kwargs)
     learnability = condition_learnability(cond_x, cond_y, val_x, val_y, n_classes)
-    frame = _feature_identity(cond_path, None, is_mil)
+    frame = _feature_identity(ref_path, None, is_mil, bag_kwargs)
     margins = class_margin_cross_fit(
-        cond_x, cond_y, frame["case_id"].astype(str).to_numpy(), n_classes
+        ref_x, ref_y, frame["case_id"].astype(str).to_numpy(), n_classes
     )
     effective = []
     for class_index in range(n_classes):
-        mask = cond_y == class_index
+        mask = ref_y == class_index
         class_cases = frame.loc[mask, "case_id"].astype(str).to_numpy()
         counts = pd.Series(class_cases).value_counts()
         effective.append(
@@ -161,7 +180,7 @@ def _cells(
                 "recovery": row.get("recovery", np.nan),
                 "recovery_se": _recovery_standard_error(row),
                 "method": row["method"],
-                **_covariates(paths, is_mil, allocated),
+                **_covariates(paths, is_mil, allocated, freeze),
             }
         )
     return cells

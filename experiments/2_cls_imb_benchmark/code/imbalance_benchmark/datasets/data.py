@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import hashlib
 from pathlib import Path
 from typing import Any, cast
 import numpy as np
@@ -10,16 +10,37 @@ from torch.utils.data import Dataset
 
 from imbalance_benchmark.datasets.features import load_slide_features
 
-logger = logging.getLogger(__name__)
-
 __all__ = [
     "load_feature_row",
     "ImbalanceDataset",
     "BagFeatureDataset",
     "bag_collate",
     "slide_level_identity",
+    "load_training_dataset",
     "TrainDataset",
 ]
+
+
+def load_training_dataset(
+    manifest_path: str | Path,
+    is_mil: bool,
+    split_name: str | None = None,
+    device: str | torch.device = "cpu",
+    class_names: list[str] | None = None,
+    bag_kwargs: dict[str, int] | None = None,
+) -> TrainDataset:
+    """Load one regime-appropriate dataset with its frozen evidence controls."""
+    if not is_mil:
+        return ImbalanceDataset(manifest_path, split_name, device, class_names)
+    controls = bag_kwargs or {}
+    return BagFeatureDataset(
+        manifest_path,
+        split_name,
+        max_instances=controls.get("max_instances", 500),
+        instance_selection_seed=controls.get("instance_selection_seed", 0),
+        device=device,
+        class_names=class_names,
+    )
 
 
 def _class_names(values: pd.Series) -> list[str]:
@@ -140,6 +161,7 @@ class BagFeatureDataset(Dataset):
         manifest_path: str | Path,
         split_name: str | None = None,
         max_instances: int = 500,
+        instance_selection_seed: int = 0,
         device: str | torch.device = "cpu",
         class_names: list[str] | None = None,
     ) -> None:
@@ -147,6 +169,7 @@ class BagFeatureDataset(Dataset):
         super().__init__()
         self.device = device
         self.max_instances = max_instances
+        self.instance_selection_seed = instance_selection_seed
         df = cast(pd.DataFrame, pd.read_csv(manifest_path))
         if split_name is not None and "split" in df.columns:
             df = cast(
@@ -191,9 +214,22 @@ class BagFeatureDataset(Dataset):
         paths = list(dict.fromkeys(str(path) for path in row["feature_path"]))
         features = torch.cat([load_slide_features(path) for path in paths], dim=0)
         if self.max_instances is not None and len(features) > self.max_instances:
-            features = features.index_select(
-                0, torch.linspace(0, len(features) - 1, self.max_instances).long()
-            )
+            if self.instance_selection_seed == 0:
+                selected = torch.linspace(
+                    0, len(features) - 1, self.max_instances
+                ).long()
+            else:
+                digest = hashlib.sha256(
+                    f"{self.instance_selection_seed}:{row['slide_id']}".encode()
+                ).digest()
+                rng = np.random.default_rng(int.from_bytes(digest[:8], "big"))
+                selected = torch.as_tensor(
+                    np.sort(
+                        rng.choice(len(features), self.max_instances, replace=False)
+                    ),
+                    dtype=torch.long,
+                )
+            features = features.index_select(0, selected)
         return features.to(self.device), self.class_to_idx[str(row["cancer_type"])]
 
 

@@ -23,18 +23,22 @@ def _freeze_and_reinit_classifier(
             parameter.requires_grad_(False)
         for parameter in attention_model.attention.parameters():
             parameter.requires_grad_(False)
+        for parameter in attention_model.projector.parameters():
+            parameter.requires_grad_(False)
         classifier, frozen = (
             attention_model.classifier,
             (
                 attention_model.instance_encoder,
                 attention_model.attention,
+                attention_model.projector,
             ),
         )
     else:
         mlp = cast(MLP, model)
-        for parameter in mlp.net[0].parameters():
+        representation = mlp.net[:-1]
+        for parameter in representation.parameters():
             parameter.requires_grad_(False)
-        classifier, frozen = cast(nn.Linear, mlp.net[-1]), (mlp.net[0],)
+        classifier, frozen = cast(nn.Linear, mlp.net[-1]), (representation,)
     nn.init.xavier_uniform_(classifier.weight)
     nn.init.zeros_(classifier.bias)
     return frozen

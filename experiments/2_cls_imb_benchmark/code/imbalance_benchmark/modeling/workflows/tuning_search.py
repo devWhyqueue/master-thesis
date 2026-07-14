@@ -6,10 +6,9 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.datasets.data import (
-    BagFeatureDataset,
-    ImbalanceDataset,
     TrainDataset,
 )
+from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.modeling.context import (
     Regime,
     build_training_ctx,
@@ -31,8 +30,12 @@ def tune_condition(
     manifest_path: Path,
 ) -> dict[str, Any]:
     """Tune every roster method against one imbalance condition's training manifest."""
-    dataset_cls = BagFeatureDataset if regime.is_mil else ImbalanceDataset
-    train_ds = dataset_cls(manifest_path, device=regime.device)
+    train_ds = load_training_dataset(
+        manifest_path,
+        regime.is_mil,
+        device=regime.device,
+        bag_kwargs=regime.bag_dataset_kwargs,
+    )
     selections: dict[str, Any] = {}
     ce_state = None
     for method in methods:

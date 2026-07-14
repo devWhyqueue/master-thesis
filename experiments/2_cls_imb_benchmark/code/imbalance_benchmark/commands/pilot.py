@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 
 from imbalance_benchmark.common import (
+    bag_dataset_kwargs,
     ensure_dirs,
     load_config,
     sign_file,
@@ -14,7 +15,11 @@ from imbalance_benchmark.common import (
     write_json,
 )
 from imbalance_benchmark.construction import patient_equals_slide
-from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
+from imbalance_benchmark.datasets.data import (
+    BagFeatureDataset,
+    ImbalanceDataset,
+)
+from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.pilot import (
     frozen_pilot_quota,
     meets_method_floor,
@@ -63,6 +68,7 @@ def _run_all_pilot_seeds(
     levels: list[int],
     is_mil: bool,
     base_seed: int,
+    config: dict[str, Any],
     paths: dict[str, Any],
 ) -> tuple[
     list[int],
@@ -72,12 +78,16 @@ def _run_all_pilot_seeds(
 ]:
     """Run every pilot construction seed and collect its candidate-level curves."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    val_ds: ImbalanceDataset | BagFeatureDataset = (
-        BagFeatureDataset(paths["data"] / "manifest.csv", "validation", device=device)
-        if is_mil
-        else ImbalanceDataset(
-            paths["data"] / "manifest.csv", "validation", device=device
+    val_ds: ImbalanceDataset | BagFeatureDataset = load_training_dataset(
+        paths["data"] / "manifest.csv",
+        is_mil,
+        "validation",
+        device=device,
+        bag_kwargs=bag_dataset_kwargs(
+            config, seed=derive_seed(base_seed, "instance_selection")
         )
+        if is_mil
+        else None,
     )
     scratch_dir = paths["data"] / "pilot"
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -102,6 +112,7 @@ def _run_all_pilot_seeds(
             is_mil,
             scratch_dir,
             quota,
+            initialization_seed=derive_seed(base_seed, "initialization"),
         )
         quotas[seed], ba_by_seed[seed], recall_by_seed[seed] = (
             quota,
@@ -162,7 +173,7 @@ def cmd_pilot(args: argparse.Namespace) -> None:
     paths = split_paths(ensure_dirs(config), args.split_index)
     train_df, classes, is_mil, eq_slide, levels, support = _pilot_setup(paths, config)
     pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
-        train_df, classes, levels, is_mil, args.seed, paths
+        train_df, classes, levels, is_mil, args.seed, config, paths
     )
     payload = _pilot_report_payload(
         levels,

@@ -14,17 +14,17 @@ from imbalance_benchmark.modeling.workflows.confirmation import (
     confirm_post_hoc,
 )
 from imbalance_benchmark.common import (
+    bag_dataset_kwargs,
     ensure_dirs,
     load_config,
     split_paths,
     verify_signed_file,
 )
 from imbalance_benchmark.datasets.data import (
-    BagFeatureDataset,
-    ImbalanceDataset,
     TrainDataset,
     bag_collate,
 )
+from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
@@ -46,14 +46,16 @@ def _confirm_condition(
     run: RunContext,
 ) -> None:
     """Run confirmation training for every roster method within one imbalance condition."""
-    dataset_cls = BagFeatureDataset if run.is_mil else ImbalanceDataset
     file_name = (
         f"manifest_{cond}.csv"
         if cond in {"natural", "balanced"}
         else f"manifest_{run.assignment}_{cond}.csv"
     )
-    train_ds: TrainDataset = dataset_cls(
-        run.paths["data"] / file_name, device=run.device
+    train_ds: TrainDataset = load_training_dataset(
+        run.paths["data"] / file_name,
+        run.is_mil,
+        device=run.device,
+        bag_kwargs=run.bag_dataset_kwargs,
     )
     cond_configs = require_tuning_configs(best_configs, methods)
     ce_states: list[tuple[dict[str, Any], int]] | None = None
@@ -92,20 +94,24 @@ def _confirm_inputs(
         best_configs = json.load(f)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    dataset_cls = BagFeatureDataset if is_mil else ImbalanceDataset
     freeze = json.loads(freeze_path.read_text())
     class_names = list(freeze["class_names"])
-    test_ds = dataset_cls(
+    bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
+    test_ds = load_training_dataset(
         paths["data"] / "manifest.csv",
-        split_name="test",
+        is_mil,
+        "test",
         device=device,
         class_names=class_names,
+        bag_kwargs=bag_kwargs,
     )
-    val_ds = dataset_cls(
+    val_ds = load_training_dataset(
         paths["data"] / "manifest.csv",
-        split_name="validation",
+        is_mil,
+        "validation",
         device=device,
         class_names=class_names,
+        bag_kwargs=bag_kwargs,
     )
     collate = bag_collate if is_mil else None
     val_ldr = torch.utils.data.DataLoader(val_ds, batch_size=64, collate_fn=collate)
@@ -121,6 +127,7 @@ def _confirm_inputs(
         "paths": paths,
         "seeds": seeds,
         "class_names": class_names,
+        "bag_dataset_kwargs": bag_kwargs or {},
     }
     return best_configs, run_data, freeze
 

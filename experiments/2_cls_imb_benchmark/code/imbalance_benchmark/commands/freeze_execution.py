@@ -27,7 +27,7 @@ from imbalance_benchmark.manifest.freeze import (
     lock_manifest_freeze,
 )
 from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constraints
-from imbalance_benchmark.manifest.freezing import locked_class_names
+from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.datasets.data import slide_level_identity
 

@@ -732,7 +732,7 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
 
     observed_regimes: list[bool] = []
 
-    def covariates(_: dict, is_mil: bool, __: dict) -> dict[str, float]:
+    def covariates(_: dict, is_mil: bool, __: dict, *args: object) -> dict[str, float]:
         observed_regimes.append(is_mil)
         return {
             "separability": 0.5,
@@ -874,6 +874,7 @@ def test_mil_covariates_use_the_dataset_slide_identity_not_raw_chunk_rows(
     from imbalance_benchmark.analysis.predictors.rq3_analysis import _covariates
 
     manifest = tmp_path / "manifest.csv"
+    balanced = tmp_path / "manifest_balanced.csv"
     condition = tmp_path / "condition.csv"
     rows = [
         {"case_id": "p0", "slide_id": "s0", "cancer_type": "A", "feature_path": "a.pt"},
@@ -881,6 +882,7 @@ def test_mil_covariates_use_the_dataset_slide_identity_not_raw_chunk_rows(
         {"case_id": "p1", "slide_id": "s1", "cancer_type": "B", "feature_path": "c.pt"},
     ]
     pd.DataFrame(rows).to_csv(manifest, index=False)
+    pd.DataFrame(rows).to_csv(balanced, index=False)
     pd.DataFrame(rows).to_csv(condition, index=False)
 
     features = np.array([[1.0, 0.0], [0.0, 1.0]])

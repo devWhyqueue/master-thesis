@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import torch
@@ -116,6 +116,7 @@ class Regime:
     config: dict[str, Any]
     n_classes: int
     is_mil: bool
+    bag_dataset_kwargs: dict[str, int] = field(default_factory=dict, kw_only=True)
 
 
 def build_training_ctx(
