@@ -13,7 +13,6 @@
 # Code
 
 - If editing Python code, run clean-code skill after a change (with the appropriate --scope/--vulture-scope). To avoid producing violations in the first place, look into the skill's clean_code_rules.yml.
-- The controlled class-imbalance benchmark lives exclusively in `experiments/2_cls_imb_benchmark/code/imbalance_benchmark`; run its tests from `experiments/2_cls_imb_benchmark/code/tests`.
 
 # LaTeX
 
