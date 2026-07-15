@@ -44,9 +44,9 @@ The study addresses three research questions:
 \begin{description}
   \item[RQ1.] \textbf{Effect of imbalance.} At fixed task, patient split, encoder, training-set size, and evaluation set, how does increasing training imbalance affect tail-class discrimination and calibration in patch classification and WSI-level MIL?
   \item[RQ2.] \textbf{Mitigation effectiveness.} Which mitigation methods recover performance lost specifically to training imbalance, and what are their calibration and computational costs?
-  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Across all controlled comparisons, do intrinsic class separability, condition-specific learnability, and independent support predict whether and how strongly imbalance damages CE performance? Conditional on demonstrated damage, do the same quantities predict mitigation recovery?
+  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Can small exploratory models help explain why some controlled comparisons are more vulnerable than others? Specifically, are imbalance severity and intrinsic separability associated with whether damage occurs, how large it is, and how much is recovered after damage? Condition-specific learnability and independent support are examined as sensitivity predictors.
 \end{description}
-RQ1 establishes whether a recoverable problem exists, and RQ2 asks which methods address that demonstrated deficit. RQ3 first models CE damage across every controlled comparison and then models recovery only where the corresponding deficit is large and precise enough to interpret. The datasets and preprocessing provenance are documented in the companion dataset report, and all detailed method objectives and variants are defined in the companion methods report \citep{queisler2026datasets,queisler2026imbalanceMethods}.
+RQ1 establishes whether a recoverable problem exists, and RQ2 asks which methods address that demonstrated deficit. RQ3 is an exploratory association analysis rather than another method ranking: it relates prespecified properties of each comparison to damage occurrence, damage magnitude, and, where damage is demonstrated, recovery. The datasets and preprocessing provenance are documented in the companion dataset report, and all detailed method objectives and variants are defined in the companion methods report \citep{queisler2026datasets,queisler2026imbalanceMethods}.
 
 \section{Experimental Design}
 \label{sec:design}
@@ -313,15 +313,15 @@ The design isolates training-distribution effects under frozen Virchow2 represen
 
 \section{Evaluation and Statistical Analysis}
 \label{sec:analysis}
-Evaluation separates predictive discrimination, probability quality, mitigation recovery, and exploratory predictors of damage and recovery. All estimands and inferential families are defined before test evaluation.
+Evaluation proceeds from description to explanation. It first measures which classes are predicted correctly, then reports PANDA-specific ordinal error and examines probability quality. It next determines whether imbalance caused a deficit, quantifies uncertainty at the patient level, and tests recovery while accounting for multiple comparisons. Finally, RQ3 explores why damage and recovery differ across controlled comparisons. All endpoints, decision rules, and inferential families are fixed before test evaluation.
 
-\subsection{Endpoints and aggregation units}
+\subsection{Discrimination endpoints and aggregation units}
 The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Overall accuracy is descriptive. Patch predictions are summarized in two ways: patch-micro estimates treat eligible patches as predictions while uncertainty remains patient-clustered, and slide/patient-macro estimates first aggregate the metric contribution within each slide or patient so that heavily tiled slides do not dominate. WSI outcomes are slide-level with patient clustering where patients contribute multiple slides.
 
-Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$. Probability quality is assessed at natural-prevalence and class-balanced weightings.
+\subsection{Ordinal outcomes for PANDA}
+Balanced accuracy treats every wrong class as an error of the same kind. PANDA WSI prediction is the only ordinal task in the benchmark, so it also receives two dataset-specific secondary outcomes that use the distance between ISUP grades. These measures complement rather than replace the common discrimination endpoints.
 
-\paragraph{Ordinal agreement and error.}
-PANDA WSI labels are ordered ISUP grades, so an error of one grade should count less than an error spanning several grades. Let $O_{ab}$ be the observed confusion-matrix count for true grade $a$ and predicted grade $b$. The count expected under independent true and predicted grades is $E_{ab}=O_{a\cdot}O_{\cdot b}/N$, which retains the observed marginal grade frequencies. With $a,b\in\{0,\ldots,C-1\}$ and quadratic disagreement weight $w_{ab}=(a-b)^2/(C-1)^2$, quadratic-weighted kappa is
+Let $N$ be the number of held-out biopsies and $C$ the number of grades. Let $O_{ab}$ be the observed confusion-matrix count for true grade $a$ and predicted grade $b$. The count expected under independent true and predicted grades is $E_{ab}=O_{a\cdot}O_{\cdot b}/N$, which retains the observed marginal grade frequencies. With $a,b\in\{0,\ldots,C-1\}$ and quadratic disagreement weight $w_{ab}=(a-b)^2/(C-1)^2$, quadratic-weighted kappa is
 \begin{equation}
   \kappa_{\mathrm{QW}}
   =1-\frac{\sum_{a=0}^{C-1}\sum_{b=0}^{C-1}w_{ab}O_{ab}}
@@ -334,7 +334,12 @@ PANDA WSI labels are ordered ISUP grades, so an error of one grade should count 
   =\frac{1}{N}\sum_{i=1}^{N}|g_i-\widehat g_i|,
   \label{eq:ordinal-mae}
 \end{equation}
-\noindent where $g_i$ and $\widehat g_i$ are the true and predicted ISUP grades. It reports the average distance in grade levels and is lower-is-better. Both measures are secondary outcomes for PANDA; kappa emphasizes agreement beyond the observed marginals, whereas MAE has the direct interpretation of grades missed per biopsy.
+\noindent where $g_i$ and $\widehat g_i$ are the true and predicted ISUP grades. It reports the average distance in grade levels and is lower-is-better. Kappa emphasizes agreement beyond the observed marginals, whereas MAE has the direct interpretation of grades missed per biopsy.
+
+\subsection{Probability quality and calibration}
+Discrimination metrics depend mainly on which class receives the highest score. Probability-quality metrics instead evaluate the full predicted distribution and whether confidence is compatible with observed outcomes. Tail-group macro negative log likelihood (NLL) is the co-primary calibration endpoint used by the recovery gate in Section~\ref{sec:recovery}. Natural-prevalence NLL, macro NLL, the Brier score, expected calibration error (ECE), and reliability diagrams provide complementary secondary views.
+
+Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$.
 
 \paragraph{Negative log likelihood.}
 Natural-prevalence negative log likelihood (NLL), also called multiclass log loss, is
@@ -370,23 +375,9 @@ For each prediction, let $\hat{y}_i=\arg\max_c\hat{p}_{ic}$ and $q_i=\max_c\hat{
 \end{equation}
 \noindent where $I_b$ contains the predictions assigned to bin $b$. ECE is secondary because it depends on binning and can be unstable with small classwise samples; its bootstrap uncertainty uses the same fixed bins and patient weights as the other endpoints. Reliability diagrams show the binwise confidence--accuracy relation overall and for the tail group.
 
-Because checkpoints and hyperparameters are selected for natural-validation balanced accuracy, all probability-quality results describe discrimination-selected models rather than models optimized for calibration. Temperature scaling and target-prior correction are the only calibration-specific adjustments applied after selection.
+Because checkpoints and hyperparameters are selected for natural-validation balanced accuracy, all probability-quality results describe discrimination-selected models rather than models optimized for calibration. The output semantics and prior corrections of individual methods are defined in the companion methods report rather than in this endpoint section \citep{queisler2026imbalanceMethods}.
 
-Scores for balanced decisions are kept distinct from probabilities for the natural target prevalence. For an ordinary CE score $z_c^{\mathrm{CE}}$ and realized training prior $\pi_c^{\mathrm{train}}$, post-hoc logit adjustment uses $z_c^{\mathrm{CE}}-\tau\log\pi_c^{\mathrm{train}}$ for balanced-accuracy decisions. It is not reported as a naturally calibrated probability. Under the prior-shift assumption, target-prevalence probabilities instead normalize
-\begin{equation}
-  z_c^{\mathrm{CE}}-\log\pi_c^{\mathrm{train}}
-  +\log\pi_c^{\mathrm{target}}.
-  \label{eq:posthoc-target-prior}
-\end{equation}
-\noindent For train-time logit adjustment, training applies CE to $g_c=z_c+\tau\log\pi_c^{\mathrm{train}}$. Because $g_c$ approximates training-posterior logits, the corresponding target-prevalence logits are
-\begin{equation}
-  z_c+(\tau-1)\log\pi_c^{\mathrm{train}}
-  +\log\pi_c^{\mathrm{target}}.
-  \label{eq:train-time-target-prior}
-\end{equation}
-\noindent The unadjusted $z_c$ remains the train-time method's validation-selected discrimination score but is a fully prior-stripped score only when $\tau=1$. The target prior $\pi^{\mathrm{target}}$ is estimated separately within each natural-validation split and applied only to the corresponding test split. Temperature scaling is fitted on natural-validation NLL after the appropriate target-prior correction and applied unchanged to test logits. Raw, balanced-decision, target-prior-corrected, and temperature-scaled outputs are retained separately. A single temperature is interpreted as a sharpness correction, not a remedy for class-specific prior mismatch.
-
-\subsection{Imbalance deficit, recovery, and inference}
+\subsection{From imbalance deficit to mitigation recovery}
 \label{sec:recovery}
 Recovery is meaningful only when imbalance has first caused a measurable loss. The analysis therefore proceeds in two stages: compare size-matched balanced and imbalanced CE, then evaluate mitigation only on an endpoint that shows sufficiently large and statistically supported harm. One \emph{comparison unit} is a fixed dataset, prediction regime, imbalance severity, and tail assignment. A \emph{gate} is the prespecified eligibility rule that routes such a unit to the relevant recovery analysis; it is not a learned model component.
 
@@ -428,27 +419,104 @@ The \emph{discrimination gate} opens when the CE balanced-accuracy deficit is at
 
 The two routes preserve an important distinction. Strong frozen features may leave balanced accuracy nearly intact while imbalance still biases tail probabilities, in which case a single discrimination rule would exclude methods designed to correct class priors. Conversely, the gates avoid unstable recovery ratios when no meaningful damage exists to recover. All CE deficits on both axes remain reported, including units that fail both rules. For the lower-is-better calibration axis, the sign-corrected deficit $D_{\mathrm{cal}}=\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$ is the denominator and the method's tail-NLL improvement over imbalanced CE is the numerator, so Equation~\eqref{eq:recovery} retains the same interpretation. Recovery for other secondary metrics is descriptive and does not reopen a comparison unit that fails both gates.
 
-Confidence intervals use a class-preserving crossed paired bootstrap. Before model training, \num{10000} label-only replicates are generated from the locked test manifests. Each patient is assigned a stratum defined by its complete split-by-class contribution vector across all test appearances; this vector can contain several classes for patch targets. Within every nonempty stratum, the observed number of patients is resampled with replacement. A selected patient's multiplicity is then applied to all of that patient's slides and patches in every split, so overlapping test appearances never become independent people. When patient and slide coincide, slides are the resampling units. Preserving every observed contribution stratum guarantees that each class represented in an original split remains represented in every replicate; an uncomputable split-level metric is treated as an implementation failure and the analysis stops rather than silently discarding the replicate.
+\subsection{Uncertainty from patient resampling}
+A \emph{bootstrap} approximates sampling uncertainty by repeatedly constructing hypothetical test cohorts from the observed patients. Sampling is performed \emph{with replacement}: within one replicate, a patient can be selected more than once or not selected at all. The metric is recomputed for every replicate, and the spread of those values shows how much the result could change under a similar patient sample. Patients---not patches---are resampled because patches from one patient are correlated.
 
-The label-only preflight verifies class representation, computability of every split-level metric, and identical patient multiplicities across split appearances. It also checks whether a nominally large bootstrap replicate is effectively dominated by only a few patients. If patient $i$ has class-specific bootstrap weight $v_i$, its \emph{Kish effective patient count} is
+\paragraph{Label-only preflight.}
+Before model training, \num{10000} bootstrap replicates are constructed using only patient identifiers, split membership, and class labels. \emph{Label-only} means that no predictions, performance values, or method identities are used; these replicates test whether the planned resampling scheme is valid before results can influence it. The count of \num{10000} is a prespecified Monte Carlo budget. It places about 250 replicates in each 2.5\% tail of a percentile interval, reducing simulation noise in the interval endpoints while remaining inexpensive at this label-only stage.
+
+A \emph{stratum} is a group of patients with the same observed contribution pattern. Here, that pattern records how many examples a patient contributes to each class in each test-split appearance. Patients are resampled only against other patients in the same stratum. This preserves the observed split--class structure, including patch targets for which one patient can contribute several classes. A selected patient's multiplicity is applied to all of that patient's slides and patches in every split. When patient and slide coincide, slides are the resampling units. Figure~\ref{fig:bootstrap-workflow} summarizes the workflow.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, font=\small, text width=3.15cm, minimum height=1.0cm},
+    fixed/.style={box, fill=gray!10},
+    sampled/.style={box, fill=blue!7},
+    result/.style={box, fill=green!7, text width=5.8cm},
+    arrow/.style={-{Latex[length=2mm]}, thick}
+  ]
+    \node[fixed] (identity) {Observed test identities\\patient, split, and class};
+    \node[fixed, right=0.35cm of identity] (strata) {Group patients by\\contribution stratum};
+    \node[sampled, right=0.35cm of strata] (resample) {Resample patients\\with replacement};
+    \node[sampled, right=0.35cm of resample] (weights) {Carry each multiplicity to\\all matched predictions};
+    \node[result, below=0.65cm of resample, xshift=0.9cm] (interval) {Recompute the complete statistic in each replicate;\\the middle 95\% forms the percentile interval};
+    \draw[arrow] (identity) -- (strata);
+    \draw[arrow] (strata) -- (resample);
+    \draw[arrow] (resample) -- (weights);
+    \draw[arrow] (weights.south) |- (interval.east);
+  \end{tikzpicture}
+  \caption{Patient-level bootstrap workflow. The label-only preflight executes the identity, stratification, and resampling steps before predictions exist. After model fitting, the same paired patient multiplicities are applied to every matched run.}
+  \label{fig:bootstrap-workflow}
+\end{figure}
+
+\noindent The preflight verifies that every original split--class cell remains represented, every split-level metric is computable, and one patient receives the same multiplicity across all appearances. Failure of any check stops the analysis rather than causing a replicate to be silently discarded.
+
+Resampling with replacement can still produce a replicate dominated by a few repeatedly selected patients. If patient $i$ has class-specific bootstrap weight $v_i$, the \emph{Kish effective patient count}
 \begin{equation}
   n_{\mathrm{Kish}}=\frac{\left(\sum_i v_i\right)^2}{\sum_i v_i^2}.
   \label{eq:kish}
 \end{equation}
-\noindent This equals the number of resampled patients when their weights are equal and becomes smaller as the weight concentrates on a few patients. The preflight records this count, the number of unique resampled patients, and the largest normalized patient weight by split and class. If $n_{\mathrm{Kish}}<5$ in any replicate, or one patient supplies more than 50\% of a class's bootstrap weight in more than 5\% of replicates, inference for that dataset--regime is designated descriptive before training. The diagnostic report and resampling seed are frozen with the analysis manifest.
+\noindent translates unequal patient weights into the equivalent number of equally weighted patients. It decreases as weight concentrates. The preflight also records the number of unique patients and the largest patient weight by split and class. If $n_{\mathrm{Kish}}<5$ in any replicate, or one patient supplies more than 50\% of a class's weight in more than 5\% of replicates, inference for that dataset--regime is designated descriptive before training. The diagnostic report and resampling seed are frozen with the analysis manifest.
 
-In the model-based bootstrap, the three split seeds are fixed design repetitions and are averaged with equal weight, not resampled as independent cohorts. Tail assignments remain separate unless an explicitly assignment-averaged estimand is reported. Within each replicate, the five matched confirmation initialization indices are resampled as paired algorithmic-noise blocks and averaged before split aggregation; they never increase the patient sample size. Balanced CE, imbalanced CE, and each method use the same patient and initialization draws. The shared balanced baseline is loaded once and receives the same bootstrap weights in every assignment-specific deficit. The full deficit and recovery ratio in Equation~\eqref{eq:recovery}, including its numerator and denominator, is recomputed inside every replicate. Patches are never bootstrapped independently. Percentile 95\% intervals are reported with the number of replicates and seed fixed in the analysis manifest.
+\paragraph{Intervals after model fitting.}
+The three patient splits are fixed design repetitions and are averaged with equal weight; they are not treated as three independent cohorts. Tail assignments remain separate unless an assignment-averaged estimand is explicitly reported. Within each patient-bootstrap replicate, the five matched confirmation-seed indices are also resampled as paired blocks and averaged before the splits are combined. This captures algorithmic variation without pretending that five model initializations create five additional patient cohorts.
 
-The tested effect is gate-specific. On the discrimination axis it is the raw balanced-accuracy difference $\Delta_{\mathrm{BA}}=\mathrm{BA}(\mathrm{method})-\mathrm{BA}(\mathrm{imbalanced\ CE})$; on the calibration axis it is the paired tail-group NLL change $\Delta_{\mathrm{cal}}=\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{method})$, oriented so positive values indicate improvement. Recovery ratios are reported as normalized effects and are never test statistics. Raw two-sided $p$-values use a paired patient-block permutation test. Under each permutation, the complete method and CE prediction blocks are swapped within a patient using the same swap for all slides, patches, split appearances, and matched confirmation seeds, after which the gate's statistic is recomputed. All permutations are enumerated when feasible; otherwise \num{100000} random permutations and the plus-one correction are used.
+Balanced CE, imbalanced CE, and each mitigation method receive the same patient multiplicities and confirmation-seed draws. The complete deficit and recovery fraction, including numerator and denominator, is recomputed in each replicate. The reported 95\% percentile interval spans the 2.5th to 97.5th percentiles of the resulting distribution. Patches are never bootstrapped independently.
 
-To keep the confirmatory family commensurate with the available independent-patient evidence, a prespecified \emph{primary} method set is confirmatory and the remaining roster is exploratory. The primary set contains the loss-reweighting, prior-correction, and resampling references that directly target tail support and are shared across both regimes: weighted CE, focal loss, train-time logit adjustment, and balanced sampling. The confirmatory family for Holm adjustment is every primary-method $\times$ gate $\times$ severity $\times$ tail-assignment comparison within a dataset and regime; severities are not separate families, and each co-primary gate contributes its own statistic. Holm's procedure adjusts the permutation $p$-values across that family, with gated-out comparisons recorded as not tested. All other methods (hybrid objectives, CFAL, OKO, cRT, RankMix-inspired, SC-MIL, MDE-inspired, and post-hoc logit adjustment) are reported with the same effect estimates and intervals but form a separate exploratory family outside the confirmatory correction. Effect estimates and intervals remain primary throughout; adjusted $p$-values are supporting evidence. Secondary classwise, calibration, and cost analyses are exploratory unless explicitly prespecified above.
+\subsection{Paired testing and multiplicity control}
+Confidence intervals and raw effect sizes are the main evidence. Hypothesis tests provide a supporting check for the prespecified primary methods. On the discrimination axis, the tested effect is the balanced-accuracy improvement over imbalanced CE. On the calibration axis, it is the reduction in tail-group macro NLL, oriented so that positive values indicate improvement. Recovery fractions are normalized effect summaries, not test statistics.
 
-\subsection{Predictors of damage and mitigation headroom}
-Two distinct frozen-feature measurements are made before mitigation fitting, and no predictor is derived from test examples or test outcomes. \emph{Intrinsic separability} asks whether the classes are distinguishable in the shared Virchow2 representation before a benchmark classifier is trained. It is measured once per dataset, regime, and split using a fixed balanced reference subset drawn from the eligible training pool and shared by every condition. \emph{Condition-specific learnability} instead asks how informative the representation remains under the exact support available in one controlled training manifest. It uses that manifest as its neighbour reference or probe-fitting set.
+The raw two-sided $p$-value comes from a paired patient-block permutation test. This test represents the null hypothesis of no method difference by repeatedly swapping the method and imbalanced-CE labels within a patient. The same swap is used for all of that patient's slides, patches, split appearances, and matched confirmation seeds, preserving the paired design. All possible swaps are enumerated when feasible. Otherwise, \num{100000} random swaps are used with a plus-one correction; this gives a minimum attainable Monte Carlo $p$-value of approximately $10^{-5}$ and avoids reporting a simulated value of zero.
 
-Both concepts are summarized on the unchanged validation set, which retains its natural class distribution. Balanced $k$-nearest-neighbour (kNN) macro recall predicts from the labels of the $k$ closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on frozen embeddings; it measures information accessible without a flexible nonlinear head. Per-class nearest-neighbour error exposes which classes overlap locally. These diagnostics never use test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of all eligible instances, fixed non-learned summaries that do not inherit the attention-MIL model being explained.
+A \emph{test family} is the set of related hypotheses interpreted together. Testing many hypotheses increases the chance that at least one small $p$-value occurs by chance. Holm adjustment controls this family-wise error by ordering the raw $p$-values from smallest to largest, applying the strongest correction to the smallest value, and then proceeding stepwise with less stringent corrections. It provides this control without assuming that the tests are independent.
 
-Many patches from one patient are not equivalent to the same number of independent patients. The patch sensitivity analysis therefore estimates a one-way random-effects intraclass correlation (ICC) of the cross-fitted class margin. For class $c$, let $G_c$ be the number of patient or slide clusters, $m_{gc}$ their sizes, and $N_c=\sum_gm_{gc}$. With between-cluster and within-cluster mean squares $\mathrm{MS}_{B,c}$ and $\mathrm{MS}_{W,c}$, the unequal-cluster-size correction and ICC are
+The confirmatory family contains weighted CE, focal loss, train-time logit adjustment, and balanced sampling. These four primary methods directly target tail support or class priors and are shared across both prediction regimes. Within one dataset and regime, the family includes every gate-passing combination of primary method, gate, severity, and tail assignment; severities are not split into separate families. Holm adjustment is applied across the testable comparisons, while gated-out comparisons are recorded as not tested. All remaining methods and all secondary classwise, calibration, and cost analyses are exploratory. They retain the same effect estimates and confidence intervals but remain outside the confirmatory correction.
+
+\subsection{Exploratory explanation of damage and recovery (RQ3)}
+RQ1 and RQ2 estimate matched effects within a dataset and task. RQ3 takes one step back and asks why some of those controlled comparisons show more damage or recovery than others. It does not predict individual patient outcomes and it does not rank mitigation methods. For damage occurrence and magnitude, one observation is a dataset, prediction regime, imbalance severity, and tail assignment. Recovery observations additionally identify the mitigation method and the discrimination or calibration gate through which the comparison entered.
+
+\paragraph{Outcomes to explain.}
+The analysis is divided into three linked questions rather than one opaque combined model:
+\begin{enumerate}
+  \item \textbf{Damage occurrence:} did the comparison pass either prespecified deficit gate? Every controlled comparison contributes to this binary analysis.
+  \item \textbf{Damage magnitude:} how large was the signed balanced-accuracy deficit? Every comparison contributes, including those with no damage or an apparent improvement under imbalance.
+  \item \textbf{Mitigation headroom:} how much of the demonstrated deficit was recovered? Only gated comparisons contribute because recovery has no stable interpretation when there is no deficit to recover.
+\end{enumerate}
+
+\noindent These three outcomes correspond directly to the sequence introduced in RQ3: occurrence, magnitude, and conditional recovery.
+
+\paragraph{Candidate explanations.}
+Only quantities available without using test outcomes are eligible as predictors. Table~\ref{tab:rq3-predictors} separates the two primary predictors from the variables used only in sensitivity analyses.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.23\linewidth}>{\raggedright\arraybackslash}p{0.49\linewidth}X@{}}
+    \toprule
+    Predictor & Question it represents & Model role \\
+    \midrule
+    Achieved imbalance ratio & How extreme was the realized head--tail allocation? & Primary, log-transformed \\
+    Intrinsic separability & How distinguishable are the classes in a common balanced frozen-feature reference, before condition-specific support is considered? & Primary \\
+    Condition-specific learnability & What remains learnable from the exact controlled training manifest? & One-predictor sensitivity \\
+    Minimum independent support & How many distinct patients or slides support the scarcest class? & One-predictor sensitivity \\
+    Effective patch support & How much patch support remains after accounting for within-patient redundancy? & Patch-only sensitivity \\
+    Prediction regime & Does the comparison use patch classification or WSI-level MIL? & One-predictor sensitivity \\
+    \bottomrule
+  \end{tabularx}
+  \caption{RQ3 predictors and their prespecified roles. Sensitivity predictors are fitted one at a time rather than added to the primary model.}
+  \label{tab:rq3-predictors}
+\end{table}
+
+\paragraph{Measuring separability and learnability.}
+Intrinsic separability holds the evidence source constant. It uses one fixed balanced reference subset per dataset, regime, and split to ask whether Virchow2 already places the classes in distinguishable regions. Condition-specific learnability changes the reference to the exact balanced or imbalanced training manifest and asks how much class information remains accessible under that condition's realized support. The distinction is between inherent feature geometry and the evidence actually retained by one constructed condition.
+
+Both quantities are evaluated on the unchanged natural-validation cohort. Balanced $k$-nearest-neighbour (kNN) macro recall labels each validation embedding from its closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on the frozen reference embeddings; its macro recall is the primary separability or learnability summary. Per-class nearest-neighbour error is reported descriptively to show which classes overlap. None of these diagnostics uses test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of a slide's eligible instances, avoiding a learned attention summary from the model being explained.
+
+\paragraph{Sensitivity to correlated patches.}
+Raw patch count can overstate evidence when many patches come from the same patient. Unique patient and slide counts therefore remain the primary support measures. As a secondary sensitivity analysis, within-patient redundancy is summarized by the intraclass correlation (ICC) of a cross-fitted class margin. An ICC near zero means that patches from the same patient are no more alike than patches from different patients; an ICC near one indicates strong redundancy.
+
+For class $c$, let $G_c$ be the number of patient or slide clusters, $m_{gc}$ their sizes, and $N_c=\sum_gm_{gc}$. With between-cluster and within-cluster mean squares $\mathrm{MS}_{B,c}$ and $\mathrm{MS}_{W,c}$, the unequal-cluster-size correction and ICC are
 \begin{equation}
   m_{0,c}=\frac{N_c-\sum_{g=1}^{G_c}m_{gc}^2/N_c}{G_c-1},
   \qquad
@@ -457,30 +525,21 @@ Many patches from one patient are not equivalent to the same number of independe
   {\mathrm{MS}_{B,c}+(m_{0,c}-1)\mathrm{MS}_{W,c}}.
   \label{eq:icc}
 \end{equation}
-\noindent The estimate is clipped to $[0,1]$: zero means that patches within a cluster are no more alike than patches from different clusters, whereas one indicates complete within-cluster redundancy. The corresponding effective sample size is
+\noindent The estimate is clipped to $[0,1]$. The corresponding effective sample size is
 \begin{equation}
   N_{\mathrm{eff},c}=\frac{N_c}{1+(\overline m_c-1)\operatorname{ICC}_c},
   \label{eq:neff}
 \end{equation}
-\noindent where $\overline m_c$ is the arithmetic mean cluster size. The scalar margin is the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}: each observation is scored only by a probe trained without it. Unique patient and slide counts remain the primary support measures. Equations~\eqref{eq:icc}--\eqref{eq:neff} provide a secondary sensitivity measure for patch targets, not a replacement for independent-unit counts. Slide count itself is used for WSI targets, with patient count also entered when patients contribute multiple slides.
+\noindent where $\overline m_c$ is the arithmetic mean cluster size. The scalar margin is the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}: each observation is scored only by a probe trained without it. Equations~\eqref{eq:icc}--\eqref{eq:neff} provide a patch-only sensitivity measure, not a replacement for independent-unit counts. Slide count is used directly for WSI targets, with patient count also examined when patients contribute multiple slides.
 
-RQ3 uses three linked exploratory analyses. Let $G_j=1$ when comparison unit $j$ passes either gate, let $\widehat D_j$ be its estimated balanced-accuracy deficit with bootstrap standard error $s_{D,j}$, and let $R_j$ be recovery for a gated unit. With standardized log imbalance $x_{\rho,j}$, standardized intrinsic separability $x_{S,j}$, and dataset--target random intercept $b_{g[j]}$, the models have the common structure
-\begin{equation}
-  \begin{aligned}
-    \operatorname{logit}\Pr(G_j=1)
-      &=\alpha_G+b_{G,g[j]}+\beta_{G,\rho}x_{\rho,j}+\beta_{G,S}x_{S,j},\\
-    \widehat D_j
-      &\sim\mathcal{N}\!\left(\alpha_D+b_{D,g[j]}+\beta_{D,\rho}x_{\rho,j}+\beta_{D,S}x_{S,j},\ s_{D,j}^2+\sigma_D^2\right),\\
-    R_j\mid G_j=1
-      &\sim\mathcal{N}\!\left(\alpha_R+b_{R,g[j]}+\beta_{R,\rho}x_{\rho,j}+\beta_{R,S}x_{S,j},\ \sigma_R^2\right).
-  \end{aligned}
-  \label{eq:rq3-models}
-\end{equation}
-\noindent The first line models whether measurable damage occurs, the second uses every signed deficit---including negative values---and the third describes recovery only after damage has been demonstrated. Adding $s_{D,j}^2$ to the residual variance prevents a noisy estimated deficit from being treated as an exact observation. This sequence is used instead of forcing occurrence, magnitude, and recovery into one hurdle model.
+\paragraph{Three deliberately small association models.}
+One model is fitted for each of the three RQ3 outcomes. The occurrence model handles the yes/no gate result; the magnitude and recovery models handle continuous outcomes. Every primary model contains exactly two predictors: the log achieved imbalance ratio and intrinsic separability. The magnitude model also uses each deficit's bootstrap standard error so that a noisy estimated deficit is not treated as an exact observation.
 
-Because the independent unit for RQ3 is the dataset--target group and only a few such groups exist, the analyses are deliberately restricted rather than predictive. Each model uses only the two predictors shown in Equation~\eqref{eq:rq3-models}. Condition-specific learnability, log minimum independent support (patients for patch targets and slides for MIL targets), and the patch-versus-WSI indicator are reported descriptively and entered only in prespecified one-predictor sensitivity fits. They are not combined because, with so few groups, they are strongly confounded with the primary predictors and with one another. Random intercepts allow each dataset--target group to have a different baseline without estimating a separate unrestricted fixed effect. The recovery model deliberately omits per-method effects, which the available gated units cannot identify.
+Comparisons from the same dataset--target group can share a baseline level of difficulty. A \emph{random intercept} allows each group to have its own starting level while estimating common associations with imbalance and separability. This adjustment is important because the analysis pools several severities and assignments from the same group. The recovery model omits method-specific effects because the small number of gated units cannot support them.
 
-Maximum a posteriori (MAP) estimation combines model fit with weak zero-centered, unit-scale Gaussian priors on standardized slopes and on the log standard deviations of the random intercept and residual terms. These priors regularize extreme estimates in the small sample; no interactions are fitted. Leave-one-dataset--target-group-out cross-validation repeatedly withholds one complete group and is reported only as a coarse stability check. With this small group count, held-out predictions shrink toward the population-average intercept, so RQ3 remains a hypothesis-generating description of association rather than a validated predictive model. TCGA-UT supplies the only genuine paired-regime evidence; the CAMELYON16, PANDA, and BRACS targets differ by regime. Model definitions, priors, and covariate roles are frozen before recovery outcomes are inspected, and all RQ3 results remain exploratory.
+The remaining predictors in Table~\ref{tab:rq3-predictors} are fitted one at a time in separate sensitivity models. They are not combined with one another or with the two primary predictors because only a few independent dataset--target groups are available and the candidate predictors are strongly confounded. No interactions are fitted.
+
+Parameters are estimated by maximum a posteriori (MAP) fitting: ordinary model fit is combined with weak zero-centered Gaussian priors that discourage extreme slopes and variance estimates in this small sample. A leave-one-dataset--target-group-out check then refits the magnitude model while withholding one complete group at a time. This is only a coarse stability check, not evidence of predictive generalization. TCGA-UT supplies the only genuine paired comparison between prediction regimes; the CAMELYON16, PANDA, and BRACS targets differ by regime. Model definitions, predictor roles, and priors are frozen before recovery outcomes are inspected, and all RQ3 conclusions remain hypothesis-generating.
 
 \clearpage
 \appendix

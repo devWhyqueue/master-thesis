@@ -172,6 +172,18 @@ The positive prior term makes head classes harder to fit during training, induci
 \end{equation}
 The sign difference follows from where the correction is applied: the train-time loss learns against prior-shifted logits, whereas the post-hoc rule removes the observed training prior from ordinary CE logits. Both patch and WSI regimes use the same definition at their respective prediction unit. Because either form deliberately changes the implied target prior, its probabilities should not be interpreted as calibrated for the natural test prevalence without an explicit target-prior assumption. Discrimination and calibration are therefore reported together, with post-hoc temperature scaling kept conceptually separate from prior correction.
 
+The benchmark retains score variants with different interpretations as separate outputs. For an ordinary CE score $z_c^{\mathrm{CE}}$, post-hoc logit adjustment uses $z_c^{\mathrm{CE}}-\tau\log\widehat\pi_c$ for class-balanced decisions; this score is not reported as a probability calibrated to the natural target prevalence. Under the prior-shift assumption, probabilities for a target prior $\pi_c^{\mathrm{target}}$ instead normalize the logits
+\begin{equation}
+  z_c^{\mathrm{CE}}-\log\widehat\pi_c+\log\pi_c^{\mathrm{target}}.
+  \label{eq:posthoc-target-prior}
+\end{equation}
+\noindent For train-time adjustment, CE is applied to $g_c=z_c+\tau\log\widehat\pi_c$. Because $g_c$ approximates training-posterior logits, the corresponding target-prevalence logits are
+\begin{equation}
+  z_c+(\tau-1)\log\widehat\pi_c+\log\pi_c^{\mathrm{target}}.
+  \label{eq:train-time-target-prior}
+\end{equation}
+\noindent The unadjusted $z_c$ is the train-time method's validation-selected discrimination score but is fully prior-stripped only when $\tau=1$. The target prior is estimated separately on each natural-validation split and applied only to the corresponding test split. Temperature scaling is fitted on natural-validation NLL after the applicable target-prior correction and then applied unchanged to test logits. Raw, balanced-decision, target-prior-corrected, and temperature-scaled outputs remain separate; a single temperature corrects overall sharpness rather than class-specific prior mismatch.
+
 Balanced Softmax is closely related prior-correction literature: it modifies the softmax denominator using class frequencies and motivates the same distinction between representation learning under a long-tailed source and decision rules for a balanced target \citep{ren2020balancedMeta}. It is not an additional benchmark method; it is included to situate logit adjustment among count-aware softmax objectives.
 
 \subsubsection{Center-Focused Affinity Loss (CFAL)}
