@@ -24,11 +24,8 @@ feature_extraction:
   dtype: float16
   device: auto
 
-evidence:
-  patch_per_slide_cap: 500
-
 wsi_training:
-  max_instances: 500
+  max_instances: 0
 
 slurm:
   project_root: /home/yannik.qu/master-thesis

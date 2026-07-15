@@ -160,7 +160,7 @@ class BagFeatureDataset(Dataset):
         self,
         manifest_path: str | Path,
         split_name: str | None = None,
-        max_instances: int = 500,
+        max_instances: int | None = None,
         instance_selection_seed: int = 0,
         device: str | torch.device = "cpu",
         class_names: list[str] | None = None,
@@ -168,7 +168,7 @@ class BagFeatureDataset(Dataset):
         """Initialize the BagFeatureDataset."""
         super().__init__()
         self.device = device
-        self.max_instances = max_instances
+        self.max_instances = max_instances or None
         self.instance_selection_seed = instance_selection_seed
         df = cast(pd.DataFrame, pd.read_csv(manifest_path))
         if split_name is not None and "split" in df.columns:

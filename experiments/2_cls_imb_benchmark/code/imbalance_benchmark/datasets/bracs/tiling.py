@@ -1,11 +1,10 @@
-"""Deterministic ROI tiling for BRACS with a per-WSI median tile budget."""
+"""Deterministic ROI tiling for BRACS."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 from PIL import Image
 
@@ -17,16 +16,14 @@ def tile_rois(
     image_index: dict[str, Path],
     tile_root: Path,
     tile_size: int,
-) -> tuple[pd.DataFrame, int]:
-    """Tile ROI images and cap each WSI at the median available tiles per WSI."""
+) -> pd.DataFrame:
+    """Tile every complete patch from each usable ROI image."""
     plans = _roi_plans(metadata, image_index, tile_size)
-    if not plans:
-        return pd.DataFrame(), 0
-    bag_size = _median_tiles_per_wsi(plans)
     rows: list[dict[str, Any]] = []
-    for slide_plans in _by_slide(plans):
-        rows.extend(_tile_slide(slide_plans, tile_root, tile_size, bag_size))
-    return pd.DataFrame(rows), bag_size
+    for plan in plans:
+        items = list(enumerate(plan["coords"]))
+        rows.extend(_write_roi_tiles(plan, items, tile_root, tile_size))
+    return pd.DataFrame(rows)
 
 
 def _roi_plans(
@@ -51,50 +48,6 @@ def _roi_coords(source: Path, tile_size: int) -> list[tuple[int, int]]:
         for y in range(0, height - tile_size + 1, tile_size)
         for x in range(0, width - tile_size + 1, tile_size)
     ]
-
-
-def _median_tiles_per_wsi(plans: list[dict[str, Any]]) -> int:
-    totals: dict[str, int] = {}
-    for plan in plans:
-        slide_id = str(plan["row"]["slide_id"])
-        totals[slide_id] = totals.get(slide_id, 0) + len(plan["coords"])
-    return int(np.median(list(totals.values())))
-
-
-def _by_slide(plans: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for plan in plans:
-        groups.setdefault(str(plan["row"]["slide_id"]), []).append(plan)
-    return list(groups.values())
-
-
-def _tile_slide(
-    slide_plans: list[dict[str, Any]], tile_root: Path, tile_size: int, bag_size: int
-) -> list[dict[str, Any]]:
-    flat = [
-        (plan_index, coord_index, coord)
-        for plan_index, plan in enumerate(slide_plans)
-        for coord_index, coord in enumerate(plan["coords"])
-    ]
-    kept = _subsample(flat, bag_size)
-    by_plan: dict[int, list[tuple[int, tuple[int, int]]]] = {}
-    for plan_index, coord_index, coord in kept:
-        by_plan.setdefault(plan_index, []).append((coord_index, coord))
-    rows: list[dict[str, Any]] = []
-    for plan_index, items in by_plan.items():
-        rows.extend(
-            _write_roi_tiles(slide_plans[plan_index], items, tile_root, tile_size)
-        )
-    return rows
-
-
-def _subsample(
-    flat: list[tuple[int, int, tuple[int, int]]], bag_size: int
-) -> list[tuple[int, int, tuple[int, int]]]:
-    if len(flat) <= bag_size:
-        return flat
-    keep = np.linspace(0, len(flat) - 1, bag_size).astype(int)
-    return [flat[index] for index in keep]
 
 
 def _write_roi_tiles(

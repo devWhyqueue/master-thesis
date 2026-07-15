@@ -8,7 +8,6 @@ import pytest
 import torch
 
 from imbalance_benchmark.analysis.predictors.rq3_analysis import _covariates
-from imbalance_benchmark.commands.prepare import _apply_patch_evidence_cap
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.manifest.pilot import run_pilot_seed
@@ -69,20 +68,6 @@ def test_native_tail_order_uses_bracs_clinical_label_order() -> None:
         "DCIS",
         "IC",
     ]
-
-
-def test_patch_evidence_cap_is_applied_before_split_construction() -> None:
-    frame = pd.DataFrame(
-        {
-            "slide_id": ["slide-a"] * 6 + ["slide-b"] * 2,
-            "patch_id": [f"p-{index}" for index in range(8)],
-        }
-    )
-
-    capped = _apply_patch_evidence_cap(frame, 3, seed=8)
-
-    assert capped.groupby("slide_id").size().to_dict() == {"slide-a": 3, "slide-b": 2}
-    assert capped.equals(_apply_patch_evidence_cap(frame, 3, seed=8))
 
 
 def test_bag_instance_cap_uses_the_frozen_selection_seed(tmp_path: Path) -> None:

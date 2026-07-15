@@ -226,7 +226,6 @@ def _freeze_meta(
             ),
         },
         "evidence_caps": {
-            "patch": config.get("evidence", {}).get("patch_per_slide_cap"),
             "wsi_instances": config.get("wsi_training", {}).get("max_instances", 500),
         },
         "instance_selection_seed": derive_seed(args.seed, "instance_selection"),

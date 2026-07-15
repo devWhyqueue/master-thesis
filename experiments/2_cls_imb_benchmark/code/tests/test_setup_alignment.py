@@ -113,9 +113,12 @@ def test_bag_dataset_concatenates_all_feature_chunks_before_capping(
         ]
     ).to_csv(manifest, index=False)
 
+    uncapped, _ = BagFeatureDataset(manifest, max_instances=0)[0]
     bag, target = BagFeatureDataset(manifest, max_instances=5)[0]
 
     assert target == 0
+    assert len(uncapped) == 7
+    assert uncapped.sum().item() == pytest.approx(44.0)
     assert len(bag) == 5
     assert bag.sum().item() == pytest.approx(32.0)
 

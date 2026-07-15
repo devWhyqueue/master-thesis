@@ -30,13 +30,9 @@ feature_extraction:
   dtype: float16
   device: auto
 
-evidence:
-  # Fixed before patch-condition construction; this is not the 5% allocation cap.
-  patch_per_slide_cap: 500
-
 wsi_training:
-  # Fixed before pilot, tuning, confirmation, and RQ3 feature summaries.
-  max_instances: 500
+  # Zero disables capping: use every eligible patch embedding in each WSI bag.
+  max_instances: 0
 
 slurm:
   # Absolute Hydra paths: jobs execute from the checkout on the cluster, not this PC.

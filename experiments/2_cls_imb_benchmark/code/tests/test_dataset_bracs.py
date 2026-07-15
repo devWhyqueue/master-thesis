@@ -62,14 +62,13 @@ def test_bracs_roi_tiling_is_deterministic(tmp_path) -> None:
         ]
     )
 
-    tiled, bag_size = tile_rois(metadata, {"roi_a": image}, tmp_path / "tiles", 256)
+    tiled = tile_rois(metadata, {"roi_a": image}, tmp_path / "tiles", 256)
 
-    assert bag_size == 2
     assert tiled["patch_id"].tolist() == ["roi_a__000_0_0", "roi_a__001_256_0"]
     assert all(path.endswith(".jpg") for path in tiled["image_path"])
 
 
-def test_bracs_tiling_caps_each_wsi_at_median(tmp_path) -> None:
+def test_bracs_tiling_retains_every_complete_roi_patch(tmp_path) -> None:
     images = {}
     rows = []
     for slide, n_tiles in (("s1", 2), ("s2", 3), ("s3", 5)):
@@ -88,12 +87,10 @@ def test_bracs_tiling_caps_each_wsi_at_median(tmp_path) -> None:
         )
     metadata = pd.DataFrame(rows)
 
-    tiled, bag_size = tile_rois(metadata, images, tmp_path / "tiles", 256)
+    tiled = tile_rois(metadata, images, tmp_path / "tiles", 256)
 
-    assert bag_size == 3  # median of available tiles per WSI: [2, 3, 5]
     per_wsi = tiled.groupby("slide_id")["patch_id"].count()
-    assert per_wsi.max() <= bag_size
-    assert per_wsi.to_dict() == {"s1": 2, "s2": 3, "s3": 3}
+    assert per_wsi.to_dict() == {"s1": 2, "s2": 3, "s3": 5}
 
 
 def test_bracs_wsi_metadata_uses_official_labels_without_roi_derivation(

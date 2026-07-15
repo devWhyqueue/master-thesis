@@ -8,7 +8,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, cast
 
-import numpy as np
 import pandas as pd
 
 from imbalance_benchmark.datasets import (
@@ -58,7 +57,7 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
         root, Path(metadata_csv) if metadata_csv else None
     )
     image_index = bracs.index_roi_images(root)
-    tiled, _ = bracs.tile_rois(roi_frame, image_index, tile_root, tile_size)
+    tiled = bracs.tile_rois(roi_frame, image_index, tile_root, tile_size)
     if tiled.empty:
         raise RuntimeError("No BRACS ROI tiles were generated.")
     assignment = bracs.split_cases(tiled, int(dataset_cfg.get("seed", 0)))
@@ -87,15 +86,11 @@ def _build_camelyon16(config: dict[str, Any]) -> pd.DataFrame:
         ]
     if not slides:
         raise RuntimeError("No usable CAMELYON16 slides found.")
-    bag_size = int(
-        np.median([len(camelyon16.list_slide_patches(data_root, s)) for s in slides])
-    )
     parts = [
         _camelyon16_slide_rows(
             data_root,
             slide,
             slide_labels[slide],
-            bag_size,
             include_patch_labels=regime == "patch",
         )
         for slide in slides
@@ -119,14 +114,10 @@ def _camelyon16_slide_rows(
     data_root: Path,
     slide_id: str,
     slide_label: str,
-    bag_size: int,
     *,
     include_patch_labels: bool,
 ) -> pd.DataFrame:
     patches = camelyon16.list_slide_patches(data_root, slide_id)
-    if len(patches) > bag_size:
-        keep = np.linspace(0, len(patches) - 1, bag_size).astype(int)
-        patches = [patches[index] for index in keep]
     patch_ids = [pid for pid, _ in patches]
     rows: dict[str, Any] = {
         "dataset": "camelyon16",
@@ -145,12 +136,7 @@ def _camelyon16_slide_rows(
 
 
 def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
-    """Build the PANDA manifest from a pre-selected slide list and per-slide tile CSVs.
-
-    ``tiles_dir`` is produced by an upstream on-cluster tiling stage (patch_id,
-    image_path, patch_label already mask-decoded via ``panda.cell_label``); this
-    adapter only assembles the manifest and applies patient-disjoint splitting.
-    """
+    """Build PANDA rows from selected slides and upstream per-slide tile CSVs."""
     dataset_cfg = config["dataset"]
     regime = dataset_cfg.get("regime", "patch")
     selection = pd.read_csv(dataset_cfg["selection_path"])
@@ -163,9 +149,8 @@ def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
     }
     if not tiles:
         raise RuntimeError("No tiled PANDA slides found.")
-    bag_size = int(np.median([len(frame) for frame in tiles.values()]))
     parts = [
-        _panda_slide_rows(row, tiles[str(row["slide_id"])], bag_size)
+        _panda_slide_rows(row, tiles[str(row["slide_id"])])
         for _, row in selection.iterrows()
         if str(row["slide_id"]) in tiles
     ]
@@ -189,12 +174,7 @@ def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
     return tagged
 
 
-def _panda_slide_rows(
-    row: pd.Series, tiles: pd.DataFrame, bag_size: int
-) -> pd.DataFrame:
-    if len(tiles) > bag_size:
-        keep = np.linspace(0, len(tiles) - 1, bag_size).astype(int)
-        tiles = tiles.iloc[keep]
+def _panda_slide_rows(row: pd.Series, tiles: pd.DataFrame) -> pd.DataFrame:
     slide_id = str(row["slide_id"])
     return pd.DataFrame(
         {

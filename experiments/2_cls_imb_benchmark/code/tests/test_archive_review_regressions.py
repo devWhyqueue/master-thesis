@@ -156,9 +156,14 @@ def test_camelyon16_wsi_rows_do_not_require_or_read_a_mask(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """CAMELYON16 WSI bags use slide labels and eligible patches, not masks."""
-    image = tmp_path / "patch.jpg"
-    image.touch()
-    monkeypatch.setattr(camelyon16, "list_slide_patches", lambda *_: [(0, image)])
+    images = [tmp_path / "patch-0.jpg", tmp_path / "patch-1.jpg"]
+    for image in images:
+        image.touch()
+    monkeypatch.setattr(
+        camelyon16,
+        "list_slide_patches",
+        lambda *_: list(enumerate(images)),
+    )
     monkeypatch.setattr(
         camelyon16,
         "load_mask",
@@ -166,11 +171,34 @@ def test_camelyon16_wsi_rows_do_not_require_or_read_a_mask(
     )
 
     rows = dataset_adapters._camelyon16_slide_rows(
-        tmp_path, "tumor_001", "tumor", 1, include_patch_labels=False
+        tmp_path, "tumor_001", "tumor", include_patch_labels=False
     )
 
-    assert rows["slide_label"].tolist() == ["tumor"]
+    assert rows["slide_label"].tolist() == ["tumor", "tumor"]
     assert "patch_label" not in rows
+
+
+def test_panda_wsi_rows_retain_every_eligible_patch() -> None:
+    """Uncapped PANDA WSI bags retain the complete tissue-patch inventory."""
+    row = pd.Series(
+        {
+            "slide_id": "slide",
+            "slide_label": "ISUP2",
+            "provider": "radboud",
+            "has_mask": True,
+        }
+    )
+    tiles = pd.DataFrame(
+        {
+            "patch_id": ["p0", "p1", "p2"],
+            "patch_label": ["benign", "cancer", "benign"],
+            "image_path": ["p0.jpg", "p1.jpg", "p2.jpg"],
+        }
+    )
+
+    result = dataset_adapters._panda_slide_rows(row, tiles)
+
+    assert result["patch_id"].tolist() == ["p0", "p1", "p2"]
 
 
 def test_tuning_uses_the_frozen_initialization_seeds() -> None:

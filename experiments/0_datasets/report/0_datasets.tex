@@ -13,10 +13,7 @@
 \usetikzlibrary{arrows.meta,positioning}
 \sisetup{group-separator={,}, group-minimum-digits=4}
 
-\graphicspath{%
-  {../../design_dataset/report/outputs/figures/}%
-  {../../class_imbalance/outputs/figures/}%
-}
+\graphicspath{{assets/}}
 
 \title{Computational Pathology and Benchmark Datasets:\\
 An Introduction to the Domain and Data}
@@ -253,11 +250,7 @@ slide-level label is used.
   \centering
   \begin{minipage}{0.32\linewidth}
     \centering
-    \IfFileExists{../../design_dataset/report/outputs/figures/camelyon16_example_patch.jpg}{%
-      \includegraphics[width=\linewidth]{camelyon16_example_patch.jpg}%
-    }{%
-      \fbox{\parbox{0.85\linewidth}{\centering\vspace{2em}CAMELYON16 example tile unavailable.\vspace{2em}}}%
-    }
+    \includegraphics[width=\linewidth]{camelyon16_example_patch.jpg}%
   \end{minipage}
   \hfill
   \begin{minipage}{0.62\linewidth}
@@ -269,25 +262,19 @@ slide-level label is used.
       \midrule
       WSIs (tumor / normal) & \num{160} / \num{238}\\
       Patch-labelled WSIs & \num{378}\\
-      WSI-bag size (median tiles) & \num{7874}\\
-      Tile labels & tumor, normal\\
-      Tumor / normal tiles & \num{59672} / \num{2340040}\\
+      Patch labels & tumor, normal\\
+      Eligible patches (tumor / normal) & \num{59672} / \num{2340040}\\
       \bottomrule
     \end{tabular}%
   \end{minipage}
-  \caption{CAMELYON16 dataset properties, alongside an example $256\times256$ tumor tile. The
-  WSI-bag size is the data-driven median of available tissue tiles per slide. Tumour tiles are scarce
-  even within slides that contain a metastasis.}
+  \caption{CAMELYON16 dataset properties, alongside an example $256\times256$ tumor patch.
+  Tumour patches are scarce even within slides that contain a metastasis.}
   \label{tab:camelyon16-summary}
 \end{table}
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../../design_dataset/report/outputs/figures/camelyon16_class_distribution.png}{%
-    \includegraphics[width=0.6\linewidth]{camelyon16_class_distribution.png}%
-  }{%
-    \fbox{\parbox{0.7\linewidth}{\centering CAMELYON16 patch distribution figure unavailable.}}%
-  }
+  \includegraphics[width=0.6\linewidth]{camelyon16_class_distribution.png}%
   \caption{CAMELYON16 patch support by tumor/normal label after mask-based labelling
   (log scale). Tumor tiles are far scarcer than normal tiles.}
   \label{fig:camelyon16-dist}
@@ -318,11 +305,7 @@ declining tail (Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist}).
   \centering
   \begin{minipage}{0.30\linewidth}
     \centering
-    \IfFileExists{../../class_imbalance/outputs/figures/tcga_ut_example_patch.jpg}{%
-      \includegraphics[width=\linewidth]{tcga_ut_example_patch.jpg}%
-    }{%
-      \fbox{\parbox{0.85\linewidth}{\centering\vspace{2em}TCGA-UT example patch unavailable.\vspace{2em}}}%
-    }
+    \includegraphics[width=\linewidth]{tcga_ut_example_patch.jpg}%
   \end{minipage}
   \hfill
   \begin{minipage}{0.64\linewidth}
@@ -334,7 +317,7 @@ declining tail (Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist}).
       \midrule
       Cancer-type labels & \num{32}\\
       Diagnostic slides & \num{8736}\\
-      Patches & \num{1608060} of $256\times256$\\
+      Author-supplied patches & \num{1608060} of $256\times256$\\
       Largest class & Glioblastoma (GBM), \num{792} slides\\
       Smallest class & B-cell lymphoma (DLBC), \num{28} slides\\
       \bottomrule
@@ -348,11 +331,7 @@ declining tail (Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist}).
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../../class_imbalance/outputs/figures/class_distribution.png}{%
-    \includegraphics[width=0.86\linewidth]{class_distribution.png}%
-  }{%
-    \fbox{\parbox{0.7\linewidth}{\centering TCGA-UT cancer-type distribution figure unavailable.}}%
-  }
+  \includegraphics[width=0.86\linewidth]{tcga_ut_class_distribution.png}%
   \caption{TCGA-UT slide support by cancer-type rank, declining gradually across the \num{32}
   classes from GBM at the head to DLBC at the tail.}
   \label{fig:tcgaut-dist}
@@ -386,11 +365,7 @@ steep tail.
   \centering
   \begin{minipage}{0.32\linewidth}
     \centering
-    \IfFileExists{../../design_dataset/report/outputs/figures/bracs_example_patch.jpg}{%
-      \includegraphics[width=\linewidth]{bracs_example_patch.jpg}%
-    }{%
-      \fbox{\parbox{0.85\linewidth}{\centering\vspace{2em}BRACS example ROI patch unavailable.\vspace{2em}}}%
-    }
+    \includegraphics[width=\linewidth]{bracs_example_patch.jpg}%
   \end{minipage}
   \hfill
   \begin{minipage}{0.62\linewidth}
@@ -401,26 +376,21 @@ steep tail.
       Property & Value\\
       \midrule
       Patients & \num{151}\\
-      WSIs with ROI tiles & \num{387}\\
-      ROI tiles & \num{278028}\\
-      WSI-bag size (median tiles) & \num{360}\\
+      ROI-bearing WSIs & \num{387}\\
+      ROI-derived patches & \num{278028}\\
       Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
       \bottomrule
     \end{tabular}%
   \end{minipage}
-  \caption{BRACS dataset properties, alongside an example $256\times256$ ROI tile. Slide-level support
-  counts each slide under every subtype it contains; the tile-level distribution instead weights
-  subtypes by their tile counts.}
+  \caption{BRACS dataset properties, alongside an example $256\times256$ ROI patch. Slide-level
+  support counts each slide under every subtype it contains; the patch-level distribution instead
+  weights subtypes by their patch counts.}
   \label{tab:bracs-summary}
 \end{table}
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../../design_dataset/report/outputs/figures/bracs_class_distribution.png}{%
-    \includegraphics[width=0.72\linewidth]{bracs_class_distribution.png}%
-  }{%
-    \fbox{\parbox{0.7\linewidth}{\centering BRACS subtype distribution figure unavailable.}}%
-  }
+  \includegraphics[width=0.72\linewidth]{bracs_class_distribution.png}%
   \caption{BRACS WSI support by seven-subtype label (slides containing each subtype), from PB
   at the head to DCIS at the tail.}
   \label{fig:bracs-dist}
@@ -474,25 +444,19 @@ share one task and differ only in prediction unit.
     \midrule
     WSIs (biopsies) & \num{10616}\\
     Patch-labelled WSIs & \num{10514}\\
-    WSI-bag size (median tiles) & \num{425}\\
-    WSI labels / tile labels & ISUP 0--5 / benign, cancer\\
-    Benign / cancer tiles & \num{3702544} / \num{803785}\\
+    Slide labels / patch labels & ISUP 0--5 / benign, cancer\\
+    Eligible patches (benign / cancer) & \num{3702544} / \num{803785}\\
     \bottomrule
   \end{tabular}
-  \caption{PANDA dataset properties from full-cohort tiling and mask-based patch labelling.
-  The WSI-bag size is the data-driven median of available tissue tiles per biopsy. Unlike the other
-  datasets, the tile and slide regimes carry different labels (binary cancer/benign vs six-class
-  ISUP), and so describe two different tasks.}
+  \caption{PANDA dataset properties from full-cohort tiling and mask-based patch labelling. Unlike
+  the other datasets, patch and slide labels define different tasks: binary cancer detection and
+  six-class ISUP grading, respectively.}
   \label{tab:panda-summary}
 \end{table}
 
 \begin{figure}[ht]
   \centering
-  \IfFileExists{../../design_dataset/report/outputs/figures/panda_class_distribution.png}{%
-    \includegraphics[width=0.72\linewidth]{panda_class_distribution.png}%
-  }{%
-    \fbox{\parbox{0.7\linewidth}{\centering PANDA ISUP distribution figure unavailable.}}%
-  }
+  \includegraphics[width=0.72\linewidth]{panda_class_distribution.png}%
   \caption{PANDA WSI support by six-class ISUP grade across the full \num{10616}-biopsy cohort, from
   ISUP\,0 at the head to ISUP\,5 at the tail.}
   \label{fig:panda-dist}
