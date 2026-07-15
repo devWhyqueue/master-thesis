@@ -49,7 +49,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 
 - Use figures, schematic diagrams, tables, and equations when they clarify concepts more efficiently than prose alone.
 - Use TikZ for simple conceptual diagrams such as pipelines, ambiguity examples, task taxonomies, and evaluation flows.
-- For more complex or richer visualizations, use the `notebooklm` skill when available and appropriate.
+- For more complex or richer visualizations, generate a fitting figure directly when appropriate.
 - Keep diagram labels clear and separated from boxes and arrows. Check for overlapping labels before finishing.
 - Keep figures compact enough to fit within `\textwidth` without overfull boxes.
 - Keep figures readable at paper scale; prefer visual summaries that reveal the main pattern over plots that expose every raw detail.
