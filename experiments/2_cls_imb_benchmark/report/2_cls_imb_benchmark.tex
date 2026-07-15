@@ -86,8 +86,8 @@ A slide is one bag of frozen patch embeddings; here, an \emph{instance} means on
 \paragraph{Comparative scope.}
 Only TCGA-UT permits a direct patch-versus-WSI comparison. Both regimes predict the same cancer-type label within the same participant-disjoint cohort. In CAMELYON16, patch classification detects tumor tissue, whereas a WSI bag is classified as metastasis-bearing or normal. In PANDA, patch classification detects cancer tissue, whereas a WSI bag predicts the biopsy's ISUP grade. In BRACS, a patch predicts its ROI-specific subtype, whereas a WSI bag predicts the official most-aggressive-lesion subtype for the complete slide. The CAMELYON16, PANDA, and BRACS regimes are therefore separate dataset--target groups rather than paired measurements of one task.
 
-\subsection{Controlled construction}
-The controlled construction asks a simple counterfactual question: how would the same prediction task perform if its fixed training budget were distributed evenly across classes rather than concentrated in a head class? Figure~\ref{fig:controlled-construction} separates the choices that are made once from the class allocation that is deliberately varied. Validation and test data remain natural throughout; only the controlled training manifest changes.
+\subsection{Controlled comparison}
+The construction asks a simple counterfactual question: how would the same prediction task perform if a fixed training budget were distributed evenly across classes rather than concentrated in a head class? Answering this question requires more than specifying an imbalance ratio. The comparison must first fix the patient split, eligible examples, representation, evaluation cohort, and total controlled training support; only then can class allocation be changed. Figure~\ref{fig:controlled-construction} summarizes this separation between fixed design choices and the intended intervention.
 
 \begin{figure}[ht]
   \centering
@@ -110,89 +110,168 @@ The controlled construction asks a simple counterfactual question: how would the
     \draw[arrow] (construct.south) -- (patch.north);
     \draw[arrow] (construct.south) -- (wsi.north);
   \end{tikzpicture}
-  \caption{Controlled construction of the benchmark. Gray steps are fixed within a split; the blue step is the intended intervention. Patch imbalance redistributes patches within a common independent-unit pool, whereas WSI imbalance changes labelled slide support.}
+  \caption{Controlled construction of the benchmark. Gray steps are fixed within a split; the blue step is the intended intervention. Patch imbalance redistributes patches within a common patient and slide pool, whereas WSI imbalance changes labelled slide support.}
   \label{fig:controlled-construction}
 \end{figure}
 
-For class supports $N_1,\ldots,N_K$, the headline imbalance ratio is
-\begin{equation}
-  \rho=\frac{N_{\max}}{N_{\min}}.
-  \label{eq:rho}
-\end{equation}
-The full distribution is also summarized by normalized entropy,
-\begin{equation}
-  \Hnorm=1-\frac{-\sum_{c=1}^{K}p_c\log p_c}{\log K},
-  \qquad p_c=\frac{N_c}{\sum_jN_j}.
-  \label{eq:entropy}
-\end{equation}
-\noindent The two quantities are complementary: $\rho$ records the extreme head--tail contrast, whereas $\Hnorm$ uses all classes and is normalized for class count. Both are computed separately at patch and slide level from each realized training manifest. Per-class patient, slide, and patch counts are reported alongside them.
-
-Patient-disjoint training, natural-validation, and natural-test partitions are created first. Imbalance manipulation is confined to training support. Within a split, every condition uses exactly the same validation patients, test patients, and eligible held-out examples. No held-out example is deleted, duplicated, or reweighted according to the training severity. Patch-level evaluation uses every eligible held-out patch under the fixed evidence rule; slide-level evaluation uses every eligible held-out slide. Consequently, recall is estimated from all available held-out cases and prevalence-dependent precision and macro F1 are compared at one fixed test prevalence.
-
-The validation cohort also retains its natural distribution. It is used for hyperparameter and checkpoint selection but never resized to resemble a training condition. Training, validation, and test manifests are versioned with patient identifiers, class counts, construction seed, and content hashes before model fitting.
-
-Each eligible dataset--regime--split then has four training conditions:
+\noindent Each eligible dataset--regime--split has four training conditions:
 \begin{enumerate}
   \item the full natural training set, used only as a descriptive anchor;
   \item a size-matched balanced training set;
   \item a moderate imbalance condition targeting $\rho=10$; and
   \item a severe imbalance condition targeting $\rho=100$ where feasible.
 \end{enumerate}
-The balanced, moderate, and severe conditions contain the same total training support $T$: patches for patch classification and slides for MIL. The largest feasible shared $T$ is chosen from training data alone under unique-support and method-feasibility constraints. The natural anchor may contain a different total and is excluded from the imbalance deficit and recovery estimands in Section~\ref{sec:recovery}.
+The balanced, moderate, and severe conditions contain the same total training support $T$: patches for patch classification and slides for MIL. The largest feasible shared $T$ is chosen from training data alone under the support constraints defined below. The natural anchor may contain a different total and is excluded from the imbalance deficit and recovery estimands in Section~\ref{sec:recovery}. Thus contrasts among the three controlled conditions change class allocation without also changing the number of training examples.
 
-The independent-evidence rule differs by regime. For patch classification, a fixed per-class patient pool and, within it, a fixed slide pool are shared by the balanced and all imbalanced conditions. Sampling first visits patients, then slides within patients, and only then patches. No patient may supply more than 10\% of a class's patch allocation and no slide more than 5\%; a deterministic round-robin pass through the contributing units enforces these caps before any unit is revisited. Thus patch imbalance changes patch allocation while preserving the available patient and slide diversity. For MIL, a slide is itself the labelled example, so changing slide support necessarily changes independent diversity. MIL selection first visits patients and then takes slide prefixes within them; each slide contributes once, and no patient supplies more than 10\% of a class's slide allocation. Each manifest therefore reports, by class, unique patients, unique slides, patches, the largest patient and slide contribution, and the fraction of the eligible independent pool retained. RQ1 interprets MIL contrasts as the effect of controlled slide-support imbalance, including its induced change in patient diversity, rather than as a patch-count effect alone.
+The target ratio $\rho_{\mathrm{target}}\in\{1,10,100\}$ specifies the intended intervention, but integer allocation and finite inventories can change the realized class distribution. The achieved ratio is therefore recomputed from every manifest. For realized class supports $N_1,\ldots,N_K$, it is
+\begin{equation}
+  \rho_{\mathrm{achieved}}=\frac{N_{\max}}{N_{\min}}.
+  \label{eq:rho}
+\end{equation}
+This quantity records the extreme head--tail contrast. The complementary normalized-entropy deficit
+\begin{equation}
+  \Hnorm=1-\frac{-\sum_{c=1}^{K}p_c\log p_c}{\log K},
+  \qquad p_c=\frac{N_c}{\sum_jN_j}.
+  \label{eq:entropy}
+\end{equation}
+\noindent uses all classes and is normalized for class count: it is zero for a balanced allocation and increases as support becomes concentrated. Both quantities are computed separately at patch and slide level from each realized training manifest. Per-class patient, slide, and patch counts are reported alongside them, because neither scalar reveals whether many patches originate from only a few patients.
 
-Very small tail classes can make both training and evaluation unstable, so the definitive experiment first runs a \emph{support pilot}: a set of small, balanced CE training runs used only to estimate how many independent training units per class are needed for stable validation performance. A \emph{pilot level} is one candidate support count; the pilot is not a hyperparameter-optimization stage, and inclusion in a pilot does not automatically include an example in the definitive comparison. In the patch regime, one unit is a patient, or a slide where patient and slide coincide. Every selected unit contributes a fixed quota $q_{\mathrm{patch}}$ of patches, apportioned as evenly as possible over its eligible slides. The quota is the largest common per-patient count feasible for every class at the largest candidate pilot level, subject to the contribution caps except for the documented five-patient exception. It is determined from training inventories and then held constant across pilot levels. In the MIL regime, one pilot unit is a labelled slide represented by all its eligible instances, while patients contributing multiple slides remain identified for clustering.
+Patient-disjoint training, natural-validation, and natural-test partitions are created first. Imbalance manipulation is confined to training support. Within a split, every condition uses exactly the same validation patients, test patients, and eligible held-out examples. No held-out example is deleted, duplicated, or reweighted according to the training severity. Patch-level evaluation uses every eligible held-out patch, and slide-level evaluation uses every eligible held-out slide. Consequently, recall is estimated from all available held-out cases and prevalence-dependent precision and macro F1 are compared at one fixed test prevalence.
 
-Within each split and regime, the nested balanced pilots compare $5,10,15,20,30$ independent units per class, or all available units when fewer exist. Figure~\ref{fig:pilot-floor} shows the intended reading: the support floor is the first level after which adding the next block produces little further validation improvement. The candidates are nested within each of three construction orderings and use the same natural-validation cohort, making adjacent levels paired rather than unrelated experiments.
+The validation cohort also retains its natural distribution. It is used for hyperparameter and checkpoint selection but never resized to resemble a training condition. Training, validation, and test manifests are versioned with patient identifiers, class counts, construction seed, and content hashes before model fitting.
+
+\subsection{Independent evidence and support floors}
+A patch is a training example, but it is not independent evidence when thousands of patches come from the same patient or slide. In this report, \emph{independent support} therefore means the number of distinct patients and slides that underlie a class's training examples. Controlling this support prevents an apparent patch-level head--tail contrast from being merely a contrast between many correlated crops from one patient and fewer crops from another.
+
+The rule is adapted to the prediction regime. For patch classification, a fixed per-class patient pool and, within it, a fixed slide pool are shared by the balanced and all imbalanced conditions. Sampling visits patients, then slides within patients, and only then patches. No patient may supply more than 10\% of a class's patch allocation and no slide more than 5\%; deterministic round-robin selection enforces these caps before any unit is revisited. Patch imbalance can therefore change the number of patches per class without changing which patient and slide pools are available. For MIL, a slide is itself the labelled example, so reducing slide support necessarily reduces independent support. Selection visits patients before taking additional slides from the same patient; each slide contributes once, and no patient supplies more than 10\% of a class's slides. MIL contrasts are consequently interpreted as controlled slide-support imbalance, including its induced change in patient diversity. Every manifest reports per-class patient, slide, and patch counts, maximum contributions, and the fraction of the eligible independent pool retained.
+
+The smallest defensible tail support is estimated before the definitive comparison with a \emph{support pilot}. These balanced CE runs ask when additional independent training units cease to materially improve natural-validation performance; they do not tune a hyperparameter or contribute observations to the definitive analysis. In the patch regime, one pilot unit is a patient, or a slide where patient and slide coincide. Each selected unit contributes the same fixed quota $q_{\mathrm{patch}}$ of patches, distributed as evenly as possible over its eligible slides. The quota is determined from the training inventories at the largest candidate level and then held fixed, so increasing a pilot level adds patients rather than patches per patient. In the MIL regime, one pilot unit is a labelled slide represented by all its eligible instances.
+
+Nested pilots compare $5,10,15,20,$ and $30$ units per class, or all available units when the scarcest class has fewer. They are repeated for three independently seeded \emph{construction orderings}. An ordering is a fixed sequence of eligible units; its prefix of length $m$ is simply the first $m$ units in that sequence. Thus the 10-unit pilot retains the same first five units as the five-unit pilot and adds the next five. At lower levels of the hierarchy, every patient has a fixed slide order and every slide has a fixed patch order. Figure~\ref{fig:construction-hierarchy} illustrates this nesting.
 
 \begin{figure}[ht]
   \centering
   \begin{tikzpicture}[
-    level/.style={draw, circle, minimum size=0.75cm, inner sep=1pt, font=\small},
-    arrow/.style={-{Latex[length=2mm]}, thick},
-    label/.style={align=center, font=\small}
+    unit/.style={draw, rounded corners=1pt, minimum width=1.05cm, minimum height=0.62cm, font=\small},
+    hierarchy/.style={font=\small, anchor=east},
+    arrow/.style={-{Latex[length=1.8mm]}, thick}
   ]
-    \node[level] (n5) at (0,0) {$5$};
-    \node[level] (n10) at (2.1,0) {$10$};
-    \node[level, fill=blue!10, thick] (n15) at (4.2,0) {$15$};
-    \node[level] (n20) at (6.3,0) {$20$};
-    \node[level] (n30) at (8.4,0) {$30$};
-    \node[label, right=0.6cm of n30] {independent units\\per class};
-    \draw[arrow] (n5) -- (n10);
-    \draw[arrow] (n10) -- (n15);
-    \draw[arrow] (n15) -- (n20);
-    \draw[arrow] (n20) -- (n30);
-    \draw[thick, blue!70!black] (n15.south) -- ++(0,-0.65) node[below, label] {example stability floor:\\next increase is negligible};
+    \node[hierarchy] at (-0.55,1.25) {Patient order};
+    \node[unit, fill=blue!22] (p3) at (0.3,1.25) {$P_3$};
+    \node[unit, fill=blue!22] (p1) at (1.7,1.25) {$P_1$};
+    \node[unit, fill=blue!8] (p4) at (3.1,1.25) {$P_4$};
+    \node[unit] (p2) at (4.5,1.25) {$P_2$};
+    \node at (5.45,1.25) {$\cdots$};
+    \draw[arrow] (p3) -- (p1);
+    \draw[arrow] (p1) -- (p4);
+    \draw[arrow] (p4) -- (p2);
+    \node[font=\scriptsize, blue!60!black] at (1.0,1.82) {shorter prefix};
+    \node[font=\scriptsize, blue!60!black] at (3.1,1.82) {extension};
+
+    \node[hierarchy] at (-0.55,0) {Slides within $P_3$};
+    \node[unit] (s3b) at (0.3,0) {$S_{3b}$};
+    \node[unit] (s3a) at (1.7,0) {$S_{3a}$};
+    \node at (2.65,0) {$\cdots$};
+    \draw[arrow] (s3b) -- (s3a);
+    \draw[arrow] (p3.south) -- (s3b.north);
+
+    \node[hierarchy] at (-0.55,-1.25) {Patches within $S_{3b}$};
+    \node[unit] (x7) at (0.3,-1.25) {$x_7$};
+    \node[unit] (x2) at (1.7,-1.25) {$x_2$};
+    \node[unit] (x5) at (3.1,-1.25) {$x_5$};
+    \node at (4.05,-1.25) {$\cdots$};
+    \draw[arrow] (x7) -- (x2);
+    \draw[arrow] (x2) -- (x5);
+    \draw[arrow] (s3b.south) -- (x7.north);
   \end{tikzpicture}
-  \caption{Interpretation of a pilot level and the stability floor. The highlighted level is illustrative; the selected level is estimated separately for each split and regime from the prespecified validation thresholds.}
-  \label{fig:pilot-floor}
+  \caption{Hierarchy behind one construction ordering. A seed fixes the patient sequence and the local slide and patch sequences. The darker patient boxes form a shorter prefix; the lighter third box is added, without replacing earlier units, when the prefix is extended.}
+  \label{fig:construction-hierarchy}
 \end{figure}
 
-At the five-patient patch level, the \num{10}\% patient cap is arithmetically infeasible; the \num{5}\% slide cap can also be infeasible when the selected patients contribute too few slides. The pilot therefore selects five distinct patients with equal quotas and records this level-specific exception. The five-slide MIL pilot likewise selects one slide from each of five patients because a \num{10}\% patient cap is impossible with only five slides. These five-unit pilots inform only the support-stability curve and are never definitive training allocations.
+\noindent Because every larger pilot level extends the preceding prefix, adjacent levels are paired within an ordering and evaluated on the same natural-validation cohort. The smallest level whose next increment changes mean balanced accuracy by less than \num{0.01} and every class recall by less than \num{0.02} in all three orderings is the \emph{stability floor}; if none qualifies, the largest candidate is used.\footnote{The five-unit pilot is the sole cap exception. With only five contributing patients, at least one patient must supply at least \num{20}\% of a class, so a \num{10}\% cap is mathematically impossible; a \num{5}\% slide cap also requires at least 20 contributing slides. The patch pilot therefore uses five patients with equal quotas, and the MIL pilot uses five slides from five patients. This diagnostic pilot level is never a definitive training allocation.}
 
-The \emph{stability floor} is the smallest count for which the increase at the next candidate is below \num{0.01} in mean natural-validation balanced accuracy and below \num{0.02} for every class across the three pilot orderings; if no candidate satisfies this rule, the largest candidate is used. The definitive minimum is the larger of this empirical floor and the \emph{method floor}, which ensures that every tested method has enough distinct examples to form its required batches or sets. Specifically, a class-aware set or batch contains at least two distinct same-class independent units, and the training manifest contains at least 10 contributing patients and 20 slides for patch training, or 10 patients and 20 slides for MIL. Where patient and slide coincide, 20 slides are required. These are eligibility constraints, not examples created by replacement. A requested severity is lowered to the largest allocation satisfying both floors; a dataset--regime is excluded rather than treated as a few-example experiment if even the balanced condition fails them. Pilot quotas, results, seeds, and resulting floors are frozen before definitive training and reported with the manifests.
+The definitive minimum is the larger of this empirical stability floor and a prespecified design floor. Each class must contain at least 10 patients and 20 slides, or 20 slides when patient and slide coincide, and any class-aware batch or set must contain at least two distinct same-class units. The 10-patient and 20-slide values are not estimated performance thresholds: they are the smallest counts compatible with the 10\% patient and 5\% slide contribution caps, respectively. The same 20-slide lower bound is retained for MIL to keep slide-based method comparisons outside a five-example regime even though MIL has no separate 5\% slide cap. A requested severity is reduced to the largest allocation satisfying both floors; a dataset--regime is excluded if even its balanced condition fails them. Pilot quotas, curves, seeds, and resulting floors are frozen and reported with the definitive manifests.
 
-For a $K$-class exponential construction, an assigned class order receives weights
+\subsection{Severity profiles and tail assignments}
+A binary task needs only a head and a tail count, but a multiclass task also needs a rule for the classes between those extremes. The exponential construction places the $K$ class supports at equal intervals on a logarithmic scale. For a locked order from head ($i=0$) to tail ($i=K-1$), it assigns weights
 \begin{equation}
-  w_i(\rho)=\rho^{-i/(K-1)},\qquad
-  n_i(\rho)\approx T\frac{w_i(\rho)}{\sum_{j=0}^{K-1}w_j(\rho)},
+  w_i(\rho_{\mathrm{target}})=\rho_{\mathrm{target}}^{-i/(K-1)},\qquad
+  n_i^*=T\frac{w_i(\rho_{\mathrm{target}})}{\sum_{j=0}^{K-1}w_j(\rho_{\mathrm{target}})},
   \quad i=0,\ldots,K-1.
   \label{eq:construction}
 \end{equation}
-Constrained integer allocation preserves $\sum_i n_i=T$, satisfies the independent-support floors, and never exceeds available unique training examples. Binary targets use $n_{\mathrm{head}}/n_{\mathrm{tail}}=\rho$ with the same total $T$. A prespecified step construction may be used for clinically meaningful BRACS groups; its class grouping and realized supports are reported before analysis. One master random ordering is created per class at each hierarchy level: patients, slides within patients, and patches within slides. Every condition is a deterministic prefix or round-robin prefix of these same orderings. For patch classification, all fixed-pool patients and slides contribute before additional patches are allocated; for MIL, class-specific slide selection is a patient-round-robin prefix of the same hierarchical ordering.
+\noindent so the head-to-tail ratio is exactly $\rho_{\mathrm{target}}$ before integer rounding. For example, with four classes and $\rho_{\mathrm{target}}=100$, the unnormalized weights are approximately $1,0.215,0.046,$ and $0.01$; the two body classes lie geometrically between the head and tail instead of being assigned ad hoc counts. Binary targets use $n_{\mathrm{head}}^*/n_{\mathrm{tail}}^*=\rho_{\mathrm{target}}$ directly. A prespecified step profile may be used for clinically meaningful BRACS groups, with its grouping and realized supports reported before analysis.
 
-If a target ratio is infeasible, the construction uses the largest attainable ratio and reports the requested ratio, achieved ratio, limiting class, realized counts, and binding independent-support floor. It never reduces validation or test support to manufacture feasibility. In particular, TCGA-UT patch classification uses balanced, $\rho=10$, and its maximum feasible or native-severity condition instead of forcing $\rho=100$. A stable lower-severity condition is retained in preference to a nominal $\rho=100$ condition supported by only a few independent units.
+The values $n_i^*$ are real-valued targets, whereas a manifest must contain whole patches or slides. \emph{Constrained integer allocation} converts them into usable class counts. Each target is rounded to the nearest integer and clipped to the class's support floor and available unique support. If the rounded counts do not sum to $T$, units are added to or removed from the classes with the largest rounding residuals until the total is exact. The resulting integers $n_i$ therefore satisfy $\sum_i n_i=T$ and every class-specific lower and upper bound while remaining close to the exponential targets under this deterministic adjustment.
 
-Class identity must not be confounded with tail status. Multiclass targets therefore use three locked tail assignments where feasible: (i) a clinical or native-support assignment, (ii) a reversed assignment for ordinal targets or a deterministic rotation for nominal targets, and (iii) one random class permutation drawn once and recorded before fitting. Binary tasks use both head/tail orientations. If support constraints make an assignment infeasible at the shared $T$, the achieved allocation is reported and the assignment is omitted only under a prespecified feasibility rule.
+Counts determine how many units a class contributes; construction orderings determine which units they are. One master ordering is created per class at each hierarchy level. Every condition selects a deterministic prefix, or a patient-round-robin extension of a prefix, from these same orderings. For patch classification, all fixed-pool patients and slides contribute before additional patches are allocated; for MIL, slides are selected by cycling through the patient prefix before revisiting a patient.
 
-Five seed families remain independent. Patient-split seeds determine cohort membership; assignment seeds determine the locked class order; construction seeds determine the master ordering and evidence selection within patients and slides; initialization seeds determine optimization randomness; and bootstrap or permutation seeds determine resampling. The three construction seeds used by the stability pilot are disjoint from the fourth construction seed used to create definitive manifests. Two locked tuning initialization seeds are used for every hyperparameter candidate within each split and assignment. They are disjoint from the five confirmation initialization seeds used after selection. No seed is chosen based on test performance.
+If a target ratio is infeasible, the same rule is applied to every dataset and regime: use the largest attainable ratio and report the requested ratio, achieved ratio, limiting class, realized counts, and binding support floor. Validation or test support is never reduced to manufacture feasibility. This general fallback is especially relevant to high-$K$ tasks, where an exponential profile must allocate support to many intermediate classes as well as the tail; it is not a dataset-specific exception. A stable lower-severity condition is preferred to a nominal $\rho=100$ condition supported by only a few independent units.
 
-The size-matched balanced manifest and its trained CE baseline are identical for all tail assignments within a split: assignment is undefined at $\rho=1$. The same balanced predictions enter every assignment-specific deficit and are represented once in resampling data, avoiding duplicated balanced fits, bootstrap records, and artificial assignment variability.
+The profile determines support by rank, so a second decision maps semantic classes to those ranks. Using only one mapping would confound a class's intrinsic difficulty with its position in the tail. Multiclass targets therefore use three locked assignments where feasible: (i) classes ordered by clinical meaning or native support, (ii) the reverse of that order for ordinal targets or a one-position rotation for nominal targets, and (iii) one distinct random permutation drawn and recorded before fitting. Figure~\ref{fig:tail-assignments} illustrates the nominal case. Binary tasks use both head--tail orientations. If support constraints make an assignment infeasible at the shared $T$, the achieved allocation is reported and the assignment is omitted only under a prespecified feasibility rule.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    cls/.style={draw, rounded corners=1pt, minimum width=1.0cm, minimum height=0.65cm, font=\small},
+    row/.style={font=\small, anchor=east},
+    rank/.style={font=\scriptsize, align=center}
+  ]
+    \node[rank] at (0,1.55) {head\\most support};
+    \node[rank] at (4.8,1.55) {tail\\least support};
+    \draw[-{Latex[length=2mm]}, thick] (0.75,1.55) -- (4.05,1.55);
+
+    \node[row] at (-0.8,0.65) {Native};
+    \node[row] at (-0.8,-0.25) {Rotated};
+    \node[row] at (-0.8,-1.15) {Random};
+
+    \node[cls, fill=blue!25] at (0,0.65) {A};
+    \node[cls, fill=blue!15] at (1.2,0.65) {B};
+    \node[cls, fill=gray!10] at (2.4,0.65) {C};
+    \node[cls, fill=orange!12] at (3.6,0.65) {D};
+    \node[cls, fill=orange!25] at (4.8,0.65) {E};
+
+    \node[cls, fill=blue!25] at (0,-0.25) {B};
+    \node[cls, fill=blue!15] at (1.2,-0.25) {C};
+    \node[cls, fill=gray!10] at (2.4,-0.25) {D};
+    \node[cls, fill=orange!12] at (3.6,-0.25) {E};
+    \node[cls, fill=orange!25] at (4.8,-0.25) {A};
+
+    \node[cls, fill=blue!25] at (0,-1.15) {C};
+    \node[cls, fill=blue!15] at (1.2,-1.15) {E};
+    \node[cls, fill=gray!10] at (2.4,-1.15) {A};
+    \node[cls, fill=orange!12] at (3.6,-1.15) {D};
+    \node[cls, fill=orange!25] at (4.8,-1.15) {B};
+  \end{tikzpicture}
+  \caption{Illustrative tail assignments for a five-class nominal target. Columns are support ranks fixed by the severity profile; rows change which semantic class occupies each rank. Ordinal targets reverse rather than rotate the second assignment.}
+  \label{fig:tail-assignments}
+\end{figure}
+
+The random quantities are separated into five seed families so that changing one source of variation does not silently change another. Table~\ref{tab:seed-families} defines their roles.
+
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{0.37\linewidth}>{\raggedright\arraybackslash}X@{}}
+    \toprule
+    Seed family & Determines & Prespecified use \\
+    \midrule
+    Patient split & Membership of the training, validation, and test cohorts & Three locked patient-disjoint splits \\
+    Tail assignment & Mapping of semantic classes to head--tail support ranks & Recorded clinical/native, reversed/rotated, and random mappings \\
+    Construction & Patient, slide, and patch orderings and the selected evidence & Three pilot orderings and a disjoint fourth ordering for definitive manifests \\
+    Initialization & Parameter initialization and optimization randomness & Two tuning seeds and five disjoint confirmation seeds \\
+    Resampling & Bootstrap draws and permutation swaps & Uncertainty intervals and hypothesis tests only \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Seed families and their non-overlapping roles in the benchmark.}
+  \label{tab:seed-families}
+\end{table}
+
+\noindent No seed is chosen based on test performance. The size-matched balanced manifest and its trained CE baseline are shared by all tail assignments within a split.\footnote{At $\rho_{\mathrm{target}}=1$, every class receives equal support. Permuting semantic classes across support ranks therefore leaves the allocation unchanged, so tail assignment is not a meaningful factor for the balanced condition.} The same balanced predictions enter every assignment-specific deficit and are represented once in resampling data, avoiding duplicated balanced fits, bootstrap records, and artificial assignment variability.
 
 \subsection{Mitigation methods}
 \label{sec:methods}
-Table~\ref{tab:roster} is intentionally compact. Equations, assumptions, defaults, and fidelity qualifications reside in the methods report \citep{queisler2026imbalanceMethods}. CE and MIL CE are the size-matched no-mitigation references. Balanced Softmax is not a separate tested method: it coincides with the $\tau=1$ special case of the train-time logit adjustment already in the roster, and is cited only as related prior-correction literature \citep{ren2020balancedMeta}.
+Table~\ref{tab:roster} lists only the methods evaluated in this benchmark. CE and MIL CE are the size-matched no-mitigation references. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
 
 \begin{table}[ht]
   \centering
@@ -212,8 +291,6 @@ Table~\ref{tab:roster} is intentionally compact. Equations, assumptions, default
   \label{tab:roster}
 \end{table}
 
-RankMix-inspired denotes the tested adaptation with teacher ranking, representative subsequences, feature interpolation, mixed labels, and a reinitialized soft-label-CE student, but without the source paper's complete combined instance and bag objectives \citep{chen2023rankmix}. MDE-inspired denotes the dual-expert component under frozen Virchow2 bags without multimodal distillation; $\lambda_{\mathrm{con}}=0$ is the dual-expert-without-consistency ablation \citep{ling2025mdeMil}. SC-MIL uses class-aware batches and records valid anchors and positive-pair counts. Logit adjustment uses training-condition priors only \citep{menon2021longTail}; cRT reinitializes and retrains only the final classifier after freezing the learned patch representation or WSI instance encoder and attention aggregator \citep{kang2020decouplingRepresentation}.
-
 \subsection{Training, selection, and replication}
 \label{sec:training}
 The frozen encoder, classifier family, optimizer family, batch definition, augmentation, and numerical precision are held fixed within a regime. Training is budgeted only in optimizer updates; epochs are neither a stopping rule nor a unit of comparison. Let $B$ be the regime's locked batch size and $T$ the common controlled support. A single-stage model receives
@@ -225,11 +302,11 @@ updates, corresponding to 30 reference passes through $T$ examples under ordinar
 
 Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity. For each trainable mitigation method, its four-value imbalance-specific grid is crossed with the common four-value learning-rate grid in Appendix~\ref{app:controls}, yielding at most 16 candidate configurations. This joint search accommodates interactions between a method's objective and optimization dynamics while holding the optimizer family, weight decay, architecture, batch definition, and all other training parameters fixed. CE and methods without a meaningful imbalance-specific control evaluate the four learning rates without introducing an artificial search dimension. Train-time logit adjustment is tuned jointly over $\tau$ and learning rate; post-hoc logit adjustment inherits the selected CE model and tunes only $\tau$ because it performs no gradient optimization.
 
-Every hyperparameter candidate is fitted with the same two tuning initialization seeds for each prespecified patient split and tail assignment. One configuration is selected per method, dataset, prediction regime, and imbalance severity by aggregate natural-validation balanced accuracy across both tuning seeds, the tuning splits, and the assignments. Macro F1 and then lower NLL are deterministic tie-breakers. The chosen configuration is locked before any of the five disjoint confirmation initialization seeds are fitted and before test evaluation. Tuning runs never enter confirmation effect estimates. For cRT, stage one inherits the selected CE configuration, while the stage-two classifier learning rate is selected separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
+Every hyperparameter candidate is fitted with the same two tuning initialization seeds for each prespecified patient split and tail assignment. Selection is performed separately for each method, dataset, prediction regime, and imbalance severity. Within each such selection unit, natural-validation balanced accuracy is averaged across both tuning seeds, all tuning splits, and all tail assignments. The configuration with the highest aggregate value is selected; macro F1 and then lower NLL are deterministic tie-breakers. The chosen configuration is locked before any of the five disjoint confirmation initialization seeds are fitted and before test evaluation. Tuning runs never enter confirmation effect estimates. For cRT, stage one inherits the selected CE configuration, while the stage-two classifier learning rate is selected separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
 
-Controlled contrasts are paired on split, assignment, confirmation initialization, and held-out cases. Each locked patient split and tail assignment is repeated with the five confirmation seeds. Exactly three patient-split seeds are used; a dataset--regime unable to produce all three valid splits under the independent-support floors is excluded from the corresponding confirmatory analysis. The split counts, support floors, condition manifests, tuning and confirmation seeds, method grids, and update budgets are frozen in the signed analysis manifest before the first definitive fit. The unit of replication and all missing or failed runs are reported. A failed run is not silently replaced using a test-informed seed.
+A \emph{controlled contrast} is the difference between two matched runs, such as balanced CE versus imbalanced CE or a mitigation method versus imbalanced CE. The two runs use the same patient split, tail assignment, confirmation-seed index, and held-out cases, so the contrast does not mix the intended change with a different cohort or replication. Each locked patient split and tail assignment is repeated with the five confirmation seeds. Exactly three patient-split seeds are used; a dataset--regime unable to produce all three valid splits under the independent-support floors is excluded from the corresponding confirmatory analysis. The split counts, support floors, condition manifests, tuning and confirmation seeds, method grids, and update budgets are frozen in the signed analysis manifest before the first definitive fit. The unit of replication and all missing or failed runs are reported. A failed run is not silently replaced using a test-informed seed.
 
-Computational cost is reported separately for validation search and locked-configuration fitting, using wall-clock training time, accelerator-hours, peak accelerator memory, total and trainable parameter counts, and effective passes through unique training examples. Costs include all stages required by the method, including both cRT stages, but exclude one-time frozen-feature extraction shared by all methods. Hardware and software environments are recorded with each run.
+Computational cost is separated into validation search and locked-configuration fitting. Resource use is summarized by wall-clock training time, accelerator-hours, and peak accelerator memory. Model size is reported as total and trainable parameter counts, while data exposure is reported as effective passes through unique training examples. Costs include every method-specific stage, including both cRT stages, but exclude the one-time frozen-feature extraction shared by all methods. Hardware and software environments are recorded with each run.
 
 \subsection{Scope and limitations}
 The design isolates training-distribution effects under frozen Virchow2 representations; it does not establish how end-to-end encoder fine-tuning would respond to imbalance. Constructed tails improve causal interpretability but need not reproduce referral pathways or biological prevalence. A shared $T$ controls data volume at the cost of discarding some available training examples, which is why the full natural condition is retained as a descriptive anchor. Some methods change more than one mechanism, so the study supports method-level comparisons rather than universal causal claims about sampling or loss design. The locked update budget equalizes optimizer steps but not information exposure: RankMix consumes teacher and student passes, MDE draws a natural and a balanced minibatch per update, and post-hoc logit adjustment performs no gradient optimization at all, so method comparisons are made at equal update budget with exposure and cost reported alongside, not at equal data throughput. MIL instance counts likewise vary with the eligible tissue area of each selected slide; processed instances, memory, and runtime are therefore reported rather than equalized by truncating bags. The number of independent patients, not the number of patches, limits inference. All imbalance-robustness findings are additionally conditional on the geometry of a single frozen encoder; whether the same deficits and recoveries hold under a different foundation representation is outside the present scope. Finally, calibration on a natural held-out cohort is conditional on that cohort's prevalence and should not be transported to a new deployment population without explicit prior-shift analysis.
@@ -405,6 +482,7 @@ Because the independent unit for RQ3 is the dataset--target group and only a few
 
 Maximum a posteriori (MAP) estimation combines model fit with weak zero-centered, unit-scale Gaussian priors on standardized slopes and on the log standard deviations of the random intercept and residual terms. These priors regularize extreme estimates in the small sample; no interactions are fitted. Leave-one-dataset--target-group-out cross-validation repeatedly withholds one complete group and is reported only as a coarse stability check. With this small group count, held-out predictions shrink toward the population-average intercept, so RQ3 remains a hypothesis-generating description of association rather than a validated predictive model. TCGA-UT supplies the only genuine paired-regime evidence; the CAMELYON16, PANDA, and BRACS targets differ by regime. Model definitions, priors, and covariate roles are frozen before recovery outcomes are inspected, and all RQ3 results remain exploratory.
 
+\clearpage
 \appendix
 \section{Experimental Controls}
 \label{app:controls}
