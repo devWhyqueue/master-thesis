@@ -1,0 +1,12 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    requirements-experiment.txt /opt/requirements-experiment.txt
+
+%post
+    python -m pip install --upgrade pip
+    python -m pip install -r /opt/requirements-experiment.txt
+
+%runscript
+    exec "$@"
