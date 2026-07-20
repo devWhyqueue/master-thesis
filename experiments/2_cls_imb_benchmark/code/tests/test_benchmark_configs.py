@@ -58,9 +58,12 @@ def test_configs_are_freeze_ready_and_output_isolated() -> None:
         ]
         for key in ("tile_root", "wsi_tile_root", "selection_path", "tiles_dir"):
             if path := config["dataset"].get(key):
+                allowed_roots = (writable_root, *mounted_roots)
+                if key == "tile_root" and config["dataset"].get("tile_squashfs"):
+                    allowed_roots += (Path("/tmp"),)
                 assert any(
                     Path(path).is_relative_to(root)
-                    for root in (writable_root, *mounted_roots)
+                    for root in allowed_roots
                 )
 
     output_roots = {config["paths"]["outputs"] for config in configs}

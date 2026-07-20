@@ -9,6 +9,13 @@ import subprocess
 from typing import Any, Callable
 
 from imbalance_benchmark.common import EXPERIMENT_ROOT, load_config
+from imbalance_benchmark.hydra.squashfs import (
+    _generated_tile_squashfs,
+    _mount_generated_tile_lines,
+    _pack_generated_tile_lines,
+    _stage_images,
+    _staging_lines,
+)
 from imbalance_benchmark.modeling.context import CONDITIONS
 
 logger = logging.getLogger(__name__)
@@ -67,30 +74,6 @@ def build_workflow(config: dict[str, Any], smoke: bool = False) -> list[SlurmJob
     )
     an = _job(config, "analyze", "analyze", False, co.name)
     return [p, pi, fr, tu, co, an]
-
-
-def _stage_images(config: dict[str, Any], stage: str) -> list[tuple[str, str]]:
-    imgs = config.get("slurm", {}).get("squashfs", [])
-    return [
-        (str(image["source"]), str(image["mount"]))
-        for image in imgs
-        if stage in image.get("stages", ("prepare",))
-    ]
-
-
-def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
-    if not images:
-        return []
-    lines = [
-        'STAGE_DIR="/tmp/imbalance-benchmark-${SLURM_JOB_ID}"',
-        'mkdir -p "$STAGE_DIR"',
-    ]
-    for idx, (src, mt) in enumerate(images):
-        loc = f"$STAGE_DIR/{idx}.sqfs"
-        lines.extend(
-            [f'cp {shlex.quote(src)} "{loc}"', f'BINDS+=("{loc}:{mt}:image-src=/")']
-        )
-    return lines
 
 
 def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
@@ -158,6 +141,7 @@ def _execution_lines(
     command: str,
     images: list[tuple[str, str]],
     dataset_root: str,
+    generated_squashfs: tuple[str, str] | None,
 ) -> list[str]:
     r, c = shlex.quote(root), shlex.quote(code_dir)
     o, co = shlex.quote(output_dir), shlex.quote(container)
@@ -171,6 +155,7 @@ def _execution_lines(
         "BINDS=()",
     ]
     lines.extend(_staging_lines(images))
+    lines.extend(_mount_generated_tile_lines(generated_squashfs))
     binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" -B "/home/space:/home/space:ro"'
     if dataset_root:
         binds += f' -B "{dataset_root}:{dataset_root}:ro"'
@@ -183,9 +168,10 @@ def _execution_lines(
             "else",
             f"  PYTHONPATH={c}${{PYTHONPATH:+:$PYTHONPATH}} bash -lc {cmd}",
             "fi",
-            "",
         ]
     )
+    lines.extend(_pack_generated_tile_lines(generated_squashfs))
+    lines.append("")
     return lines
 
 
@@ -210,7 +196,9 @@ def render_sbatch(
     data = (
         str(config.get("dataset", {}).get("root", "")) if job.name == "prepare" else ""
     )
-    lines += _execution_lines(job, r, c, o, co, cmd, images, data)
+    lines += _execution_lines(
+        job, r, c, o, co, cmd, images, data, _generated_tile_squashfs(config, job.name)
+    )
     return "\n".join(lines)
 
 

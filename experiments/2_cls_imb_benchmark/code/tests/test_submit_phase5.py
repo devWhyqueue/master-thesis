@@ -11,6 +11,8 @@ from imbalance_benchmark.hydra.workflow import (
 SQUASHFS_SOURCE = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
 SQUASHFS_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
 PANDA_RAW = "/home/space/datasets/panda/raw"
+GENERATED_TILES = "/tmp/bracs_roi_tiles"
+GENERATED_SQUASHFS = "/home/example/outputs/bracs/roi_tiles.sqfs"
 
 
 def _config() -> dict[str, object]:
@@ -98,6 +100,27 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         # Shared datasets under /home/space must stay reachable at every stage:
         # patch-regime features are read by absolute path during tune/confirm.
         assert '-B "/home/space:/home/space:ro"' in scripts[stage]
+
+
+def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
+    """BRACS tiles stay node-local and persist as one reusable image."""
+    config = _config()
+    config["dataset"].update(
+        tile_root=GENERATED_TILES,
+        tile_squashfs=GENERATED_SQUASHFS,
+    )
+
+    scripts = {
+        job.name: render_sbatch(job, config, "config.yaml")
+        for job in build_workflow(config)
+    }
+
+    prepare = scripts["prepare"]
+    assert f"{GENERATED_SQUASHFS}:{GENERATED_TILES}:image-src=/" in prepare
+    assert f"squash-dataset {GENERATED_TILES} {GENERATED_SQUASHFS}.partial" in prepare
+    assert f"mv {GENERATED_SQUASHFS}.partial {GENERATED_SQUASHFS}" in prepare
+    for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
+        assert GENERATED_SQUASHFS not in scripts[stage]
 
 
 def test_smoke_workflow_uses_test_partition() -> None:

@@ -16,7 +16,8 @@ dataset:
     tiling: non_overlapping_full_256x256_tiles
     split_unit: patient
   root: /home/space/datasets/patho_ds/BRACS
-  tile_root: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/bracs/patch/prepared/roi_tiles
+  tile_root: /tmp/bracs_roi_tiles
+  tile_squashfs: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/bracs/patch/prepared/roi_tiles.sqfs
   tile_size: 256
 
 feature_extraction:
