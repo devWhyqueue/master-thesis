@@ -171,10 +171,10 @@ def _execution_lines(
         "BINDS=()",
     ]
     lines.extend(_staging_lines(images))
-    nv = "--nv " if job.gpus else ""
-    binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw"'
+    binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" -B "/home/space:/home/space:ro"'
     if dataset_root:
         binds += f' -B "{dataset_root}:{dataset_root}:ro"'
+    nv = "--nv " if job.gpus else ""
     app = f'apptainer exec {nv}{binds} "${{BINDS[@]}}" {co} bash -lc {cmd}'
     lines.extend(
         [

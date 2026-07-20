@@ -95,6 +95,9 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
     for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
         assert SQUASHFS_SOURCE not in scripts[stage]
         assert PANDA_RAW not in scripts[stage]
+        # Shared datasets under /home/space must stay reachable at every stage:
+        # patch-regime features are read by absolute path during tune/confirm.
+        assert '-B "/home/space:/home/space:ro"' in scripts[stage]
 
 
 def test_smoke_workflow_uses_test_partition() -> None:
