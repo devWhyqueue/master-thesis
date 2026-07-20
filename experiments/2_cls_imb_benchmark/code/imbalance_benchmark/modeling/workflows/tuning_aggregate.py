@@ -39,9 +39,13 @@ def _frozen_grid(regime: Regime, method: str) -> list[dict[str, Any]]:
 def summarize_tuning_cost(cost_records: list[dict[str, int]]) -> dict[str, float | int]:
     """Aggregate realized search work across every candidate, split, and seed fit."""
     processed = sum(record["processed_examples"] for record in cost_records)
+    processed_instances = sum(
+        record.get("processed_instances", 0) for record in cost_records
+    )
     unique = sum(record["unique_training_examples"] for record in cost_records)
     return {
         "processed_examples": processed,
+        "processed_instances": processed_instances,
         "effective_passes_through_unique_examples": processed / max(unique, 1),
         "maximum_total_parameters": max(
             (record["total_parameters"] for record in cost_records), default=0
@@ -93,6 +97,7 @@ def _evaluate(
     scope.cost_records.append(
         {
             "processed_examples": int(ctx["processed_examples"]),
+            "processed_instances": int(ctx.get("processed_instances", 0)),
             "unique_training_examples": len(ctx["train_dataset"]),
             "total_parameters": counts["total_parameters"],
             "trainable_parameters": counts["trainable_parameters"],

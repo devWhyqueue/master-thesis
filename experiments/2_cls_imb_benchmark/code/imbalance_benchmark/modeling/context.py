@@ -198,6 +198,7 @@ def cost_payload(
     processed_examples: int,
     training_footprint_parameters: int | None = None,
     peak_memory_bytes: int | None = None,
+    processed_instances: int | None = None,
 ) -> dict[str, Any]:
     """Build an exact confirmation cost record from the examples actually consumed."""
     updates = updates_for(method, budget)
@@ -207,7 +208,7 @@ def cost_payload(
         counts["trainable_parameters"] = 0
     if training_footprint_parameters is not None:
         counts["training_footprint_parameters"] = training_footprint_parameters
-    return {
+    payload = {
         "updates": updates,
         "processed_examples": processed_examples,
         "wall_clock_seconds": elapsed,
@@ -220,6 +221,9 @@ def cost_payload(
         / max(unique_examples, 1),
         **counts,
     }
+    if processed_instances is not None:
+        payload["processed_instances"] = processed_instances
+    return payload
 
 
 def updates_for(method: str, budget: int) -> int:

@@ -227,10 +227,13 @@ def rankmix_bag_loss(
     bags: list[torch.Tensor],
     targets: torch.Tensor,
     alpha: float,
+    processed_instances: list[int] | None = None,
 ) -> tuple[torch.Tensor, int]:
     """RankMix-inspired soft-label CE: teacher-ranked, mixed-feature student loss."""
     if len(bags) < 2:
         logits, _, _ = student.forward_bags(bags)
+        if processed_instances is not None:
+            processed_instances.append(sum(len(bag) for bag in bags))
         return F.cross_entropy(logits, targets), 0
     mixed_bags, permutation, lambdas = _mix_batch(teacher, bags, targets, alpha)
     logits, _, _ = student.forward_bags(mixed_bags)
@@ -238,6 +241,9 @@ def rankmix_bag_loss(
     soft_targets = lambdas.unsqueeze(1) * one_hot + (1.0 - lambdas).unsqueeze(
         1
     ) * one_hot.index_select(0, permutation)
-    return -(soft_targets * F.log_softmax(logits, dim=1)).sum(dim=1).mean(), len(
-        mixed_bags
-    )
+    loss = -(soft_targets * F.log_softmax(logits, dim=1)).sum(dim=1).mean()
+    if processed_instances is not None:
+        processed_instances.append(
+            2 * sum(len(bag) for bag in bags) + sum(len(bag) for bag in mixed_bags)
+        )
+    return loss, len(mixed_bags)

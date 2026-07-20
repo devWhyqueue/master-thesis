@@ -49,6 +49,14 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
             Path(dataset_cfg.get("wsi_tile_root", root / "tiles" / "wsi")),
             int(dataset_cfg.get("seed", 0)),
             Path(metadata_csv) if metadata_csv else None,
+            Path(
+                dataset_cfg.get(
+                    "wsi_tile_manifest",
+                    Path(dataset_cfg.get("wsi_tile_root", root / "tiles" / "wsi"))
+                    / "tile_manifest.csv",
+                )
+            ),
+            int(dataset_cfg.get("expected_wsi_count", 547)),
         )
     metadata_csv = dataset_cfg.get("metadata_csv")
     tile_root = Path(dataset_cfg.get("tile_root", root / "tiles"))
@@ -136,19 +144,17 @@ def _camelyon16_slide_rows(
 
 
 def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
-    """Build PANDA rows from selected slides and upstream per-slide tile CSVs."""
+    """Build PANDA rows from a validated full-cohort level-0 tile inventory."""
     dataset_cfg = config["dataset"]
     regime = dataset_cfg.get("regime", "patch")
     selection = pd.read_csv(dataset_cfg["selection_path"])
     tiles_dir = Path(dataset_cfg["tiles_dir"])
-    tiles = {
-        str(slide_id): pd.read_csv(path)
-        for slide_id in selection["slide_id"]
-        if (path := tiles_dir / f"{slide_id}.csv").is_file()
-        and not pd.read_csv(path).empty
-    }
-    if not tiles:
-        raise RuntimeError("No tiled PANDA slides found.")
+    tiles = panda.load_tile_inventory(selection, tiles_dir)
+    panda.validate_tile_inventory(
+        selection,
+        tiles,
+        int(dataset_cfg.get("expected_slide_count", 10_616)),
+    )
     parts = [
         _panda_slide_rows(row, tiles[str(row["slide_id"])])
         for _, row in selection.iterrows()

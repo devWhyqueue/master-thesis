@@ -119,6 +119,9 @@ def _mde_train_loop(
             ctx["processed_examples"] = (
                 ctx.get("processed_examples", 0) + len(targets_u) + len(targets_b)
             )
+            ctx["processed_instances"] = ctx.get("processed_instances", 0) + sum(
+                len(bag) for bag in [*bags_u, *bags_b]
+            )
             loss.backward()
             opt.step()
             step += 1

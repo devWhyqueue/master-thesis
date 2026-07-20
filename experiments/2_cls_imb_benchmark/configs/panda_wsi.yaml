@@ -17,9 +17,12 @@ dataset:
     split_unit: biopsy
   selection_path: /home/space/datasets/panda/native_tiles_20x_256/selected_slides.csv
   tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/tiles
+  expected_slide_count: 10616
 
 feature_extraction:
   model_name: hf-hub:paige-ai/Virchow2
+  revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  weights_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
   batch_size: 64
   dtype: float16
   device: auto

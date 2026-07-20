@@ -9,6 +9,9 @@ from typing import cast
 import pandas as pd
 
 from imbalance_benchmark.datasets.bracs import metadata
+from imbalance_benchmark.datasets.bracs.audit import (
+    load_tile_manifest,
+)
 
 _ROI_ID_COLUMNS = {"roi", "roi_id", "roi_filename", "roi_name"}
 _SLIDE_COLUMNS = (
@@ -64,13 +67,21 @@ def build_manifest(
     tile_root: Path,
     seed: int,
     metadata_csv: Path | None = None,
+    tile_manifest_csv: Path | None = None,
+    expected_slides: int = 547,
 ) -> pd.DataFrame:
     """Build patient-disjoint BRACS WSI-bag rows from official slide labels."""
     wsi_frame = load_wsi_metadata(root, metadata_csv)
-    parts = [
-        _slide_rows(row, list_slide_tiles(tile_root, str(row["slide_id"])))
-        for _, row in wsi_frame.iterrows()
-    ]
+    if len(wsi_frame) != expected_slides:
+        raise ValueError(
+            f"BRACS WSI metadata has {len(wsi_frame)} slides; expected {expected_slides}"
+        )
+    tile_manifest = load_tile_manifest(
+        tile_manifest_csv or tile_root / "tile_manifest.csv",
+        tile_root,
+        expected_slides,
+    )
+    parts = _tile_manifest_parts(wsi_frame, tile_manifest)
     populated = [part for part in parts if not part.empty]
     if not populated:
         raise RuntimeError(f"No BRACS WSI tissue tiles found under {tile_root}")
@@ -79,6 +90,24 @@ def build_manifest(
     tagged = frame.merge(assignment, on="case_id", how="inner")
     metadata.assert_patient_disjoint(tagged)
     return tagged
+
+
+def _tile_manifest_parts(
+    wsi_frame: pd.DataFrame, tile_manifest: pd.DataFrame
+) -> list[pd.DataFrame]:
+    slide_ids = tile_manifest["slide_id"].astype(str)
+    return [
+        _slide_rows(
+            row,
+            [
+                Path(path)
+                for path in tile_manifest.loc[
+                    slide_ids == str(row["slide_id"]), "image_path"
+                ]
+            ],
+        )
+        for _, row in wsi_frame.iterrows()
+    ]
 
 
 def _read_metadata_sheets(root: Path, metadata_csv: Path | None) -> list[pd.DataFrame]:

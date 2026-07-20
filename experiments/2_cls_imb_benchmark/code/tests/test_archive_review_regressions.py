@@ -114,6 +114,23 @@ def test_bracs_wsi_uses_official_slide_metadata_without_roi_supervision(
     """BRACS WSI bags use official slide labels and never inspect ROI metadata."""
     tile = tmp_path / "tile.jpg"
     tile.touch()
+    pd.DataFrame(
+        {
+            "slide_id": ["BRACS_1"],
+            "image_path": [str(tile)],
+            "magnification": ["20x"],
+            "tile_size": [256],
+            "x": [0],
+            "y": [0],
+            "otsu_foreground_fraction": [0.5],
+            "grayscale_std": [10.0],
+            "canny_edge_count": [1],
+            "tissue_neighbors": [2],
+            "sha256": [
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ],
+        }
+    ).to_csv(tmp_path / "tile_manifest.csv", index=False)
     monkeypatch.setattr(
         dataset_adapters.bracs,
         "load_roi_metadata",
@@ -131,17 +148,12 @@ def test_bracs_wsi_uses_official_slide_metadata_without_roi_supervision(
             }
         ),
     )
-    monkeypatch.setattr(
-        dataset_adapters.bracs.wsi,
-        "list_slide_tiles",
-        lambda *_: [tile],
-    )
-
     rows = dataset_adapters._build_bracs(
         {
             "dataset": {
                 "root": str(tmp_path),
                 "wsi_tile_root": str(tmp_path),
+                "expected_wsi_count": 1,
                 "regime": "wsi",
             }
         }

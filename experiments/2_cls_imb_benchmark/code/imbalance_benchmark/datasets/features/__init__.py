@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from functools import lru_cache
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 import timm
@@ -15,11 +14,20 @@ from timm.data.transforms_factory import create_transform
 from timm.layers.mlp import SwiGLUPacked
 from torch.utils.data import DataLoader, Dataset
 
+from imbalance_benchmark.datasets.features.cache import (
+    load_feature_row,
+    load_slide_features,
+)
 from imbalance_benchmark.datasets.feature_provenance import (
     FEATURE_DIM,
     VIRCHOW2_MODEL,
+    VIRCHOW2_REVISION,
+    VIRCHOW2_WEIGHTS_SHA256,
     patch_sort_key,
+    record_cached_slide,
+    resolve_feature_snapshot,
     resolve_feature_provenance,
+    validate_cached_slide,
     validate_feature_cache,
 )
 
@@ -37,11 +45,24 @@ __all__ = [
 
 
 def load_feature_model(
-    model_name: str, device: torch.device
+    model_name: str,
+    device: torch.device,
+    revision: str = VIRCHOW2_REVISION,
+    weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
 ) -> tuple[torch.nn.Module, Callable[[Image.Image], torch.Tensor]]:
     """Load the frozen Virchow2 feature encoder and its input transform."""
+    snapshot = resolve_feature_snapshot(
+        {
+            "model_name": model_name,
+            "revision": revision,
+            "weights_sha256": weights_sha256,
+        }
+    )
     model = timm.create_model(
-        model_name, pretrained=True, mlp_layer=SwiGLUPacked, act_layer=torch.nn.SiLU
+        f"local-dir:{snapshot.as_posix()}",
+        pretrained=True,
+        mlp_layer=SwiGLUPacked,
+        act_layer=torch.nn.SiLU,
     )
     model = model.eval().to(device)
     transforms = cast(
@@ -94,6 +115,8 @@ def extract_slide_features(
     batch_size: int = 64,
     dtype: str = "float16",
     device: torch.device | None = None,
+    revision: str = VIRCHOW2_REVISION,
+    weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
 ) -> torch.Tensor:
     """Embed a slide's ordered patch images into a stacked (n_patches, 2560) tensor."""
     resolved_device = device or torch.device(
@@ -101,7 +124,9 @@ def extract_slide_features(
     )
     if not image_paths:
         return torch.empty((0, FEATURE_DIM))
-    model, transforms = load_feature_model(model_name, resolved_device)
+    model, transforms = load_feature_model(
+        model_name, resolved_device, revision, weights_sha256
+    )
     loader = DataLoader(
         _ImagePathDataset(image_paths, transforms),
         batch_size=batch_size,
@@ -122,6 +147,8 @@ def attach_extracted_features(
     batch_size: int = 64,
     dtype: str = "float16",
     device: torch.device | None = None,
+    revision: str = VIRCHOW2_REVISION,
+    weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
 ) -> pd.DataFrame:
     """Extract one stacked per-slide feature tensor per slide and attach references.
 
@@ -129,57 +156,84 @@ def attach_extracted_features(
     dataset adapter. Existing ``<feature_root>/<slide_id>.pt`` files are reused
     rather than re-extracted.
     """
-    feature_root.mkdir(parents=True, exist_ok=True)
-    provenance = resolve_feature_provenance({"model_name": model_name, "dtype": dtype})
-    validate_feature_cache(feature_root, provenance)
+    options = {
+        "model_name": model_name,
+        "batch_size": batch_size,
+        "dtype": dtype,
+        "device": device,
+        "revision": revision,
+        "weights_sha256": weights_sha256,
+    }
+    _prepare_feature_cache(feature_root, options)
     enriched = frame.copy()
-    feature_paths = pd.Series(index=enriched.index, dtype=object)
-    feature_indices = pd.Series(index=enriched.index, dtype=object)
-    for slide_id, group in enriched.groupby("slide_id", sort=False):
-        slide_path = feature_root / f"{slide_id}.pt"
-        if not slide_path.exists():
-            image_paths = group["image_path"].astype(str).tolist()
-            tensor = extract_slide_features(
-                image_paths, model_name, batch_size, dtype, device
-            )
-            torch.save(tensor, slide_path)
-        feature_paths.loc[group.index] = str(slide_path)
-        feature_indices.loc[group.index] = range(len(group))
+    feature_paths, feature_indices = _feature_references(
+        enriched, feature_root, options
+    )
     enriched["feature_path"] = feature_paths
     enriched["feature_index"] = feature_indices.astype(int)
     return enriched
 
 
-@lru_cache(maxsize=512)
-def load_slide_features(path: str) -> torch.Tensor:
-    """Load a feature tensor and normalize to (n_instances, dim)."""
-    tensor = torch.load(path, map_location="cpu", weights_only=False)
-    if isinstance(tensor, dict):
-        cls_tok, mean_tok = tensor.get("cls"), tensor.get("mean_patch")
-        features = (
-            torch.cat([cls_tok, mean_tok], dim=-1).float()
-            if cls_tok is not None and mean_tok is not None
-            else next(
-                value for value in tensor.values() if torch.is_tensor(value)
-            ).float()
+def _prepare_feature_cache(feature_root: Path, options: dict[str, Any]) -> None:
+    feature_root.mkdir(parents=True, exist_ok=True)
+    provenance = resolve_feature_provenance(options)
+    validate_feature_cache(feature_root, provenance)
+
+
+def _feature_references(
+    frame: pd.DataFrame, feature_root: Path, options: dict[str, Any]
+) -> tuple[pd.Series, pd.Series]:
+    feature_paths = pd.Series(index=frame.index, dtype=object)
+    feature_indices = pd.Series(index=frame.index, dtype=object)
+    for slide_id, group in frame.groupby("slide_id", sort=False):
+        slide_path = _ensure_slide_features(group, feature_root, str(slide_id), options)
+        feature_paths.loc[group.index] = str(slide_path)
+        feature_indices.loc[group.index] = range(len(group))
+    return feature_paths, feature_indices
+
+
+def _ensure_slide_features(
+    group: pd.DataFrame,
+    feature_root: Path,
+    slide_id: str,
+    options: dict[str, Any],
+) -> Path:
+    slide_path = feature_root / f"{slide_id}.pt"
+    identities = _ordered_patch_identity(group)
+    if slide_path.exists():
+        validate_cached_slide(
+            feature_root,
+            slide_id,
+            slide_path,
+            identities,
+            len(load_slide_features(str(slide_path))),
         )
-    else:
-        features = tensor.float()
-    if features.ndim == 1:
-        return features.unsqueeze(0)
-    if features.ndim > 2:
-        return features.reshape(-1, features.shape[-1])
-    return features
-
-
-def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:
-    """Load one feature vector; a multi-row tensor requires an explicit index."""
-    features = load_slide_features(path)
-    if index is not None:
-        return features[int(index)].squeeze()
-    if features.shape[0] == 1:
-        return features[0].squeeze()
-    raise ValueError(
-        f"Feature file {path} has {features.shape[0]} rows; "
-        "provide feature_index for multi-row tensors."
+        return slide_path
+    image_paths = group["image_path"].astype(str).tolist()
+    tensor = extract_slide_features(
+        image_paths,
+        str(options["model_name"]),
+        int(options["batch_size"]),
+        str(options["dtype"]),
+        cast(torch.device | None, options["device"]),
+        str(options["revision"]),
+        str(options["weights_sha256"]),
     )
+    torch.save(tensor, slide_path)
+    record_cached_slide(feature_root, slide_id, slide_path, identities, len(tensor))
+    return slide_path
+
+
+def _ordered_patch_identity(group: pd.DataFrame) -> list[str]:
+    """Return the exact patch identity sequence tied to cached tensor rows."""
+    patch_ids = (
+        group["patch_id"].astype(str)
+        if "patch_id" in group
+        else group["image_path"].astype(str)
+    )
+    return [
+        f"{patch_id}\0{image_path}"
+        for patch_id, image_path in zip(
+            patch_ids, group["image_path"].astype(str), strict=True
+        )
+    ]

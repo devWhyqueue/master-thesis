@@ -18,6 +18,10 @@ from imbalance_benchmark.datasets.features import (
     attach_extracted_features,
     resolve_feature_provenance,
 )
+from imbalance_benchmark.datasets.feature_provenance import (
+    VIRCHOW2_REVISION,
+    VIRCHOW2_WEIGHTS_SHA256,
+)
 from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_prepare"]
@@ -66,6 +70,8 @@ def _base_manifest(config: dict[str, object], paths: dict[str, Path]) -> pd.Data
         model_name=str(feature_cfg.get("model_name", "hf-hub:paige-ai/Virchow2")),
         batch_size=int(feature_cfg.get("batch_size", 64)),
         dtype=str(feature_cfg.get("dtype", "float16")),
+        revision=str(feature_cfg.get("revision", VIRCHOW2_REVISION)),
+        weights_sha256=str(feature_cfg.get("weights_sha256", VIRCHOW2_WEIGHTS_SHA256)),
     )
 
 

@@ -219,6 +219,9 @@ def _run_and_record(
                 int(ctx.get("processed_examples", 0)),
                 ctx.get("training_footprint_parameters"),
                 ctx.get("peak_memory_bytes"),
+                processed_instances=(
+                    int(ctx.get("processed_instances", 0)) if run.is_mil else None
+                ),
             ),
             "method_diagnostics": ctx.get("method_diagnostics", {}),
             "environment": _environment_payload(),

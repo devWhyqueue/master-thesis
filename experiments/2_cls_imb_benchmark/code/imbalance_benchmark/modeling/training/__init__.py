@@ -6,7 +6,6 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate
@@ -26,9 +25,8 @@ from imbalance_benchmark.modeling.losses import (
     FocalLoss,
     ScholzCombinedLoss,
     cfal_loss,
-    rankmix_bag_loss,
-    supervised_contrastive_loss,
 )
+from imbalance_benchmark.modeling.training.mil import _fit_mil_step
 
 logger = logging.getLogger(__name__)
 
@@ -119,32 +117,10 @@ def _fit_step(
     batch_data: Any, ctx: dict[str, Any], step: int, max_steps: int
 ) -> torch.Tensor:
     """Execute a single forward-backward update step for single-loader methods."""
-    is_mil, method, device = ctx["is_mil"], ctx["method"], ctx["device"]
+    method, device = ctx["method"], ctx["device"]
     model, criterion, param = ctx["model"], ctx["criterion"], ctx["param"]
-    if is_mil:
-        bags, targets = [b.to(device) for b in batch_data[0]], batch_data[1].to(device)
-        ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
-        if method == "rankmix":
-            return rankmix_bag_loss(model, ctx["teacher"], bags, targets, param)[0]
-        if method == "sc_mil":
-            logits, emb, _ = model.forward_bags(bags)
-            cont, n_pairs, n_anchors = supervised_contrastive_loss(
-                model.project_bag_embeddings(emb), targets, temperature=param
-            )
-            diag = ctx.setdefault("method_diagnostics", {})
-            for k, v in [
-                ("sc_mil_positive_pairs", n_pairs),
-                ("sc_mil_valid_anchors", n_anchors),
-                ("sc_mil_batches", 1),
-            ]:
-                diag[k] = diag.get(k, 0) + v
-            return (1.0 - (step / max_steps)) * cont + (
-                step / max_steps
-            ) * F.cross_entropy(logits, targets)
-        logits, _, _ = model.forward_bags(bags)
-        if method == "logit_adjustment" and param is not None:
-            logits = logits + param * torch.log(ctx["priors"] + 1e-8)
-        return criterion(logits, targets)
+    if ctx["is_mil"]:
+        return _fit_mil_step(batch_data, ctx, step, max_steps)
     inputs, targets = batch_data["features"].to(device), batch_data["target"].to(device)
     ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
     if method == "cfal":

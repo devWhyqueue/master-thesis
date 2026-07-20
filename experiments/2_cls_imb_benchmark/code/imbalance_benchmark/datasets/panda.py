@@ -29,6 +29,120 @@ PATCH_LABELS = ("benign", "cancer")
 SPLITS = ("train", "validation", "test")
 CANCER_VALUES = {"radboud": (3, 4, 5), "karolinska": (2,)}
 CANCER_FRACTION = 0.5
+__all__ = [
+    "CANCER_FRACTION",
+    "CANCER_VALUES",
+    "PATCH_LABELS",
+    "SPLITS",
+    "WSI_LABELS",
+    "assert_slide_disjoint",
+    "cell_label",
+    "isup_label",
+    "load_mask_channel",
+    "load_slide_frame",
+    "load_tile_inventory",
+    "select_subset",
+    "split_cases",
+    "validate_tile_inventory",
+]
+_SELECTION_AUDIT_COLUMNS = {
+    "slide_id",
+    "eligible_tile_count",
+    "source_level",
+    "tile_size",
+    "tissue_fraction_min",
+    "tissue_intensity_threshold",
+}
+_TILE_AUDIT_COLUMNS = {
+    "patch_id",
+    "image_path",
+    "level",
+    "tile_size",
+    "x",
+    "y",
+    "tissue_fraction",
+    "tissue_intensity_threshold",
+}
+
+
+def load_tile_inventory(
+    selection: pd.DataFrame, tiles_dir: Path
+) -> dict[str, pd.DataFrame]:
+    """Load every selected PANDA slide's tile CSV without silently dropping slides."""
+    inventory = {}
+    for slide_id in selection["slide_id"].astype(str):
+        path = tiles_dir / f"{slide_id}.csv"
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"PANDA tile audit is missing for {slide_id}: {path}"
+            )
+        tiles = pd.read_csv(path)
+        if "image_path" in tiles:
+            tiles["image_path"] = tiles["image_path"].map(
+                lambda value: str(
+                    Path(str(value))
+                    if Path(str(value)).is_absolute()
+                    else tiles_dir / str(value)
+                )
+            )
+        inventory[slide_id] = tiles
+    return inventory
+
+
+def validate_tile_inventory(
+    selection: pd.DataFrame,
+    inventory: dict[str, pd.DataFrame],
+    expected_slides: int,
+) -> None:
+    """Validate the full PANDA level-0, uncapped, 35%-tissue realization."""
+    missing = _SELECTION_AUDIT_COLUMNS - set(selection.columns)
+    if missing:
+        raise ValueError(f"PANDA selection audit fields are missing: {sorted(missing)}")
+    if selection["slide_id"].astype(str).nunique() != expected_slides:
+        raise ValueError("PANDA selection audit does not cover the full biopsy cohort")
+    if set(inventory) != set(selection["slide_id"].astype(str)):
+        raise ValueError("PANDA tile audit and selected-slide inventory differ")
+    for _, row in selection.iterrows():
+        slide_id = str(row["slide_id"])
+        tiles = inventory[slide_id]
+        _validate_tile_frame(slide_id, tiles)
+        _validate_selection_row(row, tiles)
+
+
+def _validate_tile_frame(slide_id: str, tiles: pd.DataFrame) -> None:
+    missing = _TILE_AUDIT_COLUMNS - set(tiles.columns)
+    if missing:
+        raise ValueError(f"PANDA tile audit fields are missing: {sorted(missing)}")
+    valid = (
+        tiles["level"].eq(0)
+        & tiles["tile_size"].eq(256)
+        & tiles["x"].mod(256).eq(0)
+        & tiles["y"].mod(256).eq(0)
+        & tiles["tissue_fraction"].ge(0.35)
+        & tiles["tissue_intensity_threshold"].eq(210)
+    )
+    if not bool(valid.all()) or tiles.duplicated(["x", "y"]).any():
+        raise ValueError(f"PANDA tile audit violates preprocessing for {slide_id}")
+    missing_files = [
+        str(path) for path in tiles["image_path"] if not Path(str(path)).is_file()
+    ]
+    if missing_files:
+        raise ValueError(
+            f"PANDA tile audit references missing images: {missing_files[:3]}"
+        )
+
+
+def _validate_selection_row(row: pd.Series, tiles: pd.DataFrame) -> None:
+    declared = (
+        int(row["source_level"]) == 0
+        and int(row["tile_size"]) == 256
+        and np.isclose(float(row["tissue_fraction_min"]), 0.35)
+        and int(row["tissue_intensity_threshold"]) == 210
+        and int(row["eligible_tile_count"]) == len(tiles)
+        and not tiles.empty
+    )
+    if not declared:
+        raise ValueError(f"PANDA selection audit is inconsistent for {row['slide_id']}")
 
 
 def isup_label(grade: int) -> str:

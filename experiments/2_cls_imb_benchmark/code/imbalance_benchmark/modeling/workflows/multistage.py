@@ -54,6 +54,9 @@ def _record_multistage_outcome(
     context["processed_examples"] = first.get("processed_examples", 0) + final.get(
         "processed_examples", 0
     )
+    context["processed_instances"] = first.get("processed_instances", 0) + final.get(
+        "processed_instances", 0
+    )
     context["selected_checkpoint_step"] = final["selected_checkpoint_step"]
 
 

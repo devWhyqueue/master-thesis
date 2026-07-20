@@ -18,6 +18,9 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
     weighted_macro_nll,
 )
 from imbalance_benchmark.analysis.metrics import assign_tiers
+from imbalance_benchmark.analysis.reporting.secondary_intervals.metrics import (
+    secondary_seed_metrics,
+)
 from imbalance_benchmark.analysis.query import load_seed_predictions, load_test_identity
 
 __all__ = ["BootstrapContext", "Baseline", "balanced_baseline"]
@@ -126,6 +129,35 @@ class BootstrapContext:
         return gather_seed_resampled(
             per_seed, self._paired_seed_indices(probs_stack.shape[0])
         )
+
+    def secondary_distributions(
+        self,
+        labels: np.ndarray,
+        predictions: np.ndarray,
+        probabilities: np.ndarray,
+        class_names: list[str],
+        tiers: dict[str, str],
+    ) -> dict[str, np.ndarray]:
+        """Return paired-seed distributions for every secondary endpoint."""
+        per_seed = [
+            secondary_seed_metrics(
+                labels,
+                predictions[index],
+                probabilities[index],
+                self.row_weights,
+                class_names,
+                tiers,
+            )
+            for index in range(predictions.shape[0])
+        ]
+        seed_indices = self._paired_seed_indices(predictions.shape[0])
+        return {
+            endpoint: gather_seed_resampled(
+                np.stack([seed_metrics[endpoint] for seed_metrics in per_seed]),
+                seed_indices,
+            )
+            for endpoint in per_seed[0]
+        }
 
 
 def _tail_classes(

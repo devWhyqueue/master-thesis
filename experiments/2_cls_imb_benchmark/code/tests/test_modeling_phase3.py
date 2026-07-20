@@ -389,6 +389,7 @@ def test_patch_method_one_step_finite_training(tmp_path, method, param):
         ("focal", 1.0),
         ("balanced_sampling", 0.5),
         ("logit_adjustment", 1.0),
+        ("crt", None),
         ("sc_mil", 0.1),
         ("mde", 0.25),
         ("rankmix", 1.0),
@@ -396,9 +397,12 @@ def test_patch_method_one_step_finite_training(tmp_path, method, param):
 )
 def test_wsi_method_one_step_finite_training(tmp_path, method, param):
     ctx = _bag_ctx(method, tmp_path, param=param)
+    if method == "crt":
+        ctx["stage_one_config"] = {"lr": 1e-3}
     state, acc = fit_method(ctx)
     assert 0.0 <= acc <= 1.0
     assert state
+    assert ctx["processed_instances"] > ctx["processed_examples"]
 
 
 def test_fit_crt_freezes_representation_and_reinits_classifier(tmp_path):
