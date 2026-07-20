@@ -6,10 +6,57 @@ import torch
 from imbalance_benchmark.datasets import features as feature_lib
 from imbalance_benchmark.datasets.features import (
     _virchow2_pool,
+    load_feature_model,
     load_feature_row,
     load_slide_features,
     patch_sort_key,
 )
+
+
+def test_load_feature_model_loads_verified_safetensors_explicitly(
+    tmp_path, monkeypatch
+) -> None:
+    weights = tmp_path / "model.safetensors"
+    weights.touch()
+    observed = {}
+
+    class Model:
+        pretrained_cfg = {}
+
+        def load_state_dict(self, state_dict):
+            observed["state_dict"] = state_dict
+
+        def eval(self):
+            return self
+
+        def to(self, device):
+            observed["device"] = device
+            return self
+
+    def create_model(name, **kwargs):
+        observed["name"] = name
+        observed["pretrained"] = kwargs["pretrained"]
+        return Model()
+
+    monkeypatch.setattr(feature_lib, "resolve_feature_snapshot", lambda *_: tmp_path)
+    monkeypatch.setattr(feature_lib.timm, "create_model", create_model)
+    monkeypatch.setattr(
+        feature_lib, "load_safetensors", lambda path: {"weights": str(path)}
+    )
+    monkeypatch.setattr(feature_lib, "resolve_data_config", lambda *_args, **_kwargs: {})
+    transform = object()
+    monkeypatch.setattr(feature_lib, "create_transform", lambda **_: transform)
+
+    model, returned_transform = load_feature_model("model", torch.device("cpu"))
+
+    assert observed == {
+        "name": f"local-dir:{tmp_path.as_posix()}",
+        "pretrained": False,
+        "state_dict": {"weights": str(weights)},
+        "device": torch.device("cpu"),
+    }
+    assert isinstance(model, Model)
+    assert returned_transform is transform
 
 
 def test_patch_sort_key_orders_by_region_then_index() -> None:

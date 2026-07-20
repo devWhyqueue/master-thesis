@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
@@ -9,6 +8,7 @@ import pandas as pd
 import timm
 import torch
 from PIL import Image
+from safetensors.torch import load_file as load_safetensors
 from timm.data.config import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from timm.layers.mlp import SwiGLUPacked
@@ -30,8 +30,6 @@ from imbalance_benchmark.datasets.feature_provenance import (
     validate_cached_slide,
     validate_feature_cache,
 )
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "load_feature_model",
@@ -60,10 +58,11 @@ def load_feature_model(
     )
     model = timm.create_model(
         f"local-dir:{snapshot.as_posix()}",
-        pretrained=True,
+        pretrained=False,
         mlp_layer=SwiGLUPacked,
         act_layer=torch.nn.SiLU,
     )
+    model.load_state_dict(load_safetensors(snapshot / "model.safetensors"))
     model = model.eval().to(device)
     transforms = cast(
         Callable[[Image.Image], torch.Tensor],
