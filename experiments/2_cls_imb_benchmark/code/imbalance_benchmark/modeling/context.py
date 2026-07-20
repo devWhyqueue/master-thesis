@@ -14,6 +14,7 @@ __all__ = [
     "PATCH_HIDDEN_DIM",
     "MIL_HIDDEN_DIM",
     "DROPOUT",
+    "REFERENCE_PASSES",
     "CONDITIONS",
     "LEARNING_RATE_GRID",
     "GRIDS",
@@ -36,6 +37,9 @@ INPUT_DIM = 2560
 PATCH_HIDDEN_DIM = 512
 MIL_HIDDEN_DIM = 256
 DROPOUT = 0.1
+# Update budget U = REFERENCE_PASSES * ceil(T / B): reference passes through the
+# controlled support (report §"Model training and selection").
+REFERENCE_PASSES = 30
 CONDITIONS = ("natural", "balanced", "moderate", "severe")
 
 LEARNING_RATE_GRID: list[float] = [1e-4, 3e-4, 1e-3, 3e-3]
@@ -163,7 +167,7 @@ def build_training_ctx(
 
 def resolve_update_budget(ctx: dict[str, Any], batch_size: int) -> int:
     """Use the signed update budget when present, otherwise retain pilot fallback."""
-    fallback = 30 * math.ceil(len(ctx["train_dataset"]) / batch_size)
+    fallback = REFERENCE_PASSES * math.ceil(len(ctx["train_dataset"]) / batch_size)
     return int(ctx.get("update_budget", fallback))
 
 

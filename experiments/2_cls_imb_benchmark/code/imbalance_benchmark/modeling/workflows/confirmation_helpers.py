@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import platform
 import sys
-from pathlib import Path
 from typing import Any, cast
 import hashlib
-import json
-from dataclasses import dataclass, field
 
 import numpy as np
 import torch
-import torch.utils.data
 
 from imbalance_benchmark.analysis.calibration import (
     apply_target_prior_correction,
@@ -19,16 +15,12 @@ from imbalance_benchmark.analysis.calibration import (
     softmax,
     temperature_scaled_payload,
 )
-from imbalance_benchmark.analysis.metrics import (
-    assign_tiers,
-    classification_payload,
-)
+from imbalance_benchmark.analysis.metrics import classification_payload
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
 from imbalance_benchmark.common import REPO_ROOT, compute_sha256, write_run_record
 from imbalance_benchmark.modeling.context import (
-    Regime,
     cost_payload,
     resolve_update_budget,
 )
@@ -37,19 +29,12 @@ from imbalance_benchmark.modeling.training import (
     resolve_batch_size,
     run_evaluation,
 )
-
-
-@dataclass
-class RunContext(Regime):
-    """Shared per-condition confirmation inputs: locked val/test loaders, paths, and seeds."""
-
-    val_loader: torch.utils.data.DataLoader
-    test_loader: torch.utils.data.DataLoader
-    paths: dict[str, Path]
-    seeds: list[int]
-    class_names: list[str]
-    assignment: str
-    feature_provenance: dict[str, str] | None = field(default=None, kw_only=True)
+from imbalance_benchmark.modeling.workflows.confirmation_provenance import (
+    _condition_tiers,
+    _load_record_freeze,
+    _provenance_payload,
+)
+from imbalance_benchmark.modeling.workflows.run_context import RunContext
 
 
 def _checkpoint_hash(state: dict[str, Any]) -> str:
@@ -89,26 +74,6 @@ def _environment_payload() -> dict[str, Any]:
             "sha256": compute_sha256(lock_path) if lock_path.is_file() else None,
         },
     }
-
-
-def _condition_tiers(run: RunContext, cond: str) -> dict[str, str] | None:
-    """Head/body/tail tiers for one condition from the frozen allocation and assignment."""
-    if cond == "balanced":
-        return None
-    fp = run.paths["data"] / "manifest_freeze.json"
-    if not fp.exists():
-        return None
-    fr = json.loads(fp.read_text())
-    alloc = fr.get("conditions", {}).get(cond, {}).get("allocated_counts") or fr.get(
-        "assignment_conditions", {}
-    ).get(run.assignment, {}).get(cond, {}).get("allocated_counts", {})
-    if not alloc or not run.class_names:
-        return None
-    return assign_tiers(
-        run.class_names,
-        alloc,
-        fr.get("tail_assignments", {}).get(run.assignment, run.class_names),
-    )
 
 
 def _split_payload(
@@ -177,7 +142,8 @@ def _run_and_record(
         for name, loader in (("validation", run.val_loader), ("test", run.test_loader))
     }
     target_priors = estimate_prior(raw_results["validation"]["targets"], run.n_classes)
-    tiers = _condition_tiers(run, cond)
+    freeze = _load_record_freeze(run)
+    tiers = _condition_tiers(run, cond, freeze)
     splits = {}
     for name, result in raw_results.items():
         loader = run.val_loader if name == "validation" else run.test_loader
@@ -231,6 +197,7 @@ def _run_and_record(
             ),
             "method_diagnostics": ctx.get("method_diagnostics", {}),
             "environment": _environment_payload(),
+            "provenance": _provenance_payload(run, cond, method, freeze),
             "splits": splits,
         },
     )

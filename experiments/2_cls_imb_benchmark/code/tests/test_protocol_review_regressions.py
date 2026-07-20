@@ -516,7 +516,7 @@ def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
 
     unsigned = tmp_path / "tuning_selections_severe.json"
     write_json(unsigned, {})
-    with pytest.raises(RuntimeError, match="no signed post-tuning lock"):
+    with pytest.raises(RuntimeError, match="no signed lock"):
         verify_signed_file(unsigned)
 
 
@@ -773,7 +773,10 @@ def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) 
 
     assert len(cells) == 1
     assert cells[0]["group"] == "tcga-ut"
-    assert cells[0]["deficit_ba"] == pytest.approx(0.2)
+    # Replicate 0 is the observed cross-split deficit; the crossed comparison
+    # that wins the key is [0.1, 0.2, 0.3], so the point estimate is 0.1, not
+    # the bootstrap mean (0.2).
+    assert cells[0]["deficit_ba"] == pytest.approx(0.1)
 
 
 def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
@@ -895,7 +898,10 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
     cells = load_rq3_cells([tmp_path])
 
     assert cells[0]["gate_passed"] is True
-    assert cells[0]["recovery"] == pytest.approx(1.25)
+    # Observed recovery is numerator[0]/denominator[0] = 1.0/2.0 = 0.5, not the
+    # mean of the per-replicate ratios (1.25). The bootstrap spread still feeds
+    # the standard error.
+    assert cells[0]["recovery"] == pytest.approx(0.5)
     assert cells[0]["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
 

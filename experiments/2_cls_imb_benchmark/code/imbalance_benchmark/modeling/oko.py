@@ -11,6 +11,7 @@ from imbalance_benchmark.modeling.context import resolve_update_budget
 from imbalance_benchmark.modeling.models import OkoClassifier
 from imbalance_benchmark.modeling.training import (
     CHECKPOINT_INTERVAL,
+    build_optimizer,
     resolve_batch_size,
 )
 
@@ -235,7 +236,7 @@ def fit_oko(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     k, lr = int(ctx["param_config"]["parameter"]), ctx["param_config"]["lr"]
     b_size = resolve_batch_size(ctx["config"], False)
     budget = resolve_update_budget(ctx, b_size)
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    opt = build_optimizer(model.parameters(), lr)
     class_index = build_class_index(ctx["train_labels"])
     units = _independent_units(dataset)
     rng = np.random.default_rng(ctx["seed"])

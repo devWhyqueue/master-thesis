@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from imbalance_benchmark.datasets.camelyon16 import (
     CELL,
@@ -26,9 +27,12 @@ def test_camelyon16_patch_labels_decode_column_major_cells() -> None:
     assert labels[2] == "normal"
 
 
-def test_camelyon16_patch_labels_out_of_bounds_is_normal() -> None:
+def test_camelyon16_patch_labels_out_of_grid_is_rejected() -> None:
+    # An out-of-grid patch id has no mask cell, so it must be refused rather
+    # than turned into a "normal" negative from missing annotation evidence.
     mask = np.zeros((CELL, CELL), dtype=np.uint8)
-    assert patch_labels(mask, [50]) == ["normal"]
+    with pytest.raises(ValueError, match="outside"):
+        patch_labels(mask, [50])
 
 
 def test_camelyon16_split_cases_are_slide_disjoint() -> None:

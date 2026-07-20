@@ -15,7 +15,7 @@ from imbalance_benchmark.analysis.aggregate import (
 )
 from imbalance_benchmark.analysis.db import connect_db, init_schema
 from imbalance_benchmark.analysis.inference.recovery import gates_and_recovery
-from imbalance_benchmark.analysis.inference.holm import apply_holm
+from imbalance_benchmark.analysis.inference.holm import PRIMARY_METHODS, apply_holm
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_block_permutation_ba,
     crossed_block_permutation_tail_nll,
@@ -131,6 +131,10 @@ def _crossed_p_value(
 ) -> float | None:
     """Calculate the gate statistic's one shared-block permutation p-value across splits."""
     if entry["method"] == "ce" or not entry.get("gate_passed"):
+        return None
+    if entry["method"] not in PRIMARY_METHODS:
+        # Only the four confirmatory methods are hypothesis-tested (§3.6);
+        # exploratory methods keep effects and CIs but no permutation p-value.
         return None
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     blocks = []

@@ -99,14 +99,18 @@ def _crossed_cell(
         else gates[gate_key]
     )
     if cell["method"] == "ce":
+        # Replicate 0 is the observed cross-split deficit (equal split weight);
+        # replicates 1.. supply only the bootstrap spread. Match aggregate.py.
         effects = np.asarray(row["bootstrap_effect"], dtype=float)
-        updated["deficit_ba"] = float(np.nanmean(effects))
+        updated["deficit_ba"] = float(effects[0])
         updated["deficit_se"] = float(np.nanstd(effects, ddof=1))
     elif "bootstrap_numerator" in row and "bootstrap_denominator" in row:
         numerator = np.asarray(row["bootstrap_numerator"], dtype=float)
         denominator = np.asarray(row["bootstrap_denominator"], dtype=float)
         with np.errstate(divide="ignore", invalid="ignore"):
             recovery = np.where(denominator != 0, numerator / denominator, np.nan)
-        updated["recovery"] = float(np.nanmean(recovery))
+        updated["recovery"] = (
+            float(numerator[0] / denominator[0]) if denominator[0] != 0 else np.nan
+        )
         updated["recovery_se"] = float(np.nanstd(recovery, ddof=1))
     return updated

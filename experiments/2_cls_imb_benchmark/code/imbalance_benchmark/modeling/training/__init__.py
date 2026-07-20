@@ -10,8 +10,14 @@ from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate
 from imbalance_benchmark.modeling.context import (
+    REFERENCE_PASSES,
     resolve_update_budget,
     set_training_mode,
+)
+from imbalance_benchmark.modeling.training.config import (
+    CHECKPOINT_INTERVAL,
+    build_optimizer,
+    resolve_batch_size,
 )
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
@@ -40,12 +46,12 @@ __all__ = [
     "run_evaluation",
     "update_budget",
     "resolve_batch_size",
+    "build_optimizer",
     "fit_model",
 ]
 
 # Scholz sampling-loss hybrids: class-balanced oversampling plus a metric loss.
 FIXED_BALANCED_SAMPLER_METHODS = frozenset({"ce_soft_f1", "ce_soft_mcc"})
-CHECKPOINT_INTERVAL = 50
 
 
 def get_class_weights(
@@ -83,15 +89,8 @@ def class_priors(
 
 
 def update_budget(support: int, batch_size: int) -> int:
-    """U = 30 * ceil(T / B): 30 reference passes through the controlled support."""
-    return 30 * math.ceil(support / batch_size)
-
-
-def resolve_batch_size(cfg: dict[str, Any], is_mil: bool) -> int:
-    """Resolve the regime's locked batch size from config."""
-    k = "wsi_training" if is_mil else "patch_training"
-    sk = "bag_batch_size" if is_mil else "batch_size"
-    return cfg.get(k, {}).get(sk, 32 if is_mil else 128)
+    """U = REFERENCE_PASSES * ceil(T / B): reference passes through controlled support."""
+    return REFERENCE_PASSES * math.ceil(support / batch_size)
 
 
 def _init_criterion(
@@ -217,7 +216,7 @@ def fit_model(
         model, ctx["val_loader"], device, is_mil, ctx["n_classes"]
     )
     set_training_mode(ctx)
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    opt = build_optimizer(model.parameters(), lr)
     _prepare_training_context(ctx, param, device)
     budget = max_steps if max_steps is not None else resolve_update_budget(ctx, b_size)
     best = _run_training_loop(opt, loader, ctx["val_loader"], ctx, budget, best)

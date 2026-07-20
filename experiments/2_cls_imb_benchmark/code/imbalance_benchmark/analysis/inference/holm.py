@@ -75,12 +75,18 @@ def _annotate_confirmatory(
 
 
 def _annotate_exploratory(exploratory: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Exploratory comparisons keep their raw effect estimates outside Holm correction."""
+    """Exploratory comparisons keep effects and CIs only; they are never hypothesis-tested.
+
+    Setup §3.6 limits hypothesis tests to the four primary methods. Exploratory
+    comparisons therefore carry no p-value and are labelled ``"exploratory"``
+    rather than ``"tested"``, even when they pass a deficit gate.
+    """
     return [
         {
             **c,
+            "p_value": None,
             "adjusted_p_value": None,
-            "status": "tested" if c.get("gate_passed") else "not tested",
+            "status": "exploratory",
             "family": "exploratory",
         }
         for c in exploratory

@@ -101,7 +101,13 @@ def patch_labels(mask: np.ndarray, patch_ids: list[int]) -> list[str]:
 def _cell_label(mask: np.ndarray, patch_id: int, n_rows: int, n_cols: int) -> str:
     col, row = divmod(int(patch_id), n_rows)
     if row >= n_rows or col >= n_cols:
-        return "normal"
+        # An out-of-grid id means the patch has no mask cell, so we have no
+        # annotation evidence for it. Refuse rather than invent a "normal"
+        # negative from missing coverage.
+        raise ValueError(
+            f"CAMELYON16 patch id {patch_id} maps outside the "
+            f"{n_rows}x{n_cols} mask grid; cannot assign a tumor/normal label."
+        )
     cell = mask[row * CELL : (row + 1) * CELL, col * CELL : (col + 1) * CELL]
     if cell.size and float((cell == TUMOR).mean()) >= TUMOR_FRACTION:
         return "tumor"

@@ -19,6 +19,7 @@ from imbalance_benchmark.modeling.context import resolve_update_budget
 from imbalance_benchmark.modeling.oko import fit_oko
 from imbalance_benchmark.modeling.training import (
     CHECKPOINT_INTERVAL,
+    build_optimizer,
     fit_model,
     get_balanced_sampler,
     resolve_batch_size,
@@ -147,7 +148,7 @@ def fit_mde(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
         ctx["seed"],
         ctx.setdefault("exposed_indices", set()),
     )
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    opt = build_optimizer(model.parameters(), lr)
     best = initial_checkpoint(model, ctx["val_loader"], device, True, ctx["n_classes"])
     model.train()
     best = _mde_train_loop(

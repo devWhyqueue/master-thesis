@@ -165,13 +165,13 @@ def verify_signed_file(path: Path) -> None:
     sidecar = path.with_suffix(path.suffix + ".sha256")
     if not sidecar.exists():
         raise RuntimeError(
-            f"Tuning selection {path.name} has no signed post-tuning lock; "
-            "re-run tuning to sign it before confirmation."
+            f"{path.name} has no signed lock; re-run the step that produces it "
+            "so it is signed before it is used as frozen evidence."
         )
     if sidecar.read_text(encoding="utf-8").strip() != compute_sha256(path):
         raise RuntimeError(
-            f"Tuning selection {path.name} no longer matches its signed lock; "
-            "refusing to confirm on altered tuning selections."
+            f"{path.name} no longer matches its signed lock; "
+            "refusing to proceed on altered evidence."
         )
 
 

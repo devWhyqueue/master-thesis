@@ -15,6 +15,7 @@ from imbalance_benchmark.common import (
     load_config,
     sign_file,
     split_paths,
+    verify_signed_file,
     write_json,
 )
 from imbalance_benchmark.manifest.construction_helpers import (
@@ -80,6 +81,9 @@ def _load_split_context(
         raise RuntimeError(
             "A signed pilot_report.json is required before definitive freeze"
         )
+    # The pilot floor determines the frozen support; its evidence must be the
+    # signed pilot, not a file that was edited after signing.
+    verify_signed_file(pilot_path)
     min_sup, req_sup, excluded, independent_floor = _load_pilot_floor(
         pilot_path, is_mil, counts
     )
