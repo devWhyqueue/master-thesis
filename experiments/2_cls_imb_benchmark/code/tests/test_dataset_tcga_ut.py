@@ -88,9 +88,16 @@ def test_strip_feature_suffix_removes_chunk_index() -> None:
     assert strip_feature_suffix("TCGA-AB-1234-01Z_3", "_[0-9]+") == "TCGA-AB-1234-01Z"
 
 
+def _make_slide(root, cls, split, slide) -> None:
+    """Create a realistic non-empty slide directory (a slide holds patches)."""
+    slide_dir = root / cls / split / slide
+    slide_dir.mkdir(parents=True)
+    (slide_dir / "0_0_506.jpg").write_bytes(b"")
+
+
 def test_collect_slide_labels_maps_class_folders(tmp_path) -> None:
     for cls, split, slide in (("LUAD", "train", "slideA"), ("LUSC", "train", "slideB")):
-        (tmp_path / cls / split / slide).mkdir(parents=True)
+        _make_slide(tmp_path, cls, split, slide)
 
     labels, conflicts = collect_slide_labels(tmp_path)
 
@@ -99,13 +106,23 @@ def test_collect_slide_labels_maps_class_folders(tmp_path) -> None:
 
 
 def test_collect_slide_labels_reports_conflicts(tmp_path) -> None:
-    (tmp_path / "LUAD" / "train" / "slideA").mkdir(parents=True)
-    (tmp_path / "LUSC" / "train" / "slideA").mkdir(parents=True)
+    _make_slide(tmp_path, "LUAD", "train", "slideA")
+    _make_slide(tmp_path, "LUSC", "train", "slideA")
 
     labels, conflicts = collect_slide_labels(tmp_path)
 
     assert labels["slideA"] == "LUAD"
     assert conflicts["slideA"] == ["LUAD", "LUSC"]
+
+
+def test_collect_slide_labels_ignores_empty_junk_dirs(tmp_path) -> None:
+    _make_slide(tmp_path, "LUAD", "0", "TCGA-AB-0001-01Z")
+    (tmp_path / "LUAD" / "40.000000" / "2").mkdir(parents=True)  # empty junk fold
+
+    labels, conflicts = collect_slide_labels(tmp_path)
+
+    assert labels == {"TCGA-AB-0001-01Z": "LUAD"}
+    assert conflicts == {}
 
 
 def test_build_feature_manifest_matches_chunks_to_labels(tmp_path) -> None:
@@ -124,8 +141,9 @@ def test_build_feature_manifest_matches_chunks_to_labels(tmp_path) -> None:
 
 def test_tcga_manifest_rejects_raw_slides_without_features(tmp_path: Path) -> None:
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
-    (raw_root / "LUAD" / "train" / "TCGA-AB-0001-01Z").mkdir(parents=True)
-    (raw_root / "LUAD" / "train" / "TCGA-AB-0002-01Z").mkdir(parents=True)
+    for name in ("TCGA-AB-0001-01Z", "TCGA-AB-0002-01Z"):
+        (raw_root / "LUAD" / "train" / name).mkdir(parents=True)
+        (raw_root / "LUAD" / "train" / name / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     torch.save(torch.ones(2, 2560), feature_dir / "TCGA-AB-0001-01Z_0.pt")
     config = _tcga_config(
@@ -144,7 +162,9 @@ def test_tcga_manifest_rejects_label_conflicts(tmp_path: Path) -> None:
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     (raw_root / "LUSC" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUSC" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     torch.save(torch.ones(2, 2560), feature_dir / f"{slide}_0.pt")
     config = _tcga_config(
@@ -163,6 +183,7 @@ def test_tcga_manifest_rejects_unmatched_feature_chunks(tmp_path: Path) -> None:
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     torch.save(torch.ones(2, 2560), feature_dir / f"{slide}_0.pt")
     torch.save(torch.ones(2, 2560), feature_dir / "unknown_0.pt")
@@ -182,6 +203,7 @@ def test_tcga_manifest_rejects_wrong_patch_total(tmp_path: Path) -> None:
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     torch.save(torch.ones(2, 2560), feature_dir / f"{slide}_0.pt")
     config = _tcga_config(
@@ -211,6 +233,7 @@ def test_tcga_manifest_rejects_invalid_tensor_provenance(
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     tensor_path = feature_dir / f"{slide}_0.pt"
     torch.save(torch.ones(2, 2560), tensor_path)
@@ -237,6 +260,7 @@ def test_tcga_manifest_requires_signed_pinned_provenance(tmp_path: Path) -> None
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     torch.save(torch.ones(2, 2560), feature_dir / f"{slide}_0.pt")
     config = _tcga_config(
@@ -257,6 +281,7 @@ def test_tcga_manifest_rejects_wrong_encoder_provenance(tmp_path: Path) -> None:
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     torch.save(torch.ones(2, 2560), feature_dir / f"{slide}_0.pt")
     config = _tcga_config(
@@ -284,6 +309,7 @@ def test_frozen_tcga_provenance_rejects_post_prepare_tensor_replacement(
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     tensor_path = feature_dir / f"{slide}_0.pt"
     torch.save(torch.ones(2, 2560), tensor_path)
@@ -326,6 +352,7 @@ def test_pilot_revalidates_prepared_tcga_provenance(
     raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
     slide = "TCGA-AB-0001-01Z"
     (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    (raw_root / "LUAD" / "train" / slide / "0_0_506.jpg").write_bytes(b"")
     feature_dir.mkdir()
     tensor_path = feature_dir / f"{slide}_0.pt"
     torch.save(torch.ones(2, 2560), tensor_path)

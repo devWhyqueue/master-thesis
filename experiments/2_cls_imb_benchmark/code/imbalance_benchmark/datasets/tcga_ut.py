@@ -38,7 +38,11 @@ def collect_slide_labels(raw_root: Path) -> tuple[dict[str, str], dict[str, list
     for class_dir in sorted(path for path in raw_root.iterdir() if path.is_dir()):
         class_name = class_dir.name
         for split_dir in sorted(path for path in class_dir.iterdir() if path.is_dir()):
-            for slide_entry in sorted(split_dir.iterdir()):
+            # A slide is a non-empty directory of patches; skip stray empty dirs
+            # (the shared cluster tree has junk folds like `40.000000/2`).
+            for slide_entry in sorted(
+                p for p in split_dir.iterdir() if p.is_dir() and any(p.iterdir())
+            ):
                 slide_id = slide_entry.name
                 existing = labels.get(slide_id)
                 if existing is None:
