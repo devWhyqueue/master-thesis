@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import torch
@@ -49,6 +49,7 @@ class RunContext(Regime):
     seeds: list[int]
     class_names: list[str]
     assignment: str
+    feature_provenance: dict[str, str] | None = field(default=None, kw_only=True)
 
 
 def _checkpoint_hash(state: dict[str, Any]) -> str:
@@ -211,6 +212,7 @@ def _run_and_record(
             "selected_checkpoint_sha256": _checkpoint_hash(state),
             "selected_checkpoint_step": ctx.get("selected_checkpoint_step", 0),
             "test_prediction_sha256": _test_prediction_hash(splits),
+            "feature_provenance": run.feature_provenance,
             "train_priors": class_priors_tensor.detach().cpu().tolist(),
             "target_priors": target_priors.tolist(),
             "cost": cost_payload(

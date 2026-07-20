@@ -20,6 +20,9 @@ from imbalance_benchmark.datasets.data import (
     ImbalanceDataset,
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
+from imbalance_benchmark.datasets.features.provenance_lock import (
+    verify_prepared_feature_provenance,
+)
 from imbalance_benchmark.manifest.pilot import (
     frozen_pilot_quota,
     meets_method_floor,
@@ -180,6 +183,7 @@ def cmd_pilot(args: argparse.Namespace) -> None:
         return
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
+    verify_prepared_feature_provenance(config, paths["data"])
     train_df, classes, is_mil, eq_slide, levels, support = _pilot_setup(paths, config)
     pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
         train_df, classes, levels, is_mil, args.seed, config, paths

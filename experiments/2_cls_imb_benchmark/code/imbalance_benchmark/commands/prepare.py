@@ -22,6 +22,9 @@ from imbalance_benchmark.datasets.feature_provenance import (
     VIRCHOW2_REVISION,
     VIRCHOW2_WEIGHTS_SHA256,
 )
+from imbalance_benchmark.datasets.features.provenance_lock import (
+    write_prepared_feature_provenance,
+)
 from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_prepare"]
@@ -89,3 +92,4 @@ def cmd_prepare(args: argparse.Namespace) -> None:
         split_df.drop_duplicates("slide_id").to_csv(
             paths["data"] / "slide_manifest.csv", index=False
         )
+        write_prepared_feature_provenance(config, paths["data"])

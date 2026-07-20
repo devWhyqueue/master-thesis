@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -84,22 +83,26 @@ def validate_preextracted_features(
     provenance: dict[str, object],
 ) -> dict[str, int]:
     """Verify a signed manifest and every pre-extracted tensor it locks."""
-    payload = _load_signed_provenance(manifest_path)
+    payload = load_signed_feature_provenance(manifest_path)
     if payload.get("provenance") != provenance:
         raise ValueError("Pre-extracted features do not use pinned Virchow2 provenance")
     records = payload.get("chunks")
     if not isinstance(records, dict) or set(records) != {p.name for p in feature_paths}:
         raise ValueError("Provenance chunk inventory differs from feature files")
     row_counts = {}
+    seen_patch_ids: set[str] = set()
     for path in feature_paths:
         record = records[path.name]
         if not isinstance(record, dict):
             raise ValueError(f"Invalid provenance record for {path.name}")
-        row_counts[str(path)] = _validate_preextracted_tensor(path, record)
+        row_counts[str(path)] = _validate_preextracted_tensor(
+            path, record, seen_patch_ids
+        )
     return row_counts
 
 
-def _load_signed_provenance(path: Path) -> dict[str, object]:
+def load_signed_feature_provenance(path: Path) -> dict[str, object]:
+    """Load an intact signed pre-extracted feature manifest."""
     sidecar = path.with_suffix(path.suffix + ".sha256")
     if not path.is_file() or not sidecar.is_file():
         raise ValueError("TCGA-UT requires a signed provenance manifest")
@@ -111,7 +114,9 @@ def _load_signed_provenance(path: Path) -> dict[str, object]:
     return payload
 
 
-def _validate_preextracted_tensor(path: Path, record: dict[str, object]) -> int:
+def _validate_preextracted_tensor(
+    path: Path, record: dict[str, object], seen_patch_ids: set[str]
+) -> int:
     if record.get("tensor_sha256") != compute_sha256(path):
         raise ValueError(f"TCGA-UT tensor hash differs for {path.name}")
     tensor = load_stored_feature_tensor(str(path))
@@ -126,9 +131,21 @@ def _validate_preextracted_tensor(path: Path, record: dict[str, object]) -> int:
         raise ValueError(f"TCGA-UT tensor dtype differs for {path.name}")
     if record.get("row_count") != tensor.shape[0]:
         raise ValueError(f"TCGA-UT tensor row count differs for {path.name}")
-    order_hash = str(record.get("patch_order_sha256", ""))
-    if re.fullmatch(r"[0-9a-f]{64}", order_hash) is None:
-        raise ValueError(f"TCGA-UT patch order hash is invalid for {path.name}")
+    identities = record.get("ordered_patch_ids")
+    if not isinstance(identities, list) or not all(
+        isinstance(identity, str) and identity for identity in identities
+    ):
+        raise ValueError(f"TCGA-UT ordered patch identities missing for {path.name}")
+    if len(identities) != tensor.shape[0]:
+        raise ValueError(f"TCGA-UT patch identity count differs for {path.name}")
+    if record.get("patch_order_sha256") != _order_hash(identities):
+        raise ValueError(f"TCGA-UT patch order hash differs for {path.name}")
+    duplicates = seen_patch_ids.intersection(identities)
+    if duplicates:
+        raise ValueError(
+            f"TCGA-UT duplicate patch identities: {sorted(duplicates)[:5]}"
+        )
+    seen_patch_ids.update(identities)
     return tensor.shape[0]
 
 

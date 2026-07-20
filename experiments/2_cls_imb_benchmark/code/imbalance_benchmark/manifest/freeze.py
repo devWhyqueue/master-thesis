@@ -18,6 +18,9 @@ from imbalance_benchmark.manifest.statistics import (
     normalized_entropy,
     support_statistics,
 )
+from imbalance_benchmark.datasets.features.provenance_lock import (
+    verify_frozen_feature_provenance,
+)
 
 __all__ = [
     "normalized_entropy",
@@ -151,6 +154,7 @@ def verify_manifest_freeze(meta: dict[str, Any]) -> None:
             raise RuntimeError(
                 f"Manifest '{name}' altered" if name else "Preflight altered"
             )
+    verify_frozen_feature_provenance(meta)
 
 
 def _get_constraints(

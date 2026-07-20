@@ -11,7 +11,6 @@ import pandas as pd
 from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
 from imbalance_benchmark.common import (
     compute_sha256,
-    dataset_provenance,
     ensure_dirs,
     load_config,
     sign_file,
@@ -30,7 +29,10 @@ from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constrain
 from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.datasets.data import slide_level_identity
-from imbalance_benchmark.datasets.features import resolve_feature_provenance
+from imbalance_benchmark.datasets.features.provenance_lock import (
+    attach_frozen_provenance,
+    verify_prepared_feature_provenance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,7 @@ def freeze_split(args: argparse.Namespace) -> None:
     """Freeze one patient split's manifests, provenance, and label-only preflight."""
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
+    feature_provenance = verify_prepared_feature_provenance(config, paths["data"])
     ctx = _load_split_context(args, paths)
     if ctx is None:
         return
@@ -118,7 +121,7 @@ def freeze_split(args: argparse.Namespace) -> None:
         independent_floor,
     )
     _attach_preflight(meta, paths, config, args.seed)
-    _attach_provenance(meta, paths, config)
+    _attach_provenance(meta, paths, config, feature_provenance)
     _write_freeze_file(meta, paths["data"] / "manifest_freeze.json")
 
 
@@ -183,24 +186,13 @@ def _attach_preflight(
 
 
 def _attach_provenance(
-    meta: dict[str, Any], paths: dict[str, Path], config: dict[str, Any]
+    meta: dict[str, Any],
+    paths: dict[str, Path],
+    config: dict[str, Any],
+    feature_provenance: dict[str, str] | None = None,
 ) -> None:
-    """Lock required dataset provenance and prepared input artifacts."""
-    data = paths["data"]
-    meta.update(
-        pilot_report={
-            "path": str(data / "pilot_report.json"),
-            "sha256": compute_sha256(data / "pilot_report.json"),
-        },
-        prepared_manifest={
-            "path": str(data / "manifest.csv"),
-            "sha256": compute_sha256(data / "manifest.csv"),
-        },
-        dataset_provenance=dataset_provenance(config.get("dataset", {})),
-        feature_encoder=resolve_feature_provenance(
-            config.get("feature_extraction", {})
-        ),
-    )
+    """Attach prepared dataset and feature provenance to a freeze."""
+    attach_frozen_provenance(meta, paths["data"], config, feature_provenance)
 
 
 def _write_freeze_file(meta: dict[str, Any], freeze_path: Path) -> None:

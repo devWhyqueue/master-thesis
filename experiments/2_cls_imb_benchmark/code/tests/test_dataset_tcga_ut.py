@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -7,9 +9,14 @@ import pandas as pd
 import pytest
 import torch
 
-from imbalance_benchmark.common import compute_sha256
+from imbalance_benchmark.commands import pilot
+from imbalance_benchmark.common import compute_data_hash, compute_sha256, sign_file
 from imbalance_benchmark.datasets import build_manifest
 from imbalance_benchmark.datasets.feature_provenance import resolve_feature_provenance
+from imbalance_benchmark.manifest.freeze import (
+    lock_manifest_freeze,
+    verify_manifest_freeze,
+)
 from imbalance_benchmark.datasets.tcga_ut import (
     assert_case_disjoint,
     assign_class_splits,
@@ -33,12 +40,16 @@ def _tcga_config(
     chunks = {}
     for path in sorted(feature_dir.glob("*.pt")):
         tensor = torch.load(path, weights_only=False)
+        ordered_patch_ids = [f"{path.stem}:patch-{index}" for index in range(len(tensor))]
         chunks[path.name] = {
             "tensor_sha256": compute_sha256(path),
             "row_count": len(tensor),
             "feature_dim": tensor.shape[1],
             "dtype": str(tensor.dtype).removeprefix("torch."),
-            "patch_order_sha256": "0" * 64,
+            "ordered_patch_ids": ordered_patch_ids,
+            "patch_order_sha256": hashlib.sha256(
+                json.dumps(ordered_patch_ids, ensure_ascii=False).encode("utf-8")
+            ).hexdigest(),
         }
     manifest_path.write_text(
         json.dumps(
@@ -191,7 +202,7 @@ def test_tcga_manifest_rejects_wrong_patch_total(tmp_path: Path) -> None:
         ("tensor_sha256", "0" * 64, "tensor hash"),
         ("feature_dim", 42, "feature dimension"),
         ("dtype", "float64", "dtype"),
-        ("patch_order_sha256", "missing", "patch order"),
+        ("patch_order_sha256", "0" * 64, "patch order"),
     ],
 )
 def test_tcga_manifest_rejects_invalid_tensor_provenance(
@@ -265,6 +276,94 @@ def test_tcga_manifest_rejects_wrong_encoder_provenance(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="pinned Virchow2 provenance"):
         build_manifest(config)
+
+
+def test_frozen_tcga_provenance_rejects_post_prepare_tensor_replacement(
+    tmp_path: Path,
+) -> None:
+    raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
+    slide = "TCGA-AB-0001-01Z"
+    (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    feature_dir.mkdir()
+    tensor_path = feature_dir / f"{slide}_0.pt"
+    torch.save(torch.ones(2, 2560), tensor_path)
+    config = _tcga_config(
+        raw_root,
+        feature_dir,
+        expected_slides=1,
+        expected_classes=1,
+        expected_patches=2,
+    )
+    build_manifest(config)
+    manifest_path = Path(config["dataset"]["feature_provenance_manifest"])
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lock_path = tmp_path / "feature_provenance_lock.json"
+    lock = {
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": compute_sha256(manifest_path),
+        "inventory_sha256": compute_data_hash(payload["chunks"]),
+    }
+    lock_path.write_text(json.dumps(lock), encoding="utf-8")
+    frozen = lock_manifest_freeze(
+        {
+            "runtime_config": config,
+            "feature_provenance": {
+                **lock,
+                "prepared_lock_path": str(lock_path),
+                "prepared_lock_sha256": compute_sha256(lock_path),
+            },
+        }
+    )
+    torch.save(torch.zeros(2, 2560), tensor_path)
+
+    with pytest.raises(RuntimeError, match="tensor hash"):
+        verify_manifest_freeze(frozen)
+
+
+def test_pilot_revalidates_prepared_tcga_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw_root, feature_dir = tmp_path / "raw", tmp_path / "features"
+    slide = "TCGA-AB-0001-01Z"
+    (raw_root / "LUAD" / "train" / slide).mkdir(parents=True)
+    feature_dir.mkdir()
+    tensor_path = feature_dir / f"{slide}_0.pt"
+    torch.save(torch.ones(2, 2560), tensor_path)
+    config = _tcga_config(
+        raw_root,
+        feature_dir,
+        expected_slides=1,
+        expected_classes=1,
+        expected_patches=2,
+    )
+    build_manifest(config)
+    manifest_path = Path(config["dataset"]["feature_provenance_manifest"])
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lock_path = tmp_path / "feature_provenance_lock.json"
+    lock_path.write_text(
+        json.dumps(
+            {
+                "manifest_path": str(manifest_path),
+                "manifest_sha256": compute_sha256(manifest_path),
+                "inventory_sha256": compute_data_hash(payload["chunks"]),
+            }
+        ),
+        encoding="utf-8",
+    )
+    sign_file(lock_path)
+    torch.save(torch.zeros(2, 2560), tensor_path)
+    paths = {"data": tmp_path}
+    monkeypatch.setattr(pilot, "load_config", lambda *_: config)
+    monkeypatch.setattr(pilot, "ensure_dirs", lambda *_: paths)
+    monkeypatch.setattr(pilot, "split_paths", lambda *_: paths)
+    monkeypatch.setattr(
+        pilot,
+        "_pilot_setup",
+        lambda *_: pytest.fail("pilot continued after provenance changed"),
+    )
+
+    with pytest.raises(RuntimeError, match="tensor hash"):
+        pilot.cmd_pilot(argparse.Namespace(config="unused", seed=0, split_index=0))
 
 
 def test_assign_class_splits_covers_all_units_without_overlap() -> None:

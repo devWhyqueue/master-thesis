@@ -131,6 +131,7 @@ def _confirm_inputs(
         "seeds": seeds,
         "bag_dataset_kwargs": bag_kwargs or {},
         "update_budgets": freeze["update_budgets"],
+        "feature_provenance": freeze.get("feature_provenance"),
     }
     return best_configs, run_data, freeze
 
