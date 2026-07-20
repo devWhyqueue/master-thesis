@@ -113,6 +113,7 @@ git pull --ff-only
 Full details in `CLUSTER.md`. Key rules:
 
 - `/home` is BeeGFS — avoid many small files.
+- Keep `~` clean: use `/tmp` for transient submission scripts and remove stale files when the job no longer needs them.
 - Use Apptainer `.sif` containers, not conda/venv trees on `/home`.
 - Use SquashFS for datasets with many files; check shared squashed datasets first.
 - `/home/space/` datasets are read-only unless you created the specific files.
