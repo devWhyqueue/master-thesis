@@ -16,7 +16,6 @@ from imbalance_benchmark.analysis.inference.gates import (
     ci_excludes_zero,
     deficit,
     discrimination_gate,
-    gate_cell,
     recovery,
 )
 from imbalance_benchmark.analysis.inference.holm import (
@@ -46,7 +45,6 @@ __all__ = [
     "ci_excludes_zero",
     "deficit",
     "discrimination_gate",
-    "gate_cell",
     "recovery",
     "PRIMARY_METHODS",
     "apply_holm",

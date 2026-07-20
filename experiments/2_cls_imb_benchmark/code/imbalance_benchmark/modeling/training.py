@@ -45,7 +45,8 @@ __all__ = [
     "fit_model",
 ]
 
-FIXED_BALANCED_SAMPLER_METHODS = frozenset({"sc_mil", "rankmix"})
+# Scholz sampling-loss hybrids: class-balanced oversampling plus a metric loss.
+FIXED_BALANCED_SAMPLER_METHODS = frozenset({"ce_soft_f1", "ce_soft_mcc"})
 CHECKPOINT_INTERVAL = 50
 
 

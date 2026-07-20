@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from imbalance_benchmark.modeling.models import AttentionMil
+from imbalance_benchmark.modeling.models import AttentionMil, CfalPrototypeClassifier
 
 __all__ = [
     "FocalLoss",
@@ -53,7 +53,7 @@ class SoftF1LossMulti(nn.Module):
         self, logits: torch.Tensor, targets_one_hot: torch.Tensor
     ) -> torch.Tensor:
         """Calculate soft macro F1 loss."""
-        probs = torch.sigmoid(logits)
+        probs = torch.softmax(logits, dim=1)
         loss = torch.tensor(0.0, device=logits.device)
         for c in range(self.n_classes):
             p, t = probs[:, c], targets_one_hot[:, c]
@@ -104,6 +104,21 @@ class ScholzCombinedLoss(nn.Module):
         return ce_loss + self.weight * metric_loss
 
 
+def _prototype_diversity(model: nn.Module) -> torch.Tensor:
+    """Penalize deviations of pairwise prototype distances from their mean.
+
+    Population variance: a single distance (binary task) contributes zero
+    rather than the undefined sample variance of one element.
+    """
+    proto = F.normalize(
+        cast(torch.Tensor, getattr(model, "prototypes")), dim=-1, eps=1e-8
+    )
+    if proto.shape[0] < 2:
+        return proto.new_zeros(())
+    pw = (proto.unsqueeze(0) - proto.unsqueeze(1)).square().sum(dim=-1)
+    return pw[torch.triu(torch.ones_like(pw), diagonal=1).bool()].var(unbiased=False)
+
+
 def cfal_loss(
     model: nn.Module,
     features: torch.Tensor,
@@ -111,31 +126,26 @@ def cfal_loss(
     class_counts: np.ndarray,
     gamma: float = 2.0,
     beta: float = 0.999,
+    margin: float = 0.1,
 ) -> torch.Tensor:
-    """Compute Center-Focused Affinity Loss (CFAL)."""
+    """Compute Center-Focused Affinity Loss (CFAL).
+
+    Follows the companion methods report: per-class weight ``1/E_c`` (the raw
+    inverse effective number, not renormalized) and fixed margin ``lambda=0.1``.
+    """
     counts = np.maximum(class_counts, 1.0)
     eff = (1.0 - beta**counts) / (1.0 - beta)
     inv_eff = torch.tensor(1.0 / eff, dtype=torch.float32, device=features.device)
-    inv_eff = inv_eff * (len(eff) / inv_eff.sum())
-
-    aff = model(features)
+    aff = cast(CfalPrototypeClassifier, model).affinities(features)
     true_aff = aff[torch.arange(len(targets), device=targets.device), targets]
-    margins = torch.relu(1.0 + aff - true_aff.unsqueeze(1))
+    margins = torch.relu(margin + aff - true_aff.unsqueeze(1))
     margin_term = margins.masked_fill(
         F.one_hot(targets, num_classes=aff.shape[1]).bool(), 0.0
     ).sum(dim=1)
     loss_cfal = (
         inv_eff[targets] * (1.0 - true_aff).clamp(min=0.0).pow(gamma) * margin_term
     ).mean()
-
-    proto = F.normalize(
-        cast(torch.Tensor, getattr(model, "prototypes")), dim=-1, eps=1e-8
-    )
-    if proto.shape[0] < 2:
-        return loss_cfal
-    pw = (proto.unsqueeze(0) - proto.unsqueeze(1)).square().sum(dim=-1)
-    reg = pw[torch.triu(torch.ones_like(pw), diagonal=1).bool()].var()
-    return loss_cfal + reg
+    return loss_cfal + _prototype_diversity(model)
 
 
 def supervised_contrastive_loss(
@@ -183,7 +193,7 @@ def _mix_ranked_bags(
     mix_lambda: float,
 ) -> torch.Tensor:
     """Interpolate two bags' teacher-ranked representative subsequences."""
-    keep = max(1, min(len(first_bag), len(second_bag)) // 2)
+    keep = max(1, min(len(first_bag), len(second_bag)))
     first = _rank_representative_instances(teacher, first_bag, first_class, keep)
     second = _rank_representative_instances(teacher, second_bag, second_class, keep)
     return mix_lambda * first + (1.0 - mix_lambda) * second

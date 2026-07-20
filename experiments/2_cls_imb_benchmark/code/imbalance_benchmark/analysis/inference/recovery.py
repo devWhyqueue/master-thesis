@@ -8,11 +8,12 @@ import numpy as np
 from imbalance_benchmark.analysis.inference.context import (
     Baseline,
     balanced_baseline,
+    _tail_classes,
 )
 from imbalance_benchmark.analysis.inference.gates import (
     _SeverityInputs,
-    _method_discrimination_recovery,
     _method_calibration_recovery,
+    _method_discrimination_recovery,
     calibration_gate_comparison,
     confidence_interval,
     discrimination_gate_comparison,
@@ -48,7 +49,7 @@ def _method_recoveries(
             inp, ba_deficit_dist, severity_ba, method, method_rec, disc_gate
         )
         ece_dist = inp.ctx.ece_distribution(method_rec["labels"], method_rec["probs"])
-        discrimination["ece"] = float(np.nanmean(ece_dist))
+        discrimination["ece"] = float(ece_dist[0])
         discrimination["ece_ci"] = confidence_interval(ece_dist)
         out.append(discrimination)
         if cal_deficit_dist is not None and severity_tail_nll is not None:
@@ -61,7 +62,7 @@ def _method_recoveries(
                 method_rec,
                 cal_gate,
             )
-            calibration["ece"] = float(np.nanmean(ece_dist))
+            calibration["ece"] = float(ece_dist[0])
             calibration["ece_ci"] = confidence_interval(ece_dist)
             out.append(calibration)
     return out
@@ -87,7 +88,7 @@ def _severity_comparisons(
     ece_dist = inp.ctx.ece_distribution(
         inp.severity_ce["labels"], inp.severity_ce["probs"]
     )
-    disc_comparison["ece"] = float(np.nanmean(ece_dist))
+    disc_comparison["ece"] = float(ece_dist[0])
     disc_comparison["ece_ci"] = confidence_interval(ece_dist)
     comparisons = [disc_comparison]
     cal_gate, cal_deficit_dist = False, None
@@ -131,6 +132,14 @@ def _severity_result(
     severity_ce = load_seed_predictions(paths, severity, "ce", assignment)
     if severity_ce is None:
         return []
+    # The tail group is defined from this severity's own allocated support, so
+    # the balanced tail-NLL reference is recomputed per severity.
+    tail_classes = _tail_classes(
+        baseline.freeze, baseline.balanced["class_names"], assignment, severity
+    )
+    balanced_tail_nll = baseline.ctx.tail_nll_distribution(
+        baseline.balanced["labels"], baseline.balanced["probs"], tail_classes
+    )
     inp = _SeverityInputs(
         paths,
         severity,
@@ -144,7 +153,7 @@ def _severity_result(
         descriptive_only,
     )
     return _severity_comparisons(
-        inp, baseline.ba, baseline.tail_nll, baseline.tail_classes, expected_methods
+        inp, baseline.ba, balanced_tail_nll, tail_classes, expected_methods
     )
 
 

@@ -95,7 +95,9 @@ def _aggregate_group(
         np.stack(group["bootstrap_effect"].map(np.asarray).tolist()), axis=0
     )
     entry.update(
-        effect=float(np.nanmean(effects)),
+        # Replicate 0 carries the observed cross-split effect (equal split
+        # weight); replicates 1.. supply the percentile interval.
+        effect=float(effects[0]),
         ci=confidence_interval(effects),
         bootstrap_effect=effects.tolist(),
         descriptive_only=bool(group["descriptive_only"].any())
@@ -117,7 +119,11 @@ def _aggregate_group(
 
 
 def _add_recovery(entry: dict[str, Any], group: pd.DataFrame) -> None:
-    """Recompute the recovery ratio inside each equal-split bootstrap draw."""
+    """Aggregate recovery across splits: observed point (index 0) plus a bootstrap CI.
+
+    The point estimate is the ratio of the split-averaged observed numerator and
+    denominator (equal split weight), not the mean of per-replicate ratios.
+    """
     numerator = np.mean(
         np.stack(group["bootstrap_numerator"].map(np.asarray).tolist()), axis=0
     )
@@ -126,8 +132,9 @@ def _add_recovery(entry: dict[str, Any], group: pd.DataFrame) -> None:
     )
     with np.errstate(divide="ignore", invalid="ignore"):
         recovery = np.where(denominator != 0, numerator / denominator, np.nan)
+    recovery_point = numerator[0] / denominator[0] if denominator[0] != 0 else np.nan
     entry.update(
-        recovery=float(np.nanmean(recovery)),
+        recovery=float(recovery_point),
         recovery_ci=confidence_interval(recovery),
         bootstrap_numerator=numerator.tolist(),
         bootstrap_denominator=denominator.tolist(),

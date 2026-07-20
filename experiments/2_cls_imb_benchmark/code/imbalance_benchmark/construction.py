@@ -214,12 +214,28 @@ def effective_rho(
 def _largest_feasible_rho(
     available: list[int], total_t: int, rho: float, min_support: int
 ) -> float:
-    """Binary-search the largest realizable severity at a frozen shared total."""
-    low, high = 1.0, rho
-    if not _allocation_is_feasible(available, total_t, low, min_support):
+    """Return the largest realizable severity in ``[1, rho]`` at a frozen total.
+
+    With class-specific availability caps the feasible set of ratios need not be
+    an interval: raising ``rho`` can make an intermediate class exceed its cap
+    and later become feasible again. A binary search assumes a single feasible
+    interval and can therefore return a ratio far below the true maximum. This
+    scans a dense grid for the highest feasible ratio and then refines its upper
+    boundary, which is correct even when feasibility is disconnected.
+    """
+    if not _allocation_is_feasible(available, total_t, 1.0, min_support):
         raise ValueError(
             "No shared total satisfies all availability and support constraints"
         )
+    grid = np.linspace(1.0, rho, 2048)
+    feasible = [
+        value
+        for value in grid
+        if _allocation_is_feasible(available, total_t, float(value), min_support)
+    ]
+    best = float(max(feasible))
+    step = float(grid[1] - grid[0]) if len(grid) > 1 else 0.0
+    low, high = best, min(best + step, rho)
     for _ in range(48):
         mid = (low + high) / 2.0
         if _allocation_is_feasible(available, total_t, mid, min_support):

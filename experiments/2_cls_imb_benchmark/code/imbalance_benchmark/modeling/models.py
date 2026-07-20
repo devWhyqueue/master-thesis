@@ -189,12 +189,20 @@ class CfalPrototypeClassifier(nn.Module):
         """Encode input features to prototype space."""
         return self.encoder(x)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Compute class affinities for input features."""
+    def log_affinities(self, x: torch.Tensor) -> torch.Tensor:
+        """Log Gaussian affinity ``log a_ic = -||z-w||^2 / sigma`` per class."""
         emb = F.normalize(self.encode(x), dim=-1, eps=1e-8)
         proto = F.normalize(self.prototypes, dim=-1, eps=1e-8)
         sq_dist = (emb.unsqueeze(1) - proto.unsqueeze(0)).square().sum(dim=-1)
-        return torch.exp(-sq_dist / self.sigma)
+        return -sq_dist / self.sigma
+
+    def affinities(self, x: torch.Tensor) -> torch.Tensor:
+        """Gaussian affinities ``a_ic in (0, 1]`` used by the CFAL margin loss."""
+        return torch.exp(self.log_affinities(x))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Inference score ``log a_ic``; softmax over it yields the ranking used at test."""
+        return self.log_affinities(x)
 
 
 def build_model(

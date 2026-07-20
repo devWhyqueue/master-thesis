@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 import torch.nn as nn
 
@@ -28,10 +27,15 @@ def meets_method_floor(support: dict[str, int], patient_equals_slide: bool) -> b
 def stability_floor_from_curve(
     levels: list[int], ba: dict[int, list[float]], rcs: dict[int, list[list[float]]]
 ) -> int:
-    """Return the first support level whose aggregate and classwise gains are stable."""
-    mean_ba = np.mean(np.stack(list(ba.values())), axis=0)
+    """Return the first support level whose aggregate and classwise gains are stable.
+
+    The report requires the balanced-accuracy increment below 0.01 and every
+    class-recall increment below 0.02 *in all three orderings*. Averaging BA
+    across orderings before differencing can let opposite-signed changes cancel,
+    so the increment must be evaluated per ordering and the largest one gated.
+    """
     for idx in range(len(levels) - 1):
-        gain = abs(float(mean_ba[idx + 1] - mean_ba[idx]))
+        gain = max(abs(float(curve[idx + 1] - curve[idx])) for curve in ba.values())
         class_gain = max(
             abs(recalls[idx + 1][class_index] - recalls[idx][class_index])
             for recalls in rcs.values()

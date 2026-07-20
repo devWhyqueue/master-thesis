@@ -758,7 +758,7 @@ def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(
             "severity": "severe",
             "method": "weighted_ce",
             "gate": "discrimination",
-            "effect": float(np.mean(effect)),
+            "effect": float(effect[0]),
             "bootstrap_effect": effect,
             "bootstrap_numerator": effect,
             "bootstrap_denominator": effect,
@@ -778,7 +778,8 @@ def test_crossed_aggregate_recomputes_recovery_inside_bootstrap_replicates(
     weighted = next(
         c for c in output["comparisons"] if c["method"] == "balanced_sampling"
     )
-    assert weighted["effect"] == pytest.approx(0.06)
+    # Replicate 0 is the observed cross-split effect: mean(0.02, 0.04, 0.06).
+    assert weighted["effect"] == pytest.approx(0.04)
     assert weighted["recovery"] == pytest.approx(1.0)
     assert weighted["bootstrap_effect"] == pytest.approx([0.04, 0.08])
     assert weighted["bootstrap_numerator"] == pytest.approx([0.04, 0.08])

@@ -163,7 +163,7 @@ def _crossed_p_value(
     tail_classes = []
     for i in range(3):
         fz = _load_freeze(split_paths(base_paths, i))
-        alloc = fz["assignment_conditions"][entry["assignment"]]["severe"][
+        alloc = fz["assignment_conditions"][entry["assignment"]][entry["severity"]][
             "allocated_counts"
         ]
         c_names = method_data["class_names"]

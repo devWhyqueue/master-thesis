@@ -33,12 +33,15 @@ def _independent_units(dataset: Any) -> np.ndarray | None:
     return frame["case_id"].to_numpy()
 
 
-def _sample_odd_classes(
-    pair_classes: np.ndarray, n_classes: int, rng: np.random.Generator
+def _sample_distinct_odd_classes(
+    pair_classes: np.ndarray, n_classes: int, k: int, rng: np.random.Generator
 ) -> np.ndarray:
-    """Sample one odd class per set uniformly from [C] \\ {pair_class}."""
-    raw = rng.integers(n_classes - 1, size=len(pair_classes))
-    return np.where(raw < pair_classes, raw, raw + 1)
+    """Sample k distinct odd classes per set (report requirement) from [C] \\ {pair}."""
+    out = np.empty((len(pair_classes), k), dtype=np.int64)
+    for row, pair in enumerate(pair_classes.tolist()):
+        others = np.array([c for c in range(n_classes) if c != pair])
+        out[row] = rng.choice(others, size=k, replace=False)
+    return out
 
 
 def _fill_column(
@@ -129,19 +132,16 @@ def sample_oko_sets(
     """Sample n_sets odd-k-out sets (Algorithm 1, Muttenthaler et al. 2024).
 
     Returns (pair_classes, set_indices of shape (n_sets, k+2), first_odd_classes);
-    the auxiliary loss uses only the first odd slot when k > 1. When ``units`` is
-    given, each set's two same-class examples come from distinct independent
-    units (patients/slides).
+    the auxiliary loss uses only the first odd slot. With ``units``, each set's
+    two same-class examples come from distinct independent units.
     """
     pair_classes = rng.integers(n_classes, size=n_sets)
     set_indices = np.empty((n_sets, k + 2), dtype=np.int64)
     _fill_distinct_pair_indices(class_index, pair_classes, set_indices, rng, units)
-    first_odd = _sample_odd_classes(pair_classes, n_classes, rng)
-    _fill_column(class_index, first_odd, set_indices, [2], rng)
-    for slot in range(1, k):
-        odd_col = _sample_odd_classes(pair_classes, n_classes, rng)
-        _fill_column(class_index, odd_col, set_indices, [2 + slot], rng)
-    return pair_classes, set_indices, first_odd
+    odd_classes = _sample_distinct_odd_classes(pair_classes, n_classes, k, rng)
+    for slot in range(k):
+        _fill_column(class_index, odd_classes[:, slot], set_indices, [2 + slot], rng)
+    return pair_classes, set_indices, odd_classes[:, 0]
 
 
 def oko_set_loss(
@@ -152,10 +152,17 @@ def oko_set_loss(
     pair_labels: torch.Tensor,
     odd_labels: torch.Tensor,
 ) -> torch.Tensor:
-    """OKO hard loss: pair-class CE from the main head plus odd-class CE from the auxiliary head."""
-    summed = model.encode(features).view(batch_n, set_size, -1).sum(dim=1)
-    return F.cross_entropy(model.main_head(summed), pair_labels) + F.cross_entropy(
-        model.odd_head(summed), odd_labels
+    """OKO hard loss over aggregated set logits (main + auxiliary odd head).
+
+    The report defines the set logits as the sum of per-example head outputs,
+    ``f_theta(S) = sum_i f_theta(x_i)``; summing the hidden embeddings first and
+    applying the biased head once would undercount the head bias.
+    """
+    encoded = model.encode(features).view(batch_n, set_size, -1)
+    main_logits = model.main_head(encoded).sum(dim=1)
+    odd_logits = model.odd_head(encoded).sum(dim=1)
+    return F.cross_entropy(main_logits, pair_labels) + F.cross_entropy(
+        odd_logits, odd_labels
     )
 
 

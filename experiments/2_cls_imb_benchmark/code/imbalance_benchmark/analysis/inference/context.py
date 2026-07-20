@@ -58,17 +58,25 @@ class BootstrapContext:
             strata, n_replicates, rng
         )
         self.case_ids = identity["case_id"].to_numpy()
-        self.row_weights = expand_to_rows(unique_cases, patient_weights, self.case_ids)
-        self.n_replicates = n_replicates
+        resampled = expand_to_rows(unique_cases, patient_weights, self.case_ids)
+        # Replicate 0 is the observed cohort (all unit weights one): every metric
+        # distribution therefore carries the observed-data point estimate at
+        # index 0, which the reported effects, recovery ratios, and deficit gates
+        # use, while replicates 1.. are the bootstrap draws for the interval.
+        observed = np.ones((resampled.shape[0], 1), dtype=resampled.dtype)
+        self.row_weights = np.concatenate([observed, resampled], axis=1)
+        self.n_replicates = self.row_weights.shape[1]
         self._seed = seed
         self._seed_indices: dict[int, np.ndarray] = {}
 
     def _paired_seed_indices(self, n_seeds: int) -> np.ndarray:
         """Return the one fixed seed resample shared by every matched comparison."""
         if n_seeds not in self._seed_indices:
-            self._seed_indices[n_seeds] = resample_seed_indices(
+            idx = resample_seed_indices(
                 n_seeds, self.n_replicates, np.random.default_rng(self._seed + n_seeds)
             )
+            idx[0] = np.arange(n_seeds)  # observed replicate averages all seeds
+            self._seed_indices[n_seeds] = idx
         return self._seed_indices[n_seeds]
 
     def ba_distribution(
@@ -121,13 +129,19 @@ class BootstrapContext:
 
 
 def _tail_classes(
-    freeze: dict[str, Any], class_names: list[str], assignment: str
+    freeze: dict[str, Any], class_names: list[str], assignment: str, severity: str
 ) -> list[int]:
-    """Class indices assigned to the tail tier under the severe condition's allocated support."""
+    """Class indices assigned to the tail tier under one condition's allocated support.
+
+    Head/body/tail tiers are defined per comparison unit from that condition's
+    realized allocation, so a moderate comparison must not read the severe
+    allocation: with class-specific caps the two allocations can rank classes
+    differently and yield different tail groups.
+    """
     allocated = (
         freeze.get("assignment_conditions", {})
         .get(assignment, {})
-        .get("severe", {})
+        .get(severity, {})
         .get("allocated_counts", {})
     )
     if not allocated:
@@ -142,15 +156,20 @@ def _tail_classes(
 
 @dataclass
 class Baseline:
-    """The balanced-CE reference distributions every severity's gates/recovery compare against."""
+    """The balanced-CE reference distributions every severity's gates/recovery compare against.
+
+    The tail group is severity-specific, so ``tail_nll`` is computed per
+    severity by the recovery layer from ``freeze``/``assignment`` rather than
+    precomputed here for a single condition.
+    """
 
     balanced: dict[str, Any]
     ctx: BootstrapContext
     n_classes: int
-    tail_classes: list[int]
     n_perm: int
     ba: np.ndarray
-    tail_nll: np.ndarray | None
+    freeze: dict[str, Any]
+    assignment: str
 
 
 def balanced_baseline(
@@ -161,16 +180,12 @@ def balanced_baseline(
     seed: int,
     assignment: str = "native",
 ) -> Baseline | None:
-    """Load balanced CE's predictions and precompute its bootstrap BA/tail-NLL distributions."""
+    """Load balanced CE's predictions and precompute its bootstrap BA distribution."""
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     balanced = load_seed_predictions(paths, "balanced", "ce")
     if not (paths["data"] / "manifest.csv").exists() or balanced is None:
         return None
     ctx = BootstrapContext(paths, is_mil, n_replicates, seed)
     n_classes = len(balanced["class_names"])
-    tail_classes = _tail_classes(freeze, balanced["class_names"], assignment)
     ba = ctx.ba_distribution(balanced["labels"], balanced["preds"], n_classes)
-    tail_nll = ctx.tail_nll_distribution(
-        balanced["labels"], balanced["probs"], tail_classes
-    )
-    return Baseline(balanced, ctx, n_classes, tail_classes, 100_000, ba, tail_nll)
+    return Baseline(balanced, ctx, n_classes, 100_000, ba, freeze, assignment)
