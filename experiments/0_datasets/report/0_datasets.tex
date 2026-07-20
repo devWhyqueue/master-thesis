@@ -24,6 +24,8 @@ An Introduction to the Domain and Data}
 \maketitle
 
 \begin{abstract}
+\begingroup
+\setlength{\emergencystretch}{2em}
 \noindent This report introduces the domain of computational pathology and the four public
 histopathology datasets it covers. It first explains what diagnostic pathology is, how a stained glass slide becomes a
 gigapixel whole-slide image, why such images are tiled into patches, and how weakly supervised and
@@ -32,6 +34,8 @@ four H\&E datasets --- CAMELYON16, TCGA-UT, BRACS, and PANDA --- presented in th
 diagnostic question they pose, from detection (\emph{is cancer present?}) through cancer typing and
 lesion subtyping to ordinal grading (\emph{how aggressive is it?}). Each dataset is given with its
 clinical background, an example patch, a summary table, and its class distribution.
+\par
+\endgroup
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -182,7 +186,8 @@ patches --- into a slide prediction \citep{song2023aiPathology,hosseini2024compu
 Because tiling discards spatial context, context-aware models such as graph neural networks (over
 patches or nuclei) and transformers (with global self-attention) are sometimes used to recover it,
 but the attention-MIL bag remains the workhorse for slide-level tasks. Both regimes appear in the
-datasets below, and two of them (CAMELYON16 and PANDA) support both on the same slides.
+datasets below. Only TCGA-UT retains the same target across them; CAMELYON16, BRACS, and PANDA
+change the label meaning or granularity between patch and WSI prediction.
 
 The features fed to these heads have shifted from hand-crafted descriptors --- interpretable
 measurements of nuclear shape, texture, or spatial architecture --- to learned representations that
@@ -213,7 +218,7 @@ annotation:
 \begin{itemize}
   \item \textbf{CAMELYON16} --- \emph{is cancer present?} Binary metastasis \emph{detection} in
         sentinel lymph nodes, with pixel-mask annotations.
-  \item \textbf{TCGA-UT} --- \emph{what cancer is it?} Pan-cancer \emph{typing} across 32 organs,
+  \item \textbf{TCGA-UT} --- \emph{what cancer is it?} Pan-cancer \emph{typing} across 32 cancer types,
         each patch labelled with its slide's cancer type.
   \item \textbf{BRACS} --- \emph{how abnormal is this tissue?} Breast-lesion \emph{subtyping} along
         the benign--atypical--malignant continuum, with region-of-interest annotations.
@@ -233,7 +238,8 @@ non-overlapping $256\times256$ patches at \num{20}x by the group's preprocessing
 a patch only if it clears a tissue-foreground stack --- Otsu thresholding (at least \num{10}\%
 foreground), a standard-deviation filter (at least \num{8} gray levels), Canny edge detection, and an
 isolation filter that discards patches with fewer than two tissue neighbours. Each surviving patch is
-then labelled from the WSI mask (value \num{1} normal, \num{2} tumour).
+then labelled from the WSI mask: it is tumour when at least \num{50}\% of the aligned mask pixels
+have value \num{2}, and normal otherwise.
 
 The benchmark uses \num{398} of the \num{399} published slides (\num{160} tumor, \num{238} normal)
 after excluding one slide without usable tile evidence; each slide is its own patient, so
@@ -295,7 +301,7 @@ No tissue-foreground filter is applied, the regions already being curated tumour
 the cancer-type label of the slide it was cropped from, so the patches are themselves labelled samples --- the unit
 of patch-level classification --- while their slide identities also allow grouping into slide-level
 bags. The labels are cancer types, not dense pixel masks or cell-level annotations, so the diagnostic
-question is \emph{what cancer is it?}, a nominal classification across 32 organs.
+question is \emph{what cancer is it?}, a nominal classification across 32 cancer types.
 
 The largest class is glioblastoma multiforme (GBM; \num{792} slides) and the smallest is diffuse
 large B-cell lymphoma (DLBC; \num{28} slides), with the remaining types spread across a gradually
@@ -323,9 +329,9 @@ declining tail (Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist}).
       \bottomrule
     \end{tabular}
   \end{minipage}
-  \caption{TCGA-UT dataset properties, alongside an example $256\times256$ H\&E tumor patch. Because
-  every patch inherits its slide's cancer-type label, the patch- and slide-level class distributions
-  coincide.}
+  \caption{TCGA-UT dataset properties, alongside an example $256\times256$ H\&E tumor patch. Every
+  patch inherits its slide's cancer-type label, so both regimes use the same label vocabulary;
+  patch-level class proportions additionally depend on how many patches each slide contributes.}
   \label{tab:tcgaut-summary}
 \end{table}
 
@@ -340,26 +346,29 @@ declining tail (Table~\ref{tab:tcgaut-summary}, Figure~\ref{fig:tcgaut-dist}).
 \subsection{BRACS --- breast-lesion subtyping}
 \label{sec:bracs}
 BRACS narrows back to a single organ but sharpens the question from \emph{which cancer} to
-\emph{how abnormal is this tissue}. It is an H\&E breast-pathology dataset of \num{547} WSIs and
-\num{4539} regions of interest (ROIs) from \num{189} patients, annotated by consensus of three
-board-certified pathologists \citep{brancati2022bracs}. The labels form three lesion types ---
-benign, atypical, and malignant --- refined into seven subtypes: normal (N), pathological benign
-(PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia
-(ADH), ductal carcinoma in situ (DCIS), and invasive carcinoma (IC). Annotations are ROI crops
-rather than whole-slide labels or pixel masks, and a single slide may contain ROIs of several
-subtypes.
+\emph{how abnormal is this tissue}. It is an H\&E breast-pathology dataset of \num{547} WSIs from
+\num{189} patients, with \num{4539} regions of interest (ROIs) drawn on \num{387} of those WSIs from
+\num{151} patients. Three board-certified pathologists annotated both levels by consensus
+\citep{brancati2022bracs}. The labels form three lesion types---benign, atypical, and
+malignant---refined into seven subtypes: normal (N), pathological benign (PB), usual ductal
+hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), ductal carcinoma
+in situ (DCIS), and invasive carcinoma (IC).
 
-The benchmark uses the seven-subtype target, which keeps clinically important but comparatively
-scarce precancers visible: the atypical lesions FEA and ADH would be hidden by collapsing to three
-lesion types. The pathologist-drawn ROIs are supplied as \texttt{.png} crops at the slides'
-native \num{0.25}~$\mu$m/px (\num{40}x) resolution; each is gridded into non-overlapping
-$256\times256$ tiles with no tissue-foreground filter, the ROIs already being tissue. This yields
-\num{278028} tiles from the \num{4539} ROIs of \num{387} WSIs (\num{151} patients); \num{16} ROIs are
-too small for even one tile. Counting the slides that contain each
-subtype (a slide with several lesions counts under each), support ranges from PB (\num{196} slides)
-at the head to DCIS (\num{87} slides) at the tail (Table~\ref{tab:bracs-summary},
-Figure~\ref{fig:bracs-dist}). BRACS's difficulty comes from fine-grained morphology rather than a
-steep tail.
+The patch regime uses the ROI annotations. A single slide may contain ROIs of several subtypes, and
+each patch inherits the label of the particular ROI from which it is cut. The supplied ROI crops are
+at the slides' native \num{0.25}~$\mu$m/px (\num{40}x) resolution and are gridded into non-overlapping
+$256\times256$ tiles without a tissue-foreground filter because the crops already delimit tissue.
+This yields \num{278028} labelled patches; \num{16} ROIs are too small to supply one complete tile.
+
+The WSI regime instead uses the official single label assigned to each complete slide: the most
+aggressive subtype detected by the pathologists. It therefore includes the \num{160} WSIs without
+released ROIs and uses the full \num{547}-WSI, \num{189}-patient cohort. The official subtype counts
+are N \num{44}, PB \num{147}, UDH \num{74}, FEA \num{41}, ADH \num{48}, DCIS \num{61}, and IC
+\num{132}. Full WSIs are sampled at \num{20}x into non-overlapping $256\times256$ patches and use the
+same deterministic foreground stack as CAMELYON16: at least \num{10}\% Otsu foreground, grayscale
+standard deviation of at least \num{8}, Canny edge evidence, and at least two tissue neighbours. No
+per-slide cap is applied. Thus the ROI-patch and WSI regimes share a subtype vocabulary but not a
+label assignment rule, cohort, or prediction target.
 
 \begin{table}[ht]
   \centering
@@ -375,24 +384,23 @@ steep tail.
       \toprule
       Property & Value\\
       \midrule
-      Patients & \num{151}\\
-      ROI-bearing WSIs & \num{387}\\
+      Full WSI cohort & \num{547} WSIs / \num{189} patients\\
+      ROI subset & \num{4539} ROIs / \num{387} WSIs / \num{151} patients\\
       ROI-derived patches & \num{278028}\\
       Subtype labels & N, PB, UDH, FEA, ADH, DCIS, IC\\
       \bottomrule
     \end{tabular}%
   \end{minipage}
-  \caption{BRACS dataset properties, alongside an example $256\times256$ ROI patch. Slide-level
-  support counts each slide under every subtype it contains; the patch-level distribution instead
-  weights subtypes by their patch counts.}
+  \caption{BRACS dataset properties, alongside an example $256\times256$ ROI patch. Patch labels are
+  ROI specific, whereas each complete WSI has one official most-aggressive-lesion subtype.}
   \label{tab:bracs-summary}
 \end{table}
 
 \begin{figure}[ht]
   \centering
   \includegraphics[width=0.72\linewidth]{bracs_class_distribution.png}%
-  \caption{BRACS WSI support by seven-subtype label (slides containing each subtype), from PB
-  at the head to DCIS at the tail.}
+  \caption{Official single-label BRACS WSI support by subtype across all \num{547} slides, from PB
+  at the head to FEA at the tail.}
   \label{fig:bracs-dist}
 \end{figure}
 
@@ -427,13 +435,12 @@ carries a cancer value. Over the \num{10514} masked biopsies that yield labelled
 slide-level grading target and a binary tile-level detection target (Table~\ref{tab:panda-summary},
 Figure~\ref{fig:panda-dist}).
 
-PANDA is the only one of the four datasets whose two regimes answer different questions, and this
-follows from its annotations rather than from a design choice. It is the one cohort carrying two
-independent label sources at two granularities: a slide-level ordinal ISUP grade, which summarises
-the whole biopsy and cannot be assigned to a single tile, and pixel masks that yield a per-tile label.
-CAMELYON16, TCGA-UT, and BRACS instead each provide a single label concept --- tumour/normal, cancer
-type, or lesion subtype --- that applies unchanged at both tile and slide level, so their two regimes
-share one task and differ only in prediction unit.
+PANDA carries two independent label sources at two granularities: a slide-level ordinal ISUP grade,
+which summarises the whole biopsy and cannot be assigned to a single tile, and pixel masks that yield
+a per-tile cancer/benign label. CAMELYON16 likewise changes granularity, from local tumour tissue to
+the slide's metastasis status. BRACS changes from the subtype of a selected ROI to the official most
+aggressive subtype on the complete WSI. Only TCGA-UT uses the same cancer-type target in both regimes;
+there, the prediction unit changes but the target does not.
 
 \begin{table}[ht]
   \centering

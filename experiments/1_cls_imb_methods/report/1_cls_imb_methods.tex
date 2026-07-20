@@ -43,7 +43,7 @@ Two prediction regimes recur throughout the benchmarks. In the \emph{patch} regi
 \label{sec:methods}
 The methods are organized by the level at which they intervene in the imbalanced learning problem. Cross-entropy (CE) is treated as the no-mitigation reference condition: it uses the observed training distribution as given and does not rebalance samples, labels, costs, or representations. The remaining methods are grouped as data-level sampling and augmentation, algorithm-level losses and prior corrections, hybrid sampling--loss methods, and representation or architecture-level methods \citep{saini2023tacklingClass,zhang2023deepLong}.
 
-The comparison is regime-specific. Patch methods consume frozen Virchow2 embeddings of controlled patches and optimize one shared MLP classifier head; CE-based patch methods use the same linear output layer, while CFAL replaces that layer with class prototypes and affinity-based prediction. WSI-bag methods consume capped frozen Virchow2 feature bags and optimize one shared attention-MIL head. Both regimes therefore rely on the same pathology foundation-model family, but they differ in supervision unit: one embedding per selected patch versus aggregation over a bounded set of instances on a slide.
+The comparison is regime-specific. Patch methods consume frozen Virchow2 embeddings of controlled patches and optimize one shared MLP classifier head; CE-based patch methods use the same linear output layer, while CFAL replaces that layer with class prototypes and affinity-based prediction. WSI-bag methods consume complete eligible frozen-feature bags and optimize one shared attention-MIL head. Both regimes therefore rely on the same pathology foundation-model family, but they differ in supervision unit: one embedding per selected patch versus aggregation over every eligible instance on a slide, without bag truncation.
 
 \begin{figure}[ht]
   \centering
@@ -77,7 +77,7 @@ The comparison is regime-specific. Patch methods consume frozen Virchow2 embeddi
 \end{figure}
 
 \subsection{Notation}
-Let $C$ be the number of cancer-type classes and let $n_c$ denote the number of training examples from class $c$. For a labeled patch or slide-level bag with label $y\in\{1,\ldots,C\}$, the model outputs logits $\mathbf{z}\in\mathbb{R}^{C}$ and class probabilities
+Let $C$ be the number of target classes and let $n_c$ denote the number of training examples from class $c$. For a labeled patch or slide-level bag with label $y\in\{1,\ldots,C\}$, the model outputs logits $\mathbf{z}\in\mathbb{R}^{C}$ and class probabilities
 \begin{equation}
   p_c = \frac{\exp(z_c)}{\sum_{j=1}^{C}\exp(z_j)}.
   \label{eq:softmax}
@@ -96,17 +96,17 @@ In the patch regime, this objective trains the shared linear head on frozen Virc
 Data-level methods change what the optimizer sees, rather than changing the mathematical penalty assigned to one observed example. In the taxonomy, this family includes resampling, augmentation, and WSI-specific feature mixing strategies that make minority or informative examples more visible during training \citep{saini2023tacklingClass}.
 
 \subsubsection{Balanced Sampling}
-Balanced sampling changes minibatch composition by sampling training examples with probabilities inversely related to their class support. For an example $i$ with class $y_i$, the sampler weight is proportional to
+Balanced sampling changes minibatch composition by sampling training examples with probabilities related to their class support through a strength $s\in[0,1]$. For an example $i$ with class $y_i$, the sampler weight is proportional to
 \begin{equation}
-  q_i \propto \frac{1}{n_{y_i}}.
+  q_i(s) \propto n_{y_i}^{-s}.
   \label{eq:balanced-sampling}
 \end{equation}
-After normalization across the training set, this makes the expected class exposure closer to uniform even though the underlying dataset remains imbalanced. The patch variant applies this sampler to patch examples and still optimizes CE. The MIL variant applies the same idea at slide-bag level and also optimizes CE. Balanced sampling therefore tests a pure data-level intervention: it asks whether equalizing training exposure is enough without changing the loss formula.
+After normalization across the training set, $s=0$ recovers ordinary sampling and $s=1$ gives equal expected exposure to every class; intermediate values partially rebalance the data. The patch variant applies this sampler to patch examples and still optimizes CE. The MIL variant applies the same idea at slide-bag level and also optimizes CE. Balanced sampling therefore tests a pure data-level intervention without changing the loss formula.
 
 \subsubsection{RankMix-Inspired Feature Mixing}
 RankMix is a WSI-native data-augmentation method for weakly supervised slide classification. Ordinary image mixup assumes two inputs with compatible spatial shapes, but WSI bags can contain different numbers of feature instances and lack instance-level labels. RankMix addresses this by mixing representative feature subsequences rather than raw slides \citep{chen2023rankmix}. The benchmark variant is called \emph{RankMix-inspired} because it preserves the source method's teacher ranking, representative subsequence selection, feature interpolation, mixed labels, and reinitialized student, but does not reproduce the paper's complete combination of instance-max and bag-level objectives. Its student instead uses soft-label CE on the mixed bag prediction. Results therefore test this specified adaptation, not a faithful reproduction of the full source method.
 
-The tested implementation follows the defining two-stage teacher--student procedure. First, a teacher attention-MIL model is trained with slide labels for 30 epochs using the same MIL architecture and optimization settings as plain MIL CE. For each bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ and target class, the teacher assigns ranking scores to instances using its softmax probability for that class; the top-$k$ instances are kept as a representative subsequence, where $k=\min(|B_a|,|B_b|)$ for the two bags being mixed, and their original within-bag order is preserved after selection. The student MIL model is then reinitialized and trained on bags built from these ranked subsequences.
+The tested implementation follows the defining two-stage teacher--student procedure. First, a teacher attention-MIL model is trained with slide labels for exactly the protocol-defined budget $U$ of optimizer updates, using the same MIL architecture and optimization settings as plain MIL CE. For each bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ and target class, the teacher assigns ranking scores to instances using its softmax probability for that class; the top-$k$ instances are kept as a representative subsequence, where $k=\min(|B_a|,|B_b|)$ for the two bags being mixed, and their original within-bag order is preserved after selection. The student MIL model is then reinitialized and receives its own $U$ updates on bags built from these ranked subsequences.
 
 Mixing itself follows the mixup idea in feature space. For two bags $a$ and $b$, let $H_a$ and $H_b$ denote the selected instance-feature matrices and $\mathbf{y}_a,\mathbf{y}_b$ the corresponding one-hot slide labels. A scalar mixing coefficient $\lambda\in(0,1)$ controls how much of each bag is retained:
 \begin{equation}
@@ -132,14 +132,14 @@ Mixing itself follows the mixup idea in feature space. For two bags $a$ and $b$,
 Algorithm-level methods keep the training examples fixed but alter how errors are penalized. They are cost-sensitive or difficulty-sensitive objectives: minority examples may receive larger explicit weights, or easy examples may contribute less to the gradient \citep{saini2023tacklingClass,scholz2024imbalanceAware}.
 
 \subsubsection{Class-Weighted Cross-Entropy}
-Class-weighted CE multiplies each example's CE term by a class-dependent cost:
+Class-weighted CE multiplies each example's CE term by a class-dependent cost controlled by the same strength $s\in[0,1]$:
 \begin{equation}
   \mathcal{L}_{\mathrm{WCE}}(\mathbf{z},y) = -w_y\log p_y,
   \qquad
-  w_c \propto \frac{1}{n_c}.
+  w_c(s) \propto n_c^{-s}.
   \label{eq:weighted-ce}
 \end{equation}
-The implementation normalizes the inverse-frequency weights so that the average scale of the loss remains comparable across methods. This method leaves the sample order and model architecture unchanged, but increases the loss contribution of classes with fewer training examples. It is evaluated for both patch classification and attention-MIL.
+The implementation normalizes these weights so that their mean across classes is one. Here $s=0$ recovers unweighted CE and $s=1$ gives inverse-frequency weighting; intermediate values reduce the correction. This method leaves the sample order and model architecture unchanged, but increases the loss contribution of classes with fewer training examples. It is evaluated for both patch classification and attention-MIL.
 
 \subsubsection{Focal Loss}
 Focal loss reduces the contribution of confidently classified examples and concentrates optimization on examples that remain difficult. With focusing parameter $\gamma$, the multiclass focal objective is
@@ -239,10 +239,11 @@ The obstacle is that ordinary F1 is computed from hard counts after prediction, 
 \noindent The multiclass implementation applies this construction separately to each class and averages the resulting classwise terms. This macro-style averaging is the imbalance-aware part: each class contributes one term regardless of how many samples it has in the full dataset. The tested objective does not replace CE completely; it adds the metric-derived term to CE so that optimization still rewards calibrated class probabilities while also pushing the minibatch toward higher macro soft F1:
 \begin{equation}
   \mathcal{L}_{\mathrm{CE+F1}} = \mathcal{L}_{\mathrm{CE}} +
+  \lambda_{\mathrm{aux}}
   \left(1-\frac{1}{C}\sum_{c=1}^{C}\mathrm{F1}_{\mathrm{soft},c}\right).
   \label{eq:ce-soft-f1}
 \end{equation}
-\noindent The benchmark trains this loss with balanced sampling on the patch manifest. That design is important for interpretation: the loss tries to optimize a macro-style class metric, while the sampler ensures that tail classes occur often enough in minibatches for their soft-F1 terms to provide a regular training signal.
+\noindent The auxiliary weight $\lambda_{\mathrm{aux}}>0$ controls the contribution of the soft-F1 term and is selected on validation. The benchmark trains this loss with balanced sampling on the patch manifest. That design is important for interpretation: the loss tries to optimize a macro-style class metric, while the sampler ensures that tail classes occur often enough in minibatches for their soft-F1 terms to provide a regular training signal.
 
 \subsubsection{Scholz-Style CE + Soft MCC}
 The soft-MCC variant uses the same principle as soft F1---replace hard evaluation counts with differentiable probability masses---but starts from the Matthews correlation coefficient (MCC). Whereas F1 for one class depends mainly on that class's positive predictions, MCC is built from the full confusion matrix and therefore reacts to false positives, false negatives, and true negatives at the same time. In binary problems it is often preferred in imbalanced settings because it can remain informative when one class dominates the dataset: accuracy can look high while predictions are still systematically biased, but MCC penalizes both kinds of mistakes jointly.
@@ -259,7 +260,7 @@ For one class treated as positive, write TP, TN, FP, and FN for the four confusi
 \noindent The numerator compares co-occurrence of correct positive and correct negative decisions with co-occurrence of the two error types; the denominator scales by how many examples fall into each margin of the confusion matrix. MCC equals $+1$ for perfect predictions, $0$ for chance-level association, and can become negative when predictions are worse than random. This makes it a correlation-style score rather than a prevalence-weighted rate.
 
 \paragraph{Multiclass MCC in a minibatch.}
-For $C$ cancer types, the multiclass extension treats labels and predictions as $C$-dimensional vectors per example. Let $Y\in\{0,1\}^{N\times C}$ be the one-hot label matrix and $\widehat{Y}\in[0,1]^{N\times C}$ the corresponding softmax probabilities, with rows $\mathbf{y}_i$ and $\hat{\mathbf{y}}_i$. Three aggregate quantities describe how mass is distributed inside the batch:
+For $C$ target classes, the multiclass extension treats labels and predictions as $C$-dimensional vectors per example. Let $Y\in\{0,1\}^{N\times C}$ be the one-hot label matrix and $\widehat{Y}\in[0,1]^{N\times C}$ the corresponding softmax probabilities, with rows $\mathbf{y}_i$ and $\hat{\mathbf{y}}_i$. Three aggregate quantities describe how mass is distributed inside the batch:
 \begin{equation}
   s = \sum_{i=1}^{N}\sum_{c=1}^{C} Y_{ic}\widehat{Y}_{ic},
   \qquad
@@ -292,10 +293,11 @@ Hard MCC replaces $\widehat{Y}$ by one-hot argmax predictions, which again block
 \noindent Every term in \eqref{eq:mcc-components} and \eqref{eq:soft-mcc} is differentiable with respect to the logits that produce $\widehat{Y}$. A confident correct prediction increases $s$; probability placed on the wrong classes increases some $p_c$ while leaving the matching $t_c$ unchanged, which lowers the numerator; and overly peaked prediction vectors reduce the prediction-side denominator term, limiting the score even if a few examples are classified correctly. As with soft F1, the training objective turns a score to be maximized into a loss to be minimized and adds it to CE:
 \begin{equation}
   \mathcal{L}_{\mathrm{CE+MCC}} =
-  \mathcal{L}_{\mathrm{CE}} + \left(1-\mathrm{MCC}_{\mathrm{soft}}\right).
+  \mathcal{L}_{\mathrm{CE}} + \lambda_{\mathrm{aux}}
+  \left(1-\mathrm{MCC}_{\mathrm{soft}}\right).
   \label{eq:ce-soft-mcc}
 \end{equation}
-\noindent This variant is also evaluated only in the patch benchmark and is trained with class-balanced oversampling. The soft-F1 and soft-MCC variants therefore ask a focused question: once tail classes are regularly presented to the optimizer, does adding a differentiable version of a class-balanced evaluation metric improve the controlled patch classifier beyond CE and simple balanced sampling?
+\noindent The auxiliary weight $\lambda_{\mathrm{aux}}>0$ has the same role and validation grid as in the soft-F1 hybrid. This variant is also evaluated only in the patch benchmark and is trained with class-balanced oversampling. The soft-F1 and soft-MCC variants therefore ask a focused question: once tail classes are regularly presented to the optimizer, does adding a differentiable version of a class-balanced evaluation metric improve the controlled patch classifier beyond CE and simple balanced sampling?
 
 \subsubsection{Odd-K-Out (OKO) Set Learning}
 Standard cross-entropy optimizes each example independently, which has two relevant consequences under class imbalance. First, the gradient signal for a tail class arrives only when that class is sampled, so rare examples can be overwhelmed by frequent ones. Second, hard-label cross-entropy encourages logit values to diverge without bound, which is a known driver of overconfidence and poor calibration \citep{guo2017calibration}. OKO \citep{muttenthaler2024setLearning} addresses both problems simultaneously by replacing per-example cross-entropy with a set-level objective. Calibration is inherently a property of a model's output distribution over a collection of examples, and training on sets is a natural way to expose the model to that distributional structure during learning.
@@ -358,7 +360,7 @@ The attention-MIL backbone first maps bag $B_i$ to an embedding $\mathbf{b}_i=\m
        {\sum_{a\ne i}\exp(\mathbf{r}_i^\top\mathbf{r}_a/\tau)}.
   \label{eq:scl}
 \end{equation}
-\noindent The numerator rewards similarity to same-class bags. The denominator compares that similarity against all other bags in the minibatch, so the loss favors representations where class clusters are compact and mutually separated. The temperature $\tau$ controls how sharply these similarities are weighted; the reference default is $\tau=\num{1.0}$, and $\tau$ is the imbalance control selected on validation.
+\noindent The numerator rewards similarity to same-class bags. The denominator compares that similarity against all other bags in the minibatch, so the loss favors representations where class clusters are compact and mutually separated. The temperature $\tau$ controls how sharply these similarities are weighted. The source reference is $\tau=\num{1.0}$; the benchmark retains it in the validation grid together with lower temperatures.
 
 SC-MIL does not rely on contrastive learning alone. The contrastive term shapes the representation space, while CE trains the final class predictor. The tested variant combines them through a linear curriculum:
 \begin{equation}

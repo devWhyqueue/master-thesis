@@ -14,6 +14,8 @@ dataset:
     evidence: nonempty_deterministically_ordered_wsi_tissue_tile_set
     labels: seven_class_official_most_aggressive_lesion_wsi_subtype
     roi_annotations: not_used
+    tiling: non_overlapping_256x256_at_20x
+    foreground: camelyon16_otsu_std_canny_isolation_stack
     split_unit: patient
   root: /home/space/datasets/patho_ds/BRACS
   wsi_tile_root: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/bracs/wsi/prepared/wsi_tiles
