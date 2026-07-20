@@ -4,29 +4,17 @@ from functools import lru_cache
 
 import torch
 
+from imbalance_benchmark.datasets.feature_provenance import (
+    load_stored_feature_tensor,
+)
+
 __all__ = ["load_feature_row", "load_slide_features"]
 
 
 @lru_cache(maxsize=512)
 def load_slide_features(path: str) -> torch.Tensor:
-    """Load a feature tensor and normalize to (n_instances, dim)."""
-    tensor = torch.load(path, map_location="cpu", weights_only=False)
-    if isinstance(tensor, dict):
-        class_token, mean_token = tensor.get("cls"), tensor.get("mean_patch")
-        features = (
-            torch.cat([class_token, mean_token], dim=-1).float()
-            if class_token is not None and mean_token is not None
-            else next(
-                value for value in tensor.values() if torch.is_tensor(value)
-            ).float()
-        )
-    else:
-        features = tensor.float()
-    if features.ndim == 1:
-        return features.unsqueeze(0)
-    if features.ndim > 2:
-        return features.reshape(-1, features.shape[-1])
-    return features
+    """Load a feature tensor and normalize to float (n_instances, dim)."""
+    return load_stored_feature_tensor(path).float()
 
 
 def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:

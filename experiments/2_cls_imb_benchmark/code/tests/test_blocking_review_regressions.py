@@ -97,6 +97,61 @@ def test_secondary_bootstrap_includes_cluster_macro_endpoints() -> None:
         assert result[endpoint][0] == pytest.approx(observed[endpoint])
 
 
+def test_wsi_secondary_outputs_use_only_applicable_endpoint_names() -> None:
+    labels = np.array([0, 1])
+    predictions = np.array([[0, 1]])
+    probabilities = np.array([[[0.9, 0.1], [0.1, 0.9]]])
+    context = object.__new__(BootstrapContext)
+    context.case_ids = np.array(["c1", "c2"])
+    context.slide_ids = np.array(["s1", "s2"])
+    context.row_weights = np.ones((2, 2), dtype=np.int64)
+    context.n_replicates = 2
+    context._seed = 7
+    context._seed_indices = {}
+
+    tcga = context.secondary_distributions(
+        labels,
+        predictions,
+        probabilities,
+        ["LUAD", "LUSC"],
+        {},
+        is_mil=True,
+        ordinal=False,
+    )
+    panda = context.secondary_distributions(
+        labels,
+        predictions,
+        probabilities,
+        ["ISUP0", "ISUP1"],
+        {},
+        is_mil=True,
+        ordinal=True,
+    )
+
+    assert "patch_micro_accuracy" not in tcga
+    assert "quadratic_weighted_kappa" not in tcga
+    assert "ordinal_mean_absolute_error" not in tcga
+    assert "patch_micro_accuracy" not in panda
+    assert "quadratic_weighted_kappa" in panda
+    assert "ordinal_mean_absolute_error" in panda
+
+
+def test_wsi_run_endpoints_do_not_call_slide_accuracy_patch_accuracy() -> None:
+    identity = pd.DataFrame(
+        {"case_id": ["c1", "c2"], "slide_id": ["s1", "s2"]}
+    )
+
+    endpoints = clustered_endpoints(
+        np.array([0, 1]),
+        np.array([0, 1]),
+        np.array([[0.9, 0.1], [0.1, 0.9]]),
+        identity,
+        is_mil=True,
+    )
+
+    assert "patch_micro_accuracy" not in endpoints
+
+
 def test_calibration_summary_separates_observed_estimate_from_bootstrap() -> None:
     assert _distribution_summary([0.9, 0.1, 0.2], "ECE") == {
         "ECE": 0.9,

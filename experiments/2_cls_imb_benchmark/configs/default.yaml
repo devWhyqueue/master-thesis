@@ -23,6 +23,10 @@ dataset:
   feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
   feature_glob: "*.pt"
   feature_suffix_pattern: "_[0-9]+"
+  feature_provenance_manifest: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw/feature_provenance_manifest.json
+  expected_slide_count: 8736
+  expected_class_count: 32
+  expected_patch_count: 1608060
 
 feature_extraction:
   model_name: hf-hub:paige-ai/Virchow2

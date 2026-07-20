@@ -65,15 +65,18 @@ def clustered_endpoints(
     probabilities: np.ndarray,
     identity: pd.DataFrame,
     seed: int | None = None,
+    is_mil: bool = False,
 ) -> dict[str, float]:
-    """Compute patch-micro, slide/patient-macro, and clustered-ECE endpoints."""
+    """Compute regime-applicable accuracy, cluster-macro, and ECE endpoints."""
     del seed
     case_ids = identity["case_id"].astype(str).to_numpy()
     slide_ids = identity["slide_id"].astype(str).to_numpy()
     ece = expected_calibration_error(labels, probabilities)
     nll = _sample_nll(labels, probabilities)
     brier = _sample_brier(labels, probabilities)
-    endpoints = _cluster_discrimination(labels, predictions, case_ids, slide_ids)
+    endpoints = _cluster_discrimination(
+        labels, predictions, case_ids, slide_ids, is_mil
+    )
     return {
         **endpoints,
         # Probability-quality contributions aggregated within each slide/patient
@@ -91,12 +94,12 @@ def _cluster_discrimination(
     predictions: np.ndarray,
     case_ids: np.ndarray,
     slide_ids: np.ndarray,
+    is_mil: bool,
 ) -> dict[str, float]:
-    """Compute micro and cluster-macro discrimination endpoints."""
+    """Compute regime-applicable micro and cluster-macro discrimination."""
     slide_ba, slide_f1 = _macro_classification(labels, predictions, slide_ids)
     patient_ba, patient_f1 = _macro_classification(labels, predictions, case_ids)
-    return {
-        "patch_micro_accuracy": float(np.mean(predictions == labels)),
+    result = {
         "slide_macro_accuracy": _macro_accuracy(predictions, labels, slide_ids),
         "patient_macro_accuracy": _macro_accuracy(predictions, labels, case_ids),
         "slide_macro_balanced_accuracy": slide_ba,
@@ -104,3 +107,6 @@ def _cluster_discrimination(
         "slide_macro_f1": slide_f1,
         "patient_macro_f1": patient_f1,
     }
+    if not is_mil:
+        result["patch_micro_accuracy"] = float(np.mean(predictions == labels))
+    return result

@@ -138,6 +138,9 @@ class BootstrapContext:
         probabilities: np.ndarray,
         class_names: list[str],
         tiers: dict[str, str],
+        *,
+        is_mil: bool = False,
+        ordinal: bool = False,
     ) -> dict[str, np.ndarray]:
         """Return paired-seed distributions for every secondary endpoint."""
         per_seed = [
@@ -150,6 +153,8 @@ class BootstrapContext:
                 tiers,
                 self.slide_ids,
                 self.case_ids,
+                is_mil=is_mil,
+                ordinal=ordinal,
             )
             for index in range(predictions.shape[0])
         ]

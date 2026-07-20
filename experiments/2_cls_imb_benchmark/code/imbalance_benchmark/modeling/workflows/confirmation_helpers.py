@@ -119,6 +119,7 @@ def _split_payload(
     target_priors: np.ndarray,
     identity: Any,
     tiers: dict[str, str] | None = None,
+    is_mil: bool = False,
 ) -> dict[str, Any]:
     """Assemble one evaluated split's real classwise metrics and prediction arrays."""
     raw_l, priors = res["logits"], train_priors.detach().cpu().numpy()
@@ -145,7 +146,9 @@ def _split_payload(
         balanced_decision_logits=dec_l.tolist(),
         target_prior_logits=tar_l.tolist(),
         target_prior_probabilities=probs,
-        clustered_endpoints=clustered_endpoints(res["targets"], preds, probs, identity),
+        clustered_endpoints=clustered_endpoints(
+            res["targets"], preds, probs, identity, is_mil=is_mil
+        ),
     )
     return payload
 
@@ -186,6 +189,7 @@ def _run_and_record(
             target_priors,
             cast(Any, loader.dataset).df,
             tiers,
+            run.is_mil,
         )
     _attach_temperature_scaled_test_outputs(splits)
     b_size = resolve_batch_size(run.config, run.is_mil)

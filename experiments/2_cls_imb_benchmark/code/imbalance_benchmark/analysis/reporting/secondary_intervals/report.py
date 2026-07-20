@@ -45,6 +45,7 @@ def _locked_tiers(
 def _split_distributions(
     base_paths: dict[str, Path],
     is_mil: bool,
+    ordinal: bool,
     n_replicates: int,
     seed: int,
     assignment: str,
@@ -68,6 +69,8 @@ def _split_distributions(
             np.asarray(record["probs"]),
             class_names,
             tiers,
+            is_mil=is_mil,
+            ordinal=ordinal,
         )
         scaled = context.secondary_distributions(
             np.asarray(record["labels"]),
@@ -75,6 +78,8 @@ def _split_distributions(
             np.asarray(record["temperature_scaled_probs"]),
             class_names,
             tiers,
+            is_mil=is_mil,
+            ordinal=ordinal,
         )
         current.update(
             {
@@ -100,13 +105,16 @@ def secondary_interval_rows(
     base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
 ) -> list[dict[str, object]]:
     """Return equal-split secondary estimates with crossed patient-bootstrap CIs."""
-    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    dataset = config.get("dataset", {})
+    is_mil = dataset.get("regime", "patch") == "wsi"
+    ordinal = is_mil and dataset.get("name") == "panda"
     distributions = {}
     for key in sorted(_complete_result_keys(base_paths)):
         assignment, condition, method = key
         split_values = _split_distributions(
             base_paths,
             is_mil,
+            ordinal,
             n_replicates,
             seed,
             assignment,

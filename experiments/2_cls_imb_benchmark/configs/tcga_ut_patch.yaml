@@ -1,11 +1,11 @@
-# TCGA-UT WSI-level MIL cell.
+# TCGA-UT patch-classification cell.
 
 paths:
-  outputs: experiments/2_cls_imb_benchmark/outputs/tcga_ut/wsi
+  outputs: experiments/2_cls_imb_benchmark/outputs/tcga_ut/patch
 
 dataset:
   name: tcga_ut
-  regime: wsi
+  regime: patch
   target: cancer_type
   seed: 0
   version: tcga-ut-komura-2022
@@ -37,7 +37,7 @@ wsi_training:
 slurm:
   project_root: /home/yannik.qu/master-thesis
   code_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/wsi
+  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/patch
   partition: gpu-2h
   test_partition: gpu-test
   container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif

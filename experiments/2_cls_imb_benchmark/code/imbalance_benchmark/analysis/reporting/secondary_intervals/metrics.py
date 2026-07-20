@@ -126,12 +126,15 @@ def _cluster_metrics(
     weights: np.ndarray,
     slide_ids: np.ndarray,
     case_ids: np.ndarray,
+    is_mil: bool,
 ) -> dict[str, np.ndarray]:
     correct = (predictions == labels).astype(float)
     nll = -np.log(np.clip(probabilities[np.arange(len(labels)), labels], 1e-12, 1.0))
     one_hot = np.eye(probabilities.shape[1], dtype=np.float64)[labels]
     brier = np.sum((probabilities - one_hot) ** 2, axis=1)
-    result = {"patch_micro_accuracy": _weighted_mean(correct, weights)}
+    result = (
+        {} if is_mil else {"patch_micro_accuracy": _weighted_mean(correct, weights)}
+    )
     for name, groups in (("slide", slide_ids), ("patient", case_ids)):
         result.update(
             {
@@ -199,6 +202,9 @@ def secondary_seed_metrics(
     tiers: dict[str, str],
     slide_ids: np.ndarray,
     case_ids: np.ndarray,
+    *,
+    is_mil: bool = False,
+    ordinal: bool = False,
 ) -> dict[str, np.ndarray]:
     """Compute the full secondary endpoint set for one model seed."""
     metrics = _class_metrics(labels, predictions, probabilities, weights, class_names)
@@ -207,17 +213,18 @@ def secondary_seed_metrics(
         {
             "accuracy": _weighted_mean((predictions == labels).astype(float), weights),
             "expected_calibration_error": weighted_ece(labels, probabilities, weights),
-            "quadratic_weighted_kappa": _quadratic_weighted_kappa(
-                labels, predictions, weights, len(class_names)
-            ),
-            "ordinal_mean_absolute_error": _weighted_mean(
-                np.abs(labels - predictions).astype(float), weights
-            ),
         }
     )
+    if ordinal:
+        metrics["quadratic_weighted_kappa"] = _quadratic_weighted_kappa(
+            labels, predictions, weights, len(class_names)
+        )
+        metrics["ordinal_mean_absolute_error"] = _weighted_mean(
+            np.abs(labels - predictions).astype(float), weights
+        )
     metrics.update(
         _cluster_metrics(
-            labels, predictions, probabilities, weights, slide_ids, case_ids
+            labels, predictions, probabilities, weights, slide_ids, case_ids, is_mil
         )
     )
     return metrics

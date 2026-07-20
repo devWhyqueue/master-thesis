@@ -17,7 +17,6 @@ from imbalance_benchmark.datasets import (
     panda_audit,
     tcga_ut,
 )
-from imbalance_benchmark.datasets import features as feature_lib
 
 __all__ = ["DATASET_NAMES", "build_manifest"]
 
@@ -32,7 +31,7 @@ def build_manifest(config: dict[str, Any]) -> pd.DataFrame:
         "bracs": _build_bracs,
         "camelyon16": _build_camelyon16,
         "panda": _build_panda,
-        "tcga_ut": _build_tcga_ut,
+        "tcga_ut": tcga_ut.build_manifest,
     }
     if name not in builders:
         raise ValueError(f"Unknown dataset {name!r}; expected one of {DATASET_NAMES}")
@@ -199,42 +198,3 @@ def _panda_slide_rows(row: pd.Series, tiles: pd.DataFrame) -> pd.DataFrame:
             "exhaustive": bool(row["has_mask"]),
         }
     )
-
-
-def _build_tcga_ut(config: dict[str, Any]) -> pd.DataFrame:
-    """Build the TCGA-UT manifest from pre-extracted chunked feature tensors."""
-    dataset_cfg = config["dataset"]
-    raw_root = Path(dataset_cfg["raw_root"])
-    feature_dir = Path(dataset_cfg["feature_dir"])
-    feature_glob = str(dataset_cfg.get("feature_glob", "*.pt"))
-    suffix_pattern = str(dataset_cfg.get("feature_suffix_pattern", "_[0-9]+"))
-    labels, _ = tcga_ut.collect_slide_labels(raw_root)
-    chunk_manifest, slide_manifest, _ = tcga_ut.build_feature_manifest(
-        feature_dir, labels, feature_glob, suffix_pattern
-    )
-    patch_rows = [
-        row
-        for _, chunk_row in chunk_manifest.iterrows()
-        for row in _expand_chunk(chunk_row)
-    ]
-    frame = pd.DataFrame(patch_rows)
-    assignment = tcga_ut.split_cases(slide_manifest, int(dataset_cfg.get("seed", 0)))
-    tagged = frame.merge(assignment, on="case_id", how="inner")
-    tcga_ut.assert_case_disjoint(tagged)
-    return tagged
-
-
-def _expand_chunk(chunk_row: pd.Series) -> list[dict[str, Any]]:
-    """Expand one chunk tensor into one manifest row per patch it contains."""
-    n_rows = feature_lib.load_slide_features(str(chunk_row["feature_path"])).shape[0]
-    return [
-        {
-            "dataset": "tcga_ut",
-            "case_id": chunk_row["case_id"],
-            "slide_id": chunk_row["slide_id"],
-            "cancer_type": chunk_row["cancer_type"],
-            "feature_path": chunk_row["feature_path"],
-            "feature_index": index,
-        }
-        for index in range(n_rows)
-    ]

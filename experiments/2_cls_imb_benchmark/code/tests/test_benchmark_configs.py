@@ -13,9 +13,9 @@ EXPECTED_CELLS = {
     "bracs_wsi.yaml": ("bracs", "wsi", "wsi_subtype"),
     "camelyon16_patch.yaml": ("camelyon16", "patch", "tumor_presence"),
     "camelyon16_wsi.yaml": ("camelyon16", "wsi", "metastasis_presence"),
-    "default.yaml": ("tcga_ut", "patch", "cancer_type"),
     "panda_patch.yaml": ("panda", "patch", "cancer_presence"),
     "panda_wsi.yaml": ("panda", "wsi", "isup_grade"),
+    "tcga_ut_patch.yaml": ("tcga_ut", "patch", "cancer_type"),
     "tcga_ut_wsi.yaml": ("tcga_ut", "wsi", "cancer_type"),
 }
 
@@ -26,7 +26,9 @@ def _load_config(path: Path) -> dict:
 
 
 def test_configs_instantiate_every_report_dataset_regime() -> None:
-    config_paths = sorted(CONFIG_ROOT.glob("*.yaml"))
+    config_paths = sorted(
+        path for path in CONFIG_ROOT.glob("*.yaml") if path.name != "default.yaml"
+    )
 
     assert {path.name for path in config_paths} == set(EXPECTED_CELLS)
     observed = {
@@ -42,7 +44,11 @@ def test_configs_instantiate_every_report_dataset_regime() -> None:
 
 
 def test_configs_are_freeze_ready_and_output_isolated() -> None:
-    configs = [_load_config(path) for path in CONFIG_ROOT.glob("*.yaml")]
+    configs = [
+        _load_config(path)
+        for path in CONFIG_ROOT.glob("*.yaml")
+        if path.name != "default.yaml"
+    ]
 
     for config in configs:
         assert dataset_provenance(config["dataset"])
@@ -76,3 +82,24 @@ def test_panda_configs_use_the_completed_native_tiles_image() -> None:
                 "stages": ["prepare"],
             }
         ]
+
+
+def test_tcga_configs_lock_the_same_participant_cohort() -> None:
+    patch = _load_config(CONFIG_ROOT / "tcga_ut_patch.yaml")
+    wsi = _load_config(CONFIG_ROOT / "tcga_ut_wsi.yaml")
+
+    cohort_keys = {
+        "raw_root",
+        "feature_dir",
+        "feature_glob",
+        "feature_suffix_pattern",
+        "feature_provenance_manifest",
+        "expected_slide_count",
+        "expected_class_count",
+        "expected_patch_count",
+        "seed",
+        "eligibility_rules",
+    }
+    assert {key: patch["dataset"][key] for key in cohort_keys} == {
+        key: wsi["dataset"][key] for key in cohort_keys
+    }
