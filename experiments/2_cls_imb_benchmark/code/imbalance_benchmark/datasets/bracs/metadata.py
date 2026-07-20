@@ -38,6 +38,7 @@ _LABEL_ALIASES = {
     "IC": "IC",
     "INVASIVECARCINOMA": "IC",
 }
+_ROI_STEM = re.compile(rf"^(?P<slide_id>BRACS_\d+)_(?P<label>{'|'.join(LABELS)})_\d+$")
 
 
 def normalize_label(value: object) -> str | None:
@@ -58,7 +59,10 @@ def find_summary_file(root: Path) -> Path:
 def index_roi_images(root: Path) -> dict[str, Path]:
     """Index ROI images by filename stem."""
     roi_roots = [path for path in root.rglob("BRACS_RoI") if path.is_dir()]
-    search_roots = roi_roots or [root]
+    latest_roots = [path / "latest_version" for path in roi_roots]
+    search_roots = (
+        [path for path in latest_roots if path.is_dir()] or roi_roots or [root]
+    )
     index: dict[str, Path] = {}
     for search_root in search_roots:
         for path in search_root.rglob("*"):
@@ -83,9 +87,10 @@ def load_roi_metadata(root: Path, metadata_csv: Path | None = None) -> pd.DataFr
     if not frames:
         columns = {name: list(sheet.columns) for name, sheet in sheets.items()}
         raise ValueError(f"Could not identify a BRACS ROI metadata sheet: {columns}")
-    frame = (
-        max(frames, key=len).drop_duplicates(subset=["roi_id"]).reset_index(drop=True)
-    )
+    slides = max(frames, key=len).drop_duplicates(subset=["slide_id"])
+    frame = _roi_metadata(slides, index_roi_images(root))
+    if frame.empty:
+        raise ValueError("BRACS ROI filenames did not match workbook slides.")
     frame["dataset"] = "bracs"
     frame["lesion_type"] = frame["cancer_type"].map(lambda label: LESION_TYPES[label])
     return cast(pd.DataFrame, frame)
@@ -96,43 +101,41 @@ def _normalize_sheet(sheet: pd.DataFrame) -> pd.DataFrame:
     if raw.empty:
         return pd.DataFrame()
     columns = {_canonical(column): column for column in raw.columns}
-    roi_col = _first(columns, ("roi", "roi_id", "roi_filename", "roi_name", "image"))
     slide_col = _first(columns, ("wsi", "slide", "slide_id", "wsi_filename"))
     case_col = _first(columns, ("patient", "patient_id", "case", "case_id"))
-    label_col = _first(
-        columns,
-        ("subtype", "lesion_subtype", "label", "class", "diagnosis", "category"),
-    )
-    if roi_col is None or slide_col is None or case_col is None or label_col is None:
+    if slide_col is None or case_col is None:
         return pd.DataFrame()
     return pd.DataFrame(
         row
         for _, raw_row in raw.iterrows()
-        if (row := _metadata_row(raw_row, roi_col, slide_col, case_col, label_col))
+        if (row := _slide_metadata_row(raw_row, slide_col, case_col))
     )
 
 
-def _metadata_row(
-    row: pd.Series,
-    roi_col: object,
-    slide_col: object,
-    case_col: object,
-    label_col: object,
+def _slide_metadata_row(
+    row: pd.Series, slide_col: object, case_col: object
 ) -> dict[str, str] | None:
-    label = normalize_label(row[label_col])
-    roi_id, slide_id, case_id = (
-        _clean_id(row[roi_col]),
-        _clean_id(row[slide_col]),
-        _clean_id(row[case_col]),
-    )
-    if label is None or not roi_id or not slide_id or not case_id:
+    slide_id, case_id = _clean_id(row[slide_col]), _clean_id(row[case_col])
+    if not slide_id or not case_id:
         return None
-    return {
-        "case_id": case_id,
-        "slide_id": slide_id,
-        "roi_id": Path(roi_id).stem,
-        "cancer_type": label,
-    }
+    return {"case_id": case_id, "slide_id": slide_id}
+
+
+def _roi_metadata(slides: pd.DataFrame, image_index: dict[str, Path]) -> pd.DataFrame:
+    cases = dict(zip(slides["slide_id"], slides["case_id"], strict=True))
+    rows = []
+    for roi_id in sorted(image_index):
+        match = _ROI_STEM.fullmatch(roi_id)
+        if match and (case_id := cases.get(match["slide_id"])):
+            rows.append(
+                {
+                    "case_id": case_id,
+                    "slide_id": match["slide_id"],
+                    "roi_id": roi_id,
+                    "cancer_type": match["label"],
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 def _canonical(value: object) -> str:

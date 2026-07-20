@@ -1,16 +1,55 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 from PIL import Image
 
 from imbalance_benchmark.datasets.bracs import (
     assert_patient_disjoint,
     list_slide_tiles,
+    load_roi_metadata,
     load_wsi_metadata,
     normalize_label,
     split_cases,
     tile_rois,
 )
+
+
+def test_bracs_roi_metadata_joins_release_filenames_to_patients(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    (tmp_path / "BRACS.xlsx").touch()
+    roi_dir = tmp_path / "BRACS_RoI" / "latest_version" / "train" / "0_N"
+    roi_dir.mkdir(parents=True)
+    (roi_dir / "BRACS_1_N_2.png").touch()
+    monkeypatch.setattr(
+        pd,
+        "read_excel",
+        lambda *_args, **_kwargs: {
+            "WSI_Information": pd.DataFrame(
+                {
+                    "WSI Filename": ["BRACS_1"],
+                    "Patient Id": [85],
+                    "RoI ": [24],
+                    "WSI label": ["PB"],
+                }
+            )
+        },
+    )
+
+    metadata = load_roi_metadata(tmp_path)
+
+    assert metadata[
+        ["case_id", "slide_id", "roi_id", "cancer_type", "lesion_type"]
+    ].to_dict("records") == [
+        {
+            "case_id": "85",
+            "slide_id": "BRACS_1",
+            "roi_id": "BRACS_1_N_2",
+            "cancer_type": "N",
+            "lesion_type": "benign",
+        }
+    ]
 
 
 def test_bracs_label_normalization_maps_seven_subtypes() -> None:
