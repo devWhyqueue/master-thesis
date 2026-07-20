@@ -1,5 +1,3 @@
-"""Render and submit the dependency-linked Hydra benchmark workflow."""
-
 from __future__ import annotations
 
 import argparse
@@ -32,7 +30,6 @@ class SlurmJob:
 
 
 def _resources(config: dict[str, Any], stage: str, gpu: bool) -> dict[str, Any]:
-    """Return resource settings for a workflow stage with safe defaults."""
     sl = config.get("slurm", {})
     sr = sl.get("resources", {}).get(stage, {})
     part = sr.get("partition", sl.get("partition", "gpu-2h" if gpu else "cpu-2h"))
@@ -97,7 +94,6 @@ def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
 
 
 def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
-    """Build the benchmark command, mapping each array task to one condition."""
     cfg_arg = f" --config {shlex.quote(config_path)}" if config_path else ""
     prefix = f"python {shlex.quote(code_dir)}/__main__.py{cfg_arg}"
     command = f"{prefix} {job.command}"
@@ -134,7 +130,6 @@ def _array_size(job: SlurmJob) -> int:
 
 
 def _directives(job: SlurmJob, root: str) -> list[str]:
-    """Render scheduler directives, including array and dependency metadata."""
     q = shlex.quote(root)
     log_dir = f"{q}/experiments/2_cls_imb_benchmark/outputs/logs"
     lines = [
@@ -162,8 +157,8 @@ def _execution_lines(
     container: str,
     command: str,
     images: list[tuple[str, str]],
+    dataset_root: str,
 ) -> list[str]:
-    """Render the container and local fallback execution blocks."""
     r, c = shlex.quote(root), shlex.quote(code_dir)
     o, co = shlex.quote(output_dir), shlex.quote(container)
     cmd = shlex.quote(command)
@@ -178,6 +173,8 @@ def _execution_lines(
     lines.extend(_staging_lines(images))
     nv = "--nv " if job.gpus else ""
     binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw"'
+    if dataset_root:
+        binds += f' -B "{dataset_root}:{dataset_root}:ro"'
     app = f'apptainer exec {nv}{binds} "${{BINDS[@]}}" {co} bash -lc {cmd}'
     lines.extend(
         [
@@ -209,9 +206,11 @@ def render_sbatch(
     r, c, o, co = _cluster_paths(config)
     cmd = _command(job, config_path, c)
     lines = _directives(job, r)
-    lines.extend(
-        _execution_lines(job, r, c, o, co, cmd, _stage_images(config, job.name))
+    images = _stage_images(config, job.name)
+    data = (
+        str(config.get("dataset", {}).get("root", "")) if job.name == "prepare" else ""
     )
+    lines += _execution_lines(job, r, c, o, co, cmd, images, data)
     return "\n".join(lines)
 
 

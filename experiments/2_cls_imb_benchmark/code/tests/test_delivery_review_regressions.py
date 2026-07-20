@@ -16,6 +16,8 @@ from imbalance_benchmark.modeling.training import _fit_step
 
 def _bootstrap_context() -> BootstrapContext:
     context = object.__new__(BootstrapContext)
+    context.case_ids = np.array(["c1", "c1", "c2", "c2"])
+    context.slide_ids = np.array(["s1", "s1", "s2", "s2"])
     context.row_weights = np.ones((4, 3), dtype=np.int64)
     context.n_replicates = 3
     context._seed = 7
@@ -157,7 +159,7 @@ def test_sc_mil_logs_all_required_batch_diagnostics() -> None:
 
 def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
     from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
-    from imbalance_benchmark.datasets.panda import validate_tile_inventory
+    from imbalance_benchmark.datasets.panda_audit import validate_tile_inventory
 
     with pytest.raises(ValueError, match="audit"):
         validate_tile_manifest(
@@ -168,6 +170,7 @@ def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
         validate_tile_inventory(
             pd.DataFrame({"slide_id": ["s"]}),
             {"s": pd.DataFrame({"image_path": ["tile.jpg"]})},
+            pd.DataFrame({"slide_id": ["s"]}),
             expected_slides=1,
         )
 

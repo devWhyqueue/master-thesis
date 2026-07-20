@@ -128,5 +128,6 @@ def _ece_distributions(
 
 def _distribution_summary(values: list[float], name: str) -> dict[str, object]:
     array = np.asarray(values)
-    low, high = np.percentile(array, [2.5, 97.5])
-    return {name: float(np.mean(array)), f"{name} 95% CI": f"[{low:.3f}, {high:.3f}]"}
+    replicates = array[1:] if len(array) > 1 else array
+    low, high = np.percentile(replicates, [2.5, 97.5])
+    return {name: float(array[0]), f"{name} 95% CI": f"[{low:.3f}, {high:.3f}]"}

@@ -10,10 +10,12 @@ from imbalance_benchmark.hydra.workflow import (
 
 SQUASHFS_SOURCE = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
 SQUASHFS_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
+PANDA_RAW = "/home/space/datasets/panda/raw"
 
 
 def _config() -> dict[str, object]:
     return {
+        "dataset": {"root": PANDA_RAW},
         "slurm": {
             "project_root": "/home/example/master-thesis",
             "code_dir": "/home/example/master-thesis/experiments/2_cls_imb_benchmark/code",
@@ -89,8 +91,10 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         f'BINDS+=("$STAGE_DIR/0.sqfs:{SQUASHFS_MOUNT}:image-src=/")'
         in scripts["prepare"]
     )
+    assert f'-B "{PANDA_RAW}:{PANDA_RAW}:ro"' in scripts["prepare"]
     for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
         assert SQUASHFS_SOURCE not in scripts[stage]
+        assert PANDA_RAW not in scripts[stage]
 
 
 def test_smoke_workflow_uses_test_partition() -> None:

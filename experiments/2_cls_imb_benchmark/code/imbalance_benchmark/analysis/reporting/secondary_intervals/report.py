@@ -24,9 +24,9 @@ __all__ = ["secondary_interval_rows", "write_interval_tables"]
 
 
 def _locked_tiers(
-    base_paths: dict[str, Path], assignment: str, condition: str, class_names: list[str]
+    paths: dict[str, Path], assignment: str, condition: str, class_names: list[str]
 ) -> dict[str, str]:
-    freeze_path = split_paths(base_paths, 0)["data"] / "manifest_freeze.json"
+    freeze_path = paths["data"] / "manifest_freeze.json"
     if not freeze_path.exists():
         return {}
     freeze = json.loads(freeze_path.read_text(encoding="utf-8"))
@@ -60,7 +60,7 @@ def _split_distributions(
                 f"Missing secondary endpoints for {assignment}/{condition}/{method}"
             )
         class_names = list(record["class_names"])
-        tiers = _locked_tiers(base_paths, assignment, condition, class_names)
+        tiers = _locked_tiers(paths, assignment, condition, class_names)
         context = BootstrapContext(paths, is_mil, n_replicates, seed)
         current = context.secondary_distributions(
             np.asarray(record["labels"]),
@@ -88,6 +88,8 @@ def _split_distributions(
                     "expected_calibration_error",
                 }
                 or name.startswith(("nll:", "brier:", "tier_nll:", "tier_brier:"))
+                or name.endswith(("_macro_nll", "_macro_brier"))
+                or name in {"patch_micro_nll", "patch_micro_brier"}
             }
         )
         distributions.append(current)

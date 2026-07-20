@@ -193,12 +193,7 @@ def _allocation_is_feasible(
 def effective_rho(
     available: list[int], rho: float, min_support: int, total_t: int | None = None
 ) -> float:
-    """Lower a requested ratio to the largest allocation-feasible value.
-
-    Feasibility is evaluated using the complete exponential allocation, every
-    class-specific availability cap, and the requested shared total.  This
-    avoids the invalid head-only shortcut that can reject attainable designs.
-    """
+    """Lower a requested ratio to the largest allocation-feasible value."""
     if not available or min_support < 1:
         raise ValueError("Support and floor must be positive")
     if total_t is None:
@@ -214,32 +209,41 @@ def effective_rho(
 def _largest_feasible_rho(
     available: list[int], total_t: int, rho: float, min_support: int
 ) -> float:
-    """Return the largest realizable severity in ``[1, rho]`` at a frozen total.
-
-    With class-specific availability caps the feasible set of ratios need not be
-    an interval: raising ``rho`` can make an intermediate class exceed its cap
-    and later become feasible again. A binary search assumes a single feasible
-    interval and can therefore return a ratio far below the true maximum. This
-    scans a dense grid for the highest feasible ratio and then refines its upper
-    boundary, which is correct even when feasibility is disconnected.
-    """
+    """Return the largest realizable severity in ``[1, rho]`` at a frozen total."""
     if not _allocation_is_feasible(available, total_t, 1.0, min_support):
-        raise ValueError(
-            "No shared total satisfies all availability and support constraints"
-        )
-    grid = np.linspace(1.0, rho, 2048)
-    feasible = [
-        value
-        for value in grid
-        if _allocation_is_feasible(available, total_t, float(value), min_support)
-    ]
-    best = float(max(feasible))
-    step = float(grid[1] - grid[0]) if len(grid) > 1 else 0.0
-    low, high = best, min(best + step, rho)
-    for _ in range(48):
-        mid = (low + high) / 2.0
-        if _allocation_is_feasible(available, total_t, mid, min_support):
-            low = mid
-        else:
-            high = mid
-    return low
+        raise ValueError("No total satisfies all availability and support constraints")
+    boundaries = _feasibility_boundaries(available, total_t, rho, min_support)
+    best = 1.0
+    for low, high in zip(boundaries, boundaries[1:]):
+        if _allocation_is_feasible(available, total_t, high, min_support):
+            best = max(best, high)
+            continue
+        midpoint = (low + high) / 2.0
+        if not _allocation_is_feasible(available, total_t, midpoint, min_support):
+            continue
+        for _ in range(64):
+            candidate = (midpoint + high) / 2.0
+            if _allocation_is_feasible(available, total_t, candidate, min_support):
+                midpoint = candidate
+            else:
+                high = candidate
+        best = max(best, midpoint)
+    return best
+
+
+def _feasibility_boundaries(
+    available: list[int], total_t: int, rho: float, min_support: int
+) -> list[float]:
+    class_count = len(available)
+    boundaries = [1.0, rho]
+    for index, capacity in enumerate(available):
+        for threshold in (min_support - 0.5, capacity + 1.0):
+            coefficients = np.full(class_count, threshold, dtype=float)
+            coefficients[index] -= total_t
+            for root in np.polynomial.polynomial.polyroots(coefficients):
+                if abs(root.imag) > 1e-7 or root.real <= 0:
+                    continue
+                candidate = float(root.real ** (-(class_count - 1)))
+                if 1.0 < candidate < rho:
+                    boundaries.append(candidate)
+    return sorted(set(boundaries))

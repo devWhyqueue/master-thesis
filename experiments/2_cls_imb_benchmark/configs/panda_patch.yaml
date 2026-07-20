@@ -9,6 +9,7 @@ dataset:
   target: cancer_presence
   seed: 0
   version: panda-kaggle-2020
+  root: /home/space/datasets/panda/raw
   eligibility_rules:
     source: official_train_csv_slides_with_nonempty_tissue_tile_manifest
     tiled_evidence: panda_native_tiles_20x_256_full_cohort

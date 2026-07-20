@@ -14,6 +14,7 @@ from imbalance_benchmark.datasets import (
     bracs,
     camelyon16,
     panda,
+    panda_audit,
     tcga_ut,
 )
 from imbalance_benchmark.datasets import features as feature_lib
@@ -147,14 +148,17 @@ def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
     """Build PANDA rows from a validated full-cohort level-0 tile inventory."""
     dataset_cfg = config["dataset"]
     regime = dataset_cfg.get("regime", "patch")
+    official = panda.load_slide_frame(Path(dataset_cfg["root"]))
     selection = pd.read_csv(dataset_cfg["selection_path"])
+    expected_slides = int(dataset_cfg.get("expected_slide_count", 10_616))
+    panda_audit.validate_selection(
+        selection,
+        official,
+        expected_slides,
+    )
     tiles_dir = Path(dataset_cfg["tiles_dir"])
     tiles = panda.load_tile_inventory(selection, tiles_dir)
-    panda.validate_tile_inventory(
-        selection,
-        tiles,
-        int(dataset_cfg.get("expected_slide_count", 10_616)),
-    )
+    panda_audit.validate_tile_inventory(selection, tiles, official, expected_slides)
     parts = [
         _panda_slide_rows(row, tiles[str(row["slide_id"])])
         for _, row in selection.iterrows()

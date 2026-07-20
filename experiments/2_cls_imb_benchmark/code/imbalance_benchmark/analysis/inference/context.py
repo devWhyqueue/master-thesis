@@ -60,7 +60,8 @@ class BootstrapContext:
         unique_cases, patient_weights = resample_patient_weights(
             strata, n_replicates, rng
         )
-        self.case_ids = identity["case_id"].to_numpy()
+        self.case_ids = identity["case_id"].astype(str).to_numpy()
+        self.slide_ids = identity["slide_id"].astype(str).to_numpy()
         resampled = expand_to_rows(unique_cases, patient_weights, self.case_ids)
         # Replicate 0 is the observed cohort (all unit weights one): every metric
         # distribution therefore carries the observed-data point estimate at
@@ -147,6 +148,8 @@ class BootstrapContext:
                 self.row_weights,
                 class_names,
                 tiers,
+                self.slide_ids,
+                self.case_ids,
             )
             for index in range(predictions.shape[0])
         ]

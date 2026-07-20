@@ -81,6 +81,10 @@ def build_manifest(
         tile_root,
         expected_slides,
     )
+    official_ids = set(wsi_frame["slide_id"].astype(str))
+    tile_ids = set(tile_manifest["slide_id"].astype(str))
+    if official_ids != tile_ids:
+        raise ValueError("BRACS official and tile-manifest slide IDs differ")
     parts = _tile_manifest_parts(wsi_frame, tile_manifest)
     populated = [part for part in parts if not part.empty]
     if not populated:
