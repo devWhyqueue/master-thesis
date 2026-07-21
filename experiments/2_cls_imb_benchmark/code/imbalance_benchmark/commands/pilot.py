@@ -75,6 +75,7 @@ def _run_all_pilot_seeds(
     paths: dict[str, Any],
 ) -> tuple[
     list[int],
+    list[int],
     dict[int, int | None],
     dict[int, list[float]],
     dict[int, list[list[float]]],
@@ -98,10 +99,12 @@ def _run_all_pilot_seeds(
     scratch_dir.mkdir(parents=True, exist_ok=True)
     n_cls = len(classes)
     pilot_seeds = [derive_seed(base_seed, f"pilot_construction_{i}") for i in range(3)]
-    # One frozen patch quota is shared by every ordering; MIL has no quota.
-    quota = (
-        None if is_mil else frozen_pilot_quota(train_df, classes, levels, pilot_seeds)
-    )
+    # One frozen patch quota is shared by every ordering; MIL has no quota. A
+    # level the cap can't satisfy at any quota is dropped, not reused from a
+    # larger level's looser cap.
+    quota = None
+    if not is_mil:
+        quota, levels = frozen_pilot_quota(train_df, classes, levels, pilot_seeds)
     quotas, ba_by_seed, recall_by_seed = {}, {}, {}
     for seed in pilot_seeds:
         _, ba_curve, recall_curve = run_pilot_seed(
@@ -124,7 +127,7 @@ def _run_all_pilot_seeds(
             ba_curve,
             recall_curve,
         )
-    return pilot_seeds, quotas, ba_by_seed, recall_by_seed
+    return levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed
 
 
 def _pilot_report_payload(
@@ -183,7 +186,7 @@ def cmd_pilot(args: argparse.Namespace) -> None:
     paths = split_paths(ensure_dirs(config), args.split_index)
     verify_prepared_feature_provenance(config, paths["data"])
     train_df, classes, is_mil, eq_slide, levels, support = _pilot_setup(paths, config)
-    pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
+    levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
         train_df, classes, levels, is_mil, args.seed, config, paths
     )
     payload = _pilot_report_payload(

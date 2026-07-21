@@ -15,11 +15,18 @@ from imbalance_benchmark.datasets.data import (
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.manifest.pilot_training import (
+    compute_pilot_quota,
     fit_pilot_model,
+    frozen_pilot_quota,
     meets_method_floor,
     method_floor,
+    patch_pilot_caps_hold,
     stability_floor_from_curve,
 )
+from imbalance_benchmark.manifest.pilot_training import (
+    _apportion_quota as apportion_quota,
+)
+from imbalance_benchmark.manifest.pilot_training import _patient_order as patient_order
 
 ValDataset = ImbalanceDataset | BagFeatureDataset
 
@@ -38,7 +45,6 @@ __all__ = [
 ]
 
 PILOT_CANDIDATE_LEVELS = (5, 10, 15, 20, 30)
-PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL = 5
 
 
 def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
@@ -50,78 +56,6 @@ def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
     return levels + [cap]
 
 
-def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
-    patients = cast(np.ndarray, df_class["case_id"].unique())
-    return list(np.random.default_rng(seed).permutation(patients))
-
-
-def compute_pilot_quota(
-    df: pd.DataFrame, classes: list[str], level: int, seed: int
-) -> int:
-    """Largest per-patient patch quota feasible for every class at one pilot level."""
-    quotas = []
-    for cls in classes:
-        c_df = cast(pd.DataFrame, df[df["cancer_type"] == cls])
-        pats = _patient_order(c_df, seed)[:level]
-        counts = c_df[c_df["case_id"].isin(pats)].groupby("case_id").size()
-        if len(counts) != level:
-            raise ValueError("Pilot ordering failed.")
-        for q in range(int(counts.min()), 0, -1):
-            sel = _apportion_quota(c_df, pats, q, seed)
-            if _patch_pilot_caps_hold(sel, level):
-                quotas.append(q)
-                break
-        else:
-            raise ValueError("Pilot inventory cannot satisfy patient and slide caps")
-    return max(1, min(quotas))
-
-
-def _patch_pilot_caps_hold(selection: pd.DataFrame, level: int) -> bool:
-    """Apply contribution caps except at the recorded five-patient pilot exception."""
-    if level == PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL:
-        return True
-    total = len(selection)
-    patient_share = selection["case_id"].value_counts().max() / total
-    slide_share = selection["slide_id"].value_counts().max() / total
-    return patient_share <= 0.10 and slide_share <= 0.05
-
-
-def frozen_pilot_quota(
-    df: pd.DataFrame, classes: list[str], levels: list[int], seeds: list[int]
-) -> int:
-    """Quota feasible at every level and seed (the cap tightens as level shrinks)."""
-    return min(
-        compute_pilot_quota(df, classes, level, seed)
-        for level in levels
-        for seed in seeds
-    )
-
-
-def _apportion_quota(
-    df: pd.DataFrame, patients: list[str], quota: int, seed: int
-) -> pd.DataFrame:
-    rng = np.random.default_rng(seed)
-    rows = []
-    for pat in patients:
-        p_df = cast(pd.DataFrame, df[df["case_id"] == pat])
-        slides = list(p_df["slide_id"].unique())
-        rng.shuffle(slides)
-        pools = {
-            s: list(
-                rng.permutation(cast(pd.DataFrame, p_df[p_df["slide_id"] == s]).index)
-            )
-            for s in slides
-        }
-        taken, s_idx = 0, 0
-        while taken < quota and any(pools.values()):
-            s = slides[s_idx % len(slides)]
-            if pools[s]:
-                rows.append(pools[s].pop(0))
-                taken += 1
-            s_idx += 1
-    return df.loc[rows]
-
-
 def build_patch_pilot_manifest(
     df: pd.DataFrame, classes: list[str], level: int, quota: int, seed: int
 ) -> pd.DataFrame:
@@ -129,12 +63,12 @@ def build_patch_pilot_manifest(
     parts = []
     for cls in classes:
         df_class = cast(pd.DataFrame, df[df["cancer_type"] == cls])
-        pat = _patient_order(df_class, seed)[:level]
-        sel = _apportion_quota(df_class, pat, quota, seed)
+        pat = patient_order(df_class, seed)[:level]
+        sel = apportion_quota(df_class, pat, quota, seed)
         v = sel["case_id"].value_counts()
         if len(v) != level or not (v == quota).all():
             raise ValueError("Pilot quota is not feasible for every selected patient")
-        if not _patch_pilot_caps_hold(sel, level):
+        if not patch_pilot_caps_hold(sel, level):
             raise ValueError(
                 "Pilot manifest violates the patient or slide contribution cap"
             )

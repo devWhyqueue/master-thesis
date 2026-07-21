@@ -1,14 +1,98 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.modeling.models import AttentionMil, MLP
 from imbalance_benchmark.modeling.training import fit_model
+
+PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL = 5
+
+
+def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
+    patients = cast(np.ndarray, df_class["case_id"].unique())
+    return list(np.random.default_rng(seed).permutation(patients))
+
+
+def _apportion_quota(
+    df: pd.DataFrame, patients: list[str], quota: int, seed: int
+) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    rows = []
+    for pat in patients:
+        p_df = cast(pd.DataFrame, df[df["case_id"] == pat])
+        slides = list(p_df["slide_id"].unique())
+        rng.shuffle(slides)
+        pools = {
+            s: list(
+                rng.permutation(cast(pd.DataFrame, p_df[p_df["slide_id"] == s]).index)
+            )
+            for s in slides
+        }
+        taken, s_idx = 0, 0
+        while taken < quota and any(pools.values()):
+            s = slides[s_idx % len(slides)]
+            if pools[s]:
+                rows.append(pools[s].pop(0))
+                taken += 1
+            s_idx += 1
+    return df.loc[rows]
+
+
+def patch_pilot_caps_hold(selection: pd.DataFrame, level: int) -> bool:
+    """Apply contribution caps except at the recorded five-patient pilot exception."""
+    if level == PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL:
+        return True
+    total = len(selection)
+    patient_share = selection["case_id"].value_counts().max() / total
+    slide_share = selection["slide_id"].value_counts().max() / total
+    return patient_share <= 0.10 and slide_share <= 0.05
+
+
+def compute_pilot_quota(
+    df: pd.DataFrame, classes: list[str], level: int, seed: int
+) -> int:
+    """Largest per-patient patch quota feasible for every class at one pilot level."""
+    quotas = []
+    for cls in classes:
+        c_df = cast(pd.DataFrame, df[df["cancer_type"] == cls])
+        pats = _patient_order(c_df, seed)[:level]
+        counts = c_df[c_df["case_id"].isin(pats)].groupby("case_id").size()
+        if len(counts) != level:
+            raise ValueError("Pilot ordering failed.")
+        for q in range(int(counts.min()), 0, -1):
+            sel = _apportion_quota(c_df, pats, q, seed)
+            if patch_pilot_caps_hold(sel, level):
+                quotas.append(q)
+                break
+        else:
+            raise ValueError("Pilot inventory cannot satisfy patient and slide caps")
+    return max(1, min(quotas))
+
+
+def frozen_pilot_quota(
+    df: pd.DataFrame, classes: list[str], levels: list[int], seeds: list[int]
+) -> tuple[int, list[int]]:
+    """Quota and levels feasible at every seed.
+
+    The cap tightens as the level shrinks, so a level where no quota
+    satisfies every seed is dropped rather than reused from a larger one.
+    """
+    feasible, quotas = [], []
+    for level in levels:
+        try:
+            level_quotas = [compute_pilot_quota(df, classes, level, s) for s in seeds]
+        except ValueError:
+            continue
+        feasible.append(level)
+        quotas.extend(level_quotas)
+    return min(quotas), feasible
 
 
 def method_floor(patient_equals_slide: bool) -> dict[str, int]:
