@@ -241,29 +241,41 @@ def test_derive_seed_keeps_families_disjoint_and_deterministic():
 
 def test_pilot_levels_for_caps_at_scarcest_class():
     levels = pilot_levels_for({"class_A": 40, "class_B": 8})
-    assert levels == [5, 8]
+    assert levels == [8]
 
 
 def test_pilot_levels_for_uses_standard_candidates_when_plentiful():
     levels = pilot_levels_for({"class_A": 100, "class_B": 100})
-    assert levels == [5, 10, 15, 20, 30]
+    assert levels == [10, 15, 20, 30, 50]
 
 
-def test_mil_pilot_level_five_uses_one_slide_per_patient():
-    """The report's first MIL pilot level needs an explicit small-count cap exception."""
+def test_mil_pilot_smallest_level_satisfies_the_patient_cap_without_exception():
+    """No hardcoded small-count exception: level 10 already satisfies the 10% cap."""
     rows = [
         {"case_id": f"PAT_{index}", "slide_id": f"SLIDE_{index}", "cancer_type": "A"}
         for index in range(10)
     ]
 
-    manifest = mil_pilot_manifest(pd.DataFrame(rows), ["A"], level=5, seed=1)
+    manifest = mil_pilot_manifest(pd.DataFrame(rows), ["A"], level=10, seed=1)
 
-    assert len(manifest) == 5
-    assert manifest["case_id"].nunique() == 5
+    assert len(manifest) == 10
+    assert manifest["case_id"].nunique() == 10
 
 
-def test_patch_pilot_level_five_records_the_unavoidable_patient_cap_exception():
-    """Five equal patient quotas imply 20% patient support while retaining slide caps."""
+def test_mil_pilot_level_five_raises_without_the_removed_exception():
+    """Five slides from five distinct patients unavoidably breach the 10% cap."""
+    rows = [
+        {"case_id": f"PAT_{index}", "slide_id": f"SLIDE_{index}", "cancer_type": "A"}
+        for index in range(10)
+    ]
+
+    with pytest.raises(ValueError, match="patient cap"):
+        mil_pilot_manifest(pd.DataFrame(rows), ["A"], level=5, seed=1)
+
+
+def test_patch_pilot_level_five_raises_without_the_removed_exception():
+    """Five equal patient quotas unavoidably imply 20% patient support; with the
+    small-count exception removed, this now raises instead of being carved out."""
     rows = [
         {
             "case_id": f"PAT_{patient}",
@@ -277,13 +289,8 @@ def test_patch_pilot_level_five_records_the_unavoidable_patient_cap_exception():
     ]
     frame = pd.DataFrame(rows)
 
-    quota = compute_pilot_quota(frame, ["class_A"], level=5, seed=0)
-    manifest = build_patch_pilot_manifest(frame, ["class_A"], 5, quota, seed=0)
-
-    assert manifest["case_id"].value_counts().max() / len(manifest) == pytest.approx(
-        0.2
-    )
-    assert manifest["slide_id"].value_counts().max() / len(manifest) <= 0.05
+    with pytest.raises(ValueError, match="cannot satisfy"):
+        compute_pilot_quota(frame, ["class_A"], level=5, seed=0)
 
 
 def test_compute_pilot_quota_is_feasible_for_every_class():
@@ -305,8 +312,8 @@ def test_compute_pilot_quota_is_feasible_for_every_class():
 
 def test_build_patch_pilot_manifest_respects_quota_per_patient():
     df = _patch_frame(n_patients=10, slides_per_patient=2, patches_per_slide=10)
-    manifest = build_patch_pilot_manifest(df, ["class_A"], level=5, quota=4, seed=2)
-    assert manifest["case_id"].nunique() == 5
+    manifest = build_patch_pilot_manifest(df, ["class_A"], level=10, quota=4, seed=2)
+    assert manifest["case_id"].nunique() == 10
     assert (manifest["case_id"].value_counts() == 4).all()
 
 

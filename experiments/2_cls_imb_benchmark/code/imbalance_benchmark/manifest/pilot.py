@@ -44,7 +44,7 @@ __all__ = [
     "stability_floor_from_curve",
 ]
 
-PILOT_CANDIDATE_LEVELS = (5, 10, 15, 20, 30)
+PILOT_CANDIDATE_LEVELS = (10, 15, 20, 30, 50)
 
 
 def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
@@ -68,7 +68,7 @@ def build_patch_pilot_manifest(
         v = sel["case_id"].value_counts()
         if len(v) != level or not (v == quota).all():
             raise ValueError("Pilot quota is not feasible for every selected patient")
-        if not patch_pilot_caps_hold(sel, level):
+        if not patch_pilot_caps_hold(sel):
             raise ValueError(
                 "Pilot manifest violates the patient or slide contribution cap"
             )
@@ -82,10 +82,7 @@ def mil_pilot_manifest(
     """Build one nested MIL pilot manifest of `level` slides per class."""
     parts = [
         select_slides_round_robin(
-            cast(pd.DataFrame, df[df["cancer_type"] == c]),
-            level,
-            seed,
-            allow_small_count_cap_exception=True,
+            cast(pd.DataFrame, df[df["cancer_type"] == c]), level, seed
         )
         for c in classes
     ]

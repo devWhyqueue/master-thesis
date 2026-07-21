@@ -131,6 +131,7 @@ def _run_all_pilot_seeds(
 
 
 def _pilot_report_payload(
+    requested_levels: list[int],
     levels: list[int],
     is_mil: bool,
     eq_slide: bool,
@@ -152,7 +153,9 @@ def _pilot_report_payload(
     definitive_floor = max(stability_floor, floor[level_unit])
     floor_met = all(meets_method_floor(values, eq_slide) for values in support.values())
     return {
+        "requested_levels": requested_levels,
         "levels": levels,
+        "dropped_levels": [lvl for lvl in requested_levels if lvl not in levels],
         "pilot_construction_seeds": pilot_seeds,
         "quotas": {str(s): q for s, q in quotas.items()},
         "balanced_accuracy_by_seed": {str(s): v for s, v in ba_by_seed.items()},
@@ -162,16 +165,6 @@ def _pilot_report_payload(
         "definitive_floor": definitive_floor,
         "patient_equals_slide": eq_slide,
         "available_independent_support": support,
-        "pilot_exceptions": (
-            ["five-slide MIL pilot uses one slide from each of five distinct patients"]
-            if is_mil and 5 in levels
-            else [
-                "five-patient patch pilot uses equal patient quotas and records "
-                "the level-specific contribution-cap exception"
-            ]
-            if 5 in levels
-            else []
-        ),
         "excluded": levels[-1] < definitive_floor or not floor_met,
     }
 
@@ -182,14 +175,21 @@ def cmd_pilot(args: argparse.Namespace) -> None:
         for index in range(3):
             cmd_pilot(argparse.Namespace(**{**vars(args), "split_index": index}))
         return
+    _cmd_pilot_one_split(args)
+
+
+def _cmd_pilot_one_split(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
     verify_prepared_feature_provenance(config, paths["data"])
-    train_df, classes, is_mil, eq_slide, levels, support = _pilot_setup(paths, config)
+    train_df, classes, is_mil, eq_slide, requested_levels, support = _pilot_setup(
+        paths, config
+    )
     levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
-        train_df, classes, levels, is_mil, args.seed, config, paths
+        train_df, classes, requested_levels, is_mil, args.seed, config, paths
     )
     payload = _pilot_report_payload(
+        requested_levels,
         levels,
         is_mil,
         eq_slide,

@@ -294,25 +294,20 @@ def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> 
     support = {"A": {"patients": 12, "slides": 25}, "B": {"patients": 12, "slides": 25}}
 
     patch = _pilot_report_payload(
-        levels, False, False, [0, 1, 2], {}, flat_ba, flat_recall, support
+        levels, levels, False, False, [0, 1, 2], {}, flat_ba, flat_recall, support
     )
     mil = _pilot_report_payload(
-        levels, True, False, [0, 1, 2], {}, flat_ba, flat_recall, support
+        levels, levels, True, False, [0, 1, 2], {}, flat_ba, flat_recall, support
     )
 
     # Patch pilot counts patients -> patient floor 10, not the 20-slide floor.
     assert patch["stability_floor"] == 5
     assert patch["definitive_floor"] == 10
     assert patch["excluded"] is False
-    assert patch["pilot_exceptions"] == [
-        "five-patient patch pilot uses equal patient quotas and records "
-        "the level-specific contribution-cap exception"
-    ]
+    assert patch["dropped_levels"] == []
     # MIL pilot counts slides -> slide floor 20 applies to the level dimension.
     assert mil["definitive_floor"] == 20
-    assert mil["pilot_exceptions"] == [
-        "five-slide MIL pilot uses one slide from each of five distinct patients"
-    ]
+    assert mil["dropped_levels"] == []
 
 
 def test_patch_pilot_patient_floor_is_preserved_as_an_independent_constraint(

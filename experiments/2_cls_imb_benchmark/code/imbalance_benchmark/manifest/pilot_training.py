@@ -12,8 +12,6 @@ from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDatase
 from imbalance_benchmark.modeling.models import AttentionMil, MLP
 from imbalance_benchmark.modeling.training import fit_model
 
-PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL = 5
-
 
 def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
     patients = cast(np.ndarray, df_class["case_id"].unique())
@@ -45,10 +43,8 @@ def _apportion_quota(
     return df.loc[rows]
 
 
-def patch_pilot_caps_hold(selection: pd.DataFrame, level: int) -> bool:
-    """Apply contribution caps except at the recorded five-patient pilot exception."""
-    if level == PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL:
-        return True
+def patch_pilot_caps_hold(selection: pd.DataFrame) -> bool:
+    """Apply the patient and slide contribution caps uniformly at every level."""
     total = len(selection)
     patient_share = selection["case_id"].value_counts().max() / total
     slide_share = selection["slide_id"].value_counts().max() / total
@@ -68,7 +64,7 @@ def compute_pilot_quota(
             raise ValueError("Pilot ordering failed.")
         for q in range(int(counts.min()), 0, -1):
             sel = _apportion_quota(c_df, pats, q, seed)
-            if patch_pilot_caps_hold(sel, level):
+            if patch_pilot_caps_hold(sel):
                 quotas.append(q)
                 break
         else:

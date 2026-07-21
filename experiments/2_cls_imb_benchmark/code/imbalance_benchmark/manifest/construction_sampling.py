@@ -225,22 +225,15 @@ def _build_slide_hierarchy(
 
 
 def select_slides_round_robin(
-    df_class: pd.DataFrame,
-    n_slides: int,
-    seed: int,
-    allow_small_count_cap_exception: bool = False,
+    df_class: pd.DataFrame, n_slides: int, seed: int
 ) -> pd.DataFrame:
-    """Sample MIL slides under the patient cap, with an explicit sub-10 pilot exception."""
+    """Sample MIL slides under the 10% patient contribution cap."""
     if df_class.empty or n_slides <= 0:
         return pd.DataFrame()
     rng = np.random.default_rng(seed)
     df_slides = df_class.drop_duplicates("slide_id")
     patients, h = _build_slide_hierarchy(df_slides, rng)
-    patient_cap = (
-        1
-        if allow_small_count_cap_exception and n_slides < 10
-        else _contribution_cap(n_slides, 0.10, "patient")
-    )
+    patient_cap = _contribution_cap(n_slides, 0.10, "patient")
     selected = _loop_slides(patients, h, patient_cap, n_slides)
     if len(selected) < n_slides:
         raise ValueError("Slide allocation is infeasible under the 10% patient cap")
