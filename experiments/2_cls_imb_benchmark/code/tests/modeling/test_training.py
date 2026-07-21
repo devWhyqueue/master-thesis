@@ -224,6 +224,16 @@ def test_large_patch_evaluation_batches_preserve_metrics(tmp_path: Path) -> None
     for name, value in optimized_checkpoint["state"].items():
         torch.testing.assert_close(value, reference_checkpoint["state"][name])
 
+
+def test_oko_reports_checkpoint_progress(tmp_path: Path, caplog) -> None:
+    ctx = _patch_ctx("oko", tmp_path, param=1)
+    ctx["update_budget"] = 1
+
+    with caplog.at_level("INFO"):
+        fit_method(ctx)
+
+    assert "tune: oko seed=0 step 1/1" in caplog.text
+
 @pytest.mark.parametrize(
     ("method", "param"),
     [

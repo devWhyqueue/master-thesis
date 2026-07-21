@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -14,8 +15,6 @@ from imbalance_benchmark.modeling.training import (
     build_optimizer,
     resolve_batch_size,
 )
-
-__all__ = ["build_class_index", "sample_oko_sets", "oko_set_loss", "fit_oko"]
 
 
 def build_class_index(labels: np.ndarray) -> dict[int, list[int]]:
@@ -226,6 +225,7 @@ def _oko_train_loop(
             best = checkpoint_step(
                 model, ctx["val_loader"], device, False, n_classes, best, step
             )
+            logging.info("tune: oko seed=%s step %d/%d", ctx.get("seed"), step, budget)
     return best
 
 
