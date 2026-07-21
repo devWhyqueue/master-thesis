@@ -187,6 +187,13 @@ def _run_training_loop(
                 best = checkpoint_step(
                     ctx["model"], val_loader, device, is_mil, n_classes, best, step
                 )
+                logger.info(
+                    "tune: %s seed=%s step %d/%d",
+                    ctx["method"],
+                    ctx.get("seed"),
+                    step,
+                    max_steps,
+                )
     return best
 
 
