@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any, cast
 
-import pandas as pd
 import timm
 import torch
 from PIL import Image
@@ -14,6 +12,7 @@ from timm.data.transforms_factory import create_transform
 from timm.layers.mlp import SwiGLUPacked
 from torch.utils.data import DataLoader, Dataset
 
+from imbalance_benchmark.datasets.features.attach import attach_extracted_features
 from imbalance_benchmark.datasets.features.cache import (
     load_feature_row,
     load_slide_features,
@@ -24,11 +23,8 @@ from imbalance_benchmark.datasets.feature_provenance import (
     VIRCHOW2_REVISION,
     VIRCHOW2_WEIGHTS_SHA256,
     patch_sort_key,
-    record_cached_slide,
-    resolve_feature_snapshot,
     resolve_feature_provenance,
-    validate_cached_slide,
-    validate_feature_cache,
+    resolve_feature_snapshot,
 )
 
 __all__ = [
@@ -108,6 +104,23 @@ class _ImagePathDataset(Dataset):  # type: ignore[type-arg]
         return self._transforms(Image.open(self._paths[index]).convert("RGB"))
 
 
+def _resolve_model(
+    model_cache: dict[str, Any] | None,
+    model_name: str,
+    device: torch.device,
+    revision: str,
+    weights_sha256: str,
+) -> tuple[torch.nn.Module, Callable[[Image.Image], torch.Tensor]]:
+    """Load once and reuse via ``model_cache``; load fresh when uncached."""
+    if model_cache is None:
+        return load_feature_model(model_name, device, revision, weights_sha256)
+    if "model" not in model_cache:
+        model_cache["model"], model_cache["transforms"] = load_feature_model(
+            model_name, device, revision, weights_sha256
+        )
+    return model_cache["model"], model_cache["transforms"]
+
+
 def extract_slide_features(
     image_paths: list[str],
     model_name: str = VIRCHOW2_MODEL,
@@ -116,6 +129,7 @@ def extract_slide_features(
     device: torch.device | None = None,
     revision: str = VIRCHOW2_REVISION,
     weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
+    model_cache: dict[str, Any] | None = None,
 ) -> torch.Tensor:
     """Embed a slide's ordered patch images into a stacked (n_patches, 2560) tensor."""
     resolved_device = device or torch.device(
@@ -123,8 +137,8 @@ def extract_slide_features(
     )
     if not image_paths:
         return torch.empty((0, FEATURE_DIM))
-    model, transforms = load_feature_model(
-        model_name, resolved_device, revision, weights_sha256
+    model, transforms = _resolve_model(
+        model_cache, model_name, resolved_device, revision, weights_sha256
     )
     loader = DataLoader(
         _ImagePathDataset(image_paths, transforms),
@@ -137,102 +151,3 @@ def extract_slide_features(
             embed_image_batch(model, images.to(resolved_device), dtype, resolved_device)
         )
     return torch.stack(rows)
-
-
-def attach_extracted_features(
-    frame: pd.DataFrame,
-    feature_root: Path,
-    model_name: str = "hf-hub:paige-ai/Virchow2",
-    batch_size: int = 64,
-    dtype: str = "float16",
-    device: torch.device | None = None,
-    revision: str = VIRCHOW2_REVISION,
-    weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
-) -> pd.DataFrame:
-    """Extract one stacked per-slide feature tensor per slide and attach references.
-
-    Rows must already be in the deterministic per-slide patch order fixed by the
-    dataset adapter. Existing ``<feature_root>/<slide_id>.pt`` files are reused
-    rather than re-extracted.
-    """
-    options = {
-        "model_name": model_name,
-        "batch_size": batch_size,
-        "dtype": dtype,
-        "device": device,
-        "revision": revision,
-        "weights_sha256": weights_sha256,
-    }
-    _prepare_feature_cache(feature_root, options)
-    enriched = frame.copy()
-    feature_paths, feature_indices = _feature_references(
-        enriched, feature_root, options
-    )
-    enriched["feature_path"] = feature_paths
-    enriched["feature_index"] = feature_indices.astype(int)
-    return enriched
-
-
-def _prepare_feature_cache(feature_root: Path, options: dict[str, Any]) -> None:
-    feature_root.mkdir(parents=True, exist_ok=True)
-    provenance = resolve_feature_provenance(options)
-    validate_feature_cache(feature_root, provenance)
-
-
-def _feature_references(
-    frame: pd.DataFrame, feature_root: Path, options: dict[str, Any]
-) -> tuple[pd.Series, pd.Series]:
-    feature_paths = pd.Series(index=frame.index, dtype=object)
-    feature_indices = pd.Series(index=frame.index, dtype=object)
-    for slide_id, group in frame.groupby("slide_id", sort=False):
-        slide_path = _ensure_slide_features(group, feature_root, str(slide_id), options)
-        feature_paths.loc[group.index] = str(slide_path)
-        feature_indices.loc[group.index] = range(len(group))
-    return feature_paths, feature_indices
-
-
-def _ensure_slide_features(
-    group: pd.DataFrame,
-    feature_root: Path,
-    slide_id: str,
-    options: dict[str, Any],
-) -> Path:
-    slide_path = feature_root / f"{slide_id}.pt"
-    identities = _ordered_patch_identity(group)
-    if slide_path.exists():
-        validate_cached_slide(
-            feature_root,
-            slide_id,
-            slide_path,
-            identities,
-            len(load_slide_features(str(slide_path))),
-        )
-        return slide_path
-    image_paths = group["image_path"].astype(str).tolist()
-    tensor = extract_slide_features(
-        image_paths,
-        str(options["model_name"]),
-        int(options["batch_size"]),
-        str(options["dtype"]),
-        cast(torch.device | None, options["device"]),
-        str(options["revision"]),
-        str(options["weights_sha256"]),
-    )
-    torch.save(tensor, slide_path)
-    record_cached_slide(feature_root, slide_id, slide_path, identities, len(tensor))
-    return slide_path
-
-
-def _ordered_patch_identity(group: pd.DataFrame) -> list[str]:
-    """Return the exact patch identity sequence tied to cached tensor rows."""
-    patch_ids = (
-        group["patch_id"].astype(str)
-        if "patch_id" in group
-        else group["image_path"].astype(str)
-    )
-    return [
-        f"{patch_id}\0{image_path}"
-        for patch_id, image_path in zip(
-            patch_ids, group["image_path"].astype(str), strict=True
-        )
-    ]
