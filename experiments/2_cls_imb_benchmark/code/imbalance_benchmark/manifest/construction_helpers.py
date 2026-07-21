@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import time
 from collections.abc import Mapping
 from typing import Callable, cast
 
@@ -20,6 +22,8 @@ from imbalance_benchmark.manifest.construction_sampling import (
     select_slides_round_robin,
 )
 from imbalance_benchmark.manifest.statistics import support_statistics
+
+logger = logging.getLogger(__name__)
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 
@@ -148,6 +152,13 @@ def designate_shared_patch_pools(
     }
 
 
+def _log_search_progress(last_logged: float, total: int, start: int) -> float:
+    if time.perf_counter() - last_logged <= 30:
+        return last_logged
+    logger.info("freeze: shared-total search still at %d (of %d)", total, start)
+    return time.perf_counter()
+
+
 def cap_feasible_shared_total(
     train_df: pd.DataFrame,
     classes: list[str],
@@ -161,9 +172,11 @@ def cap_feasible_shared_total(
     supports = class_support_counts(train_df, is_mil)
     available = [supports[name] for name in classes]
     selector = select_slides_round_robin if is_mil else select_patches_round_robin
-    for total in range(
-        max_shared_total(available, min_support), len(classes) * min_support - 1, -1
-    ):
+    start = max_shared_total(available, min_support)
+    floor = len(classes) * min_support - 1
+    logger.info("freeze: shared-total search from %d down to %d", start, floor + 1)
+    last_logged = time.perf_counter()
+    for total in range(start, floor, -1):
         locked_assignments = assignments or {"native": classes}
         if _cap_feasible(
             train_df,
@@ -176,6 +189,7 @@ def cap_feasible_shared_total(
             independent_floor,
         ):
             return total
+        last_logged = _log_search_progress(last_logged, total, start)
     raise ValueError(
         "No shared total satisfies the independent-support and contribution caps"
     )

@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Iterator
 
 import pandas as pd
 
@@ -38,6 +40,15 @@ from imbalance_benchmark.datasets.features.provenance_lock import (
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def _phase(name: str) -> Iterator[None]:
+    """Log a freeze phase's start and duration so a stuck run is visible live."""
+    start = time.perf_counter()
+    logger.info("freeze: %s starting", name)
+    yield
+    logger.info("freeze: %s done in %.1fs", name, time.perf_counter() - start)
+
+
 def _load_pilot_floor(
     pilot_report_path: Path, is_mil: bool, counts: dict[str, int]
 ) -> tuple[int, int, bool, int]:
@@ -51,9 +62,8 @@ def _load_pilot_floor(
     )
     if excluded:
         logger.warning(
-            "Pilot marked this dataset-regime excluded (insufficient independent "
-            "units even for the balanced condition); freezing anyway for inspection "
-            "but downstream analysis must treat it as excluded."
+            "Pilot marked this dataset-regime excluded (insufficient support "
+            "even for the balanced condition); freezing anyway for inspection only."
         )
     if min(counts.values()) < min_support:
         excluded = True
@@ -104,29 +114,20 @@ def _load_split_context(
 
 def freeze_split(args: argparse.Namespace) -> None:
     """Freeze one patient split's manifests, provenance, and label-only preflight."""
+    logger.info("freeze: split %s starting", args.split_index)
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
     feature_provenance = verify_prepared_feature_provenance(config, paths["data"])
     ctx = _load_split_context(args, paths)
     if ctx is None:
         return
-    paths, train_df, is_mil, classes, min_sup, req_sup, excluded, independent_floor = (
-        ctx
-    )
-    meta = _freeze_metadata(
-        args,
-        paths,
-        train_df,
-        is_mil,
-        classes,
-        min_sup,
-        req_sup,
-        excluded,
-        independent_floor,
-    )
-    _attach_preflight(meta, paths, config, args.seed)
+    with _phase("condition and tail-assignment construction"):
+        meta = _freeze_metadata(args, *ctx)
+    with _phase("bootstrap preflight"):
+        _attach_preflight(meta, paths, config, args.seed)
     _attach_provenance(meta, paths, config, feature_provenance)
     _write_freeze_file(meta, paths["data"] / "manifest_freeze.json")
+    logger.info("freeze: split %s complete", args.split_index)
 
 
 def _freeze_metadata(
@@ -234,11 +235,14 @@ def _preflight(config: dict[str, Any], seed: int) -> dict[str, Any]:
         raise RuntimeError(
             "Exactly three prepared patient splits are required before a definitive freeze"
         )
-    return bootstrap_preflight(
-        pd.concat(frames, ignore_index=True),
-        int(config.get("analysis", {}).get("bootstrap_replicates", 10_000)),
-        derive_seed(seed, "resampling"),
+    identity = pd.concat(frames, ignore_index=True)
+    n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
+    logger.info(
+        "freeze: bootstrapping %d replicates over %d test rows",
+        n_replicates,
+        len(identity),
     )
+    return bootstrap_preflight(identity, n_replicates, derive_seed(seed, "resampling"))
 
 
 def wsi_bootstrap_identity(frame: pd.DataFrame) -> pd.DataFrame:
