@@ -19,7 +19,10 @@ from imbalance_benchmark.common import sign_file
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
 from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.datasets.data import BagFeatureDataset
-from imbalance_benchmark.manifest.construction_helpers import cap_feasible_shared_total
+from imbalance_benchmark.manifest.construction_helpers import (
+    _retains_fixed_pool,
+    cap_feasible_shared_total,
+)
 from imbalance_benchmark.manifest.pilot import run_pilot_seed
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
@@ -137,6 +140,43 @@ def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_
     )
 
     assert total == 301
+
+def test_retains_fixed_pool_accepts_a_selection_within_the_larger_pool() -> None:
+    """The pool is sized to the largest count any condition needs for a
+    class, so most conditions select a strict subset of it -- requiring the
+    selection to contain the *entire* pool instead can only ever hold when a
+    condition's count happens to equal that maximum, i.e. almost never."""
+    pool = pd.DataFrame({"case_id": ["p1", "p2", "p3"], "slide_id": ["s1", "s2", "s3"]})
+    smaller_condition = pool.iloc[:2]
+
+    assert _retains_fixed_pool(smaller_condition, pool)
+    assert not _retains_fixed_pool(
+        pd.DataFrame({"case_id": ["p9"], "slide_id": ["s9"]}), pool
+    )
+
+def test_cap_feasible_shared_total_uses_a_bounded_number_of_probes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A linear scan over a wide range with an expensive per-step check can
+    take hours; binary search must stay logarithmic in the range width."""
+    from imbalance_benchmark.manifest import construction_helpers as ch
+
+    threshold, calls = 12345, []
+
+    def fake_cap_feasible(ctx, assignments, total):
+        calls.append(total)
+        return total <= threshold
+
+    monkeypatch.setattr(ch, "class_support_counts", lambda df, is_mil: {"A": 1, "B": 1})
+    monkeypatch.setattr(ch, "max_shared_total", lambda available, min_support: 100_000)
+    monkeypatch.setattr(ch, "_cap_feasible", fake_cap_feasible)
+
+    total = ch.cap_feasible_shared_total(
+        pd.DataFrame(), ["A", "B"], min_support=10, is_mil=False, seed=1
+    )
+
+    assert total == threshold
+    assert len(calls) < 40  # log2(100000) ~ 17; a linear scan would need ~87600+
 
 def test_confirmation_training_context_receives_the_validation_loader(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

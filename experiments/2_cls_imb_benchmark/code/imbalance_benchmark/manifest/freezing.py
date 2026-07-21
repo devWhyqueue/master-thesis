@@ -23,9 +23,9 @@ from imbalance_benchmark.manifest.construction_helpers import (
     class_construction_seed,
     class_support_counts,
     designate_shared_patch_pools,
-    evidence_pool_hash,
     write_natural_condition,
 )
+from imbalance_benchmark.manifest.statistics import evidence_pool_hash
 
 
 @dataclass(frozen=True)

@@ -4,13 +4,14 @@ import hashlib
 import logging
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Callable, cast
 
 from pathlib import Path
 
 import pandas as pd
 
-from imbalance_benchmark.common import compute_data_hash, compute_sha256
+from imbalance_benchmark.common import compute_sha256
 from imbalance_benchmark.construction import (
     allocate_counts,
     effective_rho,
@@ -21,7 +22,10 @@ from imbalance_benchmark.manifest.construction_sampling import (
     select_patches_round_robin,
     select_slides_round_robin,
 )
-from imbalance_benchmark.manifest.statistics import support_statistics
+from imbalance_benchmark.manifest.statistics import (
+    natural_contribution_stats,
+    support_statistics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,16 +45,6 @@ def class_construction_seed(seed: int, class_name: str) -> int:
     return int(digest[:8], 16)
 
 
-def evidence_pool_hash(train_df: pd.DataFrame, classes: list[str], is_mil: bool) -> str:
-    """Hash the fixed per-class patient/slide evidence pools shared by conditions."""
-    columns = ["cancer_type", "case_id", "slide_id"]
-    if not is_mil and "patch_id" in train_df:
-        columns.append("patch_id")
-    pool = pd.DataFrame(train_df.loc[train_df["cancer_type"].isin(classes), columns])
-    pool = cast(pd.DataFrame, pool.sort_values(by=columns))
-    return compute_data_hash(pool.to_dict("records"))
-
-
 def write_natural_condition(
     train_df: pd.DataFrame, data_dir: Path, is_mil: bool
 ) -> dict[str, object]:
@@ -67,31 +61,8 @@ def write_natural_condition(
         "achieved_rho": primary["achieved_rho"],
         "normalized_entropy": primary["normalized_entropy"],
         "support_statistics": statistics,
-        "contribution_stats": _natural_contribution_stats(train_df, is_mil),
+        "contribution_stats": natural_contribution_stats(train_df, is_mil),
     }
-
-
-def _natural_contribution_stats(
-    train_df: pd.DataFrame, is_mil: bool
-) -> dict[str, dict[str, float | int]]:
-    """Report full-eligible-pool support and largest-unit contributions by class."""
-    stats = {}
-    for class_name, rows in train_df.groupby("cancer_type"):
-        slide_rows = rows.drop_duplicates("slide_id") if is_mil else rows
-        n_units = len(slide_rows) if is_mil else len(rows)
-        stats[str(class_name)] = {
-            "n_patients": int(rows["case_id"].nunique()),
-            "n_slides": int(rows["slide_id"].nunique()),
-            "n_patches": int(len(rows)),
-            "max_patient_contribution": float(
-                slide_rows["case_id"].value_counts().iloc[0] / max(1, n_units)
-            ),
-            "max_slide_contribution": float(
-                slide_rows["slide_id"].value_counts().iloc[0] / max(1, n_units)
-            ),
-            "pool_fraction_retained": 1.0,
-        }
-    return stats
 
 
 def assignment_allocations(
@@ -152,11 +123,44 @@ def designate_shared_patch_pools(
     }
 
 
-def _log_search_progress(last_logged: float, total: int, start: int) -> float:
+def _log_search_progress(last_logged: float, lo: int, hi: int) -> float:
     if time.perf_counter() - last_logged <= 30:
         return last_logged
-    logger.info("freeze: shared-total search still at %d (of %d)", total, start)
+    logger.info("freeze: shared-total search narrowed to [%d, %d]", lo, hi)
     return time.perf_counter()
+
+
+@dataclass(frozen=True)
+class _FeasibilityContext:
+    """Everything a feasibility probe needs except the ``total`` being tried."""
+
+    train_df: pd.DataFrame
+    min_support: int
+    selector: Callable[..., pd.DataFrame]
+    is_mil: bool
+    seed: int
+    independent_floor: int
+
+
+def _binary_search_feasible_total(
+    ctx: _FeasibilityContext,
+    assignments: Mapping[str, list[str]],
+    floor: int,
+    start: int,
+) -> int:
+    """Largest total in ``(floor, start]`` where ``_cap_feasible`` holds.
+
+    Assumes feasibility is monotonic: every condition's per-class allocation
+    and its cap shrink together as total shrinks, so feasibility only gets
+    easier below any total that already works.
+    """
+    lo, hi, last_logged = floor, start, time.perf_counter()
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        ok = _cap_feasible(ctx, assignments, mid)
+        lo, hi = (mid, hi) if ok else (lo, mid)
+        last_logged = _log_search_progress(last_logged, lo, hi)
+    return lo
 
 
 def cap_feasible_shared_total(
@@ -168,68 +172,61 @@ def cap_feasible_shared_total(
     independent_floor: int = 10,
     assignments: Mapping[str, list[str]] | None = None,
 ) -> int:
-    """Find the largest controlled total that satisfies the actual unit caps."""
+    """Find the largest controlled total that satisfies the actual unit caps.
+
+    A linear scan here is O(range) with an expensive per-step check and can
+    take hours on a large patch pool, so this binary searches instead.
+    """
     supports = class_support_counts(train_df, is_mil)
     available = [supports[name] for name in classes]
     selector = select_slides_round_robin if is_mil else select_patches_round_robin
-    start = max_shared_total(available, min_support)
-    floor = len(classes) * min_support - 1
-    logger.info("freeze: shared-total search from %d down to %d", start, floor + 1)
-    last_logged = time.perf_counter()
-    for total in range(start, floor, -1):
-        locked_assignments = assignments or {"native": classes}
-        if _cap_feasible(
-            train_df,
-            locked_assignments,
-            total,
-            min_support,
-            selector,
-            is_mil,
-            seed,
-            independent_floor,
-        ):
-            return total
-        last_logged = _log_search_progress(last_logged, total, start)
-    raise ValueError(
-        "No shared total satisfies the independent-support and contribution caps"
+    locked_assignments = assignments or {"native": classes}
+    ctx = _FeasibilityContext(
+        train_df, min_support, selector, is_mil, seed, independent_floor
     )
+    floor, start = len(classes) * min_support, max_shared_total(available, min_support)
+    if not _cap_feasible(ctx, locked_assignments, floor):
+        raise ValueError(
+            "No shared total satisfies the independent-support and contribution caps"
+        )
+    if _cap_feasible(ctx, locked_assignments, start):
+        return start
+    logger.info("freeze: shared-total binary search between %d and %d", floor, start)
+    return _binary_search_feasible_total(ctx, locked_assignments, floor, start)
 
 
 def _cap_feasible(
-    train_df: pd.DataFrame,
-    assignments: Mapping[str, list[str]],
-    total: int,
-    minimum: int,
-    selector: Callable[..., pd.DataFrame],
-    is_mil: bool,
-    seed: int,
-    independent_floor: int,
+    ctx: _FeasibilityContext, assignments: Mapping[str, list[str]], total: int
 ) -> bool:
     """Probe every condition allocation on its designated fixed patch pool."""
     try:
         allocations = assignment_allocations(
-            train_df, assignments, total, minimum, is_mil=is_mil
+            ctx.train_df, assignments, total, ctx.min_support, is_mil=ctx.is_mil
         )
         pools = (
-            designate_shared_patch_pools(train_df, allocations, independent_floor, seed)
-            if not is_mil
+            designate_shared_patch_pools(
+                ctx.train_df, allocations, ctx.independent_floor, ctx.seed
+            )
+            if not ctx.is_mil
             else {}
         )
         for condition_sets in allocations.values():
             for counts in condition_sets.values():
                 for name, count in counts.items():
-                    selected = selector(
+                    selected = ctx.selector(
                         pools.get(
                             name,
                             cast(
                                 pd.DataFrame,
-                                train_df[train_df["cancer_type"] == name],
+                                ctx.train_df[ctx.train_df["cancer_type"] == name],
                             ),
                         ),
                         count,
-                        class_construction_seed(seed, name),
+                        class_construction_seed(ctx.seed, name),
                     )
-                    if not is_mil and not _retains_fixed_pool(selected, pools[name]):
+                    if not ctx.is_mil and not _retains_fixed_pool(
+                        selected, pools[name]
+                    ):
                         return False
     except ValueError:
         return False
@@ -237,7 +234,13 @@ def _cap_feasible(
 
 
 def _retains_fixed_pool(selected: pd.DataFrame, pool: pd.DataFrame) -> bool:
-    """Whether a patch condition includes every designated patient and slide."""
-    return set(pool["case_id"]).issubset(selected["case_id"]) and set(
-        pool["slide_id"]
-    ).issubset(selected["slide_id"])
+    """Whether a condition's selection is drawn entirely from its designated pool.
+
+    ``pool`` is sized to the largest count any condition needs for this class,
+    so most conditions select a strict subset of it. Checking the reverse
+    (every pool patient/slide present in the selection) can only ever hold
+    when a condition's count equals that maximum -- i.e. almost never.
+    """
+    return set(selected["case_id"]).issubset(pool["case_id"]) and set(
+        selected["slide_id"]
+    ).issubset(pool["slide_id"])
