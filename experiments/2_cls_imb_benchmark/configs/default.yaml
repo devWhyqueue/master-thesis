@@ -49,13 +49,13 @@ slurm:
   test_partition: gpu-test
   container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
   resources:
-    prepare: {partition: gpu-5h, gpus: 1, cpus: 8, time: "05:00:00"}
-    pilot: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
-    freeze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "00:30:00"}
-    tune: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
-    confirm: {partition: gpu-2d, gpus: 1, cpus: 8, time: "2-00:00:00"}
-    analyze: {partition: cpu-2h, gpus: 0, cpus: 4, time: "02:00:00"}
-    smoke: {partition: gpu-test, gpus: 1, cpus: 4, time: "00:15:00"}
+    prepare: {partition: gpu-5h, gpus: 1, cpus: 8}
+    pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
+    freeze: {partition: cpu-2h, gpus: 0, cpus: 4}
+    tune: {partition: gpu-2d, gpus: 1, cpus: 8}
+    confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
+    analyze: {partition: cpu-2h, gpus: 0, cpus: 4}
+    smoke: {partition: gpu-test, gpus: 1, cpus: 4}
 
   # Optional datasets with many small files. Each image is copied to /tmp per job
   # and mounted at its adapter-visible path before Apptainer starts.

@@ -30,7 +30,7 @@ class SlurmJob:
     partition: str
     gpus: int
     cpus: int
-    time_limit: str
+    time_limit: str | None = None
     dependency: str | None = None
     array_splits: tuple[int, ...] = ()
     array_conditions: tuple[str, ...] = ()
@@ -40,11 +40,14 @@ def _resources(config: dict[str, Any], stage: str, gpu: bool) -> dict[str, Any]:
     sl = config.get("slurm", {})
     sr = sl.get("resources", {}).get(stage, {})
     part = sr.get("partition", sl.get("partition", "gpu-2h" if gpu else "cpu-2h"))
+    time = sr.get("time")
     return {
         "partition": part,
         "gpus": int(sr.get("gpus", 1 if gpu else 0)),
         "cpus": int(sr.get("cpus", 4)),
-        "time_limit": str(sr.get("time", "02:00:00")),
+        # Unset unless a stage needs less than its partition's own time limit;
+        # SLURM already applies that limit when --time is omitted.
+        "time_limit": str(time) if time else None,
     }
 
 
@@ -121,10 +124,11 @@ def _directives(job: SlurmJob, root: str) -> list[str]:
         f"#SBATCH --partition={job.partition}",
         f"#SBATCH --gpus-per-node={job.gpus}",
         f"#SBATCH --cpus-per-task={job.cpus}",
-        f"#SBATCH --time={job.time_limit}",
         f"#SBATCH --output={log_dir}/%x-%A_%a.out",
         f"#SBATCH --error={log_dir}/%x-%A_%a.err",
     ]
+    if job.time_limit:
+        lines.append(f"#SBATCH --time={job.time_limit}")
     if job.array_splits or job.array_conditions:
         lines.append(f"#SBATCH --array=0-{_array_size(job) - 1}")
     if job.dependency:

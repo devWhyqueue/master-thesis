@@ -130,6 +130,22 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
         assert GENERATED_SQUASHFS not in scripts[stage]
 
+def test_time_limit_directive_is_omitted_unless_explicitly_configured() -> None:
+    """Partitions already cap wall time (e.g. cpu-2h -> 2h); an explicit
+    --time should only appear when a stage config asks for less than that."""
+    scripts = {
+        job.name: render_sbatch(job, _config(), "config.yaml")
+        for job in build_workflow(_config())
+    }
+    for stage, script in scripts.items():
+        assert "#SBATCH --time=" not in script, stage
+
+    config = _config()
+    config["slurm"]["resources"] = {"freeze": {"time": "00:30:00"}}
+    freeze_job = next(j for j in build_workflow(config) if j.name == "freeze")
+    script = render_sbatch(freeze_job, config, "config.yaml")
+    assert "#SBATCH --time=00:30:00" in script
+
 def test_smoke_workflow_uses_test_partition() -> None:
     """The synthetic validation has a one-job test-partition submission path."""
     jobs = build_workflow(_config(), smoke=True)
