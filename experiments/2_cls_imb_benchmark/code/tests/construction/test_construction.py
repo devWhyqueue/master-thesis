@@ -256,7 +256,7 @@ def test_patch_conditions_respect_caps_at_each_condition_size(tmp_path):
     pool["slide_id"] = pool["cancer_type"] + "_" + pool["slide_id"]
     pool["split"] = "train"
     conditions = _build_conditions(
-        pool, ["class_A", "class_B"], 440, 20, False, 3, tmp_path
+        pool, ["class_A", "class_B"], 200, 20, False, 3, tmp_path
     )
     for condition in conditions.values():
         frame = pd.read_csv(condition["path"])

@@ -19,6 +19,7 @@ from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_re
 from imbalance_benchmark.modeling.training import resolve_batch_size, update_budget
 from imbalance_benchmark.manifest.construction_helpers import (
     CONDITION_RHOS,
+    _retains_fixed_pool,
     assignment_allocations,
     class_construction_seed,
     class_support_counts,
@@ -121,10 +122,7 @@ def _build_conditions(
         if not is_mil and independent_floor is not None:
             for cls, selected in zip(classes, rows, strict=True):
                 pool = fixed_pools[cls]
-                if not (
-                    set(pool["case_id"]).issubset(selected["case_id"])
-                    and set(pool["slide_id"]).issubset(selected["slide_id"])
-                ):
+                if not _retains_fixed_pool(selected, pool):
                     raise ValueError(
                         "Controlled patch allocation does not retain its fixed evidence pool"
                     )

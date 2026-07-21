@@ -64,16 +64,17 @@ def _expand_pool(
     sel_s: list[str],
     remaining: dict,
     df: pd.DataFrame,
-    max_p: int | None,
+    required_counts: tuple[int, ...],
     max_pool_units: int | None,
     seed: int,
 ) -> None:
     """Expand sel_p/sel_s breadth-first until the pool is ready or resources are exhausted."""
     pats, hier = pool_hierarchy
+    maximum = max(required_counts, default=None)
     patient_index = len(sel_p)
     patient_cursor = 0
-    while not _pool_is_ready(df, sel_p, sel_s, max_p) or not _pool_has_capacity(
-        df, sel_p, sel_s, max_p, seed
+    while not _pool_is_ready(df, sel_p, sel_s, maximum) or not _pool_has_capacity(
+        df, sel_p, sel_s, required_counts, seed
     ):
         if max_pool_units is not None and len(sel_s) >= max_pool_units:
             break
@@ -91,8 +92,8 @@ def _expand_pool(
         slides = list(hier[patient])
         sel_s.append(slides[0])
         remaining[patient] = slides[1:]
-    if not _pool_is_ready(df, sel_p, sel_s, max_p) or not _pool_has_capacity(
-        df, sel_p, sel_s, max_p, seed
+    if not _pool_is_ready(df, sel_p, sel_s, maximum) or not _pool_has_capacity(
+        df, sel_p, sel_s, required_counts, seed
     ):
         raise ValueError(
             "Eligible patches cannot form the required fixed evidence pool"
@@ -116,6 +117,7 @@ def designate_patch_pool(
     seed: int,
     max_p: int | None = None,
     max_pool_units: int | None = None,
+    required_counts: tuple[int, ...] | None = None,
 ) -> pd.DataFrame:
     """Choose the fixed patient/slide pool used by every patch condition."""
     if min_independent_units < 10:
@@ -127,7 +129,10 @@ def designate_patch_pool(
     sel_p = pats[:min_independent_units]
     sel_s = [next(iter(hier[p])) for p in sel_p]
     remaining = {p: list(hier[p])[1:] for p in sel_p}
-    _expand_pool((pats, hier), sel_p, sel_s, remaining, df, max_p, max_pool_units, seed)
+    counts = required_counts or (() if max_p is None else (max_p,))
+    _expand_pool(
+        (pats, hier), sel_p, sel_s, remaining, df, counts, max_pool_units, seed
+    )
     return cast(
         pd.DataFrame, df[df["case_id"].isin(sel_p) & df["slide_id"].isin(sel_s)]
     )
@@ -137,11 +142,10 @@ def _pool_has_capacity(
     df_class: pd.DataFrame,
     patients: list[str],
     slides: list[str],
-    maximum_patches: int | None,
+    required_counts: tuple[int, ...],
     seed: int,
 ) -> bool:
-    """Check the real patient/slide caps, not merely the pool's raw row count."""
-    if maximum_patches is None:
+    if not required_counts:
         return True
     pool = cast(
         pd.DataFrame,
@@ -149,13 +153,16 @@ def _pool_has_capacity(
             df_class["case_id"].isin(patients) & df_class["slide_id"].isin(slides)
         ],
     )
-    try:
-        return (
-            len(select_patches_round_robin(pool, maximum_patches, seed))
-            == maximum_patches
-        )
-    except ValueError:
-        return False
+    for count in required_counts:
+        try:
+            selected = select_patches_round_robin(pool, count, seed)
+        except ValueError:
+            return False
+        if not set(pool["case_id"]).issubset(selected["case_id"]) or not set(
+            pool["slide_id"]
+        ).issubset(selected["slide_id"]):
+            return False
+    return True
 
 
 def _pool_is_ready(
