@@ -41,7 +41,7 @@ slurm:
   resources:
     prepare: {partition: gpu-5h, gpus: 1, cpus: 8}
     pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
-    freeze: {partition: cpu-5h, gpus: 0, cpus: 4}
+    freeze: {partition: cpu-2d, gpus: 0, cpus: 4}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     analyze: {partition: cpu-2h, gpus: 0, cpus: 4}
