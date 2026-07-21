@@ -100,9 +100,7 @@ def _run_all_pilot_seeds(
     pilot_seeds = [derive_seed(base_seed, f"pilot_construction_{i}") for i in range(3)]
     # One frozen patch quota is shared by every ordering; MIL has no quota.
     quota = (
-        None
-        if is_mil
-        else frozen_pilot_quota(train_df, classes, levels[-1], pilot_seeds)
+        None if is_mil else frozen_pilot_quota(train_df, classes, levels, pilot_seeds)
     )
     quotas, ba_by_seed, recall_by_seed = {}, {}, {}
     for seed in pilot_seeds:

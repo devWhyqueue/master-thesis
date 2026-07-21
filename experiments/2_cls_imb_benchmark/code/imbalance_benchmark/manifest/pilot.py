@@ -15,11 +15,11 @@ from imbalance_benchmark.datasets.data import (
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.manifest.pilot_training import (
+    fit_pilot_model,
     meets_method_floor,
     method_floor,
     stability_floor_from_curve,
 )
-from imbalance_benchmark.manifest.pilot_training import fit_pilot_model
 
 ValDataset = ImbalanceDataset | BagFeatureDataset
 
@@ -45,11 +45,9 @@ def pilot_levels_for(available_per_class: dict[str, int]) -> list[int]:
     """Return nested candidate independent-unit counts capped by the scarcest class."""
     cap = min(available_per_class.values())
     levels = [c for c in PILOT_CANDIDATE_LEVELS if c <= cap]
-    return (
-        levels
-        if (cap >= PILOT_CANDIDATE_LEVELS[-1] or (levels and levels[-1] == cap))
-        else levels + [cap]
-    )
+    if cap >= PILOT_CANDIDATE_LEVELS[-1] or (levels and levels[-1] == cap):
+        return levels
+    return levels + [cap]
 
 
 def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
@@ -83,17 +81,20 @@ def _patch_pilot_caps_hold(selection: pd.DataFrame, level: int) -> bool:
     if level == PATCH_PILOT_SMALL_COUNT_EXCEPTION_LEVEL:
         return True
     total = len(selection)
-    return (
-        selection["case_id"].value_counts().max() / total <= 0.10
-        and selection["slide_id"].value_counts().max() / total <= 0.05
-    )
+    patient_share = selection["case_id"].value_counts().max() / total
+    slide_share = selection["slide_id"].value_counts().max() / total
+    return patient_share <= 0.10 and slide_share <= 0.05
 
 
 def frozen_pilot_quota(
-    df: pd.DataFrame, classes: list[str], level: int, seeds: list[int]
+    df: pd.DataFrame, classes: list[str], levels: list[int], seeds: list[int]
 ) -> int:
-    """Determine the maximum patch quota feasible across all seeds."""
-    return min(compute_pilot_quota(df, classes, level, seed) for seed in seeds)
+    """Quota feasible at every level and seed (the cap tightens as level shrinks)."""
+    return min(
+        compute_pilot_quota(df, classes, level, seed)
+        for level in levels
+        for seed in seeds
+    )
 
 
 def _apportion_quota(
@@ -169,9 +170,8 @@ def _pilot_val_predictions(
         for batch in loader:
             if is_mil:
                 bags, tgt = batch
-                logits = cast(AttentionMil, model).forward_bags(
-                    [b.to(device) for b in bags]
-                )[0]
+                bags = [b.to(device) for b in bags]
+                logits = cast(AttentionMil, model).forward_bags(bags)[0]
             else:
                 logits, tgt = model(batch["features"].to(device)), batch["target"]
             preds.append(logits.softmax(-1).argmax(-1).cpu())

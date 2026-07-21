@@ -351,12 +351,32 @@ def test_pilot_quota_is_frozen_across_construction_orderings() -> None:
     df = pd.concat(patients, ignore_index=True)
     seeds = [11, 22, 33]
 
-    frozen = frozen_pilot_quota(df, ["A"], level=10, seeds=seeds)
+    frozen = frozen_pilot_quota(df, ["A"], levels=[10], seeds=seeds)
 
     per_seed = [compute_pilot_quota(df, ["A"], level=10, seed=seed) for seed in seeds]
     assert frozen == min(per_seed)
     # Feasible for every ordering: no selected patient can fall short of it.
     assert all(frozen <= value for value in per_seed)
+
+
+def test_frozen_pilot_quota_is_feasible_at_every_candidate_level(monkeypatch) -> None:
+    """The contribution cap tightens as the level shrinks, so the quota shared
+    across a nested pilot curve must satisfy every level, not only the last."""
+    from imbalance_benchmark.manifest import pilot as pilot_lib
+
+    per_level_quota = {5: 40, 10: 8, 15: 20, 20: 30}
+    monkeypatch.setattr(
+        pilot_lib,
+        "compute_pilot_quota",
+        lambda df, classes, level, seed: per_level_quota[level],
+    )
+
+    quota = pilot_lib.frozen_pilot_quota(
+        pd.DataFrame(), ["A"], levels=[5, 10, 15, 20], seeds=[0]
+    )
+
+    # Reusing level 20's quota (30) at level 10 would exceed what level 10 allows (8).
+    assert quota == 8
 
 
 def test_pilot_quota_respects_the_slide_contribution_cap() -> None:
