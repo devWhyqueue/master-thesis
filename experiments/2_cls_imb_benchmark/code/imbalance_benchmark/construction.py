@@ -6,10 +6,8 @@ import numpy as np
 import pandas as pd
 from imbalance_benchmark.common import compute_data_hash
 from imbalance_benchmark.datasets.bracs import LABELS as BRACS_LABELS
-from imbalance_benchmark.manifest.construction_sampling import (
-    select_patches_round_robin,
-    select_slides_round_robin,
-)
+from imbalance_benchmark.manifest.sampling.patch import select_patches_round_robin
+from imbalance_benchmark.manifest.sampling.slide import select_slides_round_robin
 
 logger = logging.getLogger(__name__)
 

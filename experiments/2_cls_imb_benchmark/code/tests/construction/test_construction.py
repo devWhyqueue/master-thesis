@@ -553,7 +553,7 @@ def test_patch_conditions_retain_every_independent_unit_in_the_fixed_pool(
 
 def test_fixed_pool_expansion_adds_one_slide_per_patient_per_round() -> None:
     """A fixed evidence pool expands breadth-first over its selected patients."""
-    from imbalance_benchmark.manifest.construction_sampling import designate_patch_pool
+    from imbalance_benchmark.manifest.sampling.patch import designate_patch_pool
 
     rows = []
     for patient in range(10):
@@ -574,6 +574,58 @@ def test_fixed_pool_expansion_adds_one_slide_per_patient_per_round() -> None:
     )
 
     assert pool.groupby("case_id")["slide_id"].nunique().eq(2).all()
+
+@pytest.mark.parametrize("n_patients,slides_per_patient,patches_per_slide", [
+    (40, 2, 400),  # BRACS-scale: few patients, tens of thousands of patches
+    (5, 2, 30),    # few patients relative to count: exercises the infeasible branch
+])
+def test_pool_capacity_check_matches_a_fresh_rebuild_per_required_count(
+    n_patients: int, slides_per_patient: int, patches_per_slide: int
+) -> None:
+    """The cached-hierarchy fast path must return exactly what per-count rebuilds would.
+
+    ``_pool_has_capacity`` builds one patch hierarchy per call and reuses a copy of
+    it across every required count instead of rebuilding fresh from the seed each
+    time. That optimization is only valid if it reproduces the same per-count
+    selection a naive rebuild-every-time reference would.
+    """
+    from imbalance_benchmark.manifest.sampling.patch import _pool_has_capacity
+
+    def _naive_pool_has_capacity(
+        df_class: pd.DataFrame,
+        patients: list[str],
+        slides: list[str],
+        required_counts: tuple[int, ...],
+        seed: int,
+    ) -> bool:
+        pool = df_class[
+            df_class["case_id"].isin(patients) & df_class["slide_id"].isin(slides)
+        ]
+        for count in required_counts:
+            try:
+                selected = select_patches_round_robin(pool, count, seed)
+            except ValueError:
+                return False
+            if not set(pool["case_id"]).issubset(selected["case_id"]) or not set(
+                pool["slide_id"]
+            ).issubset(selected["slide_id"]):
+                return False
+        return True
+
+    df = _patch_frame(n_patients, slides_per_patient, patches_per_slide)
+    patients = [f"PAT_{p}" for p in range(n_patients)]
+    slides = [
+        f"PAT_{p}_SLIDE_{s}" for p in range(n_patients) for s in range(slides_per_patient)
+    ]
+    total = n_patients * slides_per_patient * patches_per_slide
+
+    for seed in range(20):
+        required_counts = tuple(
+            sorted({max(1, total // 4 + seed), max(1, total // 2 - seed), total})
+        )
+        assert _pool_has_capacity(
+            df, patients, slides, required_counts, seed
+        ) == _naive_pool_has_capacity(df, patients, slides, required_counts, seed)
 
 @pytest.mark.parametrize("seed", range(60))
 def test_random_tail_assignment_is_distinct_from_native_and_rotated(seed: int) -> None:

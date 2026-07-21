@@ -17,11 +17,11 @@ from imbalance_benchmark.construction import (
     effective_rho,
     max_shared_total,
 )
-from imbalance_benchmark.manifest.construction_sampling import (
+from imbalance_benchmark.manifest.sampling.patch import (
     designate_patch_pool,
     select_patches_round_robin,
-    select_slides_round_robin,
 )
+from imbalance_benchmark.manifest.sampling.slide import select_slides_round_robin
 from imbalance_benchmark.manifest.statistics import (
     natural_contribution_stats,
     support_statistics,

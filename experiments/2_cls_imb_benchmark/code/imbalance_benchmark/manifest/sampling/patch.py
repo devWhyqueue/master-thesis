@@ -138,6 +138,13 @@ def designate_patch_pool(
     )
 
 
+def _copy_hierarchy(
+    h: dict[str, dict[str, list[int]]],
+) -> dict[str, dict[str, list[int]]]:
+    """Copy only the round-robin cursors ``_loop_patches`` consumes, not the whole tree."""
+    return {p: {s: list(pids) for s, pids in slides.items()} for p, slides in h.items()}
+
+
 def _pool_has_capacity(
     df_class: pd.DataFrame,
     patients: list[str],
@@ -153,9 +160,19 @@ def _pool_has_capacity(
             df_class["case_id"].isin(patients) & df_class["slide_id"].isin(slides)
         ],
     )
+    if pool.empty:
+        # Matches select_patches_round_robin's own short-circuit: an empty pool
+        # trivially satisfies every count (both sides of the subset check are empty).
+        return True
+    # Every count probes the same (pool, seed) hierarchy; a fresh np.random.default_rng(seed)
+    # rebuild per count reproduces identical shuffles, so build once and hand each
+    # probe its own copy of the consumable cursors instead of re-deriving them.
+    pool_patients, hierarchy = _build_patch_hierarchy(pool, np.random.default_rng(seed))
     for count in required_counts:
         try:
-            selected = select_patches_round_robin(pool, count, seed)
+            selected = _select_from_hierarchy(
+                pool, pool_patients, _copy_hierarchy(hierarchy), count
+            )
         except ValueError:
             return False
         if not set(pool["case_id"]).issubset(selected["case_id"]) or not set(
@@ -180,14 +197,13 @@ def _pool_is_ready(
     )
 
 
-def select_patches_round_robin(
-    df_class: pd.DataFrame, n_patches: int, seed: int
+def _select_from_hierarchy(
+    df_class: pd.DataFrame,
+    patients: list[str],
+    h: dict[str, dict[str, list[int]]],
+    n_patches: int,
 ) -> pd.DataFrame:
-    """Sample patches with round-robin patient and slide caps (10% patient, 5% slide)."""
-    if df_class.empty or n_patches <= 0:
-        return pd.DataFrame()
-    rng = np.random.default_rng(seed)
-    patients, h = _build_patch_hierarchy(df_class, rng)
+    """Consume a hierarchy's round-robin cursors to pick ``n_patches``."""
     selected, _, _ = _loop_patches(
         patients,
         h,
@@ -202,49 +218,11 @@ def select_patches_round_robin(
     return df_class.loc[selected]
 
 
-def _loop_slides(patients: list[str], h: dict, max_p: int, n: int) -> list[int]:
-    selected, pat_counts = [], {p: 0 for p in patients}
-    prog = True
-    while len(selected) < n and prog:
-        prog = False
-        for p in patients:
-            if len(selected) >= n or pat_counts[p] >= max_p:
-                continue
-            if h[p]:
-                selected.append(h[p].pop(0))
-                pat_counts[p] += 1
-                prog = True
-    return selected
-
-
-def _build_slide_hierarchy(
-    df_slides: pd.DataFrame, rng: np.random.Generator
-) -> tuple[list[str], dict[str, list[int]]]:
-    """Build a randomized per-patient slide-index dictionary."""
-    patients = list(cast(np.ndarray, df_slides["case_id"].unique()))
-    rng.shuffle(patients)
-    h = {
-        p: list(df_slides[df_slides["case_id"] == p].index.to_numpy()) for p in patients
-    }
-    for p in h:
-        rng.shuffle(h[p])
-    return patients, h
-
-
-def select_slides_round_robin(
-    df_class: pd.DataFrame, n_slides: int, seed: int
+def select_patches_round_robin(
+    df_class: pd.DataFrame, n_patches: int, seed: int
 ) -> pd.DataFrame:
-    """Sample MIL slides under the 10% patient contribution cap."""
-    if df_class.empty or n_slides <= 0:
+    """Sample patches with round-robin patient and slide caps (10% patient, 5% slide)."""
+    if df_class.empty or n_patches <= 0:
         return pd.DataFrame()
-    rng = np.random.default_rng(seed)
-    df_slides = df_class.drop_duplicates("slide_id")
-    patients, h = _build_slide_hierarchy(df_slides, rng)
-    patient_cap = _contribution_cap(n_slides, 0.10, "patient")
-    selected = _loop_slides(patients, h, patient_cap, n_slides)
-    if len(selected) < n_slides:
-        raise ValueError("Slide allocation is infeasible under the 10% patient cap")
-    return cast(
-        pd.DataFrame,
-        df_class[df_class["slide_id"].isin(df_slides.loc[selected, "slide_id"])],
-    )
+    patients, h = _build_patch_hierarchy(df_class, np.random.default_rng(seed))
+    return _select_from_hierarchy(df_class, patients, h, n_patches)
