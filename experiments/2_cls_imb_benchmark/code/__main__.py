@@ -54,6 +54,7 @@ def _parser() -> argparse.ArgumentParser:
     shard.add_argument("--group", choices=("natural", "controlled"), required=True)
     shard.add_argument("--shard-index", type=int, required=True)
     shard.add_argument("--observation-index", type=int)
+    shard.add_argument("--observations-per-candidate", type=int, default=1)
     reduce = sub.choices["tune-reduce"]
     reduce.add_argument("--phase", choices=("base", "final"), required=True)
     return parser

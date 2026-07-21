@@ -77,3 +77,16 @@ def requested_shard(
     """Resolve a CLI array index and optional observation fallback index."""
     spec = resolve_shard_spec(index, phase, group, phase_methods(is_mil, phase), grids)
     return replace(spec, observation_index=observation_index) if spec else None
+
+
+def array_coordinates(
+    index: int, explicit_observation: int | None, observations_per_candidate: int
+) -> tuple[int, int | None]:
+    """Decode a candidate array task, optionally crossed with observations."""
+    if observations_per_candidate < 1:
+        raise ValueError("observations-per-candidate must be positive")
+    if explicit_observation is not None and observations_per_candidate != 1:
+        raise ValueError("Use either observation-index or observations-per-candidate")
+    if observations_per_candidate == 1:
+        return index, explicit_observation
+    return divmod(index, observations_per_candidate)

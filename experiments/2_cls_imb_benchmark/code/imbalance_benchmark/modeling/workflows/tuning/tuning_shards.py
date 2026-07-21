@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 import os
 from pathlib import Path
@@ -73,10 +73,10 @@ def run_candidate_shard(
     stage_one_config: dict[str, Any] | None = None,
 ) -> Path:
     """Execute or reuse one candidate shard and persist its ordered observations."""
+    complete = _reusable_path(spec, output_root, fingerprint)
+    if complete is not None:
+        return complete
     target = shard_path(output_root, spec)
-    if target.exists():
-        validate_shard_payload(json.loads(target.read_text()), fingerprint, spec)
-        return target
     started_at, started = time.time(), time.perf_counter()
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
@@ -97,6 +97,20 @@ def run_candidate_shard(
     validate_shard_payload(payload, fingerprint, spec)
     _write_atomic(target, payload)
     return target
+
+
+def _reusable_path(
+    spec: ShardSpec, output_root: Path, fingerprint: list[str]
+) -> Path | None:
+    candidates = [spec]
+    if spec.observation_index is not None:
+        candidates.insert(0, replace(spec, observation_index=None))
+    for candidate in candidates:
+        path = shard_path(output_root, candidate)
+        if path.exists():
+            validate_shard_payload(json.loads(path.read_text()), fingerprint, candidate)
+            return path
+    return None
 
 
 def _runtime_payload(

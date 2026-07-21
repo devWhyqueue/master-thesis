@@ -37,6 +37,7 @@ slurm:
   output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/bracs/patch
   partition: gpu-2h
   test_partition: gpu-test
+  tune_natural_observations_per_candidate: 6
   container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
   resources:
     prepare: {partition: gpu-5h, gpus: 1, cpus: 8}

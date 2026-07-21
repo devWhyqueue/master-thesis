@@ -16,6 +16,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     _observation_keys,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    array_coordinates,
     resolve_shard_spec,
 )
 
@@ -52,6 +53,19 @@ def test_shard_mapping_covers_frozen_candidates_once() -> None:
 
     realized = [(spec.method, spec.candidate_index) for spec in specs if spec]
     assert realized == [("ce", 0), ("ce", 1), ("weighted_ce", 0)]
+
+
+def test_array_coordinates_cross_candidates_with_every_observation() -> None:
+    assert [array_coordinates(index, None, 6) for index in range(8)] == [
+        (0, 0),
+        (0, 1),
+        (0, 2),
+        (0, 3),
+        (0, 4),
+        (0, 5),
+        (1, 0),
+        (1, 1),
+    ]
 
 
 def test_resume_rejects_a_stale_freeze_fingerprint() -> None:

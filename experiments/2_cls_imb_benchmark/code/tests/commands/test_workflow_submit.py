@@ -22,6 +22,7 @@ def _config() -> dict[str, object]:
             "code_dir": "/home/example/master-thesis/experiments/2_cls_imb_benchmark/code",
             "container": "/home/example/environment.sif",
             "test_partition": "gpu-test",
+            "tune_natural_observations_per_candidate": 6,
             "squashfs": [
                 {
                     "source": SQUASHFS_SOURCE,
@@ -49,6 +50,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "analyze",
     ]
     assert jobs[-2].dependencies == ("tune-final-reduce",)
+    assert jobs[3].array_size == 792
+    assert "--observations-per-candidate 6" in jobs[3].command
     script = render_sbatch(jobs[-2], _config(), "config.yaml")
     assert "#SBATCH --array=0-11" in script
     assert (

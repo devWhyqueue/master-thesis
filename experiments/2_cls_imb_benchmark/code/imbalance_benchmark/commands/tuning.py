@@ -15,7 +15,6 @@ from imbalance_benchmark.common import (
     load_config,
     sign_file,
     split_paths,
-    verify_signed_file,
     write_json,
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
@@ -32,12 +31,14 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     write_final_selections,
     write_serial_cost,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import selected_ce
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
     combined_scopes,
     run_candidate_shard,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    array_coordinates,
     phase_methods,
     requested_shard,
 )
@@ -179,13 +180,18 @@ def cmd_tune_shard(args: argparse.Namespace) -> None:
     base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
     if any(_is_excluded(paths) for paths, _, _ in raw_scopes):
         return
-    spec = requested_shard(
+    shard_index, observation_index = array_coordinates(
         args.shard_index,
+        args.observation_index,
+        args.observations_per_candidate,
+    )
+    spec = requested_shard(
+        shard_index,
         args.phase,
         args.group,
         raw_scopes[0][1].is_mil,
         freeze["method_grids"],
-        args.observation_index,
+        observation_index,
     )
     if spec is None:
         return
@@ -213,16 +219,10 @@ def _run_shard(
         _tuning_seeds(freeze),
         fingerprint,
         base["data"],
-        _selected_ce(base["data"], spec.condition)
+        selected_ce(base["data"], spec.condition)
         if spec.phase == "dependent"
         else None,
     )
-
-
-def _selected_ce(root: Path, condition: str) -> dict[str, Any]:
-    path = root / "tuning_shards" / f"base_selections_{condition}.json"
-    verify_signed_file(path)
-    return json.loads(path.read_text())["ce"]
 
 
 def cmd_tune_reduce(args: argparse.Namespace) -> None:

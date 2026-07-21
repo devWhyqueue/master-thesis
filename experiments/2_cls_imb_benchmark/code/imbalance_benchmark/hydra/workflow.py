@@ -94,6 +94,9 @@ def _tuning_jobs(
 ) -> list[SlurmJob]:
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     roster = roster_for_regime(is_mil)
+    natural_observations = int(
+        config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
+    )
     base_methods = tuple(method for method in roster if method not in DEPENDENT_METHODS)
     dependent_methods = tuple(
         method for method in roster if method in DEPENDENT_METHODS
@@ -102,13 +105,14 @@ def _tuning_jobs(
         _job(
             config,
             "tune-base-natural",
-            "tune-shard --phase base --group natural",
+            "tune-shard --phase base --group natural"
+            f" --observations-per-candidate {natural_observations}",
             True,
             freeze_dependency,
             "tune_natural",
             "tune",
         ),
-        array_size=candidate_array_size(base_methods),
+        array_size=candidate_array_size(base_methods) * natural_observations,
     )
     base_controlled = replace(
         _job(

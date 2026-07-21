@@ -159,6 +159,13 @@ def expected_observations(
     return assignment_count * 3 * seed_count
 
 
+def selected_ce(root: Path, condition: str) -> dict[str, Any]:
+    """Load the signed base-phase CE selection for dependent shards."""
+    path = root / "tuning_shards" / f"base_selections_{condition}.json"
+    verify_signed_file(path)
+    return json.loads(path.read_text())["ce"]
+
+
 def _merge_observation_shards(
     root: Path, spec: ShardSpec, fingerprint: list[str], expected: int
 ) -> dict[str, Any]:
