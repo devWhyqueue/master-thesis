@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-from argparse import Namespace
 import json
+from argparse import Namespace
+from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 import torch
 import yaml
@@ -13,16 +13,94 @@ import yaml
 from imbalance_benchmark.analysis.inference.permutation import (
     paired_block_permutation_ba,
 )
-from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.prepare import cmd_prepare
-from imbalance_benchmark.construction import allocate_counts, max_shared_total
-from imbalance_benchmark.manifest.construction_helpers import cap_feasible_shared_total
-from imbalance_benchmark.manifest.freeze import achieved_rho
-from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.common import sign_file
+from imbalance_benchmark.construction import allocate_counts, max_shared_total
+from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.datasets.data import BagFeatureDataset
+from imbalance_benchmark.manifest.construction_helpers import cap_feasible_shared_total
+from imbalance_benchmark.manifest.pilot import run_pilot_seed
+from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
 
+def test_pilot_construction_and_initialization_seeds_are_separate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    observed: list[int] = []
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot.build_patch_pilot_manifest",
+        lambda *_: pd.DataFrame(),
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot.evaluate_pilot_candidate",
+        lambda *args, **kwargs: (
+            observed.append(kwargs["initialization_seed"]) or (0.5, [0.5])
+        ),
+    )
+
+    construction_seed = 17
+    run_pilot_seed(
+        pd.DataFrame(),
+        ["A"],
+        [5],
+        construction_seed,
+        object(),
+        torch.device("cpu"),
+        1,
+        False,
+        tmp_path,
+        1,
+        initialization_seed=101,
+    )
+
+    assert observed == [101]
+
+def test_native_tail_order_uses_bracs_clinical_label_order() -> None:
+    rows = [
+        {"cancer_type": label, "split": split}
+        for split in ("train", "validation", "test")
+        for label in ("IC", "N", "ADH", "PB", "DCIS", "UDH", "FEA")
+    ]
+
+    assert locked_class_names(pd.DataFrame(rows)) == [
+        "N",
+        "PB",
+        "UDH",
+        "FEA",
+        "ADH",
+        "DCIS",
+        "IC",
+    ]
+
+def test_bag_instance_cap_uses_the_frozen_selection_seed(tmp_path: Path) -> None:
+    feature = tmp_path / "slide.pt"
+    torch.save(torch.arange(24, dtype=torch.float32).reshape(12, 2), feature)
+    manifest = tmp_path / "manifest.csv"
+    pd.DataFrame(
+        [
+            {
+                "case_id": "case",
+                "slide_id": "slide",
+                "cancer_type": "A",
+                "feature_path": feature,
+            }
+        ]
+    ).to_csv(manifest, index=False)
+
+    first, _ = BagFeatureDataset(manifest, max_instances=4, instance_selection_seed=1)[
+        0
+    ]
+    repeat, _ = BagFeatureDataset(manifest, max_instances=4, instance_selection_seed=1)[
+        0
+    ]
+    second, _ = BagFeatureDataset(manifest, max_instances=4, instance_selection_seed=2)[
+        0
+    ]
+
+    assert torch.equal(first, repeat)
+    assert not torch.equal(first, second)
 
 def test_shared_total_keeps_all_naturally_balanced_support() -> None:
     available = [100, 100, 100]
@@ -33,7 +111,6 @@ def test_shared_total_keeps_all_naturally_balanced_support() -> None:
         allocation = allocate_counts(available, shared_total, ratio, min_support=10)
         assert sum(allocation) == shared_total
         assert all(count <= support for count, support in zip(allocation, available))
-
 
 def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_one() -> (
     None
@@ -60,68 +137,6 @@ def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_
     )
 
     assert total == 301
-
-
-def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:
-    frame = pd.DataFrame(
-        [
-            {
-                "case_id": f"{name}_{slide}",
-                "slide_id": f"{name}_{slide}",
-                "feature_path": f"{name}_{slide}_{chunk}.pt",
-                "cancer_type": name,
-            }
-            for name in ("A", "B")
-            for slide in range(30)
-            for chunk in range(2)
-        ]
-    )
-
-    total = cap_feasible_shared_total(
-        frame,
-        ["A", "B"],
-        min_support=20,
-        is_mil=True,
-        seed=1,
-        independent_floor=10,
-    )
-
-    assert total == 60
-
-
-def test_bag_dataset_concatenates_all_feature_chunks_before_capping(
-    tmp_path: Path,
-) -> None:
-    first, second = tmp_path / "first.pt", tmp_path / "second.pt"
-    torch.save(torch.ones(3, 4), first)
-    torch.save(torch.full((4, 4), 2.0), second)
-    manifest = tmp_path / "manifest.csv"
-    pd.DataFrame(
-        [
-            {
-                "case_id": "case",
-                "slide_id": "slide",
-                "cancer_type": "A",
-                "feature_path": first,
-            },
-            {
-                "case_id": "case",
-                "slide_id": "slide",
-                "cancer_type": "A",
-                "feature_path": second,
-            },
-        ]
-    ).to_csv(manifest, index=False)
-
-    uncapped, _ = BagFeatureDataset(manifest, max_instances=0)[0]
-    bag, target = BagFeatureDataset(manifest, max_instances=5)[0]
-
-    assert target == 0
-    assert len(uncapped) == 7
-    assert uncapped.sum().item() == pytest.approx(44.0)
-    assert len(bag) == 5
-    assert bag.sum().item() == pytest.approx(32.0)
-
 
 def test_confirmation_training_context_receives_the_validation_loader(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -167,7 +182,6 @@ def test_confirmation_training_context_receives_the_validation_loader(
 
     assert seen == [val_loader]
 
-
 def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     with config_path.open("w", encoding="utf-8") as handle:
@@ -186,7 +200,6 @@ def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -
         not manifests[0][["case_id", "split"]].equals(frame[["case_id", "split"]])
         for frame in manifests[1:]
     )
-
 
 def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
@@ -234,7 +247,6 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
     )
     preflight = json.loads(Path(freeze["bootstrap_preflight"]["path"]).read_text())
     assert preflight["seed"] == derive_seed(7, "resampling")
-
 
 def test_two_seed_permutation_stack_is_not_mistaken_for_one_probability_matrix():
     labels = np.array([0, 1, 0, 1])

@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+import torch
+
+from imbalance_benchmark.commands import tuning
+from imbalance_benchmark.commands.confirm import require_tuning_configs
+from imbalance_benchmark.modeling.context import Regime
+from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
+    TuningScope,
+    _select_trainable,
+    summarize_tuning_cost,
+)
+from typing import Any
+import argparse
+
+def test_tuning_uses_the_frozen_initialization_seeds() -> None:
+    """Post-freeze CLI seeds must not alter the two locked tuning repetitions."""
+    freeze = {
+        "seed_roles": {
+            "tuning_initialization_0": 101,
+            "tuning_initialization_1": 202,
+        }
+    }
+
+    assert tuning._tuning_seeds(freeze) == [101, 202]
+
+def test_tuning_uses_the_frozen_candidate_grid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A source-code grid change after freeze cannot affect configuration selection."""
+    observed: list[dict[str, Any]] = []
+    regime = Regime(
+        torch.device("cpu"),
+        {},
+        2,
+        False,
+        method_grids={"ce": [{"lr": 0.123}]},
+    )
+    scope = TuningScope(regime, object(), object())
+
+    def evaluate(
+        _: str, cfg: dict[str, Any], *__: object
+    ) -> tuple[dict[str, Any], dict[str, float]]:
+        observed.append(cfg)
+        return {}, {"balanced_accuracy": 0.5, "macro_f1": 0.5, "nll": 0.5}
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.modeling.workflows.tuning_aggregate._evaluate", evaluate
+    )
+
+    _select_trainable("ce", [scope], [7])
+
+    assert observed == [{"lr": 0.123}]
+
+def test_tuning_cost_summarizes_parameter_counts_and_effective_passes() -> None:
+    """Validation-search cost must expose its model size and realized data passes."""
+    cost = summarize_tuning_cost(
+        [
+            {
+                "processed_examples": 12,
+                "unique_training_examples": 6,
+                "total_parameters": 10,
+                "trainable_parameters": 8,
+                "training_footprint_parameters": 20,
+            }
+        ]
+    )
+
+    assert cost["effective_passes_through_unique_examples"] == 2.0
+    assert cost["maximum_total_parameters"] == 10
+    assert cost["maximum_trainable_parameters"] == 8
+    assert cost["maximum_training_footprint_parameters"] == 20
+
+def test_tuning_rejects_a_single_split_as_a_definitive_selection() -> None:
+    args = argparse.Namespace(split_index=0, config=None, seed=0)
+
+    with pytest.raises(ValueError, match="all three"):
+        tuning.cmd_tune(args)
+
+def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
+    from imbalance_benchmark.common import sign_file, verify_signed_file, write_json
+
+    selection = tmp_path / "tuning_selections.json"
+    write_json(selection, {"native": {"severe": {"weighted_ce": {"lr": 1e-3}}}})
+    sign_file(selection)
+
+    verify_signed_file(selection)  # unaltered: passes
+
+    write_json(selection, {"native": {"severe": {"weighted_ce": {"lr": 3e-3}}}})
+    with pytest.raises(RuntimeError, match="no longer matches"):
+        verify_signed_file(selection)
+
+    unsigned = tmp_path / "tuning_selections_severe.json"
+    write_json(unsigned, {})
+    with pytest.raises(RuntimeError, match="no signed lock"):
+        verify_signed_file(unsigned)
+
+def test_missing_tuning_selection_stops_confirmation() -> None:
+    with pytest.raises(RuntimeError, match="missing tuning selection"):
+        require_tuning_configs({"ce": {"lr": 1e-3}}, ("ce", "weighted_ce"))

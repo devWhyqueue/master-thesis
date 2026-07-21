@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
-from PIL import Image
 
+from PIL import Image
+from imbalance_benchmark.commands.pilot import _pilot_setup
 from imbalance_benchmark.datasets.bracs import (
     assert_patient_disjoint,
     list_slide_tiles,
@@ -13,7 +16,88 @@ from imbalance_benchmark.datasets.bracs import (
     split_cases,
     tile_rois,
 )
+from imbalance_benchmark.datasets.bracs import LABELS as BRACS_LABELS
+from imbalance_benchmark.datasets.bracs import wsi as bracs_wsi
+import imbalance_benchmark.datasets as dataset_adapters
 
+def test_bracs_wsi_uses_official_slide_metadata_without_roi_supervision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """BRACS WSI bags use official slide labels and never inspect ROI metadata."""
+    tile = tmp_path / "tile.jpg"
+    tile.touch()
+    pd.DataFrame(
+        {
+            "slide_id": ["BRACS_1"],
+            "image_path": [str(tile)],
+            "magnification": ["20x"],
+            "tile_size": [256],
+            "x": [0],
+            "y": [0],
+            "otsu_foreground_fraction": [0.5],
+            "grayscale_std": [10.0],
+            "canny_edge_count": [1],
+            "tissue_neighbors": [2],
+            "sha256": [
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ],
+        }
+    ).to_csv(tmp_path / "tile_manifest.csv", index=False)
+    monkeypatch.setattr(
+        dataset_adapters.bracs,
+        "load_roi_metadata",
+        lambda *_: (_ for _ in ()).throw(AssertionError("WSI must not read ROIs")),
+    )
+    monkeypatch.setattr(
+        dataset_adapters.bracs.wsi,
+        "load_wsi_metadata",
+        lambda *_: pd.DataFrame(
+            {
+                "dataset": ["bracs"],
+                "case_id": ["patient_1"],
+                "slide_id": ["BRACS_1"],
+                "slide_label": ["DCIS"],
+            }
+        ),
+    )
+    rows = dataset_adapters._build_bracs(
+        {
+            "dataset": {
+                "root": str(tmp_path),
+                "wsi_tile_root": str(tmp_path),
+                "expected_wsi_count": 1,
+                "regime": "wsi",
+            }
+        }
+    )
+
+    assert rows["cancer_type"].tolist() == ["DCIS"]
+    assert rows["slide_label"].tolist() == ["DCIS"]
+    assert "patch_label" not in rows
+
+def test_bracs_wsi_manifest_rejects_different_slide_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    official = pd.DataFrame(
+        {
+            "case_id": ["pA", "pB"],
+            "slide_id": ["A", "B"],
+            "slide_label": ["N", "N"],
+        }
+    )
+    tiles = pd.DataFrame(
+        {"slide_id": ["A", "C"], "image_path": ["A.jpg", "C.jpg"]}
+    )
+    monkeypatch.setattr(bracs_wsi, "load_wsi_metadata", lambda *_args: official)
+    monkeypatch.setattr(bracs_wsi, "load_tile_manifest", lambda *_args: tiles)
+    monkeypatch.setattr(
+        bracs_wsi.metadata,
+        "split_cases",
+        lambda *_args: pd.DataFrame({"case_id": ["pA"], "split": ["train"]}),
+    )
+
+    with pytest.raises(ValueError, match="slide IDs"):
+        bracs_wsi.build_manifest(tmp_path, tmp_path, 0, expected_slides=2)
 
 def test_bracs_roi_metadata_joins_release_filenames_to_patients(
     monkeypatch: pytest.MonkeyPatch, tmp_path
@@ -51,7 +135,6 @@ def test_bracs_roi_metadata_joins_release_filenames_to_patients(
         }
     ]
 
-
 def test_bracs_label_normalization_maps_seven_subtypes() -> None:
     assert normalize_label("Normal") == "N"
     assert normalize_label("Pathological Benign") == "PB"
@@ -61,7 +144,6 @@ def test_bracs_label_normalization_maps_seven_subtypes() -> None:
     assert normalize_label("Ductal Carcinoma in Situ") == "DCIS"
     assert normalize_label("Invasive Carcinoma") == "IC"
     assert normalize_label("not a subtype") is None
-
 
 def test_bracs_split_cases_are_patient_disjoint() -> None:
     frame = pd.DataFrame(
@@ -75,7 +157,6 @@ def test_bracs_split_cases_are_patient_disjoint() -> None:
     assert_patient_disjoint(assigned)
     assert set(assigned["split"]).issubset({"train", "validation", "test"})
 
-
 def test_bracs_patient_disjoint_validation_rejects_leakage() -> None:
     frame = pd.DataFrame({"case_id": ["p1", "p1"], "split": ["train", "test"]})
     try:
@@ -84,7 +165,6 @@ def test_bracs_patient_disjoint_validation_rejects_leakage() -> None:
         assert "patient leakage" in str(error)
     else:
         raise AssertionError("Expected patient leakage to raise.")
-
 
 def test_bracs_roi_tiling_is_deterministic(tmp_path) -> None:
     image = tmp_path / "roi_a.jpg"
@@ -105,7 +185,6 @@ def test_bracs_roi_tiling_is_deterministic(tmp_path) -> None:
 
     assert tiled["patch_id"].tolist() == ["roi_a__000_0_0", "roi_a__001_256_0"]
     assert all(path.endswith(".jpg") for path in tiled["image_path"])
-
 
 def test_bracs_tiling_retains_every_complete_roi_patch(tmp_path) -> None:
     images = {}
@@ -131,7 +210,6 @@ def test_bracs_tiling_retains_every_complete_roi_patch(tmp_path) -> None:
     per_wsi = tiled.groupby("slide_id")["patch_id"].count()
     assert per_wsi.to_dict() == {"s1": 2, "s2": 3, "s3": 5}
 
-
 def test_bracs_wsi_metadata_uses_official_labels_without_roi_derivation(
     tmp_path,
 ) -> None:
@@ -152,7 +230,6 @@ def test_bracs_wsi_metadata_uses_official_labels_without_roi_derivation(
         {"slide_id": "BRACS_2", "case_id": "p2", "slide_label": "IC"},
     ]
 
-
 def test_bracs_wsi_tiles_have_deterministic_order(tmp_path) -> None:
     slide_dir = tmp_path / "BRACS_1"
     slide_dir.mkdir()
@@ -166,3 +243,19 @@ def test_bracs_wsi_tiles_have_deterministic_order(tmp_path) -> None:
         "patch_02.jpg",
         "patch_10.jpg",
     ]
+
+def test_pilot_uses_the_same_semantic_bracs_order_as_the_freeze(tmp_path: Path) -> None:
+    rows = [
+        {
+            "case_id": f"patient-{name}",
+            "slide_id": f"slide-{name}",
+            "cancer_type": name,
+            "split": "train",
+        }
+        for name in BRACS_LABELS
+    ]
+    pd.DataFrame(rows).to_csv(tmp_path / "manifest.csv", index=False)
+
+    _, class_names, *_ = _pilot_setup({"data": tmp_path}, {"dataset": {}})
+
+    assert class_names == list(BRACS_LABELS)

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pandas as pd
+import pytest
 import torch
 
+from imbalance_benchmark.commands import prepare
+from imbalance_benchmark.datasets import features
 from imbalance_benchmark.datasets import features as feature_lib
 from imbalance_benchmark.datasets.features import (
     _virchow2_pool,
@@ -12,6 +18,51 @@ from imbalance_benchmark.datasets.features import (
     patch_sort_key,
 )
 
+def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
+    from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
+    from imbalance_benchmark.datasets.panda_audit import validate_tile_inventory
+
+    with pytest.raises(ValueError, match="audit"):
+        validate_tile_manifest(
+            pd.DataFrame({"slide_id": ["s"], "image_path": ["tile.jpg"]}),
+            expected_slides=1,
+        )
+    with pytest.raises(ValueError, match="audit"):
+        validate_tile_inventory(
+            pd.DataFrame({"slide_id": ["s"]}),
+            {"s": pd.DataFrame({"image_path": ["tile.jpg"]})},
+            pd.DataFrame({"slide_id": ["s"]}),
+            expected_slides=1,
+        )
+
+def test_frozen_feature_reuse_verifies_revision_order_rows_and_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        features,
+        "extract_slide_features",
+        lambda paths, *_args, **_kwargs: torch.ones(len(paths), 2560),
+    )
+    frame = pd.DataFrame(
+        {
+            "slide_id": ["s1", "s1"],
+            "patch_id": ["p0", "p1"],
+            "image_path": ["p0.jpg", "p1.jpg"],
+        }
+    )
+    root = tmp_path / "features"
+    features.attach_extracted_features(frame, root)
+    provenance = json.loads((root / "feature_provenance.json").read_text())
+    assert provenance["encoder_revision"]
+    assert provenance["weights_sha256"]
+
+    with pytest.raises(ValueError, match="patch order"):
+        features.attach_extracted_features(frame.iloc[::-1], root)
+
+    tensor_path = root / "s1.pt"
+    torch.save(torch.ones(1, 2560), tensor_path)
+    with pytest.raises(ValueError, match="row count|hash"):
+        features.attach_extracted_features(frame, root)
 
 def test_load_feature_model_loads_verified_safetensors_explicitly(
     tmp_path, monkeypatch
@@ -58,11 +109,9 @@ def test_load_feature_model_loads_verified_safetensors_explicitly(
     assert isinstance(model, Model)
     assert returned_transform is transform
 
-
 def test_patch_sort_key_orders_by_region_then_index() -> None:
     items = ["1_2", "0_9", "1_0", "0_0"]
     assert sorted(items, key=patch_sort_key) == ["0_0", "0_9", "1_0", "1_2"]
-
 
 def test_virchow2_pool_concatenates_cls_and_mean_patch_tokens() -> None:
     # (batch=1, tokens=7, dim=4): token 0 is CLS, tokens 1-4 are register tokens
@@ -78,13 +127,11 @@ def test_virchow2_pool_concatenates_cls_and_mean_patch_tokens() -> None:
     assert torch.allclose(pooled[0, :4], torch.tensor([1.0, 2.0, 3.0, 4.0]))
     assert torch.allclose(pooled[0, 4:], torch.tensor([2.0, 2.0, 2.0, 2.0]))
 
-
 def test_load_slide_features_normalizes_single_vector(tmp_path) -> None:
     path = tmp_path / "slide_0.pt"
     torch.save(torch.randn(2560), path)
     tensor = load_slide_features(str(path))
     assert tensor.shape == (1, 2560)
-
 
 def test_load_feature_row_requires_index_for_multirow(tmp_path) -> None:
     path = tmp_path / "slide_0.pt"
@@ -97,7 +144,6 @@ def test_load_feature_row_requires_index_for_multirow(tmp_path) -> None:
         raise AssertionError("Expected multi-row tensor to require an index.")
     vector = load_feature_row(str(path), 1)
     assert vector.shape == (2560,)
-
 
 def test_attach_extracted_features_writes_one_tensor_per_slide(
     tmp_path, monkeypatch
@@ -129,3 +175,40 @@ def test_attach_extracted_features_writes_one_tensor_per_slide(
     # Re-running with existing tensors on disk must not re-extract.
     feature_lib.attach_extracted_features(frame, tmp_path / "features")
     assert len(calls) == 2
+
+def test_feature_extraction_rejects_a_non_virchow2_encoder() -> None:
+    with pytest.raises(ValueError, match="Virchow2"):
+        features.resolve_feature_provenance({"model_name": "resnet50"})
+
+def test_prepare_validates_encoder_for_precomputed_feature_manifests(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        prepare,
+        "build_manifest",
+        lambda _: pd.DataFrame({"feature_path": ["cached.pt"]}),
+    )
+
+    with pytest.raises(ValueError, match="Virchow2"):
+        prepare._base_manifest(
+            {
+                "dataset": {"name": "precomputed"},
+                "feature_extraction": {"model_name": "resnet50"},
+            },
+            {"data": tmp_path},
+        )
+
+def test_feature_cache_rejects_metadata_from_a_different_encoder_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    frame = pd.DataFrame({"slide_id": ["s1"], "image_path": ["s1.jpg"]})
+    monkeypatch.setattr(
+        features,
+        "extract_slide_features",
+        lambda *_args, **_kwargs: torch.ones(1, 2560),
+    )
+    root = tmp_path / "features"
+    features.attach_extracted_features(frame, root, dtype="float16")
+
+    with pytest.raises(ValueError, match="provenance"):
+        features.attach_extracted_features(frame, root, dtype="float32")

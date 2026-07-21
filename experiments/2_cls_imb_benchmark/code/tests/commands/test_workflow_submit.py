@@ -1,6 +1,6 @@
-"""Tests for Phase 5's dependency-linked Hydra submission workflow."""
-
 from __future__ import annotations
+
+
 
 from imbalance_benchmark.hydra.workflow import (
     build_workflow,
@@ -8,12 +8,11 @@ from imbalance_benchmark.hydra.workflow import (
     submit_workflow,
 )
 
+PANDA_RAW = "/home/space/datasets/panda/raw"
 SQUASHFS_SOURCE = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
 SQUASHFS_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
-PANDA_RAW = "/home/space/datasets/panda/raw"
 GENERATED_TILES = "/tmp/bracs_roi_tiles"
 GENERATED_SQUASHFS = "/home/example/outputs/bracs/roi_tiles.sqfs"
-
 
 def _config() -> dict[str, object]:
     return {
@@ -32,7 +31,6 @@ def _config() -> dict[str, object]:
             ],
         }
     }
-
 
 def test_workflow_has_afterok_condition_arrays() -> None:
     """The main DAG serializes setup and fans training work out by condition."""
@@ -59,7 +57,6 @@ def test_workflow_has_afterok_condition_arrays() -> None:
         in script
     )
 
-
 def test_submit_links_actual_job_ids() -> None:
     """Submission turns stage names into the preceding scheduler job IDs."""
     submitted_scripts: list[str] = []
@@ -79,7 +76,6 @@ def test_submit_links_actual_job_ids() -> None:
     }
     assert "#SBATCH --dependency=afterok:4" in submitted_scripts[4]
     assert "#SBATCH --dependency=afterok:5" in submitted_scripts[5]
-
 
 def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
     """Large image copies must not be repeated across downstream array jobs."""
@@ -101,7 +97,6 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         # patch-regime features are read by absolute path during tune/confirm.
         assert '-B "/home/space:/home/space:ro"' in scripts[stage]
 
-
 def test_staged_binds_get_their_own_dash_b_flag() -> None:
     """A ``BINDS`` array entry with no ``-B`` flag is passed as a bare apptainer
     positional argument instead of a bind spec, so apptainer tries to open it
@@ -111,7 +106,6 @@ def test_staged_binds_get_their_own_dash_b_flag() -> None:
         for job in build_workflow(_config())
     }
     assert 'BINDS+=("-B" "$STAGE_DIR/0.sqfs' in scripts["prepare"]
-
 
 def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     """BRACS tiles stay node-local and persist as one reusable image."""
@@ -135,7 +129,6 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     assert f"mv {GENERATED_SQUASHFS}.partial {GENERATED_SQUASHFS}" in prepare
     for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
         assert GENERATED_SQUASHFS not in scripts[stage]
-
 
 def test_smoke_workflow_uses_test_partition() -> None:
     """The synthetic validation has a one-job test-partition submission path."""
