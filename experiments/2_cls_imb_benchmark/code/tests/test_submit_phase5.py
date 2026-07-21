@@ -90,7 +90,7 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
 
     assert f"cp {SQUASHFS_SOURCE}" in scripts["prepare"]
     assert (
-        f'BINDS+=("$STAGE_DIR/0.sqfs:{SQUASHFS_MOUNT}:image-src=/")'
+        f'BINDS+=("-B" "$STAGE_DIR/0.sqfs:{SQUASHFS_MOUNT}:image-src=/")'
         in scripts["prepare"]
     )
     assert f'-B "{PANDA_RAW}:{PANDA_RAW}:ro"' in scripts["prepare"]
@@ -100,6 +100,17 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         # Shared datasets under /home/space must stay reachable at every stage:
         # patch-regime features are read by absolute path during tune/confirm.
         assert '-B "/home/space:/home/space:ro"' in scripts[stage]
+
+
+def test_staged_binds_get_their_own_dash_b_flag() -> None:
+    """A ``BINDS`` array entry with no ``-B`` flag is passed as a bare apptainer
+    positional argument instead of a bind spec, so apptainer tries to open it
+    as the container image and fails."""
+    scripts = {
+        job.name: render_sbatch(job, _config(), "config.yaml")
+        for job in build_workflow(_config())
+    }
+    assert 'BINDS+=("-B" "$STAGE_DIR/0.sqfs' in scripts["prepare"]
 
 
 def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
@@ -116,7 +127,10 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     }
 
     prepare = scripts["prepare"]
-    assert f"{GENERATED_SQUASHFS}:{GENERATED_TILES}:image-src=/" in prepare
+    assert (
+        f'BINDS+=("-B" {GENERATED_SQUASHFS}:{GENERATED_TILES}:image-src=/)'
+        in prepare.replace("'", "")
+    )
     assert f"squash-dataset {GENERATED_TILES} {GENERATED_SQUASHFS}.partial" in prepare
     assert f"mv {GENERATED_SQUASHFS}.partial {GENERATED_SQUASHFS}" in prepare
     for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):

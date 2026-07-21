@@ -26,7 +26,7 @@ def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
         lines.extend(
             [
                 f'cp {shlex.quote(source)} "{local}"',
-                f'BINDS+=("{local}:{mount}:image-src=/")',
+                f'BINDS+=("-B" "{local}:{mount}:image-src=/")',
             ]
         )
     return lines
@@ -51,7 +51,7 @@ def _mount_generated_tile_lines(generated: tuple[str, str] | None) -> list[str]:
     source, image = generated
     return [
         f"if [ -f {shlex.quote(image)} ]; then",
-        f"  BINDS+=({shlex.quote(f'{image}:{source}:image-src=/')})",
+        f'  BINDS+=("-B" {shlex.quote(f"{image}:{source}:image-src=/")})',
         "fi",
     ]
 
