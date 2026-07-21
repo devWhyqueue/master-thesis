@@ -23,7 +23,10 @@ from imbalance_benchmark.modeling.special_methods import (
 from imbalance_benchmark.modeling.training import (
     ClassAwareBatchSampler,
     CHECKPOINT_INTERVAL,
+    build_evaluation_loader,
     fit_model,
+    initial_checkpoint,
+    run_evaluation,
     update_budget,
 )
 from imbalance_benchmark.modeling.training import _fit_step
@@ -190,6 +193,36 @@ def test_training_uses_the_frozen_update_budget(tmp_path):
     fit_model(ctx)
 
     assert ctx["selected_checkpoint_step"] == 2
+
+
+def test_large_patch_evaluation_batches_preserve_metrics(tmp_path: Path) -> None:
+    dataset = ImbalanceDataset(_write_patch_manifest(tmp_path, n_classes=2, per_class=3))
+    model = MLP(DIM, 8, 2, dropout=0.0)
+    optimized = build_evaluation_loader(dataset, is_mil=False)
+    reference = torch.utils.data.DataLoader(dataset, batch_size=2)
+    optimized_result = run_evaluation(
+        model, optimized, torch.device("cpu"), False, 2
+    )
+    reference_result = run_evaluation(
+        model, reference, torch.device("cpu"), False, 2
+    )
+
+    assert optimized.batch_size == 4096
+    for name in ("logits", "probs", "preds", "targets"):
+        np.testing.assert_allclose(optimized_result[name], reference_result[name])
+    for name in ("balanced_accuracy", "macro_f1", "nll"):
+        assert optimized_result[name] == pytest.approx(reference_result[name])
+    optimized_checkpoint = initial_checkpoint(
+        model, optimized, torch.device("cpu"), False, 2
+    )
+    reference_checkpoint = initial_checkpoint(
+        model, reference, torch.device("cpu"), False, 2
+    )
+    assert optimized_checkpoint["step"] == reference_checkpoint["step"]
+    for name in ("acc", "f1", "nll"):
+        assert optimized_checkpoint[name] == pytest.approx(reference_checkpoint[name])
+    for name, value in optimized_checkpoint["state"].items():
+        torch.testing.assert_close(value, reference_checkpoint["state"][name])
 
 @pytest.mark.parametrize(
     ("method", "param"),

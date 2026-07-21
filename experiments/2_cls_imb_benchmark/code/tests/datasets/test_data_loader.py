@@ -54,6 +54,28 @@ def test_dataset_uses_the_locked_global_class_index_even_when_a_split_is_sparse(
     assert dataset.get_n_classes() == 2
     assert dataset[0]["target"] == 0
 
+
+def test_patch_dataset_keeps_features_on_cpu_until_batch_transfer(
+    tmp_path: Path,
+) -> None:
+    manifest = tmp_path / "manifest.csv"
+    feature = tmp_path / "feature.pt"
+    torch.save(torch.ones(1, 2), feature)
+    pd.DataFrame(
+        [
+            {
+                "case_id": "p1",
+                "slide_id": "s1",
+                "cancer_type": "A",
+                "feature_path": feature,
+            }
+        ]
+    ).to_csv(manifest, index=False)
+
+    sample = ImbalanceDataset(manifest)[0]
+
+    assert sample["features"].device.type == "cpu"
+
 def test_bag_dataset_rejects_multiple_labels_for_one_slide(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.csv"
     pd.DataFrame(

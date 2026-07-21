@@ -26,6 +26,8 @@ class TuningScope:
     train_ds: TrainDataset
     cost_records: list[dict[str, int]] = field(default_factory=list)
     update_budget: int | None = None
+    assignment: str = "native"
+    split_index: int = 0
 
 
 def _frozen_grid(regime: Regime, method: str) -> list[dict[str, Any]]:

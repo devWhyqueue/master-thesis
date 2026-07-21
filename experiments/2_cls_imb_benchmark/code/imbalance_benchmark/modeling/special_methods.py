@@ -77,6 +77,7 @@ def _build_mde_loaders(
         batch_size=b_size,
         sampler=_RecordingSampler(natural, exposed),
         collate_fn=bag_collate,
+        pin_memory=torch.cuda.is_available(),
     )
     loader_b = DataLoader(
         dataset,
@@ -85,6 +86,7 @@ def _build_mde_loaders(
             get_balanced_sampler(train_labels, 1.0, seed + 1), exposed
         ),
         collate_fn=bag_collate,
+        pin_memory=torch.cuda.is_available(),
     )
     return loader_u, loader_b
 
@@ -111,10 +113,10 @@ def _mde_train_loop(
             opt.zero_grad()
             loss = mde_bag_loss(
                 model,
-                [b.to(device) for b in bags_u],
-                targets_u.to(device),
-                [b.to(device) for b in bags_b],
-                targets_b.to(device),
+                [b.to(device, non_blocking=True) for b in bags_u],
+                targets_u.to(device, non_blocking=True),
+                [b.to(device, non_blocking=True) for b in bags_b],
+                targets_b.to(device, non_blocking=True),
                 lambda_con,
             )
             ctx["processed_examples"] = (

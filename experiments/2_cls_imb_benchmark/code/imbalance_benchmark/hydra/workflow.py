@@ -1,44 +1,31 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, replace
+from dataclasses import replace
+import json
 import logging
-import posixpath
-import shlex
 import subprocess
 from typing import Any, Callable
 
-from imbalance_benchmark.common import EXPERIMENT_ROOT, load_config
-from imbalance_benchmark.hydra.squashfs import (
-    _generated_tile_squashfs,
-    _mount_generated_tile_lines,
-    _pack_generated_tile_lines,
-    _stage_images,
-    _staging_lines,
-)
+from imbalance_benchmark.common import ensure_dirs, load_config, split_paths
+from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.modeling.context import CONDITIONS
+from imbalance_benchmark.modeling.context import roster_for_regime
+from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
+from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    DEPENDENT_METHODS,
+    candidate_array_size,
+)
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class SlurmJob:
-    """One benchmark command and its SLURM resource requirements."""
-
-    name: str
-    command: str
-    partition: str
-    gpus: int
-    cpus: int
-    time_limit: str | None = None
-    dependency: str | None = None
-    array_splits: tuple[int, ...] = ()
-    array_conditions: tuple[str, ...] = ()
-
-
-def _resources(config: dict[str, Any], stage: str, gpu: bool) -> dict[str, Any]:
+def _resources(
+    config: dict[str, Any], stage: str, gpu: bool, fallback: str | None = None
+) -> dict[str, Any]:
     sl = config.get("slurm", {})
-    sr = sl.get("resources", {}).get(stage, {})
+    resources = sl.get("resources", {})
+    sr = resources.get(stage, resources.get(fallback, {}))
     part = sr.get("partition", sl.get("partition", "gpu-2h" if gpu else "cpu-2h"))
     time = sr.get("time")
     return {
@@ -52,158 +39,137 @@ def _resources(config: dict[str, Any], stage: str, gpu: bool) -> dict[str, Any]:
 
 
 def _job(
-    config: dict[str, Any], stage: str, cmd: str, gpu: bool, dep: str | None = None
+    config: dict[str, Any],
+    stage: str,
+    cmd: str,
+    gpu: bool,
+    dependencies: tuple[str, ...] = (),
+    resource: str | None = None,
+    fallback: str | None = None,
 ) -> SlurmJob:
-    return SlurmJob(stage, cmd, dependency=dep, **_resources(config, stage, gpu))
+    return SlurmJob(
+        stage,
+        cmd,
+        dependencies=dependencies,
+        **_resources(config, resource or stage, gpu, fallback),
+    )
 
 
-def build_workflow(config: dict[str, Any], smoke: bool = False) -> list[SlurmJob]:
+def build_workflow(
+    config: dict[str, Any], smoke: bool = False, resume_tuning: bool = False
+) -> list[SlurmJob]:
     """Build the benchmark DAG, or its test-partition synthetic smoke variant."""
     if smoke:
         res = _resources(config, "smoke", True)
         res["partition"] = config.get("slurm", {}).get("test_partition", "gpu-test")
         return [SlurmJob("smoke", "smoke", **res)]
     arr = (0, 1, 2)
-    p = _job(config, "prepare", "prepare", True)
-    pi = replace(_job(config, "pilot", "pilot", False, p.name), array_splits=arr)
-    fr = replace(_job(config, "freeze", "freeze", False, pi.name), array_splits=arr)
-    tu = replace(
-        _job(config, "tune", "tune", True, fr.name), array_conditions=CONDITIONS
-    )
+    setup = _setup_jobs(config, arr) if not resume_tuning else []
+    freeze_dependency = ("freeze",) if setup else ()
+    tuning = _tuning_jobs(config, freeze_dependency)
     co = replace(
-        _job(config, "confirm", "confirm", True, tu.name),
+        _job(config, "confirm", "confirm", True, ("tune-final-reduce",)),
         array_splits=arr,
         array_conditions=CONDITIONS,
     )
-    an = _job(config, "analyze", "analyze", False, co.name)
-    return [p, pi, fr, tu, co, an]
+    an = _job(config, "analyze", "analyze", False, (co.name,))
+    return [*setup, *tuning, co, an]
 
 
-def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
-    cfg_arg = f" --config {shlex.quote(config_path)}" if config_path else ""
-    prefix = f"python {shlex.quote(code_dir)}/__main__.py{cfg_arg}"
-    command = f"{prefix} {job.command}"
-    if not job.array_splits and not job.array_conditions:
-        return command
-    lines = []
-    if job.array_splits:
-        lines.append(f"SPLITS=({' '.join(str(v) for v in job.array_splits)})")
-    if job.array_conditions:
-        lines.append(
-            f"CONDITIONS=({' '.join(shlex.quote(v) for v in job.array_conditions)})"
-        )
-    if job.array_splits and job.array_conditions:
-        cmd_run = f'{prefix} --split-index "$SPLIT_INDEX" {job.command}'
-        lines.extend(
-            [
-                f"N_CONDITIONS={len(job.array_conditions)}",
-                'SPLIT_INDEX="${SPLITS[$SLURM_ARRAY_TASK_ID / $N_CONDITIONS]}"',
-                'CONDITION="${CONDITIONS[$SLURM_ARRAY_TASK_ID % $N_CONDITIONS]}"',
-                f'{cmd_run} --condition "$CONDITION"',
-            ]
-        )
-    elif job.array_splits:
-        lines.append(
-            f'{prefix} --split-index "${{SPLITS[$SLURM_ARRAY_TASK_ID]}}" {job.command}'
-        )
-    else:
-        lines.append(f'{command} --condition "${{CONDITIONS[$SLURM_ARRAY_TASK_ID]}}"')
-    return "\n".join(lines)
+def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJob]:
+    prepare = _job(config, "prepare", "prepare", True)
+    pilot = replace(
+        _job(config, "pilot", "pilot", False, (prepare.name,)),
+        array_splits=splits,
+    )
+    freeze = replace(
+        _job(config, "freeze", "freeze", False, (pilot.name,)),
+        array_splits=splits,
+    )
+    return [prepare, pilot, freeze]
 
 
-def _array_size(job: SlurmJob) -> int:
-    return max(1, len(job.array_splits)) * max(1, len(job.array_conditions))
-
-
-def _directives(job: SlurmJob, root: str) -> list[str]:
-    q = shlex.quote(root)
-    log_dir = f"{q}/experiments/2_cls_imb_benchmark/outputs/logs"
-    lines = [
-        "#!/bin/bash",
-        f"#SBATCH --job-name=imb-{job.name}",
-        f"#SBATCH --partition={job.partition}",
-        f"#SBATCH --gpus-per-node={job.gpus}",
-        f"#SBATCH --cpus-per-task={job.cpus}",
-        f"#SBATCH --output={log_dir}/%x-%A_%a.out",
-        f"#SBATCH --error={log_dir}/%x-%A_%a.err",
+def _tuning_jobs(
+    config: dict[str, Any], freeze_dependency: tuple[str, ...]
+) -> list[SlurmJob]:
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    roster = roster_for_regime(is_mil)
+    base_methods = tuple(method for method in roster if method not in DEPENDENT_METHODS)
+    dependent_methods = tuple(
+        method for method in roster if method in DEPENDENT_METHODS
+    )
+    base_natural = replace(
+        _job(
+            config,
+            "tune-base-natural",
+            "tune-shard --phase base --group natural",
+            True,
+            freeze_dependency,
+            "tune_natural",
+            "tune",
+        ),
+        array_size=candidate_array_size(base_methods),
+    )
+    base_controlled = replace(
+        _job(
+            config,
+            "tune-base-controlled",
+            "tune-shard --phase base --group controlled",
+            True,
+            freeze_dependency,
+            "tune_controlled",
+            "tune",
+        ),
+        array_size=3 * candidate_array_size(base_methods),
+    )
+    base_reduce = _job(
+        config,
+        "tune-base-reduce",
+        "tune-reduce --phase base",
+        False,
+        (base_natural.name, base_controlled.name),
+        "tune_reduce",
+    )
+    dependent_natural = replace(
+        _job(
+            config,
+            "tune-dependent-natural",
+            "tune-shard --phase dependent --group natural",
+            True,
+            (base_reduce.name,),
+            "tune_natural",
+            "tune",
+        ),
+        array_size=candidate_array_size(dependent_methods),
+    )
+    dependent_controlled = replace(
+        _job(
+            config,
+            "tune-dependent-controlled",
+            "tune-shard --phase dependent --group controlled",
+            True,
+            (base_reduce.name,),
+            "tune_controlled",
+            "tune",
+        ),
+        array_size=3 * candidate_array_size(dependent_methods),
+    )
+    final_reduce = _job(
+        config,
+        "tune-final-reduce",
+        "tune-reduce --phase final",
+        False,
+        (dependent_natural.name, dependent_controlled.name),
+        "tune_reduce",
+    )
+    return [
+        base_natural,
+        base_controlled,
+        base_reduce,
+        dependent_natural,
+        dependent_controlled,
+        final_reduce,
     ]
-    if job.time_limit:
-        lines.append(f"#SBATCH --time={job.time_limit}")
-    if job.array_splits or job.array_conditions:
-        lines.append(f"#SBATCH --array=0-{_array_size(job) - 1}")
-    if job.dependency:
-        lines.append(f"#SBATCH --dependency={job.dependency}")
-    return lines
-
-
-def _execution_lines(
-    job: SlurmJob,
-    root: str,
-    code_dir: str,
-    output_dir: str,
-    container: str,
-    command: str,
-    images: list[tuple[str, str]],
-    dataset_root: str,
-    generated_squashfs: tuple[str, str] | None,
-) -> list[str]:
-    r, c = shlex.quote(root), shlex.quote(code_dir)
-    o, co = shlex.quote(output_dir), shlex.quote(container)
-    cmd = shlex.quote(command)
-    lines = [
-        "",
-        "set -euo pipefail",
-        f"cd {r}",
-        f"mkdir -p {o}/logs",
-        f"export APPTAINERENV_PYTHONPATH={c}",
-        "BINDS=()",
-    ]
-    lines.extend(_staging_lines(images))
-    lines.extend(_mount_generated_tile_lines(generated_squashfs))
-    binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" -B "/home/space:/home/space:ro"'
-    if dataset_root:
-        binds += f' -B "{dataset_root}:{dataset_root}:ro"'
-    nv = "--nv " if job.gpus else ""
-    app = f'apptainer exec {nv}{binds} "${{BINDS[@]}}" {co} bash -lc {cmd}'
-    lines.extend(
-        [
-            f"if [ -f {co} ]; then",
-            f"  {app}",
-            "else",
-            f"  PYTHONPATH={c}${{PYTHONPATH:+:$PYTHONPATH}} bash -lc {cmd}",
-            "fi",
-        ]
-    )
-    lines.extend(_pack_generated_tile_lines(generated_squashfs))
-    lines.append("")
-    return lines
-
-
-def _cluster_paths(config: dict[str, Any]) -> tuple[str, str, str, str]:
-    sl = config.get("slurm", {})
-    r = str(sl.get("project_root", EXPERIMENT_ROOT.parent.parent))
-    b = posixpath.join(r, "experiments/2_cls_imb_benchmark")
-    c = str(sl.get("code_dir", posixpath.join(b, "code")))
-    o = str(sl.get("output_dir", posixpath.join(b, "outputs")))
-    co = str(sl.get("container", posixpath.join(b, "environment.sif")))
-    return r, c, o, co
-
-
-def render_sbatch(
-    job: SlurmJob, config: dict[str, Any], config_path: str | None = None
-) -> str:
-    """Render one self-contained, job-ID-logged Apptainer SLURM script."""
-    r, c, o, co = _cluster_paths(config)
-    cmd = _command(job, config_path, c)
-    lines = _directives(job, r)
-    images = _stage_images(config, job.name)
-    data = (
-        str(config.get("dataset", {}).get("root", "")) if job.name == "prepare" else ""
-    )
-    lines += _execution_lines(
-        job, r, c, o, co, cmd, images, data, _generated_tile_squashfs(config, job.name)
-    )
-    return "\n".join(lines)
 
 
 def _submit_script(script: str, dry_run: bool) -> str:
@@ -219,13 +185,16 @@ def submit_workflow(
     config_path: str | None = None,
     dry_run: bool = False,
     smoke: bool = False,
+    resume_tuning: bool = False,
     submit: Callable[[str, bool], str] = _submit_script,
 ) -> dict[str, str]:
     """Render and submit the workflow in topological order, returning job IDs by stage."""
+    if resume_tuning:
+        _verify_resume_freezes(config)
     submitted: dict[str, str] = {}
-    for job in build_workflow(config, smoke):
-        dep = submitted.get(job.dependency) if job.dependency else None
-        scheduled = replace(job, dependency=f"afterok:{dep}" if dep else None)
+    for job in build_workflow(config, smoke, resume_tuning):
+        dependencies = tuple(submitted[name] for name in job.dependencies)
+        scheduled = replace(job, dependencies=dependencies)
         script = render_sbatch(scheduled, config, config_path)
         jid = f"dry-run-{job.name}" if dry_run else submit(script, False)
         submitted[job.name] = jid
@@ -235,7 +204,22 @@ def submit_workflow(
     return submitted
 
 
+def _verify_resume_freezes(config: dict[str, Any]) -> None:
+    base = ensure_dirs(config)
+    for index in range(3):
+        path = split_paths(base, index)["data"] / "manifest_freeze.json"
+        if not path.exists():
+            raise FileNotFoundError(f"Cannot resume tuning without {path}")
+        verify_manifest_freeze(json.loads(path.read_text()))
+
+
 def cmd_submit(args: argparse.Namespace) -> None:
     """Submit the Hydra workflow."""
     config = load_config(args.config)
-    submit_workflow(config, args.config, args.dry_run, getattr(args, "smoke", False))
+    submit_workflow(
+        config,
+        args.config,
+        args.dry_run,
+        getattr(args, "smoke", False),
+        getattr(args, "resume_tuning", False),
+    )

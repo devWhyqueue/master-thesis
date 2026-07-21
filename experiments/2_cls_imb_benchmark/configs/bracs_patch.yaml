@@ -43,6 +43,9 @@ slurm:
     pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
     freeze: {partition: cpu-2d, gpus: 0, cpus: 4}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
+    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 2}
+    tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 2}
+    tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     analyze: {partition: cpu-2h, gpus: 0, cpus: 4}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}

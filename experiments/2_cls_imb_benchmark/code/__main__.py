@@ -16,6 +16,8 @@ from imbalance_benchmark.commands import (
     cmd_smoke,
     cmd_submit,
     cmd_tune,
+    cmd_tune_reduce,
+    cmd_tune_shard,
 )
 
 
@@ -31,6 +33,8 @@ def _parser() -> argparse.ArgumentParser:
         "pilot",
         "freeze",
         "tune",
+        "tune-shard",
+        "tune-reduce",
         "confirm",
         "analyze",
         "combine-rq3",
@@ -40,10 +44,18 @@ def _parser() -> argparse.ArgumentParser:
     submit = sub.add_parser("submit")
     submit.add_argument("--dry-run", action="store_true")
     submit.add_argument("--smoke", action="store_true")
+    submit.add_argument("--resume-tuning", action="store_true")
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
             "--condition", choices=("natural", "balanced", "moderate", "severe")
         )
+    shard = sub.choices["tune-shard"]
+    shard.add_argument("--phase", choices=("base", "dependent"), required=True)
+    shard.add_argument("--group", choices=("natural", "controlled"), required=True)
+    shard.add_argument("--shard-index", type=int, required=True)
+    shard.add_argument("--observation-index", type=int)
+    reduce = sub.choices["tune-reduce"]
+    reduce.add_argument("--phase", choices=("base", "final"), required=True)
     return parser
 
 
@@ -54,6 +66,8 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "pilot": cmd_pilot,
         "freeze": cmd_freeze,
         "tune": cmd_tune,
+        "tune-shard": cmd_tune_shard,
+        "tune-reduce": cmd_tune_reduce,
         "confirm": cmd_confirm,
         "analyze": cmd_analyze,
         "combine-rq3": cmd_combine_rq3,

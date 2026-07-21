@@ -16,6 +16,7 @@ from imbalance_benchmark.modeling.context import (
 )
 from imbalance_benchmark.modeling.training.config import (
     CHECKPOINT_INTERVAL,
+    build_evaluation_loader,
     build_optimizer,
     resolve_batch_size,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "update_budget",
     "resolve_batch_size",
     "build_optimizer",
+    "build_evaluation_loader",
     "fit_model",
 ]
 
@@ -120,7 +122,8 @@ def _fit_step(
     model, criterion, param = ctx["model"], ctx["criterion"], ctx["param"]
     if ctx["is_mil"]:
         return _fit_mil_step(batch_data, ctx, step, max_steps)
-    inputs, targets = batch_data["features"].to(device), batch_data["target"].to(device)
+    inputs = batch_data["features"].to(device, non_blocking=True)
+    targets = batch_data["target"].to(device, non_blocking=True)
     ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
     if method == "cfal":
         return cfal_loss(model, inputs, targets, ctx["class_counts"])
@@ -148,6 +151,7 @@ def _build_train_loader(
             ctx["train_dataset"],
             batch_sampler=sampler,
             collate_fn=bag_collate if is_mil else None,
+            pin_memory=torch.cuda.is_available(),
         )
     gen = torch.Generator().manual_seed(ctx["seed"])
     if method == "balanced_sampling" and param:
@@ -161,6 +165,7 @@ def _build_train_loader(
         batch_size=b_size,
         sampler=_RecordingSampler(base, exposed),
         collate_fn=bag_collate if is_mil else None,
+        pin_memory=torch.cuda.is_available(),
     )
 
 

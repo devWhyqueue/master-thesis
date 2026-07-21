@@ -68,8 +68,8 @@ def _fit_mil_step(
 ) -> torch.Tensor:
     """Execute one MIL update while recording exact bag and instance exposure."""
     device, method = ctx["device"], ctx["method"]
-    bags = [bag.to(device) for bag in batch_data[0]]
-    targets = batch_data[1].to(device)
+    bags = [bag.to(device, non_blocking=True) for bag in batch_data[0]]
+    targets = batch_data[1].to(device, non_blocking=True)
     ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
     if method == "rankmix":
         return _rankmix_step(ctx, bags, targets)

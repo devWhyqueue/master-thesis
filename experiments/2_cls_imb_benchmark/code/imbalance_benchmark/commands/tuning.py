@@ -10,25 +10,37 @@ import torch
 
 from imbalance_benchmark.common import (
     bag_dataset_kwargs,
+    compute_sha256,
     ensure_dirs,
     load_config,
     sign_file,
     split_paths,
+    verify_signed_file,
     write_json,
-)
-from imbalance_benchmark.datasets.data import (
-    bag_collate,
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
+from imbalance_benchmark.modeling.training import build_evaluation_loader
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
-    TuningScope,
     summarize_tuning_cost,
     tune_across_splits,
 )
-
-__all__ = ["cmd_tune"]
+from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
+    condition_is_reusable,
+    write_base_selections,
+    write_final_selections,
+    write_serial_cost,
+)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
+    ShardSpec,
+    combined_scopes,
+    run_candidate_shard,
+)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    phase_methods,
+    requested_shard,
+)
 
 
 def _is_excluded(paths: dict[str, Path]) -> bool:
@@ -52,13 +64,10 @@ def _tuning_inputs(
         paths["data"] / "manifest.csv",
         is_mil,
         "validation",
-        device=device,
         class_names=list(freeze["class_names"]),
         bag_kwargs=bag_kwargs,
     )
-    val_loader = torch.utils.data.DataLoader(
-        val_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
-    )
+    val_loader = build_evaluation_loader(val_ds, is_mil)
     regime = Regime(
         device,
         config,
@@ -103,15 +112,6 @@ def _output_name(args: argparse.Namespace) -> str:
     )
 
 
-def _manifest_name(condition: str, assignment: str) -> str:
-    """Resolve one condition/assignment's frozen training manifest name."""
-    return (
-        f"manifest_{condition}.csv"
-        if condition in {"natural", "balanced"}
-        else f"manifest_{assignment}_{condition}.csv"
-    )
-
-
 def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
     """Tune one configuration against the equal-weight three-split objective."""
     base_paths = ensure_dirs(load_config(args.config))
@@ -125,9 +125,7 @@ def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
         selection_path = paths["data"] / _output_name(args)
         write_json(selection_path, selections)
         sign_file(selection_path)
-        _write_tuning_cost(
-            paths, started, search_cost, getattr(args, "condition", None)
-        )
+        write_serial_cost(paths, started, search_cost, getattr(args, "condition", None))
 
 
 def _combined_selections(
@@ -146,7 +144,7 @@ def _combined_selections(
         scoped = ("native",) if condition in {"natural", "balanced"} else assignments
         selected = tune_across_splits(
             roster_for_regime(regime.is_mil),
-            _combined_scopes(scopes, condition, scoped, cost_records),
+            combined_scopes(scopes, condition, scoped, cost_records),
             _tuning_seeds(freeze),
         )
         for assignment in scoped:
@@ -154,57 +152,99 @@ def _combined_selections(
     return selections, summarize_tuning_cost(cost_records)
 
 
-def _combined_scopes(
-    scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
-    condition: str,
-    assignments: tuple[str, ...],
-    cost_records: list[dict[str, int]] | None = None,
-) -> list[TuningScope]:
-    """Build the split/assignment training datasets for one shared selection."""
-    result = []
-    for assignment in assignments:
-        for paths, regime, loader in scopes:
-            result.append(
-                TuningScope(
-                    regime,
-                    loader,
-                    load_training_dataset(
-                        paths["data"] / _manifest_name(condition, assignment),
-                        regime.is_mil,
-                        device=regime.device,
-                        class_names=regime.locked_class_names,
-                        bag_kwargs=regime.bag_dataset_kwargs,
-                    ),
-                    cost_records if cost_records is not None else [],
-                    regime.update_budgets.get(
-                        "natural" if condition == "natural" else "controlled"
-                    ),
-                )
-            )
-    return result
+def _frozen_shard_context(
+    args: argparse.Namespace,
+) -> tuple[
+    dict[str, Path],
+    list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
+    dict[str, Any],
+    list[str],
+]:
+    base_paths = ensure_dirs(load_config(args.config))
+    raw_scopes = [
+        _tuning_inputs(args, split_paths(base_paths, index)) for index in range(3)
+    ]
+    freeze_paths = [scope[0]["data"] / "manifest_freeze.json" for scope in raw_scopes]
+    freeze = json.loads(freeze_paths[0].read_text())
+    return (
+        base_paths,
+        raw_scopes,
+        freeze,
+        [compute_sha256(path) for path in freeze_paths],
+    )
 
 
-def _write_tuning_cost(
-    paths: dict[str, Path],
-    started: float,
-    search_cost: dict[str, float | int],
-    condition: str | None = None,
+def cmd_tune_shard(args: argparse.Namespace) -> None:
+    """Run one resumable frozen-candidate shard."""
+    base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
+    if any(_is_excluded(paths) for paths, _, _ in raw_scopes):
+        return
+    spec = requested_shard(
+        args.shard_index,
+        args.phase,
+        args.group,
+        raw_scopes[0][1].is_mil,
+        freeze["method_grids"],
+        args.observation_index,
+    )
+    if spec is None:
+        return
+    _run_shard(base, raw_scopes, freeze, fingerprint, spec)
+
+
+def _run_shard(
+    base: dict[str, Path],
+    raw_scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
+    freeze: dict[str, Any],
+    fingerprint: list[str],
+    spec: ShardSpec,
 ) -> None:
-    """Persist validation-search cost separately from locked confirmation fits."""
-    elapsed = time.perf_counter() - started
-    write_json(
-        paths["data"]
-        / (
-            f"tuning_search_cost_{condition}.json"
-            if condition
-            else "tuning_search_cost.json"
-        ),
-        {
-            "wall_clock_seconds": elapsed,
-            "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
-            "peak_accelerator_memory_bytes": int(torch.cuda.max_memory_allocated())
-            if torch.cuda.is_available()
-            else 0,
-            **search_cost,
-        },
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+    if condition_is_reusable(
+        base, spec.condition, roster_for_regime(raw_scopes[0][1].is_mil), assignments
+    ):
+        return
+    scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments
+    records: list[dict[str, int]] = []
+    scopes = combined_scopes(raw_scopes, spec.condition, scoped, records)
+    run_candidate_shard(
+        spec,
+        scopes,
+        _tuning_seeds(freeze),
+        fingerprint,
+        base["data"],
+        _selected_ce(base["data"], spec.condition)
+        if spec.phase == "dependent"
+        else None,
+    )
+
+
+def _selected_ce(root: Path, condition: str) -> dict[str, Any]:
+    path = root / "tuning_shards" / f"base_selections_{condition}.json"
+    verify_signed_file(path)
+    return json.loads(path.read_text())["ce"]
+
+
+def cmd_tune_reduce(args: argparse.Namespace) -> None:
+    """Reduce complete shards into the benchmark's signed selection interface."""
+    base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
+    is_mil = raw_scopes[0][1].is_mil
+    base_methods = phase_methods(is_mil, "base")
+    if args.phase == "base":
+        write_base_selections(
+            base,
+            freeze,
+            fingerprint,
+            base_methods,
+            roster_for_regime(is_mil),
+            CONDITIONS,
+        )
+        return
+    write_final_selections(
+        base,
+        freeze,
+        fingerprint,
+        base_methods,
+        phase_methods(is_mil, "dependent"),
+        CONDITIONS,
     )

@@ -32,20 +32,24 @@ def _config() -> dict[str, object]:
         }
     }
 
-def test_workflow_has_afterok_condition_arrays() -> None:
-    """The main DAG serializes setup and fans training work out by condition."""
+def test_workflow_has_resumable_sharded_tuning_dag() -> None:
+    """Tuning fans out by candidate and reduces before confirmation."""
     jobs = build_workflow(_config())
     assert [job.name for job in jobs] == [
         "prepare",
         "pilot",
         "freeze",
-        "tune",
+        "tune-base-natural",
+        "tune-base-controlled",
+        "tune-base-reduce",
+        "tune-dependent-natural",
+        "tune-dependent-controlled",
+        "tune-final-reduce",
         "confirm",
         "analyze",
     ]
-    assert jobs[3].array_conditions == ("natural", "balanced", "moderate", "severe")
-    assert jobs[4].dependency == "tune"
-    script = render_sbatch(jobs[4], _config(), "config.yaml")
+    assert jobs[-2].dependencies == ("tune-final-reduce",)
+    script = render_sbatch(jobs[-2], _config(), "config.yaml")
     assert "#SBATCH --array=0-11" in script
     assert (
         "python /home/example/master-thesis/experiments/2_cls_imb_benchmark/code/__main__.py --config config.yaml --split-index"
@@ -66,16 +70,18 @@ def test_submit_links_actual_job_ids() -> None:
         return str(len(submitted_scripts))
 
     submitted = submit_workflow(_config(), submit=fake_submit)
-    assert submitted == {
-        "prepare": "1",
-        "pilot": "2",
-        "freeze": "3",
-        "tune": "4",
-        "confirm": "5",
-        "analyze": "6",
-    }
-    assert "#SBATCH --dependency=afterok:4" in submitted_scripts[4]
-    assert "#SBATCH --dependency=afterok:5" in submitted_scripts[5]
+    assert submitted["prepare"] == "1"
+    assert submitted["analyze"] == str(len(submitted_scripts))
+    assert "#SBATCH --dependency=afterok:4:5" in submitted_scripts[5]
+    assert "#SBATCH --dependency=afterok:7:8" in submitted_scripts[8]
+    assert "#SBATCH --dependency=afterok:10" in submitted_scripts[10]
+
+
+def test_resume_tuning_skips_completed_setup() -> None:
+    jobs = build_workflow(_config(), resume_tuning=True)
+
+    assert jobs[0].name == "tune-base-natural"
+    assert all(job.name not in {"prepare", "pilot", "freeze"} for job in jobs)
 
 def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
     """Large image copies must not be repeated across downstream array jobs."""
@@ -90,7 +96,14 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         in scripts["prepare"]
     )
     assert f'-B "{PANDA_RAW}:{PANDA_RAW}:ro"' in scripts["prepare"]
-    for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
+    for stage in (
+        "pilot",
+        "freeze",
+        "tune-base-natural",
+        "tune-base-controlled",
+        "confirm",
+        "analyze",
+    ):
         assert SQUASHFS_SOURCE not in scripts[stage]
         assert PANDA_RAW not in scripts[stage]
         # Shared datasets under /home/space must stay reachable at every stage:
@@ -127,7 +140,14 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     )
     assert f"squash-dataset {GENERATED_TILES} {GENERATED_SQUASHFS}.partial" in prepare
     assert f"mv {GENERATED_SQUASHFS}.partial {GENERATED_SQUASHFS}" in prepare
-    for stage in ("pilot", "freeze", "tune", "confirm", "analyze"):
+    for stage in (
+        "pilot",
+        "freeze",
+        "tune-base-natural",
+        "tune-base-controlled",
+        "confirm",
+        "analyze",
+    ):
         assert GENERATED_SQUASHFS not in scripts[stage]
 
 def test_time_limit_directive_is_omitted_unless_explicitly_configured() -> None:

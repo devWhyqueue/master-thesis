@@ -11,16 +11,6 @@ from torch.utils.data import DataLoader, Sampler
 
 from imbalance_benchmark.modeling.models import AttentionMil, DualExpertMil
 
-__all__ = [
-    "run_evaluation",
-    "per_class_recall",
-    "checkpoint_step",
-    "initial_checkpoint",
-    "ClassAwareBatchSampler",
-    "_RecordingSampler",
-    "_RecordingBatchSampler",
-]
-
 
 def per_class_recall(
     preds: np.ndarray, targets: np.ndarray, n_classes: int
@@ -43,19 +33,22 @@ def _gather_and_eval(
     was_training = model.training
     model.eval()
     all_logits, all_targets = [], []
-    with torch.no_grad():
+    with torch.inference_mode():
         for batch in loader:
             if is_mil:
                 bags, targets = batch
                 logits = (
-                    model.forward_ensemble([b.to(device) for b in bags])
+                    model.forward_ensemble(
+                        [b.to(device, non_blocking=True) for b in bags]
+                    )
                     if isinstance(model, DualExpertMil)
                     else cast(AttentionMil, model).forward_bags(
-                        [b.to(device) for b in bags]
+                        [b.to(device, non_blocking=True) for b in bags]
                     )[0]
                 )
             else:
-                logits, targets = model(batch["features"].to(device)), batch["target"]
+                logits = model(batch["features"].to(device, non_blocking=True))
+                targets = batch["target"]
             all_logits.append(logits.cpu())
             all_targets.append(targets)
     model.train(was_training)
@@ -141,8 +134,7 @@ def checkpoint_step(
     """Evaluate the current model and keep it if it wins the BA -> F1 -> NLL tie-break."""
     if val_loader is None:
         return best
-    m = run_evaluation(model, val_loader, device, is_mil, n_classes)
-    acc, f1, nll = m["balanced_accuracy"], m["macro_f1"], m["nll"]
+    acc, f1, nll, _, _ = _gather_and_eval(model, val_loader, device, is_mil, n_classes)
     if acc > best["acc"] or (
         abs(acc - best["acc"]) < 1e-6
         and (f1 > best["f1"] or (abs(f1 - best["f1"]) < 1e-6 and nll < best["nll"]))

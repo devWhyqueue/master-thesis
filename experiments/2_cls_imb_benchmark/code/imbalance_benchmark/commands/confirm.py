@@ -20,13 +20,11 @@ from imbalance_benchmark.common import (
     split_paths,
     verify_signed_file,
 )
-from imbalance_benchmark.datasets.data import (
-    TrainDataset,
-    bag_collate,
-)
+from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
+from imbalance_benchmark.modeling.training import build_evaluation_loader
 
 __all__ = ["cmd_confirm"]
 
@@ -53,7 +51,6 @@ def _confirm_condition(
     train_ds: TrainDataset = load_training_dataset(
         run.paths["data"] / file_name,
         run.is_mil,
-        device=run.device,
         class_names=run.class_names,
         bag_kwargs=run.bag_dataset_kwargs,
     )
@@ -102,7 +99,6 @@ def _confirm_inputs(
         paths["data"] / "manifest.csv",
         is_mil,
         "test",
-        device=device,
         class_names=class_names,
         bag_kwargs=bag_kwargs,
     )
@@ -110,13 +106,11 @@ def _confirm_inputs(
         paths["data"] / "manifest.csv",
         is_mil,
         "validation",
-        device=device,
         class_names=class_names,
         bag_kwargs=bag_kwargs,
     )
-    collate = bag_collate if is_mil else None
-    val_ldr = torch.utils.data.DataLoader(val_ds, batch_size=64, collate_fn=collate)
-    test_ldr = torch.utils.data.DataLoader(test_ds, batch_size=64, collate_fn=collate)
+    val_ldr = build_evaluation_loader(val_ds, is_mil)
+    test_ldr = build_evaluation_loader(test_ds, is_mil)
     seed_roles = freeze.get("seed_roles", {})
     seeds = [int(seed_roles[role]) for role in CONFIRMATION_SEED_ROLES]
     run_data = {

@@ -4,7 +4,9 @@ from collections.abc import Iterable
 from typing import Any
 
 import torch
+from torch.utils.data import DataLoader
 
+from imbalance_benchmark.datasets.data import TrainDataset, bag_collate
 from imbalance_benchmark.modeling.context import REFERENCE_PASSES, model_kwargs
 
 __all__ = [
@@ -13,6 +15,7 @@ __all__ = [
     "WEIGHT_DECAY",
     "resolve_batch_size",
     "build_optimizer",
+    "build_evaluation_loader",
     "resolve_training_config",
 ]
 
@@ -20,6 +23,20 @@ CHECKPOINT_INTERVAL = 50
 # Fixed optimizer family shared by every trainable method and regime.
 OPTIMIZER_NAME = "AdamW"
 WEIGHT_DECAY = 1e-4
+PATCH_EVALUATION_BATCH_SIZE = 4096
+MIL_EVALUATION_BATCH_SIZE = 64
+
+
+def build_evaluation_loader(dataset: TrainDataset, is_mil: bool) -> DataLoader:
+    """Build an ordered CPU loader with a regime-appropriate inference batch."""
+    return DataLoader(
+        dataset,
+        batch_size=(
+            MIL_EVALUATION_BATCH_SIZE if is_mil else PATCH_EVALUATION_BATCH_SIZE
+        ),
+        collate_fn=bag_collate if is_mil else None,
+        pin_memory=torch.cuda.is_available(),
+    )
 
 
 def resolve_batch_size(cfg: dict[str, Any], is_mil: bool) -> int:

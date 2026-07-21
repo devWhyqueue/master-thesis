@@ -114,8 +114,11 @@ def test_combined_tuning_scope_passes_the_frozen_class_order(
         observed.append(kwargs.get("class_names"))
         return object()
 
-    monkeypatch.setattr(tuning, "load_training_dataset", load_dataset)
-    tuning._combined_scopes(
+    monkeypatch.setattr(
+        "imbalance_benchmark.modeling.workflows.tuning.tuning_shards.load_training_dataset",
+        load_dataset,
+    )
+    tuning.combined_scopes(
         [({"data": tmp_path}, regime, object())], "moderate", ("native",)
     )
 
