@@ -72,8 +72,8 @@ def test_array_coordinates_cross_candidates_with_every_observation() -> None:
 
 
 def test_bundled_array_size_covers_every_shard_once() -> None:
-    assert bundled_array_size(792, 16) == 50
-    assert bundled_array_size(15, 16) == 1
+    assert bundled_array_size(792, 8) == 99
+    assert bundled_array_size(15, 8) == 2
 
 
 def test_resume_rejects_a_stale_freeze_fingerprint() -> None:
