@@ -69,6 +69,9 @@ def clustered_endpoints(
 ) -> dict[str, float]:
     """Compute regime-applicable accuracy, cluster-macro, and ECE endpoints."""
     del seed
+    labels = np.asarray(labels)
+    predictions = np.asarray(predictions)
+    probabilities = np.asarray(probabilities)
     case_ids = identity["case_id"].astype(str).to_numpy()
     slide_ids = identity["slide_id"].astype(str).to_numpy()
     ece = expected_calibration_error(labels, probabilities)

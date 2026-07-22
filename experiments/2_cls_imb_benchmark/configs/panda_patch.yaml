@@ -45,6 +45,8 @@ slurm:
     freeze: {partition: cpu-2h, gpus: 0, cpus: 4}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
+    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8}
+    confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
     analyze: {partition: cpu-2h, gpus: 0, cpus: 4}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
   squashfs:

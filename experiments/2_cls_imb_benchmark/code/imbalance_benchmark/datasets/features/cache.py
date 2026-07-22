@@ -11,7 +11,7 @@ from imbalance_benchmark.datasets.feature_provenance import (
 __all__ = ["load_feature_row", "load_slide_features"]
 
 
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=8192)
 def load_slide_features(path: str) -> torch.Tensor:
     """Load a feature tensor and normalize to float (n_instances, dim)."""
     return load_stored_feature_tensor(path).float()

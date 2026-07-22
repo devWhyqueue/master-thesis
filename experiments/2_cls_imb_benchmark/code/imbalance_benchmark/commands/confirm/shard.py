@@ -1,0 +1,167 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Any
+
+from imbalance_benchmark.commands.confirm import (
+    _confirm_run_data,
+    _is_excluded,
+    _load_condition_selections,
+    require_tuning_configs,
+)
+from imbalance_benchmark.common import (
+    ensure_dirs,
+    load_config,
+    read_run_record,
+    split_paths,
+)
+from imbalance_benchmark.datasets.data import TrainDataset, load_training_dataset
+from imbalance_benchmark.modeling.workflows.confirmation import (
+    RunContext,
+    confirm_ce_seed,
+    confirm_crt_seed,
+    confirm_method_seed,
+    confirm_post_hoc_seed,
+)
+from imbalance_benchmark.modeling.workflows.confirmation_schedule import (
+    ConfirmUnit,
+    resolve_confirm_bundle,
+)
+
+__all__ = ["cmd_confirm_shard"]
+
+
+def _required_methods(method: str) -> tuple[str, ...]:
+    """Methods whose signed tuning selection a unit needs (post-hoc rides with ce)."""
+    if method == "ce":
+        return ("ce", "post_hoc_logit_adjustment")
+    if method == "crt":
+        return ("crt", "ce")
+    return (method,)
+
+
+def _unit_manifest_name(cond: str, assignment: str) -> str:
+    return (
+        f"manifest_{cond}.csv"
+        if cond in {"natural", "balanced"}
+        else f"manifest_{assignment}_{cond}.csv"
+    )
+
+
+def _confirm_unit_method(
+    cond: str, method: str, seed_idx: int, best_configs: dict[str, Any], run: RunContext
+) -> None:
+    """Fit one roster method for one confirmation seed; post-hoc rides with ce."""
+    train_ds: TrainDataset = load_training_dataset(
+        run.paths["data"] / _unit_manifest_name(cond, run.assignment),
+        run.is_mil,
+        class_names=run.class_names,
+        bag_kwargs=run.bag_dataset_kwargs,
+    )
+    configs = require_tuning_configs(best_configs, _required_methods(method))
+    if method == "ce":
+        state, step = confirm_ce_seed(cond, configs["ce"], train_ds, run, seed_idx)
+        confirm_post_hoc_seed(
+            cond,
+            configs["post_hoc_logit_adjustment"],
+            state,
+            step,
+            train_ds,
+            run,
+            seed_idx,
+        )
+    elif method == "crt":
+        confirm_crt_seed(cond, configs["crt"], configs["ce"], train_ds, run, seed_idx)
+    else:
+        confirm_method_seed(cond, method, configs[method], train_ds, run, seed_idx)
+
+
+def _result_dir(
+    paths: dict[str, Any], assignment: str, cond: str, method: str, seed_idx: int
+) -> Path:
+    return (
+        paths["results"]
+        / f"assignment={assignment}"
+        / cond
+        / method
+        / f"seed={seed_idx}"
+    )
+
+
+def _seed_already_done(
+    paths: dict[str, Any], assignment: str, cond: str, method: str, seed_idx: int
+) -> bool:
+    """A unit is done when its record (and, for ce, its folded post-hoc record) exists.
+
+    A crash mid-write can leave a truncated ``run.json``; treat any read failure
+    as not-done so a resumed task refits rather than trusting a corrupt record.
+    """
+    methods = ("ce", "post_hoc_logit_adjustment") if method == "ce" else (method,)
+    for name in methods:
+        result_dir = _result_dir(paths, assignment, cond, name, seed_idx)
+        try:
+            record = read_run_record(result_dir)
+        except (OSError, ValueError):
+            return False
+        if record is None or "test" not in record.get("splits", {}):
+            return False
+    return True
+
+
+def _run_confirm_unit(
+    unit: ConfirmUnit,
+    best_configs: dict[str, Any],
+    run_data: dict[str, Any],
+    assignments: tuple[str, ...],
+) -> None:
+    """Fit one scheduled unit for every tail assignment scoped to its condition."""
+    scoped_assignments = (
+        ("unassigned",) if unit.condition in {"natural", "balanced"} else assignments
+    )
+    for assignment in scoped_assignments:
+        if _seed_already_done(
+            run_data["paths"], assignment, unit.condition, unit.method, unit.seed_index
+        ):
+            continue
+        run = RunContext(**run_data, assignment=assignment)
+        selected_assignment = "native" if assignment == "unassigned" else assignment
+        selected = best_configs.get(selected_assignment, {}).get(unit.condition, {})
+        _confirm_unit_method(
+            unit.condition, unit.method, unit.seed_index, selected, run
+        )
+
+
+def _group_bundle_by_split(units: list[ConfirmUnit]) -> dict[int, list[ConfirmUnit]]:
+    grouped: dict[int, list[ConfirmUnit]] = {}
+    for unit in units:
+        grouped.setdefault(unit.split_index, []).append(unit)
+    return grouped
+
+
+def cmd_confirm_shard(args: argparse.Namespace) -> None:
+    """Run one resumable bundle of confirmation units for one partition group.
+
+    A bundle can span multiple conditions (the controlled group has three), so
+    selections are loaded per condition from the ``tune-final-reduce`` output
+    and cached only within the split currently being processed.
+    """
+    config = load_config(args.config)
+    base_paths = ensure_dirs(config)
+    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    bundle = resolve_confirm_bundle(
+        args.shard_index, args.group, is_mil, args.shards_per_task
+    )
+    for split_index, split_units in _group_bundle_by_split(bundle).items():
+        paths = split_paths(base_paths, split_index)
+        if _is_excluded(paths):
+            continue
+        run_data, freeze = _confirm_run_data(paths)
+        assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+        selections: dict[str, dict[str, Any]] = {}
+        for unit in split_units:
+            if unit.condition not in selections:
+                selections[unit.condition] = _load_condition_selections(
+                    paths, unit.condition
+                )
+            _run_confirm_unit(unit, selections[unit.condition], run_data, assignments)

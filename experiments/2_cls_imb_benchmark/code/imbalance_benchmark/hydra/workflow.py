@@ -8,9 +8,11 @@ import subprocess
 from typing import Any, Callable
 
 from imbalance_benchmark.common import load_config
+from imbalance_benchmark.hydra.confirm_jobs import confirm_jobs as _confirm_jobs
+from imbalance_benchmark.hydra.job_resources import build_job as _job
+from imbalance_benchmark.hydra.job_resources import resources_for as _resources
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.resume import verify_resume_freezes
-from imbalance_benchmark.modeling.context import CONDITIONS
 from imbalance_benchmark.modeling.context import roster_for_regime
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     DEPENDENT_METHODS,
@@ -20,39 +22,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _resources(
-    config: dict[str, Any], stage: str, gpu: bool, fallback: str | None = None
-) -> dict[str, Any]:
-    sl = config.get("slurm", {})
-    resources = sl.get("resources", {})
-    sr = resources.get(stage, resources.get(fallback, {}))
-    part = sr.get("partition", sl.get("partition", "gpu-2h" if gpu else "cpu-2h"))
-    return {
-        "partition": part,
-        "gpus": int(sr.get("gpus", 1 if gpu else 0)),
-        "cpus": int(sr.get("cpus", 4)),
-        "memory": str(sr["memory"]) if sr.get("memory") else None,
-        "time_limit": str(sr["time"]) if sr.get("time") else None,
-    }
-
-
-def _job(
-    config: dict[str, Any],
-    stage: str,
-    cmd: str,
-    gpu: bool,
-    dependencies: tuple[str, ...] = (),
-    resource: str | None = None,
-    fallback: str | None = None,
-) -> SlurmJob:
-    return SlurmJob(
-        stage,
-        cmd,
-        dependencies=dependencies,
-        **_resources(config, resource or stage, gpu, fallback),
-    )
 
 
 def build_workflow(
@@ -67,13 +36,15 @@ def build_workflow(
     setup = _setup_jobs(config, arr) if not resume_tuning else []
     freeze_dependency = ("freeze",) if setup else ()
     tuning = _tuning_jobs(config, freeze_dependency)
-    co = replace(
-        _job(config, "confirm", "confirm", True, ("tune-final-reduce",)),
-        array_splits=arr,
-        array_conditions=CONDITIONS,
+    confirm_natural, confirm_controlled = _confirm_jobs(config)
+    an = _job(
+        config,
+        "analyze",
+        "analyze",
+        False,
+        (confirm_natural.name, confirm_controlled.name),
     )
-    an = _job(config, "analyze", "analyze", False, (co.name,))
-    return [*setup, *tuning, co, an]
+    return [*setup, *tuning, confirm_natural, confirm_controlled, an]
 
 
 def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJob]:

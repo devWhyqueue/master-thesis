@@ -10,6 +10,7 @@ from imbalance_benchmark.commands import (
     cmd_analyze,
     cmd_combine_rq3,
     cmd_confirm,
+    cmd_confirm_shard,
     cmd_freeze,
     cmd_pilot,
     cmd_prepare,
@@ -36,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
         "tune-shard",
         "tune-reduce",
         "confirm",
+        "confirm-shard",
         "analyze",
         "combine-rq3",
         "smoke",
@@ -60,6 +62,12 @@ def _parser() -> argparse.ArgumentParser:
     shard.add_argument("--bundle-by-observation", action="store_true")
     reduce = sub.choices["tune-reduce"]
     reduce.add_argument("--phase", choices=("base", "final"), required=True)
+    confirm_shard = sub.choices["confirm-shard"]
+    confirm_shard.add_argument(
+        "--group", choices=("natural", "controlled"), required=True
+    )
+    confirm_shard.add_argument("--shard-index", type=int, required=True)
+    confirm_shard.add_argument("--shards-per-task", type=int, default=1)
     return parser
 
 
@@ -73,6 +81,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "tune-shard": cmd_tune_shard,
         "tune-reduce": cmd_tune_reduce,
         "confirm": cmd_confirm,
+        "confirm-shard": cmd_confirm_shard,
         "analyze": cmd_analyze,
         "combine-rq3": cmd_combine_rq3,
         "submit": cmd_submit,

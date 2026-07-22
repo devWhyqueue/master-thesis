@@ -7,6 +7,7 @@ import torch
 
 from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.commands import confirm, tuning
+from imbalance_benchmark.commands.confirm import shard as confirm_shard
 from imbalance_benchmark.common import write_run_record
 from imbalance_benchmark.datasets.bracs import LABELS as BRACS_LABELS
 from imbalance_benchmark.modeling.context import (
@@ -100,6 +101,44 @@ def test_confirmation_condition_uses_the_frozen_class_order(
     confirm._confirm_condition("moderate", ("ce",), {"ce": {}}, run)
 
     assert observed == [locked]
+
+def test_unfitted_seed_is_not_done(tmp_path: Path) -> None:
+    paths = {"results": tmp_path}
+
+    assert not confirm_shard._seed_already_done(paths, "native", "severe", "weighted_ce", 0)
+
+def test_ordinary_method_is_done_once_its_test_record_exists(tmp_path: Path) -> None:
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    _write_seed_record(method_dir, 0)
+
+    assert confirm_shard._seed_already_done(paths, "native", "severe", "weighted_ce", 0)
+
+def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
+    tmp_path: Path,
+) -> None:
+    """post-hoc rides with its seed's ce fit, so resuming a ce unit must not skip
+    it on ce's record alone -- the folded post-hoc pass would be silently lost."""
+    paths = {"results": tmp_path}
+    _write_seed_record(tmp_path / "assignment=native" / "severe" / "ce", 0)
+
+    assert not confirm_shard._seed_already_done(paths, "native", "severe", "ce", 0)
+
+    _write_seed_record(
+        tmp_path / "assignment=native" / "severe" / "post_hoc_logit_adjustment", 0
+    )
+
+    assert confirm_shard._seed_already_done(paths, "native", "severe", "ce", 0)
+
+def test_a_truncated_run_record_is_treated_as_not_done(tmp_path: Path) -> None:
+    """A crash mid-write can leave a corrupt run.json; resuming must refit rather
+    than trust it, or the seed would be silently dropped from confirmation."""
+    paths = {"results": tmp_path}
+    result_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce" / "seed=0"
+    result_dir.mkdir(parents=True)
+    (result_dir / "run.json").write_text("{not valid json")
+
+    assert not confirm_shard._seed_already_done(paths, "native", "severe", "weighted_ce", 0)
 
 def test_combined_tuning_scope_passes_the_frozen_class_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

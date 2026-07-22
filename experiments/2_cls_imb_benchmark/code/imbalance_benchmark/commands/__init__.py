@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from imbalance_benchmark.commands.analyze import cmd_analyze, cmd_combine_rq3
 from imbalance_benchmark.commands.confirm import cmd_confirm
+from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.prepare import cmd_prepare
@@ -21,6 +22,7 @@ __all__ = [
     "cmd_tune_shard",
     "cmd_tune_reduce",
     "cmd_confirm",
+    "cmd_confirm_shard",
     "cmd_analyze",
     "cmd_combine_rq3",
     "cmd_submit",

@@ -27,6 +27,8 @@ def _config() -> dict[str, object]:
             "resources": {
                 "tune_natural": {"memory": "32G"},
                 "tune_controlled": {"memory": "32G"},
+                "confirm_natural": {"partition": "gpu-5h"},
+                "confirm_controlled": {"partition": "gpu-2h"},
             },
             "squashfs": [
                 {
@@ -52,10 +54,13 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "tune-dependent-crt-natural",
         "tune-dependent-controlled",
         "tune-final-reduce",
-        "confirm",
+        "confirm-natural",
+        "confirm-controlled",
         "analyze",
     ]
+    assert jobs[-3].dependencies == ("tune-final-reduce",)
     assert jobs[-2].dependencies == ("tune-final-reduce",)
+    assert jobs[-1].dependencies == ("confirm-natural", "confirm-controlled")
     assert jobs[3].array_size == 198
     assert "--observations-per-candidate 6" in jobs[3].command
     assert "--shards-per-task 4" in jobs[3].command
@@ -69,19 +74,31 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert "--shard-offset 1" in jobs[7].command
     assert "--bundle-by-observation" in jobs[7].command
     assert jobs[8].array_size == 4
-    script = render_sbatch(jobs[-2], _config(), "config.yaml")
-    assert "#SBATCH --array=0-11" in script
-    assert (
-        "python /home/example/master-thesis/experiments/2_cls_imb_benchmark/code/__main__.py --config config.yaml --split-index"
-        in script
-    )
-    assert "APPTAINERENV_PYTHONPATH" in script
-    assert (
-        "/outputs:/home/example/master-thesis/experiments/2_cls_imb_benchmark/outputs:rw"
-        in script
-    )
     natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
     assert "#SBATCH --mem=32G" in natural_script
+
+def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None:
+    """Confirmation no longer shares one two-day array across every condition."""
+    jobs = build_workflow(_config())
+    confirm_natural = next(j for j in jobs if j.name == "confirm-natural")
+    confirm_controlled = next(j for j in jobs if j.name == "confirm-controlled")
+
+    # patch roster minus post-hoc = 10 methods; 3 splits x 5 seeds each.
+    assert confirm_natural.array_size == 3 * 10 * 5
+    assert confirm_controlled.array_size == 3 * 3 * 10 * 5
+    assert confirm_natural.partition == "gpu-5h"
+    assert confirm_controlled.partition == "gpu-2h"
+    assert confirm_natural.partition != "gpu-2d"
+    assert confirm_controlled.partition != "gpu-2d"
+
+    natural_script = render_sbatch(confirm_natural, _config(), "config.yaml")
+    controlled_script = render_sbatch(confirm_controlled, _config(), "config.yaml")
+    assert f"#SBATCH --array=0-{3 * 10 * 5 - 1}" in natural_script
+    assert f"#SBATCH --array=0-{3 * 3 * 10 * 5 - 1}" in controlled_script
+    assert "confirm-shard --group natural" in natural_script
+    assert "confirm-shard --group controlled" in controlled_script
+    assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in natural_script
+    assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in controlled_script
 
 def test_submit_links_actual_job_ids() -> None:
     """Submission turns stage names into the preceding scheduler job IDs."""
@@ -96,7 +113,9 @@ def test_submit_links_actual_job_ids() -> None:
     assert submitted["analyze"] == str(len(submitted_scripts))
     assert "#SBATCH --dependency=afterok:4:5" in submitted_scripts[5]
     assert "#SBATCH --dependency=afterok:7:8:9" in submitted_scripts[9]
-    assert "#SBATCH --dependency=afterok:11" in submitted_scripts[11]
+    assert "#SBATCH --dependency=afterok:10" in submitted_scripts[10]
+    assert "#SBATCH --dependency=afterok:10" in submitted_scripts[11]
+    assert "#SBATCH --dependency=afterok:11:12" in submitted_scripts[12]
 
 
 def test_resume_tuning_skips_completed_setup() -> None:
@@ -123,7 +142,8 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         "freeze",
         "tune-base-natural",
         "tune-base-controlled",
-        "confirm",
+        "confirm-natural",
+        "confirm-controlled",
         "analyze",
     ):
         assert SQUASHFS_SOURCE not in scripts[stage]
@@ -167,7 +187,8 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
         "freeze",
         "tune-base-natural",
         "tune-base-controlled",
-        "confirm",
+        "confirm-natural",
+        "confirm-controlled",
         "analyze",
     ):
         assert GENERATED_SQUASHFS not in scripts[stage]

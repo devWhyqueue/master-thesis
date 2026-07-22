@@ -71,24 +71,12 @@ def _confirm_condition(
             confirm_method(cond, method, cfg, train_ds, run)
 
 
-def _confirm_inputs(
-    args: argparse.Namespace, paths: dict[str, Any]
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Load config, best tuning selections, and the locked-test loader for confirmation."""
-    config = load_config(args.config)
+def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Load freeze and the locked val/test loaders shared by every condition."""
     freeze_path = paths["data"] / "manifest_freeze.json"
     if not freeze_path.exists():
         raise FileNotFoundError("Run freeze successfully before confirmation")
-    if freeze_path.exists():
-        verify_manifest_freeze(json.loads(freeze_path.read_text()))
-    condition = getattr(args, "condition", None)
-    selection_name = (
-        f"tuning_selections_{condition}.json" if condition else "tuning_selections.json"
-    )
-    selection_path = paths["data"] / selection_name
-    verify_signed_file(selection_path)
-    with selection_path.open() as f:
-        best_configs = json.load(f)
+    verify_manifest_freeze(json.loads(freeze_path.read_text()))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     freeze = json.loads(freeze_path.read_text())
     config = freeze["runtime_config"]
@@ -127,6 +115,32 @@ def _confirm_inputs(
         "update_budgets": freeze["update_budgets"],
         "feature_provenance": freeze.get("feature_provenance"),
     }
+    return run_data, freeze
+
+
+def _load_selections(paths: dict[str, Any], name: str) -> dict[str, Any]:
+    """Load and verify one signed tuning-selection interface file."""
+    selection_path = paths["data"] / name
+    verify_signed_file(selection_path)
+    with selection_path.open() as f:
+        return json.load(f)
+
+
+def _load_condition_selections(paths: dict[str, Any], condition: str) -> dict[str, Any]:
+    """Load one condition's signed selections, as written by ``tune-final-reduce``."""
+    return _load_selections(paths, f"tuning_selections_{condition}.json")
+
+
+def _confirm_inputs(
+    args: argparse.Namespace, paths: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Load config, best tuning selections, and the locked-test loader for confirmation."""
+    run_data, freeze = _confirm_run_data(paths)
+    condition = getattr(args, "condition", None)
+    name = (
+        f"tuning_selections_{condition}.json" if condition else "tuning_selections.json"
+    )
+    best_configs = _load_selections(paths, name)
     return best_configs, run_data, freeze
 
 
