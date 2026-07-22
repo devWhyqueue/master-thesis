@@ -29,12 +29,12 @@ def _resources(
     resources = sl.get("resources", {})
     sr = resources.get(stage, resources.get(fallback, {}))
     part = sr.get("partition", sl.get("partition", "gpu-2h" if gpu else "cpu-2h"))
-    time = sr.get("time")
     return {
         "partition": part,
         "gpus": int(sr.get("gpus", 1 if gpu else 0)),
         "cpus": int(sr.get("cpus", 4)),
-        "time_limit": str(time) if time else None,
+        "memory": str(sr["memory"]) if sr.get("memory") else None,
+        "time_limit": str(sr["time"]) if sr.get("time") else None,
     }
 
 

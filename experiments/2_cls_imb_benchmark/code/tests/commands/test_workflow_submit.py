@@ -24,6 +24,10 @@ def _config() -> dict[str, object]:
             "test_partition": "gpu-test",
             "tune_natural_observations_per_candidate": 6,
             "tune_shards_per_task": 8,
+            "resources": {
+                "tune_natural": {"memory": "64G"},
+                "tune_controlled": {"memory": "64G"},
+            },
             "squashfs": [
                 {
                     "source": SQUASHFS_SOURCE,
@@ -55,6 +59,7 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert jobs[3].array_size == 99
     assert "--observations-per-candidate 6" in jobs[3].command
     assert "--shards-per-task 8" in jobs[3].command
+    assert jobs[3].memory == "64G"
     assert jobs[4].array_size == 50
     assert jobs[6].array_size == 0
     assert "--shard-index 0" in jobs[6].command
@@ -73,6 +78,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "/outputs:/home/example/master-thesis/experiments/2_cls_imb_benchmark/outputs:rw"
         in script
     )
+    natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
+    assert "#SBATCH --mem=64G" in natural_script
 
 def test_submit_links_actual_job_ids() -> None:
     """Submission turns stage names into the preceding scheduler job IDs."""
