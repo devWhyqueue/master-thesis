@@ -23,10 +23,10 @@ def _config() -> dict[str, object]:
             "container": "/home/example/environment.sif",
             "test_partition": "gpu-test",
             "tune_natural_observations_per_candidate": 6,
-            "tune_shards_per_task": 8,
+            "tune_shards_per_task": 4,
             "resources": {
-                "tune_natural": {"memory": "64G"},
-                "tune_controlled": {"memory": "64G"},
+                "tune_natural": {"memory": "32G"},
+                "tune_controlled": {"memory": "32G"},
             },
             "squashfs": [
                 {
@@ -56,19 +56,19 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "analyze",
     ]
     assert jobs[-2].dependencies == ("tune-final-reduce",)
-    assert jobs[3].array_size == 102
+    assert jobs[3].array_size == 198
     assert "--observations-per-candidate 6" in jobs[3].command
-    assert "--shards-per-task 8" in jobs[3].command
+    assert "--shards-per-task 4" in jobs[3].command
     assert "--bundle-by-observation" in jobs[3].command
-    assert jobs[3].memory == "64G"
-    assert jobs[4].array_size == 50
+    assert jobs[3].memory == "32G"
+    assert jobs[4].array_size == 99
     assert jobs[6].array_size == 0
     assert "--shard-index 0" in jobs[6].command
     assert jobs[7].array_size == 6
     assert "--observations-per-candidate 6" in jobs[7].command
     assert "--shard-offset 1" in jobs[7].command
     assert "--bundle-by-observation" in jobs[7].command
-    assert jobs[8].array_size == 2
+    assert jobs[8].array_size == 4
     script = render_sbatch(jobs[-2], _config(), "config.yaml")
     assert "#SBATCH --array=0-11" in script
     assert (
@@ -81,7 +81,7 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         in script
     )
     natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
-    assert "#SBATCH --mem=64G" in natural_script
+    assert "#SBATCH --mem=32G" in natural_script
 
 def test_submit_links_actual_job_ids() -> None:
     """Submission turns stage names into the preceding scheduler job IDs."""
