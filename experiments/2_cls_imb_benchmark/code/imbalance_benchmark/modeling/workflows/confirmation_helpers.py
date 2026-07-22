@@ -92,7 +92,8 @@ def _split_payload(
     dec_l = balanced_decision_logits(raw_l, method, tau, priors)
     tar_l = apply_target_prior_correction(raw_l, method, tau, priors, target_priors)
     preds = softmax(dec_l).argmax(axis=1)
-    y, p_list, probs = res["targets"].tolist(), preds.tolist(), softmax(tar_l).tolist()
+    probs_arr = softmax(tar_l)
+    y, p_list, probs = res["targets"].tolist(), preds.tolist(), probs_arr.tolist()
     payload = classification_payload(
         y,
         p_list,
@@ -113,7 +114,7 @@ def _split_payload(
         target_prior_logits=tar_l.tolist(),
         target_prior_probabilities=probs,
         clustered_endpoints=clustered_endpoints(
-            res["targets"], preds, probs, identity, is_mil=is_mil
+            res["targets"], preds, probs_arr, identity, is_mil=is_mil
         ),
     )
     return payload
