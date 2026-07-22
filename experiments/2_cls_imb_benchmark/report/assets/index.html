@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Methodology Diagram</title>
+  <!-- Google Fonts for crisp academic presentation -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ponytail: self-contained HTML/CSS/SVG diagram replicating diagram.jpeg layout */
+    :root {
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+      /* Setup - Blue */
+      --setup-header: #003366;
+      --setup-bg: #f0f5fa;
+      --setup-border: #9ec2e6;
+      --setup-card-border: #003366;
+
+      /* Tuning - Green */
+      --tuning-header: #1b6338;
+      --tuning-bg: #f0f7f2;
+      --tuning-border: #86efac;
+      --tuning-card-border: #1b6338;
+
+      /* Confirmation - Purple */
+      --confirm-header: #512da8;
+      --confirm-bg: #f5f2f9;
+      --confirm-border: #c4b5fd;
+      --confirm-card-border: #512da8;
+
+      /* Analysis - Orange */
+      --analysis-header: #d9531e;
+      --analysis-bg: #fffcf9;
+      --analysis-border: #fdba74;
+      --analysis-card-border: #d9531e;
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #f8fafc;
+      color: #1e293b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      min-width: 1560px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .toolbar {
+      width: 100%;
+      max-width: 1540px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 10px 18px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn {
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: white;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    /* Outer Wrapper Diagram */
+    .diagram-container {
+      width: 100%;
+      max-width: 1540px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: var(--radius-lg);
+      padding: 5px 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      position: relative;
+    }
+
+    /* Top Banners */
+    .top-banner {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 8px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid #002244;
+    }
+
+    .top-banner-main {
+      background: #002244;
+      color: #ffffff;
+      font-size: 1.15rem;
+      font-weight: 800;
+      padding: 5px 16px;
+      letter-spacing: 0.2px;
+    }
+
+    .top-banner-sub {
+      background: #e6eff8;
+      color: #002244;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 3px 16px;
+      border-top: 1px solid #b0c4de;
+    }
+
+    /* Grid Layout for Columns with wider inter-stage gaps */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 285px 470px 430px 210px;
+      gap: 32px;
+      position: relative;
+    }
+
+    /* Column Base Style with increased vertical padding */
+    .column {
+      border-radius: var(--radius-md);
+      border: 2px solid;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 6px;
+      position: relative;
+    }
+
+    .column-header {
+      color: white;
+      font-size: 1.15rem;
+      font-weight: 800;
+      text-align: center;
+      padding: 4px 6px;
+      border-radius: 5px;
+      margin-bottom: 2px;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .header-tag {
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      letter-spacing: 0;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    .column-subtitle {
+      font-size: 0.74rem;
+      font-style: italic;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 14px; /* Generous bottom margin to prevent phase-label overlap */
+      min-height: 1.1em;
+    }
+
+    /* Setup Column */
+    .col-setup {
+      background-color: var(--setup-bg);
+      border-color: var(--setup-border);
+    }
+    .col-setup .column-header {
+      background-color: var(--setup-header);
+    }
+    .col-setup .column-subtitle {
+      color: #003366;
+    }
+
+    /* Tuning Column */
+    .col-tuning {
+      background-color: var(--tuning-bg);
+      border-color: var(--tuning-border);
+    }
+    .col-tuning .column-header {
+      background-color: var(--tuning-header);
+    }
+    .col-tuning .column-subtitle {
+      color: #1b6338;
+    }
+
+    /* Confirmation Column */
+    .col-confirm {
+      background-color: var(--confirm-bg);
+      border-color: var(--confirm-border);
+      justify-content: flex-start;
+    }
+    .col-confirm .column-header {
+      background-color: var(--confirm-header);
+    }
+    .col-confirm .column-subtitle {
+      color: #512da8;
+    }
+
+    /* Analysis Column */
+    .col-analysis {
+      background-color: var(--analysis-bg);
+      border-color: var(--analysis-border);
+      justify-content: flex-start;
+    }
+    .col-analysis .column-header {
+      background-color: var(--analysis-header);
+    }
+    .col-analysis .column-subtitle {
+      color: #d9531e;
+    }
+
+    /* Component Box / Card */
+    .card {
+      background: #ffffff;
+      border: 1.5px solid #000000;
+      border-radius: var(--radius-md);
+      padding: 5px 7px;
+      margin-bottom: 5px;
+      position: relative;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
+    .col-setup .card { border-color: var(--setup-card-border); }
+    .col-tuning .card { border-color: var(--tuning-card-border); }
+    .col-tuning .phase-grid-2 .card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      margin-bottom: 0;
+    }
+    .col-tuning .phase-grid-2 .card ul {
+      flex-grow: 1;
+    }
+    .col-confirm .card {
+      border-color: var(--confirm-card-border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      margin-bottom: 0;
+    }
+    .col-confirm .card ul {
+      flex-grow: 1;
+    }
+    .col-analysis .card { border-color: var(--analysis-card-border); }
+
+    .card-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #0f172a;
+      color: white;
+      font-weight: 800;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    .step-badge-text {
+      width: auto;
+      min-width: 26px;
+      padding: 0 5px;
+      border-radius: 12px;
+    }
+
+    .col-setup .step-badge { background-color: var(--setup-header); }
+    .col-tuning .step-badge { background-color: var(--tuning-header); }
+    .col-confirm .step-badge { background-color: var(--confirm-header); }
+    .col-analysis .step-badge { background-color: var(--analysis-header); }
+
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: #0f172a;
+      flex-grow: 1;
+    }
+
+    .card-subtitle {
+      font-size: 0.74rem;
+      color: #475569;
+      font-style: italic;
+      margin-top: -3px;
+      margin-bottom: 4px;
+    }
+
+    /* Bullet Lists inside cards */
+    .card ul {
+      list-style-type: disc;
+      padding-left: 14px;
+    }
+
+    .card li {
+      font-size: 0.73rem;
+      line-height: 1.25;
+      color: #1e293b;
+      margin-bottom: 2px;
+    }
+
+    .card li strong {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    /* Box 9 Vertical Icon-on-top Pillars */
+    .analysis-pillars-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .analysis-pillar-item {
+      background: #fff3ed;
+      border: 1px solid #fed7aa;
+      border-radius: 6px;
+      padding: 6px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+    }
+
+    .analysis-pillar-item svg {
+      color: #d9531e;
+      flex-shrink: 0;
+    }
+
+    .analysis-pillar-item span {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #c2410c;
+      line-height: 1.2;
+    }
+
+    /* Phase Enclosures (Dashed Boxes) */
+    .phase-container {
+      border: 1.5px dashed;
+      border-radius: var(--radius-md);
+      padding: 14px 5px 5px 5px;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .col-tuning .phase-container {
+      border-color: #22c55e;
+      background-color: rgba(240, 253, 244, 0.4);
+    }
+
+    .phase-label {
+      position: absolute;
+      top: -10px;
+      left: 20px;
+      background: var(--tuning-bg);
+      padding: 0 8px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #14532d;
+      white-space: nowrap;
+    }
+
+    .phase-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .phase-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 5px;
+    }
+
+    /* Immutable Gate & Output Badges */
+    .gate-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-top: 6px;
+    }
+
+    .col-setup .gate-badge {
+      background: #e6eff8;
+      border: 1px solid #9ec2e6;
+      color: #003366;
+    }
+
+    .col-tuning .gate-badge {
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      color: #166534;
+    }
+
+    /* Footers inside Cards */
+    .shard-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      color: #166534;
+      font-style: italic;
+      margin-top: auto;
+      padding-top: 3px;
+      border-top: 1px dashed #bbf7d0;
+    }
+
+    .confirm-footer-box {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .confirm-units-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #512da8;
+      background: #ede7f6;
+      border-radius: 16px;
+      padding: 4px 8px;
+      border: 1px solid #d1c4e9;
+    }
+
+    .confirm-time-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #512da8;
+      background: #ffffff;
+      border: 1px solid #c4b5fd;
+      border-radius: 12px;
+      padding: 3px 6px;
+    }
+
+    /* Confirmation shards banner underneath 8a and 8b */
+    .confirm-wrapper {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      flex-grow: 1;
+      position: relative;
+    }
+
+    .confirm-shards-banner {
+      border: 1.5px dashed #512da8;
+      border-radius: var(--radius-md);
+      padding: 6px 12px;
+      margin-top: 12px;
+      text-align: center;
+      font-size: 0.72rem;
+      font-style: italic;
+      color: #512da8;
+      background-color: rgba(245, 242, 249, 0.6);
+    }
+
+    /* Spacers for Setup vertical arrows */
+    .setup-arrow-spacer {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Analysis Box Layout */
+    .analysis-wrapper {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+      padding-top: 10px;
+    }
+
+    .analysis-result-card {
+      border: 2px solid #d9531e;
+      background: #ffffff;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      color: #d9531e;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      margin-top: 18px;
+    }
+
+    /* Footer Legend Bar */
+    .legend-bar {
+      width: 100%;
+      max-width: 1540px;
+      margin-top: 10px;
+      background: #eef4fa;
+      border: 1.5px solid #b0c4de;
+      border-radius: var(--radius-md);
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 0.71rem;
+      color: #1e293b;
+    }
+
+    .legend-left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .legend-stacked-col {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-left: 20px;
+      padding-left: 20px;
+      border-left: 1px solid #cbd5e1;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .legend-item svg {
+      flex-shrink: 0;
+      color: #002244;
+    }
+
+    .legend-item strong {
+      color: #002244;
+      font-weight: 700;
+    }
+
+    .legend-arrows {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.71rem;
+      font-weight: 600;
+      color: #1e293b;
+      white-space: nowrap;
+    }
+
+    .legend-arrow-symbol {
+      font-family: monospace;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    /* SVG Overlay layer for precise inter-column arrows */
+    .svg-connectors {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        background: white;
+      }
+      .toolbar {
+        display: none;
+      }
+      .diagram-container {
+        border: none;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Toolbar -->
+  <div class="toolbar">
+    <button class="btn" onclick="window.print()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Print / Save PDF
+    </button>
+  </div>
+
+  <!-- Main Diagram Container -->
+  <div class="diagram-container" id="diagram">
+
+    <!-- Top Banner Header -->
+    <div class="top-banner">
+      <div class="top-banner-main">Benchmark Methodology Workflow</div>
+      <div class="top-banner-sub">CAMELYON16, TCGA-UT, BRACS, PANDA &times; {patch, WSI}</div>
+    </div>
+
+    <!-- 4 Main Columns Layout -->
+    <div class="main-grid">
+
+      <!-- Column 1: Setup -->
+      <div class="column col-setup" id="col-setup">
+        <div class="column-header">
+          <span>Setup</span>
+          <span class="header-tag">1&times; per split</span>
+        </div>
+        <div class="column-subtitle">Dataset preparation &amp; partition freezing</div>
+
+        <!-- Step 1 -->
+        <div class="card" id="card-1">
+          <div class="card-title-row">
+            <span class="step-badge">1</span>
+            <span class="card-title">Prepare</span>
+          </div>
+          <ul>
+            <li><strong>Input:</strong> raw dataset on disk (WSIs/ROIs, labels, metadata)</li>
+            <li>Extract frozen Virchow2 features</li>
+            <li>CLS + mean patch token (2560-d)</li>
+            <li>Apply eligibility rules (valid target, split-unit ID, tissue rule, readable features)</li>
+            <li>Independently seeded</li>
+          </ul>
+          <div class="gate-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>Output: feature manifest + 3 disjoint partitions</span>
+          </div>
+        </div>
+
+        <!-- Spacer between 1 and 2 -->
+        <div class="setup-arrow-spacer" id="spacer-1-2"></div>
+
+        <!-- Step 2 -->
+        <div class="card" id="card-2">
+          <div class="card-title-row">
+            <span class="step-badge">2</span>
+            <span class="card-title">Pilot &times; 3 splits</span>
+          </div>
+          <ul>
+            <li>Size-matched balanced CE</li>
+            <li><strong>Nested support:</strong> 10 / 15 / 20 / 30 / 50 units per class</li>
+            <li>3 construction orderings</li>
+            <li>Compare natural-validation performance</li>
+          </ul>
+          <div class="gate-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6.01" y2="20"/></svg>
+            <span>Output: stability floor</span>
+          </div>
+        </div>
+
+        <!-- Spacer between 2 and 3 -->
+        <div class="setup-arrow-spacer" id="spacer-2-3"></div>
+
+        <!-- Step 3 -->
+        <div class="card" id="card-3">
+          <div class="card-title-row">
+            <span class="step-badge">3</span>
+            <span class="card-title">Freeze &times; 3 splits</span>
+          </div>
+          <ul>
+            <li>Lock min support = max(pilot floor, design floor)</li>
+            <li><strong>Design floor:</strong> 10 split units / 20 slides minimum</li>
+            <li>Build manifests: natural, balanced, moderate (&rho;=10), severe (&rho;=100, if feasible)</li>
+            <li>Shared held-out val/test sets</li>
+            <li>Sign seeds, hashes, floors</li>
+          </ul>
+          <div class="gate-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Output: signed manifest_freeze.json</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Tuning -->
+      <div class="column col-tuning" id="col-tuning">
+        <div class="column-header">
+          <span>Tuning</span>
+          <span class="header-tag">Parallel Shards</span>
+        </div>
+        <div class="column-subtitle">Hyperparameter search, locked before confirmation</div>
+
+        <!-- Base phase enclosure -->
+        <div class="phase-container" id="phase-base">
+          <div class="phase-label">Base phase</div>
+          <div class="phase-grid-2">
+            <!-- 4a -->
+            <div class="card" id="card-4a">
+              <div class="card-title-row">
+                <span class="step-badge step-badge-text">4a</span>
+                <span class="card-title" style="font-size: 0.82rem;">Tune base &middot; natural</span>
+              </div>
+              <div class="card-subtitle">independent methods</div>
+              <ul>
+                <li>Natural condition</li>
+                <li>2 tuning seeds &times; up to 16 candidates per method</li>
+              </ul>
+              <div class="shard-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                many parallel shards
+              </div>
+            </div>
+            <!-- 4b -->
+            <div class="card" id="card-4b">
+              <div class="card-title-row">
+                <span class="step-badge step-badge-text">4b</span>
+                <span class="card-title" style="font-size: 0.82rem;">Tune base &middot; controlled</span>
+              </div>
+              <div class="card-subtitle">independent methods</div>
+              <ul>
+                <li>Balanced / moderate / severe conditions</li>
+                <li>Same tuning logic, much cheaper (small matched T)</li>
+              </ul>
+              <div class="shard-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                many parallel shards
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 with generous vertical margin above & below -->
+        <div class="card" id="card-5" style="margin-top: 10px; margin-bottom: 12px;">
+          <div class="card-title-row">
+            <span class="step-badge">5</span>
+            <span class="card-title">Tune base &middot; reduce</span>
+          </div>
+          <ul>
+            <li>Aggregate base-phase shard results</li>
+          </ul>
+          <div class="gate-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Signed best-candidate selections per method &times; condition</span>
+          </div>
+        </div>
+
+        <!-- Dependent phase enclosure -->
+        <div class="phase-container" id="phase-dependent">
+          <div class="phase-label">Dependent phase</div>
+          <div class="phase-grid-3">
+            <!-- 6a -->
+            <div class="card" id="card-6a">
+              <div class="card-title-row">
+                <span class="step-badge step-badge-text">6a</span>
+                <span class="card-title" style="font-size: 0.72rem;">Tune dependent &middot; post-hoc (natural)</span>
+              </div>
+              <ul>
+                <li>Tune joint adjustment</li>
+                <li>Uses selected CE checkpoint from stage 5</li>
+              </ul>
+            </div>
+            <!-- 6b -->
+            <div class="card" id="card-6b">
+              <div class="card-title-row">
+                <span class="step-badge step-badge-text">6b</span>
+                <span class="card-title" style="font-size: 0.72rem;">Tune dependent &middot; ceRT (natural)</span>
+              </div>
+              <ul>
+                <li>Tune stage-two classifier</li>
+                <li>Uses selected CE checkpoint from stage 5</li>
+              </ul>
+            </div>
+            <!-- 6c -->
+            <div class="card" id="card-6c">
+              <div class="card-title-row">
+                <span class="step-badge step-badge-text">6c</span>
+                <span class="card-title" style="font-size: 0.72rem;">Tune dependent &middot; controlled</span>
+              </div>
+              <ul>
+                <li>Same dependent methods</li>
+                <li>Balanced / moderate / severe conditions</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 7 with generous vertical margin above -->
+        <div class="card" id="card-7" style="margin-top: 10px;">
+          <div class="card-title-row">
+            <span class="step-badge">7</span>
+            <span class="card-title">Tune final &middot; reduce</span>
+          </div>
+          <ul>
+            <li>Aggregate dependent-phase results</li>
+            <li>No more searching after this point</li>
+          </ul>
+          <div class="gate-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Lock tuning_selections.json (1 config / method &times; condition)</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Column 3: Confirmation -->
+      <div class="column col-confirm" id="col-confirm">
+        <div class="column-header">
+          <span>Confirmation</span>
+          <span class="header-tag">Cluster Array</span>
+        </div>
+        <div class="column-subtitle">Mirrors natural / controlled split</div>
+
+        <div class="confirm-wrapper">
+          <div class="confirm-bracket-container">
+            <div class="phase-grid-2">
+              <!-- 8a -->
+              <div class="card" id="card-8a">
+                <div class="card-title-row">
+                  <span class="step-badge step-badge-text">8a</span>
+                  <span class="card-title">Confirm &middot; natural</span>
+                </div>
+                <ul>
+                  <li>Locked configs + natural condition manifest</li>
+                  <li>One fit per task: (split, method, seed)</li>
+                  <li>Post-hoc logit adjustment folded into paired CE unit</li>
+                  <li>Resumable: skip if valid result already exists</li>
+                  <li><strong>Output:</strong> signed run.json per unit</li>
+                </ul>
+                <div class="confirm-footer-box">
+                  <div class="confirm-units-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 010 7.75"/></svg>
+                    &approx; approx. 150 units
+                  </div>
+                  <div class="confirm-time-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    &le;5h task budget
+                  </div>
+                </div>
+              </div>
+
+              <!-- 8b -->
+              <div class="card" id="card-8b">
+                <div class="card-title-row">
+                  <span class="step-badge step-badge-text">8b</span>
+                  <span class="card-title">Confirm &middot; controlled</span>
+                </div>
+                <ul>
+                  <li>Locked configs + balanced / moderate / severe manifests</li>
+                  <li>Bundled tasks: (split, assignment, condition, method, seed)</li>
+                  <li>Resumable: skip if valid result already exists</li>
+                  <li><strong>Output:</strong> signed run.json per unit</li>
+                </ul>
+                <div class="confirm-footer-box">
+                  <div class="confirm-units-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 010 7.75"/></svg>
+                    &approx; ~500+ units, bundled
+                  </div>
+                  <div class="confirm-time-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    &le;2h task budget
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dashed banner underneath 8a and 8b -->
+            <div class="confirm-shards-banner">
+              many parallel shards (executed across cluster)
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Column 4: Analysis -->
+      <div class="column col-analysis" id="col-analysis">
+        <div class="column-header">
+          <span>Analysis</span>
+          <span class="header-tag">Global</span>
+        </div>
+        <div class="column-subtitle">Cross-track evaluation &amp; study conclusions</div>
+
+        <div class="analysis-wrapper">
+          <!-- Step 9 -->
+          <div class="card" id="card-9">
+            <div class="card-title-row">
+              <span class="step-badge">9</span>
+              <span class="card-title">Analyze</span>
+            </div>
+            <ul>
+              <li>Glob every run.json across both confirm tracks</li>
+              <li>Directory-glob driven, idempotent</li>
+            </ul>
+
+            <!-- 2x2 grid of pillar items with prominent icon on top and text below -->
+            <div class="analysis-pillars-row">
+              <div class="analysis-pillar-item">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span>Endpoints &amp; Bootstrap CIs</span>
+              </div>
+              <div class="analysis-pillar-item">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Gating &amp; Recovery</span>
+              </div>
+              <div class="analysis-pillar-item">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><circle cx="15.5" cy="15.5" r="1.5"/></svg>
+                <span>Permutation Tests</span>
+              </div>
+              <div class="analysis-pillar-item">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                <span>Pairwise Rank Tests</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom right result box restored to original 24px icon -->
+          <div class="analysis-result-card" id="analysis-result">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <div>final metrics, statistical comparisons, and study conclusions</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- End main-grid -->
+
+    <!-- Legend Footer Bar -->
+    <div class="legend-bar">
+      <div class="legend-left-col">
+        <div class="legend-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span><strong>Lock / Gate:</strong> immutable artifact required for downstream progress</span>
+        </div>
+        <div class="legend-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span><strong>Wall-time guidance:</strong> short partitions improve throughput and resume speed</span>
+        </div>
+      </div>
+
+      <div class="legend-stacked-col">
+        <div class="legend-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span><strong>Parallelism:</strong> 3 split instances (left); many parallel shards (cluster)</span>
+        </div>
+        <div class="legend-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <span><strong>Sharded compute:</strong> SLURM array tasks across cluster resources</span>
+        </div>
+      </div>
+
+      <div class="legend-arrows">
+        <span><span class="legend-arrow-symbol">&rarr;</span> Data / artifact flow</span>
+        <span><span class="legend-arrow-symbol">- - &rarr;</span> Parallel fan-out / fan-in</span>
+      </div>
+    </div>
+
+    <!-- SVG Overlay for Crisp Connecting Lines & Arrows between Column Boxes -->
+    <svg class="svg-connectors" id="svgOverlay">
+      <defs>
+        <!-- Arrowhead Marker Solid -->
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <!-- Arrowhead Marker Orange -->
+        <marker id="arrow-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#d9531e" />
+        </marker>
+      </defs>
+    </svg>
+
+  </div>
+
+  <script>
+    /* ponytail: dynamic connector routing between main stage boundaries */
+    function updateConnectors() {
+      const svg = document.getElementById('svgOverlay');
+      const diagram = document.getElementById('diagram');
+      const dRect = diagram.getBoundingClientRect();
+
+      function getRelRect(id) {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return {
+          left: r.left - dRect.left,
+          top: r.top - dRect.top,
+          right: r.right - dRect.left,
+          bottom: r.bottom - dRect.top,
+          width: r.width,
+          height: r.height,
+          centerX: (r.left + r.right) / 2 - dRect.left,
+          centerY: (r.top + r.bottom) / 2 - dRect.top
+        };
+      }
+
+      const colSetup = getRelRect('col-setup');
+      const colTuning = getRelRect('col-tuning');
+      const colConfirm = getRelRect('col-confirm');
+      const colAnalysis = getRelRect('col-analysis');
+
+      const c1 = getRelRect('card-1');
+      const c2 = getRelRect('card-2');
+      const c3 = getRelRect('card-3');
+      const phaseBase = getRelRect('phase-base');
+      const c5 = getRelRect('card-5');
+      const phaseDep = getRelRect('phase-dependent');
+      const c7 = getRelRect('card-7');
+      const c9 = getRelRect('card-9');
+      const aResult = getRelRect('analysis-result');
+
+      let pathsHTML = '';
+
+      function drawLine(x1, y1, x2, y2, stroke = '#0f172a', isDashed = false, markerId = 'arrow') {
+        const dash = isDashed ? 'stroke-dasharray="4,4"' : '';
+        return `<path d="M ${x1} ${y1} L ${x2} ${y2}" stroke="${stroke}" stroke-width="2.2" fill="none" ${dash} marker-end="url(#${markerId})" />`;
+      }
+
+      // --- Internal Setup Down Arrows ---
+      if (c1 && c2) {
+        pathsHTML += drawLine(c1.centerX, c1.bottom, c1.centerX, c2.top - 4);
+      }
+      if (c2 && c3) {
+        pathsHTML += drawLine(c2.centerX, c2.bottom, c2.centerX, c3.top - 4);
+      }
+
+      // --- Internal Tuning Arrows ---
+      if (phaseBase && c5) {
+        pathsHTML += drawLine(c5.centerX, phaseBase.bottom, c5.centerX, c5.top - 4);
+      }
+      if (c5 && phaseDep) {
+        pathsHTML += drawLine(c5.centerX, c5.bottom, c5.centerX, phaseDep.top - 4);
+      }
+      if (phaseDep && c7) {
+        pathsHTML += drawLine(c7.centerX, phaseDep.bottom, c7.centerX, c7.top - 4);
+      }
+
+      // --- Inter-Phase Main Flow Arrows ---
+      // 1. Setup -> Tuning
+      if (colSetup && colTuning && c3 && c5) {
+        const yPos = (c3.centerY + c5.centerY) / 2;
+        pathsHTML += drawLine(colSetup.right, yPos, colTuning.left - 4, yPos);
+      }
+
+      // 2. Tuning -> Confirmation
+      if (colTuning && colConfirm) {
+        const yPos = (colTuning.top + colTuning.bottom) / 2;
+        pathsHTML += drawLine(colTuning.right, yPos, colConfirm.left - 4, yPos);
+      }
+
+      // 3. Confirmation -> Analysis
+      if (colConfirm && colAnalysis && c9) {
+        const yPos = c9.centerY;
+        pathsHTML += drawLine(colConfirm.right, yPos, colAnalysis.left - 4, yPos);
+      }
+
+      // --- Analysis Down Arrow ---
+      if (c9 && aResult) {
+        pathsHTML += drawLine(c9.centerX, c9.bottom, c9.centerX, aResult.top - 4, '#d9531e', true, 'arrow-orange');
+      }
+
+      svg.innerHTML = svg.children[0].outerHTML + pathsHTML;
+    }
+
+    // Run positioning update on load & resize
+    window.addEventListener('load', updateConnectors);
+    window.addEventListener('resize', updateConnectors);
+  </script>
+</body>
+</html>
