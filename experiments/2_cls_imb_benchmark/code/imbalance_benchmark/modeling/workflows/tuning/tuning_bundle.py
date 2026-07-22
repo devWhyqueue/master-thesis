@@ -13,15 +13,31 @@ def run_shard_bundle(args: argparse.Namespace) -> bool:
         return False
     if size < 1:
         raise ValueError("shards-per-task must be positive")
-    first = args.shard_index * size
-    processes = [
-        subprocess.Popen(_shard_command(args, index))
-        for index in range(first, first + size)
-    ]
+    indices = _bundle_indices(
+        args.shard_index,
+        size,
+        args.observations_per_candidate,
+        args.bundle_by_observation,
+    )
+    processes = [subprocess.Popen(_shard_command(args, index)) for index in indices]
     failures = [process.wait() for process in processes]
     if any(failures):
         raise RuntimeError(f"Shard bundle failed with exit codes {failures}")
     return True
+
+
+def _bundle_indices(
+    bundle_index: int, size: int, observation_count: int, by_observation: bool
+) -> list[int]:
+    if not by_observation:
+        first = bundle_index * size
+        return list(range(first, first + size))
+    candidate_group, observation_index = divmod(bundle_index, observation_count)
+    first_candidate = candidate_group * size
+    return [
+        candidate_index * observation_count + observation_index
+        for candidate_index in range(first_candidate, first_candidate + size)
+    ]
 
 
 def _shard_command(args: argparse.Namespace, shard_index: int) -> list[str]:

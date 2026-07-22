@@ -3,6 +3,7 @@ from __future__ import annotations
 from argparse import Namespace
 
 from imbalance_benchmark.modeling.workflows.tuning import tuning_bundle
+from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import _bundle_indices
 
 
 def test_bundle_launches_each_shard_once_without_recursive_bundling(monkeypatch) -> None:
@@ -25,6 +26,7 @@ def test_bundle_launches_each_shard_once_without_recursive_bundling(monkeypatch)
         observations_per_candidate=6,
         shard_offset=0,
         shards_per_task=8,
+        bundle_by_observation=False,
     )
 
     assert tuning_bundle.run_shard_bundle(args)
@@ -33,3 +35,16 @@ def test_bundle_launches_each_shard_once_without_recursive_bundling(monkeypatch)
     ]
     assert indices == list(range(24, 32))
     assert all("--shards-per-task" not in command for command in commands)
+
+
+def test_observation_bundles_keep_split_and_seed_homogeneous() -> None:
+    assert _bundle_indices(3, 8, 6, by_observation=True) == [
+        3,
+        9,
+        15,
+        21,
+        27,
+        33,
+        39,
+        45,
+    ]

@@ -18,6 +18,13 @@ def bundled_array_size(shard_count: int, shards_per_task: int) -> int:
     return math.ceil(shard_count / shards_per_task)
 
 
+def bundled_observation_array_size(
+    candidate_count: int, observation_count: int, shards_per_task: int
+) -> int:
+    """Return allocations for candidate bundles crossed with observations."""
+    return bundled_array_size(candidate_count, shards_per_task) * observation_count
+
+
 def resolve_shard_spec(
     index: int,
     phase: str,

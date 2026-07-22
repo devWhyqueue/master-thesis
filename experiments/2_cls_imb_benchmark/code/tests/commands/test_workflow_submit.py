@@ -56,16 +56,18 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "analyze",
     ]
     assert jobs[-2].dependencies == ("tune-final-reduce",)
-    assert jobs[3].array_size == 99
+    assert jobs[3].array_size == 102
     assert "--observations-per-candidate 6" in jobs[3].command
     assert "--shards-per-task 8" in jobs[3].command
+    assert "--bundle-by-observation" in jobs[3].command
     assert jobs[3].memory == "64G"
     assert jobs[4].array_size == 50
     assert jobs[6].array_size == 0
     assert "--shard-index 0" in jobs[6].command
-    assert jobs[7].array_size == 3
+    assert jobs[7].array_size == 6
     assert "--observations-per-candidate 6" in jobs[7].command
     assert "--shard-offset 1" in jobs[7].command
+    assert "--bundle-by-observation" in jobs[7].command
     assert jobs[8].array_size == 2
     script = render_sbatch(jobs[-2], _config(), "config.yaml")
     assert "#SBATCH --array=0-11" in script

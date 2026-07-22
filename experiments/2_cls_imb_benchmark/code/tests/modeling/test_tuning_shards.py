@@ -18,6 +18,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
     bundled_array_size,
+    bundled_observation_array_size,
     resolve_shard_spec,
 )
 
@@ -74,6 +75,7 @@ def test_array_coordinates_cross_candidates_with_every_observation() -> None:
 def test_bundled_array_size_covers_every_shard_once() -> None:
     assert bundled_array_size(792, 8) == 99
     assert bundled_array_size(15, 8) == 2
+    assert bundled_observation_array_size(132, 6, 8) == 102
 
 
 def test_resume_rejects_a_stale_freeze_fingerprint() -> None:

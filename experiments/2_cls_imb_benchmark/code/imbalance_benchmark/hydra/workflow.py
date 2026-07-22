@@ -3,19 +3,19 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 from functools import partial
-import json
 import logging
 import subprocess
 from typing import Any, Callable
 
-from imbalance_benchmark.common import ensure_dirs, load_config, split_paths
+from imbalance_benchmark.common import load_config
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
+from imbalance_benchmark.hydra.resume import verify_resume_freezes
 from imbalance_benchmark.modeling.context import CONDITIONS
 from imbalance_benchmark.modeling.context import roster_for_regime
-from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     DEPENDENT_METHODS,
     bundled_array_size,
+    bundled_observation_array_size,
     candidate_array_size,
 )
 
@@ -109,14 +109,15 @@ def _tuning_jobs(
             config,
             "tune-base-natural",
             "tune-shard --phase base --group natural"
-            f" --observations-per-candidate {natural_observations}{bundle_arg}",
+            f" --observations-per-candidate {natural_observations}"
+            f" --bundle-by-observation{bundle_arg}",
             True,
             freeze_dependency,
             "tune_natural",
             "tune",
         ),
-        array_size=bundle_size(
-            candidate_array_size(base_methods) * natural_observations
+        array_size=bundled_observation_array_size(
+            candidate_array_size(base_methods), natural_observations, shards_per_task
         ),
     )
     base_controlled = replace(
@@ -154,13 +155,15 @@ def _tuning_jobs(
             "tune-dependent-crt-natural",
             "tune-shard --phase dependent --group natural"
             f" --observations-per-candidate {natural_observations}"
-            f" --shard-offset 1{bundle_arg}",
+            f" --shard-offset 1 --bundle-by-observation{bundle_arg}",
             True,
             (base_reduce.name,),
             "tune_natural",
             "tune",
         ),
-        array_size=bundle_size(candidate_array_size(("crt",)) * natural_observations),
+        array_size=bundled_observation_array_size(
+            candidate_array_size(("crt",)), natural_observations, shards_per_task
+        ),
     )
     dependent_controlled = replace(
         _job(
@@ -215,7 +218,7 @@ def submit_workflow(
 ) -> dict[str, str]:
     """Render and submit the workflow in topological order, returning job IDs by stage."""
     if resume_tuning:
-        _verify_resume_freezes(config)
+        verify_resume_freezes(config)
     submitted: dict[str, str] = {}
     for job in build_workflow(config, smoke, resume_tuning):
         dependencies = tuple(submitted[name] for name in job.dependencies)
@@ -227,15 +230,6 @@ def submit_workflow(
         if dry_run:
             logger.info("%s", script)
     return submitted
-
-
-def _verify_resume_freezes(config: dict[str, Any]) -> None:
-    base = ensure_dirs(config)
-    for index in range(3):
-        path = split_paths(base, index)["data"] / "manifest_freeze.json"
-        if not path.exists():
-            raise FileNotFoundError(f"Cannot resume tuning without {path}")
-        verify_manifest_freeze(json.loads(path.read_text()))
 
 
 def cmd_submit(args: argparse.Namespace) -> None:
