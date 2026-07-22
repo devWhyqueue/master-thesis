@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import replace
+from functools import partial
 import json
 import logging
 import subprocess
@@ -14,6 +15,7 @@ from imbalance_benchmark.modeling.context import roster_for_regime
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     DEPENDENT_METHODS,
+    bundled_array_size,
     candidate_array_size,
 )
 
@@ -32,8 +34,6 @@ def _resources(
         "partition": part,
         "gpus": int(sr.get("gpus", 1 if gpu else 0)),
         "cpus": int(sr.get("cpus", 4)),
-        # Unset unless a stage needs less than its partition's own time limit;
-        # SLURM already applies that limit when --time is omitted.
         "time_limit": str(time) if time else None,
     }
 
@@ -97,6 +97,9 @@ def _tuning_jobs(
     natural_observations = int(
         config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
     )
+    shards_per_task = int(config.get("slurm", {}).get("tune_shards_per_task", 1))
+    bundle_arg = f" --shards-per-task {shards_per_task}"
+    bundle_size = partial(bundled_array_size, shards_per_task=shards_per_task)
     base_methods = tuple(method for method in roster if method not in DEPENDENT_METHODS)
     dependent_methods = tuple(
         method for method in roster if method in DEPENDENT_METHODS
@@ -106,25 +109,27 @@ def _tuning_jobs(
             config,
             "tune-base-natural",
             "tune-shard --phase base --group natural"
-            f" --observations-per-candidate {natural_observations}",
+            f" --observations-per-candidate {natural_observations}{bundle_arg}",
             True,
             freeze_dependency,
             "tune_natural",
             "tune",
         ),
-        array_size=candidate_array_size(base_methods) * natural_observations,
+        array_size=bundle_size(
+            candidate_array_size(base_methods) * natural_observations
+        ),
     )
     base_controlled = replace(
         _job(
             config,
             "tune-base-controlled",
-            "tune-shard --phase base --group controlled",
+            f"tune-shard --phase base --group controlled{bundle_arg}",
             True,
             freeze_dependency,
             "tune_controlled",
             "tune",
         ),
-        array_size=3 * candidate_array_size(base_methods),
+        array_size=bundle_size(3 * candidate_array_size(base_methods)),
     )
     base_reduce = _job(
         config,
@@ -148,25 +153,26 @@ def _tuning_jobs(
             config,
             "tune-dependent-crt-natural",
             "tune-shard --phase dependent --group natural"
-            f" --observations-per-candidate {natural_observations} --shard-offset 1",
+            f" --observations-per-candidate {natural_observations}"
+            f" --shard-offset 1{bundle_arg}",
             True,
             (base_reduce.name,),
             "tune_natural",
             "tune",
         ),
-        array_size=candidate_array_size(("crt",)) * natural_observations,
+        array_size=bundle_size(candidate_array_size(("crt",)) * natural_observations),
     )
     dependent_controlled = replace(
         _job(
             config,
             "tune-dependent-controlled",
-            "tune-shard --phase dependent --group controlled",
+            f"tune-shard --phase dependent --group controlled{bundle_arg}",
             True,
             (base_reduce.name,),
             "tune_controlled",
             "tune",
         ),
-        array_size=3 * candidate_array_size(dependent_methods),
+        array_size=bundle_size(3 * candidate_array_size(dependent_methods)),
     )
     final_reduce = _job(
         config,

@@ -37,6 +37,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     combined_scopes,
     run_candidate_shard,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import run_shard_bundle
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
     phase_methods,
@@ -45,7 +46,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 
 
 def _is_excluded(paths: dict[str, Path]) -> bool:
-    """Return whether a failed pilot/freeze excludes this confirmatory workflow."""
     return (paths["data"] / "confirmatory_exclusion.json").exists()
 
 
@@ -94,13 +94,11 @@ def cmd_tune(args: argparse.Namespace) -> None:
 
 
 def _tuning_seeds(freeze: dict[str, Any]) -> list[int]:
-    """Return the two locked initialization seeds used for every candidate."""
     roles = freeze.get("seed_roles", {})
     return [int(roles[f"tuning_initialization_{index}"]) for index in range(2)]
 
 
 def _conditions(args: argparse.Namespace) -> tuple[str, ...]:
-    """Return the requested condition scope, defaulting to the whole roster."""
     return (args.condition,) if getattr(args, "condition", None) else CONDITIONS
 
 
@@ -176,6 +174,8 @@ def _frozen_shard_context(
 
 def cmd_tune_shard(args: argparse.Namespace) -> None:
     """Run one resumable frozen-candidate shard."""
+    if run_shard_bundle(args):
+        return
     base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
     if any(_is_excluded(paths) for paths, _, _ in raw_scopes):
         return

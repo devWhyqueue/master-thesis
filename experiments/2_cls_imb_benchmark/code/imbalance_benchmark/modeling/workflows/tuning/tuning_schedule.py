@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import math
 from typing import Any
 
 from imbalance_benchmark.modeling.context import roster_for_regime
@@ -8,6 +9,13 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import Shard
 
 MAX_CANDIDATES = 16
 DEPENDENT_METHODS = ("post_hoc_logit_adjustment", "crt")
+
+
+def bundled_array_size(shard_count: int, shards_per_task: int) -> int:
+    """Return the number of allocations needed for fixed-size shard bundles."""
+    if shards_per_task < 1:
+        raise ValueError("shards per task must be positive")
+    return math.ceil(shard_count / shards_per_task)
 
 
 def resolve_shard_spec(
