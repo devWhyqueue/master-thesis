@@ -66,6 +66,8 @@ def test_array_coordinates_cross_candidates_with_every_observation() -> None:
         (1, 0),
         (1, 1),
     ]
+    assert array_coordinates(0, None, 6, candidate_offset=1) == (1, 0)
+    assert array_coordinates(23, None, 6, candidate_offset=1) == (4, 5)
 
 
 def test_resume_rejects_a_stale_freeze_fingerprint() -> None:

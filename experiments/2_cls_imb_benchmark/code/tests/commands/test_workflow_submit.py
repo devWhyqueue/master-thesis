@@ -43,7 +43,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "tune-base-natural",
         "tune-base-controlled",
         "tune-base-reduce",
-        "tune-dependent-natural",
+        "tune-dependent-posthoc-natural",
+        "tune-dependent-crt-natural",
         "tune-dependent-controlled",
         "tune-final-reduce",
         "confirm",
@@ -52,6 +53,11 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert jobs[-2].dependencies == ("tune-final-reduce",)
     assert jobs[3].array_size == 792
     assert "--observations-per-candidate 6" in jobs[3].command
+    assert jobs[6].array_size == 0
+    assert "--shard-index 0" in jobs[6].command
+    assert jobs[7].array_size == 24
+    assert "--observations-per-candidate 6" in jobs[7].command
+    assert "--shard-offset 1" in jobs[7].command
     script = render_sbatch(jobs[-2], _config(), "config.yaml")
     assert "#SBATCH --array=0-11" in script
     assert (
@@ -76,8 +82,8 @@ def test_submit_links_actual_job_ids() -> None:
     assert submitted["prepare"] == "1"
     assert submitted["analyze"] == str(len(submitted_scripts))
     assert "#SBATCH --dependency=afterok:4:5" in submitted_scripts[5]
-    assert "#SBATCH --dependency=afterok:7:8" in submitted_scripts[8]
-    assert "#SBATCH --dependency=afterok:10" in submitted_scripts[10]
+    assert "#SBATCH --dependency=afterok:7:8:9" in submitted_scripts[9]
+    assert "#SBATCH --dependency=afterok:11" in submitted_scripts[11]
 
 
 def test_resume_tuning_skips_completed_setup() -> None:

@@ -134,17 +134,27 @@ def _tuning_jobs(
         (base_natural.name, base_controlled.name),
         "tune_reduce",
     )
-    dependent_natural = replace(
+    dependent_posthoc_natural = _job(
+        config,
+        "tune-dependent-posthoc-natural",
+        "tune-shard --phase dependent --group natural --shard-index 0",
+        True,
+        (base_reduce.name,),
+        "tune_post_hoc_natural",
+        "tune_natural",
+    )
+    dependent_crt_natural = replace(
         _job(
             config,
-            "tune-dependent-natural",
-            "tune-shard --phase dependent --group natural",
+            "tune-dependent-crt-natural",
+            "tune-shard --phase dependent --group natural"
+            f" --observations-per-candidate {natural_observations} --shard-offset 1",
             True,
             (base_reduce.name,),
             "tune_natural",
             "tune",
         ),
-        array_size=candidate_array_size(dependent_methods),
+        array_size=candidate_array_size(("crt",)) * natural_observations,
     )
     dependent_controlled = replace(
         _job(
@@ -163,14 +173,19 @@ def _tuning_jobs(
         "tune-final-reduce",
         "tune-reduce --phase final",
         False,
-        (dependent_natural.name, dependent_controlled.name),
+        (
+            dependent_posthoc_natural.name,
+            dependent_crt_natural.name,
+            dependent_controlled.name,
+        ),
         "tune_reduce",
     )
     return [
         base_natural,
         base_controlled,
         base_reduce,
-        dependent_natural,
+        dependent_posthoc_natural,
+        dependent_crt_natural,
         dependent_controlled,
         final_reduce,
     ]

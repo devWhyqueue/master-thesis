@@ -80,13 +80,19 @@ def requested_shard(
 
 
 def array_coordinates(
-    index: int, explicit_observation: int | None, observations_per_candidate: int
+    index: int,
+    explicit_observation: int | None,
+    observations_per_candidate: int,
+    candidate_offset: int = 0,
 ) -> tuple[int, int | None]:
     """Decode a candidate array task, optionally crossed with observations."""
     if observations_per_candidate < 1:
         raise ValueError("observations-per-candidate must be positive")
+    if candidate_offset < 0:
+        raise ValueError("candidate offset must be non-negative")
     if explicit_observation is not None and observations_per_candidate != 1:
         raise ValueError("Use either observation-index or observations-per-candidate")
     if observations_per_candidate == 1:
-        return index, explicit_observation
-    return divmod(index, observations_per_candidate)
+        return index + candidate_offset, explicit_observation
+    candidate_index, observation_index = divmod(index, observations_per_candidate)
+    return candidate_index + candidate_offset, observation_index

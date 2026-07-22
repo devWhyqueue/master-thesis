@@ -105,7 +105,6 @@ def _conditions(args: argparse.Namespace) -> tuple[str, ...]:
 
 
 def _output_name(args: argparse.Namespace) -> str:
-    """Return the condition-safe tuning selection output name."""
     return (
         f"tuning_selections_{args.condition}.json"
         if getattr(args, "condition", None)
@@ -184,6 +183,7 @@ def cmd_tune_shard(args: argparse.Namespace) -> None:
         args.shard_index,
         args.observation_index,
         args.observations_per_candidate,
+        args.shard_offset,
     )
     spec = requested_shard(
         shard_index,
