@@ -19,19 +19,30 @@ __all__ = ["cmd_smoke"]
 logger = logging.getLogger(__name__)
 
 
+def _mock_config() -> dict[str, object]:
+    """Synthetic-dataset config for the local end-to-end smoke path."""
+    return {
+        "paths": {"outputs": "experiments/2_cls_imb_benchmark/smoke_outputs"},
+        "slurm": {"partition": "cpu-test", "container": "./environment.sif"},
+        "dataset": {
+            "name": "synthetic",
+            "regime": "patch",
+            "target": "cancer_type",
+            "version": "smoke-test-v1",
+            "eligibility_rules": {"fixture": True},
+        },
+    }
+
+
 def cmd_smoke(args: argparse.Namespace) -> None:
     """Run local end-to-end smoke test."""
     logger.info("=== Running End-to-End Smoke Test ===")
-    mock_config = {
-        "paths": {"outputs": "experiments/2_cls_imb_benchmark/smoke_outputs"},
-        "slurm": {"partition": "cpu-test", "container": "./environment.sif"},
-    }
     config_path = (
         REPO_ROOT / "experiments/2_cls_imb_benchmark/smoke_outputs/configs/default.yaml"
     )
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with config_path.open("w", encoding="utf-8") as f:
-        yaml.safe_dump(mock_config, f)
+        yaml.safe_dump(_mock_config(), f)
     ns = argparse.Namespace(
         config=str(config_path), seed=0, dry_run=True, split_index=None
     )

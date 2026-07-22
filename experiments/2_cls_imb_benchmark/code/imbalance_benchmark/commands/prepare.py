@@ -30,24 +30,37 @@ from imbalance_benchmark.manifest.seeds import derive_seed
 __all__ = ["cmd_prepare"]
 
 
+SYNTHETIC_PATCHES_PER_SLIDE = 30
+
+
 def _synthetic_manifest(paths: dict[str, Path]) -> pd.DataFrame:
-    """Build a synthetic manifest for the smoke workflow (no external datasets)."""
+    """Build a synthetic manifest for the smoke workflow (no external datasets).
+
+    20 patients/class survives the 70/15/15 split with >=10 in train, the
+    minimum the pilot's 10% patient-contribution cap can ever satisfy
+    (manifest/pilot_training.py:patch_pilot_caps_hold). One row per patch
+    (feature_index into the slide's multi-row tensor), mirroring the real
+    dataset builders' expansion (e.g. datasets/tcga_ut.py:_expand_chunks) --
+    ImbalanceDataset requires an explicit feature_index for multi-row tensors.
+    """
     rows = []
     for cls in ["class_A", "class_B", "class_C", "class_D"]:
-        for p_idx in range(12):
+        for p_idx in range(20):
             p_id = f"PAT_{cls}_{p_idx}"
             for s_idx in range(2):
                 s_id = f"SLIDE_{p_id}_{s_idx}"
                 f_path = paths["data"] / f"{s_id}.pt"
                 if not f_path.exists():
-                    torch.save(torch.randn(30, 2560), f_path)
-                rows.append(
+                    torch.save(torch.randn(SYNTHETIC_PATCHES_PER_SLIDE, 2560), f_path)
+                rows.extend(
                     {
                         "case_id": p_id,
                         "slide_id": s_id,
                         "cancer_type": cls,
                         "feature_path": str(f_path),
+                        "feature_index": patch_idx,
                     }
+                    for patch_idx in range(SYNTHETIC_PATCHES_PER_SLIDE)
                 )
     return pd.DataFrame(rows)
 
