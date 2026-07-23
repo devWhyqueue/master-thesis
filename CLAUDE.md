@@ -13,6 +13,7 @@
 # Code
 
 - If editing Python code, run clean-code skill after a change (with the appropriate --scope/--vulture-scope). To avoid producing violations in the first place, look into the skill's clean_code_rules.yml.
+- Never run full pytest suite as its excecution is already covered by the clean-code skill. Instead, run only the tests that are affected by your changes.
 
 # LaTeX
 
