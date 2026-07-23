@@ -46,7 +46,7 @@ slurm:
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
-    analyze: {partition: cpu-2h, gpus: 0, cpus: 4}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
   squashfs:
     - source: /home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs
