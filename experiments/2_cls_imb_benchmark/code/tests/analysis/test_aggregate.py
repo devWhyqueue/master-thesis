@@ -260,9 +260,7 @@ def test_ingest_and_tables_end_to_end(tmp_path: Path):
             conn,
             f"patch:{cond}:{method}:seed={seed_idx}",
             result_dir,
-            cond,
-            method,
-            seed_idx,
+            (cond, method, seed_idx),
             record,
             tiers,
         )

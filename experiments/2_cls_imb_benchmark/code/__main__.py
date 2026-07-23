@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from imbalance_benchmark.commands import (
     cmd_analyze,
+    cmd_analyze_combine,
     cmd_combine_rq3,
     cmd_confirm,
     cmd_confirm_shard,
@@ -39,6 +40,7 @@ def _parser() -> argparse.ArgumentParser:
         "confirm",
         "confirm-shard",
         "analyze",
+        "analyze-combine",
         "combine-rq3",
         "smoke",
     ):
@@ -83,6 +85,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "confirm": cmd_confirm,
         "confirm-shard": cmd_confirm_shard,
         "analyze": cmd_analyze,
+        "analyze-combine": cmd_analyze_combine,
         "combine-rq3": cmd_combine_rq3,
         "submit": cmd_submit,
         "smoke": cmd_smoke,

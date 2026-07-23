@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from imbalance_benchmark.commands.analyze import cmd_analyze, cmd_combine_rq3
+from imbalance_benchmark.commands.analyze import (
+    cmd_analyze,
+    cmd_analyze_combine,
+    cmd_combine_rq3,
+)
 from imbalance_benchmark.commands.confirm import cmd_confirm
 from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
 from imbalance_benchmark.commands.freeze import cmd_freeze
@@ -24,6 +28,7 @@ __all__ = [
     "cmd_confirm",
     "cmd_confirm_shard",
     "cmd_analyze",
+    "cmd_analyze_combine",
     "cmd_combine_rq3",
     "cmd_submit",
     "cmd_smoke",

@@ -69,7 +69,7 @@ def _ingest_discovered_run(
             freeze.get("tail_assignments", {}).get(assignment, class_names),
         )
     run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
-    ingest_run(conn, run_id, result_dir, condition, method, seed_idx, record, tiers)
+    ingest_run(conn, run_id, result_dir, (condition, method, seed_idx), record, tiers)
 
 
 def write_diagnostics(

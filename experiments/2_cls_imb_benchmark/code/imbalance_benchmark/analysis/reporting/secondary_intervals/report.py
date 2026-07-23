@@ -177,7 +177,12 @@ def _endpoint_row(
     reference: dict[str, np.ndarray] | None,
 ) -> dict[str, object]:
     estimate_low, estimate_high = confidence_interval(distribution)
-    effect = distribution - reference[endpoint] if reference else None
+    # A cross-condition reference (e.g. the balanced CE baseline) can lack a
+    # tier-specific endpoint the compared run has (balanced has no head/tail
+    # split); the effect is then undefined rather than computable.
+    effect = None
+    if reference is not None and endpoint in reference:
+        effect = distribution - reference[endpoint]
     effect_ci = confidence_interval(effect) if effect is not None else (None, None)
     return {
         "assignment": identity[0],

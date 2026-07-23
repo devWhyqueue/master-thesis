@@ -57,10 +57,13 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "confirm-natural",
         "confirm-controlled",
         "analyze",
+        "analyze-combine",
     ]
+    assert jobs[-4].dependencies == ("tune-final-reduce",)
     assert jobs[-3].dependencies == ("tune-final-reduce",)
-    assert jobs[-2].dependencies == ("tune-final-reduce",)
-    assert jobs[-1].dependencies == ("confirm-natural", "confirm-controlled")
+    assert jobs[-2].dependencies == ("confirm-natural", "confirm-controlled")
+    assert jobs[-2].array_splits == (0, 1, 2)
+    assert jobs[-1].dependencies == ("analyze",)
     assert jobs[3].array_size == 198
     assert "--observations-per-candidate 6" in jobs[3].command
     assert "--shards-per-task 4" in jobs[3].command
@@ -110,12 +113,14 @@ def test_submit_links_actual_job_ids() -> None:
 
     submitted = submit_workflow(_config(), submit=fake_submit)
     assert submitted["prepare"] == "1"
-    assert submitted["analyze"] == str(len(submitted_scripts))
+    assert submitted["analyze-combine"] == str(len(submitted_scripts))
     assert "#SBATCH --dependency=afterok:4:5" in submitted_scripts[5]
     assert "#SBATCH --dependency=afterok:7:8:9" in submitted_scripts[9]
     assert "#SBATCH --dependency=afterok:10" in submitted_scripts[10]
     assert "#SBATCH --dependency=afterok:10" in submitted_scripts[11]
     assert "#SBATCH --dependency=afterok:11:12" in submitted_scripts[12]
+    assert submitted["analyze"] == "13"
+    assert "#SBATCH --dependency=afterok:13" in submitted_scripts[13]
 
 
 def test_resume_tuning_skips_completed_setup() -> None:

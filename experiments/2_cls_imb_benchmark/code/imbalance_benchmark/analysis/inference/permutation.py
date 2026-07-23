@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from typing import Callable
 
 import numpy as np
 
@@ -42,12 +43,8 @@ def _swap_batches(
     return False, batches
 
 
-def _expand_swap_to_rows(
-    swap_patients: np.ndarray, unique_cases: np.ndarray, row_case_ids: np.ndarray
-) -> np.ndarray:
-    """Broadcast a (n_patients, batch) swap matrix to (n_rows, batch)."""
-    position = {c: i for i, c in enumerate(unique_cases)}
-    row_idx = np.asarray([position[c] for c in row_case_ids])
+def _expand_swap_to_rows(swap_patients: np.ndarray, row_idx: np.ndarray) -> np.ndarray:
+    """Broadcast a (n_patients, batch) swap matrix to (n_rows, batch) via a precomputed row index."""
     return swap_patients[row_idx, :]
 
 
@@ -80,6 +77,21 @@ def _tail_nll_batch(
         out += -np.log(p_true).mean(axis=0)
         counted += 1
     return out / max(counted, 1)
+
+
+def _permuted_p_value(
+    case_ids: np.ndarray,
+    n_permutations: int,
+    seed: int,
+    observed: float,
+    batch_stat: Callable[[np.ndarray], np.ndarray],
+) -> float:
+    """Run the shared swap-batch loop and return the two-sided permutation p-value."""
+    unique_cases = np.unique(case_ids)
+    row_idx = np.searchsorted(unique_cases, case_ids)
+    enumerated, batches = _swap_batches(len(unique_cases), n_permutations, seed)
+    stats = [batch_stat(_expand_swap_to_rows(swap, row_idx)) for swap in batches]
+    return _p_value(observed, np.concatenate(stats), enumerated)
 
 
 def _p_value(observed: float, extremes: np.ndarray, enumerated: bool) -> float:
@@ -134,10 +146,8 @@ def paired_block_permutation_ba(
 ) -> float:
     """Paired patient-block permutation test for the discrimination-axis statistic.
 
-    Under each permutation the complete method/CE prediction blocks are
-    swapped together within a patient (all of that patient's rows), and the
-    balanced-accuracy difference is recomputed; two-sided p-value with the
-    plus-one correction when permutations are sampled rather than enumerated.
+    Swaps method/CE blocks within a patient and recomputes the balanced-
+    accuracy difference; two-sided p-value, plus-one corrected when sampled.
     """
     method_stack, ce_stack = (
         _as_seed_stack(method_preds, 1),
@@ -149,19 +159,16 @@ def paired_block_permutation_ba(
         _seed_mean_ba(labels, method_stack[:, :, None], n_classes)[0]
         - _seed_mean_ba(labels, ce_stack[:, :, None], n_classes)[0]
     )
-    unique_cases = np.unique(case_ids)
-    enumerated, batches = _swap_batches(len(unique_cases), n_permutations, seed)
-    stats = []
-    for swap_patients in batches:
-        swap_rows = _expand_swap_to_rows(swap_patients, unique_cases, case_ids)
+
+    def _stat(swap_rows: np.ndarray) -> np.ndarray:
         swap = swap_rows[None, :, :]
         preds_a = np.where(swap, ce_stack[:, :, None], method_stack[:, :, None])
         preds_b = np.where(swap, method_stack[:, :, None], ce_stack[:, :, None])
-        stats.append(
-            _seed_mean_ba(labels, preds_a, n_classes)
-            - _seed_mean_ba(labels, preds_b, n_classes)
+        return _seed_mean_ba(labels, preds_a, n_classes) - _seed_mean_ba(
+            labels, preds_b, n_classes
         )
-    return _p_value(float(observed), np.concatenate(stats), enumerated)
+
+    return _permuted_p_value(case_ids, n_permutations, seed, observed, _stat)
 
 
 def paired_block_permutation_tail_nll(
@@ -178,7 +185,6 @@ def paired_block_permutation_tail_nll(
     Statistic is oriented so positive means improvement:
     ``NLL_tail(CE) - NLL_tail(method)``.
     """
-
     method_stack, ce_stack = (
         _as_seed_stack(method_probs, 2),
         _as_seed_stack(ce_probs, 2),
@@ -189,15 +195,13 @@ def paired_block_permutation_tail_nll(
         _seed_mean_tail_nll(labels, ce_stack[:, :, None, :], tail_classes)[0]
         - _seed_mean_tail_nll(labels, method_stack[:, :, None, :], tail_classes)[0]
     )
-    unique_cases = np.unique(case_ids)
-    enumerated, batches = _swap_batches(len(unique_cases), n_permutations, seed)
-    stats = []
-    for swap_patients in batches:
-        swap_rows = _expand_swap_to_rows(swap_patients, unique_cases, case_ids)
+
+    def _stat(swap_rows: np.ndarray) -> np.ndarray:
         swap3 = swap_rows[None, :, :, None]
         probs_a = np.where(swap3, ce_stack[:, :, None, :], method_stack[:, :, None, :])
         probs_b = np.where(swap3, method_stack[:, :, None, :], ce_stack[:, :, None, :])
         nll_a = _seed_mean_tail_nll(labels, probs_a, tail_classes)
         nll_b = _seed_mean_tail_nll(labels, probs_b, tail_classes)
-        stats.append(nll_b - nll_a)
-    return _p_value(float(observed), np.concatenate(stats), enumerated)
+        return nll_b - nll_a
+
+    return _permuted_p_value(case_ids, n_permutations, seed, observed, _stat)

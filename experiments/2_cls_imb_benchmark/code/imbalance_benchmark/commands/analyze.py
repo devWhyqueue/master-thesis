@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
+import logging
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,12 +16,11 @@ from imbalance_benchmark.analysis.aggregate import (
 )
 from imbalance_benchmark.analysis.db import connect_db, init_schema
 from imbalance_benchmark.analysis.inference.recovery import gates_and_recovery
-from imbalance_benchmark.analysis.inference.holm import PRIMARY_METHODS, apply_holm
+from imbalance_benchmark.analysis.inference.holm import apply_holm
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
-    crossed_block_permutation_ba,
-    crossed_block_permutation_tail_nll,
+    crossed_p_value,
+    load_freeze,
 )
-from imbalance_benchmark.analysis.metrics import assign_tiers
 from imbalance_benchmark.analysis.reporting.ingestion import (
     ingest_all_runs,
     write_diagnostics,
@@ -30,11 +30,7 @@ from imbalance_benchmark.analysis.predictors.rq3_analysis import (
     load_rq3_cells,
     run_rq3,
 )
-from imbalance_benchmark.analysis.query import (
-    load_classwise,
-    load_seed_predictions,
-    load_test_identity,
-)
+from imbalance_benchmark.analysis.query import load_classwise, load_seed_predictions
 from imbalance_benchmark.analysis.reporting.plots import (
     plot_reliability_diagram,
     plot_tail_vs_support,
@@ -58,7 +54,9 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.manifest.seeds import derive_seed
 
-__all__ = ["cmd_analyze", "cmd_combine_rq3"]
+__all__ = ["cmd_analyze", "cmd_analyze_combine", "cmd_combine_rq3"]
+
+logger = logging.getLogger(__name__)
 
 
 def cmd_combine_rq3(args: argparse.Namespace) -> None:
@@ -72,12 +70,6 @@ def cmd_combine_rq3(args: argparse.Namespace) -> None:
         base_paths["data"] / "cross_dataset_rq3.json",
         cross_dataset_rq3(load_rq3_cells(roots)),
     )
-
-
-def _load_freeze(paths: dict[str, Path]) -> dict[str, Any]:
-    """Load the frozen analysis manifest, if `freeze` has already produced one."""
-    freeze_path = paths["data"] / "manifest_freeze.json"
-    return json.loads(freeze_path.read_text()) if freeze_path.exists() else {}
 
 
 def _write_tables(
@@ -123,70 +115,11 @@ def _write_figures(
         write_tail_reliability(paths, freeze, balanced)
 
 
-def _crossed_p_value(
-    entry: dict[str, Any],
-    base_paths: dict[str, Path],
-    config: dict[str, Any],
-    seed: int,
-) -> float | None:
-    """Calculate the gate statistic's one shared-block permutation p-value across splits."""
-    if entry["method"] == "ce" or not entry.get("gate_passed"):
-        return None
-    if entry["method"] not in PRIMARY_METHODS:
-        # Only the four confirmatory methods are hypothesis-tested (§3.6);
-        # exploratory methods keep effects and CIs but no permutation p-value.
-        return None
-    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    blocks = []
-    method_data: dict[str, Any] | None = None
-    for index in range(3):
-        paths = split_paths(base_paths, index)
-        method = load_seed_predictions(
-            paths, entry["severity"], entry["method"], entry["assignment"]
-        )
-        ce = load_seed_predictions(paths, entry["severity"], "ce", entry["assignment"])
-        if method is None or ce is None:
-            return None
-        method_data = method
-        id_df = load_test_identity(paths["data"] / "manifest.csv", is_mil)
-        is_disc = entry["gate"] == "discrimination"
-        blocks.append(
-            (
-                method["labels"],
-                method["preds"] if is_disc else method["probs"],
-                ce["preds"] if is_disc else ce["probs"],
-                id_df["case_id"].to_numpy(),
-            )
-        )
-    if method_data is None:
-        return None
-    if entry["gate"] == "discrimination":
-        return crossed_block_permutation_ba(
-            blocks, len(method_data["class_names"]), seed=seed
-        )
-    tail_classes = []
-    for i in range(3):
-        fz = _load_freeze(split_paths(base_paths, i))
-        alloc = fz["assignment_conditions"][entry["assignment"]][entry["severity"]][
-            "allocated_counts"
-        ]
-        c_names = method_data["class_names"]
-        tiers = assign_tiers(
-            c_names,
-            alloc,
-            fz.get("tail_assignments", {}).get(entry["assignment"], c_names),
-        )
-        tail_classes.append(
-            [idx for idx, name in enumerate(c_names) if tiers.get(name) == "tail"]
-        )
-    return crossed_block_permutation_tail_nll(blocks, tail_classes, seed=seed)
-
-
 def _aggregate_split_comparisons(
     base_paths: dict[str, Path], config: dict[str, Any] | None = None, seed: int = 0
 ) -> None:
     """Recompute crossed, equal-split effects within each shared bootstrap replicate."""
-    aggregate_split_comparisons(base_paths, config, seed, _crossed_p_value)
+    aggregate_split_comparisons(base_paths, config, seed, crossed_p_value)
 
 
 def cmd_analyze(args: argparse.Namespace) -> None:
@@ -213,17 +146,54 @@ def _analyze_all_splits(args: argparse.Namespace) -> None:
         )
         return
     for index in range(3):
+        start = time.monotonic()
+        logger.info("analyze: split %d/3 start", index + 1)
         _analyze_one_split(argparse.Namespace(**{**vars(args), "split_index": index}))
+        logger.info(
+            "analyze: split %d/3 done in %.1fs", index + 1, time.monotonic() - start
+        )
+    _aggregate_all_splits(args)
+
+
+def _aggregate_all_splits(args: argparse.Namespace) -> None:
+    """Cross-split exclusion guard, then equal-split aggregation, tables, and endpoints.
+
+    Self-contained (re-scans exclusion) so it also works as the standalone
+    Hydra `analyze-combine` job, which has no in-process knowledge of whether
+    `_analyze_one_split` already ran for each split.
+    """
+    config = load_config(args.config)
+    base_paths = ensure_dirs(config)
+    excluded = [
+        i
+        for i in range(3)
+        if (split_paths(base_paths, i)["data"] / "confirmatory_exclusion.json").exists()
+    ]
+    if excluded:
+        write_json(
+            base_paths["data"] / "confirmatory_exclusion.json",
+            {"excluded": True, "failed_splits": excluded},
+        )
+        return
+    logger.info("analyze: aggregating splits")
     _aggregate_split_comparisons(
         base_paths, config, derive_seed(args.seed, "resampling")
     )
+    logger.info("analyze: interval tables")
     write_interval_tables(
         base_paths,
         config,
         int(config.get("analysis", {}).get("bootstrap_replicates", 10_000)),
         derive_seed(args.seed, "resampling"),
     )
+    logger.info("analyze: equal-split endpoint table")
     write_equal_split_endpoint_table(base_paths)
+    logger.info("analyze: aggregation done")
+
+
+def cmd_analyze_combine(args: argparse.Namespace) -> None:
+    """Aggregate the three split analyses into equal-split summaries (Hydra fan-in job)."""
+    _aggregate_all_splits(args)
 
 
 def _analyze_one_split(args: argparse.Namespace) -> None:
@@ -232,7 +202,7 @@ def _analyze_one_split(args: argparse.Namespace) -> None:
     paths = split_paths(ensure_dirs(config), args.split_index)
     if (paths["data"] / "confirmatory_exclusion.json").exists():
         return
-    freeze = _load_freeze(paths)
+    freeze = load_freeze(paths)
     n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
     seed = derive_seed(int(getattr(args, "seed", 0) or 0), "resampling")
     conn = connect_db(paths["db"])

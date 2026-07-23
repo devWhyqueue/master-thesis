@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,8 @@ from imbalance_benchmark.modeling.context import roster_for_regime
 
 __all__ = ["gates_and_recovery"]
 
+logger = logging.getLogger(__name__)
+
 
 def _method_recoveries(
     inp: _SeverityInputs,
@@ -40,6 +43,14 @@ def _method_recoveries(
     for method in expected_methods:
         if method == "ce":
             continue
+        logger.info(
+            "recovery: %s assignment=%s severity=%s disc_gate=%s cal_gate=%s",
+            method,
+            inp.assignment,
+            inp.severity,
+            disc_gate,
+            cal_gate,
+        )
         method_rec = load_seed_predictions(
             inp.paths, inp.severity, method, inp.assignment
         )
@@ -157,6 +168,27 @@ def _severity_result(
     )
 
 
+def _recovery_steps(
+    paths: dict[str, Path],
+    config: dict[str, Any],
+    freeze: dict[str, Any],
+    n_replicates: int,
+    seed: int,
+) -> list[tuple[str, Baseline, str]]:
+    """Every `(assignment, baseline, severity)` step with a resolvable baseline."""
+    tail_assignments = freeze.get("tail_assignments", {"native": []})
+    baselines = {
+        a: balanced_baseline(paths, config, freeze, n_replicates, seed, a)
+        for a in tail_assignments
+    }
+    return [
+        (a, baseline, s)
+        for a, baseline in baselines.items()
+        if baseline is not None
+        for s in ("moderate", "severe")
+    ]
+
+
 def gates_and_recovery(
     paths: dict[str, Path],
     config: dict[str, Any],
@@ -168,23 +200,20 @@ def gates_and_recovery(
     descriptive_only = bool(
         freeze.get("bootstrap_preflight", {}).get("is_descriptive_only", False)
     )
-    comparisons: list[dict[str, Any]] = []
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     expected_methods = roster_for_regime(is_mil)
-    for assignment in freeze.get("tail_assignments", {"native": []}):
-        baseline = balanced_baseline(
-            paths, config, freeze, n_replicates, seed, assignment
+    total = len(freeze.get("tail_assignments", {"native": []})) * 2
+    steps = _recovery_steps(paths, config, freeze, n_replicates, seed)
+    comparisons: list[dict[str, Any]] = []
+    for step, (assignment, baseline, severity) in enumerate(steps, start=1):
+        logger.info("recovery: %s/%s %d/%d", assignment, severity, step, total)
+        comparisons += _severity_result(
+            baseline,
+            paths,
+            severity,
+            seed,
+            assignment,
+            descriptive_only,
+            expected_methods,
         )
-        if baseline is None:
-            continue
-        for severity in ("moderate", "severe"):
-            comparisons += _severity_result(
-                baseline,
-                paths,
-                severity,
-                seed,
-                assignment,
-                descriptive_only,
-                expected_methods,
-            )
     return comparisons

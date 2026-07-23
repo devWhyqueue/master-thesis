@@ -24,6 +24,34 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 logger = logging.getLogger(__name__)
 
 
+def _analyze_jobs(
+    config: dict[str, Any],
+    confirm_natural: SlurmJob,
+    confirm_controlled: SlurmJob,
+    arr: tuple[int, ...],
+) -> tuple[SlurmJob, SlurmJob]:
+    """The 3-way analyze array plus its dependent equal-split aggregation job."""
+    an = replace(
+        _job(
+            config,
+            "analyze",
+            "analyze",
+            False,
+            (confirm_natural.name, confirm_controlled.name),
+        ),
+        array_splits=arr,
+    )
+    combine = _job(
+        config,
+        "analyze-combine",
+        "analyze-combine",
+        False,
+        (an.name,),
+        resource="analyze",
+    )
+    return an, combine
+
+
 def build_workflow(
     config: dict[str, Any], smoke: bool = False, resume_tuning: bool = False
 ) -> list[SlurmJob]:
@@ -37,14 +65,8 @@ def build_workflow(
     freeze_dependency = ("freeze",) if setup else ()
     tuning = _tuning_jobs(config, freeze_dependency)
     confirm_natural, confirm_controlled = _confirm_jobs(config)
-    an = _job(
-        config,
-        "analyze",
-        "analyze",
-        False,
-        (confirm_natural.name, confirm_controlled.name),
-    )
-    return [*setup, *tuning, confirm_natural, confirm_controlled, an]
+    an, combine = _analyze_jobs(config, confirm_natural, confirm_controlled, arr)
+    return [*setup, *tuning, confirm_natural, confirm_controlled, an, combine]
 
 
 def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJob]:

@@ -55,6 +55,10 @@ def load_eval_details(conn: sqlite3.Connection) -> pd.DataFrame:
 def _canonical_endpoint_details(payload: dict[str, Any]) -> dict[str, Any]:
     """Flatten clustered and locked-tier endpoints for equal-split reporting."""
     out = dict(payload.get("clustered_endpoints", {}))
+    # Same value as the split's own ECE column (both computed from the same
+    # labels/probabilities); keeping it here would collide with that column
+    # once the two frames are concatenated below.
+    out.pop("expected_calibration_error", None)
     for tier, metrics in payload.get("tier_metrics", {}).items():
         out.update(
             {f"tier_{tier}_{metric}": value for metric, value in metrics.items()}

@@ -5,7 +5,16 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from imbalance_benchmark.common import ARRAY_FIELDS
+
 __all__ = ["connect_db", "init_schema", "discover_result_dirs", "ingest_run"]
+
+# Per-sample arrays that must never be re-serialized into `extended_json`: the
+# npz sidecar (`common.ARRAY_FIELDS`) is the source of truth for these, and
+# `query.py` only ever reads small aggregates out of the DB.
+_PER_SAMPLE_ARRAY_FIELDS = frozenset(
+    ARRAY_FIELDS + ("temperature_scaled_probabilities", "temperature_scaled_logits")
+)
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -197,7 +206,7 @@ def _ingest_run_splits(
             for k, v in payload.items()
             if k not in _EVAL_SCALAR_FIELDS
             and k not in _CLASSWISE_ARRAY_FIELDS
-            and k not in ("labels", "preds", "probabilities", "logits")
+            and k not in _PER_SAMPLE_ARRAY_FIELDS
         }
         conn.execute(
             "DELETE FROM eval_results WHERE run_id = ? AND split = ?",
@@ -222,13 +231,12 @@ def ingest_run(
     conn: sqlite3.Connection,
     run_id: str,
     result_dir: Path,
-    condition: str,
-    method: str,
-    seed_index: int,
+    run_key: tuple[str, str, int],
     record: dict[str, Any],
     tiers: dict[str, str] | None = None,
 ) -> None:
     """Ingest a single run record and its evaluation splits into the SQLite database."""
+    condition, method, seed_index = run_key
     class_names = record.get("class_names", [])
     _ingest_run_meta(conn, run_id, result_dir, condition, method, seed_index, record)
     _ingest_run_splits(conn, run_id, record.get("splits", {}), class_names, tiers or {})
