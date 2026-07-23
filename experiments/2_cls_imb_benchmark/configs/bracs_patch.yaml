@@ -50,10 +50,7 @@ slurm:
     tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 32G}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
-    # A single natural confirm fit at BRACS scale runs ~11-13min (observed:
-    # job 4633142's crashed natural CE task, 50970 steps); shards_per_task=1
-    # means one fit per array task, so gpu-2h has ample margin over gpu-5h.
-    confirm_natural: {partition: gpu-2h, gpus: 1, cpus: 8}
+    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
     analyze: {partition: cpu-2h, gpus: 0, cpus: 4}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
