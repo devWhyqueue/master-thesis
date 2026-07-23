@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, cast
 
 import numpy as np
@@ -11,11 +12,52 @@ __all__ = [
     "expand_to_rows",
     "resample_seed_indices",
     "kish_effective_count",
+    "PatientWeights",
     "weighted_balanced_accuracy",
     "weighted_macro_nll",
     "weighted_ece",
     "gather_seed_resampled",
 ]
+
+
+@dataclass(frozen=True)
+class PatientWeights:
+    """Bootstrap weights held per patient; rows of a patient always share a weight.
+
+    Every bootstrap statistic here is a weighted sum over rows, and the weight
+    is constant within a patient, so ``sum_rows w(row) * v(row)`` equals
+    ``sum_patients w(patient) * (sum_rows-of-that-patient v(row))``. Aggregating
+    to patients first (``np.bincount``, O(n_rows), once) then matmul-ing against
+    the (n_patients, n_replicates) weight matrix reproduces the row-expanded
+    result at a fraction of the memory and compute.
+    """
+
+    row_patient: np.ndarray  # (n_rows,) index into `patient`
+    patient: np.ndarray  # (n_patients, n_replicates) float64
+
+    @property
+    def n_replicates(self) -> int:
+        """Number of bootstrap replicate columns (including the observed one)."""
+        return self.patient.shape[1]
+
+    def sums(
+        self, values: np.ndarray | float, mask: np.ndarray | None = None
+    ) -> np.ndarray:
+        """Sum over rows of ``weight(row) * values(row)`` per replicate.
+
+        ``values`` may be a scalar (broadcast as an all-ones row vector, e.g.
+        to get plain row-weight totals) or a per-row array; ``mask`` restricts
+        the sum to the selected rows.
+        """
+        row_patient = self.row_patient if mask is None else self.row_patient[mask]
+        if np.isscalar(values):
+            weights = None if values == 1.0 else np.full(len(row_patient), values)
+        else:
+            weights = np.asarray(values) if mask is None else np.asarray(values)[mask]
+        per_patient = np.bincount(
+            row_patient, weights=weights, minlength=len(self.patient)
+        )
+        return per_patient @ self.patient
 
 
 def _contribution_vector(
@@ -119,18 +161,17 @@ def kish_effective_count(weights: np.ndarray) -> np.ndarray:
 
 
 def weighted_balanced_accuracy(
-    labels: np.ndarray, preds: np.ndarray, row_weights: np.ndarray, n_classes: int
+    labels: np.ndarray, preds: np.ndarray, weights: PatientWeights, n_classes: int
 ) -> np.ndarray:
     """Weighted macro recall (balanced accuracy) per replicate column."""
-    n_replicates = row_weights.shape[1]
-    out = np.zeros(n_replicates, dtype=np.float64)
+    out = np.zeros(weights.n_replicates, dtype=np.float64)
     for c in range(n_classes):
         mask = labels == c
         if not mask.any():
             continue
         correct = mask & (preds == c)
-        class_weight = row_weights[mask, :].sum(axis=0)
-        correct_weight = row_weights[correct, :].sum(axis=0)
+        class_weight = weights.sums(1.0, mask)
+        correct_weight = weights.sums(1.0, correct)
         with np.errstate(divide="ignore", invalid="ignore"):
             recall = np.where(
                 class_weight > 0, correct_weight / np.maximum(class_weight, 1e-12), 0.0
@@ -142,7 +183,7 @@ def weighted_balanced_accuracy(
 def weighted_macro_nll(
     labels: np.ndarray,
     probabilities: np.ndarray,
-    row_weights: np.ndarray,
+    weights: PatientWeights,
     class_subset: list[int],
 ) -> np.ndarray:
     """Weighted mean NLL for a subset of classes, averaged unweighted across that subset.
@@ -150,8 +191,7 @@ def weighted_macro_nll(
     Used both for natural macro NLL (``class_subset`` = all classes) and the
     tail-group macro NLL used by the calibration deficit gate.
     """
-    n_replicates = row_weights.shape[1]
-    out = np.zeros(n_replicates, dtype=np.float64)
+    out = np.zeros(weights.n_replicates, dtype=np.float64)
     per_sample_nll = -np.log(
         np.clip(probabilities[np.arange(len(labels)), labels], 1e-12, 1.0)
     )
@@ -160,9 +200,8 @@ def weighted_macro_nll(
         mask = labels == c
         if not mask.any():
             continue
-        w = row_weights[mask, :]
-        class_weight = w.sum(axis=0)
-        weighted_nll = (w * per_sample_nll[mask, None]).sum(axis=0)
+        class_weight = weights.sums(1.0, mask)
+        weighted_nll = weights.sums(per_sample_nll, mask)
         with np.errstate(divide="ignore", invalid="ignore"):
             out += np.where(
                 class_weight > 0, weighted_nll / np.maximum(class_weight, 1e-12), 0.0
@@ -174,7 +213,7 @@ def weighted_macro_nll(
 def weighted_ece(
     labels: np.ndarray,
     probabilities: np.ndarray,
-    row_weights: np.ndarray,
+    weights: PatientWeights,
     n_bins: int = 10,
 ) -> np.ndarray:
     """Fixed-binning ECE per replicate under the shared crossed patient weights."""
@@ -182,56 +221,18 @@ def weighted_ece(
     correct = (probabilities.argmax(axis=1) == labels).astype(np.float64)
     edges = np.linspace(0.0, 1.0, n_bins + 1)
     bin_of_row = np.clip(np.digitize(confidence, edges[1:-1]), 0, n_bins - 1)
-    n_replicates = row_weights.shape[1]
-    total = row_weights.sum(axis=0)
-    out = np.zeros(n_replicates, dtype=np.float64)
+    total = weights.sums(1.0)
+    out = np.zeros(weights.n_replicates, dtype=np.float64)
     for b in range(n_bins):
         mask = bin_of_row == b
         if not mask.any():
             continue
-        w = row_weights[mask, :]
-        bin_weight = w.sum(axis=0)
-        acc = (w * correct[mask, None]).sum(axis=0)
-        conf = (w * confidence[mask, None]).sum(axis=0)
+        bin_weight = weights.sums(1.0, mask)
+        acc = weights.sums(correct, mask)
+        conf = weights.sums(confidence, mask)
         with np.errstate(divide="ignore", invalid="ignore"):
             gap = np.where(
                 bin_weight > 0, np.abs(acc - conf) / np.maximum(bin_weight, 1e-12), 0.0
             )
             out += np.where(total > 0, gap * bin_weight / np.maximum(total, 1e-12), 0.0)
     return out
-
-
-def _class_preflight(
-    case_of_row: np.ndarray, class_row_weights: np.ndarray, n_replicates: int
-) -> dict[str, Any]:
-    """Aggregate one class's row weights to per-patient weights and summarize them."""
-    unique_cases = np.unique(case_of_row)
-    pos = {c: i for i, c in enumerate(unique_cases)}
-    idx = np.asarray([pos[c] for c in case_of_row])
-    patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.int64)
-    np.add.at(patient_w, idx, class_row_weights)
-    kish = kish_effective_count(patient_w)
-    sum_w, max_w = patient_w.sum(axis=0), patient_w.max(axis=0)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        max_frac = np.where(sum_w > 0, max_w / np.maximum(sum_w, 1e-12), 0.0)
-    frac_dominant = float(np.mean(max_frac > 0.5))
-    mean_kish = float(np.mean(kish))
-    min_kish = float(np.min(kish))
-    return {
-        "unique_resampled_patients": float(np.mean((patient_w > 0).sum(axis=0))),
-        "kish_effective_count": mean_kish,
-        "min_kish_effective_count": min_kish,
-        "max_patient_weight_fraction": float(np.mean(max_frac)),
-        "frac_replicates_dominant": frac_dominant,
-        "is_descriptive_only": bool(min_kish < 5.0 or frac_dominant > 0.05),
-    }
-
-
-def _preflight_row_weights(
-    identity: pd.DataFrame, n_replicates: int, seed: int
-) -> np.ndarray:
-    """Resample the identity frame's patients and broadcast weights back to its rows."""
-    strata = build_strata(identity)
-    rng = np.random.default_rng(seed)
-    case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)
-    return expand_to_rows(case_ids, patient_weights, identity["case_id"].to_numpy())

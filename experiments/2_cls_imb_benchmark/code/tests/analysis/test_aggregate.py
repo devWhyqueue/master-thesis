@@ -15,12 +15,15 @@ from imbalance_benchmark.analysis.db import (
     init_schema,
 )
 from imbalance_benchmark.analysis.inference.bootstrap import (
+    PatientWeights,
     build_strata,
     expand_to_rows,
     gather_seed_resampled,
     kish_effective_count,
     resample_patient_weights,
     weighted_balanced_accuracy,
+    weighted_ece,
+    weighted_macro_nll,
 )
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import (
@@ -36,9 +39,6 @@ from imbalance_benchmark.analysis.query import (
     load_classwise,
     load_eval_details,
     load_test_identity,
-)
-from imbalance_benchmark.analysis.reporting.calibration_intervals import (
-    crossed_ece_distribution,
 )
 from imbalance_benchmark.analysis.reporting.ingestion import _ingest_discovered_run
 from imbalance_benchmark.analysis.reporting.tables import (
@@ -102,17 +102,6 @@ def _write_fake_run(
             "splits": {"validation": payload, "test": payload},
         },
     )
-
-class _Context:
-    def __init__(self, values: list[float]) -> None:
-        self.values = np.asarray(values)
-        self.probability_inputs: list[np.ndarray] = []
-
-    def ece_distribution(
-        self, _labels: np.ndarray, probabilities: np.ndarray
-    ) -> np.ndarray:
-        self.probability_inputs.append(probabilities)
-        return self.values
 
 def test_assign_tiers_ceil_k_over_3_and_binary_case():
     classes = ["A", "B", "C", "D", "E", "F", "G"]
@@ -218,10 +207,92 @@ def test_bootstrap_preflight_flags_small_kish():
 def test_weighted_balanced_accuracy_matches_unweighted_when_weights_are_one():
     labels = np.array([0, 0, 1, 1])
     preds = np.array([0, 1, 1, 1])
-    weights = np.ones((4, 3), dtype=np.int64)
+    weights = PatientWeights(np.arange(4), np.ones((4, 3), dtype=np.float64))
     ba = weighted_balanced_accuracy(labels, preds, weights, n_classes=2)
     expected = (0.5 + 1.0) / 2
     assert np.allclose(ba, expected)
+
+def test_patient_weights_kernels_match_naive_row_expansion():
+    """The patient-collapsed kernels must equal the same statistic computed by
+    naively expanding each patient's weight to every one of its rows first --
+    this is the check that fails if the algebraic collapse is ever wrong.
+    """
+    rng = np.random.default_rng(0)
+    n_patients, n_replicates, n_classes = 6, 5, 3
+    rows_per_patient = rng.integers(1, 4, size=n_patients)
+    row_patient = np.repeat(np.arange(n_patients), rows_per_patient)
+    n_rows = len(row_patient)
+    patient_weights = rng.integers(0, 5, size=(n_patients, n_replicates)).astype(
+        np.float64
+    )
+    weights = PatientWeights(row_patient, patient_weights)
+    row_weights = patient_weights[row_patient]  # naive (n_rows, n_replicates) expansion
+
+    labels = rng.integers(0, n_classes, size=n_rows)
+    preds = rng.integers(0, n_classes, size=n_rows)
+    probs = rng.dirichlet(np.ones(n_classes), size=n_rows)
+
+    def naive_balanced_accuracy() -> np.ndarray:
+        out = np.zeros(n_replicates)
+        for c in range(n_classes):
+            mask = labels == c
+            if not mask.any():
+                continue
+            correct = mask & (preds == c)
+            class_weight = row_weights[mask].sum(axis=0)
+            correct_weight = row_weights[correct].sum(axis=0)
+            out += np.where(
+                class_weight > 0, correct_weight / np.maximum(class_weight, 1e-12), 0.0
+            )
+        return out / n_classes
+
+    def naive_macro_nll(class_subset: list[int]) -> np.ndarray:
+        out = np.zeros(n_replicates)
+        per_sample_nll = -np.log(np.clip(probs[np.arange(n_rows), labels], 1e-12, 1.0))
+        counted = 0
+        for c in class_subset:
+            mask = labels == c
+            if not mask.any():
+                continue
+            w = row_weights[mask]
+            class_weight = w.sum(axis=0)
+            weighted_nll = (w * per_sample_nll[mask, None]).sum(axis=0)
+            out += np.where(
+                class_weight > 0, weighted_nll / np.maximum(class_weight, 1e-12), 0.0
+            )
+            counted += 1
+        return out / max(counted, 1)
+
+    def naive_ece(n_bins: int = 10) -> np.ndarray:
+        confidence = probs.max(axis=1)
+        correct = (probs.argmax(axis=1) == labels).astype(np.float64)
+        edges = np.linspace(0.0, 1.0, n_bins + 1)
+        bin_of_row = np.clip(np.digitize(confidence, edges[1:-1]), 0, n_bins - 1)
+        total = row_weights.sum(axis=0)
+        out = np.zeros(n_replicates)
+        for b in range(n_bins):
+            mask = bin_of_row == b
+            if not mask.any():
+                continue
+            w = row_weights[mask]
+            bin_weight = w.sum(axis=0)
+            acc = (w * correct[mask, None]).sum(axis=0)
+            conf = (w * confidence[mask, None]).sum(axis=0)
+            gap = np.where(
+                bin_weight > 0, np.abs(acc - conf) / np.maximum(bin_weight, 1e-12), 0.0
+            )
+            out += np.where(total > 0, gap * bin_weight / np.maximum(total, 1e-12), 0.0)
+        return out
+
+    assert np.allclose(
+        weighted_balanced_accuracy(labels, preds, weights, n_classes),
+        naive_balanced_accuracy(),
+    )
+    assert np.allclose(
+        weighted_macro_nll(labels, probs, weights, list(range(n_classes))),
+        naive_macro_nll(list(range(n_classes))),
+    )
+    assert np.allclose(weighted_ece(labels, probs, weights), naive_ece())
 
 def test_seed_resample_gather_averages_correctly():
     per_seed_metric = np.array([[1.0, 2.0], [3.0, 4.0]])  # (n_seeds=2, n_replicates=2)
@@ -416,7 +487,12 @@ def test_crossed_bootstrap_reuses_one_patient_weight_across_split_appearances(
     second = BootstrapContext(
         split_paths(paths, 1), is_mil=False, n_replicates=20, seed=4
     )
-    assert np.array_equal(first.row_weights[0], second.row_weights[0])
+    first_patient_of_row0 = first.weights.row_patient[0]
+    second_patient_of_row0 = second.weights.row_patient[0]
+    assert np.array_equal(
+        first.weights.patient[first_patient_of_row0],
+        second.weights.patient[second_patient_of_row0],
+    )
 
 def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -> None:
     rows = [
@@ -436,20 +512,6 @@ def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -
 
     with pytest.raises(RuntimeError, match="missing"):
         require_complete_split_comparisons(rows, expected)
-
-def test_crossed_ece_averages_seed_resampled_split_replicates() -> None:
-    first, second = _Context([0.1, 0.5]), _Context([0.3, 0.7])
-    first_probs = np.array([[[0.9, 0.1]]])
-    second_probs = np.array([[[0.1, 0.9]]])
-
-    distribution = crossed_ece_distribution(
-        [(np.array([0]), first_probs), (np.array([1]), second_probs)],
-        [first, second],
-    )
-
-    assert distribution == [0.2, 0.6]
-    assert first.probability_inputs == [first_probs]
-    assert second.probability_inputs == [second_probs]
 
 def test_recovery_standard_error_uses_the_recovery_distribution() -> None:
     """recovery_se must come from numerator/denominator, not the raw effect spread."""

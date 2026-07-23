@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from imbalance_benchmark.analysis.inference.bootstrap import _class_preflight
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_block_permutation_ba,
 )
@@ -17,7 +16,10 @@ from imbalance_benchmark.analysis.inference.holm import apply_holm, confirmatory
 from imbalance_benchmark.analysis.inference.permutation import (
     paired_block_permutation_ba,
 )
-from imbalance_benchmark.analysis.inference.preflight import run_preflight
+from imbalance_benchmark.analysis.inference.preflight import (
+    _class_preflight,
+    run_preflight,
+)
 from imbalance_benchmark.analysis.predictors.rq3_analysis import (
     _covariates,
     _has_multiple_slides_per_patient,

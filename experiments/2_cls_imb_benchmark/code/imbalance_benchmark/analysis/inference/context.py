@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 
 from imbalance_benchmark.analysis.inference.bootstrap import (
+    PatientWeights,
     build_strata,
-    expand_to_rows,
     gather_seed_resampled,
     resample_patient_weights,
     resample_seed_indices,
@@ -62,14 +62,16 @@ class BootstrapContext:
         )
         self.case_ids = identity["case_id"].astype(str).to_numpy()
         self.slide_ids = identity["slide_id"].astype(str).to_numpy()
-        resampled = expand_to_rows(unique_cases, patient_weights, self.case_ids)
+        position = {c: i for i, c in enumerate(unique_cases)}
+        row_patient = np.asarray([position[c] for c in self.case_ids])
         # Replicate 0 is the observed cohort (all unit weights one): every metric
         # distribution therefore carries the observed-data point estimate at
         # index 0, which the reported effects, recovery ratios, and deficit gates
         # use, while replicates 1.. are the bootstrap draws for the interval.
-        observed = np.ones((resampled.shape[0], 1), dtype=resampled.dtype)
-        self.row_weights = np.concatenate([observed, resampled], axis=1)
-        self.n_replicates = self.row_weights.shape[1]
+        observed = np.ones((patient_weights.shape[0], 1), dtype=patient_weights.dtype)
+        patient = np.concatenate([observed, patient_weights], axis=1).astype(np.float64)
+        self.weights = PatientWeights(row_patient, patient)
+        self.n_replicates = self.weights.n_replicates
         self._seed = seed
         self._seed_indices: dict[int, np.ndarray] = {}
 
@@ -90,7 +92,7 @@ class BootstrapContext:
         per_seed = np.stack(
             [
                 weighted_balanced_accuracy(
-                    labels, preds_stack[i], self.row_weights, n_classes
+                    labels, preds_stack[i], self.weights, n_classes
                 )
                 for i in range(preds_stack.shape[0])
             ]
@@ -107,9 +109,7 @@ class BootstrapContext:
             return None
         per_seed = np.stack(
             [
-                weighted_macro_nll(
-                    labels, probs_stack[i], self.row_weights, tail_classes
-                )
+                weighted_macro_nll(labels, probs_stack[i], self.weights, tail_classes)
                 for i in range(probs_stack.shape[0])
             ]
         )
@@ -123,7 +123,7 @@ class BootstrapContext:
         """Per-replicate fixed-bin ECE from the frozen crossed patient bootstrap."""
         per_seed = np.stack(
             [
-                weighted_ece(labels, probs_stack[i], self.row_weights)
+                weighted_ece(labels, probs_stack[i], self.weights)
                 for i in range(probs_stack.shape[0])
             ]
         )
@@ -145,14 +145,11 @@ class BootstrapContext:
         """Return paired-seed distributions for every secondary endpoint."""
         per_seed = [
             secondary_seed_metrics(
-                labels,
-                predictions[index],
-                probabilities[index],
-                self.row_weights,
+                (labels, predictions[index], probabilities[index]),
+                self.weights,
                 class_names,
                 tiers,
-                self.slide_ids,
-                self.case_ids,
+                (self.slide_ids, self.case_ids),
                 is_mil=is_mil,
                 ordinal=ordinal,
             )

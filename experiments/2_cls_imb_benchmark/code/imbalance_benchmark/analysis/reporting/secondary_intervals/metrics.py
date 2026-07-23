@@ -4,27 +4,25 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score
 
-from imbalance_benchmark.analysis.inference.bootstrap import weighted_ece
+from imbalance_benchmark.analysis.inference.bootstrap import (
+    PatientWeights,
+    weighted_ece,
+)
+from imbalance_benchmark.analysis.reporting.secondary_intervals.ordinal import (
+    ordinal_metrics,
+)
+from imbalance_benchmark.analysis.reporting.secondary_intervals.weighted import (
+    weighted_mean as _weighted_mean,
+)
 
 __all__ = ["secondary_seed_metrics"]
-
-
-def _weighted_mean(
-    values: np.ndarray, weights: np.ndarray, mask: np.ndarray | None = None
-) -> np.ndarray:
-    selected = np.ones(len(values), dtype=bool) if mask is None else mask
-    selected_weights = weights[selected]
-    denominator = selected_weights.sum(axis=0)
-    numerator = (selected_weights * values[selected, None]).sum(axis=0)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(denominator > 0, numerator / denominator, np.nan)
 
 
 def _class_metrics(
     labels: np.ndarray,
     predictions: np.ndarray,
     probabilities: np.ndarray,
-    weights: np.ndarray,
+    weights: PatientWeights,
     class_names: list[str],
 ) -> dict[str, np.ndarray]:
     true_probability = np.clip(
@@ -70,37 +68,48 @@ def _class_metrics(
     return metrics
 
 
-def _equal_group_weights(weights: np.ndarray, groups: np.ndarray) -> np.ndarray:
-    codes, _ = pd.factorize(groups, sort=False)
-    return weights / np.bincount(codes)[codes, None]
-
-
 def _group_mean(
-    values: np.ndarray, weights: np.ndarray, groups: np.ndarray
+    values: np.ndarray,
+    weights: PatientWeights,
+    groups: np.ndarray,
+    mask: np.ndarray | None = None,
 ) -> np.ndarray:
-    return _weighted_mean(values, _equal_group_weights(weights, groups))
+    """Macro-average ``values`` over ``groups`` (e.g. slides), weighted by each
+    group's (single) patient weight -- not by the group's row count.
+
+    Folds the ``1 / bincount(codes)[codes]`` group-size correction into the
+    values vector so both terms reduce to :meth:`PatientWeights.sums` calls,
+    instead of allocating a full ``(n_rows, n_replicates)`` scaled weight copy.
+    """
+    selected = np.ones(len(values), dtype=bool) if mask is None else mask
+    codes, _ = pd.factorize(groups[selected], sort=False)
+    counts = np.bincount(codes)
+    scale = np.zeros(len(values), dtype=np.float64)
+    scale[selected] = 1.0 / counts[codes]
+    numerator = weights.sums(values * scale)
+    denominator = weights.sums(scale)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(denominator > 0, numerator / denominator, np.nan)
 
 
 def _group_balanced_accuracy(
     labels: np.ndarray,
     predictions: np.ndarray,
-    weights: np.ndarray,
+    weights: PatientWeights,
     groups: np.ndarray,
 ) -> np.ndarray:
     correct = (predictions == labels).astype(float)
     recalls = []
     for label in np.unique(labels):
         selected = labels == label
-        recalls.append(
-            _group_mean(correct[selected], weights[selected], groups[selected])
-        )
+        recalls.append(_group_mean(correct, weights, groups, mask=selected))
     return np.nanmean(np.stack(recalls), axis=0)
 
 
 def _group_macro_f1(
     labels: np.ndarray,
     predictions: np.ndarray,
-    weights: np.ndarray,
+    weights: PatientWeights,
     groups: np.ndarray,
 ) -> np.ndarray:
     codes, _ = pd.factorize(groups, sort=False)
@@ -116,14 +125,18 @@ def _group_macro_f1(
         ]
     )
     first_rows = np.unique(codes, return_index=True)[1]
-    return _weighted_mean(scores, weights[first_rows])
+    values = np.zeros(len(labels), dtype=np.float64)
+    values[first_rows] = scores
+    mask = np.zeros(len(labels), dtype=bool)
+    mask[first_rows] = True
+    return _weighted_mean(values, weights, mask)
 
 
 def _cluster_metrics(
     labels: np.ndarray,
     predictions: np.ndarray,
     probabilities: np.ndarray,
-    weights: np.ndarray,
+    weights: PatientWeights,
     slide_ids: np.ndarray,
     case_ids: np.ndarray,
     is_mil: bool,
@@ -167,46 +180,23 @@ def _tier_metrics(
     return result
 
 
-def _quadratic_weighted_kappa(
-    labels: np.ndarray,
-    predictions: np.ndarray,
-    weights: np.ndarray,
-    n_classes: int,
-) -> np.ndarray:
-    observed = np.zeros((n_classes, n_classes, weights.shape[1]), dtype=float)
-    for truth in range(n_classes):
-        for predicted in range(n_classes):
-            observed[truth, predicted] = weights[
-                (labels == truth) & (predictions == predicted)
-            ].sum(axis=0)
-    total = observed.sum(axis=(0, 1))
-    expected = (
-        observed.sum(axis=1)[:, None, :] * observed.sum(axis=0)[None, :, :]
-    ) / np.maximum(total, 1e-12)
-    scale = max(n_classes - 1, 1) ** 2
-    disagreement = (
-        np.arange(n_classes)[:, None] - np.arange(n_classes)[None, :]
-    ) ** 2 / scale
-    numerator = (observed * disagreement[:, :, None]).sum(axis=(0, 1))
-    denominator = (expected * disagreement[:, :, None]).sum(axis=(0, 1))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(denominator > 0, 1.0 - numerator / denominator, np.nan)
-
-
 def secondary_seed_metrics(
-    labels: np.ndarray,
-    predictions: np.ndarray,
-    probabilities: np.ndarray,
-    weights: np.ndarray,
+    sample: tuple[np.ndarray, np.ndarray, np.ndarray],
+    weights: PatientWeights,
     class_names: list[str],
     tiers: dict[str, str],
-    slide_ids: np.ndarray,
-    case_ids: np.ndarray,
+    identity: tuple[np.ndarray, np.ndarray],
     *,
     is_mil: bool = False,
     ordinal: bool = False,
 ) -> dict[str, np.ndarray]:
-    """Compute the full secondary endpoint set for one model seed."""
+    """Compute the full secondary endpoint set for one model seed.
+
+    ``sample`` is ``(labels, predictions, probabilities)`` and ``identity`` is
+    ``(slide_ids, case_ids)`` for that seed's rows.
+    """
+    labels, predictions, probabilities = sample
+    slide_ids, case_ids = identity
     metrics = _class_metrics(labels, predictions, probabilities, weights, class_names)
     metrics.update(_tier_metrics(metrics, class_names, tiers))
     metrics.update(
@@ -216,12 +206,7 @@ def secondary_seed_metrics(
         }
     )
     if ordinal:
-        metrics["quadratic_weighted_kappa"] = _quadratic_weighted_kappa(
-            labels, predictions, weights, len(class_names)
-        )
-        metrics["ordinal_mean_absolute_error"] = _weighted_mean(
-            np.abs(labels - predictions).astype(float), weights
-        )
+        metrics.update(ordinal_metrics(labels, predictions, weights, len(class_names)))
     metrics.update(
         _cluster_metrics(
             labels, predictions, probabilities, weights, slide_ids, case_ids, is_mil

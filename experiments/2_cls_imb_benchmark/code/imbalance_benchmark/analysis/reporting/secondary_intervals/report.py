@@ -131,15 +131,9 @@ def _distributions_by_key(
 
 
 def secondary_interval_rows(
-    base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
+    distributions: dict[tuple[str, str, str], dict[str, np.ndarray]],
 ) -> list[dict[str, object]]:
     """Return equal-split secondary estimates with crossed patient-bootstrap CIs."""
-    dataset = config.get("dataset", {})
-    is_mil = dataset.get("regime", "patch") == "wsi"
-    ordinal = is_mil and dataset.get("name") == "panda"
-    distributions = _distributions_by_key(
-        base_paths, is_mil, ordinal, n_replicates, seed
-    )
     return [
         row
         for key, values in distributions.items()
@@ -217,11 +211,10 @@ def _endpoint_row(
 
 
 def _write_secondary_interval_table(
-    base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
+    base_paths: dict[str, Path],
+    distributions: dict[tuple[str, str, str], dict[str, np.ndarray]],
 ) -> None:
-    table = pd.DataFrame(
-        secondary_interval_rows(base_paths, config, n_replicates, seed)
-    )
+    table = pd.DataFrame(secondary_interval_rows(distributions))
     text = table.to_latex(
         index=False,
         float_format="%.3f",
@@ -240,9 +233,16 @@ def write_interval_tables(
     base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
 ) -> None:
     """Write calibration, cost-comparison, and full secondary interval tables."""
+    dataset = config.get("dataset", {})
+    is_mil = dataset.get("regime", "patch") == "wsi"
+    ordinal = is_mil and dataset.get("name") == "panda"
+    logger.info("interval: endpoint distributions")
+    distributions = _distributions_by_key(
+        base_paths, is_mil, ordinal, n_replicates, seed
+    )
     logger.info("interval: calibration table")
-    write_crossed_calibration_table(base_paths, config, seed)
+    write_crossed_calibration_table(base_paths, distributions)
     logger.info("interval: cost comparison table")
     write_cost_comparison_table(base_paths, n_replicates, seed)
     logger.info("interval: secondary endpoint table")
-    _write_secondary_interval_table(base_paths, config, n_replicates, seed)
+    _write_secondary_interval_table(base_paths, distributions)

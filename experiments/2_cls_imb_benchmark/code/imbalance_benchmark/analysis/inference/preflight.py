@@ -6,9 +6,47 @@ import numpy as np
 import pandas as pd
 
 from imbalance_benchmark.analysis.inference.bootstrap import (
-    _class_preflight,
-    _preflight_row_weights,
+    build_strata,
+    expand_to_rows,
+    kish_effective_count,
+    resample_patient_weights,
 )
+
+
+def _class_preflight(
+    case_of_row: np.ndarray, class_row_weights: np.ndarray, n_replicates: int
+) -> dict[str, Any]:
+    """Aggregate one class's row weights to per-patient weights and summarize them."""
+    unique_cases = np.unique(case_of_row)
+    pos = {c: i for i, c in enumerate(unique_cases)}
+    idx = np.asarray([pos[c] for c in case_of_row])
+    patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.int64)
+    np.add.at(patient_w, idx, class_row_weights)
+    kish = kish_effective_count(patient_w)
+    sum_w, max_w = patient_w.sum(axis=0), patient_w.max(axis=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        max_frac = np.where(sum_w > 0, max_w / np.maximum(sum_w, 1e-12), 0.0)
+    frac_dominant = float(np.mean(max_frac > 0.5))
+    mean_kish = float(np.mean(kish))
+    min_kish = float(np.min(kish))
+    return {
+        "unique_resampled_patients": float(np.mean((patient_w > 0).sum(axis=0))),
+        "kish_effective_count": mean_kish,
+        "min_kish_effective_count": min_kish,
+        "max_patient_weight_fraction": float(np.mean(max_frac)),
+        "frac_replicates_dominant": frac_dominant,
+        "is_descriptive_only": bool(min_kish < 5.0 or frac_dominant > 0.05),
+    }
+
+
+def _preflight_row_weights(
+    identity: pd.DataFrame, n_replicates: int, seed: int
+) -> np.ndarray:
+    """Resample the identity frame's patients and broadcast weights back to its rows."""
+    strata = build_strata(identity)
+    rng = np.random.default_rng(seed)
+    case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)
+    return expand_to_rows(case_ids, patient_weights, identity["case_id"].to_numpy())
 
 
 def _diagnostics_by_class(

@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import torch
 
+from imbalance_benchmark.analysis.inference.bootstrap import PatientWeights
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
@@ -15,11 +16,17 @@ from imbalance_benchmark.modeling.context import cost_payload
 from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.modeling.training import _fit_step
 
+def _unit_weights(n_rows: int, n_replicates: int) -> PatientWeights:
+    """One patient per row (unit weight everywhere), matching the old all-ones matrix."""
+    return PatientWeights(
+        np.arange(n_rows), np.ones((n_rows, n_replicates), dtype=np.float64)
+    )
+
 def _bootstrap_context() -> BootstrapContext:
     context = object.__new__(BootstrapContext)
     context.case_ids = np.array(["c1", "c1", "c2", "c2"])
     context.slide_ids = np.array(["s1", "s1", "s2", "s2"])
-    context.row_weights = np.ones((4, 3), dtype=np.int64)
+    context.weights = _unit_weights(4, 3)
     context.n_replicates = 3
     context._seed = 7
     context._seed_indices = {}
@@ -51,7 +58,7 @@ def test_secondary_bootstrap_includes_cluster_macro_endpoints() -> None:
     context = object.__new__(BootstrapContext)
     context.case_ids = identity["case_id"].to_numpy()
     context.slide_ids = identity["slide_id"].to_numpy()
-    context.row_weights = np.ones((4, 3), dtype=np.int64)
+    context.weights = _unit_weights(4, 3)
     context.n_replicates = 3
     context._seed = 7
     context._seed_indices = {}
@@ -85,7 +92,7 @@ def test_wsi_secondary_outputs_use_only_applicable_endpoint_names() -> None:
     context = object.__new__(BootstrapContext)
     context.case_ids = np.array(["c1", "c2"])
     context.slide_ids = np.array(["s1", "s2"])
-    context.row_weights = np.ones((2, 2), dtype=np.int64)
+    context.weights = _unit_weights(2, 2)
     context.n_replicates = 2
     context._seed = 7
     context._seed_indices = {}
@@ -278,9 +285,9 @@ def test_weighted_ece_matches_scalar_ece_at_unit_weights() -> None:
     rng = np.random.default_rng(0)
     labels = rng.integers(0, 3, size=50)
     probs = rng.dirichlet(np.ones(3), size=50)
-    row_weights = np.ones((50, 1), dtype=np.int64)
+    weights = _unit_weights(50, 1)
 
-    weighted = weighted_ece(labels, probs, row_weights)[0]
+    weighted = weighted_ece(labels, probs, weights)[0]
 
     assert weighted == pytest.approx(expected_calibration_error(labels, probs))
 
