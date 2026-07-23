@@ -106,6 +106,7 @@ def load_test_identity(
     patient IDs inside every run record.
     """
     df = pd.read_csv(manifest_path)
+    df["case_id"] = df["case_id"].astype(str)
     df = cast(pd.DataFrame, df[df["split"] == split_name]).reset_index(drop=True)
     if is_mil:
         df = df.groupby("slide_id", sort=False).first().reset_index()
