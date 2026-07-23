@@ -34,6 +34,10 @@ Paths with spaces must be double-quoted in every shell layer.
 2. `scp` it to `/tmp/` on the cluster.
 3. Run with `ssh hydra 'bash -lc "python3 /tmp/script.py"'`.
 
+**`/tmp` is node-local.** The login-node driver is fine in `/tmp`, but anything the **job**
+reads (sbatch scripts, worker `.py`, modules) must live on shared `/home` — the compute node
+has its own empty `/tmp`.
+
 ```python
 # submit_job.py — write locally, scp, run remotely
 import subprocess, shlex
