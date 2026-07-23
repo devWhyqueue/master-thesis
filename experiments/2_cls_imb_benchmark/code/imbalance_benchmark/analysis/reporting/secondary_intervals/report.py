@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,8 @@ from imbalance_benchmark.analysis.reporting.secondary_intervals.costs import (
 from imbalance_benchmark.common import split_paths
 
 __all__ = ["secondary_interval_rows", "write_interval_tables"]
+
+logger = logging.getLogger(__name__)
 
 
 def _locked_tiers(
@@ -101,16 +104,20 @@ def _split_distributions(
     return distributions
 
 
-def secondary_interval_rows(
-    base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
-) -> list[dict[str, object]]:
-    """Return equal-split secondary estimates with crossed patient-bootstrap CIs."""
-    dataset = config.get("dataset", {})
-    is_mil = dataset.get("regime", "patch") == "wsi"
-    ordinal = is_mil and dataset.get("name") == "panda"
+def _distributions_by_key(
+    base_paths: dict[str, Path],
+    is_mil: bool,
+    ordinal: bool,
+    n_replicates: int,
+    seed: int,
+) -> dict[tuple[str, str, str], dict[str, np.ndarray]]:
+    keys = sorted(_complete_result_keys(base_paths))
     distributions = {}
-    for key in sorted(_complete_result_keys(base_paths)):
+    for step, key in enumerate(keys, start=1):
         assignment, condition, method = key
+        logger.info(
+            "interval: %s/%s/%s %d/%d", assignment, condition, method, step, len(keys)
+        )
         split_values = _split_distributions(
             base_paths,
             is_mil,
@@ -122,6 +129,19 @@ def secondary_interval_rows(
             method,
         )
         distributions[key] = _average_split_values(split_values)
+    return distributions
+
+
+def secondary_interval_rows(
+    base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
+) -> list[dict[str, object]]:
+    """Return equal-split secondary estimates with crossed patient-bootstrap CIs."""
+    dataset = config.get("dataset", {})
+    is_mil = dataset.get("regime", "patch") == "wsi"
+    ordinal = is_mil and dataset.get("name") == "panda"
+    distributions = _distributions_by_key(
+        base_paths, is_mil, ordinal, n_replicates, seed
+    )
     return [
         row
         for key, values in distributions.items()
@@ -177,9 +197,8 @@ def _endpoint_row(
     reference: dict[str, np.ndarray] | None,
 ) -> dict[str, object]:
     estimate_low, estimate_high = confidence_interval(distribution)
-    # A cross-condition reference (e.g. the balanced CE baseline) can lack a
-    # tier-specific endpoint the compared run has (balanced has no head/tail
-    # split); the effect is then undefined rather than computable.
+    # A cross-condition reference (e.g. balanced CE) can lack a tier-specific
+    # endpoint the compared run has (balanced has no head/tail split).
     effect = None
     if reference is not None and endpoint in reference:
         effect = distribution - reference[endpoint]
@@ -223,6 +242,9 @@ def write_interval_tables(
     base_paths: dict[str, Path], config: dict[str, Any], n_replicates: int, seed: int
 ) -> None:
     """Write calibration, cost-comparison, and full secondary interval tables."""
+    logger.info("interval: calibration table")
     write_crossed_calibration_table(base_paths, config, seed)
+    logger.info("interval: cost comparison table")
     write_cost_comparison_table(base_paths, n_replicates, seed)
+    logger.info("interval: secondary endpoint table")
     _write_secondary_interval_table(base_paths, config, n_replicates, seed)

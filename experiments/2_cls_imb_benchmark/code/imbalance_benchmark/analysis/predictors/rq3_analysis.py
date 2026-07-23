@@ -195,22 +195,22 @@ def run_rq3(
 ) -> dict[str, Any]:
     """Compute frozen-feature RQ3 cells, fits, and descriptive covariate records.
 
-    A single dataset-regime yields only one random-intercept group, so its
-    within-split fits are degenerate; the cross-dataset combination is the
-    inferential unit (see :func:`cross_dataset_rq3`). This still emits the cells
-    and covariates each split contributes to that combined analysis.
+    One dataset-regime has only one random-intercept group, so within-split fits
+    are degenerate; the cross-dataset combination (:func:`cross_dataset_rq3`) is
+    the actual inferential unit -- this only emits each split's contribution.
     """
     is_mil = freeze.get("dataset_provenance", {}).get("regime") == "wsi"
     group = _rq3_group(freeze)
     cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
-    logger.info("rq3: %d cells ready, fitting models", len(cells))
-    models = {
-        "gate_pass": fit_gate_pass_model(deficit_cells) if deficit_cells else {},
-        "deficit": fit_deficit_model(deficit_cells) if deficit_cells else {},
-        "recovery": fit_recovery_model(recovery_cells),
-    }
+    logger.info("rq3: %d cells ready, fitting gate_pass model", len(cells))
+    gate_pass = fit_gate_pass_model(deficit_cells) if deficit_cells else {}
+    logger.info("rq3: fitting deficit model")
+    deficit = fit_deficit_model(deficit_cells) if deficit_cells else {}
+    logger.info("rq3: fitting recovery model")
+    recovery = fit_recovery_model(recovery_cells)
+    models = {"gate_pass": gate_pass, "deficit": deficit, "recovery": recovery}
     return {"cells": cells, "models": models}
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -10,6 +11,8 @@ from imbalance_benchmark.analysis.db import connect_db
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.query import load_eval_details, load_seed_predictions
 from imbalance_benchmark.common import split_paths
+
+logger = logging.getLogger(__name__)
 
 
 def crossed_ece_distribution(
@@ -55,11 +58,19 @@ def write_crossed_calibration_table(
 def _crossed_calibration_rows(
     base_paths: dict[str, Path], config: dict[str, Any], seed: int
 ) -> list[dict[str, object]]:
-    keys = _complete_result_keys(base_paths)
+    keys = sorted(_complete_result_keys(base_paths))
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
     rows = []
-    for assignment, condition, method in sorted(keys):
+    for step, (assignment, condition, method) in enumerate(keys, start=1):
+        logger.info(
+            "calibration: %s/%s/%s %d/%d",
+            assignment,
+            condition,
+            method,
+            step,
+            len(keys),
+        )
         distributions = _ece_distributions(
             base_paths, is_mil, n_replicates, seed, assignment, condition, method
         )
