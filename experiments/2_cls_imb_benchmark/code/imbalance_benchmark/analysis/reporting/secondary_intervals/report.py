@@ -47,10 +47,9 @@ def _locked_tiers(
 
 def _split_distributions(
     base_paths: dict[str, Path],
+    contexts: list[BootstrapContext],
     is_mil: bool,
     ordinal: bool,
-    n_replicates: int,
-    seed: int,
     assignment: str,
     condition: str,
     method: str,
@@ -65,7 +64,7 @@ def _split_distributions(
             )
         class_names = list(record["class_names"])
         tiers = _locked_tiers(paths, assignment, condition, class_names)
-        context = BootstrapContext(paths, is_mil, n_replicates, seed)
+        context = contexts[index]
         current = context.secondary_distributions(
             np.asarray(record["labels"]),
             np.asarray(record["preds"]),
@@ -112,6 +111,12 @@ def _distributions_by_key(
     seed: int,
 ) -> dict[tuple[str, str, str], dict[str, np.ndarray]]:
     keys = sorted(_complete_result_keys(base_paths))
+    # Contexts depend only on the split (paths/is_mil/n_replicates/seed), never on
+    # assignment/condition/method -- build the 3 once instead of once per key.
+    contexts = [
+        BootstrapContext(split_paths(base_paths, index), is_mil, n_replicates, seed)
+        for index in range(3)
+    ]
     distributions = {}
     for step, key in enumerate(keys, start=1):
         assignment, condition, method = key
@@ -119,14 +124,7 @@ def _distributions_by_key(
             "interval: %s/%s/%s %d/%d", assignment, condition, method, step, len(keys)
         )
         split_values = _split_distributions(
-            base_paths,
-            is_mil,
-            ordinal,
-            n_replicates,
-            seed,
-            assignment,
-            condition,
-            method,
+            base_paths, contexts, is_mil, ordinal, assignment, condition, method
         )
         distributions[key] = _average_split_values(split_values)
     return distributions

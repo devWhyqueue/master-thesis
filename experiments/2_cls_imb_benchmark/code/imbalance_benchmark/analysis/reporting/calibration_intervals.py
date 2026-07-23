@@ -61,6 +61,10 @@ def _crossed_calibration_rows(
     keys = sorted(_complete_result_keys(base_paths))
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
+    # Each context's patient-resample weight matrix depends only on the split
+    # (paths/is_mil/n_replicates/seed), never on assignment/condition/method --
+    # build the 3 once instead of once per key (~10-50x fewer 10k-replicate builds).
+    contexts = _bootstrap_contexts(base_paths, is_mil, n_replicates, seed)
     rows = []
     for step, (assignment, condition, method) in enumerate(keys, start=1):
         logger.info(
@@ -72,7 +76,7 @@ def _crossed_calibration_rows(
             len(keys),
         )
         distributions = _ece_distributions(
-            base_paths, is_mil, n_replicates, seed, assignment, condition, method
+            base_paths, contexts, assignment, condition, method
         )
         rows.append(
             {
@@ -103,17 +107,23 @@ def _complete_result_keys(base_paths: dict[str, Path]) -> set[tuple[str, str, st
     return set.intersection(*keys_by_split) if keys_by_split else set()
 
 
+def _bootstrap_contexts(
+    base_paths: dict[str, Path], is_mil: bool, n_replicates: int, seed: int
+) -> list[BootstrapContext]:
+    return [
+        BootstrapContext(split_paths(base_paths, index), is_mil, n_replicates, seed)
+        for index in range(3)
+    ]
+
+
 def _ece_distributions(
     base_paths: dict[str, Path],
-    is_mil: bool,
-    n_replicates: int,
-    seed: int,
+    contexts: list[BootstrapContext],
     assignment: str,
     condition: str,
     method: str,
 ) -> dict[str, list[float]]:
     records = []
-    contexts = []
     for index in range(3):
         paths = split_paths(base_paths, index)
         predictions = load_seed_predictions(paths, condition, method, assignment)
@@ -122,7 +132,6 @@ def _ece_distributions(
                 f"Missing confirmed predictions for {assignment}/{condition}/{method}"
             )
         records.append(predictions)
-        contexts.append(BootstrapContext(paths, is_mil, n_replicates, seed))
     labels = [np.asarray(record["labels"]) for record in records]
     return {
         key: crossed_ece_distribution(
