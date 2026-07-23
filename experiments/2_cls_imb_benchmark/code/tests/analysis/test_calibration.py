@@ -99,7 +99,7 @@ def test_reliability_bins_are_averaged_over_seeds_not_probabilities() -> None:
     assert confidence.tolist() == pytest.approx([0.6, 0.9])
     assert accuracy.tolist() == pytest.approx([0.5, 1.0])
 
-def test_calibration_summary_retains_scaled_outputs_and_all_claimed_metrics() -> None:
+def test_calibration_summary_reports_all_claimed_metrics() -> None:
     record = {
         "splits": {
             "validation": {"labels": [0, 1], "logits": [[4.0, 0.0], [0.0, 4.0]]},
@@ -114,9 +114,9 @@ def test_calibration_summary_retains_scaled_outputs_and_all_claimed_metrics() ->
     summary = _run_calibration(record)
 
     assert summary is not None
-    assert {"temperature_scaled_logits", "temperature_scaled_probabilities"} <= set(
+    assert {"temperature_scaled_logits", "temperature_scaled_probabilities"} & set(
         summary
-    )
+    ) == set()
     assert {
         "temperature_scaled_test_nll",
         "temperature_scaled_test_brier",

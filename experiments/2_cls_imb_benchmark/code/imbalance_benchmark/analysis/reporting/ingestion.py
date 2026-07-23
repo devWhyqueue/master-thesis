@@ -93,7 +93,6 @@ def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
     fit = fit_temperature(val_logits, np.array(val["labels"]))
     labels = np.array(test["labels"])
     raw_probs = np.array(test.get("probabilities", []))
-    calibrated_logits = test_logits / fit.temperature
     calibrated_probs = apply_temperature(test_logits, fit.temperature)
     centers, confidence, accuracy = reliability_curve(calibrated_probs, labels)
     n_classes = calibrated_probs.shape[1]
@@ -114,8 +113,6 @@ def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
             labels, calibrated_probs
         ),
         "temperature_scaled_test_ece_ci": test.get("temperature_scaled_ece_ci"),
-        "temperature_scaled_logits": calibrated_logits.tolist(),
-        "temperature_scaled_probabilities": calibrated_probs.tolist(),
         "temperature_scaled_reliability": {
             "bin_centers": centers.tolist(),
             "mean_confidence": confidence.tolist(),
