@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,8 @@ from imbalance_benchmark.analysis.predictors.rq3_features import (
 )
 
 __all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
+
+logger = logging.getLogger(__name__)
 
 
 def _min_support(condition: dict[str, Any], key: str) -> float:
@@ -149,11 +152,18 @@ def _cells(
         if row["method"] == "ce":
             gate_map[(row["assignment"], row["severity"])] |= bool(row["gate_passed"])
     cells = []
+    # Covariates depend on (assignment, severity) only: cache per condition
+    # instead of recomputing the same separability/learnability fits per method.
+    covariate_cache: dict[tuple[str, str], dict[str, Any]] = {}
     for row in comparisons:
         is_deficit_cell = row["method"] == "ce"
         if is_deficit_cell and row["gate"] != "discrimination":
             continue
+        key = (row["assignment"], row["severity"])
         allocated = freeze["assignment_conditions"][row["assignment"]][row["severity"]]
+        if key not in covariate_cache:
+            logger.info("rq3: covariates %s/%s", *key)
+            covariate_cache[key] = _covariates(paths, is_mil, allocated, freeze)
         cells.append(
             {
                 "group": group,
@@ -171,7 +181,7 @@ def _cells(
                 "recovery": row.get("recovery", np.nan),
                 "recovery_se": _recovery_standard_error(row),
                 "method": row["method"],
-                **_covariates(paths, is_mil, allocated, freeze),
+                **covariate_cache[key],
             }
         )
     return cells
@@ -195,14 +205,13 @@ def run_rq3(
     cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
-    return {
-        "cells": cells,
-        "models": {
-            "gate_pass": fit_gate_pass_model(deficit_cells) if deficit_cells else {},
-            "deficit": fit_deficit_model(deficit_cells) if deficit_cells else {},
-            "recovery": fit_recovery_model(recovery_cells),
-        },
+    logger.info("rq3: %d cells ready, fitting models", len(cells))
+    models = {
+        "gate_pass": fit_gate_pass_model(deficit_cells) if deficit_cells else {},
+        "deficit": fit_deficit_model(deficit_cells) if deficit_cells else {},
+        "recovery": fit_recovery_model(recovery_cells),
     }
+    return {"cells": cells, "models": models}
 
 
 def _rq3_group(freeze: dict[str, Any]) -> str:
