@@ -79,11 +79,12 @@ def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:
 def _build_camelyon16(config: dict[str, Any]) -> pd.DataFrame:
     dataset_cfg = config["dataset"]
     data_root = Path(dataset_cfg["root"])
+    patches_root = Path(dataset_cfg.get("patches_root", data_root / "patches" / "20x"))
     regime = dataset_cfg.get("regime", "patch")
     slide_labels = camelyon16.load_slide_labels(data_root)
     slides = [
         slide
-        for slide in camelyon16.slides_with_patches(data_root)
+        for slide in camelyon16.slides_with_patches(patches_root)
         if slide in slide_labels
     ]
     if regime == "patch":
@@ -97,6 +98,7 @@ def _build_camelyon16(config: dict[str, Any]) -> pd.DataFrame:
     parts = [
         _camelyon16_slide_rows(
             data_root,
+            patches_root,
             slide,
             slide_labels[slide],
             include_patch_labels=regime == "patch",
@@ -120,12 +122,13 @@ def _build_camelyon16(config: dict[str, Any]) -> pd.DataFrame:
 
 def _camelyon16_slide_rows(
     data_root: Path,
+    patches_root: Path,
     slide_id: str,
     slide_label: str,
     *,
     include_patch_labels: bool,
 ) -> pd.DataFrame:
-    patches = camelyon16.list_slide_patches(data_root, slide_id)
+    patches = camelyon16.list_slide_patches(patches_root, slide_id)
     patch_ids = [pid for pid, _ in patches]
     rows: dict[str, Any] = {
         "dataset": "camelyon16",

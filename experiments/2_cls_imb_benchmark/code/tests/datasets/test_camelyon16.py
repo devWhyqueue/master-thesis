@@ -34,7 +34,7 @@ def test_camelyon16_wsi_rows_do_not_require_or_read_a_mask(
     )
 
     rows = dataset_adapters._camelyon16_slide_rows(
-        tmp_path, "tumor_001", "tumor", include_patch_labels=False
+        tmp_path, tmp_path, "tumor_001", "tumor", include_patch_labels=False
     )
 
     assert rows["slide_label"].tolist() == ["tumor", "tumor"]

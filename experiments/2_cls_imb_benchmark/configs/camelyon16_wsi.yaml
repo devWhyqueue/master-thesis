@@ -15,6 +15,7 @@ dataset:
     masks: not_used
     split_unit: slide
   root: /home/space/datasets/camelyon16
+  patches_root: /home/space/datasets/camelyon16/patches_sqfs/20x
 
 feature_extraction:
   model_name: hf-hub:paige-ai/Virchow2
@@ -46,4 +47,7 @@ slurm:
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
     analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
-  squashfs: []
+  squashfs:
+    - source: /home/space/datasets-sqfs/camelyon16-patches-20x.sqfs
+      mount: /home/space/datasets/camelyon16/patches_sqfs/20x
+      stages: [prepare]

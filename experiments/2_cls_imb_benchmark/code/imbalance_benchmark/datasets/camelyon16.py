@@ -69,9 +69,9 @@ def load_slide_labels(data_root: Path) -> dict[str, str]:
     return labels
 
 
-def list_slide_patches(data_root: Path, slide_id: str) -> list[tuple[int, Path]]:
+def list_slide_patches(patches_root: Path, slide_id: str) -> list[tuple[int, Path]]:
     """Return (patch_id, image_path) pairs for a slide, sorted by integer patch id."""
-    patch_dir = data_root / "patches" / "20x" / slide_id
+    patch_dir = patches_root / slide_id
     pairs = [
         (int(entry.name[:-4]), Path(entry.path))
         for entry in os.scandir(patch_dir)
@@ -80,10 +80,9 @@ def list_slide_patches(data_root: Path, slide_id: str) -> list[tuple[int, Path]]
     return sorted(pairs, key=lambda pair: pair[0])
 
 
-def slides_with_patches(data_root: Path) -> list[str]:
+def slides_with_patches(patches_root: Path) -> list[str]:
     """Return the sorted slide ids that have an extracted 20x patch directory."""
-    patch_root = data_root / "patches" / "20x"
-    return sorted(entry.name for entry in os.scandir(patch_root) if entry.is_dir())
+    return sorted(entry.name for entry in os.scandir(patches_root) if entry.is_dir())
 
 
 def load_mask(data_root: Path, slide_id: str) -> np.ndarray:
