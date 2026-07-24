@@ -13,7 +13,10 @@ from imbalance_benchmark.datasets.bracs.audit import (
     load_tile_manifest,
 )
 
-_ROI_ID_COLUMNS = {"roi", "roi_id", "roi_filename", "roi_name"}
+# Deliberately excludes bare "roi": the official WSI-summary sheet has a
+# "RoI " column that is a per-slide ROI *count*, which canonicalizes to
+# "roi" too and must not be mistaken for a per-row ROI identifier column.
+_ROI_ID_COLUMNS = {"roi_id", "roi_filename", "roi_name"}
 _SLIDE_COLUMNS = (
     "wsi_filename",
     "wsi_id",

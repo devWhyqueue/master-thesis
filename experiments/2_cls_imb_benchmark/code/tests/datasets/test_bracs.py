@@ -230,6 +230,27 @@ def test_bracs_wsi_metadata_uses_official_labels_without_roi_derivation(
         {"slide_id": "BRACS_2", "case_id": "p2", "slide_label": "IC"},
     ]
 
+def test_bracs_wsi_metadata_accepts_the_official_roi_count_column(tmp_path) -> None:
+    """The real release names the per-slide ROI-count column "RoI ", which
+    canonicalizes to "roi" -- must not be mistaken for a per-row ROI id
+    column and rejected as an ROI-listing sheet."""
+    metadata_path = tmp_path / "wsi_metadata.csv"
+    pd.DataFrame(
+        {
+            "WSI Filename": ["BRACS_1.svs"],
+            "Patient Id": ["p1"],
+            "RoI ": [3],
+            "WSI label": ["ADH"],
+            "Set": ["train"],
+        }
+    ).to_csv(metadata_path, index=False)
+
+    metadata = load_wsi_metadata(tmp_path, metadata_path)
+
+    assert metadata[["slide_id", "case_id", "slide_label"]].to_dict("records") == [
+        {"slide_id": "BRACS_1", "case_id": "p1", "slide_label": "ADH"},
+    ]
+
 def test_bracs_wsi_tiles_have_deterministic_order(tmp_path) -> None:
     slide_dir = tmp_path / "BRACS_1"
     slide_dir.mkdir()
