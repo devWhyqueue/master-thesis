@@ -4,6 +4,7 @@ import argparse
 from dataclasses import replace
 from functools import partial
 import logging
+import os
 import subprocess
 from typing import Any, Callable
 
@@ -228,9 +229,12 @@ def submit_workflow(
 def cmd_submit(args: argparse.Namespace) -> None:
     """Submit the Hydra workflow."""
     config = load_config(args.config)
+    # Baked into rendered sbatch scripts, which cd to the project root before
+    # running — a relative --config path must be resolved before embedding.
+    config_path = os.path.abspath(args.config)
     submit_workflow(
         config,
-        args.config,
+        config_path,
         args.dry_run,
         getattr(args, "smoke", False),
         getattr(args, "resume_tuning", False),
