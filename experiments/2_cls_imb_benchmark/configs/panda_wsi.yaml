@@ -43,6 +43,10 @@ slurm:
     pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
     freeze: {partition: cpu-2h, gpus: 0, cpus: 4}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
+    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
+    tune_post_hoc_natural: {partition: gpu-5h, gpus: 1, cpus: 2, time: "03:00:00"}
+    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
+    tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
