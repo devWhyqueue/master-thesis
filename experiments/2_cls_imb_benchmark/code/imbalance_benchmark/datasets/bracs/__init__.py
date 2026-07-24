@@ -18,12 +18,14 @@ from imbalance_benchmark.datasets.bracs.wsi import (
     list_slide_tiles,
     load_wsi_metadata,
 )
+from imbalance_benchmark.datasets.bracs.wsi_tiling import discover_slides, tile_slide
 
 __all__ = [
     "IMAGE_EXTENSIONS",
     "LABELS",
     "assert_patient_disjoint",
     "build_wsi_manifest",
+    "discover_slides",
     "find_summary_file",
     "index_roi_images",
     "list_slide_tiles",
@@ -32,4 +34,5 @@ __all__ = [
     "normalize_label",
     "split_cases",
     "tile_rois",
+    "tile_slide",
 ]

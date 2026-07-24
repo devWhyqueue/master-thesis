@@ -17,6 +17,8 @@ from imbalance_benchmark.commands import (
     cmd_prepare,
     cmd_smoke,
     cmd_submit,
+    cmd_tile_wsi,
+    cmd_tile_wsi_reduce,
     cmd_tune,
     cmd_tune_reduce,
     cmd_tune_shard,
@@ -43,12 +45,16 @@ def _parser() -> argparse.ArgumentParser:
         "analyze-combine",
         "combine-rq3",
         "smoke",
+        "tile-wsi-reduce",
     ):
         sub.add_parser(command)
     submit = sub.add_parser("submit")
     submit.add_argument("--dry-run", action="store_true")
     submit.add_argument("--smoke", action="store_true")
     submit.add_argument("--resume-tuning", action="store_true")
+    tile_wsi = sub.add_parser("tile-wsi")
+    tile_wsi.add_argument("--slide-index", type=int, required=True)
+    tile_wsi.add_argument("--shard-size", type=int, default=1)
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
             "--condition", choices=("natural", "balanced", "moderate", "severe")
@@ -89,6 +95,8 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "combine-rq3": cmd_combine_rq3,
         "submit": cmd_submit,
         "smoke": cmd_smoke,
+        "tile-wsi": cmd_tile_wsi,
+        "tile-wsi-reduce": cmd_tile_wsi_reduce,
     }
 
 

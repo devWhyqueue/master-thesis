@@ -9,7 +9,11 @@ from imbalance_benchmark.commands.confirm import cmd_confirm
 from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
-from imbalance_benchmark.commands.prepare import cmd_prepare
+from imbalance_benchmark.commands.prepare import (
+    cmd_prepare,
+    cmd_tile_wsi,
+    cmd_tile_wsi_reduce,
+)
 from imbalance_benchmark.commands.smoke import cmd_smoke
 from imbalance_benchmark.commands.tuning import (
     cmd_tune,
@@ -32,4 +36,6 @@ __all__ = [
     "cmd_combine_rq3",
     "cmd_submit",
     "cmd_smoke",
+    "cmd_tile_wsi",
+    "cmd_tile_wsi_reduce",
 ]

@@ -14,6 +14,8 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.construction import split_cases
 from imbalance_benchmark.datasets import build_manifest
+from imbalance_benchmark.datasets.bracs import discover_slides, tile_slide
+from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
 from imbalance_benchmark.datasets.features import (
     attach_extracted_features,
     resolve_feature_provenance,
@@ -27,7 +29,7 @@ from imbalance_benchmark.datasets.features.provenance_lock import (
 )
 from imbalance_benchmark.manifest.seeds import derive_seed
 
-__all__ = ["cmd_prepare"]
+__all__ = ["cmd_prepare", "cmd_tile_wsi", "cmd_tile_wsi_reduce"]
 
 
 SYNTHETIC_PATCHES_PER_SLIDE = 30
@@ -106,3 +108,53 @@ def cmd_prepare(args: argparse.Namespace) -> None:
             paths["data"] / "slide_manifest.csv", index=False
         )
         write_prepared_feature_provenance(config, paths["data"])
+
+
+def _wsi_tile_root(config: dict[str, object]) -> Path:
+    dataset_cfg = config["dataset"]
+    if not isinstance(dataset_cfg, dict):
+        raise ValueError("dataset config must be a mapping")
+    return Path(dataset_cfg["wsi_tile_root"])
+
+
+def cmd_tile_wsi(args: argparse.Namespace) -> None:
+    """Tile one shard of BRACS slides and write per-slide partial manifests."""
+    config = load_config(args.config)
+    dataset_cfg = config["dataset"]
+    if not isinstance(dataset_cfg, dict):
+        raise ValueError("dataset config must be a mapping")
+    slides = discover_slides(Path(dataset_cfg["root"]))
+    slide_ids = sorted(slides)
+    start = args.slide_index * args.shard_size
+    selected = slide_ids[start : start + args.shard_size]
+    if not selected:
+        raise ValueError(
+            f"slide-index {args.slide_index} covers no slides "
+            f"({len(slide_ids)} discovered, shard-size {args.shard_size})"
+        )
+    tile_root = _wsi_tile_root(config)
+    partial_dir = tile_root / "_partials"
+    partial_dir.mkdir(parents=True, exist_ok=True)
+    for slide_id in selected:
+        frame = tile_slide(slides[slide_id], slide_id, tile_root)
+        frame.to_csv(partial_dir / f"{slide_id}.csv", index=False)
+
+
+def cmd_tile_wsi_reduce(args: argparse.Namespace) -> None:
+    """Concatenate per-slide partials into the validated ``tile_manifest.csv``."""
+    config = load_config(args.config)
+    dataset_cfg = config["dataset"]
+    if not isinstance(dataset_cfg, dict):
+        raise ValueError("dataset config must be a mapping")
+    tile_root = _wsi_tile_root(config)
+    manifest_path = Path(
+        dataset_cfg.get("wsi_tile_manifest", tile_root / "tile_manifest.csv")
+    )
+    expected_slides = int(dataset_cfg.get("expected_wsi_count", 547))
+    partials = sorted((tile_root / "_partials").glob("*.csv"))
+    if not partials:
+        raise FileNotFoundError(f"No BRACS WSI tile partials found under {tile_root}")
+    frame = pd.concat((pd.read_csv(path) for path in partials), ignore_index=True)
+    validate_tile_manifest(frame, expected_slides)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(manifest_path, index=False)
