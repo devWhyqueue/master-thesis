@@ -9,6 +9,7 @@ from PIL import Image
 from imbalance_benchmark.common import compute_sha256
 from imbalance_benchmark.datasets.bracs import wsi_tiling
 from imbalance_benchmark.datasets.bracs.audit import _rule_mask, validate_tile_manifest
+from imbalance_benchmark.datasets.bracs.wsi_foreground import TILE_SIZE
 
 # 3x3 grid: a 2x2 tissue block (each cell has >=2 tissue neighbours) plus one
 # isolated tissue cell at (2, 2) that the tissue_neighbors>=2 rule must drop.
@@ -31,7 +32,7 @@ def _cell_image(kind: str, size: tuple[int, int]) -> Image.Image:
 
 class _FakeSlide:
     properties = {"openslide.objective-power": "20"}
-    level_dimensions = ((3 * wsi_tiling.TILE_SIZE, 3 * wsi_tiling.TILE_SIZE),)
+    level_dimensions = ((3 * TILE_SIZE, 3 * TILE_SIZE),)
     level_downsamples = (1.0,)
 
     def get_best_level_for_downsample(self, _downsample: float) -> int:
@@ -40,7 +41,7 @@ class _FakeSlide:
     def read_region(
         self, location: tuple[int, int], _level: int, size: tuple[int, int]
     ) -> Image.Image:
-        col, row = location[0] // wsi_tiling.TILE_SIZE, location[1] // wsi_tiling.TILE_SIZE
+        col, row = location[0] // TILE_SIZE, location[1] // TILE_SIZE
         return _cell_image(_GRID[(row, col)], size)
 
     def __enter__(self) -> "_FakeSlide":
@@ -59,8 +60,8 @@ def test_bracs_wsi_tiling_audits_tiles_and_drops_isolated_tissue(
 
     kept = set(
         zip(
-            (frame["y"] // wsi_tiling.TILE_SIZE).tolist(),
-            (frame["x"] // wsi_tiling.TILE_SIZE).tolist(),
+            (frame["y"] // TILE_SIZE).tolist(),
+            (frame["x"] // TILE_SIZE).tolist(),
         )
     )
     assert kept == {(0, 0), (0, 1), (1, 0), (1, 1)}
