@@ -86,6 +86,8 @@ In Python: `f"afterok:{':'.join(ids)}"` passed as `--dependency=...`.
 
 `apptainer` is **only on compute nodes** — the login node gives `command not found`. Use `srun --partition=cpu-test --pty bash` for an interactive shell, or submit via `sbatch`.
 
+Containers have no SLURM client — never call `sbatch`/`srun` from inside one. A project's `submit` CLI (the thing that calls `sbatch`) is login-node/orchestrator work; only the jobs it schedules run inside the container.
+
 Pass Python paths into the container via `APPTAINERENV_PYTHONPATH` (Apptainer strips the prefix and sets `PYTHONPATH` inside):
 
 ```bash
