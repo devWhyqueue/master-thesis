@@ -30,6 +30,7 @@ class SlurmJob:
     array_splits: tuple[int, ...] = ()
     array_conditions: tuple[str, ...] = ()
     array_size: int = 0
+    array_indices: tuple[int, ...] = ()
 
 
 def render_sbatch(
@@ -38,7 +39,7 @@ def render_sbatch(
     """Render one self-contained, job-ID-logged Apptainer SLURM script."""
     root, code, output, container = _cluster_paths(config)
     command = _command(job, config_path, code)
-    lines = _directives(job, root)
+    lines = _directives(job, root, config)
     images = _stage_images(config, job.name)
     dataset = (
         str(config.get("dataset", {}).get("root", "")) if job.name == "prepare" else ""
@@ -92,7 +93,7 @@ def _crossed_array_lines(job: SlurmJob, prefix: str) -> list[str]:
     ]
 
 
-def _directives(job: SlurmJob, root: str) -> list[str]:
+def _directives(job: SlurmJob, root: str, config: dict[str, Any]) -> list[str]:
     log_dir = f"{shlex.quote(root)}/experiments/2_cls_imb_benchmark/outputs/logs"
     lines = [
         "#!/bin/bash",
@@ -111,7 +112,14 @@ def _directives(job: SlurmJob, root: str) -> list[str]:
         max(1, len(job.array_splits)) * max(1, len(job.array_conditions))
     )
     if job.array_size or job.array_splits or job.array_conditions:
-        lines.append(f"#SBATCH --array=0-{array_size - 1}")
+        indices = (
+            ",".join(str(index) for index in job.array_indices)
+            if job.array_indices
+            else f"0-{array_size - 1}"
+        )
+        concurrency = config.get("slurm", {}).get("max_array_concurrency")
+        throttle = f"%{int(concurrency)}" if concurrency else ""
+        lines.append(f"#SBATCH --array={indices}{throttle}")
     if job.dependencies:
         lines.append(f"#SBATCH --dependency=afterok:{':'.join(job.dependencies)}")
     return lines

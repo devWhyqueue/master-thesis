@@ -13,7 +13,7 @@ from imbalance_benchmark.hydra.confirm_jobs import confirm_jobs as _confirm_jobs
 from imbalance_benchmark.hydra.job_resources import build_job as _job
 from imbalance_benchmark.hydra.job_resources import resources_for as _resources
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
-from imbalance_benchmark.hydra.resume import verify_resume_freezes
+from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
 from imbalance_benchmark.modeling.context import roster_for_regime
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     DEPENDENT_METHODS,
@@ -42,15 +42,9 @@ def _analyze_jobs(
         ),
         array_splits=arr,
     )
-    combine = _job(
-        config,
-        "analyze-combine",
-        "analyze-combine",
-        False,
-        (an.name,),
-        resource="analyze",
+    return an, _job(
+        config, "analyze-combine", "analyze-combine", False, (an.name,), "analyze"
     )
-    return an, combine
 
 
 def build_workflow(
@@ -64,7 +58,8 @@ def build_workflow(
     arr = (0, 1, 2)
     setup = _setup_jobs(config, arr) if not resume_tuning else []
     freeze_dependency = ("freeze",) if setup else ()
-    tuning = _tuning_jobs(config, freeze_dependency)
+    plan = resume_plan(config) if resume_tuning else None
+    tuning = _tuning_jobs(config, freeze_dependency, plan)
     confirm_natural, confirm_controlled = _confirm_jobs(config)
     an, combine = _analyze_jobs(config, confirm_natural, confirm_controlled, arr)
     return [*setup, *tuning, confirm_natural, confirm_controlled, an, combine]
@@ -84,7 +79,7 @@ def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJo
 
 
 def _tuning_jobs(
-    config: dict[str, Any], freeze_dependency: tuple[str, ...]
+    config: dict[str, Any], freeze_dependency: tuple[str, ...], plan: ResumePlan | None
 ) -> list[SlurmJob]:
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     roster = roster_for_regime(is_mil)
@@ -98,40 +93,51 @@ def _tuning_jobs(
     dependent_methods = tuple(
         method for method in roster if method in DEPENDENT_METHODS
     )
-    base_natural = replace(
-        _job(
-            config,
-            "tune-base-natural",
-            "tune-shard --phase base --group natural"
-            f" --observations-per-candidate {natural_observations}"
-            f" --bundle-by-observation{bundle_arg}",
-            True,
-            freeze_dependency,
-            "tune_natural",
-            "tune",
-        ),
-        array_size=bundled_observation_array_size(
-            candidate_array_size(base_methods), natural_observations, shards_per_task
-        ),
+    base_natural = (
+        replace(
+            _job(
+                config,
+                "tune-base-natural",
+                "tune-shard --phase base --group natural"
+                f" --observations-per-candidate {natural_observations}"
+                f" --bundle-by-observation{bundle_arg}",
+                True,
+                freeze_dependency,
+                "tune_natural",
+                "tune",
+            ),
+            array_size=bundled_observation_array_size(
+                candidate_array_size(base_methods),
+                natural_observations,
+                shards_per_task,
+            ),
+        )
+        if not plan or not plan.base_natural_complete
+        else None
     )
-    base_controlled = replace(
-        _job(
-            config,
-            "tune-base-controlled",
-            f"tune-shard --phase base --group controlled{bundle_arg}",
-            True,
-            freeze_dependency,
-            "tune_controlled",
-            "tune",
-        ),
-        array_size=bundle_size(3 * candidate_array_size(base_methods)),
+    base_controlled = (
+        replace(
+            _job(
+                config,
+                "tune-base-controlled",
+                f"tune-shard --phase base --group controlled{bundle_arg}",
+                True,
+                freeze_dependency,
+                "tune_controlled",
+                "tune",
+            ),
+            array_size=bundle_size(3 * candidate_array_size(base_methods)),
+            array_indices=plan.controlled_indices if plan else (),
+        )
+        if not plan or plan.controlled_indices
+        else None
     )
     base_reduce = _job(
         config,
         "tune-base-reduce",
         "tune-reduce --phase base",
         False,
-        (base_natural.name, base_controlled.name),
+        tuple(job.name for job in (base_natural, base_controlled) if job),
         "tune_reduce",
     )
     dependent_posthoc_natural = _job(
@@ -184,8 +190,7 @@ def _tuning_jobs(
         "tune_reduce",
     )
     return [
-        base_natural,
-        base_controlled,
+        *[job for job in (base_natural, base_controlled) if job],
         base_reduce,
         dependent_posthoc_natural,
         dependent_crt_natural,
@@ -211,8 +216,6 @@ def submit_workflow(
     submit: Callable[[str, bool], str] = _submit_script,
 ) -> dict[str, str]:
     """Render and submit the workflow in topological order, returning job IDs by stage."""
-    if resume_tuning:
-        verify_resume_freezes(config)
     submitted: dict[str, str] = {}
     for job in build_workflow(config, smoke, resume_tuning):
         dependencies = tuple(submitted[name] for name in job.dependencies)

@@ -23,7 +23,10 @@ def _config() -> dict[str, object]:
             "container": "/home/example/environment.sif",
             "test_partition": "gpu-test",
             "tune_natural_observations_per_candidate": 6,
-            "tune_shards_per_task": 4,
+            "tune_shards_per_task": 2,
+            "confirm_natural_shards_per_task": 5,
+            "confirm_controlled_shards_per_task": 5,
+            "max_array_concurrency": 8,
             "resources": {
                 "tune_natural": {"memory": "32G"},
                 "tune_controlled": {"memory": "32G"},
@@ -64,19 +67,19 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert jobs[-2].dependencies == ("confirm-natural", "confirm-controlled")
     assert jobs[-2].array_splits == (0, 1, 2)
     assert jobs[-1].dependencies == ("analyze",)
-    assert jobs[3].array_size == 198
+    assert jobs[3].array_size == 396
     assert "--observations-per-candidate 6" in jobs[3].command
-    assert "--shards-per-task 4" in jobs[3].command
+    assert "--shards-per-task 2" in jobs[3].command
     assert "--bundle-by-observation" in jobs[3].command
     assert jobs[3].memory == "32G"
-    assert jobs[4].array_size == 99
+    assert jobs[4].array_size == 198
     assert jobs[6].array_size == 0
     assert "--shard-index 0" in jobs[6].command
-    assert jobs[7].array_size == 6
+    assert jobs[7].array_size == 12
     assert "--observations-per-candidate 6" in jobs[7].command
     assert "--shard-offset 1" in jobs[7].command
     assert "--bundle-by-observation" in jobs[7].command
-    assert jobs[8].array_size == 4
+    assert jobs[8].array_size == 8
     natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
     assert "#SBATCH --mem=32G" in natural_script
 
@@ -87,8 +90,8 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     confirm_controlled = next(j for j in jobs if j.name == "confirm-controlled")
 
     # patch roster minus post-hoc = 10 methods; 3 splits x 5 seeds each.
-    assert confirm_natural.array_size == 3 * 10 * 5
-    assert confirm_controlled.array_size == 3 * 3 * 10 * 5
+    assert confirm_natural.array_size == 3 * 10
+    assert confirm_controlled.array_size == 3 * 3 * 10
     assert confirm_natural.partition == "gpu-5h"
     assert confirm_controlled.partition == "gpu-2h"
     assert confirm_natural.partition != "gpu-2d"
@@ -96,8 +99,8 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
 
     natural_script = render_sbatch(confirm_natural, _config(), "config.yaml")
     controlled_script = render_sbatch(confirm_controlled, _config(), "config.yaml")
-    assert f"#SBATCH --array=0-{3 * 10 * 5 - 1}" in natural_script
-    assert f"#SBATCH --array=0-{3 * 3 * 10 * 5 - 1}" in controlled_script
+    assert f"#SBATCH --array=0-{3 * 10 - 1}%8" in natural_script
+    assert f"#SBATCH --array=0-{3 * 3 * 10 - 1}%8" in controlled_script
     assert "confirm-shard --group natural" in natural_script
     assert "confirm-shard --group controlled" in controlled_script
     assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in natural_script
@@ -123,11 +126,34 @@ def test_submit_links_actual_job_ids() -> None:
     assert "#SBATCH --dependency=afterok:13" in submitted_scripts[13]
 
 
-def test_resume_tuning_skips_completed_setup() -> None:
+def test_resume_tuning_skips_completed_setup(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "imbalance_benchmark.hydra.workflow.resume_plan",
+        lambda *_: type("Plan", (), {"base_natural_complete": False, "controlled_indices": (0,)})(),
+    )
     jobs = build_workflow(_config(), resume_tuning=True)
 
     assert jobs[0].name == "tune-base-natural"
     assert all(job.name not in {"prepare", "pilot", "freeze"} for job in jobs)
+
+
+def test_resume_omits_only_a_fingerprint_valid_base_natural_array(monkeypatch) -> None:
+    config = _config()
+    monkeypatch.setattr(
+        "imbalance_benchmark.hydra.workflow.resume_plan",
+        lambda *_: type("Plan", (), {"base_natural_complete": True, "controlled_indices": (1, 3)})(),
+    )
+
+    jobs = build_workflow(config, resume_tuning=True)
+    names = [job.name for job in jobs]
+    controlled = next(job for job in jobs if job.name == "tune-base-controlled")
+
+    assert "tune-base-natural" not in names
+    assert controlled.array_indices == (1, 3)
+    assert "#SBATCH --array=1,3%8" in render_sbatch(controlled, config, "config.yaml")
+    assert next(job for job in jobs if job.name == "tune-base-reduce").dependencies == (
+        "tune-base-controlled",
+    )
 
 def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
     """Large image copies must not be repeated across downstream array jobs."""

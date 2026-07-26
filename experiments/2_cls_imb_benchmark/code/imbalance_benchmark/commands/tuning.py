@@ -25,22 +25,27 @@ from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     summarize_tuning_cost,
     tune_across_splits,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
+    reduce_tuning_shards,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
-    condition_is_reusable,
-    write_base_selections,
-    write_final_selections,
     write_serial_cost,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import selected_ce
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
+    condition_is_reusable,
+    selected_ce,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
     combined_scopes,
     run_candidate_shard,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import run_shard_bundle
+from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import (
+    _bundle_indices,
+    run_shard_bundle,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
-    phase_methods,
     requested_shard,
 )
 
@@ -53,12 +58,10 @@ def _tuning_inputs(
     args: argparse.Namespace, paths: dict[str, Path]
 ) -> tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]:
     """Load config, the natural-validation loader, and the regime for the tuning sweep."""
-    config = load_config(args.config)
     freeze_path = paths["data"] / "manifest_freeze.json"
     freeze = json.loads(freeze_path.read_text())
     verify_manifest_freeze(freeze)
     config = freeze["runtime_config"]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
     val_ds = load_training_dataset(
@@ -68,18 +71,20 @@ def _tuning_inputs(
         class_names=list(freeze["class_names"]),
         bag_kwargs=bag_kwargs,
     )
-    val_loader = build_evaluation_loader(val_ds, is_mil)
-    regime = Regime(
-        device,
-        config,
-        val_ds.get_n_classes(),
-        is_mil,
-        locked_class_names=list(freeze["class_names"]),
-        bag_dataset_kwargs=bag_kwargs or {},
-        method_grids=freeze.get("method_grids", {}),
-        update_budgets=freeze.get("update_budgets", {}),
+    return (
+        paths,
+        Regime(
+            torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+            config,
+            val_ds.get_n_classes(),
+            is_mil,
+            locked_class_names=list(freeze["class_names"]),
+            bag_dataset_kwargs=bag_kwargs or {},
+            method_grids=freeze.get("method_grids", {}),
+            update_budgets=freeze.get("update_budgets", {}),
+        ),
+        build_evaluation_loader(val_ds, is_mil),
     )
-    return paths, regime, val_loader
 
 
 def cmd_tune(args: argparse.Namespace) -> None:
@@ -158,64 +163,57 @@ def _frozen_shard_context(
     dict[str, Any],
     list[str],
 ]:
-    base_paths = ensure_dirs(load_config(args.config))
-    raw_scopes = [
-        _tuning_inputs(args, split_paths(base_paths, index)) for index in range(3)
-    ]
-    freeze_paths = [scope[0]["data"] / "manifest_freeze.json" for scope in raw_scopes]
-    freeze = json.loads(freeze_paths[0].read_text())
+    base = ensure_dirs(load_config(args.config))
+    scopes = [_tuning_inputs(args, split_paths(base, index)) for index in range(3)]
+    paths = [scope[0]["data"] / "manifest_freeze.json" for scope in scopes]
     return (
-        base_paths,
-        raw_scopes,
-        freeze,
-        [compute_sha256(path) for path in freeze_paths],
+        base,
+        scopes,
+        json.loads(paths[0].read_text()),
+        [compute_sha256(path) for path in paths],
     )
 
 
-def cmd_tune_shard(args: argparse.Namespace) -> None:
-    """Run one resumable frozen-candidate shard."""
-    if run_shard_bundle(args):
+def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
+    """Run candidate indices sequentially with one loaded frozen MIL context."""
+    base, scopes, freeze, fingerprint = _frozen_shard_context(args)
+    if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
-    base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
-    if any(_is_excluded(paths) for paths, _, _ in raw_scopes):
-        return
-    shard_index, observation_index = array_coordinates(
-        args.shard_index,
-        args.observation_index,
-        args.observations_per_candidate,
-        args.shard_offset,
-    )
-    spec = requested_shard(
-        shard_index,
-        args.phase,
-        args.group,
-        raw_scopes[0][1].is_mil,
-        freeze["method_grids"],
-        observation_index,
-    )
-    if spec is None:
-        return
-    _run_shard(base, raw_scopes, freeze, fingerprint, spec)
+    for index in indices:
+        shard, observation = array_coordinates(
+            index,
+            args.observation_index,
+            args.observations_per_candidate,
+            args.shard_offset,
+        )
+        spec = requested_shard(
+            shard,
+            args.phase,
+            args.group,
+            scopes[0][1].is_mil,
+            freeze["method_grids"],
+            observation,
+        )
+        if spec is not None:
+            _run_shard(base, scopes, freeze, fingerprint, spec)
 
 
 def _run_shard(
     base: dict[str, Path],
-    raw_scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
+    scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
     freeze: dict[str, Any],
     fingerprint: list[str],
     spec: ShardSpec,
 ) -> None:
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     if condition_is_reusable(
-        base, spec.condition, roster_for_regime(raw_scopes[0][1].is_mil), assignments
+        base, spec.condition, roster_for_regime(scopes[0][1].is_mil), assignments
     ):
         return
     scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments
-    records: list[dict[str, int]] = []
-    scopes = combined_scopes(raw_scopes, spec.condition, scoped, records)
     run_candidate_shard(
         spec,
-        scopes,
+        combined_scopes(scopes, spec.condition, scoped, []),
         _tuning_seeds(freeze),
         fingerprint,
         base["data"],
@@ -225,26 +223,26 @@ def _run_shard(
     )
 
 
+def cmd_tune_shard(args: argparse.Namespace) -> None:
+    """Run one resumable frozen-candidate shard."""
+    is_mil = load_config(args.config).get("dataset", {}).get("regime") == "wsi"
+    if is_mil and args.shards_per_task > 1:
+        _run_shards(
+            args,
+            _bundle_indices(
+                args.shard_index,
+                args.shards_per_task,
+                args.observations_per_candidate,
+                args.bundle_by_observation,
+            ),
+        )
+        return
+    if run_shard_bundle(args):
+        return
+    _run_shards(args, [args.shard_index])
+
+
 def cmd_tune_reduce(args: argparse.Namespace) -> None:
     """Reduce complete shards into the benchmark's signed selection interface."""
     base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
-    is_mil = raw_scopes[0][1].is_mil
-    base_methods = phase_methods(is_mil, "base")
-    if args.phase == "base":
-        write_base_selections(
-            base,
-            freeze,
-            fingerprint,
-            base_methods,
-            roster_for_regime(is_mil),
-            CONDITIONS,
-        )
-        return
-    write_final_selections(
-        base,
-        freeze,
-        fingerprint,
-        base_methods,
-        phase_methods(is_mil, "dependent"),
-        CONDITIONS,
-    )
+    reduce_tuning_shards(base, raw_scopes, freeze, fingerprint, args.phase)

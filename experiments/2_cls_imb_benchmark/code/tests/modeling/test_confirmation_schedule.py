@@ -84,3 +84,13 @@ def test_resolve_confirm_bundle_partitions_every_unit_exactly_once() -> None:
     assert reconstructed == units
     # Every task past the array size resolves to an empty bundle.
     assert resolve_confirm_bundle(array_size, "controlled", False, shards_per_task) == []
+
+
+def test_five_unit_bundles_cover_confirmation_without_gaps_or_duplicates() -> None:
+    for group in ("natural", "controlled"):
+        units = confirm_units_for_group(group, is_mil=True)
+        bundles = [
+            resolve_confirm_bundle(index, group, True, 5)
+            for index in range(confirm_array_size(group, True, 5))
+        ]
+        assert [unit for bundle in bundles for unit in bundle] == units
