@@ -23,12 +23,8 @@ __all__ = ["attach_extracted_features"]
 def attach_extracted_features(
     frame: pd.DataFrame,
     feature_root: Path,
-    model_name: str = "hf-hub:paige-ai/Virchow2",
-    batch_size: int = 64,
-    dtype: str = "float16",
+    feature_cfg: dict[str, Any] | None = None,
     device: torch.device | None = None,
-    revision: str = VIRCHOW2_REVISION,
-    weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
 ) -> pd.DataFrame:
     """Extract one stacked per-slide feature tensor per slide and attach references.
 
@@ -37,13 +33,14 @@ def attach_extracted_features(
     rather than re-extracted. All slides in one call share a single loaded
     encoder instance instead of reloading it per slide.
     """
+    cfg = feature_cfg or {}
     options = {
-        "model_name": model_name,
-        "batch_size": batch_size,
-        "dtype": dtype,
+        "model_name": cfg.get("model_name", "hf-hub:paige-ai/Virchow2"),
+        "batch_size": int(cfg.get("batch_size", 64)),
+        "dtype": cfg.get("dtype", "float16"),
         "device": device,
-        "revision": revision,
-        "weights_sha256": weights_sha256,
+        "revision": cfg.get("revision", VIRCHOW2_REVISION),
+        "weights_sha256": cfg.get("weights_sha256", VIRCHOW2_WEIGHTS_SHA256),
     }
     _prepare_feature_cache(feature_root, options)
     enriched = frame.copy()
@@ -96,14 +93,7 @@ def _ensure_slide_features(
         return slide_path
     image_paths = group["image_path"].astype(str).tolist()
     tensor = feature_lib.extract_slide_features(
-        image_paths,
-        str(options["model_name"]),
-        int(options["batch_size"]),
-        str(options["dtype"]),
-        options["device"],
-        str(options["revision"]),
-        str(options["weights_sha256"]),
-        model_cache=model_cache,
+        image_paths, options, model_cache=model_cache
     )
     torch.save(tensor, slide_path)
     record_cached_slide(feature_root, slide_id, slide_path, identities, len(tensor))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -104,6 +105,17 @@ class _ImagePathDataset(Dataset):  # type: ignore[type-arg]
         return self._transforms(Image.open(self._paths[index]).convert("RGB"))
 
 
+def _loader_worker_count() -> int:
+    """Parallel image-decode workers, sized to the job's allocated CPUs.
+
+    Image I/O/decode otherwise runs single-threaded ahead of the GPU forward
+    pass, which starves an 8-CPU allocation down to one core's throughput.
+    """
+    slurm_cpus = os.environ.get("SLURM_CPUS_PER_TASK")
+    total = int(slurm_cpus) if slurm_cpus else os.cpu_count() or 1
+    return max(0, min(total - 1, 7))
+
+
 def _resolve_model(
     model_cache: dict[str, Any] | None,
     model_name: str,
@@ -121,19 +133,35 @@ def _resolve_model(
     return model_cache["model"], model_cache["transforms"]
 
 
+def _resolve_extraction_options(
+    options: dict[str, Any],
+) -> tuple[str, int, str, str, str, torch.device]:
+    resolved_device = options.get("device") or torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
+    return (
+        str(options.get("model_name", VIRCHOW2_MODEL)),
+        int(options.get("batch_size", 64)),
+        str(options.get("dtype", "float16")),
+        str(options.get("revision", VIRCHOW2_REVISION)),
+        str(options.get("weights_sha256", VIRCHOW2_WEIGHTS_SHA256)),
+        resolved_device,
+    )
+
+
 def extract_slide_features(
     image_paths: list[str],
-    model_name: str = VIRCHOW2_MODEL,
-    batch_size: int = 64,
-    dtype: str = "float16",
-    device: torch.device | None = None,
-    revision: str = VIRCHOW2_REVISION,
-    weights_sha256: str = VIRCHOW2_WEIGHTS_SHA256,
+    options: dict[str, Any],
     model_cache: dict[str, Any] | None = None,
 ) -> torch.Tensor:
-    """Embed a slide's ordered patch images into a stacked (n_patches, 2560) tensor."""
-    resolved_device = device or torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
+    """Embed a slide's ordered patch images into a stacked (n_patches, 2560) tensor.
+
+    ``options`` carries the same model-config bag ``attach_extracted_features``
+    assembles (``model_name``, ``batch_size``, ``dtype``, ``device``,
+    ``revision``, ``weights_sha256``).
+    """
+    model_name, batch_size, dtype, revision, weights_sha256, resolved_device = (
+        _resolve_extraction_options(options)
     )
     if not image_paths:
         return torch.empty((0, FEATURE_DIM))
@@ -143,7 +171,7 @@ def extract_slide_features(
     loader = DataLoader(
         _ImagePathDataset(image_paths, transforms),
         batch_size=batch_size,
-        num_workers=0,
+        num_workers=_loader_worker_count(),
     )
     rows: list[torch.Tensor] = []
     for images in loader:

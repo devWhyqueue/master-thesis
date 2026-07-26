@@ -208,7 +208,7 @@ def test_feature_cache_rejects_metadata_from_a_different_encoder_config(
         lambda *_args, **_kwargs: torch.ones(1, 2560),
     )
     root = tmp_path / "features"
-    features.attach_extracted_features(frame, root, dtype="float16")
+    features.attach_extracted_features(frame, root, {"dtype": "float16"})
 
     with pytest.raises(ValueError, match="provenance"):
-        features.attach_extracted_features(frame, root, dtype="float32")
+        features.attach_extracted_features(frame, root, {"dtype": "float32"})
