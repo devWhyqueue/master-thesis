@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +36,19 @@ def _rule_mask(frame: pd.DataFrame) -> pd.Series:
     )
 
 
+def _worker_count() -> int:
+    slurm_cpus = os.environ.get("SLURM_CPUS_PER_TASK")
+    return max(1, int(slurm_cpus)) if slurm_cpus else os.cpu_count() or 1
+
+
+def _hash_mismatch(pair: tuple[str, str]) -> str | None:
+    image_path, expected_hash = pair
+    path = Path(image_path)
+    if not path.is_file() or compute_sha256(path) != expected_hash:
+        return image_path
+    return None
+
+
 def validate_tile_manifest(frame: pd.DataFrame, expected_slides: int) -> None:
     """Validate BRACS tile-level evidence for every declared preprocessing rule."""
     missing = _TILE_AUDIT_COLUMNS - set(frame.columns)
@@ -47,12 +62,13 @@ def validate_tile_manifest(frame: pd.DataFrame, expected_slides: int) -> None:
         )
     if frame.duplicated(["slide_id", "x", "y"]).any():
         raise ValueError("BRACS tile audit contains duplicate level-0 coordinates")
-    for image_path, expected_hash in frame[["image_path", "sha256"]].itertuples(
-        index=False, name=None
-    ):
-        path = Path(str(image_path))
-        if not path.is_file() or compute_sha256(path) != str(expected_hash):
-            raise ValueError(f"BRACS tile audit hash mismatch: {path}")
+    pairs = list(
+        frame[["image_path", "sha256"]].astype(str).itertuples(index=False, name=None)
+    )
+    with ProcessPoolExecutor(max_workers=_worker_count()) as pool:
+        for mismatch in pool.map(_hash_mismatch, pairs, chunksize=256):
+            if mismatch is not None:
+                raise ValueError(f"BRACS tile audit hash mismatch: {mismatch}")
 
 
 def load_tile_manifest(
