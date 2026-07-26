@@ -40,6 +40,7 @@ from imbalance_benchmark.manifest.pilot import (
     pilot_levels_for,
     stability_floor_from_curve,
 )
+from imbalance_benchmark.manifest.sampling.slide import max_feasible_slide_level
 from imbalance_benchmark.manifest.seeds import derive_seed
 
 def _patch_frame(
@@ -323,6 +324,34 @@ def test_mil_pilot_level_five_raises_without_the_removed_exception():
 
     with pytest.raises(ValueError, match="patient cap"):
         mil_pilot_manifest(pd.DataFrame(rows), ["A"], level=5, seed=1)
+
+def test_max_feasible_slide_level_accounts_for_patient_concentration():
+    """Two patients hoard slides (4 and 3), so the raw 21-slide count overstates
+    what the 10% patient cap can actually deliver; the true ceiling is 16."""
+    rows = (
+        [
+            {"case_id": "PAT_hoarder_a", "slide_id": f"S_a{i}", "cancer_type": "A"}
+            for i in range(4)
+        ]
+        + [
+            {"case_id": "PAT_hoarder_b", "slide_id": f"S_b{i}", "cancer_type": "A"}
+            for i in range(3)
+        ]
+        + [
+            {"case_id": f"PAT_{i}", "slide_id": f"S_{i}", "cancer_type": "A"}
+            for i in range(14)
+        ]
+    )
+    df = pd.DataFrame(rows)
+    raw_count = df["slide_id"].nunique()
+
+    level = max_feasible_slide_level(df)
+
+    assert level == 16
+    assert level < raw_count
+    mil_pilot_manifest(df, ["A"], level=level, seed=0)
+    with pytest.raises(ValueError, match="patient cap"):
+        mil_pilot_manifest(df, ["A"], level=raw_count, seed=0)
 
 def test_patch_pilot_level_five_raises_without_the_removed_exception():
     """Five equal patient quotas unavoidably imply 20% patient support; with the

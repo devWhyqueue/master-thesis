@@ -37,6 +37,24 @@ def _build_slide_hierarchy(
     return patients, h
 
 
+def max_feasible_slide_level(df_class: pd.DataFrame) -> int:
+    """Largest slide count `select_slides_round_robin` can satisfy for one class.
+
+    Mirrors that function's 10% patient-contribution cap so callers can size
+    candidate levels that are always reachable, instead of discovering
+    infeasibility only after a training run at a proposed level.
+    """
+    counts = df_class.drop_duplicates("slide_id").groupby("case_id").size().to_numpy()
+    for n in range(int(counts.sum()), 0, -1):
+        try:
+            cap = _contribution_cap(n, 0.10, "patient")
+        except ValueError:
+            continue
+        if int(np.minimum(counts, cap).sum()) >= n:
+            return n
+    return 0
+
+
 def select_slides_round_robin(
     df_class: pd.DataFrame, n_slides: int, seed: int
 ) -> pd.DataFrame:

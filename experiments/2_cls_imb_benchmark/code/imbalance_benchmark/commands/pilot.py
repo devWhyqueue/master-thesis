@@ -31,6 +31,7 @@ from imbalance_benchmark.manifest.pilot import (
     run_pilot_seed,
     stability_floor_from_curve,
 )
+from imbalance_benchmark.manifest.sampling.slide import max_feasible_slide_level
 from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_pilot"]
@@ -46,7 +47,16 @@ def _pilot_setup(
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     eq_slide = patient_equals_slide(train_df)
     unit_col = "slide_id" if (is_mil or eq_slide) else "case_id"
-    available = train_df.groupby("cancer_type")[unit_col].nunique().to_dict()
+    available = (
+        {
+            cls: max_feasible_slide_level(
+                cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls])
+            )
+            for cls in classes
+        }
+        if unit_col == "slide_id"
+        else train_df.groupby("cancer_type")[unit_col].nunique().to_dict()
+    )
     support = {
         cls: {
             "patients": int(
