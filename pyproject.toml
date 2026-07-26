@@ -50,7 +50,7 @@ include-package-data = false
 where = [".agents/skills/bib/src", "experiments/2_cls_imb_benchmark/code"]
 
 [tool.vulture]
-ignore_names = ["forward"]
+ignore_names = ["forward", "MAX_TEXT_CHUNK"]
 
 [tool.pytest.ini_options]
 addopts = "-s"

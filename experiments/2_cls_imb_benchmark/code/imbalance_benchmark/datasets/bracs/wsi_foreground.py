@@ -97,6 +97,10 @@ def read_tile_region(
     ).convert("RGB")
     if level_size != TILE_SIZE:
         region = region.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS)
+    # Slide-wide ICC profiles (Aperio scanners: often several MB) ride along in
+    # openslide's per-region info dict; embedding the same profile in every
+    # tile bloats each PNG by orders of magnitude and isn't used downstream.
+    region.info.pop("icc_profile", None)
     return region
 
 

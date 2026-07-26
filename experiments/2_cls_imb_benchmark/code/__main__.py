@@ -6,6 +6,8 @@ import argparse
 import logging
 from collections.abc import Callable
 
+from PIL import PngImagePlugin
+
 from imbalance_benchmark.commands import (
     cmd_analyze,
     cmd_analyze_combine,
@@ -23,6 +25,11 @@ from imbalance_benchmark.commands import (
     cmd_tune_reduce,
     cmd_tune_shard,
 )
+
+
+# BRACS WSI tiles carry a large embedded scanner ICC profile (unused by this
+# pipeline) that overruns Pillow's default 1 MiB decompression-bomb guard.
+PngImagePlugin.MAX_TEXT_CHUNK = 50 * 1024 * 1024
 
 
 def _parser() -> argparse.ArgumentParser:
