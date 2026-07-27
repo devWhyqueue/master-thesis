@@ -127,20 +127,11 @@ def stability_floor_from_curve(
 
 
 def _pilot_dataset(
-    scratch_path: Path,
-    device: torch.device,
-    is_mil: bool,
-    bag_kwargs: dict[str, int] | None,
+    scratch_path: Path, device: torch.device, is_mil: bool
 ) -> BagFeatureDataset | ImbalanceDataset:
-    """Load the pilot's training manifest with the regime's fixed evidence controls."""
+    """Load the pilot's training manifest for the regime's prediction unit."""
     if is_mil:
-        controls = bag_kwargs or {}
-        return BagFeatureDataset(
-            scratch_path,
-            max_instances=controls.get("max_instances", 500),
-            instance_selection_seed=controls.get("instance_selection_seed", 0),
-            device=device,
-        )
+        return BagFeatureDataset(scratch_path, device=device)
     return ImbalanceDataset(scratch_path, device=device)
 
 
@@ -152,10 +143,9 @@ def fit_pilot_model(
     val_loader: torch.utils.data.DataLoader,
     initialization_seed: int,
     config: dict[str, Any] | None = None,
-    bag_kwargs: dict[str, int] | None = None,
 ) -> tuple[nn.Module, float]:
     """Construct reproducible pilot weights and fit the fixed CE baseline."""
-    dataset = _pilot_dataset(scratch_path, device, is_mil, bag_kwargs)
+    dataset = _pilot_dataset(scratch_path, device, is_mil)
     torch.manual_seed(initialization_seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(initialization_seed)

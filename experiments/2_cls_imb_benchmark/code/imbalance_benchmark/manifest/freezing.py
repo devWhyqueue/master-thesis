@@ -223,10 +223,6 @@ def _freeze_meta(
                 resolve_batch_size(config, is_mil),
             ),
         },
-        "evidence_caps": {
-            "wsi_instances": config.get("wsi_training", {}).get("max_instances", 500),
-        },
-        "instance_selection_seed": derive_seed(args.seed, "instance_selection"),
         "runtime_config": config,
         "conditions": native_conditions,
         "assignment_conditions": assignment_conditions,

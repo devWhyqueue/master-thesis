@@ -36,9 +36,6 @@ feature_extraction:
   dtype: float16
   device: auto
 
-wsi_training:
-  # Zero disables capping: use every eligible patch embedding in each WSI bag.
-  max_instances: 0
 
 slurm:
   # Absolute Hydra paths: jobs execute from the checkout on the cluster, not this PC.

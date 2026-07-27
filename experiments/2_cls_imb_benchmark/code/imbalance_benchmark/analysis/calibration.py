@@ -7,6 +7,7 @@ from scipy.optimize import minimize_scalar
 
 from imbalance_benchmark.analysis.metrics import (
     brier_score,
+    confidence_bin_index,
     expected_calibration_error,
     negative_log_likelihood,
 )
@@ -81,13 +82,13 @@ def reliability_curve(
     """Return bin centers, mean confidence, and accuracy per confidence bin."""
     confidence = probabilities.max(axis=1)
     predictions = probabilities.argmax(axis=1)
-    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_of_row = confidence_bin_index(confidence, n_bins)
     centers, mean_confidence, accuracy = [], [], []
-    for low, high in zip(bins[:-1], bins[1:], strict=False):
-        mask = (confidence > low) & (confidence <= high)
+    for b in range(n_bins):
+        mask = bin_of_row == b
         if not bool(mask.any()):
             continue
-        centers.append(0.5 * (low + high))
+        centers.append((b + 0.5) / n_bins)
         mean_confidence.append(float(confidence[mask].mean()))
         accuracy.append(float(np.mean(predictions[mask] == labels[mask])))
     return (

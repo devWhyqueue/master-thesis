@@ -15,6 +15,7 @@ from imbalance_benchmark.analysis.predictors.tier_summaries import tier_metrics
 
 __all__ = [
     "assign_tiers",
+    "confidence_bin_index",
     "negative_log_likelihood",
     "brier_score",
     "expected_calibration_error",
@@ -83,6 +84,18 @@ def brier_score(labels: np.ndarray, probabilities: np.ndarray, n_classes: int) -
     return float(np.mean(np.sum((probabilities - one_hot) ** 2, axis=1)))
 
 
+def confidence_bin_index(confidence: np.ndarray, n_bins: int = 10) -> np.ndarray:
+    """Assign confidences to the report's ``B`` fixed equal-width bins on [0, 1].
+
+    Single binning rule for every calibration summary (point ECE, reliability
+    diagrams, and the bootstrap's weighted ECE), so an interval never uses
+    different bins from the estimate it brackets. Bins are right-closed,
+    ``(low, high]``, which is the usual convention for confidences in (0, 1].
+    """
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    return np.digitize(confidence, edges[1:-1], right=True)
+
+
 def expected_calibration_error(
     labels: np.ndarray, probabilities: np.ndarray, n_bins: int = 10
 ) -> float:
@@ -91,10 +104,10 @@ def expected_calibration_error(
         return 0.0
     confidence = probabilities.max(axis=1)
     predictions = probabilities.argmax(axis=1)
-    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_of_row = confidence_bin_index(confidence, n_bins)
     error = 0.0
-    for low, high in zip(bins[:-1], bins[1:], strict=False):
-        mask = (confidence > low) & (confidence <= high)
+    for b in range(n_bins):
+        mask = bin_of_row == b
         if bool(mask.any()):
             accuracy = np.mean(predictions[mask] == labels[mask])
             error += float(mask.mean() * abs(accuracy - confidence[mask].mean()))

@@ -26,19 +26,12 @@ def load_training_dataset(
     split_name: str | None = None,
     device: str | torch.device = "cpu",
     class_names: list[str] | None = None,
-    bag_kwargs: dict[str, int] | None = None,
 ) -> TrainDataset:
     """Load one regime-appropriate CPU-resident frozen-feature dataset."""
     if not is_mil:
         return ImbalanceDataset(manifest_path, split_name, device, class_names)
-    controls = bag_kwargs or {}
     return BagFeatureDataset(
-        manifest_path,
-        split_name,
-        max_instances=controls.get("max_instances", 500),
-        instance_selection_seed=controls.get("instance_selection_seed", 0),
-        device=device,
-        class_names=class_names,
+        manifest_path, split_name, device=device, class_names=class_names
     )
 
 

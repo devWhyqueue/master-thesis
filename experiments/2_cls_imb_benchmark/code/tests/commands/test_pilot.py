@@ -17,10 +17,10 @@ from imbalance_benchmark.manifest.pilot import (
 from imbalance_benchmark.manifest.pilot_training import fit_pilot_model
 from typing import Any
 
-def test_pilot_training_receives_the_configured_wsi_evidence_controls(
+def test_pilot_training_uses_complete_bags_and_the_run_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """The WSI pilot must use the same fixed instance cap and training config."""
+    """The WSI pilot loads whole bags and trains under the run's own config."""
     observed: dict[str, Any] = {}
 
     class Dataset:
@@ -52,16 +52,11 @@ def test_pilot_training_receives_the_configured_wsi_evidence_controls(
         True,
         object(),
         initialization_seed=3,
-        config={"wsi_training": {"max_instances": 17, "bag_batch_size": 2}},
-        bag_kwargs={"max_instances": 17, "instance_selection_seed": 11},
+        config={"wsi_training": {"bag_batch_size": 2}},
     )
 
-    assert observed["bag_kwargs"] == {
-        "device": torch.device("cpu"),
-        "max_instances": 17,
-        "instance_selection_seed": 11,
-    }
-    assert observed["context"]["config"]["wsi_training"]["max_instances"] == 17
+    assert observed["bag_kwargs"] == {"device": torch.device("cpu")}
+    assert observed["context"]["config"]["wsi_training"]["bag_batch_size"] == 2
 
 def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> None:
     """Patch pilot levels count patients; the slide floor must not become a 20-patient floor."""

@@ -21,6 +21,7 @@ from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
 )
 from imbalance_benchmark.common import REPO_ROOT, compute_sha256, write_run_record
 from imbalance_benchmark.modeling.context import (
+    RunExposure,
     cost_payload,
     resolve_update_budget,
 )
@@ -187,13 +188,13 @@ def _run_and_record(
                 budget,
                 elapsed,
                 model,
-                len(ctx["train_dataset"]),
-                len(ctx.get("exposed_indices", set())),
-                int(ctx.get("processed_examples", 0)),
-                ctx.get("training_footprint_parameters"),
-                ctx.get("peak_memory_bytes"),
-                processed_instances=(
-                    int(ctx.get("processed_instances", 0)) if run.is_mil else None
+                RunExposure(
+                    len(ctx["train_dataset"]),
+                    len(ctx.get("exposed_indices", set())),
+                    int(ctx.get("processed_examples", 0)),
+                    ctx.get("training_footprint_parameters"),
+                    ctx.get("peak_memory_bytes"),
+                    int(ctx.get("processed_instances", 0)) if run.is_mil else None,
                 ),
             ),
             "method_diagnostics": ctx.get("method_diagnostics", {}),

@@ -14,7 +14,6 @@ SEED_ROLES = (
     "pilot_construction_1",
     "pilot_construction_2",
     "definitive_construction",
-    "instance_selection",
     "initialization",
     "resampling",
     "tuning_initialization_0",

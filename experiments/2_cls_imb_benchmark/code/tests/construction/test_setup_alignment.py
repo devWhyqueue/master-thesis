@@ -25,7 +25,7 @@ from imbalance_benchmark.manifest.construction_helpers import (
     cap_feasible_shared_total,
 )
 from imbalance_benchmark.manifest.freezing import _build_conditions
-from imbalance_benchmark.manifest.pilot import run_pilot_seed
+from imbalance_benchmark.manifest.pilot import PilotFit, run_pilot_seed
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
 
@@ -40,8 +40,8 @@ def test_pilot_construction_and_initialization_seeds_are_separate(
     )
     monkeypatch.setattr(
         "imbalance_benchmark.manifest.pilot.evaluate_pilot_candidate",
-        lambda *args, **kwargs: (
-            observed.append(kwargs["initialization_seed"]) or (0.5, [0.5])
+        lambda _df, _scratch, fit: (
+            observed.append(fit.initialization_seed) or (0.5, [0.5])
         ),
     )
 
@@ -51,13 +51,9 @@ def test_pilot_construction_and_initialization_seeds_are_separate(
         ["A"],
         [5],
         construction_seed,
-        object(),
-        torch.device("cpu"),
-        1,
-        False,
         tmp_path,
         1,
-        initialization_seed=101,
+        PilotFit(object(), torch.device("cpu"), 1, False, 101),
     )
 
     assert observed == [101]
@@ -78,34 +74,6 @@ def test_native_tail_order_uses_bracs_clinical_label_order() -> None:
         "DCIS",
         "IC",
     ]
-
-def test_bag_instance_cap_uses_the_frozen_selection_seed(tmp_path: Path) -> None:
-    feature = tmp_path / "slide.pt"
-    torch.save(torch.arange(24, dtype=torch.float32).reshape(12, 2), feature)
-    manifest = tmp_path / "manifest.csv"
-    pd.DataFrame(
-        [
-            {
-                "case_id": "case",
-                "slide_id": "slide",
-                "cancer_type": "A",
-                "feature_path": feature,
-            }
-        ]
-    ).to_csv(manifest, index=False)
-
-    first, _ = BagFeatureDataset(manifest, max_instances=4, instance_selection_seed=1)[
-        0
-    ]
-    repeat, _ = BagFeatureDataset(manifest, max_instances=4, instance_selection_seed=1)[
-        0
-    ]
-    second, _ = BagFeatureDataset(manifest, max_instances=4, instance_selection_seed=2)[
-        0
-    ]
-
-    assert torch.equal(first, repeat)
-    assert not torch.equal(first, second)
 
 def test_shared_total_keeps_all_naturally_balanced_support() -> None:
     available = [100, 100, 100]

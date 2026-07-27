@@ -7,7 +7,6 @@ import pandas as pd
 import torch
 
 from imbalance_benchmark.common import (
-    bag_dataset_kwargs,
     ensure_dirs,
     load_config,
     sign_file,
@@ -24,6 +23,7 @@ from imbalance_benchmark.datasets.features.provenance_lock import (
     verify_prepared_feature_provenance,
 )
 from imbalance_benchmark.manifest.pilot import (
+    PilotFit,
     frozen_pilot_quota,
     meets_method_floor,
     method_floor,
@@ -92,18 +92,12 @@ def _run_all_pilot_seeds(
 ]:
     """Run every pilot construction seed and collect its candidate-level curves."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    bag_kwargs = (
-        bag_dataset_kwargs(config, seed=derive_seed(base_seed, "instance_selection"))
-        if is_mil
-        else None
-    )
     val_ds: ImbalanceDataset | BagFeatureDataset = load_training_dataset(
         paths["data"] / "manifest.csv",
         is_mil,
         "validation",
         device=device,
         class_names=classes,
-        bag_kwargs=bag_kwargs,
     )
     scratch_dir = paths["data"] / "pilot"
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -116,21 +110,17 @@ def _run_all_pilot_seeds(
     if not is_mil:
         quota, levels = frozen_pilot_quota(train_df, classes, levels, pilot_seeds)
     quotas, ba_by_seed, recall_by_seed = {}, {}, {}
+    fit = PilotFit(
+        val_ds,
+        device,
+        n_cls,
+        is_mil,
+        derive_seed(base_seed, "initialization"),
+        config,
+    )
     for seed in pilot_seeds:
         _, ba_curve, recall_curve = run_pilot_seed(
-            train_df,
-            classes,
-            levels,
-            seed,
-            val_ds,
-            device,
-            n_cls,
-            is_mil,
-            scratch_dir,
-            quota,
-            initialization_seed=derive_seed(base_seed, "initialization"),
-            config=config,
-            bag_kwargs=bag_kwargs,
+            train_df, classes, levels, seed, scratch_dir, quota, fit
         )
         quotas[seed], ba_by_seed[seed], recall_by_seed[seed] = (
             quota,

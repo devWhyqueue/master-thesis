@@ -119,7 +119,7 @@ def _bag_ctx(
     method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3
 ) -> dict:
     manifest = _write_bag_manifest(tmp_path, n_classes=n_classes)
-    train_ds = BagFeatureDataset(manifest, max_instances=5)
+    train_ds = BagFeatureDataset(manifest)
     model_kwargs = {"input_dim": DIM, "hidden_dim": 8, "dropout": 0.0}
 
     def model_factory() -> torch.nn.Module:

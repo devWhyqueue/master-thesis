@@ -124,7 +124,7 @@ def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:
 
     assert total == 60
 
-def test_bag_dataset_concatenates_all_feature_chunks_before_capping(
+def test_bag_dataset_concatenates_every_feature_chunk_of_a_slide(
     tmp_path: Path,
 ) -> None:
     first, second = tmp_path / "first.pt", tmp_path / "second.pt"
@@ -148,11 +148,8 @@ def test_bag_dataset_concatenates_all_feature_chunks_before_capping(
         ]
     ).to_csv(manifest, index=False)
 
-    uncapped, _ = BagFeatureDataset(manifest, max_instances=0)[0]
-    bag, target = BagFeatureDataset(manifest, max_instances=5)[0]
+    bag, target = BagFeatureDataset(manifest)[0]
 
     assert target == 0
-    assert len(uncapped) == 7
-    assert uncapped.sum().item() == pytest.approx(44.0)
-    assert len(bag) == 5
-    assert bag.sum().item() == pytest.approx(32.0)
+    assert len(bag) == 7
+    assert bag.sum().item() == pytest.approx(44.0)

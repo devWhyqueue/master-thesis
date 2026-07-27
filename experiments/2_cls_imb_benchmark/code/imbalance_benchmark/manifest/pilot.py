@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 import numpy as np
@@ -32,6 +33,7 @@ ValDataset = ImbalanceDataset | BagFeatureDataset
 
 __all__ = [
     "PILOT_CANDIDATE_LEVELS",
+    "PilotFit",
     "pilot_levels_for",
     "compute_pilot_quota",
     "frozen_pilot_quota",
@@ -110,34 +112,37 @@ def _pilot_val_predictions(
     return torch.cat(preds).numpy(), torch.cat(targets).numpy()
 
 
+@dataclass(frozen=True)
+class PilotFit:
+    """The fixed balanced-CE fitting context every pilot candidate level shares."""
+
+    val_ds: ValDataset
+    device: torch.device
+    n_cls: int
+    is_mil: bool
+    initialization_seed: int
+    config: dict[str, object] | None = None
+
+
 def evaluate_pilot_candidate(
-    df: pd.DataFrame,
-    val_ds: ValDataset,
-    device: torch.device,
-    n_cls: int,
-    is_mil: bool,
-    scratch: Path,
-    initialization_seed: int,
-    config: dict[str, object] | None = None,
-    bag_kwargs: dict[str, int] | None = None,
+    df: pd.DataFrame, scratch: Path, fit: PilotFit
 ) -> tuple[float, list[float]]:
     """Fit one balanced-CE pilot candidate and return its validation BA and recalls."""
     df.to_csv(scratch, index=False)
     loader = torch.utils.data.DataLoader(
-        val_ds, batch_size=64, collate_fn=bag_collate if is_mil else None
+        fit.val_ds, batch_size=64, collate_fn=bag_collate if fit.is_mil else None
     )
     model, best_acc = fit_pilot_model(
         scratch,
-        device,
-        n_cls,
-        is_mil,
+        fit.device,
+        fit.n_cls,
+        fit.is_mil,
         loader,
-        initialization_seed=initialization_seed,
-        config=config,
-        bag_kwargs=bag_kwargs,
+        initialization_seed=fit.initialization_seed,
+        config=fit.config,
     )
-    preds, targets = _pilot_val_predictions(model, loader, device, is_mil)
-    return best_acc, per_class_recall(preds, targets, n_cls)
+    preds, targets = _pilot_val_predictions(model, loader, fit.device, fit.is_mil)
+    return best_acc, per_class_recall(preds, targets, fit.n_cls)
 
 
 def run_pilot_seed(
@@ -145,37 +150,20 @@ def run_pilot_seed(
     classes: list[str],
     levels: list[int],
     seed: int,
-    val_ds: ValDataset,
-    device: torch.device,
-    n_cls: int,
-    is_mil: bool,
     scratch_dir: Path,
     quota: int | None,
-    *,
-    initialization_seed: int,
-    config: dict[str, object] | None = None,
-    bag_kwargs: dict[str, int] | None = None,
+    fit: PilotFit,
 ) -> tuple[int | None, list[float], list[list[float]]]:
     """Run every nested candidate level for one pilot construction seed at the frozen quota."""
     ba_curve, recall_curve = [], []
     for level in levels:
         manifest = (
             mil_pilot_manifest(df, classes, level, seed)
-            if is_mil
+            if fit.is_mil
             else build_patch_pilot_manifest(df, classes, level, quota or 0, seed)
         )
         p = scratch_dir / f"pilot_seed={seed}_level={level}.csv"
-        ba, recalls = evaluate_pilot_candidate(
-            manifest,
-            val_ds,
-            device,
-            n_cls,
-            is_mil,
-            p,
-            initialization_seed=initialization_seed,
-            config=config,
-            bag_kwargs=bag_kwargs,
-        )
+        ba, recalls = evaluate_pilot_candidate(manifest, p, fit)
         ba_curve.append(ba)
         recall_curve.append(recalls)
     return quota, ba_curve, recall_curve

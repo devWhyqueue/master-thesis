@@ -10,7 +10,10 @@ from typing import Any, cast, Iterator
 
 import pandas as pd
 
-from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
+from imbalance_benchmark.analysis.inference.preflight import (
+    bootstrap_preflight,
+    require_valid_preflight,
+)
 from imbalance_benchmark.common import (
     compute_sha256,
     ensure_dirs,
@@ -173,23 +176,6 @@ def _freeze_metadata(
     )
 
 
-def _attach_preflight(
-    meta: dict[str, Any],
-    paths: dict[str, Path],
-    config: dict[str, Any],
-    seed: int,
-) -> None:
-    """Persist and content-hash the shared label-only bootstrap preflight."""
-    path = paths["data"] / "bootstrap_preflight.json"
-    preflight = _preflight(config, seed)
-    write_json(path, preflight)
-    meta["bootstrap_preflight"] = {
-        "path": str(path),
-        "sha256": compute_sha256(path),
-        "is_descriptive_only": preflight["is_descriptive_only"],
-    }
-
-
 def _attach_provenance(
     meta: dict[str, Any],
     paths: dict[str, Path],
@@ -220,6 +206,24 @@ def _write_exclusion(paths: dict[str, Path], minimum: int, requested: int) -> No
     )
 
 
+def _attach_preflight(
+    meta: dict[str, Any],
+    paths: dict[str, Path],
+    config: dict[str, Any],
+    seed: int,
+) -> None:
+    """Persist and content-hash the shared label-only bootstrap preflight."""
+    path = paths["data"] / "bootstrap_preflight.json"
+    preflight = _preflight(config, seed)
+    require_valid_preflight(preflight)
+    write_json(path, preflight)
+    meta["bootstrap_preflight"] = {
+        "path": str(path),
+        "sha256": compute_sha256(path),
+        "is_descriptive_only": preflight["is_descriptive_only"],
+    }
+
+
 def _preflight(config: dict[str, Any], seed: int) -> dict[str, Any]:
     """Build the joint test identity required by the frozen bootstrap preflight."""
     frames = []
@@ -229,7 +233,7 @@ def _preflight(config: dict[str, Any], seed: int) -> dict[str, Any]:
             frame = pd.read_csv(manifest)
             test = cast(pd.DataFrame, frame[frame["split"] == "test"])
             if config.get("dataset", {}).get("regime", "patch") == "wsi":
-                test = wsi_bootstrap_identity(test)
+                test = slide_level_identity(test)
             frames.append(test.assign(patient_split=index))
     if len(frames) != 3:
         raise RuntimeError(
@@ -243,8 +247,3 @@ def _preflight(config: dict[str, Any], seed: int) -> dict[str, Any]:
         len(identity),
     )
     return bootstrap_preflight(identity, n_replicates, derive_seed(seed, "resampling"))
-
-
-def wsi_bootstrap_identity(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return WSI bootstrap identities at the same one-row-per-slide unit as inference."""
-    return slide_level_identity(frame)

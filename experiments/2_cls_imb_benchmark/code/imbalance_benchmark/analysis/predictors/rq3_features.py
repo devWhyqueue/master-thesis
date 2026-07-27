@@ -18,12 +18,9 @@ def feature_frame(
     split: str | None,
     is_mil: bool,
     class_names: list[str] | None,
-    bag_kwargs: dict[str, int] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Load fixed embeddings and integer targets from one frozen manifest partition."""
-    dataset = load_training_dataset(
-        manifest, is_mil, split, class_names=class_names, bag_kwargs=bag_kwargs
-    )
+    dataset = load_training_dataset(manifest, is_mil, split, class_names=class_names)
     if is_mil:
         bags = cast(BagFeatureDataset, dataset)
         features = [np.r_[bag.mean(0).cpu(), bag.std(0).cpu()] for bag, _ in bags]
@@ -40,12 +37,9 @@ def feature_identity(
     split: str | None,
     is_mil: bool,
     class_names: list[str] | None,
-    bag_kwargs: dict[str, int] | None = None,
 ) -> pd.DataFrame:
     """Return identities in the same one-row-per-observation order as features."""
-    dataset = load_training_dataset(
-        manifest, is_mil, split, class_names=class_names, bag_kwargs=bag_kwargs
-    )
+    dataset = load_training_dataset(manifest, is_mil, split, class_names=class_names)
     return cast(pd.DataFrame, dataset.df[["case_id", "slide_id"]]).reset_index(
         drop=True
     )

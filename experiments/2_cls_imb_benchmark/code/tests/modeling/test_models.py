@@ -10,7 +10,7 @@ import torch
 from imbalance_benchmark.datasets.data import (
     ImbalanceDataset,
 )
-from imbalance_benchmark.modeling.context import cost_payload
+from imbalance_benchmark.modeling.context import RunExposure, cost_payload
 from imbalance_benchmark.modeling.context import set_training_mode
 from imbalance_benchmark.modeling.models import (
     AttentionMil,
@@ -93,9 +93,7 @@ def test_post_hoc_cost_has_no_trainable_network_parameters() -> None:
         3,
         0.0,
         torch.nn.Linear(2, 2),
-        4,
-        4,
-        0,
+        RunExposure(4, 4, 0),
     )
 
     assert cost["trainable_parameters"] == 0
@@ -107,10 +105,7 @@ def test_rankmix_cost_records_teacher_and_student_training_footprint() -> None:
         3,
         1.0,
         torch.nn.Linear(2, 2),
-        4,
-        4,
-        8,
-        training_footprint_parameters=12,
+        RunExposure(4, 4, 8, training_footprint_parameters=12),
     )
 
     assert cost["training_footprint_parameters"] == 12

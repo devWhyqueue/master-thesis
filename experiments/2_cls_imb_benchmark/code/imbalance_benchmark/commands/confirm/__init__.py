@@ -14,7 +14,6 @@ from imbalance_benchmark.modeling.workflows.confirmation import (
     confirm_post_hoc,
 )
 from imbalance_benchmark.common import (
-    bag_dataset_kwargs,
     ensure_dirs,
     load_config,
     split_paths,
@@ -49,10 +48,7 @@ def _confirm_condition(
         else f"manifest_{run.assignment}_{cond}.csv"
     )
     train_ds: TrainDataset = load_training_dataset(
-        run.paths["data"] / file_name,
-        run.is_mil,
-        class_names=run.class_names,
-        bag_kwargs=run.bag_dataset_kwargs,
+        run.paths["data"] / file_name, run.is_mil, class_names=run.class_names
     )
     cond_configs = require_tuning_configs(best_configs, methods)
     ce_states: list[tuple[dict[str, Any], int]] | None = None
@@ -82,20 +78,11 @@ def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
     config = freeze["runtime_config"]
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     class_names = list(freeze["class_names"])
-    bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
     test_ds = load_training_dataset(
-        paths["data"] / "manifest.csv",
-        is_mil,
-        "test",
-        class_names=class_names,
-        bag_kwargs=bag_kwargs,
+        paths["data"] / "manifest.csv", is_mil, "test", class_names=class_names
     )
     val_ds = load_training_dataset(
-        paths["data"] / "manifest.csv",
-        is_mil,
-        "validation",
-        class_names=class_names,
-        bag_kwargs=bag_kwargs,
+        paths["data"] / "manifest.csv", is_mil, "validation", class_names=class_names
     )
     val_ldr = build_evaluation_loader(val_ds, is_mil)
     test_ldr = build_evaluation_loader(test_ds, is_mil)
@@ -111,7 +98,6 @@ def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
         "test_loader": test_ldr,
         "paths": paths,
         "seeds": seeds,
-        "bag_dataset_kwargs": bag_kwargs or {},
         "update_budgets": freeze["update_budgets"],
         "feature_provenance": freeze.get("feature_provenance"),
     }

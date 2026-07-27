@@ -6,6 +6,8 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+from imbalance_benchmark.analysis.metrics import confidence_bin_index
+
 __all__ = [
     "build_strata",
     "resample_patient_weights",
@@ -219,8 +221,7 @@ def weighted_ece(
     """Fixed-binning ECE per replicate under the shared crossed patient weights."""
     confidence = probabilities.max(axis=1)
     correct = (probabilities.argmax(axis=1) == labels).astype(np.float64)
-    edges = np.linspace(0.0, 1.0, n_bins + 1)
-    bin_of_row = np.clip(np.digitize(confidence, edges[1:-1]), 0, n_bins - 1)
+    bin_of_row = confidence_bin_index(confidence, n_bins)
     total = weights.sums(1.0)
     out = np.zeros(weights.n_replicates, dtype=np.float64)
     for b in range(n_bins):

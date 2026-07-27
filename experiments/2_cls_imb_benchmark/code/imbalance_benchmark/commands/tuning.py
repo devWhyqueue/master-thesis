@@ -9,7 +9,6 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.common import (
-    bag_dataset_kwargs,
     compute_sha256,
     ensure_dirs,
     load_config,
@@ -63,13 +62,11 @@ def _tuning_inputs(
     verify_manifest_freeze(freeze)
     config = freeze["runtime_config"]
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    bag_kwargs = bag_dataset_kwargs(config, freeze) if is_mil else None
     val_ds = load_training_dataset(
         paths["data"] / "manifest.csv",
         is_mil,
         "validation",
         class_names=list(freeze["class_names"]),
-        bag_kwargs=bag_kwargs,
     )
     return (
         paths,
@@ -79,7 +76,6 @@ def _tuning_inputs(
             val_ds.get_n_classes(),
             is_mil,
             locked_class_names=list(freeze["class_names"]),
-            bag_dataset_kwargs=bag_kwargs or {},
             method_grids=freeze.get("method_grids", {}),
             update_budgets=freeze.get("update_budgets", {}),
         ),

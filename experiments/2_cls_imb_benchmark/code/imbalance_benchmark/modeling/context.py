@@ -29,6 +29,7 @@ __all__ = [
     "resolve_update_budget",
     "set_training_mode",
     "param_counts",
+    "RunExposure",
     "cost_payload",
     "updates_for",
 ]
@@ -122,7 +123,6 @@ class Regime:
     n_classes: int
     is_mil: bool
     locked_class_names: list[str] = field(default_factory=list, kw_only=True)
-    bag_dataset_kwargs: dict[str, int] = field(default_factory=dict, kw_only=True)
     method_grids: dict[str, list[dict[str, Any]]] = field(
         default_factory=dict, kw_only=True
     )
@@ -192,41 +192,49 @@ def _peak_memory(override: int | None) -> int:
     return int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
 
 
+@dataclass(frozen=True)
+class RunExposure:
+    """Exactly what one fitted run consumed, as recorded by its training loop."""
+
+    unique_examples: int
+    exposed_examples: int
+    processed_examples: int
+    training_footprint_parameters: int | None = None
+    peak_memory_bytes: int | None = None
+    processed_instances: int | None = None
+
+
 def cost_payload(
     method: str,
     budget: int,
     elapsed: float,
     model: torch.nn.Module,
-    unique_examples: int,
-    exposed_examples: int,
-    processed_examples: int,
-    training_footprint_parameters: int | None = None,
-    peak_memory_bytes: int | None = None,
-    processed_instances: int | None = None,
+    exposure: RunExposure,
 ) -> dict[str, Any]:
     """Build an exact confirmation cost record from the examples actually consumed."""
     updates = updates_for(method, budget)
-    peak = _peak_memory(peak_memory_bytes)
+    peak = _peak_memory(exposure.peak_memory_bytes)
     counts = param_counts(model)
     if method == "post_hoc_logit_adjustment":
         counts["trainable_parameters"] = 0
-    if training_footprint_parameters is not None:
-        counts["training_footprint_parameters"] = training_footprint_parameters
+    if exposure.training_footprint_parameters is not None:
+        counts["training_footprint_parameters"] = exposure.training_footprint_parameters
+    processed = exposure.processed_examples
     payload = {
         "updates": updates,
-        "processed_examples": processed_examples,
+        "processed_examples": processed,
         "wall_clock_seconds": elapsed,
         "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
         "peak_accelerator_memory_bytes": peak,
-        "examples_per_update": processed_examples / updates if updates else 0.0,
-        "unique_training_examples": unique_examples,
-        "unique_examples_exposed": exposed_examples,
-        "effective_passes_through_unique_examples": processed_examples
-        / max(unique_examples, 1),
+        "examples_per_update": processed / updates if updates else 0.0,
+        "unique_training_examples": exposure.unique_examples,
+        "unique_examples_exposed": exposure.exposed_examples,
+        "effective_passes_through_unique_examples": processed
+        / max(exposure.unique_examples, 1),
         **counts,
     }
-    if processed_instances is not None:
-        payload["processed_instances"] = processed_instances
+    if exposure.processed_instances is not None:
+        payload["processed_instances"] = exposure.processed_instances
     return payload
 
 

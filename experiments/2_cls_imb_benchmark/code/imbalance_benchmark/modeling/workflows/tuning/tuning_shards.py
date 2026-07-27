@@ -43,7 +43,6 @@ def combined_scopes(
                         paths["data"] / manifest,
                         regime.is_mil,
                         class_names=regime.locked_class_names,
-                        bag_kwargs=regime.bag_dataset_kwargs,
                     ),
                     records,
                     regime.update_budgets.get(

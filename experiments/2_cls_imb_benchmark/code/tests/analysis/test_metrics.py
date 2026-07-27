@@ -12,7 +12,7 @@ from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
-from imbalance_benchmark.modeling.context import cost_payload
+from imbalance_benchmark.modeling.context import RunExposure, cost_payload
 from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.modeling.training import _fit_step
 
@@ -385,9 +385,9 @@ def test_cost_uses_actual_processed_examples_for_partial_batches() -> None:
         budget=3,
         elapsed=1.0,
         model=torch.nn.Linear(2, 2),
-        unique_examples=10,
-        exposed_examples=10,
-        processed_examples=10,
+        exposure=RunExposure(
+            unique_examples=10, exposed_examples=10, processed_examples=10
+        ),
     )
 
     assert cost["processed_examples"] == 10
@@ -404,10 +404,12 @@ def test_post_hoc_cost_does_not_inherit_a_previous_gpu_memory_peak(
         budget=0,
         elapsed=0.0,
         model=torch.nn.Linear(2, 2),
-        unique_examples=4,
-        exposed_examples=0,
-        processed_examples=0,
-        peak_memory_bytes=0,
+        exposure=RunExposure(
+            unique_examples=4,
+            exposed_examples=0,
+            processed_examples=0,
+            peak_memory_bytes=0,
+        ),
     )
 
     assert cost["peak_accelerator_memory_bytes"] == 0

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 from typing import cast
 
@@ -18,21 +17,22 @@ from imbalance_benchmark.datasets.features import load_slide_features
 
 
 class BagFeatureDataset(Dataset):
-    """Multi-class WSI bags backed by frozen feature tensors."""
+    """Multi-class WSI bags backed by frozen feature tensors.
+
+    A bag is every eligible instance of its slide: the report's design fixes
+    bag content per slide across conditions and methods and reports processed
+    instances rather than truncating bags, so there is no instance cap.
+    """
 
     def __init__(
         self,
         manifest_path: str | Path,
         split_name: str | None = None,
-        max_instances: int | None = None,
-        instance_selection_seed: int = 0,
         device: str | torch.device = "cpu",
         class_names: list[str] | None = None,
     ) -> None:
         super().__init__()
         del device
-        self.max_instances = max_instances or None
-        self.instance_selection_seed = instance_selection_seed
         frame = cast(pd.DataFrame, pd.read_csv(manifest_path))
         if split_name is not None and "split" in frame.columns:
             frame = cast(
@@ -70,21 +70,7 @@ class BagFeatureDataset(Dataset):
         row = self.df.iloc[index]
         paths = list(dict.fromkeys(str(path) for path in row["feature_path"]))
         features = torch.cat([load_slide_features(path) for path in paths], dim=0)
-        if self.max_instances is not None and len(features) > self.max_instances:
-            features = features.index_select(
-                0, self._selected_indices(row, len(features))
-            )
         return features, self.class_to_idx[str(row["cancer_type"])]
-
-    def _selected_indices(self, row: pd.Series, count: int) -> torch.Tensor:
-        if self.instance_selection_seed == 0:
-            return torch.linspace(0, count - 1, self.max_instances).long()
-        digest = hashlib.sha256(
-            f"{self.instance_selection_seed}:{row['slide_id']}".encode()
-        ).digest()
-        rng = np.random.default_rng(int.from_bytes(digest[:8], "big"))
-        selected = np.sort(rng.choice(count, self.max_instances, replace=False))
-        return torch.as_tensor(selected, dtype=torch.long)
 
 
 def bag_collate(

@@ -176,6 +176,38 @@ def run_preflight(
     )
 
 
+_VALIDITY_CHECKS = {
+    "all_split_level_metrics_computable": (
+        "a split/class cell is unrepresented in some replicate"
+    ),
+    "identical_multiplicities_across_split_appearances": (
+        "a split unit received different multiplicities across its split appearances"
+    ),
+}
+
+
+def require_valid_preflight(preflight: dict[str, Any]) -> None:
+    """Raise when the label-only resampling scheme is itself invalid.
+
+    Report §"Uncertainty from split-unit resampling": failure of a preflight
+    check stops the analysis rather than silently discarding replicates. Weight
+    concentration is different in kind: it only designates the dataset--regime
+    descriptive, which ``is_descriptive_only`` carries forward instead.
+    """
+    failures = [
+        reason
+        for key, reason in _VALIDITY_CHECKS.items()
+        if not preflight.get(key, False)
+    ]
+    if failures:
+        raise RuntimeError(
+            "Label-only bootstrap preflight failed: "
+            + "; ".join(failures)
+            + ". Fix the resampling scheme before freezing; replicates must not "
+            "be discarded to make it pass."
+        )
+
+
 def bootstrap_preflight(
     identity: pd.DataFrame, n_replicates: int = 10_000, seed: int = 0
 ) -> dict[str, Any]:

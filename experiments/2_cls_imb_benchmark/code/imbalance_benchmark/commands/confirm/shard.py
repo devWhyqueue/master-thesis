@@ -57,7 +57,6 @@ def _confirm_unit_method(
         run.paths["data"] / _unit_manifest_name(cond, run.assignment),
         run.is_mil,
         class_names=run.class_names,
-        bag_kwargs=run.bag_dataset_kwargs,
     )
     configs = require_tuning_configs(best_configs, _required_methods(method))
     if method == "ce":

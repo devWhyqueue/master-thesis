@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 from imbalance_benchmark.analysis.predictors.rq3_cross_split import load_rq3_cells
-from imbalance_benchmark.common import bag_dataset_kwargs
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
     fit_gate_pass_model,
@@ -66,19 +65,18 @@ def _covariates(
     indicator) are descriptive covariates for the single-predictor sensitivity
     fits only.
     """
-    bag_kwargs = bag_dataset_kwargs({}, freeze) if is_mil else None
     class_names = list((freeze or {}).get("class_names", [])) or None
     ref_path = paths["data"] / "manifest_balanced.csv"
-    ref_x, ref_y = _feature_frame(ref_path, None, is_mil, class_names, bag_kwargs)
+    ref_x, ref_y = _feature_frame(ref_path, None, is_mil, class_names)
     val_x, val_y = _feature_frame(
-        paths["data"] / "manifest.csv", "validation", is_mil, class_names, bag_kwargs
+        paths["data"] / "manifest.csv", "validation", is_mil, class_names
     )
     n_classes = len(np.unique(ref_y))
     intrinsic = intrinsic_separability(ref_x, ref_y, val_x, val_y, n_classes)
     cond_path = Path(condition["path"])
     if not cond_path.exists():
         raise RuntimeError(f"Missing frozen controlled manifest for RQ3: {cond_path}")
-    cond_x, cond_y = _feature_frame(cond_path, None, is_mil, class_names, bag_kwargs)
+    cond_x, cond_y = _feature_frame(cond_path, None, is_mil, class_names)
     learnability = condition_learnability(cond_x, cond_y, val_x, val_y, n_classes)
     covariates = {
         "separability": float(intrinsic["linear_probe_macro_recall"]),
@@ -94,13 +92,11 @@ def _covariates(
                 np.log(_min_support(condition, "n_patients"))
             )
         return covariates
-    reference_frame = _feature_identity(ref_path, None, is_mil, class_names, bag_kwargs)
+    reference_frame = _feature_identity(ref_path, None, is_mil, class_names)
     margins = class_margin_cross_fit(
         ref_x, ref_y, reference_frame["case_id"].astype(str).to_numpy(), n_classes
     )
-    condition_frame = _feature_identity(
-        cond_path, None, is_mil, class_names, bag_kwargs
-    )
+    condition_frame = _feature_identity(cond_path, None, is_mil, class_names)
     effective = []
     for class_index in range(n_classes):
         reference_mask = ref_y == class_index

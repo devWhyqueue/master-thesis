@@ -18,6 +18,7 @@ from imbalance_benchmark.analysis.inference.permutation import (
 )
 from imbalance_benchmark.analysis.inference.preflight import (
     _class_preflight,
+    require_valid_preflight,
     run_preflight,
 )
 from imbalance_benchmark.analysis.predictors.rq3_analysis import (
@@ -28,7 +29,7 @@ from imbalance_benchmark.analysis.predictors.separability import (
     effective_support,
     intraclass_correlation,
 )
-from imbalance_benchmark.commands.freeze_execution import wsi_bootstrap_identity
+from imbalance_benchmark.datasets.data import slide_level_identity
 
 def _ce_gate_entry(descriptive_only: bool) -> dict[str, object]:
     return {
@@ -253,9 +254,29 @@ def test_wsi_preflight_uses_one_identity_row_per_slide() -> None:
         ]
     )
 
-    identity = wsi_bootstrap_identity(raw)
+    identity = slide_level_identity(raw)
 
     assert identity[["case_id", "slide_id", "cancer_type"]].to_dict("records") == [
         {"case_id": "p1", "slide_id": "s1", "cancer_type": "A"},
         {"case_id": "p2", "slide_id": "s2", "cancer_type": "B"},
     ]
+
+
+def test_freeze_stops_when_a_preflight_validity_check_fails() -> None:
+    """Setup: a failed preflight check stops the analysis, it is not just recorded.
+
+    Weight concentration is separate: it only marks the cell descriptive.
+    """
+    valid = {
+        "all_split_level_metrics_computable": True,
+        "identical_multiplicities_across_split_appearances": True,
+        "is_descriptive_only": True,
+    }
+    require_valid_preflight(valid)
+
+    for key in (
+        "all_split_level_metrics_computable",
+        "identical_multiplicities_across_split_appearances",
+    ):
+        with pytest.raises(RuntimeError, match="preflight failed"):
+            require_valid_preflight({**valid, key: False})
