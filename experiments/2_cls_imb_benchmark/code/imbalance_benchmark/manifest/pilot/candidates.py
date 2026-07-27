@@ -17,6 +17,7 @@ from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.manifest.pilot.training import (
     compute_pilot_quota,
+    eligible_patient_order,
     fit_pilot_model,
     frozen_pilot_quota,
     meets_method_floor,
@@ -27,7 +28,6 @@ from imbalance_benchmark.manifest.pilot.training import (
 from imbalance_benchmark.manifest.pilot.training import (
     _apportion_quota as apportion_quota,
 )
-from imbalance_benchmark.manifest.pilot.training import _patient_order as patient_order
 
 ValDataset = ImbalanceDataset | BagFeatureDataset
 
@@ -65,7 +65,7 @@ def build_patch_pilot_manifest(
     parts = []
     for cls in classes:
         df_class = cast(pd.DataFrame, df[df["cancer_type"] == cls])
-        pat = patient_order(df_class, seed)[:level]
+        pat = eligible_patient_order(df_class, quota, level, seed)
         sel = apportion_quota(df_class, pat, quota, seed)
         v = sel["case_id"].value_counts()
         if len(v) != level or not (v == quota).all():

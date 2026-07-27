@@ -51,23 +51,36 @@ def patch_pilot_caps_hold(selection: pd.DataFrame) -> bool:
     return patient_share <= 0.10 and slide_share <= 0.05
 
 
+def eligible_patient_order(
+    c_df: pd.DataFrame, quota: int, level: int, seed: int
+) -> list[str]:
+    """Seeded prefix of `level` patients whose own inventory can supply `quota`.
+
+    A patient with fewer than `quota` patches of the class cannot be asked
+    for that many, so eligibility is checked before taking the prefix rather
+    than after - this is what keeps a single low-inventory patient from
+    landing in a manifest built at a larger, frozen quota.
+    """
+    inventory = cast(pd.Series, c_df.groupby("case_id").size())
+    eligible_patients = cast(pd.Series, inventory[inventory >= quota]).index.tolist()
+    eligible_df = cast(pd.DataFrame, c_df[c_df["case_id"].isin(eligible_patients)])
+    return _patient_order(eligible_df, seed)[:level]
+
+
 def _class_pilot_quota(c_df: pd.DataFrame, level: int, seed: int) -> int:
     """Largest per-patient quota one class can supply to `level` eligible patients.
 
-    Eligibility for a candidate quota is inventory-based: a patient must hold at
-    least that many patches of the class to be selected at it. The scan starts
-    at the level-th order statistic of per-patient inventory (the largest quota
-    at least `level` patients can supply), not the minimum of a seed-chosen
-    prefix, so one low-inventory patient cannot by itself pin the quota to 1.
+    The scan starts at the level-th order statistic of per-patient inventory
+    (the largest quota at least `level` patients can supply), not the minimum
+    of a seed-chosen prefix, so one low-inventory patient cannot by itself
+    pin the quota to 1.
     """
     inventory = cast(pd.Series, c_df.groupby("case_id").size())
     if len(inventory) < level:
         raise ValueError("Pilot ordering failed.")
     max_q = int(inventory.sort_values(ascending=False).iloc[level - 1])
     for q in range(max_q, 0, -1):
-        eligible_patients = cast(pd.Series, inventory[inventory >= q]).index.tolist()
-        eligible_df = cast(pd.DataFrame, c_df[c_df["case_id"].isin(eligible_patients)])
-        pats = _patient_order(eligible_df, seed)[:level]
+        pats = eligible_patient_order(c_df, q, level, seed)
         if len(pats) < level:
             continue
         if patch_pilot_caps_hold(_apportion_quota(c_df, pats, q, seed)):

@@ -158,6 +158,46 @@ def test_pilot_quota_ignores_a_single_low_inventory_patient() -> None:
 
     assert quota == 30
 
+def test_patch_pilot_manifest_excludes_a_patient_too_scarce_for_the_frozen_quota() -> (
+    None
+):
+    """Building the manifest at the frozen quota must skip an ineligible patient.
+
+    ``compute_pilot_quota`` already ignores a low-inventory patient when
+    choosing the quota; ``build_patch_pilot_manifest`` must apply the same
+    inventory-based eligibility filter when it later selects patients at
+    that frozen quota, or the poisoned patient still lands in the level-10
+    prefix and cannot supply the required 30 patches.
+    """
+    rows = []
+    for patient in range(11):
+        for slide in range(2):
+            rows.extend(
+                {
+                    "case_id": f"p{patient}",
+                    "slide_id": f"p{patient}_s{slide}",
+                    "cancer_type": "A",
+                    "split": "train",
+                }
+                for _ in range(15)
+            )
+    rows.append(
+        {
+            "case_id": "p_poisoned",
+            "slide_id": "p_poisoned_s0",
+            "cancer_type": "A",
+            "split": "train",
+        }
+    )
+    frame = pd.DataFrame(rows)
+    quota = compute_pilot_quota(frame, ["A"], level=10, seed=0)
+
+    manifest = build_patch_pilot_manifest(frame, ["A"], level=10, quota=quota, seed=0)
+
+    assert "p_poisoned" not in set(manifest["case_id"])
+    assert manifest["case_id"].nunique() == 10
+    assert len(manifest) == 10 * quota
+
 def test_frozen_pilot_quota_drops_levels_the_cap_cannot_satisfy(monkeypatch) -> None:
     """The contribution cap tightens as the level shrinks, so a level no quota
     can satisfy is dropped rather than silently reused from a larger level."""
