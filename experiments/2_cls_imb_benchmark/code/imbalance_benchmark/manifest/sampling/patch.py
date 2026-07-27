@@ -152,6 +152,12 @@ def _pool_has_capacity(
     required_counts: tuple[int, ...],
     seed: int,
 ) -> bool:
+    """Every count must be selectable; only the largest must retain the whole pool.
+
+    A tail condition's smaller count is drawn *from* the pool, not required to
+    exhaust it - only the largest requested count fixes the pool's designated
+    patients and slides, since it is the one sized to need all of them.
+    """
     if not required_counts:
         return True
     pool = cast(
@@ -168,6 +174,7 @@ def _pool_has_capacity(
     # rebuild per count reproduces identical shuffles, so build once and hand each
     # probe its own copy of the consumable cursors instead of re-deriving them.
     pool_patients, hierarchy = _build_patch_hierarchy(pool, np.random.default_rng(seed))
+    maximum = max(required_counts)
     for count in required_counts:
         try:
             selected = _select_from_hierarchy(
@@ -175,9 +182,10 @@ def _pool_has_capacity(
             )
         except ValueError:
             return False
-        if not set(pool["case_id"]).issubset(selected["case_id"]) or not set(
-            pool["slide_id"]
-        ).issubset(selected["slide_id"]):
+        if count == maximum and (
+            not set(pool["case_id"]).issubset(selected["case_id"])
+            or not set(pool["slide_id"]).issubset(selected["slide_id"])
+        ):
             return False
     return True
 

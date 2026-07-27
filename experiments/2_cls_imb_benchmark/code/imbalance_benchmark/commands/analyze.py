@@ -10,8 +10,10 @@ from typing import Any, cast
 import pandas as pd
 
 from imbalance_benchmark.analysis.calibration import seed_averaged_reliability_curve
-from imbalance_benchmark.analysis.aggregate import (
+from imbalance_benchmark.analysis.aggregation.aggregate import (
     aggregate_split_comparisons,
+)
+from imbalance_benchmark.analysis.aggregation.equal_split_endpoints import (
     write_equal_split_endpoint_table,
 )
 from imbalance_benchmark.analysis.db import connect_db, init_schema

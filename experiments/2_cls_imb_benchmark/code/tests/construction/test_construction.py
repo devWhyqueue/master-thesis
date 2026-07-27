@@ -25,6 +25,7 @@ from imbalance_benchmark.construction import (
 )
 from imbalance_benchmark.construction import _allocation_is_feasible
 from imbalance_benchmark.manifest.construction_helpers import write_natural_condition
+from imbalance_benchmark.manifest.shared_total.severity import severity_aware_upper_bound
 from imbalance_benchmark.manifest.freeze import (
     achieved_rho,
     build_tail_assignments,
@@ -32,7 +33,7 @@ from imbalance_benchmark.manifest.freeze import (
     normalized_entropy,
     verify_manifest_freeze,
 )
-from imbalance_benchmark.manifest.pilot import (
+from imbalance_benchmark.manifest.pilot.candidates import (
     build_patch_pilot_manifest,
     compute_pilot_quota,
     method_floor,
@@ -477,6 +478,22 @@ def test_asymmetric_availability_keeps_the_largest_approximately_balanced_total(
     assert all(
         count <= capacity for count, capacity in zip(allocation, available, strict=True)
     )
+
+def test_severity_aware_upper_bound_covers_a_severe_heads_needed_total() -> None:
+    """The bound must not stay clipped to what a merely-balanced total needs.
+
+    ``max_shared_total`` for this fixture is tiny (driven by the scarcest
+    class, B at 40): it would leave no room for a severity profile whose head
+    class (A, 500 available) needs far more than that to realize ρ=100.
+    """
+    supports = {"A": 500, "B": 40}
+    assignments = {"native": ["A", "B"], "reversed": ["B", "A"]}
+
+    bound = severity_aware_upper_bound(supports, assignments, min_support=10, rho=100.0)
+
+    # native's head (A, available 500) needs (k-1)*min_support + min(500, 1000).
+    assert bound == 10 + 500
+    assert bound > max_shared_total([supports["A"], supports["B"]], min_support=10)
 
 def test_evidence_seed_is_stable_when_a_semantic_class_changes_tail_rank(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

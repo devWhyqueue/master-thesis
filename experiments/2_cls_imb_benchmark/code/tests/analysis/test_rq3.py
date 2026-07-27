@@ -489,6 +489,34 @@ def test_rq3_crossed_cell_uses_observed_point_not_bootstrap_mean() -> None:
     assert rec_out["recovery"] == pytest.approx(0.5)  # observed 1/2, not mean 1.25
     assert rec_out["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
+def test_rq3_crossed_cell_treats_a_near_zero_denominator_as_undefined() -> None:
+    """A tiny but nonzero deficit must not blow recovery up to an arbitrary value.
+
+    Finding: a denominator of 1e-9 produced recovery=-6.7e7, which then
+    silently entered ``load_rq3_cells``'s cross-split average. Only an exact
+    zero was previously guarded; this widens the guard to a tolerance.
+    """
+    from imbalance_benchmark.analysis.predictors.rq3_cross_split import _crossed_cell
+
+    gates = {("native", "severe", "discrimination"): True}
+    rec_cell = {
+        "assignment": "native",
+        "severity": "severe",
+        "method": "weighted_ce",
+        "gate": "discrimination",
+    }
+    rec_row = {
+        "bootstrap_numerator": [0.067, 4.0],
+        "bootstrap_denominator": [1e-9, 2.0],
+    }
+
+    rec_out = _crossed_cell(rec_cell, gates, rec_row)
+
+    assert np.isnan(rec_out["recovery"])
+    assert np.isnan(rec_out["recovery_se"]) or rec_out["recovery_se"] == pytest.approx(
+        0.0
+    )
+
 def test_cross_dataset_rq3_pools_groups_and_reports_stability() -> None:
     """RQ3's combined fit spans dataset-target groups with LODO and sensitivity fits."""
     from imbalance_benchmark.analysis.predictors.rq3_analysis import cross_dataset_rq3

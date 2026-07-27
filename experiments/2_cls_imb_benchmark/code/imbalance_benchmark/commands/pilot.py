@@ -22,7 +22,7 @@ from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.datasets.features.provenance_lock import (
     verify_prepared_feature_provenance,
 )
-from imbalance_benchmark.manifest.pilot import (
+from imbalance_benchmark.manifest.pilot.candidates import (
     PilotFit,
     frozen_pilot_quota,
     meets_method_floor,

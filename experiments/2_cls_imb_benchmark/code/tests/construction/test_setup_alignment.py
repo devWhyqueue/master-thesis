@@ -16,16 +16,14 @@ from imbalance_benchmark.analysis.inference.permutation import (
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.common import sign_file
-from imbalance_benchmark.construction import allocate_counts, max_shared_total
+from imbalance_benchmark.construction import allocate_counts, effective_rho, max_shared_total
 from imbalance_benchmark.construction import locked_class_names
-from imbalance_benchmark.manifest import construction_helpers
+from imbalance_benchmark.manifest.shared_total import search as shared_total_search
 from imbalance_benchmark.datasets.data import BagFeatureDataset
-from imbalance_benchmark.manifest.construction_helpers import (
-    _retains_fixed_pool,
-    cap_feasible_shared_total,
-)
+from imbalance_benchmark.manifest.construction_helpers import _retains_fixed_pool
+from imbalance_benchmark.manifest.shared_total.search import cap_feasible_shared_total
 from imbalance_benchmark.manifest.freezing import _build_conditions
-from imbalance_benchmark.manifest.pilot import PilotFit, run_pilot_seed
+from imbalance_benchmark.manifest.pilot.candidates import PilotFit, run_pilot_seed
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.workflows.confirmation import RunContext, confirm_ce
 
@@ -35,11 +33,11 @@ def test_pilot_construction_and_initialization_seeds_are_separate(
     observed: list[int] = []
 
     monkeypatch.setattr(
-        "imbalance_benchmark.manifest.pilot.build_patch_pilot_manifest",
+        "imbalance_benchmark.manifest.pilot.candidates.build_patch_pilot_manifest",
         lambda *_: pd.DataFrame(),
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.manifest.pilot.evaluate_pilot_candidate",
+        "imbalance_benchmark.manifest.pilot.candidates.evaluate_pilot_candidate",
         lambda _df, _scratch, fit: (
             observed.append(fit.initialization_seed) or (0.5, [0.5])
         ),
@@ -85,9 +83,14 @@ def test_shared_total_keeps_all_naturally_balanced_support() -> None:
         assert sum(allocation) == shared_total
         assert all(count <= support for count, support in zip(allocation, available))
 
-def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_one() -> (
-    None
-):
+def test_shared_total_prefers_severity_over_the_largest_balanced_total() -> None:
+    """A total right at the balanced ceiling can starve severity, not help it.
+
+    At ``max_shared_total`` (301 here), the balanced condition's equal share
+    already sits nearly at B/C's own availability (100), leaving them no
+    slack to shrink toward the floor for a severe profile - achieved severity
+    is *worse* there than at a slightly smaller, deliberately chosen total.
+    """
     frame = pd.DataFrame(
         [
             {
@@ -109,9 +112,20 @@ def test_shared_total_uses_one_extra_example_when_balanced_counts_can_differ_by_
         independent_floor=10,
     )
 
-    assert total == 301
+    assert total < max_shared_total([200, 100, 100], min_support=20)
+    severe_at_total = effective_rho([200, 100, 100], 100.0, min_support=20, total_t=total)
+    severe_at_balanced_ceiling = effective_rho(
+        [200, 100, 100], 100.0, min_support=20, total_t=301
+    )
+    assert severe_at_total > severe_at_balanced_ceiling
 
-def test_retains_fixed_pool_requires_every_designated_unit() -> None:
+def test_retains_fixed_pool_checks_full_designated_coverage() -> None:
+    """The primitive itself is unchanged: it still tests pool-vs-selection coverage.
+
+    What changed is *where* it is enforced - only the largest count a class
+    receives must satisfy it; see
+    ``test_pool_availability_lets_smaller_conditions_leave_units_unused``.
+    """
     pool = pd.DataFrame({"case_id": ["p1", "p2", "p3"], "slide_id": ["s1", "s2", "s3"]})
     smaller_condition = pool.iloc[:2]
 
@@ -120,6 +134,68 @@ def test_retains_fixed_pool_requires_every_designated_unit() -> None:
     assert not _retains_fixed_pool(
         pd.DataFrame({"case_id": ["p9"], "slide_id": ["s9"]}), pool
     )
+
+def test_pool_availability_lets_smaller_conditions_leave_units_unused(
+    tmp_path: Path,
+) -> None:
+    """Severity-skewed availability must still yield a controlled ratio > 1.
+
+    A scarce tail class's severe/moderate count can sit near the support
+    floor while its balanced count is far larger. The fixed pool is sized to
+    the largest count a class ever receives (here, balanced); the pool
+    availability invariant only requires *that* condition to retain every
+    designated unit, not the smaller ones too. Requiring every condition to
+    retain the same pool (the old, strict semantics) makes a scarce class's
+    pool contradictorily small for its own larger balanced count, which is
+    what collapsed BRACS patch splits 0/1 to an unachieved ratio of 1.
+    """
+    rows = [
+        {
+            "case_id": f"A-patient-{patient}",
+            "slide_id": f"A-slide-{patient}-{slide}",
+            "patch_id": f"A-{patient}-{slide}-{patch}",
+            "cancer_type": "A",
+            "split": "train",
+        }
+        for patient in range(40)
+        for slide in range(4)
+        for patch in range(5)
+    ] + [
+        {
+            "case_id": f"B-patient-{patient}",
+            "slide_id": f"B-slide-{patient}-{slide}",
+            "patch_id": f"B-{patient}-{slide}-{patch}",
+            "cancer_type": "B",
+            "split": "train",
+        }
+        for patient in range(15)
+        for slide in range(2)
+        for patch in range(3)
+    ]
+    frame = pd.DataFrame(rows)
+
+    total = cap_feasible_shared_total(frame, ["A", "B"], 20, False, 1)
+    conditions = _build_conditions(
+        frame, ["A", "B"], total, 20, False, 1, tmp_path, independent_floor=10
+    )
+
+    assert conditions["moderate"]["achieved_rho"] > 1.5
+    assert conditions["severe"]["achieved_rho"] >= conditions["moderate"]["achieved_rho"]
+    assert (
+        conditions["severe"]["allocated_counts"]["B"]
+        < conditions["balanced"]["allocated_counts"]["B"]
+    )
+
+    retained = {
+        name: pd.read_csv(condition["path"])
+        .groupby("cancer_type")[["case_id", "slide_id"]]
+        .agg(lambda values: frozenset(values))
+        for name, condition in conditions.items()
+    }
+    largest = max(conditions, key=lambda name: conditions[name]["allocated_counts"]["B"])
+    for name in conditions:
+        assert retained[name].loc["B", "case_id"] <= retained[largest].loc["B", "case_id"]
+        assert retained[name].loc["B", "slide_id"] <= retained[largest].loc["B", "slide_id"]
 
 def test_feasible_patch_total_builds_with_one_retained_pool(tmp_path: Path) -> None:
     rows = [
@@ -148,8 +224,21 @@ def test_feasible_patch_total_builds_with_one_retained_pool(tmp_path: Path) -> N
         .agg(lambda values: frozenset(values))
         for name, condition in conditions.items()
     }
-    assert retained_units["balanced"].equals(retained_units["moderate"])
-    assert retained_units["balanced"].equals(retained_units["severe"])
+    # Each condition draws from the class's fixed pool; only the condition with
+    # the largest count for a class must retain every designated unit in it.
+    for cls in ("A", "B"):
+        largest = max(
+            conditions, key=lambda name: conditions[name]["allocated_counts"][cls]
+        )
+        for name in conditions:
+            assert (
+                retained_units[name].loc[cls, "case_id"]
+                <= retained_units[largest].loc[cls, "case_id"]
+            )
+            assert (
+                retained_units[name].loc[cls, "slide_id"]
+                <= retained_units[largest].loc[cls, "slide_id"]
+            )
 
 def test_shared_total_search_handles_non_monotone_contribution_caps(
     monkeypatch: pytest.MonkeyPatch,
@@ -165,14 +254,14 @@ def test_shared_total_search_handles_non_monotone_contribution_caps(
         for slide in range(5 if patient < 5 else 4)
     ]
 
-    real_probe = construction_helpers._cap_feasible
+    real_probe = shared_total_search._cap_feasible
     probes = []
 
     def tracked_probe(*args):
         probes.append(1)
         return real_probe(*args)
 
-    monkeypatch.setattr(construction_helpers, "_cap_feasible", tracked_probe)
+    monkeypatch.setattr(shared_total_search, "_cap_feasible", tracked_probe)
     total = cap_feasible_shared_total(
         pd.DataFrame(rows), ["A", "B"], min_support=20, is_mil=True, seed=1
     )
@@ -267,10 +356,13 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
             "slide_id": f"{cls}_{index}",
             "patch_id": f"{cls}_{index}_patch",
             "cancer_type": cls,
-            "split": "train" if index < 30 else "test",
+            "split": "train" if index < train_n else "test",
         }
-        for cls in ("A", "B")
-        for index in range(40)
+        # Three classes, each comfortably above the 20-patch floor whichever
+        # role a tail assignment gives it, so moderate/severe can genuinely
+        # differ instead of both saturating the same head-capacity ceiling.
+        for cls, total, train_n in (("A", 340, 300), ("B", 240, 200), ("C", 190, 150))
+        for index in range(total)
     ]
     for split_index in range(3):
         data_dir = tmp_path / "outputs" / f"split={split_index}" / "data"

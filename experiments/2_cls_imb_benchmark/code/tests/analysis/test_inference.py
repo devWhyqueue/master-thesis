@@ -228,7 +228,7 @@ def test_preflight_is_descriptive_when_any_split_class_fails_kish_threshold() ->
 
 def test_descriptive_only_cell_never_opens_a_gate_or_permutes() -> None:
     """A preflight descriptive-only cell must skip gates and permutation p-values."""
-    from imbalance_benchmark.analysis.aggregate import _apply_gates
+    from imbalance_benchmark.analysis.aggregation.aggregate import _apply_gates
 
     def fake_p_value(
         entry, base_paths, config, seed

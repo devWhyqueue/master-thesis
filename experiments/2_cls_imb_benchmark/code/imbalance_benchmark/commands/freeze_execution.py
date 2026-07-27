@@ -23,10 +23,11 @@ from imbalance_benchmark.common import (
     verify_signed_file,
     write_json,
 )
-from imbalance_benchmark.manifest.construction_helpers import (
-    cap_feasible_shared_total,
-    class_support_counts,
+from imbalance_benchmark.manifest.construction_helpers import class_support_counts
+from imbalance_benchmark.manifest.shared_total.degenerate import (
+    reject_degenerate_conditions,
 )
+from imbalance_benchmark.manifest.shared_total.search import cap_feasible_shared_total
 from imbalance_benchmark.manifest.freeze import (
     build_tail_assignments,
     lock_manifest_freeze,
@@ -101,7 +102,15 @@ def _load_split_context(
         pilot_path, is_mil, counts
     )
     if excluded:
-        _write_exclusion(paths, min_sup, req_sup)
+        write_json(
+            paths["data"] / "confirmatory_exclusion.json",
+            {
+                "excluded": True,
+                "reason": "independent-support floor or patch contribution caps not met",
+                "min_support": min_sup,
+                "requested_min_support": req_sup,
+            },
+        )
         return None
     return (
         paths,
@@ -126,6 +135,7 @@ def freeze_split(args: argparse.Namespace) -> None:
         return
     with _phase("condition and tail-assignment construction"):
         meta = _freeze_metadata(args, *ctx)
+    reject_degenerate_conditions(meta)
     with _phase("bootstrap preflight"):
         _attach_preflight(meta, paths, config, args.seed)
     _attach_provenance(meta, paths, config, feature_provenance)
@@ -191,19 +201,6 @@ def _write_freeze_file(meta: dict[str, Any], freeze_path: Path) -> None:
     meta["path"] = str(freeze_path)
     write_json(freeze_path, lock_manifest_freeze(meta))
     sign_file(freeze_path)
-
-
-def _write_exclusion(paths: dict[str, Path], minimum: int, requested: int) -> None:
-    """Record an explicit confirmation exclusion for an infeasible split."""
-    write_json(
-        paths["data"] / "confirmatory_exclusion.json",
-        {
-            "excluded": True,
-            "reason": "independent-support floor or patch contribution caps not met",
-            "min_support": minimum,
-            "requested_min_support": requested,
-        },
-    )
 
 
 def _attach_preflight(

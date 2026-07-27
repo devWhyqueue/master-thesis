@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import logging
-import time
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import cast
 
 from pathlib import Path
@@ -12,25 +9,12 @@ from pathlib import Path
 import pandas as pd
 
 from imbalance_benchmark.common import compute_sha256
-from imbalance_benchmark.construction import (
-    allocate_counts,
-    effective_rho,
-    max_shared_total,
-)
-from imbalance_benchmark.manifest.sampling.patch import (
-    designate_patch_pool,
-    select_patches_round_robin,
-)
-from imbalance_benchmark.manifest.sampling.slide import select_slides_round_robin
+from imbalance_benchmark.construction import allocate_counts, effective_rho
+from imbalance_benchmark.manifest.sampling.patch import designate_patch_pool
 from imbalance_benchmark.manifest.statistics import (
     natural_contribution_stats,
     support_statistics,
 )
-from imbalance_benchmark.manifest.statistics.selection_capacity import (
-    feasible_selection_counts,
-)
-
-logger = logging.getLogger(__name__)
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 
@@ -104,139 +88,42 @@ def assignment_allocations(
     }
 
 
+def required_counts_by_class(
+    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
+) -> dict[str, set[int]]:
+    """Every allocated count observed per class, across conditions and assignments."""
+    required: dict[str, set[int]] = {}
+    for condition_sets in allocations.values():
+        for counts in condition_sets.values():
+            for class_name, count in counts.items():
+                required.setdefault(class_name, set()).add(count)
+    return required
+
+
 def designate_shared_patch_pools(
     train_df: pd.DataFrame,
     allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
     independent_floor: int,
     seed: int,
 ) -> dict[str, pd.DataFrame]:
-    """Designate one per-class pool that can realize every locked allocation."""
-    required: dict[str, set[int]] = {}
-    for condition_sets in allocations.values():
-        for counts in condition_sets.values():
-            for class_name, count in counts.items():
-                required.setdefault(class_name, set()).add(count)
+    """Designate one per-class pool that every locked allocation draws from.
+
+    The pool is sized to the largest count a class is ever assigned; smaller
+    counts (e.g. a tail condition's) draw from it without needing to exhaust
+    it, so ``max_pool_units`` must not be clipped to the smallest count.
+    """
+    required = required_counts_by_class(allocations)
     return {
         class_name: designate_patch_pool(
             cast(pd.DataFrame, train_df[train_df["cancer_type"] == class_name]),
             independent_floor,
             class_construction_seed(seed, class_name),
             max(counts),
-            max_pool_units=min(counts),
+            max_pool_units=max(independent_floor, max(counts)),
             required_counts=tuple(sorted(counts)),
         )
         for class_name, counts in required.items()
     }
-
-
-@dataclass(frozen=True)
-class _FeasibilityContext:
-    """Everything a feasibility probe needs except the ``total`` being tried."""
-
-    train_df: pd.DataFrame
-    is_mil: bool
-    seed: int
-    independent_floor: int
-    min_support: int
-    locked_assignments: Mapping[str, list[str]]
-    supports: Mapping[str, int]
-    feasible_counts: Mapping[str, set[int]]
-
-
-def _log_scan_progress(last_logged: float, total: int, start: int, floor: int) -> float:
-    if time.perf_counter() - last_logged <= 30:
-        return last_logged
-    logger.info("freeze: shared-total scan at %d (range [%d, %d])", total, floor, start)
-    return time.perf_counter()
-
-
-def _total_is_feasible(ctx: _FeasibilityContext, total: int) -> bool:
-    """Whether one candidate total is realizable under every selection cap."""
-    allocations = assignment_allocations(
-        ctx.train_df,
-        ctx.locked_assignments,
-        total,
-        ctx.min_support,
-        is_mil=ctx.is_mil,
-        supports=ctx.supports,
-    )
-    fits = all(
-        count in ctx.feasible_counts[class_name]
-        for condition_sets in allocations.values()
-        for counts in condition_sets.values()
-        for class_name, count in counts.items()
-    )
-    return fits and _cap_feasible(ctx, allocations)
-
-
-def cap_feasible_shared_total(
-    train_df: pd.DataFrame,
-    classes: list[str],
-    min_support: int,
-    is_mil: bool,
-    seed: int,
-    independent_floor: int = 10,
-    assignments: Mapping[str, list[str]] | None = None,
-) -> int:
-    """Find the largest controlled total that satisfies the actual unit caps."""
-    supports = class_support_counts(train_df, is_mil)
-    floor = len(classes) * min_support
-    start = max_shared_total([supports[name] for name in classes], min_support)
-    ctx = _FeasibilityContext(
-        train_df,
-        is_mil,
-        seed,
-        independent_floor,
-        min_support,
-        assignments or {"native": classes},
-        supports,
-        feasible_selection_counts(train_df, min_support, is_mil),
-    )
-    last_logged = time.perf_counter()
-    for total in range(start, floor - 1, -1):
-        last_logged = _log_scan_progress(last_logged, total, start, floor)
-        if _total_is_feasible(ctx, total):
-            return total
-    raise ValueError(
-        "No shared total satisfies the independent-support and contribution caps"
-    )
-
-
-def _cap_feasible(
-    ctx: _FeasibilityContext,
-    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
-) -> bool:
-    """Probe every condition allocation on its designated fixed patch pool."""
-    selector = select_slides_round_robin if ctx.is_mil else select_patches_round_robin
-    try:
-        pools = (
-            designate_shared_patch_pools(
-                ctx.train_df, allocations, ctx.independent_floor, ctx.seed
-            )
-            if not ctx.is_mil
-            else {}
-        )
-        for condition_sets in allocations.values():
-            for counts in condition_sets.values():
-                for name, count in counts.items():
-                    selected = selector(
-                        pools.get(
-                            name,
-                            cast(
-                                pd.DataFrame,
-                                ctx.train_df[ctx.train_df["cancer_type"] == name],
-                            ),
-                        ),
-                        count,
-                        class_construction_seed(ctx.seed, name),
-                    )
-                    if not ctx.is_mil and not _retains_fixed_pool(
-                        selected, pools[name]
-                    ):
-                        return False
-    except ValueError:
-        return False
-    return True
 
 
 def _retains_fixed_pool(selected: pd.DataFrame, pool: pd.DataFrame) -> bool:

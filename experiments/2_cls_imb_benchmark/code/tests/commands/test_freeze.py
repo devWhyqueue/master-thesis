@@ -158,6 +158,70 @@ def test_freeze_rejects_missing_dataset_provenance(tmp_path: Path) -> None:
             {"dataset": {"name": "synthetic", "regime": "patch"}},
         )
 
+def test_reject_degenerate_conditions_catches_achieved_rho_collapse() -> None:
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_degenerate_conditions,
+    )
+
+    meta = {
+        "conditions": {"balanced": {"allocated_counts": {"A": 70, "B": 70}}},
+        "assignment_conditions": {
+            "native": {
+                "moderate": {
+                    "achieved_rho": 1.0,
+                    "requested_rho": 10.0,
+                    "allocated_counts": {"A": 70, "B": 70},
+                    "limiting_class": "B",
+                    "binding_independent_support_constraint": "independent-support floor",
+                },
+                "severe": {
+                    "achieved_rho": 1.0,
+                    "requested_rho": 100.0,
+                    "allocated_counts": {"A": 70, "B": 70},
+                    "limiting_class": "B",
+                    "binding_independent_support_constraint": "independent-support floor",
+                },
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="Degenerate native/moderate"):
+        reject_degenerate_conditions(meta)
+
+def test_reject_degenerate_conditions_allows_a_capacity_bound_adversarial_assignment() -> (
+    None
+):
+    """An adversarial (e.g. reversed) assignment tying moderate to severe at a
+    real head-capacity ceiling is a data limit, not a null experiment - it
+    must not be confused with collapsing back to the balanced condition."""
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_degenerate_conditions,
+    )
+
+    meta = {
+        "conditions": {"balanced": {"allocated_counts": {"A": 70, "B": 70}}},
+        "assignment_conditions": {
+            "reversed": {
+                "moderate": {
+                    "achieved_rho": 3.5,
+                    "requested_rho": 10.0,
+                    "allocated_counts": {"A": 20, "B": 120},
+                    "limiting_class": "B",
+                    "binding_independent_support_constraint": "unique-support availability",
+                },
+                "severe": {
+                    "achieved_rho": 3.5,
+                    "requested_rho": 100.0,
+                    "allocated_counts": {"A": 20, "B": 120},
+                    "limiting_class": "B",
+                    "binding_independent_support_constraint": "unique-support availability",
+                },
+            }
+        },
+    }
+
+    reject_degenerate_conditions(meta)
+
 def test_dataset_provenance_requires_a_frozen_target() -> None:
     dataset = {
         "name": "panda",

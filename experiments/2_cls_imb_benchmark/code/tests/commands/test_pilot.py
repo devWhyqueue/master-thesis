@@ -8,13 +8,13 @@ import pytest
 import torch
 
 from imbalance_benchmark.commands.pilot import _pilot_report_payload
-from imbalance_benchmark.manifest.pilot import (
+from imbalance_benchmark.manifest.pilot.candidates import (
     build_patch_pilot_manifest,
     compute_pilot_quota,
     frozen_pilot_quota,
     meets_method_floor,
 )
-from imbalance_benchmark.manifest.pilot_training import fit_pilot_model
+from imbalance_benchmark.manifest.pilot.training import fit_pilot_model
 from typing import Any
 
 def test_pilot_training_uses_complete_bags_and_the_run_config(
@@ -34,7 +34,7 @@ def test_pilot_training_uses_complete_bags_and_the_run_config(
             return 2
 
     monkeypatch.setattr(
-        "imbalance_benchmark.manifest.pilot_training.BagFeatureDataset", Dataset
+        "imbalance_benchmark.manifest.pilot.training.BagFeatureDataset", Dataset
     )
 
     def fit_model(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
@@ -42,7 +42,7 @@ def test_pilot_training_uses_complete_bags_and_the_run_config(
         return {}, 0.5
 
     monkeypatch.setattr(
-        "imbalance_benchmark.manifest.pilot_training.fit_model", fit_model
+        "imbalance_benchmark.manifest.pilot.training.fit_model", fit_model
     )
 
     fit_pilot_model(
@@ -124,10 +124,44 @@ def test_pilot_quota_is_frozen_across_construction_orderings() -> None:
     assert all(frozen <= value for value in per_seed)
     assert feasible_levels == [10]
 
+def test_pilot_quota_ignores_a_single_low_inventory_patient() -> None:
+    """One patient with a single patch must not drag the whole class's quota to 1.
+
+    The candidate quota is the level-th order statistic of per-patient
+    inventory, and eligibility for it is inventory-based, so a scarce patient
+    is excluded from that level's pilot rather than pinning the quota for
+    everyone else.
+    """
+    rows = []
+    for patient in range(11):
+        for slide in range(2):
+            rows.extend(
+                {
+                    "case_id": f"p{patient}",
+                    "slide_id": f"p{patient}_s{slide}",
+                    "cancer_type": "A",
+                    "split": "train",
+                }
+                for _ in range(15)
+            )
+    rows.append(
+        {
+            "case_id": "p_poisoned",
+            "slide_id": "p_poisoned_s0",
+            "cancer_type": "A",
+            "split": "train",
+        }
+    )
+    frame = pd.DataFrame(rows)
+
+    quota = compute_pilot_quota(frame, ["A"], level=10, seed=0)
+
+    assert quota == 30
+
 def test_frozen_pilot_quota_drops_levels_the_cap_cannot_satisfy(monkeypatch) -> None:
     """The contribution cap tightens as the level shrinks, so a level no quota
     can satisfy is dropped rather than silently reused from a larger level."""
-    from imbalance_benchmark.manifest import pilot_training
+    from imbalance_benchmark.manifest.pilot import training as pilot_training
 
     def fake_compute(df, classes, level, seed):
         if level == 10:

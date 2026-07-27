@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from imbalance_benchmark.analysis.aggregate import require_complete_split_comparisons
+from imbalance_benchmark.analysis.aggregation.aggregate import (
+    require_complete_split_comparisons,
+    require_consistent_achieved_severity,
+)
 from imbalance_benchmark.analysis.db import (
     connect_db,
     discover_result_dirs,
@@ -535,6 +538,44 @@ def test_recovery_standard_error_uses_the_recovery_distribution() -> None:
     expected = float(np.nanstd(numerator / denominator, ddof=1))
     assert recovery_se == pytest.approx(expected)
     assert recovery_se != pytest.approx(effect_se)
+
+def test_require_consistent_achieved_severity_rejects_one_null_split_among_two_real(
+    tmp_path: Path,
+) -> None:
+    """Two real splits and one collapsed-to-balanced split must not be averaged."""
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index, achieved in enumerate([1.0, 10.0, 10.0]):
+        write_json(
+            split_paths(paths, index)["data"] / "manifest_freeze.json",
+            {
+                "assignment_conditions": {
+                    "native": {
+                        "severe": {"achieved_rho": achieved, "allocated_counts": {}}
+                    }
+                }
+            },
+        )
+
+    with pytest.raises(RuntimeError, match="differs materially"):
+        require_consistent_achieved_severity(paths)
+
+def test_require_consistent_achieved_severity_allows_modest_natural_variation(
+    tmp_path: Path,
+) -> None:
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index, achieved in enumerate([9.2, 10.0, 9.8]):
+        write_json(
+            split_paths(paths, index)["data"] / "manifest_freeze.json",
+            {
+                "assignment_conditions": {
+                    "native": {
+                        "severe": {"achieved_rho": achieved, "allocated_counts": {}}
+                    }
+                }
+            },
+        )
+
+    require_consistent_achieved_severity(paths)
 
 def test_cross_split_aggregation_requires_every_comparison_in_all_three_splits() -> (
     None

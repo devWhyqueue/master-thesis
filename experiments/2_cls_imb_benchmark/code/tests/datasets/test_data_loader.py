@@ -9,7 +9,7 @@ import torch
 from imbalance_benchmark.datasets import build_manifest
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 from imbalance_benchmark.datasets.data import ImbalanceDataset
-from imbalance_benchmark.manifest.construction_helpers import cap_feasible_shared_total
+from imbalance_benchmark.manifest.construction_helpers import class_support_counts
 from imbalance_benchmark.manifest.statistics import support_statistics
 
 def test_slide_statistics_count_mixed_label_slides_once_per_class() -> None:
@@ -98,7 +98,8 @@ def test_bag_dataset_rejects_multiple_labels_for_one_slide(tmp_path: Path) -> No
     with pytest.raises(ValueError, match="exactly one class"):
         BagFeatureDataset(manifest)
 
-def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:
+def test_mil_available_support_counts_unique_slides_not_feature_chunks() -> None:
+    """MIL availability is the number of slides, not one row per feature chunk."""
     frame = pd.DataFrame(
         [
             {
@@ -113,16 +114,7 @@ def test_mil_shared_total_counts_unique_slides_not_feature_chunks() -> None:
         ]
     )
 
-    total = cap_feasible_shared_total(
-        frame,
-        ["A", "B"],
-        min_support=20,
-        is_mil=True,
-        seed=1,
-        independent_floor=10,
-    )
-
-    assert total == 60
+    assert class_support_counts(frame, is_mil=True) == {"A": 30, "B": 30}
 
 def test_bag_dataset_concatenates_every_feature_chunk_of_a_slide(
     tmp_path: Path,

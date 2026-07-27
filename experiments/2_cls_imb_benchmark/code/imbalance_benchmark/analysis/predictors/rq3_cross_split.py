@@ -7,6 +7,13 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+# Mirrors gates.recovery's zero-deficit-is-undefined convention, widened from
+# an exact-zero check to a tolerance: a merely tiny denominator still blows
+# the ratio up to an arbitrarily large, meaningless recovery value (observed
+# in practice: minus tens of millions) that would otherwise silently enter
+# the cross-split average in load_rq3_cells.
+_NEAR_ZERO_DEFICIT = 1e-6
+
 
 def load_rq3_cells(analysis_roots: list[Path]) -> list[dict[str, Any]]:
     """Use crossed-bootstrap outcomes and equal split weights for RQ3 cells."""
@@ -108,9 +115,15 @@ def _crossed_cell(
         numerator = np.asarray(row["bootstrap_numerator"], dtype=float)
         denominator = np.asarray(row["bootstrap_denominator"], dtype=float)
         with np.errstate(divide="ignore", invalid="ignore"):
-            recovery = np.where(denominator != 0, numerator / denominator, np.nan)
+            recovery = np.where(
+                np.abs(denominator) > _NEAR_ZERO_DEFICIT,
+                numerator / denominator,
+                np.nan,
+            )
         updated["recovery"] = (
-            float(numerator[0] / denominator[0]) if denominator[0] != 0 else np.nan
+            float(numerator[0] / denominator[0])
+            if abs(denominator[0]) > _NEAR_ZERO_DEFICIT
+            else np.nan
         )
         updated["recovery_se"] = float(np.nanstd(recovery, ddof=1))
     return updated

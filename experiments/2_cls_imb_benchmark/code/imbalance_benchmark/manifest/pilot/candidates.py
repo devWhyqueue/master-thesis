@@ -15,7 +15,7 @@ from imbalance_benchmark.datasets.data import (
 )
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
-from imbalance_benchmark.manifest.pilot_training import (
+from imbalance_benchmark.manifest.pilot.training import (
     compute_pilot_quota,
     fit_pilot_model,
     frozen_pilot_quota,
@@ -24,10 +24,10 @@ from imbalance_benchmark.manifest.pilot_training import (
     patch_pilot_caps_hold,
     stability_floor_from_curve,
 )
-from imbalance_benchmark.manifest.pilot_training import (
+from imbalance_benchmark.manifest.pilot.training import (
     _apportion_quota as apportion_quota,
 )
-from imbalance_benchmark.manifest.pilot_training import _patient_order as patient_order
+from imbalance_benchmark.manifest.pilot.training import _patient_order as patient_order
 
 ValDataset = ImbalanceDataset | BagFeatureDataset
 

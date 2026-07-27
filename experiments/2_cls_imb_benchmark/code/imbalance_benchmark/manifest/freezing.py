@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -24,6 +25,7 @@ from imbalance_benchmark.manifest.construction_helpers import (
     class_construction_seed,
     class_support_counts,
     designate_shared_patch_pools,
+    required_counts_by_class,
     write_natural_condition,
 )
 from imbalance_benchmark.manifest.statistics import evidence_pool_hash
@@ -67,6 +69,7 @@ def _build_conditions(
     condition_names: tuple[str, ...] = tuple(CONDITION_RHOS),
     independent_floor: int | None = None,
     fixed_pools: dict[str, pd.DataFrame] | None = None,
+    max_required_counts: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     """Construct cap-compliant controlled manifests from one fixed eligible pool."""
     counts = class_support_counts(train_df, is_mil)
@@ -81,24 +84,26 @@ def _build_conditions(
         )
         for name in condition_names
     }
+    local_allocations = {
+        "current": {
+            name: dict(zip(classes, allocation, strict=True))
+            for name, allocation in allocations.items()
+        }
+    }
     fixed_pools = fixed_pools or (
         {
             cls: designate_shared_patch_pools(
-                train_df,
-                {
-                    "current": {
-                        name: dict(zip(classes, allocation, strict=True))
-                        for name, allocation in allocations.items()
-                    }
-                },
-                independent_floor or 10,
-                seed,
+                train_df, local_allocations, independent_floor or 10, seed
             )[cls]
             for cls in classes
         }
         if not is_mil
         else {}
     )
+    max_required = max_required_counts or {
+        class_name: max(counts)
+        for class_name, counts in required_counts_by_class(local_allocations).items()
+    }
     pool_df = (
         pd.concat(fixed_pools.values(), ignore_index=True) if fixed_pools else train_df
     )
@@ -120,9 +125,10 @@ def _build_conditions(
             for idx, cls in enumerate(classes)
         ]
         if not is_mil and independent_floor is not None:
-            for cls, selected in zip(classes, rows, strict=True):
-                pool = fixed_pools[cls]
-                if not _retains_fixed_pool(selected, pool):
+            for idx, cls in enumerate(classes):
+                if allocated[idx] != max_required[cls]:
+                    continue
+                if not _retains_fixed_pool(rows[idx], fixed_pools[cls]):
                     raise ValueError(
                         "Controlled patch allocation does not retain its fixed evidence pool"
                     )
@@ -164,13 +170,21 @@ def _freeze_meta(
         ordinal=str(config.get("dataset", {}).get("name", "")) == "panda"
         and bool(config.get("dataset", {}).get("regime", "patch") == "wsi"),
     )
+    full_allocations = assignment_allocations(
+        train_df, assignments, shared_t, min_support
+    )
     shared_pools = (
         designate_shared_patch_pools(
-            train_df,
-            assignment_allocations(train_df, assignments, shared_t, min_support),
-            independent_floor,
-            construction_seed,
+            train_df, full_allocations, independent_floor, construction_seed
         )
+        if not is_mil
+        else None
+    )
+    max_required = (
+        {
+            class_name: max(counts)
+            for class_name, counts in required_counts_by_class(full_allocations).items()
+        }
         if not is_mil
         else None
     )
@@ -187,6 +201,7 @@ def _freeze_meta(
             condition_names=("moderate", "severe"),
             independent_floor=independent_floor,
             fixed_pools=shared_pools,
+            max_required_counts=max_required,
         )
         for assignment, order in assignments.items()
     }
@@ -201,6 +216,7 @@ def _freeze_meta(
         condition_names=("balanced",),
         independent_floor=independent_floor,
         fixed_pools=shared_pools,
+        max_required_counts=max_required,
     )
     return {
         "class_names": classes,
