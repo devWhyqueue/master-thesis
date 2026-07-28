@@ -6,7 +6,7 @@ from typing import Any
 import torch
 from torch.utils.data import DataLoader
 
-from imbalance_benchmark.datasets.data import TrainDataset, bag_collate
+from imbalance_benchmark.datasets.data import TrainDataset, bag_collate, patch_collate
 from imbalance_benchmark.modeling.context import REFERENCE_PASSES, model_kwargs
 
 __all__ = [
@@ -34,7 +34,7 @@ def build_evaluation_loader(dataset: TrainDataset, is_mil: bool) -> DataLoader:
         batch_size=(
             MIL_EVALUATION_BATCH_SIZE if is_mil else PATCH_EVALUATION_BATCH_SIZE
         ),
-        collate_fn=bag_collate if is_mil else None,
+        collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
         pin_memory=torch.cuda.is_available(),
     )
 

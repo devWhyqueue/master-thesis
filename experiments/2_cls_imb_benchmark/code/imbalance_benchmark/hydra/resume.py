@@ -106,7 +106,8 @@ def _controlled_bundle_complete(
             spec = requested_shard(
                 shard_index, "base", "controlled", is_mil, freeze["method_grids"], None
             )
-            assert spec is not None
+            if spec is None:
+                continue
             load_candidate(
                 base["data"],
                 spec,

@@ -6,7 +6,7 @@ import torch
 
 from imbalance_benchmark.datasets.data.bag import BagFeatureDataset, bag_collate
 from imbalance_benchmark.datasets.data.common import slide_level_identity
-from imbalance_benchmark.datasets.data.patch import ImbalanceDataset
+from imbalance_benchmark.datasets.data.patch import ImbalanceDataset, patch_collate
 from imbalance_benchmark.datasets.features import load_feature_row
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "ImbalanceDataset",
     "BagFeatureDataset",
     "bag_collate",
+    "patch_collate",
     "slide_level_identity",
     "load_training_dataset",
     "TrainDataset",

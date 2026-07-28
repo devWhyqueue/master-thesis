@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
-from imbalance_benchmark.datasets.data import bag_collate
+from imbalance_benchmark.datasets.data import bag_collate, patch_collate
 from imbalance_benchmark.modeling.context import (
     REFERENCE_PASSES,
     resolve_update_budget,
@@ -150,7 +150,7 @@ def _build_train_loader(
         return DataLoader(
             ctx["train_dataset"],
             batch_sampler=sampler,
-            collate_fn=bag_collate if is_mil else None,
+            collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
             pin_memory=torch.cuda.is_available(),
         )
     gen = torch.Generator().manual_seed(ctx["seed"])
@@ -164,7 +164,7 @@ def _build_train_loader(
         ctx["train_dataset"],
         batch_size=b_size,
         sampler=_RecordingSampler(base, exposed),
-        collate_fn=bag_collate if is_mil else None,
+        collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
         pin_memory=torch.cuda.is_available(),
     )
 

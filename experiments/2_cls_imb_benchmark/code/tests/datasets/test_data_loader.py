@@ -76,6 +76,56 @@ def test_patch_dataset_keeps_features_on_cpu_until_batch_transfer(
 
     assert sample["features"].device.type == "cpu"
 
+def test_getitems_matches_stacked_getitem_for_arbitrary_indices(
+    tmp_path: Path,
+) -> None:
+    manifest = tmp_path / "manifest.csv"
+    shared = tmp_path / "shared.pt"
+    torch.save(torch.arange(12, dtype=torch.float32).reshape(3, 4), shared)
+    solo = tmp_path / "solo.pt"
+    torch.save(torch.full((1, 4), 9.0), solo)
+    rows = [
+        {
+            "case_id": "p0",
+            "slide_id": "s0",
+            "cancer_type": "A",
+            "feature_path": shared,
+            "feature_index": 0,
+        },
+        {
+            "case_id": "p0",
+            "slide_id": "s0",
+            "cancer_type": "A",
+            "feature_path": shared,
+            "feature_index": 1,
+        },
+        {
+            "case_id": "p1",
+            "slide_id": "s1",
+            "cancer_type": "B",
+            "feature_path": shared,
+            "feature_index": 2,
+        },
+        {
+            "case_id": "p2",
+            "slide_id": "s2",
+            "cancer_type": "B",
+            "feature_path": solo,
+        },
+    ]
+    pd.DataFrame(rows).to_csv(manifest, index=False)
+    dataset = ImbalanceDataset(manifest)
+    indices = [3, 0, 2, 1, 0]
+
+    batched = dataset.__getitems__(indices)
+
+    stacked_features = torch.stack([dataset[i]["features"] for i in indices])
+    stacked_targets = torch.tensor(
+        [dataset[i]["target"] for i in indices], dtype=torch.long
+    )
+    torch.testing.assert_close(batched["features"], stacked_features)
+    torch.testing.assert_close(batched["target"], stacked_targets)
+
 def test_bag_dataset_rejects_multiple_labels_for_one_slide(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.csv"
     pd.DataFrame(

@@ -9,6 +9,7 @@ import torch
 
 from imbalance_benchmark.datasets.data import (
     ImbalanceDataset,
+    patch_collate,
 )
 from imbalance_benchmark.modeling.context import RunExposure, cost_payload
 from imbalance_benchmark.modeling.context import set_training_mode
@@ -74,7 +75,9 @@ def _patch_ctx(
         "model": model_factory(),
         "model_factory": model_factory,
         "train_dataset": train_ds,
-        "val_loader": torch.utils.data.DataLoader(train_ds, batch_size=8),
+        "val_loader": torch.utils.data.DataLoader(
+            train_ds, batch_size=8, collate_fn=patch_collate
+        ),
         "device": torch.device("cpu"),
         "config": {"patch_training": {"batch_size": 8}},
         "param_config": {"lr": 1e-3, "parameter": param}

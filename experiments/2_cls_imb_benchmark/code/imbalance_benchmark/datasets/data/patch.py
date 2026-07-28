@@ -13,6 +13,7 @@ from imbalance_benchmark.datasets.data.common import (
     validate_class_names,
 )
 from imbalance_benchmark.datasets.features import load_feature_row
+from imbalance_benchmark.datasets.features.cache import bank_index, feature_rows
 
 
 class ImbalanceDataset(Dataset):
@@ -47,6 +48,8 @@ class ImbalanceDataset(Dataset):
         self.patch_ids = (
             frame["patch_id"].tolist() if "patch_id" in frame else [None] * len(frame)
         )
+        self.rows = feature_rows(self.feature_paths, self.feature_indices)
+        self.targets = torch.tensor(self.get_int_targets(), dtype=torch.long)
 
     @staticmethod
     def _feature_indices(frame: pd.DataFrame) -> list[int | None]:
@@ -81,3 +84,20 @@ class ImbalanceDataset(Dataset):
             "target": self.class_to_idx[target_name],
             "patch_id": patch_id,
         }
+
+    def __getitems__(self, indices: list[int]) -> dict[str, Any]:
+        """Return an already-collated batch; pair with :func:`patch_collate`.
+
+        ``DataLoader`` calls this instead of ``__getitem__`` + per-item collate
+        whenever it is present, so this is the fast path every patch-regime
+        loader must use.
+        """
+        return {
+            "features": bank_index(self.rows[indices]),
+            "target": self.targets[indices],
+        }
+
+
+def patch_collate(batch: dict[str, Any]) -> dict[str, Any]:
+    """Identity collate for :class:`ImbalanceDataset`: ``__getitems__`` already batches."""
+    return batch

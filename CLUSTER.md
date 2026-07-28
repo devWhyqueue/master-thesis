@@ -241,5 +241,6 @@ Keep the repo at `~/master-thesis` (clone: `git clone --depth 1 https://github.c
 - Do not modify or remove shared datasets unless you created the specific files yourself.
 - Prefer Apptainer and SquashFS over many small files.
 - Never cancel jobs you did not start unless explicitly asked.
+- Keep queued+running jobs at or under 100 per account (`squeue -u $USER | wc -l`) — colleagues share the cluster; shrink array/bundle size or stage submissions instead of flooding the queue.
 - Use job-id-specific log names.
 - Keep upstream docs as the source of truth when cluster behavior changes.

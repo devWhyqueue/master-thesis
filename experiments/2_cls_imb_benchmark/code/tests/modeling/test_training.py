@@ -11,6 +11,7 @@ from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
     bag_collate,
+    patch_collate,
 )
 from imbalance_benchmark.modeling.models import (
     AttentionMil,
@@ -103,7 +104,9 @@ def _patch_ctx(
         "model": model_factory(),
         "model_factory": model_factory,
         "train_dataset": train_ds,
-        "val_loader": torch.utils.data.DataLoader(train_ds, batch_size=8),
+        "val_loader": torch.utils.data.DataLoader(
+            train_ds, batch_size=8, collate_fn=patch_collate
+        ),
         "device": torch.device("cpu"),
         "config": {"patch_training": {"batch_size": 8}},
         "param_config": {"lr": 1e-3, "parameter": param}
@@ -199,7 +202,9 @@ def test_large_patch_evaluation_batches_preserve_metrics(tmp_path: Path) -> None
     dataset = ImbalanceDataset(_write_patch_manifest(tmp_path, n_classes=2, per_class=3))
     model = MLP(DIM, 8, 2, dropout=0.0)
     optimized = build_evaluation_loader(dataset, is_mil=False)
-    reference = torch.utils.data.DataLoader(dataset, batch_size=2)
+    reference = torch.utils.data.DataLoader(
+        dataset, batch_size=2, collate_fn=patch_collate
+    )
     optimized_result = run_evaluation(
         model, optimized, torch.device("cpu"), False, 2
     )
