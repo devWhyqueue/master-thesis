@@ -101,3 +101,44 @@ def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
 def test_missing_tuning_selection_stops_confirmation() -> None:
     with pytest.raises(RuntimeError, match="missing tuning selection"):
         require_tuning_configs({"ce": {"lr": 1e-3}}, ("ce", "weighted_ce"))
+
+def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bundle's cached scopes must share one cost_records list per shard.
+
+    Regression: giving each cached scope its own fresh ``[]`` left
+    ``scopes[0].cost_records`` empty whenever ``_fit_payload`` evaluated an
+    observation on a different scope index, failing
+    ``validate_shard_payload`` in production after a full natural-condition
+    fit had already run.
+    """
+    regime = Regime(torch.device("cpu"), {}, 2, False)
+    base_scopes = [
+        TuningScope(regime, object(), object(), split_index=i) for i in range(3)
+    ]
+    monkeypatch.setattr(tuning, "condition_is_reusable", lambda *_: False)
+    monkeypatch.setattr(tuning, "combined_scopes", lambda *_a, **_k: base_scopes)
+    captured: list[list[TuningScope]] = []
+
+    def fake_run_candidate_shard(spec, scopes, seeds, fingerprint, output_root, stage):
+        del spec, seeds, fingerprint, output_root, stage
+        captured.append(scopes)
+
+    monkeypatch.setattr(tuning, "run_candidate_shard", fake_run_candidate_shard)
+    freeze = {
+        "seed_roles": {"tuning_initialization_0": 1, "tuning_initialization_1": 2},
+        "tail_assignments": {"native": []},
+    }
+    spec = tuning.ShardSpec("natural", "ce", 0, "base", observation_index=0)
+    built: dict = {}
+
+    base = {"data": None}
+    tuning._run_shard(base, [(None, regime, None)], freeze, ["fp"], built, spec)
+    tuning._run_shard(base, [(None, regime, None)], freeze, ["fp"], built, spec)
+
+    first, second = captured
+    assert len({id(s.cost_records) for s in first}) == 1
+    assert len({id(s.cost_records) for s in second}) == 1
+    assert first[0].cost_records is not second[0].cost_records
+    assert first[0].cost_records == [] and second[0].cost_records == []

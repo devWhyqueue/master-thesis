@@ -214,9 +214,10 @@ def _run_shard(
     key = (spec.condition, scoped)
     if key not in built:
         built[key] = combined_scopes(raw_scopes, spec.condition, scoped, [])
+    fresh_cost_records: list[dict[str, int]] = []
     run_candidate_shard(
         spec,
-        [replace(scope, cost_records=[]) for scope in built[key]],
+        [replace(scope, cost_records=fresh_cost_records) for scope in built[key]],
         _tuning_seeds(freeze),
         fingerprint,
         base["data"],
