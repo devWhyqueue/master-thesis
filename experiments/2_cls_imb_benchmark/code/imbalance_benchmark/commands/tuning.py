@@ -41,7 +41,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import (
     _bundle_indices,
-    run_shard_bundle,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
@@ -221,21 +220,17 @@ def _run_shard(
 
 def cmd_tune_shard(args: argparse.Namespace) -> None:
     """Run one resumable frozen-candidate shard."""
-    is_mil = load_config(args.config).get("dataset", {}).get("regime") == "wsi"
-    if is_mil and args.shards_per_task > 1:
-        _run_shards(
-            args,
-            _bundle_indices(
-                args.shard_index,
-                args.shards_per_task,
-                args.observations_per_candidate,
-                args.bundle_by_observation,
-            ),
-        )
-        return
-    if run_shard_bundle(args):
-        return
-    _run_shards(args, [args.shard_index])
+    if args.shards_per_task < 1:
+        raise ValueError("shards-per-task must be positive")
+    _run_shards(
+        args,
+        _bundle_indices(
+            args.shard_index,
+            args.shards_per_task,
+            args.observations_per_candidate,
+            args.bundle_by_observation,
+        ),
+    )
 
 
 def cmd_tune_reduce(args: argparse.Namespace) -> None:

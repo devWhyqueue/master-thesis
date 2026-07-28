@@ -3,21 +3,11 @@ from __future__ import annotations
 from argparse import Namespace
 
 from imbalance_benchmark.commands import tuning
-from imbalance_benchmark.modeling.workflows.tuning import tuning_bundle
 from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import _bundle_indices
 
 
-def test_bundle_launches_each_shard_once_without_recursive_bundling(monkeypatch) -> None:
-    commands: list[list[str]] = []
-
-    class Process:
-        def __init__(self, command: list[str]) -> None:
-            commands.append(command)
-
-        def wait(self) -> int:
-            return 0
-
-    monkeypatch.setattr(tuning_bundle.subprocess, "Popen", Process)
+def test_patch_bundle_runs_exact_shards_sequentially(monkeypatch) -> None:
+    calls: list[tuple[Namespace, list[int]]] = []
     args = Namespace(
         config="config.yaml",
         phase="base",
@@ -29,13 +19,13 @@ def test_bundle_launches_each_shard_once_without_recursive_bundling(monkeypatch)
         shards_per_task=8,
         bundle_by_observation=False,
     )
+    monkeypatch.setattr(
+        tuning, "_run_shards", lambda received, indices: calls.append((received, indices))
+    )
 
-    assert tuning_bundle.run_shard_bundle(args)
-    indices = [
-        int(command[command.index("--shard-index") + 1]) for command in commands
-    ]
-    assert indices == list(range(24, 32))
-    assert all("--shards-per-task" not in command for command in commands)
+    tuning.cmd_tune_shard(args)
+
+    assert calls == [(args, list(range(24, 32)))]
 
 
 def test_observation_bundles_keep_split_and_seed_homogeneous() -> None:
@@ -81,13 +71,15 @@ def test_wsi_bundle_reuses_one_context_for_two_exact_shards(monkeypatch) -> None
     assert calls == [6, 7]
 
 
-def test_patch_bundle_keeps_parallel_subprocess_execution(monkeypatch) -> None:
+def test_single_shard_runs_without_bundle_indices(monkeypatch) -> None:
     args = Namespace(
         config="config.yaml", phase="base", group="natural", shard_index=0,
         observation_index=None, observations_per_candidate=1, shard_offset=0,
-        shards_per_task=2, bundle_by_observation=False,
+        shards_per_task=1, bundle_by_observation=False,
     )
-    monkeypatch.setattr(tuning, "load_config", lambda *_: {"dataset": {"regime": "patch"}})
-    monkeypatch.setattr(tuning, "run_shard_bundle", lambda received: received is args)
+    calls: list[list[int]] = []
+    monkeypatch.setattr(tuning, "_run_shards", lambda _, indices: calls.append(indices))
 
     tuning.cmd_tune_shard(args)
+
+    assert calls == [[0]]

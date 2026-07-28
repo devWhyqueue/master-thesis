@@ -197,6 +197,13 @@ def test_configs_are_freeze_ready_and_output_isolated() -> None:
     assert len(output_roots) == len(EXPECTED_CELLS)
     assert len(slurm_roots) == len(EXPECTED_CELLS)
 
+def test_bracs_patch_bundle_uses_one_32g_allocation() -> None:
+    config = _load_config(CONFIG_ROOT / "bracs_patch.yaml")
+
+    assert config["slurm"]["tune_shards_per_task"] == 4
+    assert config["slurm"]["resources"]["tune_natural"]["memory"] == "32G"
+
+
 def test_panda_configs_use_the_completed_native_tiles_image() -> None:
     for name in ("panda_patch.yaml", "panda_wsi.yaml"):
         config = _load_config(CONFIG_ROOT / name)
