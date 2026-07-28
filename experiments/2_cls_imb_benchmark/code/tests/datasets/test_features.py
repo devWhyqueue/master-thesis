@@ -17,6 +17,12 @@ from imbalance_benchmark.datasets.features import (
     load_slide_features,
     patch_sort_key,
 )
+from imbalance_benchmark.datasets.features import cache as feature_cache
+from imbalance_benchmark.datasets.features.cache import (
+    bank_index,
+    bank_is_cpu,
+    feature_rows,
+)
 
 def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
     from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
@@ -197,6 +203,38 @@ def test_prepare_validates_encoder_for_precomputed_feature_manifests(
             },
             {"data": tmp_path},
         )
+
+def test_bank_stays_on_cpu_without_cuda(tmp_path: Path) -> None:
+    path = tmp_path / "slide_0.pt"
+    torch.save(torch.randn(1, 8), path)
+
+    rows = feature_rows([str(path)], [None])
+
+    assert bank_is_cpu()
+    assert bank_index(rows).device.type == "cpu"
+
+
+def test_target_bank_device_env_override_bypasses_auto_sizing() -> None:
+    assert feature_cache._target_bank_device({"IMB_FEATURE_BANK_DEVICE": "cpu"}, 1) == (
+        torch.device("cpu")
+    )
+
+
+def test_target_bank_device_auto_falls_back_to_cpu_without_cuda() -> None:
+    assert feature_cache._target_bank_device({}, 1) == torch.device("cpu")
+
+
+def test_target_bank_device_auto_respects_the_free_memory_fraction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(feature_cache.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        feature_cache.torch.cuda, "mem_get_info", lambda: (1000, 1000)
+    )
+
+    assert feature_cache._target_bank_device({}, 399) == torch.device("cuda")
+    assert feature_cache._target_bank_device({}, 400) == torch.device("cpu")
+
 
 def test_feature_cache_rejects_metadata_from_a_different_encoder_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

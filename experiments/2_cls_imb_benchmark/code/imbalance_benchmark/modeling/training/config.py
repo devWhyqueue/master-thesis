@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from imbalance_benchmark.datasets.data import TrainDataset, bag_collate, patch_collate
+from imbalance_benchmark.datasets.features.cache import bank_is_cpu
 from imbalance_benchmark.modeling.context import REFERENCE_PASSES, model_kwargs
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "resolve_batch_size",
     "build_optimizer",
     "build_evaluation_loader",
+    "pin_memory_ok",
     "resolve_training_config",
 ]
 
@@ -27,6 +29,16 @@ PATCH_EVALUATION_BATCH_SIZE = 4096
 MIL_EVALUATION_BATCH_SIZE = 64
 
 
+def pin_memory_ok(is_mil: bool) -> bool:
+    """Whether a loader may pin its output batch.
+
+    Pinning a tensor already resident on CUDA raises; MIL never reads the
+    device-resident feature bank, so only the patch-regime bank placement
+    matters here.
+    """
+    return torch.cuda.is_available() and (is_mil or bank_is_cpu())
+
+
 def build_evaluation_loader(dataset: TrainDataset, is_mil: bool) -> DataLoader:
     """Build an ordered CPU loader with a regime-appropriate inference batch."""
     return DataLoader(
@@ -35,7 +47,7 @@ def build_evaluation_loader(dataset: TrainDataset, is_mil: bool) -> DataLoader:
             MIL_EVALUATION_BATCH_SIZE if is_mil else PATCH_EVALUATION_BATCH_SIZE
         ),
         collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
-        pin_memory=torch.cuda.is_available(),
+        pin_memory=pin_memory_ok(is_mil),
     )
 
 

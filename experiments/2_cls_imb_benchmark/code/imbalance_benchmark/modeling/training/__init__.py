@@ -18,6 +18,7 @@ from imbalance_benchmark.modeling.training.config import (
     CHECKPOINT_INTERVAL,
     build_evaluation_loader,
     build_optimizer,
+    pin_memory_ok,
     resolve_batch_size,
 )
 from imbalance_benchmark.modeling.evaluation import (
@@ -49,6 +50,7 @@ __all__ = [
     "resolve_batch_size",
     "build_optimizer",
     "build_evaluation_loader",
+    "pin_memory_ok",
     "fit_model",
 ]
 
@@ -151,7 +153,7 @@ def _build_train_loader(
             ctx["train_dataset"],
             batch_sampler=sampler,
             collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=pin_memory_ok(is_mil),
         )
     gen = torch.Generator().manual_seed(ctx["seed"])
     if method == "balanced_sampling" and param:
@@ -165,7 +167,7 @@ def _build_train_loader(
         batch_size=b_size,
         sampler=_RecordingSampler(base, exposed),
         collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
-        pin_memory=torch.cuda.is_available(),
+        pin_memory=pin_memory_ok(is_mil),
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import json
 import time
 from pathlib import Path
@@ -21,6 +22,7 @@ from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
+    TuningScope,
     summarize_tuning_cost,
     tune_across_splits,
 )
@@ -174,6 +176,7 @@ def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
     base, scopes, freeze, fingerprint = _frozen_shard_context(args)
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
+    built: dict[tuple[str, tuple[str, ...]], list[TuningScope]] = {}
     for index in indices:
         shard, observation = array_coordinates(
             index,
@@ -190,25 +193,30 @@ def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
             observation,
         )
         if spec is not None:
-            _run_shard(base, scopes, freeze, fingerprint, spec)
+            _run_shard(base, scopes, freeze, fingerprint, built, spec)
 
 
 def _run_shard(
     base: dict[str, Path],
-    scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
+    raw_scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
     freeze: dict[str, Any],
     fingerprint: list[str],
+    built: dict[tuple[str, tuple[str, ...]], list[TuningScope]],
     spec: ShardSpec,
 ) -> None:
+    """Run one shard, reusing ``built``'s cached scopes per (condition, scoped) key."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     if condition_is_reusable(
-        base, spec.condition, roster_for_regime(scopes[0][1].is_mil), assignments
+        base, spec.condition, roster_for_regime(raw_scopes[0][1].is_mil), assignments
     ):
         return
     scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments
+    key = (spec.condition, scoped)
+    if key not in built:
+        built[key] = combined_scopes(raw_scopes, spec.condition, scoped, [])
     run_candidate_shard(
         spec,
-        combined_scopes(scopes, spec.condition, scoped, []),
+        [replace(scope, cost_records=[]) for scope in built[key]],
         _tuning_seeds(freeze),
         fingerprint,
         base["data"],

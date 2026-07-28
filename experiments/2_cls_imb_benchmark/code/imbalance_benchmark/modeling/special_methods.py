@@ -22,6 +22,7 @@ from imbalance_benchmark.modeling.training import (
     build_optimizer,
     fit_model,
     get_balanced_sampler,
+    pin_memory_ok,
     resolve_batch_size,
 )
 from imbalance_benchmark.modeling.workflows.multistage import fit_crt, fit_rankmix
@@ -77,7 +78,7 @@ def _build_mde_loaders(
         batch_size=b_size,
         sampler=_RecordingSampler(natural, exposed),
         collate_fn=bag_collate,
-        pin_memory=torch.cuda.is_available(),
+        pin_memory=pin_memory_ok(True),
     )
     loader_b = DataLoader(
         dataset,
@@ -86,7 +87,7 @@ def _build_mde_loaders(
             get_balanced_sampler(train_labels, 1.0, seed + 1), exposed
         ),
         collate_fn=bag_collate,
-        pin_memory=torch.cuda.is_available(),
+        pin_memory=pin_memory_ok(True),
     )
     return loader_u, loader_b
 

@@ -21,7 +21,8 @@ from imbalance_benchmark.modeling.models import (
     OkoClassifier,
     build_model,
 )
-from imbalance_benchmark.modeling.oko import (
+from imbalance_benchmark.modeling.oko.sampling import (
+    _build_oko_pools,
     build_class_index,
     sample_oko_sets,
 )
@@ -226,6 +227,23 @@ def test_scholz_methods_are_the_balanced_sampler_hybrids():
     assert "ce_soft_f1" in FIXED_BALANCED_SAMPLER_METHODS
     assert "ce_soft_mcc" in FIXED_BALANCED_SAMPLER_METHODS
     assert "rankmix" not in FIXED_BALANCED_SAMPLER_METHODS
+
+def test_oko_prebuilt_pools_match_the_rebuilt_reference_draws():
+    """Hoisting the per-fit sampling pools out of the step loop must not change draws."""
+    labels = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
+    units = np.array(["a", "a", "b", "c", "c", "d", "e", "e", "f"])
+    class_index = build_class_index(labels)
+    pools = _build_oko_pools(class_index, units)
+
+    reference = sample_oko_sets(
+        class_index, 3, 40, 2, np.random.default_rng(7), units=units
+    )
+    hoisted = sample_oko_sets(
+        class_index, 3, 40, 2, np.random.default_rng(7), pools=pools
+    )
+
+    for reference_array, hoisted_array in zip(reference, hoisted, strict=True):
+        np.testing.assert_array_equal(reference_array, hoisted_array)
 
 def test_oko_odd_classes_are_distinct_and_exclude_the_pair_class():
     n_classes, k = 5, 3
