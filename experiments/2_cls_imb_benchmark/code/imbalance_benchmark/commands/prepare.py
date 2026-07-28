@@ -31,19 +31,35 @@ __all__ = ["cmd_prepare", "cmd_tile_wsi", "cmd_tile_wsi_reduce"]
 SYNTHETIC_PATCHES_PER_SLIDE = 30
 
 
+# Per-class patient counts, deliberately unequal and unequal in train (>=70%
+# of each, per the 70/15/15 split). The smallest class's train count must
+# clear PILOT_CANDIDATE_LEVELS[-1] (currently 50, manifest/pilot/candidates.py)
+# -- below that, pilot_levels_for() appends that class's own count as a forced
+# extra candidate, and a construction-noise stability search that never
+# converges falls back to it (stability_floor_from_curve's last-level
+# fallback), pinning every class's independent-support floor to the smallest
+# class's *entire* pool with zero slack. A uniform count here left every class
+# at that same floor, so moderate/severe construction had no room to allocate
+# away from balanced and always reported achieved_rho == 1.0 (degenerate).
+_SYNTHETIC_PATIENTS_PER_CLASS = {
+    "class_A": 150,
+    "class_B": 110,
+    "class_C": 90,
+    "class_D": 76,
+}
+
+
 def _synthetic_manifest(paths: dict[str, Path]) -> pd.DataFrame:
     """Build a synthetic manifest for the smoke workflow (no external datasets).
 
-    20 patients/class survives the 70/15/15 split with >=10 in train, the
-    minimum the pilot's 10% patient-contribution cap can ever satisfy
-    (manifest/pilot_training.py:patch_pilot_caps_hold). One row per patch
-    (feature_index into the slide's multi-row tensor), mirroring the real
-    dataset builders' expansion (e.g. datasets/tcga_ut.py:_expand_chunks) --
-    ImbalanceDataset requires an explicit feature_index for multi-row tensors.
+    One row per patch (feature_index into the slide's multi-row tensor),
+    mirroring the real dataset builders' expansion (e.g.
+    datasets/tcga_ut.py:_expand_chunks) -- ImbalanceDataset requires an
+    explicit feature_index for multi-row tensors.
     """
     rows = []
-    for cls in ["class_A", "class_B", "class_C", "class_D"]:
-        for p_idx in range(20):
+    for cls, n_patients in _SYNTHETIC_PATIENTS_PER_CLASS.items():
+        for p_idx in range(n_patients):
             p_id = f"PAT_{cls}_{p_idx}"
             for s_idx in range(2):
                 s_id = f"SLIDE_{p_id}_{s_idx}"
