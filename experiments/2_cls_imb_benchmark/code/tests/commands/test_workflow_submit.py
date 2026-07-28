@@ -129,11 +129,12 @@ def test_submit_links_actual_job_ids() -> None:
 def test_resume_tuning_skips_completed_setup(monkeypatch) -> None:
     monkeypatch.setattr(
         "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type("Plan", (), {"base_natural_complete": False, "controlled_indices": (0,)})(),
+        lambda *_: type("Plan", (), {"natural_indices": (2, 5), "controlled_indices": (0,)})(),
     )
     jobs = build_workflow(_config(), resume_tuning=True)
 
     assert jobs[0].name == "tune-base-natural"
+    assert jobs[0].array_indices == (2, 5)
     assert all(job.name not in {"prepare", "pilot", "freeze"} for job in jobs)
 
 
@@ -141,7 +142,7 @@ def test_resume_omits_only_a_fingerprint_valid_base_natural_array(monkeypatch) -
     config = _config()
     monkeypatch.setattr(
         "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type("Plan", (), {"base_natural_complete": True, "controlled_indices": (1, 3)})(),
+        lambda *_: type("Plan", (), {"natural_indices": (), "controlled_indices": (1, 3)})(),
     )
 
     jobs = build_workflow(config, resume_tuning=True)

@@ -111,8 +111,9 @@ def _tuning_jobs(
                 natural_observations,
                 shards_per_task,
             ),
+            array_indices=plan.natural_indices if plan else (),
         )
-        if not plan or not plan.base_natural_complete
+        if not plan or plan.natural_indices
         else None
     )
     base_controlled = (
