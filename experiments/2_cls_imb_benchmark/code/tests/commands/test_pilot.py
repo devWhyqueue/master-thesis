@@ -93,10 +93,32 @@ def test_patch_pilot_patient_floor_is_preserved_as_an_independent_constraint(
         encoding="utf-8",
     )
 
-    constraints = _pilot_constraints(report, is_mil=False)
+    constraints = _pilot_constraints(report)
 
-    assert constraints.patch_floor == 60
     assert constraints.independent_floor == 30
+
+
+def test_patch_floor_does_not_track_the_pilot_quota(tmp_path: Path) -> None:
+    """Two splits differing only in pilot quota must freeze the same patch floor.
+
+    The quota is pinned by the scarcest class's least-stocked patient at the
+    largest pilot level, so letting it scale the floor makes one one-patch
+    patient decide a split's achievable severity.
+    """
+    from imbalance_benchmark.manifest.freezing import _pilot_constraints
+
+    floors = []
+    for quota in (1, 24):
+        report = tmp_path / f"pilot_report_{quota}.json"
+        report.write_text(
+            json.dumps(
+                {"definitive_floor": 20, "quotas": {"1": quota}, "excluded": False}
+            ),
+            encoding="utf-8",
+        )
+        floors.append(_pilot_constraints(report).patch_floor)
+
+    assert floors[0] == floors[1] == 20
 
 def test_pilot_quota_is_frozen_across_construction_orderings() -> None:
     """One quota is shared by every pilot ordering, not recomputed per seed."""

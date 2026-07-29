@@ -56,7 +56,7 @@ def _phase(name: str) -> Iterator[None]:
 def _load_pilot_floor(
     pilot_report_path: Path, is_mil: bool, counts: dict[str, int]
 ) -> tuple[int, int, bool, int]:
-    constraints = _pilot_constraints(pilot_report_path, is_mil)
+    constraints = _pilot_constraints(pilot_report_path)
     requested = constraints.patch_floor
     min_support = max(requested, 20) if not is_mil else requested
     excluded = (

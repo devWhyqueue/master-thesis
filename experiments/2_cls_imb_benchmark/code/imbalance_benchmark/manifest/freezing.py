@@ -39,22 +39,23 @@ class PilotConstraints:
     independent_floor: int
 
 
-def _pilot_constraints(pilot_report_path: Path, is_mil: bool) -> PilotConstraints:
-    """Translate the pilot's independent-unit floor into a patch/slide-count floor.
-    MIL support is already counted in slides, matching the pilot's unit. Patch
-    support is counted in patches, so the patient/slide floor is converted via
-    the largest pilot quota (patches held constant per contributing patient).
+def _pilot_constraints(pilot_report_path: Path) -> PilotConstraints:
+    """Freeze the pilot's independent-unit floor as both the unit and count floor.
+
+    The pilot's per-patient quota must not scale the patch floor. That quota is
+    the scarcest class's *minimum* per-patient inventory at the largest pilot
+    level (``pilot_levels_for`` ends at that class's full patient count, so
+    eligibility can drop nobody), which makes it a knife-edge: one patient
+    holding a single patch moves the frozen floor - and with it every
+    condition's achievable severity - by more than an order of magnitude, and
+    leaves splits of one dataset incomparable. The guarantee the floor exists
+    for is per-class independent support, and that is enforced directly by
+    ``independent_floor`` in pool designation plus the contribution caps.
     """
     if not pilot_report_path.exists():
         return PilotConstraints(10, 10)
-    report = json.loads(pilot_report_path.read_text())
-    definitive_floor = report["definitive_floor"]
-    if is_mil:
-        return PilotConstraints(definitive_floor, definitive_floor)
-    quotas = [q for q in report["quotas"].values() if q is not None]
-    return PilotConstraints(
-        definitive_floor * (max(quotas) if quotas else 1), definitive_floor
-    )
+    definitive_floor = json.loads(pilot_report_path.read_text())["definitive_floor"]
+    return PilotConstraints(definitive_floor, definitive_floor)
 
 
 def _build_conditions(
