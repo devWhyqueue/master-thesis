@@ -27,6 +27,7 @@ from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     tune_across_splits,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
+    _bundle_indices,
     reduce_tuning_shards,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
@@ -40,9 +41,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
     combined_scopes,
     run_candidate_shard,
-)
-from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import (
-    _bundle_indices,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,

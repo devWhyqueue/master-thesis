@@ -3,7 +3,9 @@ from __future__ import annotations
 from argparse import Namespace
 
 from imbalance_benchmark.commands import tuning
-from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import _bundle_indices
+from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
+    _bundle_indices,
+)
 
 
 def test_patch_bundle_runs_exact_shards_sequentially(monkeypatch) -> None:

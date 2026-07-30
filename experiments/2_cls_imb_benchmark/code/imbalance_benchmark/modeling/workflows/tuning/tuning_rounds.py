@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
@@ -9,6 +10,12 @@ from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
     shift_window,
     winner_is_interior,
 )
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    load_registry,
+    register_candidates,
+    registry_lookup,
+)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import ShardSpec
 
 __all__ = [
     "AxisState",
@@ -17,6 +24,7 @@ __all__ = [
     "round_payload",
     "all_resolved",
     "new_candidates",
+    "resolve_round_specs",
 ]
 
 
@@ -161,3 +169,66 @@ def new_candidates(
     previous = _cross(prev_lr_window, prev_strength_window)
     current = _cross(lr_now, strength_now)
     return [cfg for cfg in current if cfg not in previous]
+
+
+def _round_zero_specs(
+    root: Path,
+    condition: str,
+    phase: str,
+    method: str,
+    active_grid: list[dict[str, Any]],
+) -> list[ShardSpec]:
+    """Address the frozen initial window exactly as before and register it."""
+    specs = [
+        ShardSpec(condition, method, index, phase) for index in range(len(active_grid))
+    ]
+    register_candidates(root, condition, method, active_grid, round_index=0)
+    return specs
+
+
+def _later_round_specs(
+    root: Path,
+    condition: str,
+    phase: str,
+    method: str,
+    active_grid: list[dict[str, Any]],
+    round_index: int,
+) -> list[ShardSpec]:
+    """Reuse each already-trained value from wherever it lives; register the rest."""
+    registry = load_registry(root, condition)
+    new_configs = [
+        config
+        for config in active_grid
+        if registry_lookup(registry, method, config) is None
+    ]
+    if new_configs:
+        register_candidates(root, condition, method, new_configs, round_index)
+        registry = load_registry(root, condition)
+    specs = []
+    for config in active_grid:
+        found = registry_lookup(registry, method, config)
+        if found is None:
+            raise RuntimeError(f"Candidate not registered after this round: {config}")
+        source_round, index = found
+        specs.append(ShardSpec(condition, method, index, phase, round=source_round))
+    return specs
+
+
+def resolve_round_specs(
+    root: Path,
+    condition: str,
+    phase: str,
+    method: str,
+    active_grid: list[dict[str, Any]],
+    round_index: int,
+) -> list[ShardSpec]:
+    """Resolve one round's active grid to wherever each candidate was trained.
+
+    Round 0 is the frozen initial window, addressed exactly as before. A
+    later round's grid may reuse values a previous round already trained;
+    those are looked up in the cross-round registry, and only genuinely
+    new values are registered against this round.
+    """
+    if round_index == 0:
+        return _round_zero_specs(root, condition, phase, method, active_grid)
+    return _later_round_specs(root, condition, phase, method, active_grid, round_index)

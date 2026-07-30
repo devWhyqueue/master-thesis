@@ -9,7 +9,9 @@ from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     load_candidate,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_bundle import _bundle_indices
+from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
+    _bundle_indices,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     bundled_array_size,
     bundled_observation_array_size,

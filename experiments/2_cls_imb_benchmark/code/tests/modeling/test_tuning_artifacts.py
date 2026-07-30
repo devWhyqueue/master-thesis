@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
-    ShardSpec,
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_registry,
     register_candidates,
     registry_lookup,
+)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
+    ShardSpec,
     shard_path,
 )
 

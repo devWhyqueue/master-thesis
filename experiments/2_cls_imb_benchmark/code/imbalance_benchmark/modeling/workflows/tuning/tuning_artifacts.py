@@ -130,47 +130,6 @@ def load_candidate(
     return _merge_observation_shards(root, spec, fingerprint, expected_observations)
 
 
-def registry_path(root: Path, condition: str) -> Path:
-    """Path to one condition's cross-round candidate registry (not signed: a cache)."""
-    return root / "tuning_shards" / f"candidate_registry_{condition}.json"
-
-
-def _registry_key(method: str, config: dict[str, Any]) -> str:
-    return f"{method}|{config.get('parameter')}|{config.get('lr')}"
-
-
-def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
-    """Load the map from (method, config) to the round/index it was first trained in."""
-    path = registry_path(root, condition)
-    return json.loads(path.read_text()) if path.exists() else {}
-
-
-def registry_lookup(
-    registry: dict[str, dict[str, int]], method: str, config: dict[str, Any]
-) -> tuple[int, int] | None:
-    """Find which round/index already trained this exact (method, config), if any."""
-    entry = registry.get(_registry_key(method, config))
-    return (entry["round"], entry["candidate_index"]) if entry else None
-
-
-def register_candidates(
-    root: Path,
-    condition: str,
-    method: str,
-    configs: list[dict[str, Any]],
-    round_index: int,
-    start_index: int = 0,
-) -> None:
-    """Record where one round's freshly trained candidates now live, idempotently."""
-    registry = load_registry(root, condition)
-    for offset, config in enumerate(configs):
-        key = _registry_key(method, config)
-        registry.setdefault(
-            key, {"round": round_index, "candidate_index": start_index + offset}
-        )
-    write_atomic(registry_path(root, condition), registry)
-
-
 def condition_is_reusable(
     base: dict[str, Path],
     condition: str,

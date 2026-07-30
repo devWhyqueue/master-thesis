@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import time
@@ -13,36 +14,28 @@ from imbalance_benchmark.common import (
     write_json,
 )
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
-    _selection_key,
     summarize_tuning_cost,
+)
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    select_candidate_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     ShardSpec,
     condition_is_reusable,
     expected_observations,
     load_candidate,
-    observation_key as _observation_sort_key,
+)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
+    resolve_round_specs,
 )
 
 
-def select_candidate_payload(payloads: list[dict[str, Any]]) -> dict[str, Any]:
-    """Select a candidate in frozen order using the report's exact tie-break."""
-    ordered = sorted(payloads, key=lambda payload: int(payload["candidate_index"]))
-    selected, selected_key = ordered[0], None
-    for payload in ordered:
-        observations = sorted(payload["metrics"], key=_observation_sort_key)
-        metrics = [
-            (
-                float(metric["balanced_accuracy"]),
-                float(metric["macro_f1"]),
-                float(metric["nll"]),
-            )
-            for metric in observations
-        ]
-        key = _selection_key(metrics)
-        if selected_key is None or key > selected_key:
-            selected, selected_key = payload, key
-    return selected
+@dataclass(frozen=True)
+class ReduceRound:
+    """One reduce call's verification fingerprint and adaptive-search round index."""
+
+    fingerprint: list[str] = field(default_factory=list)
+    index: int = 0
 
 
 def reduce_phase(
@@ -51,21 +44,21 @@ def reduce_phase(
     phase: str,
     methods: tuple[str, ...],
     grids: dict[str, list[dict[str, Any]]],
-    fingerprint: list[str],
+    reduce_round: ReduceRound,
     expected_observations: int | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Reduce every required shard for one condition and phase."""
+    """Reduce every required shard for one condition, phase, and search round."""
     selections, payloads = {}, []
     for method in methods:
-        count = 1 if method == "post_hoc_logit_adjustment" else len(grids[method])
-        candidates = [
-            load_candidate(
-                root,
-                ShardSpec(condition, method, index, phase),
-                fingerprint,
-                expected_observations,
+        if method == "post_hoc_logit_adjustment":
+            specs = [ShardSpec(condition, method, 0, phase)]
+        else:
+            specs = resolve_round_specs(
+                root, condition, phase, method, grids[method], reduce_round.index
             )
-            for index in range(count)
+        candidates = [
+            load_candidate(root, spec, reduce_round.fingerprint, expected_observations)
+            for spec in specs
         ]
         payloads.extend(candidates)
         selections[method] = (
@@ -105,7 +98,7 @@ def write_base_selections(
             "base",
             methods,
             freeze["method_grids"],
-            fingerprint,
+            ReduceRound(fingerprint),
             expected_observations(condition, assignments, freeze),
         )
         write_base_selection(base["data"], condition, selected)
@@ -199,13 +192,14 @@ def _reduce_condition(
     assignments: tuple[str, ...],
     condition: str,
 ) -> None:
+    reduce_round = ReduceRound(fingerprint)
     base_selected, base_payloads = reduce_phase(
         base["data"],
         condition,
         "base",
         base_methods,
         freeze["method_grids"],
-        fingerprint,
+        reduce_round,
         expected_observations(condition, assignments, freeze),
     )
     dependent, dependent_payloads = reduce_phase(
@@ -214,7 +208,7 @@ def _reduce_condition(
         "dependent",
         dependent_methods,
         freeze["method_grids"],
-        fingerprint,
+        reduce_round,
         expected_observations(condition, assignments, freeze),
     )
     selected = {**base_selected, **dependent}
