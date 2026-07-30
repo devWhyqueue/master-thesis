@@ -16,6 +16,12 @@ from imbalance_benchmark.modeling.context import (
     get_grid_configs,
     roster_for_regime,
 )
+from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
+    LR_ENVELOPE,
+    initial_window,
+    shift_window,
+    winner_is_interior,
+)
 from imbalance_benchmark.modeling.context import Regime
 from imbalance_benchmark.modeling.workflows.confirmation import (
     RunContext,
@@ -199,6 +205,62 @@ def test_oko_grid_capped_by_k_minus_1():
     assert max(c["parameter"] for c in configs) <= 2
     configs_binary = get_grid_configs("oko", n_classes=2)
     assert {c["parameter"] for c in configs_binary} == {1}
+
+def test_get_grid_configs_honors_an_explicit_lr_window():
+    shifted = LR_ENVELOPE[3:7]
+    configs = get_grid_configs("ce", lr_window=shifted)
+    assert configs == [{"lr": lr} for lr in shifted]
+
+def test_initial_window_positions_by_regime():
+    assert initial_window("low", LR_ENVELOPE) == LR_ENVELOPE[0:4]
+    assert initial_window("current", LR_ENVELOPE) == LEARNING_RATE_GRID
+    assert initial_window("high", LR_ENVELOPE) == LR_ENVELOPE[3:7]
+
+def test_initial_window_rejects_unknown_regime():
+    with pytest.raises(ValueError):
+        initial_window("mid", LR_ENVELOPE)
+
+def test_winner_is_interior_true_only_off_the_edges():
+    window = LEARNING_RATE_GRID
+    assert winner_is_interior(window, window[1])
+    assert winner_is_interior(window, window[2])
+    assert not winner_is_interior(window, window[0])
+    assert not winner_is_interior(window, window[-1])
+
+def test_shift_window_reuses_three_overlapping_values_outward():
+    window = LEARNING_RATE_GRID  # LR_ENVELOPE[2:6]
+    shifted = shift_window(window, window[-1], LR_ENVELOPE)
+    assert shifted == LR_ENVELOPE[3:7]
+    assert set(window) & set(shifted) == set(window[1:])
+
+def test_shift_window_reuses_three_overlapping_values_inward_direction():
+    window = LEARNING_RATE_GRID
+    shifted = shift_window(window, window[0], LR_ENVELOPE)
+    assert shifted == LR_ENVELOPE[1:5]
+    assert set(window) & set(shifted) == set(window[:-1])
+
+def test_shift_window_exhausts_at_the_envelope_boundary():
+    top_window = LR_ENVELOPE[-4:]
+    assert shift_window(top_window, top_window[-1], LR_ENVELOPE) is None
+    bottom_window = LR_ENVELOPE[:4]
+    assert shift_window(bottom_window, bottom_window[0], LR_ENVELOPE) is None
+
+def test_shift_window_rejects_an_interior_winner():
+    window = LEARNING_RATE_GRID
+    with pytest.raises(ValueError):
+        shift_window(window, window[1], LR_ENVELOPE)
+
+def test_repeated_shifts_never_duplicate_a_previously_evaluated_column():
+    window = initial_window("low", LR_ENVELOPE)
+    seen = set(window)
+    for _ in range(len(LR_ENVELOPE) - 4):
+        shifted = shift_window(window, window[-1], LR_ENVELOPE)
+        assert shifted is not None
+        new_columns = set(shifted) - seen
+        assert new_columns == {shifted[-1]}
+        seen |= new_columns
+        window = shifted
+    assert shift_window(window, window[-1], LR_ENVELOPE) is None
 
 def test_confirmation_provenance_payload_carries_appendix_a_fields() -> None:
     """The run record's provenance carries the Appendix A fields flagged as missing.

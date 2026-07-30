@@ -122,6 +122,7 @@ def test_resume_accepts_only_a_complete_matching_observation_set() -> None:
             "candidate_index": 0,
             "phase": "base",
             "observation_index": None,
+            "round": 0,
         },
         "seeds": [11, 22],
         "scope_count": 1,

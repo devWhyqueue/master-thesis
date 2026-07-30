@@ -11,13 +11,21 @@ from imbalance_benchmark.common import split_paths, verify_signed_file
 
 @dataclass(frozen=True)
 class ShardSpec:
-    """One independently executable frozen candidate or observation."""
+    """One independently executable frozen candidate or observation.
+
+    ``round`` namespaces an adaptive search round (0 is the frozen initial
+    window); a candidate keeps the same ``round``/``candidate_index`` for as
+    long as it was actually trained in, so a later round that reuses it
+    reads the same file instead of retraining it (see the candidate
+    registry in this module).
+    """
 
     condition: str
     method: str
     candidate_index: int
     phase: str
     observation_index: int | None = None
+    round: int = 0
 
 
 def validate_shard_payload(
@@ -77,7 +85,14 @@ def observation_key(observation: dict[str, Any]) -> tuple[int, int]:
 
 def shard_path(root: Path, spec: ShardSpec) -> Path:
     """Return the collision-free artifact path for one candidate or observation."""
-    candidate = root / "tuning_shards" / spec.condition / spec.phase / spec.method
+    candidate = (
+        root
+        / "tuning_shards"
+        / spec.condition
+        / spec.phase
+        / spec.method
+        / f"round={spec.round}"
+    )
     if spec.observation_index is None:
         return candidate / f"candidate={spec.candidate_index}.json"
     return (
@@ -113,6 +128,47 @@ def load_candidate(
     if expected_observations is None:
         raise RuntimeError(f"Missing tuning shard: {path}")
     return _merge_observation_shards(root, spec, fingerprint, expected_observations)
+
+
+def registry_path(root: Path, condition: str) -> Path:
+    """Path to one condition's cross-round candidate registry (not signed: a cache)."""
+    return root / "tuning_shards" / f"candidate_registry_{condition}.json"
+
+
+def _registry_key(method: str, config: dict[str, Any]) -> str:
+    return f"{method}|{config.get('parameter')}|{config.get('lr')}"
+
+
+def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
+    """Load the map from (method, config) to the round/index it was first trained in."""
+    path = registry_path(root, condition)
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def registry_lookup(
+    registry: dict[str, dict[str, int]], method: str, config: dict[str, Any]
+) -> tuple[int, int] | None:
+    """Find which round/index already trained this exact (method, config), if any."""
+    entry = registry.get(_registry_key(method, config))
+    return (entry["round"], entry["candidate_index"]) if entry else None
+
+
+def register_candidates(
+    root: Path,
+    condition: str,
+    method: str,
+    configs: list[dict[str, Any]],
+    round_index: int,
+    start_index: int = 0,
+) -> None:
+    """Record where one round's freshly trained candidates now live, idempotently."""
+    registry = load_registry(root, condition)
+    for offset, config in enumerate(configs):
+        key = _registry_key(method, config)
+        registry.setdefault(
+            key, {"round": round_index, "candidate_index": start_index + offset}
+        )
+    write_atomic(registry_path(root, condition), registry)
 
 
 def condition_is_reusable(

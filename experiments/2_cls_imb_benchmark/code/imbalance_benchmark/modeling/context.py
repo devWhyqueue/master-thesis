@@ -38,11 +38,11 @@ INPUT_DIM = 2560
 PATCH_HIDDEN_DIM = 512
 MIL_HIDDEN_DIM = 256
 DROPOUT = 0.1
-# Update budget U = REFERENCE_PASSES * ceil(T / B): reference passes through the
-# controlled support (report §"Model training and selection").
+# Update budget U = REFERENCE_PASSES * ceil(T / B) (report §"Model training and selection").
 REFERENCE_PASSES = 30
 CONDITIONS = ("natural", "balanced", "moderate", "severe")
 
+# Current-centered window into workflows.tuning.search_windows.LR_ENVELOPE[2:6].
 LEARNING_RATE_GRID: list[float] = [1e-4, 3e-4, 1e-3, 3e-3]
 
 GRIDS: dict[str, list[float] | list[int]] = {
@@ -60,9 +60,8 @@ GRIDS: dict[str, list[float] | list[int]] = {
     "mde": [0.0, 0.1, 0.25, 0.5],
 }
 
-# No imbalance-specific control (Appendix, Table "Experimental Controls"): only the
-# common learning-rate grid applies. cRT's stage-two learning rate reuses the same
-# four values but is not crossed with anything since stage one inherits CE.
+# No imbalance-specific control (Appendix, Table "Experimental Controls"):
+# only the common learning-rate grid applies.
 NO_STRENGTH_GRID_METHODS = frozenset({"ce", "crt"})
 
 PATCH_ONLY_METHODS = ("ce_soft_f1", "ce_soft_mcc", "cfal", "oko")
@@ -83,26 +82,28 @@ def roster_for_regime(is_mil: bool) -> tuple[str, ...]:
     return SHARED_METHODS + (WSI_ONLY_METHODS if is_mil else PATCH_ONLY_METHODS)
 
 
-def get_grid_configs(method: str, n_classes: int | None = None) -> list[dict[str, Any]]:
-    """Return the method's candidate configurations per the frozen Appendix grids.
+def get_grid_configs(
+    method: str,
+    n_classes: int | None = None,
+    lr_window: list[float] | None = None,
+    strength_window: list[float] | None = None,
+) -> list[dict[str, Any]]:
+    """Return the method's candidates for one active search window (default: frozen).
 
-    CE and cRT sweep only the four-value learning-rate grid. Post-hoc logit
-    adjustment performs no gradient optimization, so it sweeps only its four
-    tau values (no learning-rate crossing) and inherits CE's trained model.
-    Every other trainable method crosses its four-value method-specific grid
-    with the four-value learning-rate grid (<=16 configurations). OKO's
-    odd-class count is additionally capped by K-1 when n_classes is known.
+    CE/cRT sweep only ``lr_window``; post-hoc adjustment sweeps only its taus;
+    other methods cross ``strength_window`` with ``lr_window``, capping OKO by K-1.
     """
+    lr_values = lr_window if lr_window is not None else LEARNING_RATE_GRID
     if method in NO_STRENGTH_GRID_METHODS:
-        return [{"lr": lr} for lr in LEARNING_RATE_GRID]
+        return [{"lr": lr} for lr in lr_values]
     if method == "post_hoc_logit_adjustment":
         return [{"parameter": p} for p in GRIDS[method]]
     if method not in GRIDS:
-        return [{"lr": lr} for lr in LEARNING_RATE_GRID]
-    values = GRIDS[method]
+        return [{"lr": lr} for lr in lr_values]
+    values = strength_window if strength_window is not None else GRIDS[method]
     if method == "oko" and n_classes is not None:
         values = sorted({int(v) for v in values if int(v) <= n_classes - 1})
-    return [{"parameter": p, "lr": lr} for p in values for lr in LEARNING_RATE_GRID]
+    return [{"parameter": p, "lr": lr} for p in values for lr in lr_values]
 
 
 def model_kwargs(is_mil: bool) -> dict[str, Any]:
