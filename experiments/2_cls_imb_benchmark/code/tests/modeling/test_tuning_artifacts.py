@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_registry,
+    load_round_grids,
     register_candidates,
     registry_lookup,
+    write_round_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     ShardSpec,
@@ -63,3 +67,18 @@ def test_registries_are_scoped_per_condition(tmp_path):
     register_candidates(tmp_path, "moderate", "ce", [{"lr": 1e-4}], round_index=0)
     severe_registry = load_registry(tmp_path, "severe")
     assert registry_lookup(severe_registry, "ce", {"lr": 1e-4}) is None
+
+
+def test_round_grids_round_trip_signed(tmp_path):
+    windows = {"ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None}}
+    write_round_grids(tmp_path, "moderate", 1, windows)
+    loaded = load_round_grids(tmp_path, "moderate")
+    assert loaded == {"round": 1, "windows": windows}
+
+
+def test_round_grids_reject_tampering(tmp_path):
+    write_round_grids(tmp_path, "moderate", 1, {"ce": {"lr_window": [1.0]}})
+    path = tmp_path / "tuning_shards" / "tuning_round_grids_moderate.json"
+    path.write_text(path.read_text().replace("1.0", "2.0"))
+    with pytest.raises(RuntimeError, match="no longer matches"):
+        load_round_grids(tmp_path, "moderate")

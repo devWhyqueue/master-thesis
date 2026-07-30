@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 
-from imbalance_benchmark.commands import tuning
+from imbalance_benchmark.commands.tuning import shard as tuning
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     _bundle_indices,
 )

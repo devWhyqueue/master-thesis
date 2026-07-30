@@ -15,11 +15,8 @@ from imbalance_benchmark.commands.prepare import (
     cmd_tile_wsi_reduce,
 )
 from imbalance_benchmark.commands.smoke import cmd_smoke
-from imbalance_benchmark.commands.tuning import (
-    cmd_tune,
-    cmd_tune_reduce,
-    cmd_tune_shard,
-)
+from imbalance_benchmark.commands.tuning import cmd_tune, cmd_tune_reduce
+from imbalance_benchmark.commands.tuning.shard import cmd_tune_shard
 from imbalance_benchmark.hydra import cmd_submit
 
 __all__ = [

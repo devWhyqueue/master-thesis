@@ -8,6 +8,10 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     combined_cost,
     select_candidate_payload,
 )
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    register_candidates,
+    write_round_grids,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     validate_shard_payload,
 )
@@ -19,6 +23,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
     bundled_array_size,
     bundled_observation_array_size,
+    resolve_round_shard_spec,
     resolve_shard_spec,
 )
 
@@ -55,6 +60,38 @@ def test_shard_mapping_covers_frozen_candidates_once() -> None:
 
     realized = [(spec.method, spec.candidate_index) for spec in specs if spec]
     assert realized == [("ce", 0), ("ce", 1), ("weighted_ce", 0)]
+
+
+def test_resolve_round_shard_spec_addresses_only_new_configs(tmp_path) -> None:
+    windows = {
+        "ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None}
+    }
+    write_round_grids(tmp_path, "moderate", 1, windows)
+    # 3e-4, 1e-3, 3e-3 already trained in round 0; only 1e-2 is new this round.
+    register_candidates(tmp_path, "moderate", "ce", [{"lr": v} for v in windows["ce"]["lr_window"][:3]], round_index=0)
+
+    spec = resolve_round_shard_spec(tmp_path, "moderate", 0, "base", ("ce",))
+    assert spec == ShardSpec("moderate", "ce", 0, "base", round=1)
+    assert resolve_round_shard_spec(tmp_path, "moderate", 1, "base", ("ce",)) is None
+
+
+def test_resolve_round_shard_spec_skips_a_method_with_nothing_new(tmp_path) -> None:
+    write_round_grids(
+        tmp_path,
+        "moderate",
+        1,
+        {
+            "ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None},
+            "weighted_ce": {"lr_window": [3e-4], "strength_window": [1.0]},
+        },
+    )
+    register_candidates(tmp_path, "moderate", "weighted_ce", [{"lr": 3e-4, "parameter": 1.0}], round_index=0)
+
+    # weighted_ce has nothing new: its whole fixed-slot range (0-15) is dead this
+    # round; ce's one new candidate starts at its reserved offset, index 16.
+    assert resolve_round_shard_spec(tmp_path, "moderate", 0, "base", ("weighted_ce", "ce")) is None
+    spec = resolve_round_shard_spec(tmp_path, "moderate", 16, "base", ("weighted_ce", "ce"))
+    assert spec.method == "ce"
 
 
 def test_array_coordinates_cross_candidates_with_every_observation() -> None:

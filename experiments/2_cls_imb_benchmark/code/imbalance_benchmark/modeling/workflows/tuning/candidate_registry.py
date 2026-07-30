@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from imbalance_benchmark.common import sign_file, verify_signed_file, write_json
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import _selection_key
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     observation_key,
@@ -16,6 +17,9 @@ __all__ = [
     "registry_lookup",
     "register_candidates",
     "select_candidate_payload",
+    "round_grids_path",
+    "write_round_grids",
+    "load_round_grids",
 ]
 
 
@@ -85,3 +89,30 @@ def select_candidate_payload(payloads: list[dict[str, Any]]) -> dict[str, Any]:
         if selected_key is None or key > selected_key:
             selected, selected_key = payload, key
     return selected
+
+
+def round_grids_path(root: Path, condition: str) -> Path:
+    """Path to one condition's signed current-round active-window record."""
+    return root / "tuning_shards" / f"tuning_round_grids_{condition}.json"
+
+
+def write_round_grids(
+    root: Path, condition: str, round_index: int, windows: dict[str, dict[str, Any]]
+) -> Path:
+    """Sign this round's active lr/strength windows so shard, reduce, and decide agree.
+
+    ``windows`` maps each method still under search to
+    ``{"lr_window": [...], "strength_window": [...] | None}``; a method
+    already resolved or tuning-limited is simply absent.
+    """
+    path = round_grids_path(root, condition)
+    write_json(path, {"round": round_index, "windows": windows})
+    sign_file(path)
+    return path
+
+
+def load_round_grids(root: Path, condition: str) -> dict[str, Any]:
+    """Load and verify the current round's signed active windows."""
+    path = round_grids_path(root, condition)
+    verify_signed_file(path)
+    return json.loads(path.read_text())

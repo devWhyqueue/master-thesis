@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from dataclasses import replace
 import math
+from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.modeling.context import roster_for_regime
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    load_round_grids,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import ShardSpec
+from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
+    expand_grid,
+    new_configs_for_round,
+)
 
 MAX_CANDIDATES = 16
 DEPENDENT_METHODS = ("post_hoc_logit_adjustment", "crt")
@@ -47,6 +55,30 @@ def resolve_shard_spec(
     if candidate_index >= limit:
         return None
     return ShardSpec(conditions[condition_index], method, candidate_index, phase)
+
+
+def resolve_round_shard_spec(
+    root: Path, condition: str, index: int, phase: str, methods: tuple[str, ...]
+) -> ShardSpec | None:
+    """Resolve one round>0 array index from this round's signed active windows.
+
+    Each condition resolves its adaptive search independently, so a later
+    round's array always addresses one condition; only the genuinely new
+    (not-yet-trained) configs are addressed, reusing round 0's exact
+    fixed-slot addressing over that smaller per-method grid.
+    """
+    round_grids = load_round_grids(root, condition)
+    grids = {
+        method: new_configs_for_round(
+            root, condition, method, expand_grid(**round_grids["windows"][method])
+        )
+        for method in methods
+        if method in round_grids["windows"]
+    }
+    spec = resolve_shard_spec(index, phase, "natural", tuple(grids), grids)
+    if spec is None:
+        return None
+    return replace(spec, condition=condition, round=round_grids["round"])
 
 
 def candidate_array_size(methods: tuple[str, ...]) -> int:

@@ -24,6 +24,8 @@ __all__ = [
     "round_payload",
     "all_resolved",
     "new_candidates",
+    "new_configs_for_round",
+    "expand_grid",
     "resolve_round_specs",
 ]
 
@@ -139,9 +141,10 @@ def all_resolved(states: dict[str, RoundState]) -> bool:
     return all(state.resolved or state.tuning_limited for state in states.values())
 
 
-def _cross(
+def expand_grid(
     lr_window: list[float], strength_window: list[float] | None
 ) -> list[dict[str, Any]]:
+    """Cross one lr/strength window pair into its full candidate list."""
     if strength_window is None:
         return [{"lr": lr} for lr in lr_window]
     return [{"parameter": p, "lr": lr} for p in strength_window for lr in lr_window]
@@ -166,8 +169,8 @@ def new_candidates(
         if next_strength_window is not None
         else prev_strength_window
     )
-    previous = _cross(prev_lr_window, prev_strength_window)
-    current = _cross(lr_now, strength_now)
+    previous = expand_grid(prev_lr_window, prev_strength_window)
+    current = expand_grid(lr_now, strength_now)
     return [cfg for cfg in current if cfg not in previous]
 
 
@@ -186,6 +189,23 @@ def _round_zero_specs(
     return specs
 
 
+def new_configs_for_round(
+    root: Path, condition: str, method: str, active_grid: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Return this round's active-grid configs not already trained in an earlier round.
+
+    Pure lookup (no registration), so a shard task can independently derive
+    exactly which of its round's configs it must actually train, matching
+    what the later reduce step will independently register.
+    """
+    registry = load_registry(root, condition)
+    return [
+        config
+        for config in active_grid
+        if registry_lookup(registry, method, config) is None
+    ]
+
+
 def _later_round_specs(
     root: Path,
     condition: str,
@@ -195,15 +215,10 @@ def _later_round_specs(
     round_index: int,
 ) -> list[ShardSpec]:
     """Reuse each already-trained value from wherever it lives; register the rest."""
-    registry = load_registry(root, condition)
-    new_configs = [
-        config
-        for config in active_grid
-        if registry_lookup(registry, method, config) is None
-    ]
+    new_configs = new_configs_for_round(root, condition, method, active_grid)
     if new_configs:
         register_candidates(root, condition, method, new_configs, round_index)
-        registry = load_registry(root, condition)
+    registry = load_registry(root, condition)
     specs = []
     for config in active_grid:
         found = registry_lookup(registry, method, config)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
 import json
 import time
 from pathlib import Path
@@ -22,30 +21,18 @@ from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
-    TuningScope,
     summarize_tuning_cost,
     tune_across_splits,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
-    _bundle_indices,
     reduce_tuning_shards,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     write_serial_cost,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
-    condition_is_reusable,
-    selected_ce,
-)
-from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
-    ShardSpec,
-    combined_scopes,
-    run_candidate_shard,
-)
-from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
-    array_coordinates,
-    requested_shard,
-)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import combined_scopes
+
+__all__ = ["cmd_tune", "cmd_tune_reduce"]
 
 
 def _is_excluded(paths: dict[str, Path]) -> bool:
@@ -166,77 +153,6 @@ def _frozen_shard_context(
         scopes,
         json.loads(paths[0].read_text()),
         [compute_sha256(path) for path in paths],
-    )
-
-
-def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
-    """Run candidate indices sequentially with one loaded frozen MIL context."""
-    base, scopes, freeze, fingerprint = _frozen_shard_context(args)
-    if any(_is_excluded(paths) for paths, _, _ in scopes):
-        return
-    built: dict[tuple[str, tuple[str, ...]], list[TuningScope]] = {}
-    for index in indices:
-        shard, observation = array_coordinates(
-            index,
-            args.observation_index,
-            args.observations_per_candidate,
-            args.shard_offset,
-        )
-        spec = requested_shard(
-            shard,
-            args.phase,
-            args.group,
-            scopes[0][1].is_mil,
-            freeze["method_grids"],
-            observation,
-        )
-        if spec is not None:
-            _run_shard(base, scopes, freeze, fingerprint, built, spec)
-
-
-def _run_shard(
-    base: dict[str, Path],
-    raw_scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
-    freeze: dict[str, Any],
-    fingerprint: list[str],
-    built: dict[tuple[str, tuple[str, ...]], list[TuningScope]],
-    spec: ShardSpec,
-) -> None:
-    """Run one shard, reusing ``built``'s cached scopes per (condition, scoped) key."""
-    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    if condition_is_reusable(
-        base, spec.condition, roster_for_regime(raw_scopes[0][1].is_mil), assignments
-    ):
-        return
-    scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments
-    key = (spec.condition, scoped)
-    if key not in built:
-        built[key] = combined_scopes(raw_scopes, spec.condition, scoped, [])
-    fresh_cost_records: list[dict[str, int]] = []
-    run_candidate_shard(
-        spec,
-        [replace(scope, cost_records=fresh_cost_records) for scope in built[key]],
-        _tuning_seeds(freeze),
-        fingerprint,
-        base["data"],
-        selected_ce(base["data"], spec.condition)
-        if spec.phase == "dependent"
-        else None,
-    )
-
-
-def cmd_tune_shard(args: argparse.Namespace) -> None:
-    """Run one resumable frozen-candidate shard."""
-    if args.shards_per_task < 1:
-        raise ValueError("shards-per-task must be positive")
-    _run_shards(
-        args,
-        _bundle_indices(
-            args.shard_index,
-            args.shards_per_task,
-            args.observations_per_candidate,
-            args.bundle_by_observation,
-        ),
     )
 
 

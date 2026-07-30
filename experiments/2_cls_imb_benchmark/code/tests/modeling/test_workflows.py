@@ -6,7 +6,8 @@ import pytest
 import torch
 
 from imbalance_benchmark.analysis.query import load_seed_predictions
-from imbalance_benchmark.commands import confirm, tuning
+from imbalance_benchmark.commands import confirm
+from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import combined_scopes
 from imbalance_benchmark.commands.confirm import shard as confirm_shard
 from imbalance_benchmark.common import write_run_record
 from imbalance_benchmark.datasets.bracs import LABELS as BRACS_LABELS
@@ -163,7 +164,7 @@ def test_combined_tuning_scope_passes_the_frozen_class_order(
         "imbalance_benchmark.modeling.workflows.tuning.tuning_shards.load_training_dataset",
         load_dataset,
     )
-    tuning.combined_scopes(
+    combined_scopes(
         [({"data": tmp_path}, regime, object())], "moderate", ("native",)
     )
 
