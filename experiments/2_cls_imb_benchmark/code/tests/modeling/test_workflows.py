@@ -8,6 +8,9 @@ import torch
 from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.commands import confirm
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import combined_scopes
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    merge_round_state,
+)
 from imbalance_benchmark.commands.confirm import shard as confirm_shard
 from imbalance_benchmark.common import write_run_record
 from imbalance_benchmark.datasets.bracs import LABELS as BRACS_LABELS
@@ -92,6 +95,10 @@ def test_confirmation_condition_uses_the_frozen_class_order(
 
     monkeypatch.setattr(confirm, "load_training_dataset", load_dataset)
     monkeypatch.setattr(confirm, "confirm_ce", lambda *args: [])
+    split_data = tmp_path / "split=0" / "data"
+    merge_round_state(
+        tmp_path / "data", "moderate", {"ce": {"resolved": True, "tuning_limited": False}}
+    )
     run = RunContext(
         device=torch.device("cpu"),
         config={},
@@ -100,7 +107,7 @@ def test_confirmation_condition_uses_the_frozen_class_order(
         class_names=locked,
         val_loader=object(),
         test_loader=object(),
-        paths={"data": tmp_path},
+        paths={"data": split_data},
         seeds=[],
         assignment="native",
     )

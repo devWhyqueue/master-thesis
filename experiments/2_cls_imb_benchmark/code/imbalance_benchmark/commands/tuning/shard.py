@@ -89,7 +89,9 @@ def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
     methods = phase_methods(scopes[0][1].is_mil, args.phase)
-    overridden = round_overridden_scopes(base["data"], args.condition, scopes, methods)
+    overridden = round_overridden_scopes(
+        base["data"], args.condition, args.phase, scopes, methods
+    )
 
     def _spec_for(index: int) -> ShardSpec | None:
         return resolve_round_shard_spec(

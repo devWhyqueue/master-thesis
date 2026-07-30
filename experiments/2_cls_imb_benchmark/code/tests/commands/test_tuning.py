@@ -99,9 +99,33 @@ def test_tuning_selection_signed_lock_detects_tampering(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="no signed lock"):
         verify_signed_file(unsigned)
 
-def test_missing_tuning_selection_stops_confirmation() -> None:
+def test_missing_tuning_selection_stops_confirmation(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="missing tuning selection"):
-        require_tuning_configs({"ce": {"lr": 1e-3}}, ("ce", "weighted_ce"))
+        require_tuning_configs(
+            tmp_path, "severe", {"ce": {"lr": 1e-3}}, ("ce", "weighted_ce")
+        )
+
+def test_unresolved_tuning_lock_stops_confirmation(tmp_path: Path) -> None:
+    from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+        merge_round_state,
+    )
+
+    merge_round_state(
+        tmp_path, "severe", {"ce": {"resolved": False, "tuning_limited": False}}
+    )
+    with pytest.raises(RuntimeError, match="tuning lock unresolved"):
+        require_tuning_configs(tmp_path, "severe", {"ce": {"lr": 1e-3}}, ("ce",))
+
+def test_resolved_tuning_lock_admits_confirmation(tmp_path: Path) -> None:
+    from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+        merge_round_state,
+    )
+
+    merge_round_state(
+        tmp_path, "severe", {"ce": {"resolved": True, "tuning_limited": False}}
+    )
+    configs = {"ce": {"lr": 1e-3}}
+    assert require_tuning_configs(tmp_path, "severe", configs, ("ce",)) == configs
 
 def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
     monkeypatch: pytest.MonkeyPatch,

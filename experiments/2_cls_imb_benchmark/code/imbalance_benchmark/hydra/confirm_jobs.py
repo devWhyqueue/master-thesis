@@ -22,7 +22,7 @@ def _confirm_group_job(
             f"confirm-{group}",
             f"confirm-shard --group {group} --shards-per-task {shards_per_task}",
             True,
-            ("tune-final-reduce",),
+            (),
             f"confirm_{group}",
             "confirm",
         ),
@@ -39,6 +39,8 @@ def confirm_jobs(config: dict[str, Any]) -> tuple[SlurmJob, SlurmJob]:
     two-day allocation across both. Every array task resolves its own unit
     bundle from ``confirmation_schedule`` at run time; no reduce step is
     needed because ``analyze`` discovers run records by directory glob.
+    Submitted separately (``submit --confirm-only``) once every condition's
+    tuning lock is resolved - see ``build_workflow``'s ``confirm_only``.
     """
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     sl = config.get("slurm", {})

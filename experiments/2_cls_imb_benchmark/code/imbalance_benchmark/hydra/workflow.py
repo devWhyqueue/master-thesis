@@ -48,21 +48,32 @@ def _analyze_jobs(
 
 
 def build_workflow(
-    config: dict[str, Any], smoke: bool = False, resume_tuning: bool = False
+    config: dict[str, Any],
+    smoke: bool = False,
+    resume_tuning: bool = False,
+    confirm_only: bool = False,
 ) -> list[SlurmJob]:
-    """Build the benchmark DAG, or its test-partition synthetic smoke variant."""
+    """Build the benchmark DAG, or its test-partition synthetic smoke variant.
+
+    Tuning's adaptive search rounds submit themselves once a prior round
+    completes (see ``tune-decide``), so their true finish time is unknown at
+    submit time - confirm and analyze can never be statically chained after
+    them. ``confirm_only`` builds just that later stage, submitted
+    separately once every condition's tuning lock is resolved.
+    """
     if smoke:
         res = _resources(config, "smoke", True)
         res["partition"] = config.get("slurm", {}).get("test_partition", "gpu-test")
         return [SlurmJob("smoke", "smoke", **res)]
     arr = (0, 1, 2)
+    if confirm_only:
+        confirm_natural, confirm_controlled = _confirm_jobs(config)
+        an, combine = _analyze_jobs(config, confirm_natural, confirm_controlled, arr)
+        return [confirm_natural, confirm_controlled, an, combine]
     setup = _setup_jobs(config, arr) if not resume_tuning else []
     freeze_dependency = ("freeze",) if setup else ()
     plan = resume_plan(config) if resume_tuning else None
-    tuning = _tuning_jobs(config, freeze_dependency, plan)
-    confirm_natural, confirm_controlled = _confirm_jobs(config)
-    an, combine = _analyze_jobs(config, confirm_natural, confirm_controlled, arr)
-    return [*setup, *tuning, confirm_natural, confirm_controlled, an, combine]
+    return [*setup, *_tuning_jobs(config, freeze_dependency, plan)]
 
 
 def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJob]:
@@ -90,9 +101,6 @@ def _tuning_jobs(
     bundle_arg = f" --shards-per-task {shards_per_task}"
     bundle_size = partial(bundled_array_size, shards_per_task=shards_per_task)
     base_methods = tuple(method for method in roster if method not in DEPENDENT_METHODS)
-    dependent_methods = tuple(
-        method for method in roster if method in DEPENDENT_METHODS
-    )
     base_natural = (
         replace(
             _job(
@@ -141,62 +149,19 @@ def _tuning_jobs(
         tuple(job.name for job in (base_natural, base_controlled) if job),
         "tune_reduce",
     )
-    dependent_posthoc_natural = _job(
+    decide = _job(
         config,
-        "tune-dependent-posthoc-natural",
-        "tune-shard --phase dependent --group natural --shard-index 0",
-        True,
-        (base_reduce.name,),
-        "tune_post_hoc_natural",
-        "tune_natural",
-    )
-    dependent_crt_natural = replace(
-        _job(
-            config,
-            "tune-dependent-crt-natural",
-            "tune-shard --phase dependent --group natural"
-            f" --observations-per-candidate {natural_observations}"
-            f" --shard-offset 1 --bundle-by-observation{bundle_arg}",
-            True,
-            (base_reduce.name,),
-            "tune_natural",
-            "tune",
-        ),
-        array_size=bundled_observation_array_size(
-            candidate_array_size(("crt",)), natural_observations, shards_per_task
-        ),
-    )
-    dependent_controlled = replace(
-        _job(
-            config,
-            "tune-dependent-controlled",
-            f"tune-shard --phase dependent --group controlled{bundle_arg}",
-            True,
-            (base_reduce.name,),
-            "tune_controlled",
-            "tune",
-        ),
-        array_size=bundle_size(3 * candidate_array_size(dependent_methods)),
-    )
-    final_reduce = _job(
-        config,
-        "tune-final-reduce",
-        "tune-reduce --phase final",
+        "tune-decide-base",
+        "tune-decide --phase base --round 0",
         False,
-        (
-            dependent_posthoc_natural.name,
-            dependent_crt_natural.name,
-            dependent_controlled.name,
-        ),
+        (base_reduce.name,),
+        "tune_decide",
         "tune_reduce",
     )
     return [
         *[job for job in (base_natural, base_controlled) if job],
         base_reduce,
-        dependent_posthoc_natural,
-        dependent_crt_natural,
-        dependent_controlled,
-        final_reduce,
+        decide,
     ]
 
 
@@ -214,11 +179,12 @@ def submit_workflow(
     dry_run: bool = False,
     smoke: bool = False,
     resume_tuning: bool = False,
+    confirm_only: bool = False,
     submit: Callable[[str, bool], str] = _submit_script,
 ) -> dict[str, str]:
     """Render and submit the workflow in topological order, returning job IDs by stage."""
     submitted: dict[str, str] = {}
-    for job in build_workflow(config, smoke, resume_tuning):
+    for job in build_workflow(config, smoke, resume_tuning, confirm_only):
         dependencies = tuple(submitted[name] for name in job.dependencies)
         scheduled = replace(job, dependencies=dependencies)
         script = render_sbatch(scheduled, config, config_path)
@@ -242,4 +208,5 @@ def cmd_submit(args: argparse.Namespace) -> None:
         args.dry_run,
         getattr(args, "smoke", False),
         getattr(args, "resume_tuning", False),
+        getattr(args, "confirm_only", False),
     )

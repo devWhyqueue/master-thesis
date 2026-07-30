@@ -67,7 +67,7 @@ def resolve_round_shard_spec(
     (not-yet-trained) configs are addressed, reusing round 0's exact
     fixed-slot addressing over that smaller per-method grid.
     """
-    round_grids = load_round_grids(root, condition)
+    round_grids = load_round_grids(root, condition, phase)
     grids = {
         method: new_configs_for_round(
             root, condition, method, expand_grid(**round_grids["windows"][method])

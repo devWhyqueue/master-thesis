@@ -7,8 +7,11 @@ import pytest
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_registry,
     load_round_grids,
+    load_round_state,
+    merge_round_state,
     register_candidates,
     registry_lookup,
+    tuning_locked,
     write_round_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
@@ -71,14 +74,63 @@ def test_registries_are_scoped_per_condition(tmp_path):
 
 def test_round_grids_round_trip_signed(tmp_path):
     windows = {"ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None}}
-    write_round_grids(tmp_path, "moderate", 1, windows)
-    loaded = load_round_grids(tmp_path, "moderate")
+    write_round_grids(tmp_path, "moderate", "base", 1, windows)
+    loaded = load_round_grids(tmp_path, "moderate", "base")
     assert loaded == {"round": 1, "windows": windows}
 
 
+def test_round_grids_are_scoped_per_phase(tmp_path):
+    write_round_grids(tmp_path, "moderate", "base", 2, {"ce": {"lr_window": [1.0]}})
+    with pytest.raises(RuntimeError, match="no signed lock"):
+        load_round_grids(tmp_path, "moderate", "dependent")
+
+
 def test_round_grids_reject_tampering(tmp_path):
-    write_round_grids(tmp_path, "moderate", 1, {"ce": {"lr_window": [1.0]}})
-    path = tmp_path / "tuning_shards" / "tuning_round_grids_moderate.json"
+    write_round_grids(tmp_path, "moderate", "base", 1, {"ce": {"lr_window": [1.0]}})
+    path = tmp_path / "tuning_shards" / "tuning_round_grids_moderate_base.json"
     path.write_text(path.read_text().replace("1.0", "2.0"))
     with pytest.raises(RuntimeError, match="no longer matches"):
-        load_round_grids(tmp_path, "moderate")
+        load_round_grids(tmp_path, "moderate", "base")
+
+
+def test_merge_round_state_combines_base_and_dependent_phases(tmp_path):
+    merge_round_state(tmp_path, "moderate", {"ce": {"resolved": True, "tuning_limited": False}})
+    merge_round_state(tmp_path, "moderate", {"crt": {"resolved": False, "tuning_limited": True}})
+    state = load_round_state(tmp_path, "moderate")
+    assert state["ce"]["resolved"] is True
+    assert state["crt"]["tuning_limited"] is True
+
+
+def test_merge_round_state_overwrites_a_methods_prior_entry(tmp_path):
+    merge_round_state(tmp_path, "moderate", {"ce": {"resolved": False, "tuning_limited": False}})
+    merge_round_state(tmp_path, "moderate", {"ce": {"resolved": True, "tuning_limited": False}})
+    state = load_round_state(tmp_path, "moderate")
+    assert state["ce"]["resolved"] is True
+
+
+def test_tuning_locked_false_when_state_file_absent(tmp_path):
+    assert tuning_locked(tmp_path, "moderate", ("ce",)) is False
+
+
+def test_tuning_locked_false_when_a_required_method_is_missing(tmp_path):
+    merge_round_state(tmp_path, "moderate", {"ce": {"resolved": True, "tuning_limited": False}})
+    assert tuning_locked(tmp_path, "moderate", ("ce", "crt")) is False
+
+
+def test_tuning_locked_false_while_a_method_is_still_shifting(tmp_path):
+    merge_round_state(
+        tmp_path, "moderate", {"ce": {"resolved": False, "tuning_limited": False}}
+    )
+    assert tuning_locked(tmp_path, "moderate", ("ce",)) is False
+
+
+def test_tuning_locked_true_once_every_method_resolved_or_limited(tmp_path):
+    merge_round_state(
+        tmp_path,
+        "moderate",
+        {
+            "ce": {"resolved": True, "tuning_limited": False},
+            "crt": {"resolved": False, "tuning_limited": True},
+        },
+    )
+    assert tuning_locked(tmp_path, "moderate", ("ce", "crt")) is True

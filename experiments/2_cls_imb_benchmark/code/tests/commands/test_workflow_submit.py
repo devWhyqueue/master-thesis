@@ -44,7 +44,12 @@ def _config() -> dict[str, object]:
     }
 
 def test_workflow_has_resumable_sharded_tuning_dag() -> None:
-    """Tuning fans out by candidate and reduces before confirmation."""
+    """Base tuning fans out by candidate, reduces, then hands off to tune-decide.
+
+    Dependent-phase (crt/post-hoc) round-0 jobs are no longer statically
+    chained here: CE may still need further adaptive rounds after this
+    reduce, so tune-decide submits them itself only once CE resolves.
+    """
     jobs = build_workflow(_config())
     assert [job.name for job in jobs] == [
         "prepare",
@@ -53,39 +58,53 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "tune-base-natural",
         "tune-base-controlled",
         "tune-base-reduce",
-        "tune-dependent-posthoc-natural",
-        "tune-dependent-crt-natural",
-        "tune-dependent-controlled",
-        "tune-final-reduce",
-        "confirm-natural",
-        "confirm-controlled",
-        "analyze",
-        "analyze-combine",
+        "tune-decide-base",
     ]
-    assert jobs[-4].dependencies == ("tune-final-reduce",)
-    assert jobs[-3].dependencies == ("tune-final-reduce",)
-    assert jobs[-2].dependencies == ("confirm-natural", "confirm-controlled")
-    assert jobs[-2].array_splits == (0, 1, 2)
-    assert jobs[-1].dependencies == ("analyze",)
+    assert jobs[5].dependencies == ("tune-base-natural", "tune-base-controlled")
+    assert jobs[6].dependencies == ("tune-base-reduce",)
+    assert jobs[6].command == "tune-decide --phase base --round 0"
     assert jobs[3].array_size == 396
     assert "--observations-per-candidate 6" in jobs[3].command
     assert "--shards-per-task 2" in jobs[3].command
     assert "--bundle-by-observation" in jobs[3].command
     assert jobs[3].memory == "32G"
     assert jobs[4].array_size == 198
-    assert jobs[6].array_size == 0
-    assert "--shard-index 0" in jobs[6].command
-    assert jobs[7].array_size == 12
-    assert "--observations-per-candidate 6" in jobs[7].command
-    assert "--shard-offset 1" in jobs[7].command
-    assert "--bundle-by-observation" in jobs[7].command
-    assert jobs[8].array_size == 8
     natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
     assert "#SBATCH --mem=32G" in natural_script
 
+
+def test_dependent_round_zero_jobs_match_the_frozen_shapes() -> None:
+    """Dependent-phase round-0 jobs (submitted by tune-decide) keep today's sizes."""
+    from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
+
+    posthoc, crt, controlled = dependent_round_zero_jobs(_config(), is_mil=False)
+    assert posthoc.array_size == 0
+    assert "--shard-index 0" in posthoc.command
+    assert crt.array_size == 12
+    assert "--observations-per-candidate 6" in crt.command
+    assert "--shard-offset 1" in crt.command
+    assert "--bundle-by-observation" in crt.command
+    assert controlled.array_size == 8
+
+
+def test_confirm_only_builds_just_confirm_and_analyze() -> None:
+    """confirm_only submits the later stage separately once tuning is locked."""
+    jobs = build_workflow(_config(), confirm_only=True)
+    assert [job.name for job in jobs] == [
+        "confirm-natural",
+        "confirm-controlled",
+        "analyze",
+        "analyze-combine",
+    ]
+    assert jobs[0].dependencies == ()
+    assert jobs[1].dependencies == ()
+    assert jobs[2].dependencies == ("confirm-natural", "confirm-controlled")
+    assert jobs[2].array_splits == (0, 1, 2)
+    assert jobs[3].dependencies == ("analyze",)
+
 def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None:
     """Confirmation no longer shares one two-day array across every condition."""
-    jobs = build_workflow(_config())
+    jobs = build_workflow(_config(), confirm_only=True)
     confirm_natural = next(j for j in jobs if j.name == "confirm-natural")
     confirm_controlled = next(j for j in jobs if j.name == "confirm-controlled")
 
@@ -116,14 +135,27 @@ def test_submit_links_actual_job_ids() -> None:
 
     submitted = submit_workflow(_config(), submit=fake_submit)
     assert submitted["prepare"] == "1"
-    assert submitted["analyze-combine"] == str(len(submitted_scripts))
+    assert submitted["tune-decide-base"] == str(len(submitted_scripts))
     assert "#SBATCH --dependency=afterok:4:5" in submitted_scripts[5]
-    assert "#SBATCH --dependency=afterok:7:8:9" in submitted_scripts[9]
-    assert "#SBATCH --dependency=afterok:10" in submitted_scripts[10]
-    assert "#SBATCH --dependency=afterok:10" in submitted_scripts[11]
-    assert "#SBATCH --dependency=afterok:11:12" in submitted_scripts[12]
-    assert submitted["analyze"] == "13"
-    assert "#SBATCH --dependency=afterok:13" in submitted_scripts[13]
+    assert "#SBATCH --dependency=afterok:6" in submitted_scripts[6]
+
+
+def test_confirm_only_links_actual_job_ids() -> None:
+    """A separate confirm_only submission chains confirm into analyze on its own."""
+    submitted_scripts: list[str] = []
+
+    def fake_submit(script: str, dry_run: bool) -> str:
+        submitted_scripts.append(script)
+        return str(len(submitted_scripts))
+
+    submitted = submit_workflow(_config(), confirm_only=True, submit=fake_submit)
+    assert submitted["confirm-natural"] == "1"
+    assert submitted["confirm-controlled"] == "2"
+    assert "#SBATCH --dependency=" not in submitted_scripts[0]
+    assert "#SBATCH --dependency=afterok:1:2" in submitted_scripts[2]
+    assert submitted["analyze"] == "3"
+    assert "#SBATCH --dependency=afterok:3" in submitted_scripts[3]
+    assert submitted["analyze-combine"] == "4"
 
 
 def test_resume_tuning_skips_completed_setup(monkeypatch) -> None:
@@ -160,7 +192,10 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
     """Large image copies must not be repeated across downstream array jobs."""
     scripts = {
         job.name: render_sbatch(job, _config(), "config.yaml")
-        for job in build_workflow(_config())
+        for job in [
+            *build_workflow(_config()),
+            *build_workflow(_config(), confirm_only=True),
+        ]
     }
 
     assert f"cp {SQUASHFS_SOURCE}" in scripts["prepare"]
@@ -204,7 +239,7 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
 
     scripts = {
         job.name: render_sbatch(job, config, "config.yaml")
-        for job in build_workflow(config)
+        for job in [*build_workflow(config), *build_workflow(config, confirm_only=True)]
     }
 
     prepare = scripts["prepare"]

@@ -20,6 +20,10 @@ __all__ = [
     "round_grids_path",
     "write_round_grids",
     "load_round_grids",
+    "round_state_path",
+    "merge_round_state",
+    "load_round_state",
+    "tuning_locked",
 ]
 
 
@@ -91,13 +95,22 @@ def select_candidate_payload(payloads: list[dict[str, Any]]) -> dict[str, Any]:
     return selected
 
 
-def round_grids_path(root: Path, condition: str) -> Path:
-    """Path to one condition's signed current-round active-window record."""
-    return root / "tuning_shards" / f"tuning_round_grids_{condition}.json"
+def round_grids_path(root: Path, condition: str, phase: str) -> Path:
+    """Path to one condition/phase's signed current-round active-window record.
+
+    Base and dependent methods can be on different round numbers at once
+    (dependent only starts once CE resolves), so each phase tracks its own
+    round independently.
+    """
+    return root / "tuning_shards" / f"tuning_round_grids_{condition}_{phase}.json"
 
 
 def write_round_grids(
-    root: Path, condition: str, round_index: int, windows: dict[str, dict[str, Any]]
+    root: Path,
+    condition: str,
+    phase: str,
+    round_index: int,
+    windows: dict[str, dict[str, Any]],
 ) -> Path:
     """Sign this round's active lr/strength windows so shard, reduce, and decide agree.
 
@@ -105,14 +118,54 @@ def write_round_grids(
     ``{"lr_window": [...], "strength_window": [...] | None}``; a method
     already resolved or tuning-limited is simply absent.
     """
-    path = round_grids_path(root, condition)
+    path = round_grids_path(root, condition, phase)
     write_json(path, {"round": round_index, "windows": windows})
     sign_file(path)
     return path
 
 
-def load_round_grids(root: Path, condition: str) -> dict[str, Any]:
+def load_round_grids(root: Path, condition: str, phase: str) -> dict[str, Any]:
     """Load and verify the current round's signed active windows."""
-    path = round_grids_path(root, condition)
+    path = round_grids_path(root, condition, phase)
     verify_signed_file(path)
     return json.loads(path.read_text())
+
+
+def round_state_path(root: Path, condition: str) -> Path:
+    """Path to one condition's signed tuning lock, covering every phase's methods."""
+    return root / "tuning_shards" / f"tuning_round_state_{condition}.json"
+
+
+def merge_round_state(root: Path, condition: str, updates: dict[str, Any]) -> Path:
+    """Sign an updated tuning lock, merging one phase's methods into any prior state."""
+    path = round_state_path(root, condition)
+    state = load_round_state(root, condition) if path.exists() else {}
+    state.update(updates)
+    write_json(path, state)
+    sign_file(path)
+    return path
+
+
+def load_round_state(root: Path, condition: str) -> dict[str, Any]:
+    """Load and verify the current signed tuning lock."""
+    path = round_state_path(root, condition)
+    verify_signed_file(path)
+    return json.loads(path.read_text())
+
+
+def tuning_locked(root: Path, condition: str, methods: tuple[str, ...]) -> bool:
+    """True once every required method is resolved or correctly marked tuning-limited.
+
+    This is the tuning lock confirmation must check: a method's mere
+    presence in a selection file is not enough, since a round's winner
+    can still be an unresolved edge case awaiting another round.
+    """
+    path = round_state_path(root, condition)
+    if not path.exists():
+        return False
+    state = load_round_state(root, condition)
+    return all(
+        method in state
+        and (state[method]["resolved"] or state[method]["tuning_limited"])
+        for method in methods
+    )

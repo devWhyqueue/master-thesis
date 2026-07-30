@@ -68,6 +68,7 @@ def reduce_tuning_shards(
 def round_overridden_scopes(
     root: Path,
     condition: str,
+    phase: str,
     scopes: list[tuple[dict[str, Path], Any, Any]],
     methods: tuple[str, ...],
 ) -> list[tuple[dict[str, Path], Any, Any]]:
@@ -78,7 +79,7 @@ def round_overridden_scopes(
     just a regime whose grids hold this round's values at the same indices
     ``resolve_round_shard_spec`` used to address them.
     """
-    round_grids = load_round_grids(root, condition)
+    round_grids = load_round_grids(root, condition, phase)
     overrides = {
         method: new_configs_for_round(
             root, condition, method, expand_grid(**round_grids["windows"][method])

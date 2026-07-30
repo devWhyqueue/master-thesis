@@ -66,7 +66,7 @@ def test_resolve_round_shard_spec_addresses_only_new_configs(tmp_path) -> None:
     windows = {
         "ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None}
     }
-    write_round_grids(tmp_path, "moderate", 1, windows)
+    write_round_grids(tmp_path, "moderate", "base", 1, windows)
     # 3e-4, 1e-3, 3e-3 already trained in round 0; only 1e-2 is new this round.
     register_candidates(tmp_path, "moderate", "ce", [{"lr": v} for v in windows["ce"]["lr_window"][:3]], round_index=0)
 
@@ -79,6 +79,7 @@ def test_resolve_round_shard_spec_skips_a_method_with_nothing_new(tmp_path) -> N
     write_round_grids(
         tmp_path,
         "moderate",
+        "base",
         1,
         {
             "ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None},

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -18,6 +19,9 @@ from imbalance_benchmark.common import (
     load_config,
     split_paths,
     verify_signed_file,
+)
+from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    tuning_locked,
 )
 from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.datasets.data import load_training_dataset
@@ -50,7 +54,9 @@ def _confirm_condition(
     train_ds: TrainDataset = load_training_dataset(
         run.paths["data"] / file_name, run.is_mil, class_names=run.class_names
     )
-    cond_configs = require_tuning_configs(best_configs, methods)
+    cond_configs = require_tuning_configs(
+        run.paths["data"].parent.parent / "data", cond, best_configs, methods
+    )
     ce_states: list[tuple[dict[str, Any], int]] | None = None
     for method in methods:
         cfg = cond_configs[method]
@@ -131,14 +137,26 @@ def _confirm_inputs(
 
 
 def require_tuning_configs(
-    configs: dict[str, Any], methods: tuple[str, ...]
+    root: Path, condition: str, configs: dict[str, Any], methods: tuple[str, ...]
 ) -> dict[str, Any]:
-    """Refuse confirmation if a prespecified method lacks its signed selection."""
+    """Refuse confirmation if a method lacks its selection or its tuning lock.
+
+    A selection can exist yet still be mid-search: an adaptive round's
+    winner may be an unresolved edge case awaiting another round. Only a
+    signed tuning-round-state showing every method resolved or correctly
+    marked tuning-limited - the tuning lock - may unblock confirmation.
+    """
     missing = [
         method for method in methods if not isinstance(configs.get(method), dict)
     ]
     if missing:
         raise RuntimeError(f"missing tuning selection for methods: {missing}")
+    if not tuning_locked(root, condition, methods):
+        raise RuntimeError(
+            f"tuning lock unresolved for condition {condition!r}; "
+            "confirmation refused until every search window is resolved "
+            "or correctly marked tuning-limited"
+        )
     return configs
 
 

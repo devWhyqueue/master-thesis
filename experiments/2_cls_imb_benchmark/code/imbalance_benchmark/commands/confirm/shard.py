@@ -58,7 +58,12 @@ def _confirm_unit_method(
         run.is_mil,
         class_names=run.class_names,
     )
-    configs = require_tuning_configs(best_configs, _required_methods(method))
+    configs = require_tuning_configs(
+        run.paths["data"].parent.parent / "data",
+        cond,
+        best_configs,
+        _required_methods(method),
+    )
     if method == "ce":
         state, step = confirm_ce_seed(cond, configs["ce"], train_ds, run, seed_idx)
         confirm_post_hoc_seed(

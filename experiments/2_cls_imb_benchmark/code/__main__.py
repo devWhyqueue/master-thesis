@@ -22,6 +22,7 @@ from imbalance_benchmark.commands import (
     cmd_tile_wsi,
     cmd_tile_wsi_reduce,
     cmd_tune,
+    cmd_tune_decide,
     cmd_tune_reduce,
     cmd_tune_shard,
 )
@@ -59,6 +60,7 @@ def _parser() -> argparse.ArgumentParser:
     submit.add_argument("--dry-run", action="store_true")
     submit.add_argument("--smoke", action="store_true")
     submit.add_argument("--resume-tuning", action="store_true")
+    submit.add_argument("--confirm-only", action="store_true")
     tile_wsi = sub.add_parser("tile-wsi")
     tile_wsi.add_argument("--slide-index", type=int, required=True)
     tile_wsi.add_argument("--shard-size", type=int, default=1)
@@ -81,6 +83,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     reduce = sub.choices["tune-reduce"]
     reduce.add_argument("--phase", choices=("base", "final"), required=True)
+    decide = sub.add_parser("tune-decide")
+    decide.add_argument("--phase", choices=("base", "dependent"), required=True)
+    decide.add_argument(
+        "--condition",
+        choices=("natural", "balanced", "moderate", "severe"),
+        required=True,
+    )
+    decide.add_argument("--round", type=int, default=0)
     confirm_shard = sub.choices["confirm-shard"]
     confirm_shard.add_argument(
         "--group", choices=("natural", "controlled"), required=True
@@ -99,6 +109,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "tune": cmd_tune,
         "tune-shard": cmd_tune_shard,
         "tune-reduce": cmd_tune_reduce,
+        "tune-decide": cmd_tune_decide,
         "confirm": cmd_confirm,
         "confirm-shard": cmd_confirm_shard,
         "analyze": cmd_analyze,
