@@ -100,20 +100,20 @@ def build_strata(identity: pd.DataFrame) -> pd.Series:
 def resample_patient_weights(
     strata: pd.Series, n_replicates: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Resample patients with replacement within each stratum, vectorized over replicates.
+    """Bayesian bootstrap (Rubin 1981): independent Dirichlet weight per patient.
 
     Returns ``(case_ids, weights)`` where ``weights`` has shape
-    ``(n_patients, n_replicates)``; each stratum's column sum is exactly the
-    stratum's patient count in every replicate (only the within-stratum
-    allocation varies), which is what preserves class representation exactly.
+    ``(n_patients, n_replicates)``. Every patient draws an independent,
+    strictly positive, continuous weight each replicate (a Dirichlet draw
+    is almost-surely positive in every coordinate), so a patient whose
+    contribution pattern is unique never collapses to zero simulated
+    variance the way a per-stratum multinomial draw did. ``strata`` is
+    accepted only for its patient index (grouping now feeds diagnostics in
+    :mod:`preflight`, not the draw itself).
     """
     case_ids = strata.index.to_numpy()
-    weights = np.zeros((len(case_ids), n_replicates), dtype=np.int64)
-    for _, members in strata.groupby(strata):
-        idx = np.flatnonzero(np.isin(case_ids, members.index.to_numpy()))
-        m = len(idx)
-        draws = rng.multinomial(m, np.full(m, 1.0 / m), size=n_replicates)
-        weights[idx, :] = draws.T
+    n = len(case_ids)
+    weights = n * rng.dirichlet(np.ones(n), size=n_replicates).T
     return case_ids, weights
 
 

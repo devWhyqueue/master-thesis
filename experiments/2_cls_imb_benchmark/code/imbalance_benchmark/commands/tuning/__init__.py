@@ -27,9 +27,6 @@ from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     reduce_tuning_shards,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
-    write_serial_cost,
-)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import combined_scopes
 
 __all__ = ["cmd_tune", "cmd_tune_reduce"]
@@ -37,6 +34,32 @@ __all__ = ["cmd_tune", "cmd_tune_reduce"]
 
 def _is_excluded(paths: dict[str, Path]) -> bool:
     return (paths["data"] / "confirmatory_exclusion.json").exists()
+
+
+def write_serial_cost(
+    paths: dict[str, Path],
+    started: float,
+    search_cost: dict[str, float | int],
+    condition: str | None,
+) -> None:
+    """Preserve cost output for the legacy serial tuning command."""
+    elapsed = time.perf_counter() - started
+    name = (
+        f"tuning_search_cost_{condition}.json"
+        if condition
+        else "tuning_search_cost.json"
+    )
+    write_json(
+        paths["data"] / name,
+        {
+            "wall_clock_seconds": elapsed,
+            "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
+            "peak_accelerator_memory_bytes": int(torch.cuda.max_memory_allocated())
+            if torch.cuda.is_available()
+            else 0,
+            **search_cost,
+        },
+    )
 
 
 def _tuning_inputs(

@@ -168,15 +168,21 @@ def test_kish_effective_count_uniform_weights_equals_n():
     kish = kish_effective_count(weights)
     assert np.allclose(kish, 10.0)
 
-def test_stratum_preservation_invariant():
+def test_stratum_weights_vary_but_average_to_the_stratum_size():
+    """The Bayesian bootstrap drops the retired multinomial draw's exact
+    per-replicate stratum-sum invariant: each patient's Dirichlet weight is
+    now independent, so a stratum's weight sum varies across replicates -
+    but stays unbiased, converging to the stratum's patient count on average.
+    """
     identity = _toy_identity()
     strata = build_strata(identity)
     rng = np.random.default_rng(0)
-    case_ids, weights = resample_patient_weights(strata, n_replicates=500, rng=rng)
+    case_ids, weights = resample_patient_weights(strata, n_replicates=2000, rng=rng)
     for stratum_key, members in strata.groupby(strata):
         idx = np.isin(case_ids, members.index.to_numpy())
         stratum_sum = weights[idx, :].sum(axis=0)
-        assert np.all(stratum_sum == len(members))
+        assert not np.all(stratum_sum == len(members))
+        assert stratum_sum.mean() == pytest.approx(len(members), abs=0.5)
 
 def test_crossed_strata_distinguish_complete_split_by_class_contributions():
     identity = pd.DataFrame(

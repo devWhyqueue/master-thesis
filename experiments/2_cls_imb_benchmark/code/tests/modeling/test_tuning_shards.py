@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from imbalance_benchmark.modeling.workflows.tuning_aggregate import combined_cost
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
-    combined_cost,
     select_candidate_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (

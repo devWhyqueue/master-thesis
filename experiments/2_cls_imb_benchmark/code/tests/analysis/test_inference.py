@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from imbalance_benchmark.analysis.inference.bootstrap import resample_patient_weights
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_block_permutation_ba,
 )
@@ -18,6 +19,7 @@ from imbalance_benchmark.analysis.inference.permutation import (
 )
 from imbalance_benchmark.analysis.inference.preflight import (
     _class_preflight,
+    _weights_vary,
     require_valid_preflight,
     run_preflight,
 )
@@ -270,6 +272,7 @@ def test_freeze_stops_when_a_preflight_validity_check_fails() -> None:
     valid = {
         "all_split_level_metrics_computable": True,
         "identical_multiplicities_across_split_appearances": True,
+        "patient_weights_vary": True,
         "is_descriptive_only": True,
     }
     require_valid_preflight(valid)
@@ -277,6 +280,59 @@ def test_freeze_stops_when_a_preflight_validity_check_fails() -> None:
     for key in (
         "all_split_level_metrics_computable",
         "identical_multiplicities_across_split_appearances",
+        "patient_weights_vary",
     ):
         with pytest.raises(RuntimeError, match="preflight failed"):
             require_valid_preflight({**valid, key: False})
+
+
+def test_bayesian_weights_give_every_patient_positive_variance() -> None:
+    """The Rubin (1981) Bayesian bootstrap must vary even a singleton stratum's weight.
+
+    The retired per-stratum multinomial draw gave a singleton contribution
+    pattern weight 1 in every replicate - zero simulated variance. Every
+    patient, including one with a unique split-by-class pattern, must now
+    draw an independent, varying weight.
+    """
+    strata = pd.Series(
+        [("test", "A", 1), ("test", "A", 1), ("test", "B", 1)],
+        index=["singleton_A1", "singleton_A2", "singleton_B"],
+    )
+    rng = np.random.default_rng(0)
+
+    case_ids, weights = resample_patient_weights(strata, n_replicates=2000, rng=rng)
+
+    assert set(case_ids) == set(strata.index)
+    assert np.all(weights > 0)
+    assert np.all(np.var(weights, axis=1) > 0)
+    # Bayesian bootstrap weights average to 1 (n * Dirichlet(1,...,1) mean).
+    assert weights.mean(axis=1) == pytest.approx(1.0, abs=0.1)
+
+
+def test_degenerate_patient_weights_fail_preflight() -> None:
+    """A patient whose weight never varies must fail the new validity check."""
+    identity = pd.DataFrame(
+        {"case_id": ["p1", "p1", "p2"], "cancer_type": ["A", "A", "B"]}
+    )
+    constant_weights = np.ones((3, 5))
+
+    assert _weights_vary(identity, constant_weights, n_replicates=5) is False
+
+    varying_weights = np.array(
+        [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0], [5.0, 1.0, 4.0, 2.0, 3.0]]
+    )
+    assert _weights_vary(identity, varying_weights, n_replicates=5) is True
+
+
+def test_unique_resampled_patients_below_five_is_descriptive_even_with_good_kish() -> (
+    None
+):
+    """A structural patient-count shortfall must gate even with concentrated,
+    well-balanced weights (i.e. it is not merely a restatement of Kish)."""
+    weights = np.ones((4, 100))  # 4 patients, equal weight every replicate: Kish == 4
+
+    result = _class_preflight(np.arange(4), weights, n_replicates=100)
+
+    assert result["kish_effective_count"] == pytest.approx(4.0)
+    assert result["unique_resampled_patients"] == pytest.approx(4.0)
+    assert result["is_descriptive_only"] is True

@@ -20,7 +20,7 @@ def _class_preflight(
     unique_cases = np.unique(case_of_row)
     pos = {c: i for i, c in enumerate(unique_cases)}
     idx = np.asarray([pos[c] for c in case_of_row])
-    patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.int64)
+    patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.float64)
     np.add.at(patient_w, idx, class_row_weights)
     kish = kish_effective_count(patient_w)
     sum_w, max_w = patient_w.sum(axis=0), patient_w.max(axis=0)
@@ -29,13 +29,20 @@ def _class_preflight(
     frac_dominant = float(np.mean(max_frac > 0.5))
     mean_kish = float(np.mean(kish))
     min_kish = float(np.min(kish))
+    # Under the Bayesian bootstrap every patient's weight is a.s. positive in
+    # every replicate, so this is really a structural patient-count check
+    # (distinct from Kish's weight-concentration check), not a resampling
+    # artifact the way it was under the retired multinomial draw.
+    unique_resampled = float(np.mean((patient_w > 0).sum(axis=0)))
     return {
-        "unique_resampled_patients": float(np.mean((patient_w > 0).sum(axis=0))),
+        "unique_resampled_patients": unique_resampled,
         "kish_effective_count": mean_kish,
         "min_kish_effective_count": min_kish,
         "max_patient_weight_fraction": float(np.mean(max_frac)),
         "frac_replicates_dominant": frac_dominant,
-        "is_descriptive_only": bool(min_kish < 5.0 or frac_dominant > 0.05),
+        "is_descriptive_only": bool(
+            min_kish < 5.0 or frac_dominant > 0.05 or unique_resampled < 5.0
+        ),
     }
 
 
@@ -105,6 +112,9 @@ def _split_class_diagnostic(
     diagnostic = _class_preflight(
         identity.loc[mask, "case_id"].to_numpy(), weights[mask, :], n_replicates
     )
+    # Defensive: under the Bayesian bootstrap every weight is a.s. positive,
+    # so this is always True in practice; kept as a guard against a future
+    # resampling change reintroducing an unrepresented cell.
     represented = bool((weights[mask, :].sum(axis=0) > 0).all())
     diagnostic.update(
         all_replicates_represented=represented, metric_computable=represented
@@ -126,12 +136,31 @@ def _multiplicities_match(identity: pd.DataFrame, weights: np.ndarray) -> bool:
     )
 
 
+def _weights_vary(
+    identity: pd.DataFrame, weights: np.ndarray, n_replicates: int
+) -> bool:
+    """True iff every patient's resampled weight actually varies across replicates.
+
+    A Bayesian-bootstrap sanity check: a patient whose weight were constant
+    across replicates would mean the Dirichlet draw is not doing its job for
+    that patient (e.g. a regression reintroducing a degenerate weight), so
+    this must hold for every patient whenever more than one replicate exists.
+    """
+    if n_replicates <= 1:
+        return True
+    cases = identity["case_id"].to_numpy()
+    _, first_row_of_case = np.unique(cases, return_index=True)
+    patient_w = weights[first_row_of_case, :]
+    return bool(np.all(np.var(patient_w, axis=1) > 0))
+
+
 def _preflight_result(
     n_replicates: int,
     seed: int,
     by_class: dict[str, Any],
     by_split_class: dict[str, dict[str, Any]],
     multiplicities_match: bool,
+    weights_vary: bool,
 ) -> dict[str, Any]:
     """Assemble the immutable preflight report from its component diagnostics."""
     diagnostics = [
@@ -146,6 +175,7 @@ def _preflight_result(
             value["metric_computable"] for value in diagnostics
         ),
         "identical_multiplicities_across_split_appearances": multiplicities_match,
+        "patient_weights_vary": weights_vary,
         "is_descriptive_only": any(
             value["is_descriptive_only"] for value in diagnostics
         ),
@@ -160,9 +190,10 @@ def run_preflight(
     """Per split-frame, by-class preflight: unique resampled patients, Kish, max weight.
 
     Mean Kish and max-weight fractions are reported across replicates. Inference
-    is descriptive-only when any replicate's Kish count is below five, or when one
+    is descriptive-only when any replicate's Kish count is below five, when one
     patient supplies more than 50% of a class's weight in more than 5% of
-    replicates, per report §"Imbalance deficit, recovery, and inference".
+    replicates, or when a split/class cell has fewer than five contributing
+    patients, per report §"Imbalance deficit, recovery, and inference".
     """
     row_weights = _preflight_row_weights(identity, n_replicates, seed)
     by_class = _diagnostics_by_class(identity, row_weights, n_replicates)
@@ -173,6 +204,7 @@ def run_preflight(
         by_class,
         by_split_class,
         _multiplicities_match(identity, row_weights),
+        _weights_vary(identity, row_weights, n_replicates),
     )
 
 
@@ -182,6 +214,9 @@ _VALIDITY_CHECKS = {
     ),
     "identical_multiplicities_across_split_appearances": (
         "a split unit received different multiplicities across its split appearances"
+    ),
+    "patient_weights_vary": (
+        "a patient's resampled weight does not vary across replicates"
     ),
 }
 

@@ -9,8 +9,10 @@ from imbalance_benchmark.commands import tuning
 from imbalance_benchmark.commands.tuning import shard as tuning_shard
 from imbalance_benchmark.commands.confirm import require_tuning_configs
 from imbalance_benchmark.modeling.context import Regime
+from imbalance_benchmark.modeling.workflows import tuning_aggregate
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     TuningScope,
+    _select_post_hoc,
     _select_trainable,
     summarize_tuning_cost,
 )
@@ -55,6 +57,46 @@ def test_tuning_uses_the_frozen_candidate_grid(
     _select_trainable("ce", [scope], [7])
 
     assert observed == [{"lr": 0.123}]
+
+def test_select_post_hoc_persists_every_taus_averaged_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The signed selection must reproduce every tau's metrics, not only the winner."""
+    regime = Regime(
+        torch.device("cpu"),
+        {},
+        2,
+        False,
+        method_grids={
+            "post_hoc_logit_adjustment": [{"parameter": p} for p in (0.5, 1.0, 2.0)]
+        },
+    )
+    train_ds = type("DS", (), {"get_int_targets": lambda self: [0, 1, 0, 1]})()
+    scope = TuningScope(regime, object(), train_ds)
+    canned = {0.5: (0.6, 0.5, 0.9), 1.0: (0.8, 0.7, 0.5), 2.0: (0.4, 0.3, 1.2)}
+    fake_model = type("Model", (), {"load_state_dict": lambda self, state: None})()
+
+    def fake_run_evaluation(
+        model: Any, val_loader: Any, device: Any, is_mil: Any, n_classes: Any,
+        tau: float, priors: Any,
+    ) -> dict[str, float]:
+        ba, f1, nll = canned[tau]
+        return {"balanced_accuracy": ba, "macro_f1": f1, "nll": nll}
+
+    monkeypatch.setattr(tuning_aggregate, "_evaluate", lambda *a, **k: ({}, {}))
+    monkeypatch.setattr(
+        tuning_aggregate, "build_training_ctx", lambda *a, **k: {"model": fake_model}
+    )
+    monkeypatch.setattr(tuning_aggregate, "run_evaluation", fake_run_evaluation)
+
+    result = _select_post_hoc({}, [scope], [7])
+
+    assert result["parameter"] == 1.0
+    assert result["taus"] == {
+        "0.5": {"balanced_accuracy": 0.6, "macro_f1": 0.5, "nll": 0.9},
+        "1.0": {"balanced_accuracy": 0.8, "macro_f1": 0.7, "nll": 0.5},
+        "2.0": {"balanced_accuracy": 0.4, "macro_f1": 0.3, "nll": 1.2},
+    }
 
 def test_tuning_cost_summarizes_parameter_counts_and_effective_passes() -> None:
     """Validation-search cost must expose its model size and realized data passes."""

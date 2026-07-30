@@ -22,10 +22,12 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
 from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
     STRENGTH_ENVELOPES,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
+    write_base_selection,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     ReduceRound,
     reduce_phase,
-    write_base_selection,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     RoundState,
@@ -123,7 +125,7 @@ def cmd_tune_decide(args: argparse.Namespace) -> None:
     )
     states = {
         method: decide_next_round(method, selections[method], *windows[method])
-        for method in methods
+        for method in selections
     }
     merge_round_state(base["data"], args.condition, round_payload(states))
     if args.phase == "base":

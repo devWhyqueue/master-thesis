@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import pytest
@@ -11,8 +12,17 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
     load_round_state,
     merge_round_state,
+    write_round_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.search_windows import LR_ENVELOPE
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
+    ShardSpec,
+    shard_path,
+    write_atomic,
+)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
+    write_base_selection,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import decide_next_round
 
 
@@ -138,6 +148,90 @@ def test_advance_skips_dependent_phase_if_already_started(tmp_path, monkeypatch)
     )
 
     assert submitted == []
+
+
+def test_cmd_tune_decide_handles_a_later_round_with_only_some_methods_active(
+    tmp_path, monkeypatch
+):
+    """A method resolved in an earlier round must survive a later round's
+    decide call for a *different* still-shifting method: no KeyError from
+    the round's active-method subset, and no lost base selection."""
+    base = {"data": tmp_path}
+    merge_round_state(
+        tmp_path, "moderate", {"ce": {"resolved": True, "tuning_limited": False}}
+    )
+    write_base_selection(tmp_path, "moderate", {"ce": {"lr": 1e-4}})
+    write_round_grids(
+        tmp_path,
+        "moderate",
+        "base",
+        1,
+        {"weighted_ce": {"lr_window": [1e-4, 3e-4], "strength_window": [0.25, 0.5]}},
+    )
+    grid = [{"parameter": p, "lr": lr} for p in (0.25, 0.5) for lr in (1e-4, 3e-4)]
+    for index, cfg in enumerate(grid):
+        write_atomic(
+            shard_path(
+                tmp_path, ShardSpec("moderate", "weighted_ce", index, "base", round=1)
+            ),
+            {
+                "complete": True,
+                "fingerprint": ["fp"],
+                "spec": {
+                    "condition": "moderate",
+                    "method": "weighted_ce",
+                    "candidate_index": index,
+                    "phase": "base",
+                    "observation_index": None,
+                    "round": 1,
+                },
+                "seeds": [11],
+                "scope_count": 1,
+                "observation_keys": [{"scope_index": 0, "seed_index": 0, "seed": 11}],
+                "cost_records": [{}],
+                "config": cfg,
+                "metrics": [
+                    {
+                        "scope_index": 0,
+                        "seed_index": 0,
+                        "seed": 11,
+                        "balanced_accuracy": 0.5,
+                        "macro_f1": 0.5,
+                        "nll": 0.5,
+                    }
+                ],
+            },
+        )
+
+    fake_regime = type("Regime", (), {"is_mil": False})()
+    monkeypatch.setattr(
+        decide,
+        "_frozen_shard_context",
+        lambda args: (
+            base,
+            [({"data": tmp_path}, fake_regime, None)],
+            {"runtime_config": {}},
+            ["fp"],
+        ),
+    )
+    monkeypatch.setattr(decide, "_is_excluded", lambda paths: False)
+    advanced = []
+    monkeypatch.setattr(
+        decide, "_advance", lambda *a: advanced.append(a)
+    )
+
+    decide.cmd_tune_decide(_args(round_index=1))
+
+    state = load_round_state(tmp_path, "moderate")
+    assert state["ce"] == {"resolved": True, "tuning_limited": False}
+    assert "weighted_ce" in state
+
+    saved = json.loads(
+        (tmp_path / "tuning_shards" / "base_selections_moderate.json").read_text()
+    )
+    assert saved["ce"] == {"lr": 1e-4}
+    assert "weighted_ce" in saved
+    assert len(advanced) == 1
 
 
 def _fake_job(name: str):

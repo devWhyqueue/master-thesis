@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from typing import Any
 
 import torch
@@ -14,7 +15,12 @@ from imbalance_benchmark.modeling.context import (
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
 
-__all__ = ["TuningScope", "tune_across_splits", "summarize_tuning_cost"]
+__all__ = [
+    "TuningScope",
+    "tune_across_splits",
+    "summarize_tuning_cost",
+    "combined_cost",
+]
 
 
 @dataclass
@@ -142,10 +148,24 @@ def _select_trainable(
     return best_cfg
 
 
+def _tau_metrics_summary(metrics: list[tuple[float, float, float]]) -> dict[str, float]:
+    """Average one tau's balanced accuracy, macro-F1, and NLL across observations."""
+    return {
+        "balanced_accuracy": sum(metric[0] for metric in metrics) / len(metrics),
+        "macro_f1": sum(metric[1] for metric in metrics) / len(metrics),
+        "nll": sum(metric[2] for metric in metrics) / len(metrics),
+    }
+
+
 def _select_post_hoc(
     ce_config: dict[str, Any], scopes: list[TuningScope], seeds: list[int]
 ) -> dict[str, Any]:
-    """Select one post-hoc strength from all selected CE checkpoints."""
+    """Select one post-hoc strength from all selected CE checkpoints.
+
+    Every tau's averaged metrics are persisted alongside the selected one,
+    not just the winner, so the selection is reproducible from the signed
+    tuning selection alone without rerunning evaluation.
+    """
     taus = [
         cfg["parameter"]
         for cfg in _frozen_grid(scopes[0].regime, "post_hoc_logit_adjustment")
@@ -178,7 +198,11 @@ def _select_post_hoc(
                 observations[tau].append(
                     (result["balanced_accuracy"], result["macro_f1"], result["nll"])
                 )
-    return {"parameter": max(taus, key=lambda tau: _selection_key(observations[tau]))}
+    best_tau = max(taus, key=lambda tau: _selection_key(observations[tau]))
+    return {
+        "parameter": best_tau,
+        "taus": {str(tau): _tau_metrics_summary(observations[tau]) for tau in taus},
+    }
 
 
 def tune_across_splits(
@@ -196,3 +220,30 @@ def tune_across_splits(
         else:
             selections[method] = _select_trainable(method, scopes, seeds)
     return selections
+
+
+def combined_cost(payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    """Merge parallel search cost without treating wall time as accelerator time."""
+    records = [record for payload in payloads for record in payload["cost_records"]]
+    starts = [float(payload["started_at"]) for payload in payloads]
+    completions = [float(payload["completed_at"]) for payload in payloads]
+    return {
+        "wall_clock_seconds": max(completions) - min(starts),
+        "accelerator_hours": sum(
+            float(payload["accelerator_seconds"]) for payload in payloads
+        )
+        / 3600,
+        "peak_accelerator_memory_bytes": max(
+            int(payload["peak_accelerator_memory_bytes"]) for payload in payloads
+        ),
+        "hardware": _unique_hardware(payloads),
+        **summarize_tuning_cost(records),
+    }
+
+
+def _unique_hardware(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    hardware = {
+        json.dumps(payload["hardware"], sort_keys=True): payload["hardware"]
+        for payload in payloads
+    }
+    return [hardware[key] for key in sorted(hardware)]
