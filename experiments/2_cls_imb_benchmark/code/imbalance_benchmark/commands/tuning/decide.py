@@ -170,13 +170,12 @@ def _advance(
         check_queue_cap()
         _submit_next_round(base, config, config_path, args, unresolved, windows, submit)
         return
-    ce_state = states.get("ce")
-    ce_ready = ce_state is not None and (ce_state.resolved or ce_state.tuning_limited)
-    if (
-        args.phase == "base"
-        and ce_ready
-        and not _dependent_phase_started(base["data"], args.condition)
-    ):
+    if args.phase != "base" or _dependent_phase_started(base["data"], args.condition):
+        return
+    # states only holds methods still active *this* round - CE's own
+    # readiness must come from the persisted, cross-round lock instead.
+    ce_state = load_round_state(base["data"], args.condition).get("ce", {})
+    if ce_state.get("resolved") or ce_state.get("tuning_limited"):
         check_queue_cap()
         _start_dependent_phase(base, config, config_path, args, is_mil, submit)
 

@@ -23,7 +23,10 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     write_base_selection,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import decide_next_round
+from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
+    decide_next_round,
+    round_payload,
+)
 
 
 def _args(condition="moderate", phase="base", round_index=0) -> argparse.Namespace:
@@ -203,6 +206,7 @@ def test_advance_starts_dependent_phase_once_ce_resolves(tmp_path, monkeypatch):
         return f"id-{len(submitted)}"
 
     ce_resolved = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+    merge_round_state(tmp_path, "moderate", round_payload({"ce": ce_resolved}))
 
     decide._advance(
         {"data": tmp_path}, {}, "config.yaml", _args(phase="base"), {"ce": ce_resolved},
@@ -217,6 +221,39 @@ def test_advance_starts_dependent_phase_once_ce_resolves(tmp_path, monkeypatch):
         "tune-decide-moderate-dependent-r0",
     ]
     assert submitted[-1].dependencies == ("id-1", "id-2", "id-3")
+
+
+def test_advance_starts_dependent_phase_when_ce_resolved_in_an_earlier_round(
+    tmp_path, monkeypatch
+):
+    """CE can resolve in round 0 while another method (e.g. oko) still needs
+    round 2 - CE then has no entry in *this* round's ``states`` at all (only
+    still-active methods do), so readiness must come from the persisted
+    lock, not ``states.get("ce")``. This is exactly what silently stalled
+    the dependent phase on real cluster data: the round-2 decide job ran
+    clean, found nothing to advance, and simply never started it."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    monkeypatch.setattr(
+        decide, "dependent_round_zero_jobs", lambda config, is_mil: [_fake_job("posthoc")]
+    )
+    ce_resolved = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+    merge_round_state(tmp_path, "moderate", round_payload({"ce": ce_resolved}))
+    oko_resolved = decide_next_round("oko", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+
+    submitted = []
+
+    def fake_submit(config, config_path, job):
+        submitted.append(job)
+        return f"id-{len(submitted)}"
+
+    decide._advance(
+        {"data": tmp_path}, {}, "config.yaml", _args(phase="base", round_index=2),
+        {"oko": oko_resolved},  # ce absent: not part of this round's active set
+        {"oko": (LEARNING_RATE_GRID, None)}, False,
+        submit=fake_submit,
+    )
+
+    assert [job.name for job in submitted] == ["posthoc", "tune-decide-moderate-dependent-r0"]
 
 
 def test_advance_skips_dependent_phase_if_already_started(tmp_path, monkeypatch):
