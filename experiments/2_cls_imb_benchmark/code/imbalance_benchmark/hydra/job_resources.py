@@ -33,10 +33,16 @@ def build_job(
     resource: str | None = None,
     fallback: str | None = None,
 ) -> SlurmJob:
-    """Build one stage's job with its resolved SLURM resources."""
+    """Build one stage's job with its resolved SLURM resources.
+
+    ``tune-decide`` shells out to ``sbatch``/``squeue`` itself to self-chain
+    the adaptive search - the Apptainer container has no SLURM client, so
+    that resource type always runs on the host instead.
+    """
     return SlurmJob(
         stage,
         cmd,
         dependencies=dependencies,
+        on_host=resource == "tune_decide",
         **resources_for(config, resource or stage, gpu, fallback),
     )

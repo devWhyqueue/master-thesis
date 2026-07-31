@@ -31,6 +31,7 @@ class SlurmJob:
     array_conditions: tuple[str, ...] = ()
     array_size: int = 0
     array_indices: tuple[int, ...] = ()
+    on_host: bool = False
 
 
 def render_sbatch(
@@ -44,16 +45,20 @@ def render_sbatch(
     dataset = (
         str(config.get("dataset", {}).get("root", "")) if job.name == "prepare" else ""
     )
-    lines += _execution_lines(
-        job,
-        root,
-        code,
-        output,
-        container,
-        command,
-        images,
-        dataset,
-        _generated_tile_squashfs(config, job.name),
+    lines += (
+        _host_execution_lines(root, command)
+        if job.on_host
+        else _execution_lines(
+            job,
+            root,
+            code,
+            output,
+            container,
+            command,
+            images,
+            dataset,
+            _generated_tile_squashfs(config, job.name),
+        )
     )
     return "\n".join(lines)
 
@@ -169,6 +174,25 @@ def _execution_lines(
     lines.extend(_pack_generated_tile_lines(generated_squashfs))
     lines.append("")
     return lines
+
+
+def _host_execution_lines(root: str, command: str) -> list[str]:
+    """Run a job on the login/compute-node host, outside Apptainer.
+
+    Self-chaining stages (``tune-decide``) shell out to ``sbatch``/``squeue``
+    themselves - the Apptainer container has no SLURM client, so those
+    calls must run on the host. ``uv run`` (rather than the container)
+    supplies the same pinned dependencies.
+    """
+    quoted_root = shlex.quote(root)
+    quoted_command = shlex.quote(f"uv run {command}")
+    return [
+        "",
+        "set -euo pipefail",
+        f"cd {quoted_root}",
+        f"bash -lc {quoted_command}",
+        "",
+    ]
 
 
 def _cluster_paths(config: dict[str, Any]) -> tuple[str, str, str, str]:

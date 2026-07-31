@@ -77,6 +77,19 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert "#SBATCH --mem=32G" in natural_script
 
 
+def test_decide_jobs_run_on_host_not_in_apptainer() -> None:
+    """tune-decide shells out to sbatch/squeue itself - the container has no
+    SLURM client, so it must run on the host (via uv) instead, while still
+    keeping its #SBATCH directives (partition, dependency) intact."""
+    jobs = build_workflow(_config())
+    decide = next(j for j in jobs if j.name == "tune-decide-base-natural")
+    script = render_sbatch(decide, _config(), "config.yaml")
+    assert "apptainer" not in script
+    assert "uv run python" in script
+    assert "#SBATCH --partition=cpu-2h" in script
+    assert "#SBATCH --dependency=afterok:tune-base-reduce" in script
+
+
 def test_dependent_round_zero_jobs_match_the_frozen_shapes() -> None:
     """Dependent-phase round-0 jobs (submitted by tune-decide) keep today's sizes."""
     from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
