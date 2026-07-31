@@ -53,26 +53,30 @@ def _real_submit(config: dict[str, Any], config_path: str | None, job: SlurmJob)
     return _submit_script(render_sbatch(job, config, config_path), False)
 
 
-def _round0_windows(methods: tuple[str, ...]) -> dict[str, Window]:
-    """Every method but CE/CRT trains a real "parameter" - only the three
-    STRENGTH_ENVELOPES controls shift that window adaptively, but the rest
-    still need it non-``None`` or a later round's ``expand_grid`` drops it."""
-    return {
-        method: (
-            LEARNING_RATE_GRID,
-            [float(v) for v in GRIDS[method]]
-            if method not in NO_STRENGTH_GRID_METHODS
-            else None,
-        )
-        for method in methods
-    }
+def _round0_windows(methods: tuple[str, ...], n_classes: int) -> dict[str, Window]:
+    """Every method's strength window, OKO's k capped at n_classes - 1."""
+    windows = {}
+    for method in methods:
+        if method in NO_STRENGTH_GRID_METHODS:
+            windows[method] = (LEARNING_RATE_GRID, None)
+            continue
+        values = [float(v) for v in GRIDS[method]]
+        if method == "oko":
+            values = sorted({v for v in values if int(v) <= n_classes - 1})
+        windows[method] = (LEARNING_RATE_GRID, values)
+    return windows
 
 
 def _this_round_windows(
-    root: Any, condition: str, phase: str, round_index: int, methods: tuple[str, ...]
+    root: Any,
+    condition: str,
+    phase: str,
+    round_index: int,
+    methods: tuple[str, ...],
+    n_classes: int,
 ) -> dict[str, Window]:
     if round_index == 0:
-        return _round0_windows(methods)
+        return _round0_windows(methods, n_classes)
     round_grids = load_round_grids(root, condition, phase)
     return {
         method: (window["lr_window"], window.get("strength_window"))
@@ -131,8 +135,9 @@ def cmd_tune_decide(args: argparse.Namespace) -> None:
     selections = _reduce_this_round(
         base, freeze, args.condition, args.phase, args.round, methods, fingerprint
     )
+    n_classes = len(freeze["class_names"])
     windows = _this_round_windows(
-        base["data"], args.condition, args.phase, args.round, methods
+        base["data"], args.condition, args.phase, args.round, methods, n_classes
     )
     states = {
         method: decide_next_round(method, selections[method], *windows[method])

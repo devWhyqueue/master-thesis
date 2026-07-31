@@ -31,7 +31,7 @@ def _args(condition="moderate", phase="base", round_index=0) -> argparse.Namespa
 
 
 def test_this_round_windows_round_zero_uses_frozen_defaults():
-    windows = decide._this_round_windows(Path("root"), "moderate", "base", 0, ("ce", "focal"))
+    windows = decide._this_round_windows(Path("root"), "moderate", "base", 0, ("ce", "focal"), 9)
     assert windows["ce"] == (LEARNING_RATE_GRID, None)
     assert windows["focal"] == (LEARNING_RATE_GRID, GRIDS["focal"])
 
@@ -43,10 +43,20 @@ def test_round_zero_windows_keep_the_parameter_dimension_for_fixed_grid_methods(
     later round's expand_grid drop that key and crash the method's fit
     function (KeyError: 'parameter'), which is exactly what happened the
     first time oko reached round 1 on real cluster data."""
-    windows = decide._round0_windows(("oko", "weighted_ce", "balanced_sampling"))
+    windows = decide._round0_windows(("oko", "weighted_ce", "balanced_sampling"), 9)
     assert windows["oko"] == (LEARNING_RATE_GRID, [float(v) for v in GRIDS["oko"]])
     assert windows["weighted_ce"][1] == [float(v) for v in GRIDS["weighted_ce"]]
     assert windows["balanced_sampling"][1] == [float(v) for v in GRIDS["balanced_sampling"]]
+
+
+def test_round_zero_windows_cap_oko_k_by_n_classes():
+    """OKO samples k distinct "odd classes" without replacement, so k must
+    stay <= n_classes - 1 or sampling itself crashes (ValueError: Cannot
+    take a larger sample than population) - this is what broke oko's
+    round 1 on BRACS (7 classes) once its window carried the full [1,2,4,8]
+    grid forward instead of get_grid_configs' frozen-round k <= n-1 cap."""
+    windows = decide._round0_windows(("oko",), 7)
+    assert windows["oko"] == (LEARNING_RATE_GRID, [1.0, 2.0, 4.0])
 
 
 def test_this_round_windows_later_round_reads_signed_grids(tmp_path):
@@ -57,7 +67,7 @@ def test_this_round_windows_later_round_reads_signed_grids(tmp_path):
     write_round_grids(
         tmp_path, "moderate", "base", 1, {"ce": {"lr_window": LR_ENVELOPE[3:7], "strength_window": None}}
     )
-    windows = decide._this_round_windows(tmp_path, "moderate", "base", 1, ("ce",))
+    windows = decide._this_round_windows(tmp_path, "moderate", "base", 1, ("ce",), 9)
     assert windows["ce"] == (LR_ENVELOPE[3:7], None)
 
 
@@ -284,7 +294,11 @@ def test_cmd_tune_decide_handles_a_later_round_with_only_some_methods_active(
         lambda args: (
             base,
             [({"data": tmp_path}, fake_regime, None)],
-            {"runtime_config": {}, "seed_roles": {"tuning_initialization_0": 11}},
+            {
+                "runtime_config": {},
+                "seed_roles": {"tuning_initialization_0": 11},
+                "class_names": ["a", "b", "c", "d", "e", "f", "g"],
+            },
             ["fp"],
         ),
     )
