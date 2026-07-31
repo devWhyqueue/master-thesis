@@ -48,6 +48,32 @@ def test_this_round_windows_later_round_reads_signed_grids(tmp_path):
     assert windows["ce"] == (LR_ENVELOPE[3:7], None)
 
 
+def test_reduce_this_round_passes_expected_observations_to_reduce_phase(monkeypatch):
+    """Natural-group base shards are written observation-bundled (no flat
+    ``candidate=N.json``), so ``reduce_phase`` must get a real expected-
+    observation count or ``load_candidate`` raises "Missing tuning shard"
+    on every candidate - this is what broke every condition's round-0
+    decide the first time it ran against real bundled shard output."""
+    captured = {}
+
+    def fake_reduce_phase(root, condition, phase, methods, grids, reduce_round, expected=None):
+        captured["expected"] = expected
+        return {}, []
+
+    monkeypatch.setattr(decide, "reduce_phase", fake_reduce_phase)
+
+    freeze = {
+        "method_grids": {"ce": [{"lr": 1e-4}]},
+        "seed_roles": {"tuning_initialization_0": 1, "tuning_initialization_1": 2},
+        "tail_assignments": {"native": []},
+    }
+    decide._reduce_this_round(
+        {"data": Path("root")}, freeze, "moderate", "base", 0, ("ce",), ["fp"]
+    )
+
+    assert captured["expected"] == 6  # len(assignments)=1 * 3 splits * 2 seeds
+
+
 def test_dependent_phase_started_false_when_no_state_file(tmp_path):
     assert decide._dependent_phase_started(tmp_path, "moderate") is False
 
@@ -210,7 +236,7 @@ def test_cmd_tune_decide_handles_a_later_round_with_only_some_methods_active(
         lambda args: (
             base,
             [({"data": tmp_path}, fake_regime, None)],
-            {"runtime_config": {}},
+            {"runtime_config": {}, "seed_roles": {"tuning_initialization_0": 11}},
             ["fp"],
         ),
     )

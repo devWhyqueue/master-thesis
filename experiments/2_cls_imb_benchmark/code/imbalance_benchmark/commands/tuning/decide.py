@@ -22,6 +22,9 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
 from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
     STRENGTH_ENVELOPES,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
+    expected_observations as _expected_observations,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     write_base_selection,
 )
@@ -91,6 +94,7 @@ def _reduce_this_round(
             for method in methods
             if method in round_grids["windows"]
         }
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     selections, _ = reduce_phase(
         base["data"],
         condition,
@@ -98,6 +102,7 @@ def _reduce_this_round(
         tuple(grids),
         grids,
         ReduceRound(fingerprint, index=round_index),
+        _expected_observations(condition, assignments, freeze),
     )
     return selections
 
