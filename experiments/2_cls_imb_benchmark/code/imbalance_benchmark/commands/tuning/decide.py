@@ -190,11 +190,7 @@ def _submit_next_round(
     new_windows = {
         method: {
             "lr_window": state.next_lr_window or windows[method][0],
-            "strength_window": (
-                state.next_strength_window
-                if state.strength is not None
-                else windows[method][1]
-            ),
+            "strength_window": state.next_strength_window or windows[method][1],
         }
         for method, state in unresolved.items()
     }

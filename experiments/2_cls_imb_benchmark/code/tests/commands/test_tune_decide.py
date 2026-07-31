@@ -126,6 +126,41 @@ def test_advance_submits_next_round_when_a_method_is_still_shifting(tmp_path, mo
     assert grids["windows"]["ce"]["lr_window"] == LR_ENVELOPE[3:7]
 
 
+def test_advance_keeps_the_resolved_strength_window_when_only_lr_still_shifts(
+    tmp_path, monkeypatch
+):
+    """When a method's strength axis resolves before its lr axis, the next
+    round must still carry the resolved strength window forward (like lr's
+    ``next_lr_window or windows[method][0]`` already does), not drop it to
+    None - a dropped window here loses the "parameter" key entirely and
+    silently trains the next round without that method's control applied,
+    which is exactly what happened to ce_soft_f1's round 1 on the cluster."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    submitted = []
+
+    def fake_submit(config, config_path, job):
+        submitted.append(job)
+        return f"id-{len(submitted)}"
+
+    base = {"data": tmp_path}
+    windows = {"focal": (LEARNING_RATE_GRID, GRIDS["focal"])}
+    state = decide_next_round(
+        "focal",
+        {"lr": LEARNING_RATE_GRID[-1], "parameter": GRIDS["focal"][1]},
+        LEARNING_RATE_GRID,
+        GRIDS["focal"],
+    )
+    assert state.strength.resolved  # interior winner: strength axis is done
+
+    decide._advance(
+        base, {}, "config.yaml", _args(round_index=0), {"focal": state}, windows, False,
+        submit=fake_submit,
+    )
+
+    grids = load_round_grids(tmp_path, "moderate", "base")
+    assert grids["windows"]["focal"]["strength_window"] == GRIDS["focal"]
+
+
 def test_advance_does_nothing_further_once_dependent_phase_resolves(tmp_path, monkeypatch):
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     submitted = []
