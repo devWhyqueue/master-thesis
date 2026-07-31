@@ -14,7 +14,7 @@ from imbalance_benchmark.hydra.job_resources import build_job as _job
 from imbalance_benchmark.hydra.job_resources import resources_for as _resources
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
-from imbalance_benchmark.modeling.context import roster_for_regime
+from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     DEPENDENT_METHODS,
     bundled_array_size,
@@ -149,19 +149,22 @@ def _tuning_jobs(
         tuple(job.name for job in (base_natural, base_controlled) if job),
         "tune_reduce",
     )
-    decide = _job(
-        config,
-        "tune-decide-base",
-        "tune-decide --phase base --round 0",
-        False,
-        (base_reduce.name,),
-        "tune_decide",
-        "tune_reduce",
-    )
+    decisions = [
+        _job(
+            config,
+            f"tune-decide-base-{condition}",
+            f"tune-decide --phase base --condition {condition} --round 0",
+            False,
+            (base_reduce.name,),
+            "tune_decide",
+            "tune_reduce",
+        )
+        for condition in CONDITIONS
+    ]
     return [
         *[job for job in (base_natural, base_controlled) if job],
         base_reduce,
-        decide,
+        *decisions,
     ]
 
 
