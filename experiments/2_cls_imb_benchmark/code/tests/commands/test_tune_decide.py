@@ -36,6 +36,19 @@ def test_this_round_windows_round_zero_uses_frozen_defaults():
     assert windows["focal"] == (LEARNING_RATE_GRID, GRIDS["focal"])
 
 
+def test_round_zero_windows_keep_the_parameter_dimension_for_fixed_grid_methods():
+    """oko/weighted_ce/balanced_sampling are not in STRENGTH_ENVELOPES (their
+    grid is fixed, never adaptively shifted) but they still train a real
+    "parameter" per candidate - a strength window of None here makes a
+    later round's expand_grid drop that key and crash the method's fit
+    function (KeyError: 'parameter'), which is exactly what happened the
+    first time oko reached round 1 on real cluster data."""
+    windows = decide._round0_windows(("oko", "weighted_ce", "balanced_sampling"))
+    assert windows["oko"] == (LEARNING_RATE_GRID, [float(v) for v in GRIDS["oko"]])
+    assert windows["weighted_ce"][1] == [float(v) for v in GRIDS["weighted_ce"]]
+    assert windows["balanced_sampling"][1] == [float(v) for v in GRIDS["balanced_sampling"]]
+
+
 def test_this_round_windows_later_round_reads_signed_grids(tmp_path):
     from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
         write_round_grids,

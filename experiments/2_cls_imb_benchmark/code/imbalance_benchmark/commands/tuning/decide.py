@@ -12,15 +12,16 @@ from imbalance_benchmark.hydra.queue import check_queue_cap
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
 from imbalance_benchmark.hydra.workflow import _submit_script
-from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID
+from imbalance_benchmark.modeling.context import (
+    GRIDS,
+    LEARNING_RATE_GRID,
+    NO_STRENGTH_GRID_METHODS,
+)
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
     load_round_state,
     merge_round_state,
     write_round_grids,
-)
-from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
-    STRENGTH_ENVELOPES,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     expected_observations as _expected_observations,
@@ -53,10 +54,15 @@ def _real_submit(config: dict[str, Any], config_path: str | None, job: SlurmJob)
 
 
 def _round0_windows(methods: tuple[str, ...]) -> dict[str, Window]:
+    """Every method but CE/CRT trains a real "parameter" - only the three
+    STRENGTH_ENVELOPES controls shift that window adaptively, but the rest
+    still need it non-``None`` or a later round's ``expand_grid`` drops it."""
     return {
         method: (
             LEARNING_RATE_GRID,
-            [float(v) for v in GRIDS[method]] if method in STRENGTH_ENVELOPES else None,
+            [float(v) for v in GRIDS[method]]
+            if method not in NO_STRENGTH_GRID_METHODS
+            else None,
         )
         for method in methods
     }
