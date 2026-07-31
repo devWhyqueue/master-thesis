@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 import torch
@@ -65,11 +66,18 @@ def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> 
     flat_recall = {seed: [[0.5, 0.5]] * len(levels) for seed in (0, 1, 2)}
     support = {"A": {"patients": 12, "slides": 25}, "B": {"patients": 12, "slides": 25}}
 
+    difficulty = {
+        seed: {
+            "linear_probe_recall": {"A": 0.7, "B": 0.5},
+            "knn_recall": {"A": 0.6, "B": 0.4},
+        }
+        for seed in (0, 1, 2)
+    }
     patch = _pilot_report_payload(
-        levels, levels, False, False, [0, 1, 2], {}, flat_ba, flat_recall, support
+        levels, levels, False, False, [0, 1, 2], {}, flat_ba, flat_recall, support, difficulty
     )
     mil = _pilot_report_payload(
-        levels, levels, True, False, [0, 1, 2], {}, flat_ba, flat_recall, support
+        levels, levels, True, False, [0, 1, 2], {}, flat_ba, flat_recall, support, difficulty
     )
 
     # Patch pilot counts patients -> patient floor 10, not the 20-slide floor.
@@ -80,6 +88,7 @@ def test_pilot_definitive_floor_does_not_collapse_patient_and_slide_floors() -> 
     # MIL pilot counts slides -> slide floor 20 applies to the level dimension.
     assert mil["definitive_floor"] == 20
     assert mil["dropped_levels"] == []
+    assert patch["difficulty_evidence"]["ranking_easiest_to_hardest"] == ["A", "B"]
 
 def test_patch_pilot_patient_floor_is_preserved_as_an_independent_constraint(
     tmp_path: Path,
@@ -271,4 +280,25 @@ def test_method_floor_requires_patients_and_slides_together() -> None:
     )
     assert meets_method_floor(
         {"patients": 10, "slides": 20}, patient_equals_slide=False
+    )
+
+
+def test_grouped_difficulty_uses_case_disjoint_folds() -> None:
+    from imbalance_benchmark.manifest.pilot.difficulty import grouped_difficulty
+
+    features, labels, groups = [], [], []
+    for label in range(2):
+        for case in range(5):
+            for row in range(2):
+                features.append([label * 10 + case, row])
+                labels.append(label)
+                groups.append(f"{label}_{case}")
+    evidence = grouped_difficulty(
+        np.asarray(features), np.asarray(labels), np.asarray(groups), ["A", "B"]
+    )
+
+    assert len(evidence["folds"]) == 5
+    assert all(
+        not set(fold["train_groups"]) & set(fold["test_groups"])
+        for fold in evidence["folds"]
     )

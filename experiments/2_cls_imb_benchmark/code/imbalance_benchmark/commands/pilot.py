@@ -13,6 +13,10 @@ from imbalance_benchmark.common import (
     split_paths,
     write_json,
 )
+from imbalance_benchmark.manifest.pilot.difficulty import (
+    aggregate_difficulty,
+    pilot_difficulty,
+)
 from imbalance_benchmark.construction import locked_class_names, patient_equals_slide
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
@@ -24,9 +28,11 @@ from imbalance_benchmark.datasets.features.provenance_lock import (
 )
 from imbalance_benchmark.manifest.pilot.candidates import (
     PilotFit,
+    build_patch_pilot_manifest,
     frozen_pilot_quota,
     meets_method_floor,
     method_floor,
+    mil_pilot_manifest,
     pilot_levels_for,
     run_pilot_seed,
     stability_floor_from_curve,
@@ -89,6 +95,7 @@ def _run_all_pilot_seeds(
     dict[int, int | None],
     dict[int, list[float]],
     dict[int, list[list[float]]],
+    dict[int, dict[str, Any]],
 ]:
     """Run every pilot construction seed and collect its candidate-level curves."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -109,7 +116,7 @@ def _run_all_pilot_seeds(
     quota = None
     if not is_mil:
         quota, levels = frozen_pilot_quota(train_df, classes, levels, pilot_seeds)
-    quotas, ba_by_seed, recall_by_seed = {}, {}, {}
+    quotas, ba_by_seed, recall_by_seed, difficulty_by_seed = {}, {}, {}, {}
     fit = PilotFit(
         val_ds,
         device,
@@ -127,7 +134,18 @@ def _run_all_pilot_seeds(
             ba_curve,
             recall_curve,
         )
-    return levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed
+        largest = levels[-1]
+        manifest = (
+            mil_pilot_manifest(train_df, classes, largest, seed)
+            if is_mil
+            else build_patch_pilot_manifest(
+                train_df, classes, largest, quota or 0, seed
+            )
+        )
+        scratch = scratch_dir / f"pilot_seed={seed}_level={largest}.csv"
+        manifest.to_csv(scratch, index=False)
+        difficulty_by_seed[seed] = pilot_difficulty(scratch, manifest, is_mil, classes)
+    return levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed, difficulty_by_seed
 
 
 def _pilot_report_payload(
@@ -140,6 +158,7 @@ def _pilot_report_payload(
     ba_by_seed: dict[int, list[float]],
     recall_by_seed: dict[int, list[list[float]]],
     support: dict[str, dict[str, int]],
+    difficulty_by_seed: dict[int, dict[str, Any]],
 ) -> dict[str, Any]:
     """Assemble the frozen pilot report: floors, curves, seeds, and exclusion status."""
     stability_floor = stability_floor_from_curve(levels, ba_by_seed, recall_by_seed)
@@ -152,6 +171,7 @@ def _pilot_report_payload(
     level_unit = "slides" if (is_mil or eq_slide) else "patients"
     definitive_floor = max(stability_floor, floor[level_unit])
     floor_met = all(meets_method_floor(values, eq_slide) for values in support.values())
+    difficulty = aggregate_difficulty(difficulty_by_seed, list(support))
     return {
         "requested_levels": requested_levels,
         "levels": levels,
@@ -165,6 +185,17 @@ def _pilot_report_payload(
         "definitive_floor": definitive_floor,
         "patient_equals_slide": eq_slide,
         "available_independent_support": support,
+        "difficulty_evidence": {
+            "support_level": levels[-1],
+            "fold_settings": {
+                "splitter": "StratifiedGroupKFold",
+                "n_splits": 5,
+                "group": "case_id",
+                "shuffle": True,
+                "random_state": 0,
+            },
+            **difficulty,
+        },
         "excluded": levels[-1] < definitive_floor or not floor_met,
     }
 
@@ -185,8 +216,10 @@ def _cmd_pilot_one_split(args: argparse.Namespace) -> None:
     train_df, classes, is_mil, eq_slide, requested_levels, support = _pilot_setup(
         paths, config
     )
-    levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed = _run_all_pilot_seeds(
-        train_df, classes, requested_levels, is_mil, args.seed, config, paths
+    levels, pilot_seeds, quotas, ba_by_seed, recall_by_seed, difficulty_by_seed = (
+        _run_all_pilot_seeds(
+            train_df, classes, requested_levels, is_mil, args.seed, config, paths
+        )
     )
     payload = _pilot_report_payload(
         requested_levels,
@@ -198,6 +231,7 @@ def _cmd_pilot_one_split(args: argparse.Namespace) -> None:
         ba_by_seed,
         recall_by_seed,
         support,
+        difficulty_by_seed,
     )
     report_path = paths["data"] / "pilot_report.json"
     write_json(report_path, payload)

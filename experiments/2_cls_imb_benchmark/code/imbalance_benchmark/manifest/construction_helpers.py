@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from typing import cast
+from typing import Any, cast
 
 from pathlib import Path
 
 import pandas as pd
 
 from imbalance_benchmark.common import compute_sha256
-from imbalance_benchmark.construction import allocate_counts, effective_rho
+from imbalance_benchmark.construction import (
+    allocate_counts,
+    build_manifest_hash,
+    effective_rho,
+)
 from imbalance_benchmark.manifest.sampling.patch import designate_patch_pool
 from imbalance_benchmark.manifest.statistics import (
     natural_contribution_stats,
@@ -17,6 +21,33 @@ from imbalance_benchmark.manifest.statistics import (
 )
 
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
+
+
+def condition_metadata(
+    path: Path,
+    condition: pd.DataFrame,
+    statistics: dict[str, Any],
+    primary: dict[str, Any],
+    contributions: dict[str, Any],
+    constraints: tuple[str | None, str | None],
+    spec: dict[str, Any],
+) -> dict[str, Any]:
+    """Return frozen metadata for one written controlled manifest."""
+    return {
+        "path": str(path),
+        "sha256": compute_sha256(path),
+        "requested_rho": CONDITION_RHOS.get(str(spec["name"]), 1.0),
+        "achieved_rho": primary["achieved_rho"],
+        "normalized_entropy": primary["normalized_entropy"],
+        "allocated_counts": primary["counts"],
+        "support_statistics": statistics,
+        "manifest_hash": build_manifest_hash(condition),
+        "contribution_stats": contributions,
+        "construction_seed": spec["seed"],
+        "evidence_pool_hash": spec["pool_hash"],
+        "limiting_class": constraints[0],
+        "binding_independent_support_constraint": constraints[1],
+    }
 
 
 def class_support_counts(train_df: pd.DataFrame, is_mil: bool) -> dict[str, int]:

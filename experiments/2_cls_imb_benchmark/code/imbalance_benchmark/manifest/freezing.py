@@ -13,7 +13,7 @@ from imbalance_benchmark.construction import (
     select_patches_round_robin,
     select_slides_round_robin,
 )
-from imbalance_benchmark.manifest.freeze import build_tail_assignments, write_condition
+from imbalance_benchmark.manifest.freeze import write_condition
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.manifest.seeds import SEED_ROLES
 from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
@@ -134,17 +134,19 @@ def _build_conditions(
                         "Controlled patch allocation does not retain its fixed evidence pool"
                     )
         conditions[name] = write_condition(
-            name,
-            dict(zip(classes, allocated)),
-            rows,
-            train_df,
-            is_mil,
-            seed,
-            data_dir,
-            f"{file_prefix}{name}",
-            pool_hash,
-            available,
-            min_support,
+            {
+                "name": name,
+                "allocated": dict(zip(classes, allocated)),
+                "rows": rows,
+                "pool": train_df,
+                "is_mil": is_mil,
+                "seed": seed,
+                "data_dir": data_dir,
+                "stem": f"{file_prefix}{name}",
+                "pool_hash": pool_hash,
+                "available": available,
+                "minimum": min_support,
+            }
         )
     return conditions
 
@@ -165,12 +167,10 @@ def _freeze_meta(
     """Assemble the frozen analysis manifest: conditions, tail assignments, and provenance."""
     construction_seed = derive_seed(args.seed, "definitive_construction")
     config = load_config(args.config)
-    assignments = assignments or build_tail_assignments(
-        classes,
-        derive_seed(args.seed, "assignment"),
-        ordinal=str(config.get("dataset", {}).get("name", "")) == "panda"
-        and bool(config.get("dataset", {}).get("regime", "patch") == "wsi"),
-    )
+    if assignments is None:
+        raise ValueError(
+            "Difficulty-aligned assignments must be supplied from pilot evidence"
+        )
     full_allocations = assignment_allocations(
         train_df, assignments, shared_t, min_support
     )

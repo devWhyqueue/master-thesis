@@ -29,8 +29,8 @@ from imbalance_benchmark.manifest.shared_total.degenerate import (
 )
 from imbalance_benchmark.manifest.shared_total.search import cap_feasible_shared_total
 from imbalance_benchmark.manifest.freeze import (
-    build_tail_assignments,
     lock_manifest_freeze,
+    locked_difficulty_assignments,
 )
 from imbalance_benchmark.manifest.freezing import _freeze_meta, _pilot_constraints
 from imbalance_benchmark.construction import locked_class_names
@@ -156,11 +156,8 @@ def _freeze_metadata(
 ) -> dict[str, Any]:
     """Build definitive metadata after the split has passed pilot eligibility."""
     config = load_config(args.config)
-    assignments = build_tail_assignments(
-        classes,
-        derive_seed(args.seed, "assignment"),
-        ordinal=str(config.get("dataset", {}).get("name", "")) == "panda"
-        and config.get("dataset", {}).get("regime", "patch") == "wsi",
+    assignments, omissions, evidence = locked_difficulty_assignments(
+        ensure_dirs(config), args.split_index, classes
     )
     total = cap_feasible_shared_total(
         train_df,
@@ -171,7 +168,7 @@ def _freeze_metadata(
         independent_floor,
         assignments,
     )
-    return _freeze_meta(
+    meta = _freeze_meta(
         args,
         paths,
         train_df,
@@ -184,6 +181,9 @@ def _freeze_metadata(
         independent_floor,
         assignments,
     )
+    meta["difficulty_evidence"] = evidence
+    meta["assignment_omissions"] = omissions
+    return meta
 
 
 def _attach_provenance(

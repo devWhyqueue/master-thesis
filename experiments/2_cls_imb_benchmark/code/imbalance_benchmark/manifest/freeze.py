@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import math
+import json
 from pathlib import Path
 from typing import Any, cast
 
-import numpy as np
 import pandas as pd
 
 from imbalance_benchmark.common import (
     compute_data_hash,
     compute_sha256,
+    split_paths,
     verify_signed_file,
 )
-from imbalance_benchmark.construction import build_manifest_hash
+from imbalance_benchmark.manifest.construction_helpers import condition_metadata
 from imbalance_benchmark.manifest.statistics import (
     achieved_rho,
     normalized_entropy,
@@ -70,42 +70,84 @@ def contribution_stats(
     }
 
 
-def _distinct_random_order(
-    native_order: list[str], taken: list[list[str]], seed: int
-) -> list[str]:
-    """Draw one random permutation distinct from the already-locked assignments.
-
-    A random permutation may coincide with the native or reversed/rotated
-    assignment; class identity would then be confounded with tail status.
-    Resample deterministically until the draw is distinct, unless every
-    permutation is already taken (too few classes for a third assignment).
-    """
-    rng = np.random.default_rng(seed)
-    feasible = math.factorial(len(native_order)) > len(taken)
-    for _ in range(1000):
-        candidate = list(rng.permutation(native_order))
-        if not feasible or candidate not in taken:
-            return candidate
-    return list(rng.permutation(native_order))
-
-
 def build_tail_assignments(
-    native_order: list[str], seed: int, ordinal: bool
+    native_order: list[str], difficulty: dict[str, float]
 ) -> dict[str, list[str]]:
-    """Build the three locked tail assignments: native, reversed/rotated, and random."""
+    """Build native and difficulty-directed assignments; native order breaks ties."""
+    if set(native_order) != set(difficulty):
+        raise ValueError("Difficulty evidence must cover every locked class")
+    easiest_to_hardest = sorted(
+        native_order, key=lambda name: (difficulty[name], native_order.index(name))
+    )
     if len(native_order) == 2:
-        return {"native": list(native_order), "reversed": list(reversed(native_order))}
-    rotated_or_reversed = (
-        list(reversed(native_order)) if ordinal else native_order[1:] + native_order[:1]
-    )
-    random_order = _distinct_random_order(
-        list(native_order), [list(native_order), rotated_or_reversed], seed
-    )
+        return {
+            "native": list(native_order),
+            "difficulty_reversed": list(reversed(easiest_to_hardest)),
+        }
     return {
         "native": list(native_order),
-        "reversed_or_rotated": rotated_or_reversed,
-        "random": random_order,
+        "difficulty_aligned": easiest_to_hardest,
+        "difficulty_reversed": list(reversed(easiest_to_hardest)),
     }
+
+
+def _pilot_difficulty_reports(base_paths: dict[str, Path]) -> list[dict[str, Any]]:
+    """Load signed difficulty evidence from all required splits."""
+    reports = []
+    for index in range(3):
+        path = split_paths(base_paths, index)["data"] / "pilot_report.json"
+        if not path.exists():
+            raise RuntimeError(
+                "All three signed pilot reports are required before freeze"
+            )
+        verify_signed_file(path)
+        evidence = json.loads(path.read_text()).get("difficulty_evidence")
+        if not isinstance(evidence, dict) or not isinstance(
+            evidence.get("difficulty"), dict
+        ):
+            raise RuntimeError(
+                "Pilot report lacks signed difficulty evidence; re-run pilot"
+            )
+        reports.append(evidence)
+    return reports
+
+
+def _duplicate_assignment(
+    candidates: list[dict[str, list[str]]], key: str, selected: set[str]
+) -> int | None:
+    """Return first split where a candidate repeats an earlier assignment."""
+    return next(
+        (
+            index
+            for index, candidate in enumerate(candidates)
+            if key in candidate
+            and candidate[key] in [candidate[name] for name in selected]
+        ),
+        None,
+    )
+
+
+def locked_difficulty_assignments(
+    base_paths: dict[str, Path], split_index: int, classes: list[str]
+) -> tuple[dict[str, list[str]], dict[str, str], dict[str, Any]]:
+    """Keep assignment keys identical across splits and record duplicate omissions."""
+    reports = _pilot_difficulty_reports(base_paths)
+    candidates = [
+        build_tail_assignments(classes, report["difficulty"]) for report in reports
+    ]
+    selected, omissions = {"native"}, {}
+    for key in ("difficulty_aligned", "difficulty_reversed"):
+        duplicate = _duplicate_assignment(candidates, key, selected)
+        if key in candidates[0] and duplicate is None:
+            selected.add(key)
+        elif duplicate is not None:
+            omissions[key] = f"duplicates an earlier assignment in split {duplicate}"
+    current = candidates[split_index]
+    return (
+        {key: current[key] for key in current if key in selected},
+        omissions,
+        reports[split_index],
+    )
 
 
 def lock_manifest_freeze(freeze_meta: dict[str, Any]) -> dict[str, Any]:
@@ -181,40 +223,22 @@ def _get_constraints(
     return limited, binding
 
 
-def write_condition(
-    name: str,
-    allocated: dict[str, int],
-    rows: list[pd.DataFrame],
-    pool: pd.DataFrame,
-    is_mil: bool,
-    seed: int,
-    data_dir: Path,
-    stem: str | None,
-    pool_hash: str | None,
-    available: list[int],
-    minimum: int,
-) -> dict[str, Any]:
+def write_condition(spec: dict[str, Any]) -> dict[str, Any]:
     """Write one controlled manifest and its construction metadata."""
-    condition = pd.concat(rows, ignore_index=True)
-    path = data_dir / f"manifest_{stem or name}.csv"
+    condition = pd.concat(spec["rows"], ignore_index=True)
+    path = spec["data_dir"] / f"manifest_{spec['stem'] or spec['name']}.csv"
     condition.to_csv(path, index=False)
-    limited, binding = _get_constraints(name, allocated, available, minimum)
+    limited, binding = _get_constraints(
+        spec["name"], spec["allocated"], spec["available"], spec["minimum"]
+    )
     statistics = support_statistics(condition)
-    primary = statistics["slide" if is_mil else "patch"]
-    return {
-        "path": str(path),
-        "sha256": compute_sha256(path),
-        "requested_rho": {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}.get(
-            name, 1.0
-        ),
-        "achieved_rho": primary["achieved_rho"],
-        "normalized_entropy": primary["normalized_entropy"],
-        "allocated_counts": primary["counts"],
-        "support_statistics": statistics,
-        "manifest_hash": build_manifest_hash(condition),
-        "contribution_stats": contribution_stats(condition, pool, is_mil),
-        "construction_seed": seed,
-        "evidence_pool_hash": pool_hash,
-        "limiting_class": limited,
-        "binding_independent_support_constraint": binding,
-    }
+    primary = statistics["slide" if spec["is_mil"] else "patch"]
+    return condition_metadata(
+        path,
+        condition,
+        statistics,
+        primary,
+        contribution_stats(condition, spec["pool"], spec["is_mil"]),
+        (limited, binding),
+        spec,
+    )

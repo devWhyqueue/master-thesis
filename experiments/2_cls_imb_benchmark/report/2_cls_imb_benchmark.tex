@@ -46,7 +46,7 @@ The study addresses three research questions:
 \begin{description}
   \item[RQ1.] \textbf{Effect of imbalance.} At fixed task, split-unit partition, encoder, training-set size, and evaluation set, how does increasing training imbalance affect tail-class discrimination and calibration in patch classification and WSI-level MIL?
   \item[RQ2.] \textbf{Mitigation effectiveness.} Which mitigation methods recover performance lost specifically to training imbalance, and what are their calibration and computational costs?
-  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Can small exploratory models help explain why some controlled comparisons are more vulnerable than others? Specifically, are imbalance severity and intrinsic separability associated with whether damage occurs, how large it is, and how much is recovered after damage? Condition-specific learnability and independent support are examined as sensitivity predictors.
+  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Can small exploratory models help explain why some controlled comparisons are more vulnerable than others? Specifically, are achieved imbalance severity and support--difficulty alignment associated with whether damage occurs, how large it is, and how much is recovered after damage? Separability, learnability, and support measures are examined as sensitivity predictors.
 \end{description}
 RQ1 establishes whether a recoverable problem exists, and RQ2 asks which methods address that demonstrated deficit. RQ3 is an exploratory association analysis rather than another method ranking: it relates prespecified properties of each comparison to damage occurrence, damage magnitude, and, where damage is demonstrated, recovery. The datasets and preprocessing provenance are documented in the companion dataset report, and all detailed method objectives and variants are defined in the companion methods report \citep{queisler2026datasets,queisler2026imbalanceMethods}.
 
@@ -196,6 +196,8 @@ Nested pilots compare $10,15,20,30,$ and $50$ units per class, or all available 
 
 The definitive minimum is the larger of this empirical stability floor and a prespecified design floor. Each class must contain at least 10 split units and 20 slides, or 20 slides when split unit and slide coincide, and any class-aware batch or set must contain at least two distinct same-class units. The 10-unit and 20-slide values are not estimated performance thresholds: they are the smallest counts compatible with the 10\% split-unit and 5\% slide contribution caps, respectively. The same 20-slide lower bound is retained for MIL to keep slide-based method comparisons outside a five-example regime even though MIL has no separate 5\% slide cap. A requested severity is reduced to the largest allocation satisfying both floors; a dataset--regime is excluded if even its balanced condition fails them. Pilot quotas, curves, seeds, and resulting floors are frozen and reported with the definitive manifests.
 
+Before assigning support ranks, the largest balanced pilot level is used to measure class difficulty. For each of the three pilot constructions, a class-balanced linear probe makes five-fold out-of-fold predictions with case/patient-disjoint \texttt{StratifiedGroupKFold} partitions. Class difficulty is $d_c=1-\overline{\mathrm{recall}}_c$, where recall is averaged across the three constructions; five-neighbour kNN recall is retained as sensitivity evidence. Pilot hashes, folds, classwise scores, and the easiest-to-hardest ranking are signed. Equal scores retain native class order.
+
 \subsection{Severity profiles and tail assignments}
 A binary task needs only a head and a tail count, but a multiclass task also needs a rule for the classes between those extremes. The exponential construction places the $K$ class supports at equal intervals on a logarithmic scale. For a locked order from head ($i=0$) to tail ($i=K-1$), it assigns weights
 \begin{equation}
@@ -214,7 +216,7 @@ If a target ratio is infeasible, the same rule is applied to every dataset and r
 
 The fallback has a limit: a moderate or severe condition whose realized allocation is indistinguishable from the balanced condition---achieved ratio within a small tolerance of 1, or realized counts identical to the balanced manifest---is not a lower-severity instance of the intended contrast but a null one, since the imbalance intervention did not occur. Such a condition is reported as degenerate rather than fitted and averaged with genuine moderate or severe conditions from other splits or assignments, and it is excluded from the imbalance deficit and recovery estimands in Section~\ref{sec:recovery}. Its requested ratio, achieved ratio, limiting class, and binding support floor are recorded alongside the exclusion, using the same fields every condition already reports.
 
-The profile determines support by rank, so a second decision maps semantic classes to those ranks. Using only one mapping would confound a class's intrinsic difficulty with its position in the tail. Multiclass targets therefore use three locked assignments where feasible: (i) classes ordered by clinical meaning or native support, (ii) the reverse of that order for ordinal targets or a one-position rotation for nominal targets, and (iii) one distinct random permutation drawn and recorded before fitting. Figure~\ref{fig:tail-assignments} illustrates the nominal case. Binary tasks use both head--tail orientations. If support constraints make an assignment infeasible at the shared $T$, the achieved allocation is reported and the assignment is omitted only under a prespecified feasibility rule.
+The profile determines support by rank, so a second decision maps semantic classes to those ranks. Using only one mapping would confound scarcity with intrinsic class difficulty. Multiclass targets therefore use native, difficulty-aligned, and difficulty-reversed assignments where distinct: native retains clinical, ordinal, or natural-support order; aligned places easiest classes at the head and hardest classes at the tail, compounding scarcity with difficulty; reversed places hardest classes at the head and easiest classes at the tail, providing compensation. Binary tasks retain native and reversed orientations. A difficulty mapping that duplicates an earlier mapping in any locked split is omitted across that dataset--regime with its reason recorded. These three sensitivity assignments separate interpretable mechanisms but do not exhaust all possible class-support mappings. Figure~\ref{fig:tail-assignments} illustrates the design.
 
 \begin{figure}[ht]
   \centering
@@ -228,8 +230,8 @@ The profile determines support by rank, so a second decision maps semantic class
     \draw[-{Latex[length=2mm]}, thick] (0.75,1.55) -- (4.05,1.55);
 
     \node[row] at (-0.8,0.65) {Native};
-    \node[row] at (-0.8,-0.25) {Rotated};
-    \node[row] at (-0.8,-1.15) {Random};
+    \node[row] at (-0.8,-0.25) {Aligned};
+    \node[row] at (-0.8,-1.15) {Reversed};
 
     \node[cls, fill=blue!25] at (0,0.65) {A};
     \node[cls, fill=blue!15] at (1.2,0.65) {B};
@@ -238,10 +240,10 @@ The profile determines support by rank, so a second decision maps semantic class
     \node[cls, fill=orange!25] at (4.8,0.65) {E};
 
     \node[cls, fill=blue!25] at (0,-0.25) {B};
-    \node[cls, fill=blue!15] at (1.2,-0.25) {C};
-    \node[cls, fill=gray!10] at (2.4,-0.25) {D};
+    \node[cls, fill=blue!15] at (1.2,-0.25) {D};
+    \node[cls, fill=gray!10] at (2.4,-0.25) {A};
     \node[cls, fill=orange!12] at (3.6,-0.25) {E};
-    \node[cls, fill=orange!25] at (4.8,-0.25) {A};
+    \node[cls, fill=orange!25] at (4.8,-0.25) {C};
 
     \node[cls, fill=blue!25] at (0,-1.15) {C};
     \node[cls, fill=blue!15] at (1.2,-1.15) {E};
@@ -249,7 +251,7 @@ The profile determines support by rank, so a second decision maps semantic class
     \node[cls, fill=orange!12] at (3.6,-1.15) {D};
     \node[cls, fill=orange!25] at (4.8,-1.15) {B};
   \end{tikzpicture}
-  \caption{Illustrative tail assignments for a five-class nominal target. Columns are support ranks fixed by the severity profile; rows change which semantic class occupies each rank. Ordinal targets reverse rather than rotate the second assignment.}
+  \caption{Illustrative tail assignments for a five-class target. Columns are support ranks fixed by the severity profile. Difficulty increases from B to C: aligned compounds difficulty with scarce support, while reversed compensates it.}
   \label{fig:tail-assignments}
 \end{figure}
 
@@ -263,7 +265,7 @@ The random quantities are separated into five seed families so that changing one
     Seed family & Determines & Prespecified use \\
     \midrule
     Split-unit partition & Membership of the training, validation, and test cohorts & Three locked patient- or case-disjoint splits \\
-    Tail assignment & Mapping of semantic classes to head--tail support ranks & Recorded clinical/native, reversed/rotated, and random mappings \\
+    Tail assignment & Mapping of semantic classes to head--tail support ranks & Native, difficulty-aligned, and difficulty-reversed mappings from signed pilot evidence \\
     Construction & Split-unit, slide, and patch orderings and the selected evidence & Three pilot orderings and a disjoint fourth ordering for definitive manifests \\
     Initialization & Parameter initialization and optimization randomness & Two tuning seeds and five disjoint confirmation seeds \\
     Resampling & Bootstrap draws and permutation swaps & Uncertainty intervals and hypothesis tests only \\
@@ -529,7 +531,8 @@ Only quantities available without using test outcomes are eligible as predictors
     Predictor & Question it represents & Model role \\
     \midrule
     Achieved imbalance ratio & How extreme was the realized head--tail allocation? & Primary, log-transformed \\
-    Intrinsic separability & How distinguishable are the classes in a common balanced frozen-feature reference, before condition-specific support is considered? & Primary \\
+    Support--difficulty alignment $A=\operatorname{corr}(\log N_c,d_c)$ & Does greater allocated support go to more difficult classes ($A>0$), or does scarcity compound difficulty ($A<0$)? & Primary \\
+    Intrinsic separability & How distinguishable are the classes in a common balanced frozen-feature reference, before condition-specific support is considered? & One-predictor sensitivity \\
     Condition-specific learnability & What remains learnable from the exact controlled training manifest? & One-predictor sensitivity \\
     Minimum independent support & How many distinct split units or slides support the scarcest class? & One-predictor sensitivity \\
     Effective patch support & How much patch support remains after accounting for within-case redundancy? & Patch-only sensitivity \\
@@ -565,9 +568,9 @@ For class $c$, let $G_c$ be the number of split-unit or slide clusters, $m_{gc}$
 \noindent where $\overline m_c$ is the arithmetic mean cluster size. The scalar margin is the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}: each observation is scored only by a probe trained without it. Equations~\eqref{eq:icc}--\eqref{eq:neff} provide a patch-only sensitivity measure, not a replacement for independent-unit counts. Slide count is used directly for WSI targets, with patient count also examined when patients contribute multiple slides.
 
 \paragraph{Three deliberately small association models.}
-One model is fitted for each of the three RQ3 outcomes. The occurrence model handles the yes/no gate result; the magnitude and recovery models handle continuous outcomes. Every primary model contains exactly two predictors: the log achieved imbalance ratio and intrinsic separability. The magnitude model also uses each deficit's bootstrap standard error so that a noisy estimated deficit is not treated as an exact observation.
+One model is fitted for each of the three RQ3 outcomes. The occurrence model handles the yes/no gate result; the magnitude and recovery models handle continuous outcomes. Every primary model contains exactly two predictors: the log achieved imbalance ratio and support--difficulty alignment $A$. The magnitude model also uses each deficit's bootstrap standard error so that a noisy estimated deficit is not treated as an exact observation.
 
-Comparisons from the same dataset--target group can share a baseline level of difficulty. A \emph{random intercept} allows each group to have its own starting level while estimating common associations with imbalance and separability. This adjustment is important because the analysis pools several severities and assignments from the same group. The recovery model omits method-specific effects because the small number of gated units cannot support them.
+Comparisons from the same dataset--target group can share a baseline level of difficulty. A \emph{random intercept} allows each group to have its own starting level while estimating common associations with imbalance and alignment. This adjustment is important because the analysis pools several severities and assignments from the same group. The recovery model omits method-specific effects because the small number of gated units cannot support them.
 
 The remaining predictors in Table~\ref{tab:rq3-predictors} are fitted one at a time in separate sensitivity models. They are not combined with one another or with the two primary predictors because only a few independent dataset--target groups are available and the candidate predictors are strongly confounded. No interactions are fitted.
 

@@ -93,6 +93,7 @@ def _rq3_cell(group: str, method: str, rho: float, deficit: float, gate: bool) -
         "group": group,
         "method": method,
         "rho": rho,
+        "support_difficulty_alignment": 0.2,
         "separability": 0.5,
         "learnability": 0.4,
         "log_min_support": 3.0,
@@ -134,6 +135,7 @@ def test_rq3_gate_pass_and_deficit_and_recovery_models_run():
             {
                 "group": groups[i],
                 "rho": rho,
+                "support_difficulty_alignment": 0.2,
                 "separability": separability,
                 "gate_passed": gate_passed,
                 "deficit_ba": float(rng.normal(0.05, 0.02)),
@@ -200,7 +202,12 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
             "bootstrap_denominator": [0.08, 0.10],
         },
     ]
-    freeze = {"assignment_conditions": {"native": {"severe": {"achieved_rho": 100.0}}}}
+    freeze = {
+        "difficulty_evidence": {"difficulty": {"A": 0.1, "B": 0.2}},
+        "assignment_conditions": {
+            "native": {"severe": {"achieved_rho": 100.0, "allocated_counts": {"A": 10, "B": 100}}}
+        },
+    }
 
     cells = _cells({}, comparisons, freeze, "dataset:target", False)
 
@@ -530,7 +537,12 @@ def test_cross_dataset_rq3_pools_groups_and_reports_stability() -> None:
 
     assert report["n_groups"] == 4
     assert len(report["models"]["deficit"]["rand_intercepts"]) == 4
-    assert set(report["sensitivity"]) == {"learnability", "log_min_support", "is_wsi"}
+    assert set(report["sensitivity"]) == {
+        "separability",
+        "learnability",
+        "log_min_support",
+        "is_wsi",
+    }
     assert set(report["leave_one_group_out"]) == set(report["groups"])
 
 def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) -> None:
@@ -548,6 +560,7 @@ def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) 
                         "severity": "severe",
                         "method": "ce",
                         "rho": 10.0,
+                        "support_difficulty_alignment": 0.2,
                         "separability": 0.5,
                         "learnability": 0.4,
                         "log_min_support": 2.0,
@@ -642,12 +655,14 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
             "native": {
                 "severe": {
                     "achieved_rho": 10.0,
+                    "allocated_counts": {"A": 10, "B": 100},
                     "contribution_stats": {},
                     "path": str(tmp_path / "x.csv"),
                 }
             }
         }
     }
+    freeze["difficulty_evidence"] = {"difficulty": {"A": 0.1, "B": 0.2}}
 
     cells = _cells({"data": tmp_path}, comparisons, freeze, "panda:wsi", True)
     report = run_rq3(
@@ -679,6 +694,7 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
         "severity": "severe",
         "method": "weighted_ce",
         "rho": 10.0,
+        "support_difficulty_alignment": 0.2,
         "separability": 0.5,
         "learnability": 0.4,
         "log_min_support": 2.0,

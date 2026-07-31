@@ -21,6 +21,7 @@ __all__ = [
 # Descriptive covariates entered only as single-predictor sensitivity fits, never
 # jointly with the two primary predictors (report §"Predictors of damage...").
 SENSITIVITY_COVARIATES = (
+    "separability",
     "learnability",
     "log_min_support",
     "log_min_patient_support",
@@ -29,12 +30,30 @@ SENSITIVITY_COVARIATES = (
 )
 
 
+def support_difficulty_alignment(
+    allocated: dict[str, Any], freeze: dict[str, Any]
+) -> float:
+    """Correlate log allocated support with frozen class difficulty."""
+    difficulty = freeze.get("difficulty_evidence", {}).get("difficulty", {})
+    names = list(allocated.get("allocated_counts", {}))
+    if not names or any(name not in difficulty for name in names):
+        raise RuntimeError("Frozen difficulty evidence is required for RQ3 alignment")
+    support = np.log([allocated["allocated_counts"][name] for name in names])
+    scores = np.asarray([difficulty[name] for name in names], dtype=float)
+    return (
+        0.0
+        if np.ptp(support) == 0 or np.ptp(scores) == 0
+        else float(np.corrcoef(support, scores)[0, 1])
+    )
+
+
 class RQ3Cell(dict):
     """One dataset-target x severity x method cell's RQ3 inputs.
 
     Required keys: ``group`` (dataset-target group id, gets a random
-    intercept), ``rho`` (requested imbalance ratio), ``separability``
-    (intrinsic separability score), ``gate_passed`` (bool), ``deficit_ba``
+    intercept), ``rho`` (achieved imbalance ratio),
+    ``support_difficulty_alignment`` (support/difficulty correlation),
+    ``gate_passed`` (bool), ``deficit_ba``
     (float), ``deficit_se`` (bootstrap standard error of ``deficit_ba``),
     ``recovery`` (float, meaningful only when ``gate_passed``), and
     ``recovery_se``.
@@ -42,9 +61,10 @@ class RQ3Cell(dict):
 
 
 def build_predictors(cells: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray]:
-    """Standardizable two-predictor design matrix: [log(rho), intrinsic separability]."""
+    """Standardizable primary matrix: [log achieved rho, support/difficulty alignment]."""
     x = np.array(
-        [[math.log(c["rho"]), c["separability"]] for c in cells], dtype=np.float64
+        [[math.log(c["rho"]), c["support_difficulty_alignment"]] for c in cells],
+        dtype=np.float64,
     )
     groups = np.array([c["group"] for c in cells])
     return x, groups
@@ -140,6 +160,14 @@ def _sensitivity_fit(
     return fit_rq3_model(y, x, groups, errors, is_logistic=logistic)
 
 
+def _held_out_prediction(
+    fit: dict[str, Any], mean: np.ndarray, std: np.ndarray, cell: dict[str, Any]
+) -> float:
+    """Predict one held-out deficit from standardized primary predictors."""
+    predictors = np.array([math.log(cell["rho"]), cell["support_difficulty_alignment"]])
+    return float(fit["intercept"] + ((predictors - mean) / std) @ fit["slopes"])
+
+
 def leave_one_group_out(cells: list[dict[str, Any]]) -> dict[str, Any]:
     """Leave-one-dataset-target-group-out held-out deficit prediction."""
     groups = sorted({c["group"] for c in cells})
@@ -152,14 +180,7 @@ def leave_one_group_out(cells: list[dict[str, Any]]) -> dict[str, Any]:
         fit = fit_deficit_model(train)
         x, _ = build_predictors(train)
         mean, std = x.mean(0), np.maximum(x.std(0), 1e-8)
-        sl = np.array(fit["slopes"], dtype=float)
-        preds = [
-            fit["intercept"]
-            + float(
-                ((np.array([np.log(c["rho"]), c["separability"]]) - mean) / std) @ sl
-            )
-            for c in test
-        ]
+        preds = [_held_out_prediction(fit, mean, std, cell) for cell in test]
         actual = np.array([c["deficit_ba"] for c in test])
         out[held] = {
             "held_out_rmse": float(np.sqrt(np.mean((np.array(preds) - actual) ** 2))),

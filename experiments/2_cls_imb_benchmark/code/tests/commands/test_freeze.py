@@ -133,6 +133,7 @@ def test_freeze_uses_one_patch_pool_for_balanced_and_every_assignment(
         20,
         False,
         10,
+        {"native": ["A", "B"], "difficulty_reversed": ["B", "A"]},
     )
 
     pool_hashes = {

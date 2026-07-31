@@ -691,12 +691,13 @@
           <ul>
             <li>Size-matched balanced CE</li>
             <li><strong>Nested support:</strong> 10 / 15 / 20 / 30 / 50 units per class</li>
-            <li>3 construction orderings</li>
+            <li>3 constructions: grouped five-fold linear probes</li>
+            <li>kNN sensitivity; rank easiest to hardest</li>
             <li>Compare natural-validation performance</li>
           </ul>
           <div class="gate-badge">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6.01" y2="20"/></svg>
-            <span>Output: stability floor</span>
+            <span>Output: stability floor + signed difficulty ranking</span>
           </div>
         </div>
 
@@ -712,9 +713,10 @@
           <ul>
             <li>Lock min support = max(pilot floor, design floor)</li>
             <li><strong>Design floor:</strong> 10 split units / 20 slides minimum</li>
-            <li>Build manifests: natural, balanced, moderate (&rho;=10), severe (&rho;=100, if feasible)</li>
+            <li>Build native, difficulty-aligned, and difficulty-reversed manifests</li>
+            <li>Conditions: natural, balanced, moderate (&rho;=10), severe (&rho;=100, if feasible)</li>
             <li>Shared held-out val/test sets</li>
-            <li>Sign seeds, hashes, floors</li>
+            <li>Sign pilot hashes, folds, rankings, and freeze</li>
           </ul>
           <div class="gate-badge">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>

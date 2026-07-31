@@ -14,6 +14,7 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_linked_sensitivity_models,
     fit_recovery_model,
     leave_one_group_out,
+    support_difficulty_alignment,
 )
 from imbalance_benchmark.analysis.predictors.separability import (
     class_margin_cross_fit,
@@ -57,14 +58,7 @@ def _covariates(
     condition: dict[str, Any],
     freeze: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Frozen-feature RQ3 covariates measured before mitigation fitting.
-
-    ``separability`` (intrinsic, fixed balanced reference) is the second primary
-    predictor; the rest (condition-specific learnability, balanced-kNN recall,
-    per-class NN error, log minimum independent support, and the patch-vs-WSI
-    indicator) are descriptive covariates for the single-predictor sensitivity
-    fits only.
-    """
+    """Frozen-feature RQ3 covariates measured before mitigation fitting."""
     class_names = list((freeze or {}).get("class_names", [])) or None
     ref_path = paths["data"] / "manifest_balanced.csv"
     ref_x, ref_y = _feature_frame(ref_path, None, is_mil, class_names)
@@ -167,6 +161,9 @@ def _cells(
                 "severity": row["severity"],
                 "gate": row["gate"],
                 "rho": allocated["achieved_rho"],
+                "support_difficulty_alignment": support_difficulty_alignment(
+                    allocated, freeze
+                ),
                 "gate_passed": (
                     gate_map[(row["assignment"], row["severity"])]
                     if is_deficit_cell

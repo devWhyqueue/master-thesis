@@ -131,7 +131,7 @@ def confirmatory_table(comparisons: list[dict[str, Any]]) -> str:
 
 
 def rq3_table(models: dict[str, dict[str, Any]]) -> str:
-    """RQ3 coefficient table: intercept and (log rho, separability) slopes per linked model."""
+    """RQ3 coefficient table: log severity and support/difficulty alignment slopes."""
     rows = []
     for name, fit in models.items():
         if not fit:
@@ -142,7 +142,9 @@ def rq3_table(models: dict[str, dict[str, Any]]) -> str:
                 "model": name,
                 "intercept": fit.get("intercept"),
                 "slope_log_rho": slopes[0] if len(slopes) > 0 else None,
-                "slope_separability": slopes[1] if len(slopes) > 1 else None,
+                "slope_support_difficulty_alignment": slopes[1]
+                if len(slopes) > 1
+                else None,
                 "sigma_u": fit.get("sigma_u"),
                 "sigma": fit.get("sigma"),
             }

@@ -49,8 +49,15 @@ def _ingest_discovered_run(
     record: dict[str, Any],
 ) -> None:
     """Add one run with tiers derived from its frozen assignment allocation."""
+    provenance = record.get("provenance", {})
+    if provenance.get("freeze_content_sha256") != freeze.get("content_sha256"):
+        raise RuntimeError("Run belongs to a stale manifest freeze; regenerate it")
     class_names = record.get("class_names", [])
     assignment = record.get("assignment", "native")
+    if condition not in {"natural", "balanced"} and assignment not in freeze.get(
+        "tail_assignments", {}
+    ):
+        raise RuntimeError("Run assignment is absent from the current manifest freeze")
     allocated = (
         freeze.get("conditions", {}).get(condition, {}).get("allocated_counts", {})
     )

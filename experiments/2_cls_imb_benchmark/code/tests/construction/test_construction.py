@@ -206,21 +206,22 @@ def test_achieved_rho_matches_max_over_min():
     assert achieved_rho({"a": 100, "b": 10, "c": 50}) == pytest.approx(10.0)
     assert achieved_rho({"a": 0, "b": 0}) == 1.0
 
-def test_build_tail_assignments_variants_and_reproducibility():
+def test_build_tail_assignments_follow_difficulty_and_native_ties():
     classes = ["class_A", "class_B", "class_C", "class_D"]
-    assignments = build_tail_assignments(classes, seed=11, ordinal=False)
+    assignments = build_tail_assignments(
+        classes,
+        {"class_A": 0.3, "class_B": 0.1, "class_C": 0.3, "class_D": 0.2},
+    )
     assert assignments["native"] == classes
-    assert assignments["reversed_or_rotated"] == classes[1:] + classes[:1]
-    assert sorted(assignments["random"]) == sorted(classes)
-    again = build_tail_assignments(classes, seed=11, ordinal=False)
-    assert assignments["random"] == again["random"]
-    different_seed = build_tail_assignments(classes, seed=12, ordinal=False)
-    assert different_seed["random"] != assignments["random"]
+    assert assignments["difficulty_aligned"] == ["class_B", "class_D", "class_A", "class_C"]
+    assert assignments["difficulty_reversed"] == ["class_C", "class_A", "class_D", "class_B"]
 
-def test_build_tail_assignments_reversed_for_ordinal():
-    classes = ["g0", "g1", "g2", "g3"]
-    assignments = build_tail_assignments(classes, seed=1, ordinal=True)
-    assert assignments["reversed_or_rotated"] == list(reversed(classes))
+def test_binary_assignments_keep_native_and_reversed_orientations():
+    assignments = build_tail_assignments(["g0", "g1"], {"g0": 0.1, "g1": 0.2})
+    assert assignments == {
+        "native": ["g0", "g1"],
+        "difficulty_reversed": ["g1", "g0"],
+    }
 
 def test_contribution_stats_reports_pool_fraction():
     pool = _patch_frame(n_patients=10, slides_per_patient=2, patches_per_slide=5)
@@ -672,14 +673,6 @@ def test_pool_capacity_check_matches_a_fresh_rebuild_per_required_count(
         assert _pool_has_capacity(
             df, patients, slides, required_counts, seed
         ) == _naive_pool_has_capacity(df, patients, slides, required_counts, seed)
-
-@pytest.mark.parametrize("seed", range(60))
-def test_random_tail_assignment_is_distinct_from_native_and_rotated(seed: int) -> None:
-    """The random permutation must not duplicate the native or rotated assignment."""
-    assignments = build_tail_assignments(["A", "B", "C"], seed=seed, ordinal=False)
-
-    orders = [tuple(order) for order in assignments.values()]
-    assert len(set(orders)) == 3
 
 def test_effective_rho_returns_largest_feasible_when_feasibility_is_disconnected():
     inventory = [372, 231, 107, 463, 114, 364, 96]
