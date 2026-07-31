@@ -34,8 +34,12 @@ Across Histopathology Patch Classification and WSI-Level MIL}
 \endgroup
 \end{abstract}
 
-\setcounter{tocdepth}{1}
-{\small\tableofcontents}
+\setcounter{tocdepth}{2}
+\begingroup
+\scriptsize
+\renewcommand{\addvspace}[1]{\vspace{0.25em}}
+\tableofcontents
+\endgroup
 \clearpage
 
 \section{Introduction}
@@ -53,7 +57,7 @@ RQ1 first establishes whether a recoverable problem exists. RQ2 is evaluated onl
 
 \section{Benchmark Logic}
 \label{sec:design}
-What must remain fixed for a balanced--imbalanced contrast to mean what it claims? Data source, prediction target, split-unit partition, frozen representation, total controlled training support, validation and test cohorts, and training budget remain fixed. Only the allocation of training support across classes changes. Figure~\ref{fig:study-logic} follows that contrast from construction to interpretation.
+Interpretability depends on separating the intended intervention from everything else. The benchmark therefore freezes three layers of the comparison. Task definition fixes the data source, prediction target, and frozen representation. Evidence design fixes the split-unit partition and total controlled support. Model comparison fixes the natural validation and test cohorts and the training budget. Only class allocation within training support changes. Figure~\ref{fig:study-logic} follows that contrast from construction to interpretation.
 
 \begin{figure}[H]
   \centering
@@ -75,7 +79,7 @@ What must remain fixed for a balanced--imbalanced contrast to mean what it claim
     \draw[arrow] (damage) -- (recover);
     \draw[arrow] (recover) -- (why);
   \end{tikzpicture}
-  \caption{Reader-facing logic of the benchmark. RQ1 concerns the damage contrast, RQ2 concerns gated recovery, and RQ3 concerns variation among those controlled comparisons.}
+  \caption{Logic of the benchmark. RQ1 concerns the damage contrast, RQ2 concerns gated recovery, and RQ3 concerns variation among those controlled comparisons.}
   \label{fig:study-logic}
 \end{figure}
 
@@ -85,7 +89,7 @@ This logic also explains the order of the report. Section~\ref{sec:data} establi
 
 \section{Prediction Tasks and Evidence Units}
 \label{sec:data}
-What counts as one example, and when do many examples still represent little independent evidence? Patch classification predicts a label for one directly labelled image crop. WSI-level MIL predicts one label for a complete slide represented as a bag of patch embeddings; its patches are instances, not independently labelled examples. The terms \emph{patch} and \emph{tile} both denote a $256\times256$ crop, but \emph{patch} is used throughout.
+Patch counts and independent evidence are not interchangeable. Patch classification predicts a label for one directly labelled image crop. WSI-level MIL predicts one label for a complete slide represented as a bag of patch embeddings; its patches are instances, not independently labelled examples. The terms \emph{patch} and \emph{tile} both denote a $256\times256$ crop, but \emph{patch} is used throughout.
 
 Table~\ref{tab:datasets} defines the prediction example, target, and split unit in each dataset--regime. A \emph{split unit} is the patient or participant where available and the biopsy or WSI otherwise. It is assigned to exactly one partition before any imbalance is constructed, and all slides from that unit follow the assignment.
 
@@ -121,7 +125,7 @@ With prediction and evidence units fixed, the next question is how to change cla
 
 \section{Constructing Controlled Imbalance}
 \label{sec:construction}
-How can the benchmark create a strong imbalance contrast without quietly changing data volume, held-out prevalence, or the pool of available evidence? Four training conditions establish the comparison: a full natural anchor, a size-matched balanced reference, a moderate imbalance targeting $\rho=10$, and a severe imbalance targeting $\rho=100$ where feasible. The natural anchor describes performance with all eligible training data. Only the three controlled conditions share total support $T$ and enter imbalance-deficit and recovery estimands.
+Controlled imbalance must alter class allocation without quietly changing data volume, held-out prevalence, or the pool of available evidence. Four training conditions establish the comparison: a full natural anchor, a size-matched balanced reference, a moderate imbalance targeting $\rho=10$, and a severe imbalance targeting $\rho=100$ where feasible. The natural anchor describes performance with all eligible training data. Only the three controlled conditions share total support $T$ and enter imbalance-deficit and recovery estimands.
 
 \subsection{What changes and what remains fixed}
 The construction asks a simple counterfactual question: how would the same prediction task perform if a fixed training budget were distributed evenly across classes rather than concentrated in a head class? Answering this question requires more than specifying an imbalance ratio. The comparison must first fix the split-unit partition, eligible examples, representation, evaluation cohort, and total controlled training support; only then can class allocation be changed. Figure~\ref{fig:controlled-construction} summarizes this separation between fixed design choices and the intended intervention.
@@ -184,7 +188,7 @@ These safeguards define the evidence available to every model. The next section 
 
 \section{Measuring Damage and Recovery}
 \label{sec:analysis}
-How does the benchmark turn model predictions into answers to RQ1 and RQ2? The logic is deliberately asymmetric. Balanced CE is compared with imbalanced CE first. Only when that contrast shows a meaningful deficit on discrimination or calibration is a mitigation method interpreted in terms of recovery on the affected endpoint.
+RQ1 and RQ2 are answered in a deliberately asymmetric sequence. Balanced CE is compared with imbalanced CE first. Only when that contrast shows a meaningful deficit on discrimination or calibration is a mitigation method interpreted in terms of recovery on the affected endpoint.
 
 For intuition, suppose balanced CE attains balanced accuracy \num{0.72}, imbalanced CE attains \num{0.62}, and a mitigation method attains \num{0.68}. Imbalance caused a \num{0.10} deficit and the method regained \num{0.06}, or 60\% of the demonstrated damage. This normalization distinguishes repair of an imbalance effect from a generic method improvement. Exact estimands and gates appear after the endpoints they use.
 
@@ -327,7 +331,7 @@ RQ3 can therefore suggest which combinations of severity, difficulty, and suppor
 
 \section{Interpretation and Limitations}
 \label{sec:limits}
-What can this design support, and where must interpretation stop? Its strongest claim concerns training-distribution effects under one frozen Virchow2 representation. It does not establish how end-to-end encoder fine-tuning would respond, whether another foundation representation would produce the same deficits, or whether constructed tails reproduce biological prevalence and referral pathways. The shared total $T$ isolates allocation by discarding some available examples; the full natural condition is therefore retained as a descriptive anchor.
+The design supports deliberately narrow claims. Its strongest claim concerns effects of the training distribution under one frozen Virchow2 representation. It does not establish how end-to-end encoder fine-tuning would respond, whether another foundation representation would produce the same deficits, or whether constructed tails reproduce biological prevalence and referral pathways. The shared total $T$ isolates allocation by discarding some available examples; the full natural condition is therefore retained as a descriptive anchor.
 
 Method comparisons also identify methods, not universal mechanisms. Some interventions change sampling, objectives, representations, or architecture together. Equal optimizer updates do not imply equal information exposure: RankMix trains teacher and student, MDE consumes natural and balanced minibatches, and post-hoc logit adjustment performs no gradient optimization. MIL bags likewise vary with eligible tissue area. Processed examples, unique exposures, accelerator time, memory, and model size are reported rather than treated as equal.
 
@@ -337,6 +341,9 @@ Finally, calibration is conditional on the natural held-out prevalence and canno
 
 \clearpage
 \appendix
+\phantomsection
+\addcontentsline{toc}{part}{Appendices}
+\addtocontents{toc}{\protect\setcounter{tocdepth}{1}}
 \section{Construction and Support Specification}
 \label{app:construction}
 This appendix records dataset eligibility, hierarchical sampling, support floors, allocation, and seed rules. These details implement the controlled contrast introduced in Section~\ref{sec:construction}; they do not add further estimands.
