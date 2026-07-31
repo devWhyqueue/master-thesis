@@ -24,7 +24,17 @@ Across Histopathology Patch Classification and WSI-Level MIL}
 
 \begin{document}
 \raggedbottom
-\maketitle
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\centering
+\vspace*{\fill}
+\makeatletter
+{\LARGE\bfseries \@title\par}
+\vspace{1.5em}
+{\large \@author\par}
+\vspace{1.5em}
+{\large \@date\par}
+\makeatother
 
 \begin{abstract}
 \begingroup
@@ -33,13 +43,12 @@ Across Histopathology Patch Classification and WSI-Level MIL}
 \par
 \endgroup
 \end{abstract}
+\vspace*{\fill}
+\end{titlepage}
+\hypersetup{pageanchor=true}
 
 \setcounter{tocdepth}{2}
-\begingroup
-\scriptsize
-\renewcommand{\addvspace}[1]{\vspace{0.25em}}
 \tableofcontents
-\endgroup
 \clearpage
 
 \section{Introduction}
@@ -683,12 +692,10 @@ Computational cost is separated into validation search and locked-configuration 
 \section{Reproducibility and Execution Workflow}
 \label{app:overview}
 
-Figure~\ref{fig:benchmark-overview} records artifact flow from preparation through confirmation and analysis. It is an execution map for reproducibility, whereas Figure~\ref{fig:study-logic} is the conceptual map for interpreting the study.
-
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.995\linewidth,keepaspectratio]{assets/cls_imb_benchmark.png}
-  \caption{Operational workflow of the controlled class-imbalance benchmark, including immutable artifacts, parallel tuning, confirmation, and analysis.}
+  \includegraphics[width=0.92\linewidth,keepaspectratio]{assets/cls_imb_benchmark.png}
+  \caption{Operational workflow of the controlled class-imbalance benchmark.}
   \label{fig:benchmark-overview}
 \end{figure}
 \end{landscape}
