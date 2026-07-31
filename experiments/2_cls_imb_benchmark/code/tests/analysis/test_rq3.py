@@ -19,7 +19,7 @@ from imbalance_benchmark.analysis.inference.gates import (
 from imbalance_benchmark.analysis.metrics import (
     classification_payload,
 )
-from imbalance_benchmark.analysis.predictors import rq3_analysis
+from imbalance_benchmark.analysis.predictors import rq3_analysis, rq3_features
 from imbalance_benchmark.analysis.predictors.hierarchical_models import _log_scale_prior
 from imbalance_benchmark.analysis.predictors.rq3_analysis import (
     _cells,
@@ -167,6 +167,10 @@ def test_rq3_recovery_model_empty_when_no_gated_cells():
 def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatch):
     """A calibration-only cell must use tail-NLL recovery, not BA recovery."""
     monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._reference_block",
+        lambda *_: {},
+    )
+    monkeypatch.setattr(
         "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
         lambda *_: {"separability": 0.5},
     )
@@ -305,17 +309,17 @@ def test_rq3_icc_margin_uses_the_fixed_intrinsic_reference(
         return ref_x, ref_y
 
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._feature_frame",
+        "imbalance_benchmark.analysis.predictors.rq3_features.feature_frame",
         feature_frame,
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._feature_identity",
+        "imbalance_benchmark.analysis.predictors.rq3_features.feature_identity",
         lambda path, *_: pd.DataFrame(
             {"case_id": ["a", "b"], "slide_id": ["s1", "s2"]}
         ),
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.intrinsic_separability",
+        "imbalance_benchmark.analysis.predictors.rq3_features.intrinsic_separability",
         lambda *_: {
             "linear_probe_macro_recall": 0.5,
             "knn_macro_recall": 0.5,
@@ -323,7 +327,7 @@ def test_rq3_icc_margin_uses_the_fixed_intrinsic_reference(
         },
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.condition_learnability",
+        "imbalance_benchmark.analysis.predictors.rq3_features.condition_learnability",
         lambda *_: {"linear_probe_macro_recall": 0.5},
     )
 
@@ -332,16 +336,18 @@ def test_rq3_icc_margin_uses_the_fixed_intrinsic_reference(
         return np.array([0.1, 0.2])
 
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.class_margin_cross_fit",
+        "imbalance_benchmark.analysis.predictors.rq3_features.class_margin_cross_fit",
         margins,
     )
 
     condition_path = tmp_path / "condition.csv"
     condition_path.touch()
+    reference = rq3_analysis._reference_block({"data": tmp_path}, False, None)
     _covariates(
         {"data": tmp_path},
         False,
         {"path": str(condition_path), "contribution_stats": {}},
+        reference,
     )
 
     assert np.array_equal(seen["x"], ref_x)
@@ -378,10 +384,10 @@ def test_rq3_effective_support_uses_condition_support(
             }
         )
 
-    monkeypatch.setattr(rq3_analysis, "_feature_frame", feature_frame)
-    monkeypatch.setattr(rq3_analysis, "_feature_identity", identity)
+    monkeypatch.setattr(rq3_features, "feature_frame", feature_frame)
+    monkeypatch.setattr(rq3_features, "feature_identity", identity)
     monkeypatch.setattr(
-        rq3_analysis,
+        rq3_features,
         "intrinsic_separability",
         lambda *_: {
             "linear_probe_macro_recall": 0.5,
@@ -390,17 +396,19 @@ def test_rq3_effective_support_uses_condition_support(
         },
     )
     monkeypatch.setattr(
-        rq3_analysis,
+        rq3_features,
         "condition_learnability",
         lambda *_: {"linear_probe_macro_recall": 0.5},
     )
-    monkeypatch.setattr(rq3_analysis, "class_margin_cross_fit", lambda x, *_: x[:, 0])
-    monkeypatch.setattr(rq3_analysis, "intraclass_correlation", lambda *_: 0.0)
+    monkeypatch.setattr(rq3_features, "class_margin_cross_fit", lambda x, *_: x[:, 0])
+    monkeypatch.setattr(rq3_features, "intraclass_correlation", lambda *_: 0.0)
 
+    reference = rq3_analysis._reference_block({"data": tmp_path}, False, ["A", "B"])
     result = rq3_analysis._covariates(
         {"data": tmp_path},
         False,
         {"path": str(condition), "contribution_stats": {}},
+        reference,
         {"class_names": ["A", "B"]},
     )
 
@@ -417,9 +425,9 @@ def test_rq3_wsi_records_patient_support_without_patch_effective_support(
         path.write_text("placeholder", encoding="utf-8")
     features = np.array([[1.0], [2.0], [3.0], [4.0]])
     labels = np.array([0, 0, 1, 1])
-    monkeypatch.setattr(rq3_analysis, "_feature_frame", lambda *_: (features, labels))
+    monkeypatch.setattr(rq3_features, "feature_frame", lambda *_: (features, labels))
     monkeypatch.setattr(
-        rq3_analysis,
+        rq3_features,
         "intrinsic_separability",
         lambda *_: {
             "linear_probe_macro_recall": 0.5,
@@ -428,16 +436,17 @@ def test_rq3_wsi_records_patient_support_without_patch_effective_support(
         },
     )
     monkeypatch.setattr(
-        rq3_analysis,
+        rq3_features,
         "condition_learnability",
         lambda *_: {"linear_probe_macro_recall": 0.5},
     )
     monkeypatch.setattr(
-        rq3_analysis,
-        "_feature_identity",
+        rq3_features,
+        "feature_identity",
         lambda *_: (_ for _ in ()).throw(AssertionError("WSI must not compute N_eff")),
     )
 
+    reference = rq3_analysis._reference_block({"data": tmp_path}, True, ["A", "B"])
     result = rq3_analysis._covariates(
         {"data": tmp_path},
         True,
@@ -448,6 +457,7 @@ def test_rq3_wsi_records_patient_support_without_patch_effective_support(
                 "B": {"n_slides": 6, "n_patients": 3},
             },
         },
+        reference,
         {"class_names": ["A", "B"]},
     )
 
@@ -635,6 +645,10 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
             "is_wsi": 1.0,
         }
 
+    monkeypatch.setattr(
+        "imbalance_benchmark.analysis.predictors.rq3_analysis._reference_block",
+        lambda *_: {},
+    )
     monkeypatch.setattr(
         "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
         covariates,

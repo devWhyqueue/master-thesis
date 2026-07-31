@@ -150,6 +150,8 @@ def _execution_lines(
         f"cd {quoted_root}",
         f"mkdir -p {quoted_output}/logs",
         f"export APPTAINERENV_PYTHONPATH={quoted_code}",
+        'export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"',
+        'export APPTAINERENV_OMP_NUM_THREADS="$OMP_NUM_THREADS"',
         "BINDS=()",
     ]
     lines.extend(_staging_lines(images))

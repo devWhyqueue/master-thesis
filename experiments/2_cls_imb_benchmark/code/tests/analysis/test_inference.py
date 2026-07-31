@@ -23,9 +23,10 @@ from imbalance_benchmark.analysis.inference.preflight import (
     require_valid_preflight,
     run_preflight,
 )
-from imbalance_benchmark.analysis.predictors.rq3_analysis import (
+from imbalance_benchmark.analysis.predictors.rq3_features import (
     _covariates,
     _has_multiple_slides_per_patient,
+    _reference_block,
 )
 from imbalance_benchmark.analysis.predictors.separability import (
     effective_support,
@@ -137,11 +138,11 @@ def test_wsi_patient_support_sensitivity_requires_multi_slide_patients(
         return np.array([[0.0, 0.0], [1.0, 1.0]]), np.array([0, 1])
 
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._feature_frame",
+        "imbalance_benchmark.analysis.predictors.rq3_features.feature_frame",
         feature_frame,
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.intrinsic_separability",
+        "imbalance_benchmark.analysis.predictors.rq3_features.intrinsic_separability",
         lambda *_args: {
             "linear_probe_macro_recall": 0.5,
             "knn_macro_recall": 0.5,
@@ -149,15 +150,18 @@ def test_wsi_patient_support_sensitivity_requires_multi_slide_patients(
         },
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.condition_learnability",
+        "imbalance_benchmark.analysis.predictors.rq3_features.condition_learnability",
         lambda *_args: {"linear_probe_macro_recall": 0.5},
     )
     paths = {"data": tmp_path}
     for condition in (one_slide_per_patient, multiple_slides_per_patient):
         condition["path"] = str(tmp_path)
 
-    one_slide_covariates = _covariates(paths, True, one_slide_per_patient)
-    multi_slide_covariates = _covariates(paths, True, multiple_slides_per_patient)
+    reference = _reference_block(paths, True, None)
+    one_slide_covariates = _covariates(paths, True, one_slide_per_patient, reference)
+    multi_slide_covariates = _covariates(
+        paths, True, multiple_slides_per_patient, reference
+    )
 
     assert "log_min_patient_support" not in one_slide_covariates
     assert "log_min_patient_support" in multi_slide_covariates

@@ -369,7 +369,16 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
         data_dir.mkdir(parents=True)
         pd.DataFrame(rows).to_csv(data_dir / "manifest.csv", index=False)
         (data_dir / "pilot_report.json").write_text(
-            json.dumps({"definitive_floor": 10, "quotas": {"0": 1}, "excluded": False}),
+            json.dumps(
+                {
+                    "definitive_floor": 10,
+                    "quotas": {"0": 1},
+                    "excluded": False,
+                    "difficulty_evidence": {
+                        "difficulty": {"A": 0.1, "B": 0.2, "C": 0.3}
+                    },
+                }
+            ),
             encoding="utf-8",
         )
         sign_file(data_dir / "pilot_report.json")

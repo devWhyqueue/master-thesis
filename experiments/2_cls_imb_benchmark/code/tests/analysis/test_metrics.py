@@ -336,7 +336,10 @@ def test_mil_covariates_exclude_patch_effective_support(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Effective support is a patch-only sensitivity covariate."""
-    from imbalance_benchmark.analysis.predictors.rq3_analysis import _covariates
+    from imbalance_benchmark.analysis.predictors.rq3_features import (
+        _covariates,
+        _reference_block,
+    )
 
     manifest = tmp_path / "manifest.csv"
     balanced = tmp_path / "manifest_balanced.csv"
@@ -353,11 +356,11 @@ def test_mil_covariates_exclude_patch_effective_support(
     features = np.array([[1.0, 0.0], [0.0, 1.0]])
     labels = np.array([0, 1])
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._feature_frame",
+        "imbalance_benchmark.analysis.predictors.rq3_features.feature_frame",
         lambda *_: (features, labels),
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.intrinsic_separability",
+        "imbalance_benchmark.analysis.predictors.rq3_features.intrinsic_separability",
         lambda *_: {
             "linear_probe_macro_recall": 0.5,
             "knn_macro_recall": 0.5,
@@ -365,16 +368,20 @@ def test_mil_covariates_exclude_patch_effective_support(
         },
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.condition_learnability",
+        "imbalance_benchmark.analysis.predictors.rq3_features.condition_learnability",
         lambda *_: {"linear_probe_macro_recall": 0.5},
     )
     monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis.class_margin_cross_fit",
+        "imbalance_benchmark.analysis.predictors.rq3_features.class_margin_cross_fit",
         lambda *_: np.array([0.1, 0.2]),
     )
 
+    reference = _reference_block({"data": tmp_path}, True, None)
     result = _covariates(
-        {"data": tmp_path}, True, {"path": str(condition), "contribution_stats": {}}
+        {"data": tmp_path},
+        True,
+        {"path": str(condition), "contribution_stats": {}},
+        reference,
     )
 
     assert "log_effective_support" not in result

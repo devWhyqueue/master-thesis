@@ -19,14 +19,52 @@ __all__ = [
 ]
 
 
-def _pairwise_nearest(ref_x: np.ndarray, query_x: np.ndarray) -> np.ndarray:
-    """Index of each query row's nearest reference row by squared Euclidean distance."""
-    d2 = (
-        (query_x**2).sum(axis=1, keepdims=True)
-        - 2.0 * query_x @ ref_x.T
-        + (ref_x**2).sum(axis=1)[None, :]
-    )
-    return d2.argmin(axis=1)
+_CHUNK_SIZE = 4096
+
+
+def _knn_and_nn_probe(
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+    val_x: np.ndarray,
+    val_y: np.ndarray,
+    n_classes: int,
+    k: int = 5,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Shared (n_val, n_ref) distance pass: k-NN vote predictions and 1-NN correctness.
+
+    Both consumers (balanced k-NN macro recall, per-class 1-NN error) need the same
+    squared-distance matrix; computing it once per chunk instead of twice halves the
+    heaviest allocation in RQ3 covariates. Rows are processed in chunks so the full
+    ``(n_val, n_ref)`` matrix is never materialized at once.
+    """
+    k = min(k, ref_x.shape[0])
+    ref_sq = (ref_x**2).sum(axis=1)[None, :]
+    n_val = val_x.shape[0]
+    preds = np.empty(n_val, dtype=ref_y.dtype)
+    nn_correct = np.empty(n_val, dtype=bool)
+    for start in range(0, n_val, _CHUNK_SIZE):
+        chunk = val_x[start : start + _CHUNK_SIZE]
+        d2 = (chunk**2).sum(axis=1, keepdims=True) - 2.0 * chunk @ ref_x.T + ref_sq
+        end = start + chunk.shape[0]
+        # argpartition (unordered top-k) suffices: the k labels feed an
+        # order-insensitive bincount().argmax() vote, same as a full argsort.
+        neighbor_idx = np.argpartition(d2, k - 1, axis=1)[:, :k]
+        neighbor_labels = ref_y[neighbor_idx]
+        preds[start:end] = [
+            np.bincount(row, minlength=n_classes).argmax() for row in neighbor_labels
+        ]
+        nn_correct[start:end] = ref_y[d2.argmin(axis=1)] == val_y[start:end]
+    return preds, nn_correct
+
+
+def _macro_recall(preds: np.ndarray, val_y: np.ndarray, n_classes: int) -> float:
+    """Class-balanced recall of ``preds`` against ``val_y`` over ``n_classes``."""
+    recalls = []
+    for c in range(n_classes):
+        mask = val_y == c
+        if mask.any():
+            recalls.append(float((preds[mask] == c).mean()))
+    return float(np.mean(recalls)) if recalls else 0.0
 
 
 def balanced_knn_macro_recall(
@@ -38,23 +76,8 @@ def balanced_knn_macro_recall(
     k: int = 5,
 ) -> float:
     """Balanced (macro-recall) k-nearest-neighbour classification of the validation set."""
-    d2 = (
-        (val_x**2).sum(axis=1, keepdims=True)
-        - 2.0 * val_x @ ref_x.T
-        + (ref_x**2).sum(axis=1)[None, :]
-    )
-    k = min(k, ref_x.shape[0])
-    neighbor_idx = np.argsort(d2, axis=1)[:, :k]
-    neighbor_labels = ref_y[neighbor_idx]
-    preds = np.array(
-        [np.bincount(row, minlength=n_classes).argmax() for row in neighbor_labels]
-    )
-    recalls = []
-    for c in range(n_classes):
-        mask = val_y == c
-        if mask.any():
-            recalls.append(float((preds[mask] == c).mean()))
-    return float(np.mean(recalls)) if recalls else 0.0
+    preds, _ = _knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes, k)
+    return _macro_recall(preds, val_y, n_classes)
 
 
 def linear_probe_macro_recall(
@@ -73,6 +96,18 @@ def linear_probe_macro_recall(
     return float(np.mean(recalls))
 
 
+def _per_class_error(
+    nn_correct: np.ndarray, val_y: np.ndarray, n_classes: int
+) -> np.ndarray:
+    """Per-class 1-NN mismatch rate from a correctness mask; NaN where unsupported."""
+    out = np.full(n_classes, np.nan)
+    for c in range(n_classes):
+        mask = val_y == c
+        if mask.any():
+            out[c] = 1.0 - float(nn_correct[mask].mean())
+    return out
+
+
 def per_class_nn_error(
     ref_x: np.ndarray,
     ref_y: np.ndarray,
@@ -81,14 +116,8 @@ def per_class_nn_error(
     n_classes: int,
 ) -> np.ndarray:
     """Per-class 1-nearest-neighbour label-mismatch error rate; NaN where unsupported."""
-    nearest = _pairwise_nearest(ref_x, val_x)
-    correct = ref_y[nearest] == val_y
-    out = np.full(n_classes, np.nan)
-    for c in range(n_classes):
-        mask = val_y == c
-        if mask.any():
-            out[c] = 1.0 - float(correct[mask].mean())
-    return out
+    _, nn_correct = _knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes)
+    return _per_class_error(nn_correct, val_y, n_classes)
 
 
 def probe_metrics(
@@ -99,16 +128,13 @@ def probe_metrics(
     n_classes: int,
 ) -> dict[str, Any]:
     """The three fixed probes (kNN, linear, per-class NN error), scored on the validation set."""
+    preds, nn_correct = _knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes)
     return {
-        "knn_macro_recall": balanced_knn_macro_recall(
-            ref_x, ref_y, val_x, val_y, n_classes
-        ),
+        "knn_macro_recall": _macro_recall(preds, val_y, n_classes),
         "linear_probe_macro_recall": linear_probe_macro_recall(
             ref_x, ref_y, val_x, val_y
         ),
-        "per_class_nn_error": per_class_nn_error(
-            ref_x, ref_y, val_x, val_y, n_classes
-        ).tolist(),
+        "per_class_nn_error": _per_class_error(nn_correct, val_y, n_classes).tolist(),
     }
 
 
