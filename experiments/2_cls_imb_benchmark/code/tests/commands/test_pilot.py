@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -10,13 +11,14 @@ import torch
 
 from imbalance_benchmark.commands.pilot import _pilot_report_payload
 from imbalance_benchmark.manifest.pilot.candidates import (
+    PilotFit,
     build_patch_pilot_manifest,
     compute_pilot_quota,
+    evaluate_pilot_candidate,
     frozen_pilot_quota,
     meets_method_floor,
 )
 from imbalance_benchmark.manifest.pilot.training import fit_pilot_model
-from typing import Any
 
 def test_pilot_training_uses_complete_bags_and_the_run_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -51,7 +53,7 @@ def test_pilot_training_uses_complete_bags_and_the_run_config(
         torch.device("cpu"),
         2,
         True,
-        object(),
+        cast(Any, object()),
         initialization_seed=3,
         config={"wsi_training": {"bag_batch_size": 2}},
     )
@@ -302,3 +304,178 @@ def test_grouped_difficulty_uses_case_disjoint_folds() -> None:
         not set(fold["train_groups"]) & set(fold["test_groups"])
         for fold in evidence["folds"]
     )
+
+
+def test_one_slide_pilot_levels_below_twenty_drop_without_apportionment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from imbalance_benchmark.manifest.pilot import training
+
+    frame = pd.DataFrame(
+        {
+            "case_id": np.repeat([f"p{index}" for index in range(20)], 50),
+            "slide_id": np.repeat([f"s{index}" for index in range(20)], 50),
+            "cancer_type": "A",
+        }
+    )
+    monkeypatch.setattr(
+        training,
+        "_apportion_quota",
+        lambda *_: pytest.fail("structural rejection must not apportion"),
+    )
+
+    for level in (10, 15):
+        with pytest.raises(ValueError, match="cannot satisfy"):
+            compute_pilot_quota(frame, ["A"], level, seed=0)
+
+
+def test_large_pilot_levels_use_inventory_order_statistic_without_apportionment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from imbalance_benchmark.manifest.pilot import training
+
+    inventories = list(range(1, 51))
+    frame = pd.DataFrame(
+        {
+            "case_id": np.concatenate(
+                [np.repeat(f"p{index}", count) for index, count in enumerate(inventories)]
+            ),
+            "slide_id": np.concatenate(
+                [np.repeat(f"s{index}", count) for index, count in enumerate(inventories)]
+            ),
+            "cancer_type": "A",
+        }
+    )
+    monkeypatch.setattr(
+        training,
+        "_apportion_quota",
+        lambda *_: pytest.fail("structural acceptance must not apportion"),
+    )
+
+    for level in (20, 30, 50):
+        expected = sorted(inventories, reverse=True)[level - 1]
+        assert {compute_pilot_quota(frame, ["A"], level, seed) for seed in (0, 1, 2)} == {
+            expected
+        }
+
+
+def test_multislide_small_levels_retain_exhaustive_cap_search(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from imbalance_benchmark.manifest.pilot import training
+
+    frame = pd.DataFrame(
+        {
+            "case_id": np.repeat([f"p{index}" for index in range(15)], 40),
+            "slide_id": np.repeat(
+                [f"s{index}_{slide}" for index in range(15) for slide in range(2)], 20
+            ),
+            "cancer_type": "A",
+        }
+    )
+    original, calls = training._apportion_quota, []
+
+    def apportion(
+        df: pd.DataFrame, patients: list[str], quota: int, seed: int
+    ) -> pd.DataFrame:
+        calls.append((df, patients, quota, seed))
+        return original(df, patients, quota, seed)
+
+    monkeypatch.setattr(training, "_apportion_quota", apportion)
+
+    assert compute_pilot_quota(frame, ["A"], 10, seed=0) == 40
+    assert compute_pilot_quota(frame, ["A"], 15, seed=0) == 40
+    assert calls
+
+
+def test_seeded_quota_apportionment_keeps_row_order() -> None:
+    from imbalance_benchmark.manifest.pilot.training import _apportion_quota
+
+    frame = pd.DataFrame(
+        {
+            "case_id": ["p"] * 6,
+            "slide_id": ["a"] * 3 + ["b"] * 3,
+            "cancer_type": "A",
+        }
+    )
+    rng, slides = np.random.default_rng(7), ["a", "b"]
+    rng.shuffle(slides)
+    pools = {slide: list(rng.permutation(frame[frame["slide_id"] == slide].index)) for slide in slides}
+    expected = [pools[slides[index % len(slides)]].pop(0) for index in range(6)]
+
+    assert _apportion_quota(frame, ["p"], quota=6, seed=7).index.tolist() == expected
+
+
+def test_patch_pilot_validation_uses_shared_evaluation_loader(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class Dataset:
+        def __len__(self) -> int:
+            return 2
+
+        def __getitems__(self, indices: list[int]) -> dict[str, torch.Tensor]:
+            return {
+                "features": torch.eye(2)[indices],
+                "target": torch.tensor(indices),
+            }
+
+    class Model(torch.nn.Module):
+        def forward(self, features: torch.Tensor) -> torch.Tensor:
+            return features
+
+    observed: dict[str, object] = {}
+
+    def fit_model(*args: object, **kwargs: object) -> tuple[Model, float]:
+        observed["loader"] = args[4]
+        return Model(), 1.0
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot.candidates.fit_pilot_model", fit_model
+    )
+    fit = PilotFit(cast(Any, Dataset()), torch.device("cpu"), 2, False, 0)
+
+    accuracy, recalls = evaluate_pilot_candidate(pd.DataFrame(), tmp_path / "pilot.csv", fit)
+
+    assert cast(torch.utils.data.DataLoader, observed["loader"]).batch_size == 4096
+    assert accuracy == 1.0
+    assert recalls == [1.0, 1.0]
+
+
+def test_patch_difficulty_reads_feature_bank_in_manifest_order(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from imbalance_benchmark.manifest.pilot.difficulty import pilot_difficulty
+
+    class Patches:
+        rows = torch.tensor([2, 0, 1])
+        df = pd.DataFrame({"case_id": ["c2", "c0", "c1"]})
+
+        def __getitem__(self, _: int) -> dict[str, torch.Tensor]:
+            pytest.fail("difficulty extraction must not load rows one at a time")
+
+        def get_int_targets(self) -> np.ndarray:
+            return np.asarray([1, 0, 1])
+
+    observed: dict[str, np.ndarray] = {}
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot.difficulty.load_training_dataset",
+        lambda *_args, **_kwargs: Patches(),
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot.difficulty.bank_index",
+        lambda rows: torch.tensor([[2.0], [0.0], [1.0]])[rows],
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.manifest.pilot.difficulty.grouped_difficulty",
+        lambda features, labels, groups, _classes: observed.update(
+            features=features, labels=labels, groups=groups
+        )
+        or {},
+    )
+    manifest = pd.DataFrame({"case_id": ["c2", "c0", "c1"]})
+
+    pilot_difficulty(tmp_path / "pilot.csv", manifest, False, ["A", "B"])
+
+    np.testing.assert_array_equal(observed["features"], [[1.0], [2.0], [0.0]])
+    np.testing.assert_array_equal(observed["labels"], [1, 0, 1])
+    np.testing.assert_array_equal(observed["groups"], ["c2", "c0", "c1"])
