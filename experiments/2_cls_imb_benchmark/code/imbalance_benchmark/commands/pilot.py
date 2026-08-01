@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from typing import Any, cast
 
 import pandas as pd
@@ -42,13 +43,22 @@ from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = ["cmd_pilot"]
 
+logger = logging.getLogger(__name__)
+
 
 def _pilot_setup(
     paths: dict[str, Any], config: dict[str, Any]
 ) -> tuple[pd.DataFrame, list[str], bool, bool, list[int], dict[str, dict[str, int]]]:
     """Load the training manifest and derive the regime, unit type, and candidate levels."""
-    df = pd.read_csv(paths["data"] / "manifest.csv")
+    manifest_path = paths["data"] / "manifest.csv"
+    logger.info(
+        "pilot: reading %s (%.1f MB)",
+        manifest_path,
+        manifest_path.stat().st_size / 2**20,
+    )
+    df = pd.read_csv(manifest_path)
     train_df = cast(pd.DataFrame, df[df["split"] == "train"])
+    logger.info("pilot: manifest has %d rows, %d in train", len(df), len(train_df))
     classes = locked_class_names(df)
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     eq_slide = patient_equals_slide(train_df)
@@ -125,7 +135,10 @@ def _run_all_pilot_seeds(
         derive_seed(base_seed, "initialization"),
         config,
     )
-    for seed in pilot_seeds:
+    for position, seed in enumerate(pilot_seeds, start=1):
+        logger.info(
+            "pilot: construction seed %d (%d/%d)", seed, position, len(pilot_seeds)
+        )
         _, ba_curve, recall_curve = run_pilot_seed(
             train_df, classes, levels, seed, scratch_dir, quota, fit
         )
@@ -210,6 +223,7 @@ def cmd_pilot(args: argparse.Namespace) -> None:
 
 
 def _cmd_pilot_one_split(args: argparse.Namespace) -> None:
+    logger.info("pilot: starting split %s", args.split_index)
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
     verify_prepared_feature_provenance(config, paths["data"])
@@ -236,3 +250,4 @@ def _cmd_pilot_one_split(args: argparse.Namespace) -> None:
     report_path = paths["data"] / "pilot_report.json"
     write_json(report_path, payload)
     sign_file(report_path)
+    logger.info("pilot: wrote %s (excluded=%s)", report_path, payload["excluded"])

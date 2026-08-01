@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -46,6 +47,8 @@ __all__ = [
     "meets_method_floor",
     "stability_floor_from_curve",
 ]
+
+logger = logging.getLogger(__name__)
 
 PILOT_CANDIDATE_LEVELS = (10, 15, 20, 30, 50)
 
@@ -159,7 +162,14 @@ def run_pilot_seed(
 ) -> tuple[int | None, list[float], list[list[float]]]:
     """Run every nested candidate level for one pilot construction seed at the frozen quota."""
     ba_curve, recall_curve = [], []
-    for level in levels:
+    for position, level in enumerate(levels, start=1):
+        logger.info(
+            "pilot seed %d: fitting level %d (%d/%d)",
+            seed,
+            level,
+            position,
+            len(levels),
+        )
         manifest = (
             mil_pilot_manifest(df, classes, level, seed)
             if fit.is_mil
@@ -167,6 +177,7 @@ def run_pilot_seed(
         )
         p = scratch_dir / f"pilot_seed={seed}_level={level}.csv"
         ba, recalls = evaluate_pilot_candidate(manifest, p, fit)
+        logger.info("pilot seed %d: level %d balanced accuracy %.4f", seed, level, ba)
         ba_curve.append(ba)
         recall_curve.append(recalls)
     return quota, ba_curve, recall_curve

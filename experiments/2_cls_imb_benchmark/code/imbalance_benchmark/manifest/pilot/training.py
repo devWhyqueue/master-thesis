@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -11,6 +12,8 @@ import torch.nn as nn
 from imbalance_benchmark.datasets.data import BagFeatureDataset, ImbalanceDataset
 from imbalance_benchmark.modeling.models import AttentionMil, MLP
 from imbalance_benchmark.modeling.training import fit_model
+
+logger = logging.getLogger(__name__)
 
 
 def _patient_order(df_class: pd.DataFrame, seed: int) -> list[str]:
@@ -110,13 +113,16 @@ def frozen_pilot_quota(
     satisfies every seed is dropped rather than reused from a larger one.
     """
     feasible, quotas = [], []
-    for level in levels:
+    for position, level in enumerate(levels, start=1):
+        logger.info("pilot quota: level %d (%d/%d)", level, position, len(levels))
         try:
             level_quotas = [compute_pilot_quota(df, classes, level, s) for s in seeds]
         except ValueError:
+            logger.info("pilot quota: level %d infeasible, dropped", level)
             continue
         feasible.append(level)
         quotas.extend(level_quotas)
+    logger.info("pilot quota: frozen at %d, levels %s", min(quotas), feasible)
     return min(quotas), feasible
 
 
