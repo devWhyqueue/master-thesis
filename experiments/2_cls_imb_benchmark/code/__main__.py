@@ -83,6 +83,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     reduce = sub.choices["tune-reduce"]
     reduce.add_argument("--phase", choices=("base", "final"), required=True)
+    reduce.add_argument(
+        "--condition", choices=("natural", "balanced", "moderate", "severe")
+    )
     decide = sub.add_parser("tune-decide")
     decide.add_argument("--phase", choices=("base", "dependent"), required=True)
     decide.add_argument(

@@ -7,6 +7,10 @@ from pathlib import Path
 import pytest
 
 from imbalance_benchmark.commands.tuning import decide
+from imbalance_benchmark.commands.tuning.round_windows import (
+    round0_windows,
+    this_round_windows,
+)
 from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
@@ -34,7 +38,7 @@ def _args(condition="moderate", phase="base", round_index=0) -> argparse.Namespa
 
 
 def test_this_round_windows_round_zero_uses_frozen_defaults():
-    windows = decide._this_round_windows(Path("root"), "moderate", "base", 0, ("ce", "focal"), 9)
+    windows = this_round_windows(Path("root"), "moderate", "base", 0, ("ce", "focal"), 9)
     assert windows["ce"] == (LEARNING_RATE_GRID, None)
     assert windows["focal"] == (LEARNING_RATE_GRID, GRIDS["focal"])
 
@@ -46,7 +50,7 @@ def test_round_zero_windows_keep_the_parameter_dimension_for_fixed_grid_methods(
     later round's expand_grid drop that key and crash the method's fit
     function (KeyError: 'parameter'), which is exactly what happened the
     first time oko reached round 1 on real cluster data."""
-    windows = decide._round0_windows(("oko", "weighted_ce", "balanced_sampling"), 9)
+    windows = round0_windows(("oko", "weighted_ce", "balanced_sampling"), 9)
     assert windows["oko"] == (LEARNING_RATE_GRID, [float(v) for v in GRIDS["oko"]])
     assert windows["weighted_ce"][1] == [float(v) for v in GRIDS["weighted_ce"]]
     assert windows["balanced_sampling"][1] == [float(v) for v in GRIDS["balanced_sampling"]]
@@ -58,7 +62,7 @@ def test_round_zero_windows_cap_oko_k_by_n_classes():
     take a larger sample than population) - this is what broke oko's
     round 1 on BRACS (7 classes) once its window carried the full [1,2,4,8]
     grid forward instead of get_grid_configs' frozen-round k <= n-1 cap."""
-    windows = decide._round0_windows(("oko",), 7)
+    windows = round0_windows(("oko",), 7)
     assert windows["oko"] == (LEARNING_RATE_GRID, [1.0, 2.0, 4.0])
 
 
@@ -70,7 +74,7 @@ def test_this_round_windows_later_round_reads_signed_grids(tmp_path):
     write_round_grids(
         tmp_path, "moderate", "base", 1, {"ce": {"lr_window": LR_ENVELOPE[3:7], "strength_window": None}}
     )
-    windows = decide._this_round_windows(tmp_path, "moderate", "base", 1, ("ce",), 9)
+    windows = this_round_windows(tmp_path, "moderate", "base", 1, ("ce",), 9)
     assert windows["ce"] == (LR_ENVELOPE[3:7], None)
 
 
@@ -174,18 +178,23 @@ def test_advance_keeps_the_resolved_strength_window_when_only_lr_still_shifts(
     assert grids["windows"]["focal"]["strength_window"] == GRIDS["focal"]
 
 
-def test_advance_does_nothing_further_once_dependent_phase_resolves(tmp_path, monkeypatch):
+def test_advance_submits_final_reduce_once_dependent_phase_resolves(tmp_path, monkeypatch):
+    """Before this fix, a fully-resolved dependent phase just returned - no
+    job ever signed ``tuning_selections_{condition}.json``, so confirm always
+    failed with "has no signed lock" once the adaptive search converged."""
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     submitted = []
     resolved = decide_next_round("crt", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
 
     decide._advance(
-        {"data": tmp_path}, {}, "config.yaml", _args(phase="dependent"), {"crt": resolved},
-        {"crt": (LEARNING_RATE_GRID, None)}, False,
-        submit=lambda *a: submitted.append(a) or "id",
+        {"data": tmp_path}, {}, "config.yaml", _args(condition="moderate", phase="dependent"),
+        {"crt": resolved}, {"crt": (LEARNING_RATE_GRID, None)}, False,
+        submit=lambda config, config_path, job: submitted.append(job) or "id",
     )
 
-    assert submitted == []
+    assert len(submitted) == 1
+    assert submitted[0].name == "tune-final-reduce-moderate"
+    assert submitted[0].command == "tune-reduce --phase final --condition moderate"
 
 
 def test_advance_starts_dependent_phase_once_ce_resolves(tmp_path, monkeypatch):

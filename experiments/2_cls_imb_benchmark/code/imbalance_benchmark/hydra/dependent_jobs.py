@@ -13,7 +13,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     candidate_array_size,
 )
 
-__all__ = ["dependent_round_zero_jobs"]
+__all__ = ["dependent_round_zero_jobs", "final_reduce_job"]
 
 
 def _posthoc_natural_job(
@@ -75,6 +75,18 @@ def _controlled_job(
         array_size=bundled_array_size(
             3 * candidate_array_size(dependent_methods), shards_per_task
         ),
+    )
+
+
+def final_reduce_job(config: dict[str, Any], condition: str) -> SlurmJob:
+    """Sign one condition's final tuning selection once its dependent phase converges."""
+    return _job(
+        config,
+        f"tune-final-reduce-{condition}",
+        f"tune-reduce --phase final --condition {condition}",
+        False,
+        (),
+        "tune_reduce",
     )
 
 

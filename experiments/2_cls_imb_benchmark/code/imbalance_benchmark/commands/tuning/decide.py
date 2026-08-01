@@ -10,13 +10,12 @@ from imbalance_benchmark.commands.tuning import _frozen_shard_context, _is_exclu
 from imbalance_benchmark.hydra.job_resources import build_job
 from imbalance_benchmark.hydra.queue import check_queue_cap
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
-from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
-from imbalance_benchmark.hydra.workflow import _submit_script
-from imbalance_benchmark.modeling.context import (
-    GRIDS,
-    LEARNING_RATE_GRID,
-    NO_STRENGTH_GRID_METHODS,
+from imbalance_benchmark.hydra.dependent_jobs import (
+    dependent_round_zero_jobs,
+    final_reduce_job,
 )
+from imbalance_benchmark.hydra.workflow import _submit_script
+from imbalance_benchmark.commands.tuning.round_windows import Window, this_round_windows
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
     load_round_state,
@@ -46,43 +45,9 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 
 __all__ = ["cmd_tune_decide"]
 
-Window = tuple[list[float], list[float] | None]
-
 
 def _real_submit(config: dict[str, Any], config_path: str | None, job: SlurmJob) -> str:
     return _submit_script(render_sbatch(job, config, config_path), False)
-
-
-def _round0_windows(methods: tuple[str, ...], n_classes: int) -> dict[str, Window]:
-    """Every method's strength window, OKO's k capped at n_classes - 1."""
-    windows = {}
-    for method in methods:
-        if method in NO_STRENGTH_GRID_METHODS:
-            windows[method] = (LEARNING_RATE_GRID, None)
-            continue
-        values = [float(v) for v in GRIDS[method]]
-        if method == "oko":
-            values = sorted({v for v in values if int(v) <= n_classes - 1})
-        windows[method] = (LEARNING_RATE_GRID, values)
-    return windows
-
-
-def _this_round_windows(
-    root: Any,
-    condition: str,
-    phase: str,
-    round_index: int,
-    methods: tuple[str, ...],
-    n_classes: int,
-) -> dict[str, Window]:
-    if round_index == 0:
-        return _round0_windows(methods, n_classes)
-    round_grids = load_round_grids(root, condition, phase)
-    return {
-        method: (window["lr_window"], window.get("strength_window"))
-        for method, window in round_grids["windows"].items()
-        if method in methods
-    }
 
 
 def _reduce_this_round(
@@ -136,7 +101,7 @@ def cmd_tune_decide(args: argparse.Namespace) -> None:
         base, freeze, args.condition, args.phase, args.round, methods, fingerprint
     )
     n_classes = len(freeze["class_names"])
-    windows = _this_round_windows(
+    windows = this_round_windows(
         base["data"], args.condition, args.phase, args.round, methods, n_classes
     )
     states = {
@@ -170,7 +135,11 @@ def _advance(
         check_queue_cap()
         _submit_next_round(base, config, config_path, args, unresolved, windows, submit)
         return
-    if args.phase != "base" or _dependent_phase_started(base["data"], args.condition):
+    if args.phase != "base":
+        check_queue_cap()
+        submit(config, config_path, final_reduce_job(config, args.condition))
+        return
+    if _dependent_phase_started(base["data"], args.condition):
         return
     # states only holds methods still active *this* round - CE's own
     # readiness must come from the persisted, cross-round lock instead.

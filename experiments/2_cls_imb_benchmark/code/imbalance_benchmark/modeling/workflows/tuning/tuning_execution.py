@@ -166,8 +166,13 @@ def reduce_tuning_shards(
     freeze: dict[str, Any],
     fingerprint: list[str],
     phase: str,
+    condition: str | None = None,
 ) -> None:
-    """Reduce complete base or dependent shards into signed selections."""
+    """Reduce complete base or dependent shards into signed selections.
+
+    ``condition`` scopes a ``phase="final"`` reduce to one condition, since
+    the others may still be mid-search when this condition's converges.
+    """
     is_mil = raw_scopes[0][1].is_mil
     base_methods = phase_methods(is_mil, "base")
     if phase == "base":
@@ -186,7 +191,7 @@ def reduce_tuning_shards(
         fingerprint,
         base_methods,
         phase_methods(is_mil, "dependent"),
-        CONDITIONS,
+        (condition,) if condition else CONDITIONS,
     )
 
 
