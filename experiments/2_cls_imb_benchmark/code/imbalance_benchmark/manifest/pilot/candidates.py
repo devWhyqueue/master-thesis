@@ -12,11 +12,10 @@ from imbalance_benchmark.construction import select_slides_round_robin
 from imbalance_benchmark.datasets.data import (
     BagFeatureDataset,
     ImbalanceDataset,
-    bag_collate,
-    patch_collate,
 )
 from imbalance_benchmark.modeling.evaluation import per_class_recall
 from imbalance_benchmark.modeling.models import AttentionMil
+from imbalance_benchmark.modeling.training.config import build_evaluation_loader
 from imbalance_benchmark.manifest.pilot.training import (
     compute_pilot_quota,
     eligible_patient_order,
@@ -133,11 +132,7 @@ def evaluate_pilot_candidate(
 ) -> tuple[float, list[float]]:
     """Fit one balanced-CE pilot candidate and return its validation BA and recalls."""
     df.to_csv(scratch, index=False)
-    loader = torch.utils.data.DataLoader(
-        fit.val_ds,
-        batch_size=64,
-        collate_fn=bag_collate if fit.is_mil else patch_collate,  # type: ignore[arg-type]
-    )
+    loader = build_evaluation_loader(fit.val_ds, fit.is_mil)
     model, best_acc = fit_pilot_model(
         scratch,
         fit.device,

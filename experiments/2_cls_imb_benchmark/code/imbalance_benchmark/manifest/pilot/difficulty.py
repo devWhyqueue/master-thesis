@@ -15,6 +15,7 @@ from imbalance_benchmark.datasets.data import (
     ImbalanceDataset,
     load_training_dataset,
 )
+from imbalance_benchmark.datasets.features.cache import bank_index
 
 
 def _recalls(
@@ -88,9 +89,7 @@ def pilot_difficulty(
         identities = dataset.df.drop_duplicates("slide_id")
     else:
         patches = cast(ImbalanceDataset, dataset)
-        features = np.asarray(
-            [patches[index]["features"].cpu().numpy() for index in range(len(patches))]
-        )
+        features = bank_index(patches.rows).cpu().numpy()
         labels = np.asarray(patches.get_int_targets())
         identities = patches.df
     evidence = grouped_difficulty(

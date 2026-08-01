@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 from pathlib import Path
 from typing import Any, cast
 
@@ -31,7 +32,7 @@ def _apportion_quota(
         slides = list(p_df["slide_id"].unique())
         rng.shuffle(slides)
         pools = {
-            s: list(
+            s: deque(
                 rng.permutation(cast(pd.DataFrame, p_df[p_df["slide_id"] == s]).index)
             )
             for s in slides
@@ -40,7 +41,7 @@ def _apportion_quota(
         while taken < quota and any(pools.values()):
             s = slides[s_idx % len(slides)]
             if pools[s]:
-                rows.append(pools[s].pop(0))
+                rows.append(pools[s].popleft())
                 taken += 1
             s_idx += 1
     return df.loc[rows]
@@ -82,6 +83,10 @@ def _class_pilot_quota(c_df: pd.DataFrame, level: int, seed: int) -> int:
     if len(inventory) < level:
         raise ValueError("Pilot ordering failed.")
     max_q = int(inventory.sort_values(ascending=False).iloc[level - 1])
+    if level >= 20:
+        return max_q
+    if c_df.groupby("case_id")["slide_id"].nunique().max() <= 1:
+        raise ValueError("Pilot inventory cannot satisfy patient and slide caps")
     for q in range(max_q, 0, -1):
         pats = eligible_patient_order(c_df, q, level, seed)
         if len(pats) < level:
