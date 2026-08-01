@@ -26,6 +26,7 @@ class SlurmJob:
     cpus: int
     memory: str | None = None
     time_limit: str | None = None
+    constraint: str | None = None
     dependencies: tuple[str, ...] = ()
     array_splits: tuple[int, ...] = ()
     array_conditions: tuple[str, ...] = ()
@@ -113,6 +114,8 @@ def _directives(job: SlurmJob, root: str, config: dict[str, Any]) -> list[str]:
         lines.append(f"#SBATCH --time={job.time_limit}")
     if job.memory:
         lines.append(f"#SBATCH --mem={job.memory}")
+    if job.constraint:
+        lines.append(f"#SBATCH --constraint={job.constraint}")
     array_size = job.array_size or (
         max(1, len(job.array_splits)) * max(1, len(job.array_conditions))
     )

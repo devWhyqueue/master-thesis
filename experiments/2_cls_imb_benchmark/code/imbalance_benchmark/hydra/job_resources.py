@@ -21,6 +21,7 @@ def resources_for(
         "cpus": int(sr.get("cpus", 4)),
         "memory": str(sr["memory"]) if sr.get("memory") else None,
         "time_limit": str(sr["time"]) if sr.get("time") else None,
+        "constraint": str(sr["constraint"]) if sr.get("constraint") else None,
     }
 
 
