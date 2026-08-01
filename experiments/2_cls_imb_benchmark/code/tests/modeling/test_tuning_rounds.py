@@ -5,11 +5,11 @@ from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
     LR_ENVELOPE,
     STRENGTH_ENVELOPES,
     initial_window,
+    new_candidates,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     all_resolved,
     decide_next_round,
-    new_candidates,
     round_payload,
 )
 
@@ -86,6 +86,29 @@ def test_focal_strength_envelope_exhausts_at_top():
     assert state.strength.tuning_limited
     assert state.tuning_limited
     assert state.next_strength_window is None
+
+
+def test_strength_exhaustion_pins_a_still_shifting_lr_to_what_this_round_trained():
+    """Regression: found live on the cluster (BRACS severe, ce_soft_mcc).
+    Strength hits its envelope ceiling and freezes the whole method while lr
+    independently wins an edge case that would normally shift - before this
+    fix, the frozen state recorded lr's speculative next window (never
+    actually submitted as a round), so final reduction could never find a
+    registered candidate for it. lr must instead be pinned to the window it
+    was actually evaluated against this round."""
+    strength_top = STRENGTH_ENVELOPES["ce_soft_mcc"][-4:]  # already at the ceiling
+    lr_window = LEARNING_RATE_GRID
+    state = decide_next_round(
+        "ce_soft_mcc",
+        {"lr": lr_window[0], "parameter": strength_top[-1]},
+        lr_window,
+        strength_window=strength_top,
+    )
+    assert state.tuning_limited
+    assert state.strength.tuning_limited
+    assert state.lr.tuning_limited  # pinned, not left mid-shift
+    assert state.lr.window == lr_window  # what this round actually trained
+    assert state.next_lr_window is None
 
 
 def test_resolved_requires_every_active_axis_interior():

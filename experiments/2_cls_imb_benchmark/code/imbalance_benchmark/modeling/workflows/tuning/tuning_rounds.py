@@ -23,9 +23,7 @@ __all__ = [
     "decide_next_round",
     "round_payload",
     "all_resolved",
-    "new_candidates",
     "new_configs_for_round",
-    "expand_grid",
     "resolve_round_specs",
 ]
 
@@ -86,6 +84,31 @@ def _axis_state(window: list[float], winner: float, envelope: list[float]) -> Ax
     return AxisState(shifted, resolved=False, tuning_limited=False)
 
 
+def _freeze_orphaned_axes(
+    state: RoundState, lr_window: list[float], strength_window: list[float] | None
+) -> RoundState:
+    """Pin an axis mid-shift to what this round actually trained.
+
+    Either axis's independent envelope exhaustion freezes the whole method
+    (report protocol: search stops once any control is tuning-limited), but
+    the other axis may have computed a real shift this same round. That
+    shifted window is never submitted as a next round, so it must not be
+    recorded as this axis's state either - only the window this round
+    actually trained is real.
+    """
+    lr = state.lr
+    if not (lr.resolved or lr.tuning_limited):
+        lr = AxisState(lr_window, resolved=False, tuning_limited=True)
+    strength = state.strength
+    if (
+        strength is not None
+        and strength_window is not None
+        and not (strength.resolved or strength.tuning_limited)
+    ):
+        strength = AxisState(strength_window, resolved=False, tuning_limited=True)
+    return RoundState(state.method, lr, strength)
+
+
 def decide_next_round(
     method: str,
     winning_config: dict[str, Any],
@@ -110,7 +133,10 @@ def decide_next_round(
         strength_state = _axis_state(
             strength_window, winning_config["parameter"], STRENGTH_ENVELOPES[method]
         )
-    return RoundState(method, lr_state, strength_state)
+    state = RoundState(method, lr_state, strength_state)
+    if state.tuning_limited:
+        return _freeze_orphaned_axes(state, lr_window, strength_window)
+    return state
 
 
 def round_payload(states: dict[str, RoundState]) -> dict[str, Any]:
@@ -139,39 +165,6 @@ def all_resolved(states: dict[str, RoundState]) -> bool:
     every required method of a condition.
     """
     return all(state.resolved or state.tuning_limited for state in states.values())
-
-
-def expand_grid(
-    lr_window: list[float], strength_window: list[float] | None
-) -> list[dict[str, Any]]:
-    """Cross one lr/strength window pair into its full candidate list."""
-    if strength_window is None:
-        return [{"lr": lr} for lr in lr_window]
-    return [{"parameter": p, "lr": lr} for p in strength_window for lr in lr_window]
-
-
-def new_candidates(
-    prev_lr_window: list[float],
-    next_lr_window: list[float] | None,
-    prev_strength_window: list[float] | None = None,
-    next_strength_window: list[float] | None = None,
-) -> list[dict[str, Any]]:
-    """Return exactly the configs in the next round's grid that are not in the current one.
-
-    Preserves the full factorial: when both axes shift in the same round, the
-    new corner (new lr, new strength) is included alongside the two new
-    edges, since a single outward corner cannot rule out an LR-strength
-    interaction.
-    """
-    lr_now = next_lr_window if next_lr_window is not None else prev_lr_window
-    strength_now = (
-        next_strength_window
-        if next_strength_window is not None
-        else prev_strength_window
-    )
-    previous = expand_grid(prev_lr_window, prev_strength_window)
-    current = expand_grid(lr_now, strength_now)
-    return [cfg for cfg in current if cfg not in previous]
 
 
 def _round_zero_specs(

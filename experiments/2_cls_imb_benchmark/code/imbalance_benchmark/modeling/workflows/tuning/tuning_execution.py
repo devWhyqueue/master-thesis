@@ -24,8 +24,8 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     reduce_terminal_phase,
     terminal_active_grids,
 )
+from imbalance_benchmark.modeling.workflows.tuning.search_windows import expand_grid
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
-    expand_grid,
     new_configs_for_round,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import phase_methods

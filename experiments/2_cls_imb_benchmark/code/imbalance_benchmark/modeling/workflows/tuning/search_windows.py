@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = [
     "LR_ENVELOPE",
     "STRENGTH_ENVELOPES",
@@ -7,6 +9,8 @@ __all__ = [
     "initial_window",
     "winner_is_interior",
     "shift_window",
+    "expand_grid",
+    "new_candidates",
 ]
 
 # Frozen envelope audited to bound the adaptive learning-rate search (report
@@ -71,3 +75,36 @@ def shift_window(
     if start == 0:
         return None
     return envelope[start - 1 : start - 1 + len(window)]
+
+
+def expand_grid(
+    lr_window: list[float], strength_window: list[float] | None
+) -> list[dict[str, Any]]:
+    """Cross one lr/strength window pair into its full candidate list."""
+    if strength_window is None:
+        return [{"lr": lr} for lr in lr_window]
+    return [{"parameter": p, "lr": lr} for p in strength_window for lr in lr_window]
+
+
+def new_candidates(
+    prev_lr_window: list[float],
+    next_lr_window: list[float] | None,
+    prev_strength_window: list[float] | None = None,
+    next_strength_window: list[float] | None = None,
+) -> list[dict[str, Any]]:
+    """Return exactly the configs in the next round's grid that are not in the current one.
+
+    Preserves the full factorial: when both axes shift in the same round, the
+    new corner (new lr, new strength) is included alongside the two new
+    edges, since a single outward corner cannot rule out an LR-strength
+    interaction.
+    """
+    lr_now = next_lr_window if next_lr_window is not None else prev_lr_window
+    strength_now = (
+        next_strength_window
+        if next_strength_window is not None
+        else prev_strength_window
+    )
+    previous = expand_grid(prev_lr_window, prev_strength_window)
+    current = expand_grid(lr_now, strength_now)
+    return [cfg for cfg in current if cfg not in previous]

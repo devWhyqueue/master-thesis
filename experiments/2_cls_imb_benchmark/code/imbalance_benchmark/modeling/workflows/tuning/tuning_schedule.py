@@ -10,8 +10,8 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import ShardSpec
+from imbalance_benchmark.modeling.workflows.tuning.search_windows import expand_grid
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
-    expand_grid,
     new_configs_for_round,
 )
 

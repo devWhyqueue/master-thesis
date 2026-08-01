@@ -32,10 +32,10 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     ReduceRound,
     reduce_phase,
 )
+from imbalance_benchmark.modeling.workflows.tuning.search_windows import expand_grid
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     RoundState,
     decide_next_round,
-    expand_grid,
     round_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
