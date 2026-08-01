@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from imbalance_benchmark.modeling.context import get_grid_configs
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     resolve_terminal_specs,
     select_candidate_payload,
@@ -24,7 +25,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     load_candidate,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
-    expand_grid,
     resolve_round_specs,
 )
 
@@ -148,19 +148,24 @@ def reduce_phase(
 
 
 def terminal_active_grids(
-    state: dict[str, Any], methods: tuple[str, ...]
+    state: dict[str, Any], methods: tuple[str, ...], n_classes: int
 ) -> dict[str, list[dict[str, Any]]]:
     """Expand every resolved or tuning-limited method's terminal active window.
 
-    ``state`` is the signed cross-round tuning lock (``tuning_round_state``):
-    each entry's ``lr_window``/``strength_window`` is the window that
-    actually decided that axis, so it is the terminal grid regardless of how
-    many rounds it took to get there. ``post_hoc_logit_adjustment`` never
-    enters this state machine (see ``_reduce_method``) and is simply absent.
+    ``state`` is the signed cross-round tuning lock (``tuning_round_state``).
+    Only the audited-unbounded controls (focal, ce_soft_f1, ce_soft_mcc)
+    adaptively shift a strength window there; a fixed-grid method (oko,
+    weighted_ce, balanced_sampling) always has ``strength_window: None`` in
+    ``state`` even though it trains a real parameter per candidate, so
+    ``get_grid_configs`` is used to fall back to that method's full frozen
+    grid instead of silently dropping the parameter dimension.
     """
     return {
-        method: expand_grid(
-            state[method]["lr_window"], state[method].get("strength_window")
+        method: get_grid_configs(
+            method,
+            n_classes,
+            state[method]["lr_window"],
+            state[method].get("strength_window"),
         )
         for method in methods
         if method in state

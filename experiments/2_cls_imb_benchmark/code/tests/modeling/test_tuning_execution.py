@@ -22,7 +22,10 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
 )
 
 FINGERPRINT = ["fp"]
-FREEZE = {"seed_roles": {"tuning_initialization_0": 11}}
+FREEZE = {
+    "seed_roles": {"tuning_initialization_0": 11},
+    "class_names": ["a", "b", "c", "d", "e", "f", "g"],
+}
 
 
 def _write_candidate(

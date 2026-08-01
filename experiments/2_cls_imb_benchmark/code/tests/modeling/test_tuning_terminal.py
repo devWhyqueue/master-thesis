@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from imbalance_benchmark.modeling.context import LEARNING_RATE_GRID
+from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     register_candidates,
     resolve_terminal_specs,
@@ -65,7 +65,7 @@ def test_terminal_active_grids_expands_each_methods_own_signed_window():
         "ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None},
         "focal": {"lr_window": LEARNING_RATE_GRID, "strength_window": [0.0, 0.5, 1.0, 1.5]},
     }
-    grids = terminal_active_grids(state, ("ce", "focal"))
+    grids = terminal_active_grids(state, ("ce", "focal"), 9)
     assert grids["ce"] == [{"lr": lr} for lr in [3e-4, 1e-3, 3e-3, 1e-2]]
     assert grids["focal"] == [
         {"parameter": p, "lr": lr} for p in [0.0, 0.5, 1.0, 1.5] for lr in LEARNING_RATE_GRID
@@ -73,7 +73,29 @@ def test_terminal_active_grids_expands_each_methods_own_signed_window():
 
 
 def test_terminal_active_grids_omits_methods_absent_from_state():
-    assert terminal_active_grids({}, ("post_hoc_logit_adjustment",)) == {}
+    assert terminal_active_grids({}, ("post_hoc_logit_adjustment",), 9) == {}
+
+
+def test_terminal_active_grids_falls_back_to_the_full_grid_for_fixed_grid_methods():
+    """Regression: found live on the cluster. balanced_sampling/weighted_ce/oko
+    never get a strength_window recorded in tuning_round_state (only the
+    audited-unbounded controls adaptively shift one), so a naive expand_grid
+    against the state dropped the parameter key entirely and every terminal
+    candidate lookup failed with "not in registry" - the full frozen grid
+    must be used instead, still crossed with the state's (possibly shifted)
+    lr_window."""
+    state = {
+        "balanced_sampling": {"lr_window": [3e-5, 1e-4, 3e-4, 1e-3], "strength_window": None},
+        "oko": {"lr_window": LEARNING_RATE_GRID, "strength_window": None},
+    }
+    grids = terminal_active_grids(state, ("balanced_sampling", "oko"), 7)
+    assert grids["balanced_sampling"] == [
+        {"parameter": p, "lr": lr}
+        for p in GRIDS["balanced_sampling"]
+        for lr in [3e-5, 1e-4, 3e-4, 1e-3]
+    ]
+    # oko is additionally capped at n_classes - 1 = 6, dropping the 8.
+    assert {cfg["parameter"] for cfg in grids["oko"]} == {1.0, 2.0, 4.0}
 
 
 def test_resolve_terminal_specs_finds_a_later_round_candidate_without_registering_it(

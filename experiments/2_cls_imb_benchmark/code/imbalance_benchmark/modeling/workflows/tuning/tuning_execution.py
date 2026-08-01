@@ -135,7 +135,7 @@ def _reduce_condition(
     if not tuning_locked(root, condition, methods):
         raise RuntimeError(f"Tuning is not locked for condition: {condition}")
     state = load_round_state(root, condition)
-    terminal_grids = terminal_active_grids(state, methods)
+    terminal_grids = terminal_active_grids(state, methods, len(freeze["class_names"]))
     expected = expected_observations(condition, assignments, freeze)
     base_selected, _ = reduce_terminal_phase(
         root, condition, "base", base_methods, terminal_grids, fingerprint, expected
