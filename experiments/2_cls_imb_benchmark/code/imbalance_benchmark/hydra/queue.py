@@ -6,7 +6,7 @@ import subprocess
 
 __all__ = ["DEFAULT_QUEUE_CAP", "check_queue_cap"]
 
-DEFAULT_QUEUE_CAP = 25
+DEFAULT_QUEUE_CAP = 100
 
 
 def _squeue_count() -> int:
