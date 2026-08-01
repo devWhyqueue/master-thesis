@@ -116,13 +116,31 @@ def test_resolve_terminal_specs_finds_a_later_round_candidate_without_registerin
     ]
 
 
+def test_resolve_terminal_specs_finds_an_int_registered_candidate_via_a_float_query(
+    tmp_path: Path,
+):
+    """Regression: found live on the cluster (BRACS balanced/severe, oko).
+    oko's grid is defined in plain ints ([1, 2, 4, 8]), but a later round's
+    fallback window construction casts to float before registering - before
+    this fix the two paths keyed the same candidate differently, so a
+    terminal lookup built from the int-typed frozen grid silently missed a
+    candidate that was actually trained and registered as a float."""
+    register_candidates(tmp_path, "moderate", "oko", [{"parameter": 1, "lr": 1e-4}], round_index=0)
+
+    specs = resolve_terminal_specs(
+        tmp_path, "moderate", "base", "oko", [{"parameter": 1.0, "lr": 1e-4}]
+    )
+
+    assert [(spec.round, spec.candidate_index) for spec in specs] == [(0, 0)]
+
+
 def test_resolve_terminal_specs_aborts_on_a_config_missing_from_the_registry(tmp_path: Path):
     """A round-state window naming a config the registry never recorded means
     the tuning lock was granted against stale or corrupted state - final
     reduction must refuse to guess, not silently retrain or skip it."""
     register_candidates(tmp_path, "moderate", "ce", [{"lr": 1e-4}], round_index=0)
 
-    with pytest.raises(RuntimeError, match="not in registry"):
+    with pytest.raises(RuntimeError, match="Unregistered terminal candidate"):
         resolve_terminal_specs(tmp_path, "moderate", "base", "ce", [{"lr": 3e-4}])
 
 

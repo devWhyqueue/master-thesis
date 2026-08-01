@@ -37,8 +37,13 @@ def registry_path(root: Path, condition: str) -> Path:
     return root / "tuning_shards" / f"candidate_registry_{condition}.json"
 
 
+def _numeric(value: Any) -> float | None:
+    """Normalize to float so ``1`` (oko's int grid) and ``1.0`` key identically."""
+    return float(value) if value is not None else None
+
+
 def _registry_key(method: str, config: dict[str, Any]) -> str:
-    return f"{method}|{config.get('parameter')}|{config.get('lr')}"
+    return f"{method}|{_numeric(config.get('parameter'))}|{_numeric(config.get('lr'))}"
 
 
 def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
@@ -78,18 +83,15 @@ def resolve_terminal_specs(
     """Resolve one method's terminal active grid through the cross-round registry.
 
     Final reduction must never train or register a candidate itself: every
-    value in a resolved or tuning-limited method's terminal window has to
-    already be registered from whichever round actually trained it, or the
-    tuning lock was granted before that shard existed.
+    value here has to already be registered from whichever round trained
+    it, or the tuning lock was granted before that shard existed.
     """
     registry = load_registry(root, condition)
     specs = []
     for config in active_grid:
         found = registry_lookup(registry, method, config)
         if found is None:
-            raise RuntimeError(
-                f"Terminal candidate not in registry for {method}: {config}"
-            )
+            raise RuntimeError(f"Unregistered terminal candidate: {method} {config}")
         source_round, index = found
         specs.append(ShardSpec(condition, method, index, phase, round=source_round))
     return specs
@@ -106,9 +108,8 @@ def terminal_cost_payloads(
     """Load every uniquely trained candidate across every round, for realized cost.
 
     A resolved method's terminal window only covers its last few candidates;
-    the adaptive search's realized cost must still count every value it
-    actually trained on the way there, exactly once (the registry already
-    dedupes a reused candidate to wherever it was first trained).
+    realized cost must count every value trained on the way there, exactly
+    once (the registry already dedupes a reused candidate).
     """
     registry = load_registry(root, condition)
     specs = []
