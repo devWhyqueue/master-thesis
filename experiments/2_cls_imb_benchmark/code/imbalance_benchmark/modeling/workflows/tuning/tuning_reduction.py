@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    resolve_terminal_specs,
     select_candidate_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
@@ -23,6 +24,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     load_candidate,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
+    expand_grid,
     resolve_round_specs,
 )
 
@@ -68,6 +70,25 @@ def _ce_anchor_candidates(
     ]
 
 
+def combine_selection(
+    method: str,
+    active_grid: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    ce_by_lr: dict[float, dict[str, Any]],
+) -> dict[str, Any]:
+    """Pick this method's winning config, aliasing CE's free zero-strength point."""
+    selection_pool = candidates
+    if method in CE_ANCHORED_METHODS and ce_by_lr:
+        selection_pool = candidates + _ce_anchor_candidates(
+            active_grid, candidates, ce_by_lr
+        )
+    if method == "ce":
+        ce_by_lr.update(
+            {candidate["config"]["lr"]: candidate for candidate in candidates}
+        )
+    return select_candidate_payload(selection_pool)["config"]
+
+
 def _reduce_method(
     location: ReduceLocation,
     method: str,
@@ -96,16 +117,7 @@ def _reduce_method(
         for spec in specs
     ]
     payloads.extend(candidates)
-    selection_pool = candidates
-    if method in CE_ANCHORED_METHODS and ce_by_lr:
-        selection_pool = candidates + _ce_anchor_candidates(
-            grids[method], candidates, ce_by_lr
-        )
-    if method == "ce":
-        ce_by_lr.update(
-            {candidate["config"]["lr"]: candidate for candidate in candidates}
-        )
-    return select_candidate_payload(selection_pool)["config"]
+    return combine_selection(method, grids[method], candidates, ce_by_lr)
 
 
 def reduce_phase(
@@ -128,6 +140,88 @@ def reduce_phase(
             method,
             grids,
             reduce_round,
+            expected_observations,
+            ce_by_lr,
+            payloads,
+        )
+    return selections, payloads
+
+
+def terminal_active_grids(
+    state: dict[str, Any], methods: tuple[str, ...]
+) -> dict[str, list[dict[str, Any]]]:
+    """Expand every resolved or tuning-limited method's terminal active window.
+
+    ``state`` is the signed cross-round tuning lock (``tuning_round_state``):
+    each entry's ``lr_window``/``strength_window`` is the window that
+    actually decided that axis, so it is the terminal grid regardless of how
+    many rounds it took to get there. ``post_hoc_logit_adjustment`` never
+    enters this state machine (see ``_reduce_method``) and is simply absent.
+    """
+    return {
+        method: expand_grid(
+            state[method]["lr_window"], state[method].get("strength_window")
+        )
+        for method in methods
+        if method in state
+    }
+
+
+def _reduce_terminal_method(
+    location: ReduceLocation,
+    method: str,
+    terminal_grids: dict[str, list[dict[str, Any]]],
+    fingerprint: list[str],
+    expected_observations: int | None,
+    ce_by_lr: dict[float, dict[str, Any]],
+    payloads: list[dict[str, Any]],
+) -> Any:
+    """Reduce one method's terminal active window through the cross-round registry."""
+    root, condition, phase = location.root, location.condition, location.phase
+    if method == "post_hoc_logit_adjustment":
+        candidate = load_candidate(
+            root,
+            ShardSpec(condition, method, 0, phase),
+            fingerprint,
+            expected_observations,
+        )
+        payloads.append(candidate)
+        return candidate["selection"]
+    active_grid = terminal_grids[method]
+    specs = resolve_terminal_specs(root, condition, phase, method, active_grid)
+    candidates = [
+        load_candidate(root, spec, fingerprint, expected_observations) for spec in specs
+    ]
+    for candidate, config in zip(candidates, active_grid, strict=True):
+        if candidate["config"] != config:
+            raise RuntimeError(
+                f"Terminal shard config mismatch for {method}: registry expected "
+                f"{config}, shard has {candidate['config']}"
+            )
+    payloads.extend(candidates)
+    return combine_selection(method, active_grid, candidates, ce_by_lr)
+
+
+def reduce_terminal_phase(
+    root: Path,
+    condition: str,
+    phase: str,
+    methods: tuple[str, ...],
+    terminal_grids: dict[str, list[dict[str, Any]]],
+    fingerprint: list[str],
+    expected_observations: int | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Reduce every method's terminal active window into the signed final selection."""
+    location = ReduceLocation(root, condition, phase)
+    selections: dict[str, Any] = {}
+    payloads: list[dict[str, Any]] = []
+    ce_by_lr: dict[float, dict[str, Any]] = {}
+    for method in methods:
+        selections[method] = _reduce_terminal_method(
+            location,
+            method,
+            terminal_grids,
+            fingerprint,
             expected_observations,
             ce_by_lr,
             payloads,

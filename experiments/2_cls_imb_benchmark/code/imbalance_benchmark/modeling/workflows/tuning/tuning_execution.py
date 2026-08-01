@@ -10,6 +10,9 @@ from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import combined_cost
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
+    load_round_state,
+    terminal_cost_payloads,
+    tuning_locked,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     condition_is_reusable,
@@ -18,6 +21,8 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     ReduceRound,
     reduce_phase,
+    reduce_terminal_phase,
+    terminal_active_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     expand_grid,
@@ -117,33 +122,47 @@ def _reduce_condition(
     assignments: tuple[str, ...],
     condition: str,
 ) -> None:
-    reduce_round = ReduceRound(fingerprint)
-    base_selected, base_payloads = reduce_phase(
-        base["data"],
-        condition,
-        "base",
-        base_methods,
-        freeze["method_grids"],
-        reduce_round,
-        expected_observations(condition, assignments, freeze),
+    """Reduce every required method's signed terminal adaptive state, not round 0.
+
+    A method's ``base_selections_*`` entry (if any) may only reflect the
+    round it happened to resolve in, and dependent methods like ``crt``
+    never appear there at all - so the terminal ``tuning_round_state`` is
+    the only source of truth for which round each method's active window
+    ended up in, for both base and dependent methods alike.
+    """
+    root = base["data"]
+    methods = (*base_methods, *dependent_methods)
+    if not tuning_locked(root, condition, methods):
+        raise RuntimeError(f"Tuning is not locked for condition: {condition}")
+    state = load_round_state(root, condition)
+    terminal_grids = terminal_active_grids(state, methods)
+    expected = expected_observations(condition, assignments, freeze)
+    base_selected, _ = reduce_terminal_phase(
+        root, condition, "base", base_methods, terminal_grids, fingerprint, expected
     )
-    dependent, dependent_payloads = reduce_phase(
-        base["data"],
+    dependent_selected, _ = reduce_terminal_phase(
+        root,
         condition,
         "dependent",
         dependent_methods,
-        freeze["method_grids"],
-        reduce_round,
-        expected_observations(condition, assignments, freeze),
+        terminal_grids,
+        fingerprint,
+        expected,
     )
-    selected = {**base_selected, **dependent}
+    selected = {**base_selected, **dependent_selected}
+    cost_payloads = [
+        *terminal_cost_payloads(
+            root, condition, "base", base_methods, fingerprint, expected
+        ),
+        *terminal_cost_payloads(
+            root, condition, "dependent", dependent_methods, fingerprint, expected
+        ),
+    ]
     scoped = ("native",) if condition in {"natural", "balanced"} else assignments
     output = {assignment: {} for assignment in assignments}
     for assignment in scoped:
         output[assignment][condition] = selected
-    _write_condition_outputs(
-        base, condition, output, combined_cost([*base_payloads, *dependent_payloads])
-    )
+    _write_condition_outputs(base, condition, output, combined_cost(cost_payloads))
 
 
 def _write_condition_outputs(

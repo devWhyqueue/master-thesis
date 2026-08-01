@@ -7,6 +7,8 @@ from typing import Any
 from imbalance_benchmark.common import sign_file, verify_signed_file, write_json
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import _selection_key
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
+    ShardSpec,
+    load_candidate,
     observation_key,
     write_atomic,
 )
@@ -15,6 +17,7 @@ __all__ = [
     "registry_path",
     "load_registry",
     "registry_lookup",
+    "registry_candidates_for_method",
     "register_candidates",
     "select_candidate_payload",
     "round_grids_path",
@@ -24,6 +27,8 @@ __all__ = [
     "merge_round_state",
     "load_round_state",
     "tuning_locked",
+    "resolve_terminal_specs",
+    "terminal_cost_payloads",
 ]
 
 
@@ -48,6 +53,78 @@ def registry_lookup(
     """Find which round/index already trained this exact (method, config), if any."""
     entry = registry.get(_registry_key(method, config))
     return (entry["round"], entry["candidate_index"]) if entry else None
+
+
+def registry_candidates_for_method(
+    registry: dict[str, dict[str, int]], method: str
+) -> list[dict[str, int]]:
+    """Every round/index this method ever trained, regardless of its terminal window.
+
+    Realized tuning cost must count each candidate once no matter how many
+    rounds' windows it passed through, so this walks the whole registry
+    instead of only the terminal active grid.
+    """
+    prefix = f"{method}|"
+    return [entry for key, entry in registry.items() if key.startswith(prefix)]
+
+
+def resolve_terminal_specs(
+    root: Path,
+    condition: str,
+    phase: str,
+    method: str,
+    active_grid: list[dict[str, Any]],
+) -> list[ShardSpec]:
+    """Resolve one method's terminal active grid through the cross-round registry.
+
+    Final reduction must never train or register a candidate itself: every
+    value in a resolved or tuning-limited method's terminal window has to
+    already be registered from whichever round actually trained it, or the
+    tuning lock was granted before that shard existed.
+    """
+    registry = load_registry(root, condition)
+    specs = []
+    for config in active_grid:
+        found = registry_lookup(registry, method, config)
+        if found is None:
+            raise RuntimeError(
+                f"Terminal candidate not in registry for {method}: {config}"
+            )
+        source_round, index = found
+        specs.append(ShardSpec(condition, method, index, phase, round=source_round))
+    return specs
+
+
+def terminal_cost_payloads(
+    root: Path,
+    condition: str,
+    phase: str,
+    methods: tuple[str, ...],
+    fingerprint: list[str],
+    expected_observations: int | None = None,
+) -> list[dict[str, Any]]:
+    """Load every uniquely trained candidate across every round, for realized cost.
+
+    A resolved method's terminal window only covers its last few candidates;
+    the adaptive search's realized cost must still count every value it
+    actually trained on the way there, exactly once (the registry already
+    dedupes a reused candidate to wherever it was first trained).
+    """
+    registry = load_registry(root, condition)
+    specs = []
+    for method in methods:
+        if method == "post_hoc_logit_adjustment":
+            specs.append(ShardSpec(condition, method, 0, phase))
+            continue
+        specs.extend(
+            ShardSpec(
+                condition, method, entry["candidate_index"], phase, round=entry["round"]
+            )
+            for entry in registry_candidates_for_method(registry, method)
+        )
+    return [
+        load_candidate(root, spec, fingerprint, expected_observations) for spec in specs
+    ]
 
 
 def register_candidates(
