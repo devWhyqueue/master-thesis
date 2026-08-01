@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import json
+import hashlib
 from functools import lru_cache
 from pathlib import Path
 
@@ -174,49 +174,3 @@ def patch_sort_key(item: str) -> tuple[int, int]:
 def _order_hash(ordered_patch_identity: list[str]) -> str:
     payload = json.dumps(ordered_patch_identity, ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
-
-
-def _cache_records(feature_root: Path) -> dict[str, dict[str, object]]:
-    path = feature_root / "feature_cache_manifest.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-
-
-def record_cached_slide(
-    feature_root: Path,
-    slide_id: str,
-    slide_path: Path,
-    ordered_patch_identity: list[str],
-    row_count: int,
-) -> None:
-    """Record row, order, and tensor hashes for one newly extracted slide."""
-    records = _cache_records(feature_root)
-    records[slide_id] = {
-        "row_count": row_count,
-        "patch_order_sha256": _order_hash(ordered_patch_identity),
-        "tensor_sha256": compute_sha256(slide_path),
-    }
-    (feature_root / "feature_cache_manifest.json").write_text(
-        json.dumps(records, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-
-
-def validate_cached_slide(
-    feature_root: Path,
-    slide_id: str,
-    slide_path: Path,
-    ordered_patch_identity: list[str],
-    row_count: int,
-) -> None:
-    """Refuse reuse when cached rows, patch order, or tensor content changed."""
-    record = _cache_records(feature_root).get(slide_id)
-    if record is None:
-        raise ValueError(f"Cached slide {slide_id} lacks row/order/hash provenance")
-    if record.get("patch_order_sha256") != _order_hash(ordered_patch_identity):
-        raise ValueError(f"Cached slide {slide_id} patch order differs")
-    if (
-        row_count != len(ordered_patch_identity)
-        or int(str(record.get("row_count", -1))) != row_count
-    ):
-        raise ValueError(f"Cached slide {slide_id} row count differs")
-    if record.get("tensor_sha256") != compute_sha256(slide_path):
-        raise ValueError(f"Cached slide {slide_id} tensor hash differs")

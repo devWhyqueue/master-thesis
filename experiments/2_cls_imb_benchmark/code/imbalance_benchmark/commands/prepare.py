@@ -95,8 +95,18 @@ def _base_manifest(config: dict[str, object], paths: dict[str, Path]) -> pd.Data
     if "image_path" not in df.columns or "feature_path" in df.columns:
         return df
     return attach_extracted_features(
-        df, paths["data"] / "features" / str(dataset_name), feature_cfg
+        df,
+        paths["data"] / "features" / str(dataset_name),
+        feature_cfg,
+        gpu_workers=_prepare_gpu_workers(config),
     )
+
+
+def _prepare_gpu_workers(config: dict[str, object]) -> int:
+    slurm = config.get("slurm", {})
+    resources = slurm.get("resources", {}) if isinstance(slurm, dict) else {}
+    prepare = resources.get("prepare", {}) if isinstance(resources, dict) else {}
+    return int(prepare.get("gpus", 1)) if isinstance(prepare, dict) else 1
 
 
 def cmd_prepare(args: argparse.Namespace) -> None:

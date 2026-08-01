@@ -36,6 +36,7 @@ __all__ = [
     "load_slide_features",
     "load_feature_row",
     "patch_sort_key",
+    "resolve_feature_provenance",
 ]
 
 
@@ -171,7 +172,7 @@ def extract_slide_features(
     loader = DataLoader(
         _ImagePathDataset(image_paths, transforms),
         batch_size=batch_size,
-        num_workers=_loader_worker_count(),
+        num_workers=int(options.get("loader_workers", _loader_worker_count())),
     )
     rows: list[torch.Tensor] = []
     for images in loader:
