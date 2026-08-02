@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-
+from pathlib import Path
 
 from imbalance_benchmark.hydra.workflow import (
     build_workflow,
@@ -14,6 +14,9 @@ SQUASHFS_SOURCE = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
 SQUASHFS_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
 GENERATED_TILES = "/tmp/bracs_roi_tiles"
 GENERATED_SQUASHFS = "/home/example/outputs/bracs/roi_tiles.sqfs"
+CAMELYON_CONFIG = (
+    Path(__file__).resolve().parents[3] / "configs" / "camelyon16_patch.yaml"
+)
 
 def _config() -> dict[str, object]:
     return {
@@ -303,7 +306,7 @@ def test_smoke_workflow_uses_test_partition() -> None:
 
 
 def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> None:
-    config = load_config("../configs/camelyon16_patch.yaml")
+    config = load_config(CAMELYON_CONFIG)
     base_natural, base_controlled = [
         job
         for job in build_workflow(config)
@@ -366,7 +369,7 @@ def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(
         phase_methods,
     )
 
-    config = load_config("../configs/camelyon16_patch.yaml")
+    config = load_config(CAMELYON_CONFIG)
     methods = phase_methods(False, "base")
     seen: list[int] = []
     monkeypatch.setattr(

@@ -100,9 +100,7 @@ def _reserve_bank(rows: list[torch.Tensor], capacity: int) -> None:
     if any(row.dtype != _BANK.dtype or row.shape != _BANK.shape[1:] for row in rows):
         raise ValueError("Feature bank rows must share dtype and shape.")
     start = len(_ROWS) - len(rows)
-    _BANK[start : start + len(rows)].copy_(
-        torch.stack(rows), non_blocking=True
-    )
+    _BANK[start : start + len(rows)].copy_(torch.stack(rows), non_blocking=True)
 
 
 def feature_rows(
@@ -118,12 +116,11 @@ def feature_rows(
             _ROWS[key] = len(_ROWS)
             new_rows.append(row)
         ids[position] = _ROWS[key]
-    capacity = capacity_hint if capacity_hint is not None else len(_ROWS)
-    if capacity < len(_ROWS):
-        raise RuntimeError(
-            "Feature bank capacity hint is smaller than its unique rows."
-        )
-    _reserve_bank(new_rows, capacity)
+    # One process loads several manifests into the same bank -- three splits'
+    # validation frames, then far smaller per-condition frames. Each hint sizes
+    # only its own manifest, so the reservation takes the largest seen rather
+    # than letting a later, smaller frame undercut the rows already banked.
+    _reserve_bank(new_rows, max(capacity_hint or 0, len(_ROWS)))
     return ids
 
 

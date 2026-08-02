@@ -285,6 +285,37 @@ def test_feature_bank_reserves_a_split_manifest_without_concatenation(
         bank_index(validation.rows)
 
 
+def test_feature_bank_keeps_its_reservation_for_a_later_smaller_manifest(
+    tmp_path: Path,
+) -> None:
+    """A per-condition frame is far smaller than the split frame banked before it."""
+    reset_feature_bank()
+    paths = []
+    for index in range(4):
+        path = tmp_path / f"slide_{index}.pt"
+        torch.save(torch.full((1, 2), index, dtype=torch.float16), path)
+        paths.append(str(path))
+    columns = {"slide_id": [f"slide_{i}" for i in range(4)], "cancer_type": list("ABAB")}
+    split = tmp_path / "manifest.csv"
+    pd.DataFrame({**columns, "feature_path": paths}).to_csv(split, index=False)
+    condition = tmp_path / "manifest_balanced.csv"
+    pd.DataFrame(
+        {
+            "slide_id": ["slide_0"],
+            "cancer_type": ["A"],
+            "feature_path": [paths[0]],
+        }
+    ).to_csv(condition, index=False)
+
+    ImbalanceDataset(split, None, class_names=["A", "B"])
+    banked = ImbalanceDataset(condition, None, class_names=["A", "B"])
+
+    assert banked.rows.tolist() == [0]
+    assert feature_cache._BANK is not None
+    assert feature_cache._BANK.shape == (4, 2)
+    reset_feature_bank()
+
+
 def test_feature_cache_rejects_metadata_from_a_different_encoder_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
