@@ -44,12 +44,12 @@ slurm:
     pilot: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 32G}
     freeze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 256G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
-    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|h100|h200"}
+    tune_natural: {partition: gpu-2d, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|h100|h200"}
     tune_post_hoc_natural: {partition: gpu-5h, gpus: 1, cpus: 2, time: "03:00:00", memory: 96G, constraint: "80gb|h100|h200"}
     tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
-    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|h100|h200"}
+    confirm_natural: {partition: gpu-2d, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|h100|h200"}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     analyze: {partition: cpu-2d, gpus: 0, cpus: 8, memory: 32G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
