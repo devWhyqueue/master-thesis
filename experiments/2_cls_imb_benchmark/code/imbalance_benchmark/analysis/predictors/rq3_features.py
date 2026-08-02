@@ -84,10 +84,11 @@ def _reference_block(
     computed here too and reused across every ``(assignment, severity)`` cell.
     """
     ref_path = paths["data"] / "manifest_balanced.csv"
-    ref_x, ref_y = feature_frame(ref_path, None, is_mil, class_names)
+    # Seed the resident bank at full-manifest capacity before loading subsets.
     val_x, val_y = feature_frame(
         paths["data"] / "manifest.csv", "validation", is_mil, class_names
     )
+    ref_x, ref_y = feature_frame(ref_path, None, is_mil, class_names)
     n_classes = len(np.unique(ref_y))
     intrinsic = intrinsic_separability(ref_x, ref_y, val_x, val_y, n_classes)
     block = {

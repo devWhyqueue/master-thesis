@@ -352,6 +352,32 @@ def test_rq3_icc_margin_uses_the_fixed_intrinsic_reference(
 
     assert np.array_equal(seen["x"], ref_x)
 
+
+def test_rq3_banks_the_full_manifest_before_the_balanced_subset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    loaded: list[str] = []
+
+    def feature_frame(path: Path, *_: object) -> tuple[np.ndarray, np.ndarray]:
+        loaded.append(path.name)
+        return np.array([[0.0], [1.0]]), np.array([0, 1])
+
+    monkeypatch.setattr(rq3_features, "feature_frame", feature_frame)
+    monkeypatch.setattr(
+        rq3_features,
+        "intrinsic_separability",
+        lambda *_: {
+            "linear_probe_macro_recall": 0.5,
+            "knn_macro_recall": 0.5,
+            "per_class_nn_error": {},
+        },
+    )
+
+    rq3_features._reference_block({"data": tmp_path}, True, None)
+
+    assert loaded == ["manifest.csv", "manifest_balanced.csv"]
+
+
 def test_rq3_effective_support_uses_condition_support(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
