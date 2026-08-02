@@ -237,8 +237,8 @@ def test_target_bank_device_auto_respects_the_free_memory_fraction(
         feature_cache.torch.cuda, "mem_get_info", lambda: (1000, 1000)
     )
 
-    assert feature_cache._target_bank_device({}, 750) == torch.device("cuda")
-    assert feature_cache._target_bank_device({}, 751) == torch.device("cpu")
+    assert feature_cache._target_bank_device({}, 850) == torch.device("cuda")
+    assert feature_cache._target_bank_device({}, 851) == torch.device("cpu")
 
 
 def test_feature_bank_reserves_a_split_manifest_without_concatenation(

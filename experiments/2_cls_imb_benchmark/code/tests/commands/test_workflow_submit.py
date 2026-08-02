@@ -305,10 +305,10 @@ def test_smoke_workflow_uses_test_partition() -> None:
     assert jobs[0].command == "smoke"
 
 
-def test_camelyon_natural_jobs_use_three_shards_on_gpu_5h(monkeypatch) -> None:
-    """Natural keeps 80 GB cards: its bank is ~32 GB, which a 40 GB card cannot
-    hold once _BANK_DEVICE_FRACTION is applied, so placement silently falls back
-    to host memory and training drops from 54 to 14 steps/s -- past the wall."""
+def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> None:
+    """Natural keeps the 40 GB pool: its ~32 GB bank only stays on the card
+    because _BANK_DEVICE_FRACTION is 0.85 (0.75 pushed it to host memory and
+    cost roughly a 4x slowdown)."""
     config = load_config(CAMELYON_CONFIG)
     base_natural, base_controlled = [
         job
@@ -324,8 +324,8 @@ def test_camelyon_natural_jobs_use_three_shards_on_gpu_5h(monkeypatch) -> None:
     assert "--shards-per-task 3" in base_natural.command
     assert "--shards-per-task 4" in base_controlled.command
     assert base_natural.partition == confirm_natural.partition == "gpu-5h"
-    assert "40gb" not in base_natural.constraint
-    assert "40gb" not in confirm_natural.constraint
+    assert "40gb" in base_natural.constraint
+    assert "40gb" in confirm_natural.constraint
     assert "40gb" in base_controlled.constraint
     assert "40gb" in confirm_controlled.constraint
     for resource in (
@@ -334,7 +334,7 @@ def test_camelyon_natural_jobs_use_three_shards_on_gpu_5h(monkeypatch) -> None:
         "confirm_natural",
     ):
         assert config["slurm"]["resources"][resource]["partition"] == "gpu-5h"
-        assert "40gb" not in config["slurm"]["resources"][resource]["constraint"]
+        assert "40gb" in config["slurm"]["resources"][resource]["constraint"]
     assert "%35" in render_sbatch(base_natural, config)
     assert "%35" in render_sbatch(confirm_natural, config)
 

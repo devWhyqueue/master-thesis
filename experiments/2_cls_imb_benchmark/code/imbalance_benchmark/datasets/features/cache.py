@@ -20,7 +20,12 @@ __all__ = [
 ]
 
 # Fraction of free accelerator memory the bank may claim in "auto" placement.
-_BANK_DEVICE_FRACTION = 0.75
+# CAMELYON16 patch banks ~32 GB of float32 rows, which 0.75 rejects on a 40 GB
+# card -- placement then falls back to host memory and training runs about four
+# times slower. 0.85 keeps that pool usable; the ~7 GB left over is ample for an
+# MLP over 2560-d features, and an overcommit still degrades to host placement
+# rather than failing.
+_BANK_DEVICE_FRACTION = 0.85
 
 
 @lru_cache(maxsize=8192)
