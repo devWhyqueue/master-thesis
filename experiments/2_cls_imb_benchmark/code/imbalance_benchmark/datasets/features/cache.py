@@ -20,7 +20,7 @@ __all__ = [
 ]
 
 # Fraction of free accelerator memory the bank may claim in "auto" placement.
-_BANK_DEVICE_FRACTION = 0.4
+_BANK_DEVICE_FRACTION = 0.75
 
 
 @lru_cache(maxsize=8192)
@@ -48,6 +48,7 @@ def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:
 # dtype rather than upcasting eagerly like ``load_slide_features`` does.
 _BANK: torch.Tensor | None = None
 _ROWS: dict[tuple[str, int], int] = {}
+_BANK_CAPACITY = 0
 
 
 def _resolve_row(path: str, index: int | None) -> tuple[int, torch.Tensor]:
@@ -73,45 +74,41 @@ def _target_bank_device(env: Mapping[str, str], num_bytes: int) -> torch.device:
     if not torch.cuda.is_available():
         return torch.device("cpu")
     free_bytes, _ = torch.cuda.mem_get_info()
-    fits = num_bytes < _BANK_DEVICE_FRACTION * free_bytes
+    fits = num_bytes <= _BANK_DEVICE_FRACTION * free_bytes
     return torch.device("cuda") if fits else torch.device("cpu")
 
 
-def _grow_bank(new_rows: list[torch.Tensor]) -> None:
-    """Append newly materialized rows to the bank, promoting dtype on mismatch.
-
-    ponytail: placement is decided once, at first materialization, from the
-    bytes seen so far. The bank is built validation-rows-first (see the note
-    on ``feature_rows``), so in practice there is exactly one grow event and
-    this sizes the whole bank; a partial/pinned placement for datasets whose
-    first grow undershoots but later grows overflow is not built until
-    profiling on a dataset like that (PANDA/CAMELYON16) shows it matters.
-    """
-    global _BANK
-    if not new_rows:
+def _reserve_bank(rows: list[torch.Tensor], capacity: int) -> None:
+    """Allocate final bank once and fill its first free rows."""
+    global _BANK, _BANK_CAPACITY
+    if not rows:
         return
-    addition = torch.stack(new_rows)
-    if _BANK is not None and _BANK.dtype != addition.dtype:
-        _BANK, addition = _BANK.float(), addition.float()
     if _BANK is None:
-        device = _target_bank_device(
-            os.environ, addition.numel() * addition.element_size()
+        first = rows[0]
+        _BANK_CAPACITY = capacity
+        _BANK = torch.empty(
+            (capacity, *first.shape),
+            dtype=first.dtype,
+            device=_target_bank_device(
+                os.environ, capacity * first.numel() * first.element_size()
+            ),
         )
-        _BANK = addition.to(device)
-        return
-    _BANK = torch.cat([_BANK, addition.to(_BANK.device)], dim=0)
+    if len(_ROWS) > _BANK_CAPACITY:
+        raise RuntimeError(
+            "Feature bank capacity hint is smaller than its unique rows."
+        )
+    if any(row.dtype != _BANK.dtype or row.shape != _BANK.shape[1:] for row in rows):
+        raise ValueError("Feature bank rows must share dtype and shape.")
+    start = len(_ROWS) - len(rows)
+    _BANK[start : start + len(rows)].copy_(
+        torch.stack(rows), non_blocking=True
+    )
 
 
-def feature_rows(paths: list[str], indices: list[int | None]) -> torch.Tensor:
-    """Return a LongTensor of bank row ids, materializing any missing rows.
-
-    ponytail: grows the bank via ``torch.cat`` on every miss batch, which is
-    O(n^2) in the number of *grow events* (not rows). In practice there is
-    exactly one grow event: ``_tuning_inputs`` loads the full validation
-    manifest first, sealing those rows before any per-condition training
-    manifest asks for its (already-seen) subset. Revisit only if profiling
-    shows repeated grows.
-    """
+def feature_rows(
+    paths: list[str], indices: list[int | None], capacity_hint: int | None = None
+) -> torch.Tensor:
+    """Return bank row ids, reserving split manifests' full row capacity once."""
     ids = torch.empty(len(paths), dtype=torch.long)
     new_rows: list[torch.Tensor] = []
     for position, (path, index) in enumerate(zip(paths, indices)):
@@ -121,7 +118,12 @@ def feature_rows(paths: list[str], indices: list[int | None]) -> torch.Tensor:
             _ROWS[key] = len(_ROWS)
             new_rows.append(row)
         ids[position] = _ROWS[key]
-    _grow_bank(new_rows)
+    capacity = capacity_hint if capacity_hint is not None else len(_ROWS)
+    if capacity < len(_ROWS):
+        raise RuntimeError(
+            "Feature bank capacity hint is smaller than its unique rows."
+        )
+    _reserve_bank(new_rows, capacity)
     return ids
 
 
@@ -144,6 +146,7 @@ def reset_feature_bank() -> None:
     isolation (distinct tests use distinct feature dims, which the bank
     cannot mix once seeded).
     """
-    global _BANK
+    global _BANK, _BANK_CAPACITY
     _BANK = None
+    _BANK_CAPACITY = 0
     _ROWS.clear()

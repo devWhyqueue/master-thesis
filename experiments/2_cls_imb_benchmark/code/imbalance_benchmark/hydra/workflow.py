@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import replace
-from functools import partial
 import logging
 import os
 import subprocess
@@ -97,9 +96,11 @@ def _tuning_jobs(
     natural_observations = int(
         config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
     )
-    shards_per_task = int(config.get("slurm", {}).get("tune_shards_per_task", 1))
-    bundle_arg = f" --shards-per-task {shards_per_task}"
-    bundle_size = partial(bundled_array_size, shards_per_task=shards_per_task)
+    slurm = config.get("slurm", {})
+    natural_shards = int(
+        slurm.get("tune_natural_shards_per_task", slurm.get("tune_shards_per_task", 1))
+    )
+    controlled_shards = int(slurm.get("tune_shards_per_task", 1))
     base_methods = tuple(method for method in roster if method not in DEPENDENT_METHODS)
     base_natural = (
         replace(
@@ -108,7 +109,7 @@ def _tuning_jobs(
                 "tune-base-natural",
                 "tune-shard --phase base --group natural"
                 f" --observations-per-candidate {natural_observations}"
-                f" --bundle-by-observation{bundle_arg}",
+                f" --bundle-by-observation --shards-per-task {natural_shards}",
                 True,
                 freeze_dependency,
                 "tune_natural",
@@ -117,7 +118,7 @@ def _tuning_jobs(
             array_size=bundled_observation_array_size(
                 candidate_array_size(base_methods),
                 natural_observations,
-                shards_per_task,
+                natural_shards,
             ),
             array_indices=plan.natural_indices if plan else (),
         )
@@ -129,13 +130,16 @@ def _tuning_jobs(
             _job(
                 config,
                 "tune-base-controlled",
-                f"tune-shard --phase base --group controlled{bundle_arg}",
+                "tune-shard --phase base --group controlled"
+                f" --shards-per-task {controlled_shards}",
                 True,
                 freeze_dependency,
                 "tune_controlled",
                 "tune",
             ),
-            array_size=bundle_size(3 * candidate_array_size(base_methods)),
+            array_size=bundled_array_size(
+                3 * candidate_array_size(base_methods), controlled_shards
+            ),
             array_indices=plan.controlled_indices if plan else (),
         )
         if not plan or plan.controlled_indices

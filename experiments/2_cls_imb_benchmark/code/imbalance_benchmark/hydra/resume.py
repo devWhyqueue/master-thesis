@@ -54,19 +54,45 @@ def resume_plan(config: dict[str, Any]) -> ResumePlan:
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     methods = phase_methods(is_mil, "base")
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    bundle_size = int(config.get("slurm", {}).get("tune_shards_per_task", 1))
+    natural_bundle_size, controlled_bundle_size = _bundle_sizes(config)
     natural = _pending_natural(
-        config, base, methods, is_mil, freeze, fingerprint, bundle_size
+        config, base, methods, is_mil, freeze, fingerprint, natural_bundle_size
     )
+    controlled = _pending_controlled(
+        base,
+        methods,
+        is_mil,
+        freeze,
+        fingerprint,
+        assignments,
+        controlled_bundle_size,
+    )
+    return ResumePlan(natural, controlled)
+
+
+def _bundle_sizes(config: dict[str, Any]) -> tuple[int, int]:
+    slurm = config.get("slurm", {})
+    controlled = int(slurm.get("tune_shards_per_task", 1))
+    return int(slurm.get("tune_natural_shards_per_task", controlled)), controlled
+
+
+def _pending_controlled(
+    base: dict[str, Any],
+    methods: tuple[str, ...],
+    is_mil: bool,
+    freeze: dict[str, Any],
+    fingerprint: list[str],
+    assignments: tuple[str, ...],
+    bundle_size: int,
+) -> tuple[int, ...]:
     total = 3 * candidate_array_size(methods)
-    controlled = tuple(
+    return tuple(
         index
         for index in range(bundled_array_size(total, bundle_size))
         if not _controlled_bundle_complete(
             index, bundle_size, total, is_mil, freeze, fingerprint, assignments, base
         )
     )
-    return ResumePlan(natural, controlled)
 
 
 def _pending_natural(

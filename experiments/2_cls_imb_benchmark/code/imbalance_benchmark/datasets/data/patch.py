@@ -29,6 +29,7 @@ class ImbalanceDataset(Dataset):
         super().__init__()
         del device
         frame = cast(pd.DataFrame, pd.read_csv(manifest_path))
+        capacity_hint = len(frame)
         if split_name is not None and "split" in frame.columns:
             frame = cast(
                 pd.DataFrame, frame[frame["split"] == split_name].reset_index(drop=True)
@@ -48,7 +49,9 @@ class ImbalanceDataset(Dataset):
         self.patch_ids = (
             frame["patch_id"].tolist() if "patch_id" in frame else [None] * len(frame)
         )
-        self.rows = feature_rows(self.feature_paths, self.feature_indices)
+        self.rows = feature_rows(
+            self.feature_paths, self.feature_indices, capacity_hint
+        )
         self.targets = torch.tensor(self.get_int_targets(), dtype=torch.long)
 
     @staticmethod

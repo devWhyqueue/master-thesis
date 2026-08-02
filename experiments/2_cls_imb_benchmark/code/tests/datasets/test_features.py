@@ -22,7 +22,9 @@ from imbalance_benchmark.datasets.features.cache import (
     bank_index,
     bank_is_cpu,
     feature_rows,
+    reset_feature_bank,
 )
+from imbalance_benchmark.datasets.data.patch import ImbalanceDataset
 
 def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
     from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
@@ -218,6 +220,9 @@ def test_target_bank_device_env_override_bypasses_auto_sizing() -> None:
     assert feature_cache._target_bank_device({"IMB_FEATURE_BANK_DEVICE": "cpu"}, 1) == (
         torch.device("cpu")
     )
+    assert feature_cache._target_bank_device({"IMB_FEATURE_BANK_DEVICE": "cuda"}, 1) == (
+        torch.device("cuda")
+    )
 
 
 def test_target_bank_device_auto_falls_back_to_cpu_without_cuda() -> None:
@@ -232,8 +237,52 @@ def test_target_bank_device_auto_respects_the_free_memory_fraction(
         feature_cache.torch.cuda, "mem_get_info", lambda: (1000, 1000)
     )
 
-    assert feature_cache._target_bank_device({}, 399) == torch.device("cuda")
-    assert feature_cache._target_bank_device({}, 400) == torch.device("cpu")
+    assert feature_cache._target_bank_device({}, 750) == torch.device("cuda")
+    assert feature_cache._target_bank_device({}, 751) == torch.device("cpu")
+
+
+def test_feature_bank_reserves_a_split_manifest_without_concatenation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = []
+    for index in range(4):
+        path = tmp_path / f"slide_{index}.pt"
+        torch.save(torch.full((1, 2), index, dtype=torch.float16), path)
+        paths.append(str(path))
+    manifest = tmp_path / "manifest.csv"
+    pd.DataFrame(
+        {
+            "slide_id": [f"slide_{index}" for index in range(4)],
+            "cancer_type": ["A", "B", "A", "B"],
+            "feature_path": paths,
+            "split": ["validation", "validation", "train", "train"],
+        }
+    ).to_csv(manifest, index=False)
+    monkeypatch.setattr(
+        feature_cache.torch,
+        "cat",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no cat")),
+    )
+
+    validation = ImbalanceDataset(manifest, "validation", class_names=["A", "B"])
+    training = ImbalanceDataset(manifest, "train", class_names=["A", "B"])
+
+    assert validation.rows.tolist() == [0, 1]
+    assert training.rows.tolist() == [2, 3]
+    assert feature_cache._BANK is not None
+    assert feature_cache._BANK.shape == (4, 2)
+    assert feature_cache._BANK.dtype == torch.float16
+    assert feature_cache._BANK.device.type == "cpu"
+    assert torch.equal(
+        bank_index(torch.tensor([3, 0])),
+        torch.tensor([[3.0, 3.0], [0.0, 0.0]]),
+    )
+    assert bank_index(training.rows).dtype == torch.float32
+
+    reset_feature_bank()
+    assert bank_is_cpu()
+    with pytest.raises(RuntimeError, match="empty"):
+        bank_index(validation.rows)
 
 
 def test_feature_cache_rejects_metadata_from_a_different_encoder_config(

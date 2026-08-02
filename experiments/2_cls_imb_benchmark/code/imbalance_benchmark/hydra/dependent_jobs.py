@@ -36,7 +36,10 @@ def _crt_natural_job(
     natural_observations: int,
     bundle_arg: str,
 ) -> SlurmJob:
-    shards_per_task = int(config.get("slurm", {}).get("tune_shards_per_task", 1))
+    slurm = config.get("slurm", {})
+    shards_per_task = int(
+        slurm.get("tune_natural_shards_per_task", slurm.get("tune_shards_per_task", 1))
+    )
     return replace(
         _job(
             config,
@@ -100,17 +103,35 @@ def dependent_round_zero_jobs(
     statically after base's round-0 reduce - CE's own adaptive search may
     still need further rounds at that point.
     """
-    roster = roster_for_regime(is_mil)
+    return _round_zero_jobs(config, is_mil, dependency)
+
+
+def _round_zero_jobs(
+    config: dict[str, Any], is_mil: bool, dependency: tuple[str, ...]
+) -> list[SlurmJob]:
     dependent_methods = tuple(
-        method for method in roster if method in DEPENDENT_METHODS
+        method for method in roster_for_regime(is_mil) if method in DEPENDENT_METHODS
     )
     natural_observations = int(
         config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
     )
-    shards_per_task = int(config.get("slurm", {}).get("tune_shards_per_task", 1))
-    bundle_arg = f" --shards-per-task {shards_per_task}"
+    slurm = config.get("slurm", {})
+    natural_shards = int(
+        slurm.get("tune_natural_shards_per_task", slurm.get("tune_shards_per_task", 1))
+    )
+    controlled_shards = int(slurm.get("tune_shards_per_task", 1))
     return [
         _posthoc_natural_job(config, dependency),
-        _crt_natural_job(config, dependency, natural_observations, bundle_arg),
-        _controlled_job(config, dependency, dependent_methods, bundle_arg),
+        _crt_natural_job(
+            config,
+            dependency,
+            natural_observations,
+            f" --shards-per-task {natural_shards}",
+        ),
+        _controlled_job(
+            config,
+            dependency,
+            dependent_methods,
+            f" --shards-per-task {controlled_shards}",
+        ),
     ]

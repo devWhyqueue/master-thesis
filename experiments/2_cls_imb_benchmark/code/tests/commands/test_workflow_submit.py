@@ -7,6 +7,7 @@ from imbalance_benchmark.hydra.workflow import (
     render_sbatch,
     submit_workflow,
 )
+from imbalance_benchmark.common import load_config
 
 PANDA_RAW = "/home/space/datasets/panda/raw"
 SQUASHFS_SOURCE = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
@@ -299,3 +300,87 @@ def test_smoke_workflow_uses_test_partition() -> None:
     assert len(jobs) == 1
     assert jobs[0].partition == "gpu-test"
     assert jobs[0].command == "smoke"
+
+
+def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> None:
+    config = load_config("../configs/camelyon16_patch.yaml")
+    base_natural, base_controlled = [
+        job
+        for job in build_workflow(config)
+        if job.name in {"tune-base-natural", "tune-base-controlled"}
+    ]
+    confirm_natural, confirm_controlled = [
+        job
+        for job in build_workflow(config, confirm_only=True)
+        if job.name in {"confirm-natural", "confirm-controlled"}
+    ]
+
+    assert "--shards-per-task 3" in base_natural.command
+    assert "--shards-per-task 4" in base_controlled.command
+    assert base_natural.partition == confirm_natural.partition == "gpu-5h"
+    assert "40gb" in base_natural.constraint
+    assert "40gb" in confirm_natural.constraint
+    assert "40gb" in confirm_controlled.constraint
+    for resource in (
+        "tune_natural",
+        "tune_post_hoc_natural",
+        "confirm_natural",
+    ):
+        assert config["slurm"]["resources"][resource]["partition"] == "gpu-5h"
+        assert "40gb" in config["slurm"]["resources"][resource]["constraint"]
+    assert "%35" in render_sbatch(base_natural, config)
+    assert "%35" in render_sbatch(confirm_natural, config)
+
+    from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
+
+    _, dependent_natural, dependent_controlled = dependent_round_zero_jobs(
+        config, is_mil=False
+    )
+    assert "--shards-per-task 3" in dependent_natural.command
+    assert "--shards-per-task 4" in dependent_controlled.command
+
+    monkeypatch.setattr(
+        "imbalance_benchmark.hydra.workflow.resume_plan",
+        lambda *_: type(
+            "Plan",
+            (),
+            {
+                "natural_indices": tuple(range(base_natural.array_size)),
+                "controlled_indices": tuple(range(base_controlled.array_size)),
+            },
+        )(),
+    )
+    resumed = build_workflow(config, resume_tuning=True)
+    natural = next(job for job in resumed if job.name == "tune-base-natural")
+    assert len(natural.array_indices) == len(set(natural.array_indices))
+    assert natural.array_indices == tuple(range(base_natural.array_size))
+
+
+def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(
+    monkeypatch,
+) -> None:
+    from imbalance_benchmark.hydra import resume
+    from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+        bundled_observation_array_size,
+        candidate_array_size,
+        phase_methods,
+    )
+
+    config = load_config("../configs/camelyon16_patch.yaml")
+    methods = phase_methods(False, "base")
+    seen: list[int] = []
+    monkeypatch.setattr(
+        resume,
+        "_natural_bundle_complete",
+        lambda index, *_args: seen.append(index) or False,
+    )
+
+    pending = resume._pending_natural(
+        config, {}, methods, False, {}, [], 3
+    )
+
+    expected = bundled_observation_array_size(
+        candidate_array_size(methods), 6, 3
+    )
+    assert pending == tuple(range(expected))
+    assert seen == list(range(expected))
