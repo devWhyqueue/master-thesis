@@ -94,9 +94,14 @@ def _result_dir(
 
 
 def _seed_already_done(
-    paths: dict[str, Any], assignment: str, cond: str, method: str, seed_idx: int
+    paths: dict[str, Any],
+    assignment: str,
+    cond: str,
+    method: str,
+    seed_idx: int,
+    configs: dict[str, Any],
 ) -> bool:
-    """A unit is done when its record (and, for ce, its folded post-hoc record) exists.
+    """Return whether complete records match the current effective configurations.
 
     A crash mid-write can leave a truncated ``run.json``; treat any read failure
     as not-done so a resumed task refits rather than trusting a corrupt record.
@@ -109,6 +114,13 @@ def _seed_already_done(
         except (OSError, ValueError):
             return False
         if record is None or "test" not in record.get("splits", {}):
+            return False
+        selected = configs.get(name)
+        if name == "post_hoc_logit_adjustment" and isinstance(selected, dict):
+            selected = {"parameter": selected.get("parameter")}
+        if name == "crt" and isinstance(selected, dict):
+            selected = {**selected, "stage_one": configs.get("ce")}
+        if record.get("tuning_params") != selected:
             return False
     return True
 
@@ -124,13 +136,18 @@ def _run_confirm_unit(
         ("unassigned",) if unit.condition in {"natural", "balanced"} else assignments
     )
     for assignment in scoped_assignments:
+        selected_assignment = "native" if assignment == "unassigned" else assignment
+        selected = best_configs.get(selected_assignment, {}).get(unit.condition, {})
         if _seed_already_done(
-            run_data["paths"], assignment, unit.condition, unit.method, unit.seed_index
+            run_data["paths"],
+            assignment,
+            unit.condition,
+            unit.method,
+            unit.seed_index,
+            selected,
         ):
             continue
         run = RunContext(**run_data, assignment=assignment)
-        selected_assignment = "native" if assignment == "unassigned" else assignment
-        selected = best_configs.get(selected_assignment, {}).get(unit.condition, {})
         _confirm_unit_method(
             unit.condition, unit.method, unit.seed_index, selected, run
         )

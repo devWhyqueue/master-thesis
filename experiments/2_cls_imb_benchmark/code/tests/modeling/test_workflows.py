@@ -29,15 +29,22 @@ from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
 from imbalance_benchmark.modeling.context import Regime
 from imbalance_benchmark.modeling.workflows.confirmation import (
     RunContext,
+    confirm_crt_seed,
     confirm_method,
 )
 
-def _write_seed_record(method_dir: Path, seed_idx: int) -> None:
+
+def _write_seed_record(
+    method_dir: Path,
+    seed_idx: int,
+    tuning_params: dict[str, object] | None = None,
+) -> None:
     write_run_record(
         method_dir / f"seed={seed_idx}",
         {
             "benchmark": "patch",
             "class_names": ["A", "B"],
+            "tuning_params": tuning_params or {},
             "splits": {
                 "test": {
                     "labels": [0, 1],
@@ -48,6 +55,7 @@ def _write_seed_record(method_dir: Path, seed_idx: int) -> None:
             },
         },
     )
+
 
 def test_train_time_logit_adjustment_confirmation_preserves_selected_tau(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -83,6 +91,41 @@ def test_train_time_logit_adjustment_confirmation_preserves_selected_tau(
 
     assert observed == [0.25]
 
+
+def test_crt_records_its_stage_one_ce_selection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    observed: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "imbalance_benchmark.modeling.workflows.confirmation._training_context",
+        lambda *args: {"param_config": args[-1]},
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.modeling.workflows.confirmation._timed_fit",
+        lambda *_: ({}, 0.0),
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.modeling.workflows.confirmation._run_and_record",
+        lambda *args: observed.append(args[3]["param_config"]),
+    )
+    run = RunContext(
+        device=torch.device("cpu"),
+        config={},
+        n_classes=2,
+        is_mil=False,
+        class_names=["A", "B"],
+        val_loader=object(),
+        test_loader=object(),
+        paths={"data": tmp_path, "results": tmp_path},
+        seeds=[7],
+        assignment="native",
+    )
+
+    confirm_crt_seed("balanced", {"lr": 1e-3}, {"lr": 3e-5}, object(), run, seed_idx=0)
+
+    assert observed == [{"lr": 1e-3, "stage_one": {"lr": 3e-5}}]
+
+
 def test_confirmation_condition_uses_the_frozen_class_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -97,7 +140,9 @@ def test_confirmation_condition_uses_the_frozen_class_order(
     monkeypatch.setattr(confirm, "confirm_ce", lambda *args: [])
     split_data = tmp_path / "split=0" / "data"
     merge_round_state(
-        tmp_path / "data", "moderate", {"ce": {"resolved": True, "tuning_limited": False}}
+        tmp_path / "data",
+        "moderate",
+        {"ce": {"resolved": True, "tuning_limited": False}},
     )
     run = RunContext(
         device=torch.device("cpu"),
@@ -116,17 +161,40 @@ def test_confirmation_condition_uses_the_frozen_class_order(
 
     assert observed == [locked]
 
+
 def test_unfitted_seed_is_not_done(tmp_path: Path) -> None:
     paths = {"results": tmp_path}
 
-    assert not confirm_shard._seed_already_done(paths, "native", "severe", "weighted_ce", 0)
+    assert not confirm_shard._seed_already_done(
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}
+    )
+
 
 def test_ordinary_method_is_done_once_its_test_record_exists(tmp_path: Path) -> None:
     paths = {"results": tmp_path}
     method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
-    _write_seed_record(method_dir, 0)
+    config = {"lr": 3e-5, "parameter": 1.0}
+    _write_seed_record(method_dir, 0, config)
 
-    assert confirm_shard._seed_already_done(paths, "native", "severe", "weighted_ce", 0)
+    assert confirm_shard._seed_already_done(
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": config}
+    )
+
+
+def test_changed_tuning_config_invalidates_an_existing_seed(tmp_path: Path) -> None:
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    _write_seed_record(method_dir, 0, {"lr": 1e-4, "parameter": 1.0})
+
+    assert not confirm_shard._seed_already_done(
+        paths,
+        "native",
+        "severe",
+        "weighted_ce",
+        0,
+        {"weighted_ce": {"lr": 3e-5, "parameter": 1.0}},
+    )
+
 
 def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
     tmp_path: Path,
@@ -134,15 +202,43 @@ def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
     """post-hoc rides with its seed's ce fit, so resuming a ce unit must not skip
     it on ce's record alone -- the folded post-hoc pass would be silently lost."""
     paths = {"results": tmp_path}
-    _write_seed_record(tmp_path / "assignment=native" / "severe" / "ce", 0)
-
-    assert not confirm_shard._seed_already_done(paths, "native", "severe", "ce", 0)
-
+    configs = {
+        "ce": {"lr": 3e-5},
+        "post_hoc_logit_adjustment": {"parameter": 0.5, "taus": {}},
+    }
     _write_seed_record(
-        tmp_path / "assignment=native" / "severe" / "post_hoc_logit_adjustment", 0
+        tmp_path / "assignment=native" / "severe" / "ce", 0, configs["ce"]
     )
 
-    assert confirm_shard._seed_already_done(paths, "native", "severe", "ce", 0)
+    assert not confirm_shard._seed_already_done(
+        paths, "native", "severe", "ce", 0, configs
+    )
+
+    _write_seed_record(
+        tmp_path / "assignment=native" / "severe" / "post_hoc_logit_adjustment",
+        0,
+        {"parameter": 0.5},
+    )
+
+    assert confirm_shard._seed_already_done(paths, "native", "severe", "ce", 0, configs)
+
+
+def test_crt_requires_its_selected_stage_one_ce_config(tmp_path: Path) -> None:
+    paths = {"results": tmp_path}
+    configs = {"crt": {"lr": 1e-3}, "ce": {"lr": 3e-5}}
+    method_dir = tmp_path / "assignment=native" / "balanced" / "crt"
+    _write_seed_record(method_dir, 0, configs["crt"])
+
+    assert not confirm_shard._seed_already_done(
+        paths, "native", "balanced", "crt", 0, configs
+    )
+
+    _write_seed_record(method_dir, 0, {**configs["crt"], "stage_one": configs["ce"]})
+
+    assert confirm_shard._seed_already_done(
+        paths, "native", "balanced", "crt", 0, configs
+    )
+
 
 def test_a_truncated_run_record_is_treated_as_not_done(tmp_path: Path) -> None:
     """A crash mid-write can leave a corrupt run.json; resuming must refit rather
@@ -152,7 +248,10 @@ def test_a_truncated_run_record_is_treated_as_not_done(tmp_path: Path) -> None:
     result_dir.mkdir(parents=True)
     (result_dir / "run.json").write_text("{not valid json")
 
-    assert not confirm_shard._seed_already_done(paths, "native", "severe", "weighted_ce", 0)
+    assert not confirm_shard._seed_already_done(
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}
+    )
+
 
 def test_combined_tuning_scope_passes_the_frozen_class_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -171,11 +270,10 @@ def test_combined_tuning_scope_passes_the_frozen_class_order(
         "imbalance_benchmark.modeling.workflows.tuning.tuning_shards.load_training_dataset",
         load_dataset,
     )
-    combined_scopes(
-        [({"data": tmp_path}, regime, object())], "moderate", ("native",)
-    )
+    combined_scopes([({"data": tmp_path}, regime, object())], "moderate", ("native",))
 
     assert observed == [locked]
+
 
 def test_roster_for_regime_matches_report_table():
     patch = roster_for_regime(False)
@@ -193,14 +291,17 @@ def test_roster_for_regime_matches_report_table():
     assert set(patch) - shared == {"ce_soft_f1", "ce_soft_mcc", "cfal", "oko"}
     assert set(wsi) - shared == {"rankmix", "sc_mil", "mde"}
 
+
 def test_ce_and_crt_grids_are_lr_only():
     assert get_grid_configs("ce") == [{"lr": lr} for lr in LEARNING_RATE_GRID]
     assert get_grid_configs("crt") == [{"lr": lr} for lr in LEARNING_RATE_GRID]
+
 
 def test_post_hoc_grid_has_no_learning_rate():
     configs = get_grid_configs("post_hoc_logit_adjustment")
     assert configs == [{"parameter": p} for p in GRIDS["post_hoc_logit_adjustment"]]
     assert all("lr" not in c for c in configs)
+
 
 def test_weighted_ce_grid_crosses_16_configurations():
     configs = get_grid_configs("weighted_ce")
@@ -208,25 +309,30 @@ def test_weighted_ce_grid_crosses_16_configurations():
     assert {c["parameter"] for c in configs} == set(GRIDS["weighted_ce"])
     assert {c["lr"] for c in configs} == set(LEARNING_RATE_GRID)
 
+
 def test_oko_grid_capped_by_k_minus_1():
     configs = get_grid_configs("oko", n_classes=3)
     assert max(c["parameter"] for c in configs) <= 2
     configs_binary = get_grid_configs("oko", n_classes=2)
     assert {c["parameter"] for c in configs_binary} == {1}
 
+
 def test_get_grid_configs_honors_an_explicit_lr_window():
     shifted = LR_ENVELOPE[3:7]
     configs = get_grid_configs("ce", lr_window=shifted)
     assert configs == [{"lr": lr} for lr in shifted]
+
 
 def test_initial_window_positions_by_regime():
     assert initial_window("low", LR_ENVELOPE) == LR_ENVELOPE[0:4]
     assert initial_window("current", LR_ENVELOPE) == LEARNING_RATE_GRID
     assert initial_window("high", LR_ENVELOPE) == LR_ENVELOPE[3:7]
 
+
 def test_initial_window_rejects_unknown_regime():
     with pytest.raises(ValueError):
         initial_window("mid", LR_ENVELOPE)
+
 
 def test_winner_is_interior_true_only_off_the_edges():
     window = LEARNING_RATE_GRID
@@ -235,11 +341,13 @@ def test_winner_is_interior_true_only_off_the_edges():
     assert not winner_is_interior(window, window[0])
     assert not winner_is_interior(window, window[-1])
 
+
 def test_shift_window_reuses_three_overlapping_values_outward():
     window = LEARNING_RATE_GRID  # LR_ENVELOPE[2:6]
     shifted = shift_window(window, window[-1], LR_ENVELOPE)
     assert shifted == LR_ENVELOPE[3:7]
     assert set(window) & set(shifted) == set(window[1:])
+
 
 def test_shift_window_reuses_three_overlapping_values_inward_direction():
     window = LEARNING_RATE_GRID
@@ -247,16 +355,19 @@ def test_shift_window_reuses_three_overlapping_values_inward_direction():
     assert shifted == LR_ENVELOPE[1:5]
     assert set(window) & set(shifted) == set(window[:-1])
 
+
 def test_shift_window_exhausts_at_the_envelope_boundary():
     top_window = LR_ENVELOPE[-4:]
     assert shift_window(top_window, top_window[-1], LR_ENVELOPE) is None
     bottom_window = LR_ENVELOPE[:4]
     assert shift_window(bottom_window, bottom_window[0], LR_ENVELOPE) is None
 
+
 def test_shift_window_rejects_an_interior_winner():
     window = LEARNING_RATE_GRID
     with pytest.raises(ValueError):
         shift_window(window, window[1], LR_ENVELOPE)
+
 
 def test_repeated_shifts_never_duplicate_a_previously_evaluated_column():
     window = initial_window("low", LR_ENVELOPE)
@@ -269,6 +380,7 @@ def test_repeated_shifts_never_duplicate_a_previously_evaluated_column():
         seen |= new_columns
         window = shifted
     assert shift_window(window, window[-1], LR_ENVELOPE) is None
+
 
 def test_confirmation_provenance_payload_carries_appendix_a_fields() -> None:
     """The run record's provenance carries the Appendix A fields flagged as missing.
@@ -312,6 +424,7 @@ def test_confirmation_provenance_payload_carries_appendix_a_fields() -> None:
     assert out["achieved_rho"] == 99.0
     assert out["pilot_min_support"] == 20
 
+
 def test_partial_confirmation_block_is_rejected(tmp_path: Path) -> None:
     """Fewer than five valid confirmation seeds must stop inference, not be averaged."""
     paths = {"results": tmp_path}
@@ -321,6 +434,7 @@ def test_partial_confirmation_block_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="incomplete"):
         load_seed_predictions(paths, "severe", "weighted_ce", "native")
+
 
 def test_complete_confirmation_block_stacks_all_five_seeds(tmp_path: Path) -> None:
     paths = {"results": tmp_path}
@@ -332,6 +446,7 @@ def test_complete_confirmation_block_stacks_all_five_seeds(tmp_path: Path) -> No
 
     assert stacked is not None
     assert stacked["preds"].shape[0] == 5
+
 
 def test_missing_confirmation_method_is_not_silently_skipped(tmp_path: Path) -> None:
     """A roster method with no directory is a failed confirmation block."""

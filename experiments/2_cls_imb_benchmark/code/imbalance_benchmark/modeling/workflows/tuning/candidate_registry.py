@@ -13,24 +13,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     write_atomic,
 )
 
-__all__ = [
-    "registry_path",
-    "load_registry",
-    "registry_lookup",
-    "registry_candidates_for_method",
-    "register_candidates",
-    "select_candidate_payload",
-    "round_grids_path",
-    "write_round_grids",
-    "load_round_grids",
-    "round_state_path",
-    "merge_round_state",
-    "load_round_state",
-    "tuning_locked",
-    "resolve_terminal_specs",
-    "terminal_cost_payloads",
-]
-
 
 def registry_path(root: Path, condition: str) -> Path:
     """Path to one condition's cross-round candidate registry (not signed: a cache)."""
@@ -49,7 +31,18 @@ def _registry_key(method: str, config: dict[str, Any]) -> str:
 def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
     """Load the map from (method, config) to the round/index it was first trained in."""
     path = registry_path(root, condition)
-    return json.loads(path.read_text()) if path.exists() else {}
+    registry = json.loads(path.read_text()) if path.exists() else {}
+    normalized: dict[str, dict[str, int]] = {}
+    for key, entry in registry.items():
+        method, parameter, lr = key.split("|")
+        config = {"lr": None if lr == "None" else float(lr)}
+        if parameter != "None":
+            config["parameter"] = float(parameter)
+        canonical = _registry_key(method, config)
+        if canonical in normalized and normalized[canonical] != entry:
+            raise RuntimeError(f"Conflicting candidate registry entries: {canonical}")
+        normalized[canonical] = entry
+    return normalized
 
 
 def registry_lookup(

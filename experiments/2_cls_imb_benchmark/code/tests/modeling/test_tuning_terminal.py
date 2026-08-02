@@ -63,12 +63,17 @@ def test_terminal_active_grids_expands_each_methods_own_signed_window():
     round-0 grid - a resolved method's winner can live several rounds out."""
     state = {
         "ce": {"lr_window": [3e-4, 1e-3, 3e-3, 1e-2], "strength_window": None},
-        "focal": {"lr_window": LEARNING_RATE_GRID, "strength_window": [0.0, 0.5, 1.0, 1.5]},
+        "focal": {
+            "lr_window": LEARNING_RATE_GRID,
+            "strength_window": [0.0, 0.5, 1.0, 1.5],
+        },
     }
     grids = terminal_active_grids(state, ("ce", "focal"), 9)
     assert grids["ce"] == [{"lr": lr} for lr in [3e-4, 1e-3, 3e-3, 1e-2]]
     assert grids["focal"] == [
-        {"parameter": p, "lr": lr} for p in [0.0, 0.5, 1.0, 1.5] for lr in LEARNING_RATE_GRID
+        {"parameter": p, "lr": lr}
+        for p in [0.0, 0.5, 1.0, 1.5]
+        for lr in LEARNING_RATE_GRID
     ]
 
 
@@ -85,7 +90,10 @@ def test_terminal_active_grids_falls_back_to_the_full_grid_for_fixed_grid_method
     must be used instead, still crossed with the state's (possibly shifted)
     lr_window."""
     state = {
-        "balanced_sampling": {"lr_window": [3e-5, 1e-4, 3e-4, 1e-3], "strength_window": None},
+        "balanced_sampling": {
+            "lr_window": [3e-5, 1e-4, 3e-4, 1e-3],
+            "strength_window": None,
+        },
         "oko": {"lr_window": LEARNING_RATE_GRID, "strength_window": None},
     }
     grids = terminal_active_grids(state, ("balanced_sampling", "oko"), 7)
@@ -119,13 +127,11 @@ def test_resolve_terminal_specs_finds_a_later_round_candidate_without_registerin
 def test_resolve_terminal_specs_finds_an_int_registered_candidate_via_a_float_query(
     tmp_path: Path,
 ):
-    """Regression: found live on the cluster (BRACS balanced/severe, oko).
-    oko's grid is defined in plain ints ([1, 2, 4, 8]), but a later round's
-    fallback window construction casts to float before registering - before
-    this fix the two paths keyed the same candidate differently, so a
-    terminal lookup built from the int-typed frozen grid silently missed a
-    candidate that was actually trained and registered as a float."""
-    register_candidates(tmp_path, "moderate", "oko", [{"parameter": 1, "lr": 1e-4}], round_index=0)
+    """Load the integer-form key persisted before registry keys were normalized."""
+    write_atomic(
+        tmp_path / "tuning_shards" / "candidate_registry_moderate.json",
+        {"oko|1|0.0001": {"round": 0, "candidate_index": 0}},
+    )
 
     specs = resolve_terminal_specs(
         tmp_path, "moderate", "base", "oko", [{"parameter": 1.0, "lr": 1e-4}]
@@ -134,7 +140,26 @@ def test_resolve_terminal_specs_finds_an_int_registered_candidate_via_a_float_qu
     assert [(spec.round, spec.candidate_index) for spec in specs] == [(0, 0)]
 
 
-def test_resolve_terminal_specs_aborts_on_a_config_missing_from_the_registry(tmp_path: Path):
+def test_registry_normalization_rejects_conflicting_candidate_locations(
+    tmp_path: Path,
+) -> None:
+    write_atomic(
+        tmp_path / "tuning_shards" / "candidate_registry_moderate.json",
+        {
+            "oko|1|0.0001": {"round": 0, "candidate_index": 0},
+            "oko|1.0|0.0001": {"round": 1, "candidate_index": 0},
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Conflicting candidate registry entries"):
+        resolve_terminal_specs(
+            tmp_path, "moderate", "base", "oko", [{"parameter": 1.0, "lr": 1e-4}]
+        )
+
+
+def test_resolve_terminal_specs_aborts_on_a_config_missing_from_the_registry(
+    tmp_path: Path,
+):
     """A round-state window naming a config the registry never recorded means
     the tuning lock was granted against stale or corrupted state - final
     reduction must refuse to guess, not silently retrain or skip it."""
@@ -174,7 +199,9 @@ def test_reduce_terminal_phase_aborts_on_a_stale_shard_that_no_longer_matches_th
 ):
     register_candidates(tmp_path, "moderate", "ce", [{"lr": 1e-4}], round_index=0)
     # The shard on disk disagrees with what the registry says lives here.
-    _write_candidate(tmp_path, ShardSpec("moderate", "ce", 0, "base"), {"lr": 9e-4}, 0.5)
+    _write_candidate(
+        tmp_path, ShardSpec("moderate", "ce", 0, "base"), {"lr": 9e-4}, 0.5
+    )
 
     with pytest.raises(RuntimeError, match="config mismatch"):
         reduce_terminal_phase(
@@ -199,7 +226,9 @@ def test_terminal_cost_payloads_counts_round_zero_and_outward_probes_exactly_onc
         tmp_path, ShardSpec("moderate", "ce", 0, "base", round=1), {"lr": 1e-2}, 0.9
     )
 
-    payloads = terminal_cost_payloads(tmp_path, "moderate", "base", ("ce",), FINGERPRINT)
+    payloads = terminal_cost_payloads(
+        tmp_path, "moderate", "base", ("ce",), FINGERPRINT
+    )
 
     assert len(payloads) == 5  # 4 from round 0 plus the 1 outward probe
     assert {p["config"]["lr"] for p in payloads} == {1e-4, 3e-4, 1e-3, 3e-3, 1e-2}

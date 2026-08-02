@@ -136,7 +136,10 @@ def confirm_crt_seed(
 ) -> None:
     """Fit cRT for one confirmation seed (stage one inherits CE; stage two retrains
     only the classifier)."""
-    ctx = _training_context("crt", cond, train_ds, run, run.seeds[seed_idx], cfg)
+    effective_config = {**cfg, "stage_one": stage_one_config}
+    ctx = _training_context(
+        "crt", cond, train_ds, run, run.seeds[seed_idx], effective_config
+    )
     ctx["stage_one_config"] = stage_one_config
     state, elapsed = _timed_fit(fit_crt, ctx)
     _run_and_record(cond, "crt", seed_idx, ctx, state, run, elapsed)
