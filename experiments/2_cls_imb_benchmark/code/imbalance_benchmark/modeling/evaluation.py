@@ -49,10 +49,11 @@ def _gather_and_eval(
             else:
                 logits = model(batch["features"].to(device, non_blocking=True))
                 targets = batch["target"]
-            all_logits.append(logits.cpu())
+            all_logits.append(logits)
             all_targets.append(targets)
     model.train(was_training)
-    logits, targets = torch.cat(all_logits, dim=0), torch.cat(all_targets, dim=0).long()
+    logits = torch.cat(all_logits, dim=0).cpu()
+    targets = torch.cat(all_targets, dim=0).long()
     preds = logits.softmax(dim=-1).argmax(dim=-1)
     recalls = [
         float((preds[targets == c] == c).sum().item())

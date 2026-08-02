@@ -31,8 +31,10 @@ from imbalance_benchmark.modeling.training import (
     update_budget,
 )
 from imbalance_benchmark.modeling.training import _fit_step
+from imbalance_benchmark.modeling.evaluation import _gather_and_eval
 
 DIM = 16
+
 
 def _mil_context(method: str) -> dict[str, object]:
     return {
@@ -44,6 +46,7 @@ def _mil_context(method: str) -> dict[str, object]:
         "param": 0.1,
         "method_diagnostics": {},
     }
+
 
 def _write_patch_manifest(
     tmp_path: Path, n_classes: int = 3, per_class: int = 8
@@ -67,6 +70,7 @@ def _write_patch_manifest(
     pd.DataFrame(rows).to_csv(manifest_path, index=False)
     return manifest_path
 
+
 def _write_bag_manifest(tmp_path: Path, n_classes: int = 3, per_class: int = 6) -> Path:
     classes = [f"class_{i}" for i in range(n_classes)]
     rows = []
@@ -86,6 +90,7 @@ def _write_bag_manifest(tmp_path: Path, n_classes: int = 3, per_class: int = 6) 
     manifest_path = tmp_path / "manifest.csv"
     pd.DataFrame(rows).to_csv(manifest_path, index=False)
     return manifest_path
+
 
 def _patch_ctx(
     method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3
@@ -118,6 +123,7 @@ def _patch_ctx(
         "train_labels": train_ds.get_int_targets(),
     }
 
+
 def _bag_ctx(
     method: str, tmp_path: Path, param: float | None = None, n_classes: int = 3
 ) -> dict:
@@ -149,6 +155,7 @@ def _bag_ctx(
         "train_labels": train_ds.get_int_targets(),
     }
 
+
 def test_sc_mil_logs_all_required_batch_diagnostics() -> None:
     context = _mil_context("sc_mil")
 
@@ -168,9 +175,11 @@ def test_sc_mil_logs_all_required_batch_diagnostics() -> None:
         }
     ]
 
+
 def test_update_budget_formula():
     assert update_budget(support=100, batch_size=32) == 30 * 4
     assert update_budget(support=96, batch_size=32) == 30 * 3
+
 
 def test_sc_mil_batch_sampler_provides_same_class_positive_pairs():
     labels = np.array([0, 0, 0, 1, 1, 2, 2, 2])
@@ -178,6 +187,7 @@ def test_sc_mil_batch_sampler_provides_same_class_positive_pairs():
     for batch in sampler:
         counts = np.bincount(labels[batch], minlength=3)
         assert all(count == 0 or count >= 2 for count in counts)
+
 
 def test_training_restores_train_mode_after_validation_checkpoint(tmp_path):
     """Dropout must remain active for updates after the first validation checkpoint."""
@@ -187,6 +197,7 @@ def test_training_restores_train_mode_after_validation_checkpoint(tmp_path):
     fit_model(ctx, max_steps=CHECKPOINT_INTERVAL + 1)
 
     assert ctx["model"].training
+
 
 def test_training_uses_the_frozen_update_budget(tmp_path):
     """A frozen budget controls fitting even if the runtime formula changes."""
@@ -199,20 +210,18 @@ def test_training_uses_the_frozen_update_budget(tmp_path):
 
 
 def test_large_patch_evaluation_batches_preserve_metrics(tmp_path: Path) -> None:
-    dataset = ImbalanceDataset(_write_patch_manifest(tmp_path, n_classes=2, per_class=3))
+    dataset = ImbalanceDataset(
+        _write_patch_manifest(tmp_path, n_classes=2, per_class=3)
+    )
     model = MLP(DIM, 8, 2, dropout=0.0)
     optimized = build_evaluation_loader(dataset, is_mil=False)
     reference = torch.utils.data.DataLoader(
         dataset, batch_size=2, collate_fn=patch_collate
     )
-    optimized_result = run_evaluation(
-        model, optimized, torch.device("cpu"), False, 2
-    )
-    reference_result = run_evaluation(
-        model, reference, torch.device("cpu"), False, 2
-    )
+    optimized_result = run_evaluation(model, optimized, torch.device("cpu"), False, 2)
+    reference_result = run_evaluation(model, reference, torch.device("cpu"), False, 2)
 
-    assert optimized.batch_size == 4096
+    assert optimized.batch_size == 131072
     for name in ("logits", "probs", "preds", "targets"):
         np.testing.assert_allclose(optimized_result[name], reference_result[name])
     for name in ("balanced_accuracy", "macro_f1", "nll"):
@@ -230,6 +239,36 @@ def test_large_patch_evaluation_batches_preserve_metrics(tmp_path: Path) -> None
         torch.testing.assert_close(value, reference_checkpoint["state"][name])
 
 
+def test_evaluation_transfers_concatenated_logits_once(
+    monkeypatch, tmp_path: Path
+) -> None:
+    dataset = ImbalanceDataset(
+        _write_patch_manifest(tmp_path, n_classes=2, per_class=2)
+    )
+    model = MLP(DIM, 8, 2, dropout=0.0)
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=1,
+        collate_fn=patch_collate,
+    )
+    original_cpu = torch.Tensor.cpu
+    transfers = 0
+
+    def record_cpu(tensor: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+        nonlocal transfers
+        transfers += 1
+        return original_cpu(tensor, *args, **kwargs)
+
+    monkeypatch.setattr(torch.Tensor, "cpu", record_cpu)
+    _, _, _, logits, targets = _gather_and_eval(
+        model, loader, torch.device("cpu"), False, 2
+    )
+
+    assert transfers == 1
+    assert logits.shape == (4, 2)
+    assert targets.tolist() == [0, 0, 1, 1]
+
+
 def test_oko_reports_checkpoint_progress(tmp_path: Path, caplog) -> None:
     ctx = _patch_ctx("oko", tmp_path, param=1)
     ctx["update_budget"] = 1
@@ -238,6 +277,7 @@ def test_oko_reports_checkpoint_progress(tmp_path: Path, caplog) -> None:
         fit_method(ctx)
 
     assert "tune: oko seed=0 step 1/1" in caplog.text
+
 
 @pytest.mark.parametrize(
     ("method", "param"),
@@ -258,6 +298,7 @@ def test_patch_method_one_step_finite_training(tmp_path, method, param):
     state, acc = fit_method({**ctx, "config": {"patch_training": {"batch_size": 8}}})
     assert 0.0 <= acc <= 1.0
     assert state
+
 
 @pytest.mark.parametrize(
     ("method", "param"),
@@ -282,6 +323,7 @@ def test_wsi_method_one_step_finite_training(tmp_path, method, param):
     assert state
     assert ctx["processed_instances"] > ctx["processed_examples"]
 
+
 def test_build_optimizer_is_the_single_locked_optimizer() -> None:
     """The one optimizer factory reports the same weight decay the record records."""
     from imbalance_benchmark.modeling.training.config import (
@@ -293,6 +335,7 @@ def test_build_optimizer_is_the_single_locked_optimizer() -> None:
     assert isinstance(opt, torch.optim.AdamW)
     assert opt.defaults["weight_decay"] == WEIGHT_DECAY == 1e-4
     assert opt.defaults["lr"] == 1e-3
+
 
 def test_resolve_training_config_records_source_only_defaults() -> None:
     """The resolved config exposes the defaults the supplied YAML never states.
