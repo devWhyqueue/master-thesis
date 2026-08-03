@@ -34,7 +34,9 @@ slurm:
   partition: gpu-2h
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
-  tune_shards_per_task: 4
+  # 8 shards keep a controlled task near 60 min on average (worst observed
+  # per-shard cost puts the tail at ~98 min), so it fits gpu-2h with headroom.
+  tune_shards_per_task: 8
   tune_natural_shards_per_task: 3
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
@@ -46,7 +48,7 @@ slurm:
     freeze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 256G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
     tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
-    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
