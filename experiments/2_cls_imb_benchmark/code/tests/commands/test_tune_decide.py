@@ -143,6 +143,47 @@ def test_advance_submits_next_round_when_a_method_is_still_shifting(tmp_path, mo
     assert grids["windows"]["ce"]["lr_window"] == LR_ENVELOPE[3:7]
 
 
+def test_natural_round_shards_by_observation_on_its_own_resources(tmp_path, monkeypatch):
+    """A natural fit spans the full training partition, so a round-1 task that
+    ran every (split, seed) observation back to back would need six such fits
+    in one allocation and blow its wall. Natural rounds must shard by
+    observation and use the natural resource key, exactly as round 0 does."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    config = {
+        "slurm": {
+            "tune_natural_observations_per_candidate": 6,
+            "tune_natural_shards_per_task": 3,
+            "tune_shards_per_task": 8,
+            "resources": {
+                "tune_natural": {"partition": "gpu-5h"},
+                "tune_controlled": {"partition": "gpu-2h"},
+            },
+        }
+    }
+    submitted = []
+    edge = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[-1]}, LEARNING_RATE_GRID)
+
+    for condition in ("natural", "moderate"):
+        decide._advance(
+            {"data": tmp_path}, config, "config.yaml",
+            _args(condition=condition, round_index=0), {"ce": edge},
+            {"ce": (LEARNING_RATE_GRID, None)}, False,
+            submit=lambda c, p, job: submitted.append(job) or "id-1",
+        )
+
+    natural, moderate = submitted[0], submitted[2]
+    assert natural.partition == "gpu-5h"
+    assert "--observations-per-candidate 6" in natural.command
+    assert "--bundle-by-observation" in natural.command
+    assert "--shards-per-task 3" in natural.command
+    # 1 shifting ce candidate -> ceil(4/3) bundles x 6 observations.
+    assert natural.array_size == 12
+
+    assert moderate.partition == "gpu-2h"
+    assert "--observations-per-candidate" not in moderate.command
+    assert moderate.array_size == 4
+
+
 def test_advance_keeps_the_resolved_strength_window_when_only_lr_still_shifts(
     tmp_path, monkeypatch
 ):

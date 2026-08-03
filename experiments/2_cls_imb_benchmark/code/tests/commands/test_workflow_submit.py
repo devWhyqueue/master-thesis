@@ -319,8 +319,10 @@ def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> N
     ]
 
     assert "--shards-per-task 3" in base_natural.command
-    assert "--shards-per-task 4" in base_controlled.command
+    assert "--shards-per-task 8" in base_controlled.command
     assert base_natural.partition == confirm_natural.partition == "gpu-5h"
+    # Controlled fits use the shared budget T and finish well inside 2h.
+    assert base_controlled.partition == "gpu-2h"
     assert "40gb" in base_natural.constraint
     assert "40gb" in confirm_natural.constraint
     assert "40gb" in base_controlled.constraint
@@ -334,7 +336,7 @@ def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> N
     from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
 
     (dependent_controlled,) = dependent_round_zero_jobs(config, is_mil=False)
-    assert "--shards-per-task 4" in dependent_controlled.command
+    assert "--shards-per-task 8" in dependent_controlled.command
 
     monkeypatch.setattr(
         "imbalance_benchmark.hydra.workflow.resume_plan",

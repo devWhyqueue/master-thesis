@@ -94,9 +94,13 @@ def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
     )
 
     def _spec_for(index: int) -> ShardSpec | None:
-        return resolve_round_shard_spec(
-            base["data"], args.condition, index, args.phase, methods
+        candidate, observation = array_coordinates(
+            index, args.observation_index, args.observations_per_candidate
         )
+        spec = resolve_round_shard_spec(
+            base["data"], args.condition, candidate, args.phase, methods
+        )
+        return replace(spec, observation_index=observation) if spec else None
 
     _execute_shards(base, overridden, freeze, fingerprint, indices, _spec_for)
 

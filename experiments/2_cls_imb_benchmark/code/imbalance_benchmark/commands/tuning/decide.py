@@ -39,6 +39,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     round_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    bundled_observation_array_size,
     candidate_array_size,
     phase_methods,
 )
@@ -149,6 +150,42 @@ def _advance(
         _start_dependent_phase(base, config, config_path, args, is_mil, submit)
 
 
+def _round_shard_job(
+    config: dict[str, Any],
+    args: argparse.Namespace,
+    next_round: int,
+    methods: tuple[str, ...],
+) -> SlurmJob:
+    """Build one adaptive round's shard array on the resources its condition needs.
+
+    A natural fit spans the full training partition, so one task must not run
+    every (split, seed) observation back to back the way a controlled task
+    can; natural rounds are sharded by observation exactly as round 0 is.
+    """
+    name = f"tune-decide-shard-{args.condition}-{args.phase}-r{next_round}"
+    command = (
+        f"tune-shard --phase {args.phase} --condition {args.condition}"
+        f" --round {next_round}"
+    )
+    candidates = candidate_array_size(methods)
+    if args.condition != "natural":
+        job = build_job(config, name, command, True, (), "tune_controlled", "tune")
+        return replace(job, array_size=candidates)
+    slurm = config.get("slurm", {})
+    observations = int(slurm.get("tune_natural_observations_per_candidate", 1))
+    shards = int(
+        slurm.get("tune_natural_shards_per_task", slurm.get("tune_shards_per_task", 1))
+    )
+    command += (
+        f" --observations-per-candidate {observations}"
+        f" --bundle-by-observation --shards-per-task {shards}"
+    )
+    return replace(
+        build_job(config, name, command, True, (), "tune_natural", "tune"),
+        array_size=bundled_observation_array_size(candidates, observations, shards),
+    )
+
+
 def _submit_next_round(
     base: dict[str, Any],
     config: dict[str, Any],
@@ -168,20 +205,11 @@ def _submit_next_round(
         for method, state in unresolved.items()
     }
     write_round_grids(base["data"], args.condition, args.phase, next_round, new_windows)
-    shard = replace(
-        build_job(
-            config,
-            f"tune-decide-shard-{args.condition}-{args.phase}-r{next_round}",
-            f"tune-shard --phase {args.phase} --condition {args.condition}"
-            f" --round {next_round}",
-            True,
-            (),
-            "tune_controlled",
-            "tune",
-        ),
-        array_size=candidate_array_size(tuple(new_windows)),
+    shard_id = submit(
+        config,
+        config_path,
+        _round_shard_job(config, args, next_round, tuple(new_windows)),
     )
-    shard_id = submit(config, config_path, shard)
     decide = build_job(
         config,
         f"tune-decide-{args.condition}-{args.phase}-r{next_round}",
