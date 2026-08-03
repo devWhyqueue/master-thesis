@@ -13,7 +13,7 @@ from imbalance_benchmark.commands.tuning import (
     _is_excluded,
     _tuning_seeds,
 )
-from imbalance_benchmark.modeling.context import Regime, roster_for_regime
+from imbalance_benchmark.modeling.context import Regime, roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import TuningScope
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     _bundle_indices,
@@ -88,7 +88,7 @@ def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
     base, scopes, freeze, fingerprint = _frozen_shard_context(args)
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
-    methods = phase_methods(scopes[0][1].is_mil, args.phase)
+    methods = phase_methods(scopes[0][1].is_mil, args.phase, args.condition)
     overridden = round_overridden_scopes(
         base["data"], args.condition, args.phase, scopes, methods
     )
@@ -112,7 +112,10 @@ def _run_shard(
     """Run one shard, reusing ``built``'s cached scopes per (condition, scoped) key."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     if condition_is_reusable(
-        base, spec.condition, roster_for_regime(raw_scopes[0][1].is_mil), assignments
+        base,
+        spec.condition,
+        roster_for_condition(raw_scopes[0][1].is_mil, spec.condition),
+        assignments,
     ):
         return
     scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments

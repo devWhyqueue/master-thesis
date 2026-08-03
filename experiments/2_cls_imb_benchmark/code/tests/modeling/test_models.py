@@ -11,7 +11,10 @@ from imbalance_benchmark.datasets.data import (
     ImbalanceDataset,
     patch_collate,
 )
-from imbalance_benchmark.modeling.context import RunExposure, cost_payload
+from imbalance_benchmark.modeling.workflows.run_context import (
+    RunExposure,
+    cost_payload,
+)
 from imbalance_benchmark.modeling.context import set_training_mode
 from imbalance_benchmark.modeling.models import (
     AttentionMil,

@@ -71,7 +71,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert jobs[6].dependencies == ("tune-base-reduce",)
     assert jobs[6].command == "tune-decide --phase base --condition natural --round 0"
     assert jobs[9].command == "tune-decide --phase base --condition severe --round 0"
-    assert jobs[3].array_size == 396
+    # Natural fits the CE anchor alone: 4 learning-rate candidates, 6 observations.
+    assert jobs[3].array_size == 12
     assert "--observations-per-candidate 6" in jobs[3].command
     assert "--shards-per-task 2" in jobs[3].command
     assert "--bundle-by-observation" in jobs[3].command
@@ -94,18 +95,13 @@ def test_decide_jobs_run_on_host_not_in_apptainer() -> None:
     assert "#SBATCH --dependency=afterok:tune-base-reduce" in script
 
 
-def test_dependent_round_zero_jobs_match_the_frozen_shapes() -> None:
-    """Dependent-phase round-0 jobs (submitted by tune-decide) keep today's sizes."""
+def test_dependent_round_zero_jobs_cover_the_controlled_conditions_only() -> None:
+    """crt and post-hoc are mitigation methods, so the natural anchor has none."""
     from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
 
-    posthoc, crt, controlled = dependent_round_zero_jobs(_config(), is_mil=False)
-    assert posthoc.array_size == 0
-    assert "--shard-index 0" in posthoc.command
-    assert crt.array_size == 12
-    assert "--observations-per-candidate 6" in crt.command
-    assert "--shard-offset 1" in crt.command
-    assert "--bundle-by-observation" in crt.command
-    assert controlled.array_size == 8
+    jobs = dependent_round_zero_jobs(_config(), is_mil=False)
+    assert [job.name for job in jobs] == ["tune-dependent-controlled"]
+    assert jobs[0].array_size == 8
 
 
 def test_confirm_only_builds_just_confirm_and_analyze() -> None:
@@ -129,8 +125,9 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     confirm_natural = next(j for j in jobs if j.name == "confirm-natural")
     confirm_controlled = next(j for j in jobs if j.name == "confirm-controlled")
 
-    # patch roster minus post-hoc = 10 methods; 3 splits x 5 seeds each.
-    assert confirm_natural.array_size == 3 * 10
+    # patch roster minus post-hoc = 10 methods; 3 splits x 5 seeds each,
+    # bundled 5 per task. Natural fits ce alone, so it keeps one method.
+    assert confirm_natural.array_size == 3 * 1
     assert confirm_controlled.array_size == 3 * 3 * 10
     assert confirm_natural.partition == "gpu-5h"
     assert confirm_controlled.partition == "gpu-2h"
@@ -139,7 +136,7 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
 
     natural_script = render_sbatch(confirm_natural, _config(), "config.yaml")
     controlled_script = render_sbatch(confirm_controlled, _config(), "config.yaml")
-    assert f"#SBATCH --array=0-{3 * 10 - 1}%8" in natural_script
+    assert f"#SBATCH --array=0-{3 * 1 - 1}%8" in natural_script
     assert f"#SBATCH --array=0-{3 * 3 * 10 - 1}%8" in controlled_script
     assert "confirm-shard --group natural" in natural_script
     assert "confirm-shard --group controlled" in controlled_script
@@ -328,11 +325,7 @@ def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> N
     assert "40gb" in confirm_natural.constraint
     assert "40gb" in base_controlled.constraint
     assert "40gb" in confirm_controlled.constraint
-    for resource in (
-        "tune_natural",
-        "tune_post_hoc_natural",
-        "confirm_natural",
-    ):
+    for resource in ("tune_natural", "confirm_natural"):
         assert config["slurm"]["resources"][resource]["partition"] == "gpu-5h"
         assert "40gb" in config["slurm"]["resources"][resource]["constraint"]
     assert "%35" in render_sbatch(base_natural, config)
@@ -340,10 +333,7 @@ def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> N
 
     from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
 
-    _, dependent_natural, dependent_controlled = dependent_round_zero_jobs(
-        config, is_mil=False
-    )
-    assert "--shards-per-task 3" in dependent_natural.command
+    (dependent_controlled,) = dependent_round_zero_jobs(config, is_mil=False)
     assert "--shards-per-task 4" in dependent_controlled.command
 
     monkeypatch.setattr(
@@ -374,7 +364,7 @@ def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(
     )
 
     config = load_config(CAMELYON_CONFIG)
-    methods = phase_methods(False, "base")
+    methods = phase_methods(False, "base", "natural")
     seen: list[int] = []
     monkeypatch.setattr(
         resume,
@@ -382,9 +372,7 @@ def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(
         lambda index, *_args: seen.append(index) or False,
     )
 
-    pending = resume._pending_natural(
-        config, {}, methods, False, {}, [], 3
-    )
+    pending = resume._pending_natural(config, {}, False, {}, [], 3)
 
     expected = bundled_observation_array_size(
         candidate_array_size(methods), 6, 3

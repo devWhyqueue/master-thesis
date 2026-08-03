@@ -17,6 +17,7 @@ from imbalance_benchmark.common import (
     split_paths,
 )
 from imbalance_benchmark.datasets.data import TrainDataset, load_training_dataset
+from imbalance_benchmark.modeling.context import roster_for_condition
 from imbalance_benchmark.modeling.workflows.confirmation import (
     RunContext,
     confirm_ce_seed,
@@ -32,13 +33,20 @@ from imbalance_benchmark.modeling.workflows.confirmation_schedule import (
 __all__ = ["cmd_confirm_shard"]
 
 
-def _required_methods(method: str) -> tuple[str, ...]:
-    """Methods whose signed tuning selection a unit needs (post-hoc rides with ce)."""
-    if method == "ce":
+def _fitted_methods(cond: str, method: str, is_mil: bool) -> tuple[str, ...]:
+    """Methods one unit actually fits: post-hoc rides with ce where the roster has it."""
+    if method == "ce" and "post_hoc_logit_adjustment" in roster_for_condition(
+        is_mil, cond
+    ):
         return ("ce", "post_hoc_logit_adjustment")
+    return (method,)
+
+
+def _required_methods(cond: str, method: str, is_mil: bool) -> tuple[str, ...]:
+    """Methods whose signed tuning selection a unit needs."""
     if method == "crt":
         return ("crt", "ce")
-    return (method,)
+    return _fitted_methods(cond, method, is_mil)
 
 
 def _unit_manifest_name(cond: str, assignment: str) -> str:
@@ -62,19 +70,20 @@ def _confirm_unit_method(
         run.paths["data"].parent.parent / "data",
         cond,
         best_configs,
-        _required_methods(method),
+        _required_methods(cond, method, run.is_mil),
     )
     if method == "ce":
         state, step = confirm_ce_seed(cond, configs["ce"], train_ds, run, seed_idx)
-        confirm_post_hoc_seed(
-            cond,
-            configs["post_hoc_logit_adjustment"],
-            state,
-            step,
-            train_ds,
-            run,
-            seed_idx,
-        )
+        if "post_hoc_logit_adjustment" in _fitted_methods(cond, method, run.is_mil):
+            confirm_post_hoc_seed(
+                cond,
+                configs["post_hoc_logit_adjustment"],
+                state,
+                step,
+                train_ds,
+                run,
+                seed_idx,
+            )
     elif method == "crt":
         confirm_crt_seed(cond, configs["crt"], configs["ce"], train_ds, run, seed_idx)
     else:
@@ -100,14 +109,14 @@ def _seed_already_done(
     method: str,
     seed_idx: int,
     configs: dict[str, Any],
+    is_mil: bool,
 ) -> bool:
     """Return whether complete records match the current effective configurations.
 
     A crash mid-write can leave a truncated ``run.json``; treat any read failure
     as not-done so a resumed task refits rather than trusting a corrupt record.
     """
-    methods = ("ce", "post_hoc_logit_adjustment") if method == "ce" else (method,)
-    for name in methods:
+    for name in _fitted_methods(cond, method, is_mil):
         result_dir = _result_dir(paths, assignment, cond, name, seed_idx)
         try:
             record = read_run_record(result_dir)
@@ -145,6 +154,7 @@ def _run_confirm_unit(
             unit.method,
             unit.seed_index,
             selected,
+            run_data["is_mil"],
         ):
             continue
         run = RunContext(**run_data, assignment=assignment)

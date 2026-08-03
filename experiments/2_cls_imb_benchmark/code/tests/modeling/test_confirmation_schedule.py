@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import math
 
-from imbalance_benchmark.modeling.context import roster_for_regime
+from imbalance_benchmark.modeling.context import (
+    NATURAL_ANCHOR_METHODS,
+    roster_for_regime,
+)
 from imbalance_benchmark.modeling.workflows.confirmation_schedule import (
     CONFIRMATION_SEED_COUNT,
     confirm_array_size,
@@ -15,16 +18,22 @@ from imbalance_benchmark.modeling.workflows.confirmation_schedule import (
 def test_confirm_group_methods_excludes_post_hoc() -> None:
     """Post-hoc rides with its seed's ce unit; it never gets its own unit."""
     for is_mil in (False, True):
-        methods = confirm_group_methods(is_mil)
+        methods = confirm_group_methods(is_mil, "balanced")
         assert "post_hoc_logit_adjustment" not in methods
         assert set(methods) == set(roster_for_regime(is_mil)) - {
             "post_hoc_logit_adjustment"
         }
 
 
+def test_natural_anchor_schedules_only_the_ce_reference() -> None:
+    """The anchor is descriptive, so no mitigation method is fitted on it."""
+    for is_mil in (False, True):
+        assert confirm_group_methods(is_mil, "natural") == NATURAL_ANCHOR_METHODS
+
+
 def test_natural_units_cover_one_condition_across_every_split_method_seed() -> None:
     units = confirm_units_for_group("natural", is_mil=False)
-    methods = confirm_group_methods(False)
+    methods = confirm_group_methods(False, "natural")
 
     assert len(units) == 3 * len(methods) * CONFIRMATION_SEED_COUNT
     assert all(unit.condition == "natural" for unit in units)
@@ -43,7 +52,7 @@ def test_controlled_units_cover_three_conditions_across_every_split_method_seed(
     None
 ):
     units = confirm_units_for_group("controlled", is_mil=True)
-    methods = confirm_group_methods(True)
+    methods = confirm_group_methods(True, "balanced")
 
     assert len(units) == 3 * 3 * len(methods) * CONFIRMATION_SEED_COUNT
     assert {u.condition for u in units} == {"balanced", "moderate", "severe"}

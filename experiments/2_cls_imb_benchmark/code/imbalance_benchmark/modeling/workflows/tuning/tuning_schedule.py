@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from imbalance_benchmark.modeling.context import roster_for_regime
+from imbalance_benchmark.modeling.context import group_conditions, roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
 )
@@ -43,9 +43,7 @@ def resolve_shard_spec(
     """Map a stable SLURM index to one valid frozen candidate."""
     if index < 0:
         return None
-    conditions = (
-        ("natural",) if group == "natural" else ("balanced", "moderate", "severe")
-    )
+    conditions = group_conditions(group)
     per_condition = candidate_array_size(methods)
     condition_index, remainder = divmod(index, per_condition)
     if condition_index >= len(conditions):
@@ -103,12 +101,11 @@ def _candidate_slot(methods: tuple[str, ...], index: int) -> tuple[str, int]:
     raise IndexError("Candidate shard index lies outside the method roster")
 
 
-def phase_methods(is_mil: bool, phase: str) -> tuple[str, ...]:
-    """Split the frozen roster around the CE-dependent methods."""
-    roster = roster_for_regime(is_mil)
+def phase_methods(is_mil: bool, phase: str, condition: str) -> tuple[str, ...]:
+    """Split one condition's frozen roster around the CE-dependent methods."""
     return tuple(
         method
-        for method in roster
+        for method in roster_for_condition(is_mil, condition)
         if (method not in DEPENDENT_METHODS) == (phase == "base")
     )
 
@@ -122,7 +119,9 @@ def requested_shard(
     observation_index: int | None,
 ) -> ShardSpec | None:
     """Resolve a CLI array index and optional observation fallback index."""
-    spec = resolve_shard_spec(index, phase, group, phase_methods(is_mil, phase), grids)
+    # Every condition in a group shares one roster, so its first fixes the methods.
+    methods = phase_methods(is_mil, phase, group_conditions(group)[0])
+    spec = resolve_shard_spec(index, phase, group, methods, grids)
     return replace(spec, observation_index=observation_index) if spec else None
 
 

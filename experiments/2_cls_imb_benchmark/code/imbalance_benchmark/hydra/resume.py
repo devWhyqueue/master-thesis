@@ -52,22 +52,11 @@ def resume_plan(config: dict[str, Any]) -> ResumePlan:
     freeze = json.loads(freeze_paths[0].read_text())
     fingerprint = [compute_sha256(path) for path in freeze_paths]
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    methods = phase_methods(is_mil, "base")
-    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    natural_bundle_size, controlled_bundle_size = _bundle_sizes(config)
-    natural = _pending_natural(
-        config, base, methods, is_mil, freeze, fingerprint, natural_bundle_size
+    natural_bundle, controlled_bundle = _bundle_sizes(config)
+    return ResumePlan(
+        _pending_natural(config, base, is_mil, freeze, fingerprint, natural_bundle),
+        _pending_controlled(base, is_mil, freeze, fingerprint, controlled_bundle),
     )
-    controlled = _pending_controlled(
-        base,
-        methods,
-        is_mil,
-        freeze,
-        fingerprint,
-        assignments,
-        controlled_bundle_size,
-    )
-    return ResumePlan(natural, controlled)
 
 
 def _bundle_sizes(config: dict[str, Any]) -> tuple[int, int]:
@@ -78,14 +67,13 @@ def _bundle_sizes(config: dict[str, Any]) -> tuple[int, int]:
 
 def _pending_controlled(
     base: dict[str, Any],
-    methods: tuple[str, ...],
     is_mil: bool,
     freeze: dict[str, Any],
     fingerprint: list[str],
-    assignments: tuple[str, ...],
     bundle_size: int,
 ) -> tuple[int, ...]:
-    total = 3 * candidate_array_size(methods)
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+    total = 3 * candidate_array_size(phase_methods(is_mil, "base", "balanced"))
     return tuple(
         index
         for index in range(bundled_array_size(total, bundle_size))
@@ -98,7 +86,6 @@ def _pending_controlled(
 def _pending_natural(
     config: dict[str, Any],
     base: dict[str, Any],
-    methods: tuple[str, ...],
     is_mil: bool,
     freeze: dict[str, Any],
     fingerprint: list[str],
@@ -108,7 +95,9 @@ def _pending_natural(
         config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
     )
     natural_size = bundled_observation_array_size(
-        candidate_array_size(methods), observations, bundle_size
+        candidate_array_size(phase_methods(is_mil, "base", "natural")),
+        observations,
+        bundle_size,
     )
     return tuple(
         index

@@ -20,11 +20,7 @@ from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
 from imbalance_benchmark.common import REPO_ROOT, compute_sha256, write_run_record
-from imbalance_benchmark.modeling.context import (
-    RunExposure,
-    cost_payload,
-    resolve_update_budget,
-)
+from imbalance_benchmark.modeling.context import resolve_update_budget
 from imbalance_benchmark.modeling.training import (
     class_priors,
     resolve_batch_size,
@@ -35,7 +31,11 @@ from imbalance_benchmark.modeling.workflows.confirmation_provenance import (
     _load_record_freeze,
     _provenance_payload,
 )
-from imbalance_benchmark.modeling.workflows.run_context import RunContext
+from imbalance_benchmark.modeling.workflows.run_context import (
+    RunContext,
+    RunExposure,
+    cost_payload,
+)
 
 
 def _checkpoint_hash(state: dict[str, Any]) -> str:

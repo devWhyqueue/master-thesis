@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from imbalance_benchmark.modeling.context import roster_for_regime
+from imbalance_benchmark.modeling.context import group_conditions, roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     bundled_array_size,
 )
@@ -35,8 +35,8 @@ class ConfirmUnit:
     seed_index: int
 
 
-def confirm_group_methods(is_mil: bool) -> tuple[str, ...]:
-    """Roster methods scheduled as their own units.
+def confirm_group_methods(is_mil: bool, condition: str) -> tuple[str, ...]:
+    """One condition's roster methods scheduled as their own units.
 
     Post-hoc logit adjustment is excluded: it has no independent unit because
     it inherits its seed's CE checkpoint in-memory and rides with that seed's
@@ -44,17 +44,9 @@ def confirm_group_methods(is_mil: bool) -> tuple[str, ...]:
     """
     return tuple(
         method
-        for method in roster_for_regime(is_mil)
+        for method in roster_for_condition(is_mil, condition)
         if method != "post_hoc_logit_adjustment"
     )
-
-
-def _group_conditions(group: str) -> tuple[str, ...]:
-    if group == "natural":
-        return ("natural",)
-    if group == "controlled":
-        return ("balanced", "moderate", "severe")
-    raise ValueError(f"Unknown confirm group: {group}")
 
 
 def confirm_units_for_group(
@@ -67,12 +59,11 @@ def confirm_units_for_group(
     per-dataset state, so a SLURM array index resolves to the same unit both
     when the workflow is built locally and when a task runs on the cluster.
     """
-    methods = confirm_group_methods(is_mil)
     return [
         ConfirmUnit(split_index, condition, method, seed_index)
         for split_index in splits
-        for condition in _group_conditions(group)
-        for method in methods
+        for condition in group_conditions(group)
+        for method in confirm_group_methods(is_mil, condition)
         for seed_index in range(CONFIRMATION_SEED_COUNT)
     ]
 

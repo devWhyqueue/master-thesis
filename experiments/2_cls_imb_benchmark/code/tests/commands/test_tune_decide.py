@@ -197,6 +197,23 @@ def test_advance_submits_final_reduce_once_dependent_phase_resolves(tmp_path, mo
     assert submitted[0].command == "tune-reduce --phase final --condition moderate"
 
 
+def test_advance_finalizes_natural_without_a_dependent_phase(tmp_path, monkeypatch):
+    """The natural anchor fits ce alone, so crt/post-hoc never run there and
+    its base decide must sign the selection itself rather than wait for a
+    dependent phase that would never be submitted."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    submitted = []
+    ce_resolved = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+
+    decide._advance(
+        {"data": tmp_path}, {}, "config.yaml", _args(condition="natural", phase="base"),
+        {"ce": ce_resolved}, {"ce": (LEARNING_RATE_GRID, None)}, False,
+        submit=lambda config, config_path, job: submitted.append(job) or "id",
+    )
+
+    assert [job.name for job in submitted] == ["tune-final-reduce-natural"]
+
+
 def test_advance_starts_dependent_phase_once_ce_resolves(tmp_path, monkeypatch):
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     monkeypatch.setattr(

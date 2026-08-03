@@ -18,7 +18,11 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
-from imbalance_benchmark.modeling.context import CONDITIONS, Regime, roster_for_regime
+from imbalance_benchmark.modeling.context import (
+    CONDITIONS,
+    Regime,
+    roster_for_condition,
+)
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     summarize_tuning_cost,
@@ -151,7 +155,7 @@ def _combined_selections(
     for condition in _conditions(args):
         scoped = ("native",) if condition in {"natural", "balanced"} else assignments
         selected = tune_across_splits(
-            roster_for_regime(regime.is_mil),
+            roster_for_condition(regime.is_mil, condition),
             combined_scopes(scopes, condition, scoped, cost_records),
             _tuning_seeds(freeze),
         )

@@ -12,7 +12,10 @@ from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
-from imbalance_benchmark.modeling.context import RunExposure, cost_payload
+from imbalance_benchmark.modeling.workflows.run_context import (
+    RunExposure,
+    cost_payload,
+)
 from imbalance_benchmark.modeling.models import AttentionMil
 from imbalance_benchmark.modeling.training import _fit_step
 

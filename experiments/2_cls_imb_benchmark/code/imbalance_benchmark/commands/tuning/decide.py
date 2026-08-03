@@ -96,7 +96,7 @@ def cmd_tune_decide(args: argparse.Namespace) -> None:
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
     is_mil = scopes[0][1].is_mil
-    methods = phase_methods(is_mil, args.phase)
+    methods = phase_methods(is_mil, args.phase, args.condition)
     selections = _reduce_this_round(
         base, freeze, args.condition, args.phase, args.round, methods, fingerprint
     )
@@ -135,7 +135,7 @@ def _advance(
         check_queue_cap()
         _submit_next_round(base, config, config_path, args, unresolved, windows, submit)
         return
-    if args.phase != "base":
+    if args.phase != "base" or not phase_methods(is_mil, "dependent", args.condition):
         check_queue_cap()
         submit(config, config_path, final_reduce_job(config, args.condition))
         return

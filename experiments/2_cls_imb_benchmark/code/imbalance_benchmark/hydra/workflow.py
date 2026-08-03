@@ -13,12 +13,12 @@ from imbalance_benchmark.hydra.job_resources import build_job as _job
 from imbalance_benchmark.hydra.job_resources import resources_for as _resources
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
-from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
+from imbalance_benchmark.modeling.context import CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
-    DEPENDENT_METHODS,
     bundled_array_size,
     bundled_observation_array_size,
     candidate_array_size,
+    phase_methods,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,6 @@ def _tuning_jobs(
     config: dict[str, Any], freeze_dependency: tuple[str, ...], plan: ResumePlan | None
 ) -> list[SlurmJob]:
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    roster = roster_for_regime(is_mil)
     natural_observations = int(
         config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
     )
@@ -101,7 +100,8 @@ def _tuning_jobs(
         slurm.get("tune_natural_shards_per_task", slurm.get("tune_shards_per_task", 1))
     )
     controlled_shards = int(slurm.get("tune_shards_per_task", 1))
-    base_methods = tuple(method for method in roster if method not in DEPENDENT_METHODS)
+    natural_methods = phase_methods(is_mil, "base", "natural")
+    controlled_methods = phase_methods(is_mil, "base", "balanced")
     base_natural = (
         replace(
             _job(
@@ -116,7 +116,7 @@ def _tuning_jobs(
                 "tune",
             ),
             array_size=bundled_observation_array_size(
-                candidate_array_size(base_methods),
+                candidate_array_size(natural_methods),
                 natural_observations,
                 natural_shards,
             ),
@@ -138,7 +138,7 @@ def _tuning_jobs(
                 "tune",
             ),
             array_size=bundled_array_size(
-                3 * candidate_array_size(base_methods), controlled_shards
+                3 * candidate_array_size(controlled_methods), controlled_shards
             ),
             array_indices=plan.controlled_indices if plan else (),
         )

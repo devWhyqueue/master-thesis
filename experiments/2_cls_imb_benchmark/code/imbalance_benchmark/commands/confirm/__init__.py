@@ -26,7 +26,7 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
 from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
-from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
+from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_condition
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 
 __all__ = ["cmd_confirm"]
@@ -180,10 +180,10 @@ def cmd_confirm(args: argparse.Namespace) -> None:
 def _confirm_split(args: argparse.Namespace, paths: dict[str, Any]) -> None:
     """Run every requested condition for one prepared patient split."""
     best_configs, run_data, freeze = _confirm_inputs(args, paths)
-    methods = roster_for_regime(run_data["is_mil"])
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for cond in conditions:
+        methods = roster_for_condition(run_data["is_mil"], cond)
         scoped_assignments = (
             ("unassigned",) if cond in {"natural", "balanced"} else assignments
         )

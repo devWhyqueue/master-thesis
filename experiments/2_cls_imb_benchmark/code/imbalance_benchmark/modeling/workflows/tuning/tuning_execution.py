@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.common import sign_file, split_paths, write_json
-from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_regime
+from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import combined_cost
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
@@ -66,20 +66,20 @@ def write_base_selections(
     base: dict[str, Path],
     freeze: dict[str, Any],
     fingerprint: list[str],
-    methods: tuple[str, ...],
-    roster: tuple[str, ...],
+    is_mil: bool,
     conditions: tuple[str, ...],
 ) -> None:
     """Reduce and sign every incomplete base-method condition."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for condition in conditions:
+        roster = roster_for_condition(is_mil, condition)
         if condition_is_reusable(base, condition, roster, assignments):
             continue
         selected, _ = reduce_phase(
             base["data"],
             condition,
             "base",
-            methods,
+            phase_methods(is_mil, "base", condition),
             freeze["method_grids"],
             ReduceRound(fingerprint),
             expected_observations(condition, assignments, freeze),
@@ -91,23 +91,21 @@ def write_final_selections(
     base: dict[str, Path],
     freeze: dict[str, Any],
     fingerprint: list[str],
-    base_methods: tuple[str, ...],
-    dependent_methods: tuple[str, ...],
+    is_mil: bool,
     conditions: tuple[str, ...],
 ) -> None:
     """Write the unchanged signed selection interface and parallel search costs."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for condition in conditions:
-        if condition_is_reusable(
-            base, condition, (*base_methods, *dependent_methods), assignments
-        ):
+        roster = roster_for_condition(is_mil, condition)
+        if condition_is_reusable(base, condition, roster, assignments):
             continue
         _reduce_condition(
             base,
             freeze,
             fingerprint,
-            base_methods,
-            dependent_methods,
+            phase_methods(is_mil, "base", condition),
+            phase_methods(is_mil, "dependent", condition),
             assignments,
             condition,
         )
@@ -193,23 +191,14 @@ def reduce_tuning_shards(
     the others may still be mid-search when this condition's converges.
     """
     is_mil = raw_scopes[0][1].is_mil
-    base_methods = phase_methods(is_mil, "base")
     if phase == "base":
-        write_base_selections(
-            base,
-            freeze,
-            fingerprint,
-            base_methods,
-            roster_for_regime(is_mil),
-            CONDITIONS,
-        )
+        write_base_selections(base, freeze, fingerprint, is_mil, CONDITIONS)
         return
     write_final_selections(
         base,
         freeze,
         fingerprint,
-        base_methods,
-        phase_methods(is_mil, "dependent"),
+        is_mil,
         (condition,) if condition else CONDITIONS,
     )
 

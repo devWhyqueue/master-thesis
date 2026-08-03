@@ -7,12 +7,9 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.datasets.data import TrainDataset
-from imbalance_benchmark.modeling.context import (
-    Regime,
-    build_training_ctx,
-    param_counts,
-)
+from imbalance_benchmark.modeling.context import Regime, build_training_ctx
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
+from imbalance_benchmark.modeling.workflows.run_context import param_counts
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
 
 __all__ = [

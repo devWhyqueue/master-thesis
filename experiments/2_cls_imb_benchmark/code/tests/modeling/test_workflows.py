@@ -166,7 +166,7 @@ def test_unfitted_seed_is_not_done(tmp_path: Path) -> None:
     paths = {"results": tmp_path}
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}, False
     )
 
 
@@ -177,7 +177,7 @@ def test_ordinary_method_is_done_once_its_test_record_exists(tmp_path: Path) -> 
     _write_seed_record(method_dir, 0, config)
 
     assert confirm_shard._seed_already_done(
-        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": config}
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": config}, False
     )
 
 
@@ -193,6 +193,7 @@ def test_changed_tuning_config_invalidates_an_existing_seed(tmp_path: Path) -> N
         "weighted_ce",
         0,
         {"weighted_ce": {"lr": 3e-5, "parameter": 1.0}},
+        False,
     )
 
 
@@ -211,7 +212,7 @@ def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
     )
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "severe", "ce", 0, configs
+        paths, "native", "severe", "ce", 0, configs, False
     )
 
     _write_seed_record(
@@ -220,7 +221,9 @@ def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
         {"parameter": 0.5},
     )
 
-    assert confirm_shard._seed_already_done(paths, "native", "severe", "ce", 0, configs)
+    assert confirm_shard._seed_already_done(
+        paths, "native", "severe", "ce", 0, configs, False
+    )
 
 
 def test_crt_requires_its_selected_stage_one_ce_config(tmp_path: Path) -> None:
@@ -230,13 +233,13 @@ def test_crt_requires_its_selected_stage_one_ce_config(tmp_path: Path) -> None:
     _write_seed_record(method_dir, 0, configs["crt"])
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "balanced", "crt", 0, configs
+        paths, "native", "balanced", "crt", 0, configs, False
     )
 
     _write_seed_record(method_dir, 0, {**configs["crt"], "stage_one": configs["ce"]})
 
     assert confirm_shard._seed_already_done(
-        paths, "native", "balanced", "crt", 0, configs
+        paths, "native", "balanced", "crt", 0, configs, False
     )
 
 
@@ -249,7 +252,7 @@ def test_a_truncated_run_record_is_treated_as_not_done(tmp_path: Path) -> None:
     (result_dir / "run.json").write_text("{not valid json")
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}, False
     )
 
 

@@ -19,6 +19,7 @@ from imbalance_benchmark.manifest.pilot.candidates import (
     meets_method_floor,
 )
 from imbalance_benchmark.manifest.pilot.training import fit_pilot_model
+from imbalance_benchmark.modeling.training.config import PATCH_EVALUATION_BATCH_SIZE
 
 def test_pilot_training_uses_complete_bags_and_the_run_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -436,7 +437,8 @@ def test_patch_pilot_validation_uses_shared_evaluation_loader(
 
     accuracy, recalls = evaluate_pilot_candidate(pd.DataFrame(), tmp_path / "pilot.csv", fit)
 
-    assert cast(torch.utils.data.DataLoader, observed["loader"]).batch_size == 4096
+    loader = cast(torch.utils.data.DataLoader, observed["loader"])
+    assert loader.batch_size == PATCH_EVALUATION_BATCH_SIZE
     assert accuracy == 1.0
     assert recalls == [1.0, 1.0]
 

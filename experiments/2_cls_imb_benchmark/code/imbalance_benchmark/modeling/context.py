@@ -16,6 +16,8 @@ __all__ = [
     "DROPOUT",
     "REFERENCE_PASSES",
     "CONDITIONS",
+    "CONTROLLED_CONDITIONS",
+    "NATURAL_ANCHOR_METHODS",
     "LEARNING_RATE_GRID",
     "GRIDS",
     "PATCH_ONLY_METHODS",
@@ -23,15 +25,13 @@ __all__ = [
     "SHARED_METHODS",
     "Regime",
     "roster_for_regime",
+    "roster_for_condition",
+    "group_conditions",
     "get_grid_configs",
     "model_kwargs",
     "build_training_ctx",
     "resolve_update_budget",
     "set_training_mode",
-    "param_counts",
-    "RunExposure",
-    "cost_payload",
-    "updates_for",
 ]
 
 INPUT_DIM = 2560
@@ -41,6 +41,12 @@ DROPOUT = 0.1
 # Update budget U = REFERENCE_PASSES * ceil(T / B) (report §"Model training and selection").
 REFERENCE_PASSES = 30
 CONDITIONS = ("natural", "balanced", "moderate", "severe")
+CONTROLLED_CONDITIONS = ("balanced", "moderate", "severe")
+
+# The natural anchor is descriptive and never enters the imbalance deficit or
+# recovery estimands (report §"From imbalance deficit to mitigation recovery"),
+# so only the CE reference is fitted there.
+NATURAL_ANCHOR_METHODS = ("ce",)
 
 # Current-centered window into workflows.tuning.search_windows.LR_ENVELOPE[2:6].
 LEARNING_RATE_GRID: list[float] = [1e-4, 3e-4, 1e-3, 3e-3]
@@ -80,6 +86,27 @@ SHARED_METHODS = (
 def roster_for_regime(is_mil: bool) -> tuple[str, ...]:
     """Return the prespecified method roster for the WSI or patch regime."""
     return SHARED_METHODS + (WSI_ONLY_METHODS if is_mil else PATCH_ONLY_METHODS)
+
+
+def roster_for_condition(is_mil: bool, condition: str) -> tuple[str, ...]:
+    """Return the methods fitted in one training condition.
+
+    Mitigation is compared only against a size-matched balanced reference, so
+    the full roster applies to the controlled conditions alone; the natural
+    anchor fits ``NATURAL_ANCHOR_METHODS``.
+    """
+    if condition == "natural":
+        return NATURAL_ANCHOR_METHODS
+    return roster_for_regime(is_mil)
+
+
+def group_conditions(group: str) -> tuple[str, ...]:
+    """Return the conditions one SLURM partition group covers."""
+    if group == "natural":
+        return ("natural",)
+    if group == "controlled":
+        return CONTROLLED_CONDITIONS
+    raise ValueError(f"Unknown condition group: {group}")
 
 
 def get_grid_configs(
@@ -177,74 +204,3 @@ def set_training_mode(ctx: dict[str, Any]) -> None:
     ctx["model"].train()
     for module in ctx.get("frozen_eval_modules", ()):
         module.eval()
-
-
-def param_counts(model: torch.nn.Module) -> dict[str, int]:
-    """Total and trainable parameter counts for one confirmation run's cost record."""
-    total = sum(p.numel() for p in model.parameters())
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    return {"total_parameters": int(total), "trainable_parameters": int(trainable)}
-
-
-def _peak_memory(override: int | None) -> int:
-    """Return a measured peak unless a non-training method supplies its exact zero."""
-    if override is not None:
-        return int(override)
-    return int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else 0
-
-
-@dataclass(frozen=True)
-class RunExposure:
-    """Exactly what one fitted run consumed, as recorded by its training loop."""
-
-    unique_examples: int
-    exposed_examples: int
-    processed_examples: int
-    training_footprint_parameters: int | None = None
-    peak_memory_bytes: int | None = None
-    processed_instances: int | None = None
-
-
-def cost_payload(
-    method: str,
-    budget: int,
-    elapsed: float,
-    model: torch.nn.Module,
-    exposure: RunExposure,
-) -> dict[str, Any]:
-    """Build an exact confirmation cost record from the examples actually consumed."""
-    updates = updates_for(method, budget)
-    peak = _peak_memory(exposure.peak_memory_bytes)
-    counts = param_counts(model)
-    if method == "post_hoc_logit_adjustment":
-        counts["trainable_parameters"] = 0
-    if exposure.training_footprint_parameters is not None:
-        counts["training_footprint_parameters"] = exposure.training_footprint_parameters
-    processed = exposure.processed_examples
-    payload = {
-        "updates": updates,
-        "processed_examples": processed,
-        "wall_clock_seconds": elapsed,
-        "accelerator_hours": elapsed / 3600 if torch.cuda.is_available() else 0.0,
-        "peak_accelerator_memory_bytes": peak,
-        "examples_per_update": processed / updates if updates else 0.0,
-        "unique_training_examples": exposure.unique_examples,
-        "unique_examples_exposed": exposure.exposed_examples,
-        "effective_passes_through_unique_examples": processed
-        / max(exposure.unique_examples, 1),
-        **counts,
-    }
-    if exposure.processed_instances is not None:
-        payload["processed_instances"] = exposure.processed_instances
-    return payload
-
-
-def updates_for(method: str, budget: int) -> int:
-    """Report's update accounting: RankMix doubles, cRT adds its stage-two budget."""
-    if method == "rankmix":
-        return 2 * budget
-    if method == "crt":
-        return budget + math.ceil(0.2 * budget)
-    if method == "post_hoc_logit_adjustment":
-        return 0
-    return budget
