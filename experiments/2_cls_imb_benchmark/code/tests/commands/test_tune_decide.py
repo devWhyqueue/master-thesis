@@ -143,11 +143,12 @@ def test_advance_submits_next_round_when_a_method_is_still_shifting(tmp_path, mo
     assert grids["windows"]["ce"]["lr_window"] == LR_ENVELOPE[3:7]
 
 
-def test_natural_round_shards_by_observation_on_its_own_resources(tmp_path, monkeypatch):
-    """A natural fit spans the full training partition, so a round-1 task that
+def test_natural_round_runs_one_fit_per_task_on_the_short_partition(tmp_path, monkeypatch):
+    """A natural fit spans the full training partition, so a round task that
     ran every (split, seed) observation back to back would need six such fits
-    in one allocation and blow its wall. Natural rounds must shard by
-    observation and use the natural resource key, exactly as round 0 does."""
+    in one allocation and blow its wall. One shard per task bounds a natural
+    round at a single fit, which fits the short partition; round 0 keeps the
+    long one because it does bundle several candidates per task."""
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     config = {
         "slurm": {
@@ -172,16 +173,41 @@ def test_natural_round_shards_by_observation_on_its_own_resources(tmp_path, monk
         )
 
     natural, moderate = submitted[0], submitted[2]
-    assert natural.partition == "gpu-5h"
+    assert natural.partition == "gpu-2h"  # falls back to tune_controlled
     assert "--observations-per-candidate 6" in natural.command
     assert "--bundle-by-observation" in natural.command
-    assert "--shards-per-task 3" in natural.command
-    # 1 shifting ce candidate -> ceil(4/3) bundles x 6 observations.
-    assert natural.array_size == 12
+    assert "--shards-per-task 1" in natural.command
+    # ce's 4 candidate slots x 6 observations, one fit each.
+    assert natural.array_size == 24
 
     assert moderate.partition == "gpu-2h"
     assert "--observations-per-candidate" not in moderate.command
     assert moderate.array_size == 4
+
+
+def test_natural_round_honours_an_explicit_round_resource(tmp_path, monkeypatch):
+    """``tune_natural_round`` overrides the fallback when a dataset needs it."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    config = {
+        "slurm": {
+            "tune_natural_observations_per_candidate": 6,
+            "resources": {
+                "tune_natural_round": {"partition": "gpu-5h"},
+                "tune_controlled": {"partition": "gpu-2h"},
+            },
+        }
+    }
+    submitted = []
+    edge = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[-1]}, LEARNING_RATE_GRID)
+
+    decide._advance(
+        {"data": tmp_path}, config, "config.yaml",
+        _args(condition="natural", round_index=0), {"ce": edge},
+        {"ce": (LEARNING_RATE_GRID, None)}, False,
+        submit=lambda c, p, job: submitted.append(job) or "id-1",
+    )
+
+    assert submitted[0].partition == "gpu-5h"
 
 
 def test_advance_keeps_the_resolved_strength_window_when_only_lr_still_shifts(

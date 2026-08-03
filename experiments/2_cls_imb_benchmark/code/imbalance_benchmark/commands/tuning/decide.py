@@ -161,6 +161,9 @@ def _round_shard_job(
     A natural fit spans the full training partition, so one task must not run
     every (split, seed) observation back to back the way a controlled task
     can; natural rounds are sharded by observation exactly as round 0 is.
+    One shard per task then bounds a natural round task at a single fit, which
+    is why it asks for the short partition rather than round 0's long one:
+    round 0 bundles several candidates per task, a round shift never does.
     """
     name = f"tune-decide-shard-{args.condition}-{args.phase}-r{next_round}"
     command = (
@@ -171,18 +174,18 @@ def _round_shard_job(
     if args.condition != "natural":
         job = build_job(config, name, command, True, (), "tune_controlled", "tune")
         return replace(job, array_size=candidates)
-    slurm = config.get("slurm", {})
-    observations = int(slurm.get("tune_natural_observations_per_candidate", 1))
-    shards = int(
-        slurm.get("tune_natural_shards_per_task", slurm.get("tune_shards_per_task", 1))
+    observations = int(
+        config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
     )
     command += (
         f" --observations-per-candidate {observations}"
-        f" --bundle-by-observation --shards-per-task {shards}"
+        " --bundle-by-observation --shards-per-task 1"
     )
     return replace(
-        build_job(config, name, command, True, (), "tune_natural", "tune"),
-        array_size=bundled_observation_array_size(candidates, observations, shards),
+        build_job(
+            config, name, command, True, (), "tune_natural_round", "tune_controlled"
+        ),
+        array_size=bundled_observation_array_size(candidates, observations, 1),
     )
 
 
