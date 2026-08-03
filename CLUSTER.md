@@ -199,6 +199,14 @@ PANDA (prostate cancer grade assessment) lives at:
 
 See `/home/space/datasets/panda/README.md` for source, license, and layout details.
 
+CAMELYON16 lives at:
+
+```text
+/home/space/datasets/camelyon16
+```
+
+Pre-tiled 20x patches under `patches/20x/<slide>/<id>.jpg`; a SquashFS copy is staged from `/home/space/datasets-sqfs/camelyon16-patches-20x.sqfs` for the `prepare` stage.
+
 Treat shared dataset directories as read-only unless you created the specific files yourself. It is fine to inspect `/home/space/datasets/` to find existing data, but do not modify, rename, or remove datasets created by other users.
 
 Create SquashFS images from a compute node, not the login node:
