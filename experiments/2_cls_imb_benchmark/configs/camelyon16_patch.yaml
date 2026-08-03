@@ -34,9 +34,12 @@ slurm:
   partition: gpu-2h
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
-  # 8 shards keep a controlled task near 60 min on average (worst observed
-  # per-shard cost puts the tail at ~98 min), so it fits gpu-2h with headroom.
-  tune_shards_per_task: 8
+  # Task 47 of array 4670449 timed out at 8 shards: it drew a shard chunk
+  # weighted toward oko (8490 steps/seed) and only cleared ~1.6 of 8 shards
+  # in 2h, so the wall/setup cost per shard is higher and more variable than
+  # the mean estimate assumed. 4 shards matches the empirically-safe prior
+  # baseline (35-task run: mean 30min, max 49min), well inside gpu-2h.
+  tune_shards_per_task: 4
   tune_natural_shards_per_task: 3
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
