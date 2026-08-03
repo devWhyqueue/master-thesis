@@ -175,7 +175,8 @@ def expected_observations(
 
 
 def selected_ce(root: Path, condition: str) -> dict[str, Any]:
-    """Load the signed base-phase CE selection for dependent shards."""
+    """Load CE's signed self-contained-search selection, needed before the
+    CE-inherited methods (post-hoc logit adjustment, cRT) can start their shards."""
     path = root / "tuning_shards" / f"base_selections_{condition}.json"
     verify_signed_file(path)
     return json.loads(path.read_text())["ce"]

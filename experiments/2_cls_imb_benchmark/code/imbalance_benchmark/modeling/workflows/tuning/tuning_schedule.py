@@ -102,7 +102,9 @@ def _candidate_slot(methods: tuple[str, ...], index: int) -> tuple[str, int]:
 
 
 def phase_methods(is_mil: bool, phase: str, condition: str) -> tuple[str, ...]:
-    """Split one condition's frozen roster around the CE-dependent methods."""
+    """Split one condition's frozen roster into self-contained methods
+    (``phase="base"``) and methods that inherit CE's tuned config (``phase="dependent"``).
+    """
     return tuple(
         method
         for method in roster_for_condition(is_mil, condition)

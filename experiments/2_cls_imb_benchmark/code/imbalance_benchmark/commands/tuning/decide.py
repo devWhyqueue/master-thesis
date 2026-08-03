@@ -203,7 +203,8 @@ def _start_dependent_phase(
     is_mil: bool,
     submit: Callable[[dict[str, Any], str | None, SlurmJob], str],
 ) -> None:
-    """Submit the dependent phase's frozen round-0 jobs, now that CE is final."""
+    """Submit the CE-inherited search's frozen round-0 jobs, now that this
+    condition's CE config is locked."""
     jobs = dependent_round_zero_jobs(config, is_mil)
     job_ids = tuple(submit(config, config_path, job) for job in jobs)
     decide = build_job(

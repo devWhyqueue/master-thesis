@@ -57,13 +57,13 @@
       flex-direction: column;
       align-items: center;
       padding: 20px;
-      min-width: 1560px;
+      min-width: 1580px;
       -webkit-font-smoothing: antialiased;
     }
 
     .toolbar {
       width: 100%;
-      max-width: 1540px;
+      max-width: 1560px;
       display: flex;
       justify-content: flex-end;
       align-items: center;
@@ -99,7 +99,7 @@
     /* Outer Wrapper Diagram */
     .diagram-container {
       width: 100%;
-      max-width: 1540px;
+      max-width: 1560px;
       background: #ffffff;
       border: 1.5px solid #cbd5e1;
       border-radius: var(--radius-lg);
@@ -139,8 +139,8 @@
     /* Grid Layout for Columns with wider inter-stage gaps */
     .main-grid {
       display: grid;
-      grid-template-columns: 285px 470px 430px 210px;
-      gap: 32px;
+      grid-template-columns: 260px 450px 410px 270px;
+      gap: 36px;
       position: relative;
     }
 
@@ -164,10 +164,11 @@
       margin-bottom: 2px;
       letter-spacing: 0.2px;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      white-space: nowrap;
+      row-gap: 2px;
     }
 
     .header-tag {
@@ -341,38 +342,6 @@
       color: #0f172a;
     }
 
-    /* Box 9 Vertical Icon-on-top Pillars */
-    .analysis-pillars-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5px;
-      margin-top: 8px;
-    }
-
-    .analysis-pillar-item {
-      background: #fff3ed;
-      border: 1px solid #fed7aa;
-      border-radius: 6px;
-      padding: 6px 4px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 4px;
-    }
-
-    .analysis-pillar-item svg {
-      color: #d9531e;
-      flex-shrink: 0;
-    }
-
-    .analysis-pillar-item span {
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: #c2410c;
-      line-height: 1.2;
-    }
-
     /* Phase Enclosures (Dashed Boxes) */
     .phase-container {
       border: 1.5px dashed;
@@ -399,16 +368,38 @@
       white-space: nowrap;
     }
 
+    .phase-tag {
+      font-family: 'Courier New', monospace;
+      font-size: 0.62rem;
+      font-weight: 700;
+      background: rgba(34, 197, 94, 0.18);
+      color: #14532d;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-right: 5px;
+      white-space: nowrap;
+    }
+
+    .phase-body {
+      font-size: 0.7rem;
+      font-style: italic;
+      color: #14532d;
+      margin: 2px 6px 8px;
+      line-height: 1.3;
+    }
+
+    .phase-entry-note {
+      font-size: 0.68rem;
+      font-style: italic;
+      color: #166534;
+      text-align: center;
+      margin: -4px 6px 8px;
+    }
+
     .phase-grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px;
-    }
-
-    .phase-grid-3 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 5px;
     }
 
     /* Immutable Gate & Output Badges */
@@ -447,6 +438,7 @@
       margin-top: auto;
       padding-top: 3px;
       border-top: 1px dashed #bbf7d0;
+      text-align: center;
     }
 
     .confirm-footer-box {
@@ -468,6 +460,7 @@
       border-radius: 16px;
       padding: 4px 8px;
       border: 1px solid #d1c4e9;
+      text-align: center;
     }
 
     .confirm-time-badge {
@@ -482,6 +475,7 @@
       border: 1px solid #c4b5fd;
       border-radius: 12px;
       padding: 3px 6px;
+      text-align: center;
     }
 
     /* Confirmation shards banner underneath 8a and 8b */
@@ -542,13 +536,15 @@
     /* Footer Legend Bar */
     .legend-bar {
       width: 100%;
-      max-width: 1540px;
+      max-width: 1560px;
       margin-top: 10px;
       background: #eef4fa;
       border: 1.5px solid #b0c4de;
       border-radius: var(--radius-md);
       padding: 6px 14px;
       display: flex;
+      flex-wrap: wrap;
+      row-gap: 4px;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
@@ -652,13 +648,13 @@
     <!-- 4 Main Columns Layout -->
     <div class="main-grid">
 
-      <!-- Column 1: Setup -->
+      <!-- Column 1: Construction -->
       <div class="column col-setup" id="col-setup">
         <div class="column-header">
-          <span>Setup</span>
-          <span class="header-tag">1&times; per split</span>
+          <span>Construction</span>
+          <span class="header-tag">per dataset &times; regime</span>
         </div>
-        <div class="column-subtitle">Dataset preparation &amp; partition freezing</div>
+        <div class="column-subtitle">Features, support floors, frozen manifests</div>
 
         <!-- Step 1 -->
         <div class="card" id="card-1">
@@ -671,7 +667,7 @@
             <li>Extract frozen Virchow2 features</li>
             <li>CLS + mean patch token (2560-d)</li>
             <li>Apply eligibility rules (valid target, split-unit ID, tissue rule, readable features)</li>
-            <li>Independently seeded</li>
+            <li>Independently seeded; runs once (no split loop)</li>
           </ul>
           <div class="gate-badge">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -725,28 +721,30 @@
         </div>
       </div>
 
-      <!-- Column 2: Tuning -->
+      <!-- Column 2: Validation Search -->
       <div class="column col-tuning" id="col-tuning">
         <div class="column-header">
-          <span>Tuning</span>
-          <span class="header-tag">Parallel Shards</span>
+          <span>Validation Search</span>
+          <span class="header-tag">adaptive rounds &middot; parallel shards</span>
         </div>
-        <div class="column-subtitle">Hyperparameter search, locked before confirmation</div>
+        <div class="column-subtitle">Test-blind; locked before confirmation</div>
 
-        <!-- Base phase enclosure -->
+        <!-- Self-contained phase enclosure -->
         <div class="phase-container" id="phase-base">
-          <div class="phase-label">Base phase</div>
+          <div class="phase-label">Search &middot; self-contained methods</div>
+          <p class="phase-body"><span class="phase-tag">--phase base</span>every candidate fitted from scratch; needs no other method's result.</p>
           <div class="phase-grid-2">
             <!-- 4a -->
             <div class="card" id="card-4a">
               <div class="card-title-row">
                 <span class="step-badge step-badge-text">4a</span>
-                <span class="card-title" style="font-size: 0.82rem;">Tune base &middot; natural</span>
+                <span class="card-title" style="font-size: 0.82rem;">Search &middot; natural anchor</span>
               </div>
-              <div class="card-subtitle">independent methods</div>
+              <div class="card-subtitle">CE only</div>
               <ul>
                 <li>Natural condition</li>
-                <li>2 tuning seeds &times; up to 16 candidates per method</li>
+                <li>2 tuning seeds &times; up to 16 candidates</li>
+                <li>6 observations/candidate (1 assignment &times; 3 splits &times; 2 seeds)</li>
               </ul>
               <div class="shard-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
@@ -757,12 +755,13 @@
             <div class="card" id="card-4b">
               <div class="card-title-row">
                 <span class="step-badge step-badge-text">4b</span>
-                <span class="card-title" style="font-size: 0.82rem;">Tune base &middot; controlled</span>
+                <span class="card-title" style="font-size: 0.82rem;">Search &middot; controlled</span>
               </div>
               <div class="card-subtitle">independent methods</div>
               <ul>
                 <li>Balanced / moderate / severe conditions</li>
-                <li>Same tuning logic, much cheaper (small matched T)</li>
+                <li>2 tuning seeds &times; up to 16 candidates per method</li>
+                <li>&le;18 observations/candidate (&le;3 assignments &times; 3 splits &times; 2 seeds)</li>
               </ul>
               <div class="shard-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
@@ -776,53 +775,39 @@
         <div class="card" id="card-5" style="margin-top: 10px; margin-bottom: 12px;">
           <div class="card-title-row">
             <span class="step-badge">5</span>
-            <span class="card-title">Tune base &middot; reduce</span>
+            <span class="card-title">Reduce &amp; decide &middot; per condition</span>
           </div>
           <ul>
-            <li>Aggregate base-phase shard results</li>
+            <li>Reduce this round's self-contained shards</li>
+            <li>Per method: resolved / tuning-limited / shift window</li>
           </ul>
           <div class="gate-badge">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <span>Signed best-candidate selections per method &times; condition</span>
+            <span>Signed base_selections_&lt;condition&gt;.json</span>
+          </div>
+          <div class="shard-badge">
+            &#8635; unresolved methods: round r+1 shard array + its own decide (&le;3 rounds)
           </div>
         </div>
 
-        <!-- Dependent phase enclosure -->
+        <!-- CE-inherited phase enclosure -->
         <div class="phase-container" id="phase-dependent">
-          <div class="phase-label">Dependent phase</div>
-          <div class="phase-grid-3">
-            <!-- 6a -->
-            <div class="card" id="card-6a">
-              <div class="card-title-row">
-                <span class="step-badge step-badge-text">6a</span>
-                <span class="card-title" style="font-size: 0.72rem;">Tune dependent &middot; post-hoc (natural)</span>
-              </div>
-              <ul>
-                <li>Tune joint adjustment</li>
-                <li>Uses selected CE checkpoint from stage 5</li>
-              </ul>
+          <div class="phase-label">Search &middot; methods that inherit CE's tuned model</div>
+          <p class="phase-body"><span class="phase-tag">--phase dependent</span>post-hoc logit adjustment (tunes only &tau;, no gradient optimization); cRT (stage&nbsp;1 = selected CE config, tunes stage-2 learning rate).</p>
+          <p class="phase-entry-note">Starts when CE's config locks for a condition, not when the whole phase finishes</p>
+          <!-- 6 -->
+          <div class="card" id="card-6">
+            <div class="card-title-row">
+              <span class="step-badge">6</span>
+              <span class="card-title">Search &middot; controlled</span>
             </div>
-            <!-- 6b -->
-            <div class="card" id="card-6b">
-              <div class="card-title-row">
-                <span class="step-badge step-badge-text">6b</span>
-                <span class="card-title" style="font-size: 0.72rem;">Tune dependent &middot; ceRT (natural)</span>
-              </div>
-              <ul>
-                <li>Tune stage-two classifier</li>
-                <li>Uses selected CE checkpoint from stage 5</li>
-              </ul>
-            </div>
-            <!-- 6c -->
-            <div class="card" id="card-6c">
-              <div class="card-title-row">
-                <span class="step-badge step-badge-text">6c</span>
-                <span class="card-title" style="font-size: 0.72rem;">Tune dependent &middot; controlled</span>
-              </div>
-              <ul>
-                <li>Same dependent methods</li>
-                <li>Balanced / moderate / severe conditions</li>
-              </ul>
+            <ul>
+              <li>Balanced / moderate / severe conditions only &mdash; the natural anchor fits CE alone</li>
+              <li>Post-hoc LA + cRT bundled into one controlled job</li>
+              <li>Uses the selected CE config from step 5</li>
+            </ul>
+            <div class="shard-badge">
+              &#8635; own decide loop: round r+1 (&le;3 rounds)
             </div>
           </div>
         </div>
@@ -831,10 +816,10 @@
         <div class="card" id="card-7" style="margin-top: 10px;">
           <div class="card-title-row">
             <span class="step-badge">7</span>
-            <span class="card-title">Tune final &middot; reduce</span>
+            <span class="card-title">Final reduce &middot; per condition</span>
           </div>
           <ul>
-            <li>Aggregate dependent-phase results</li>
+            <li>Locks once its dependent search converges</li>
             <li>No more searching after this point</li>
           </ul>
           <div class="gate-badge">
@@ -849,9 +834,9 @@
       <div class="column col-confirm" id="col-confirm">
         <div class="column-header">
           <span>Confirmation</span>
-          <span class="header-tag">Cluster Array</span>
+          <span class="header-tag">cluster array</span>
         </div>
-        <div class="column-subtitle">Mirrors natural / controlled split</div>
+        <div class="column-subtitle">Locked configs &times; 5 confirmation seeds</div>
 
         <div class="confirm-wrapper">
           <div class="confirm-bracket-container">
@@ -865,18 +850,18 @@
                 <ul>
                   <li>Locked configs + natural condition manifest</li>
                   <li>One fit per task: (split, method, seed)</li>
-                  <li>Post-hoc logit adjustment folded into paired CE unit</li>
+                  <li>Post-hoc LA rides its seed's CE unit (no unit of its own)</li>
                   <li>Resumable: skip if valid result already exists</li>
                   <li><strong>Output:</strong> signed run.json per unit</li>
                 </ul>
                 <div class="confirm-footer-box">
                   <div class="confirm-units-badge">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 010 7.75"/></svg>
-                    &approx; approx. 150 units
+                    15 units (3 splits &times; 1 method &times; 5 seeds)
                   </div>
                   <div class="confirm-time-badge">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    &le;5h task budget
+                    partition per dataset config (gpu-2h / gpu-5h)
                   </div>
                 </div>
               </div>
@@ -889,18 +874,20 @@
                 </div>
                 <ul>
                   <li>Locked configs + balanced / moderate / severe manifests</li>
-                  <li>Bundled tasks: (split, assignment, condition, method, seed)</li>
+                  <li>Bundled tasks: (split, condition, method, seed)</li>
+                  <li>Each unit fits every scoped tail assignment internally &mdash; assignment is not a unit dimension</li>
+                  <li>Post-hoc LA rides its seed's CE unit (no unit of its own)</li>
                   <li>Resumable: skip if valid result already exists</li>
                   <li><strong>Output:</strong> signed run.json per unit</li>
                 </ul>
                 <div class="confirm-footer-box">
                   <div class="confirm-units-badge">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 010 7.75"/></svg>
-                    &approx; ~500+ units, bundled
+                    450 patch &middot; 405 WSI units, bundled
                   </div>
                   <div class="confirm-time-badge">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    &le;2h task budget
+                    partition per dataset config (gpu-2h / gpu-5h)
                   </div>
                 </div>
               </div>
@@ -919,44 +906,53 @@
       <div class="column col-analysis" id="col-analysis">
         <div class="column-header">
           <span>Analysis</span>
-          <span class="header-tag">Global</span>
+          <span class="header-tag">per split &rarr; equal-split &rarr; cross-dataset</span>
         </div>
-        <div class="column-subtitle">Cross-track evaluation &amp; study conclusions</div>
+        <div class="column-subtitle">Endpoints, gates, recovery, inference</div>
 
         <div class="analysis-wrapper">
           <!-- Step 9 -->
           <div class="card" id="card-9">
             <div class="card-title-row">
               <span class="step-badge">9</span>
-              <span class="card-title">Analyze</span>
+              <span class="card-title">Analyze &middot; array &times; 3 splits</span>
             </div>
             <ul>
-              <li>Glob every run.json across both confirm tracks</li>
-              <li>Directory-glob driven, idempotent</li>
+              <li>Glob this split's run.json files; directory-glob driven, idempotent</li>
+              <li>Ingest to result DB; endpoints &amp; bootstrap CIs</li>
+              <li>Gating &amp; recovery diagnostics</li>
+              <li>Per-split RQ3 predictors</li>
             </ul>
-
-            <!-- 2x2 grid of pillar items with prominent icon on top and text below -->
-            <div class="analysis-pillars-row">
-              <div class="analysis-pillar-item">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                <span>Endpoints &amp; Bootstrap CIs</span>
-              </div>
-              <div class="analysis-pillar-item">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span>Gating &amp; Recovery</span>
-              </div>
-              <div class="analysis-pillar-item">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><circle cx="15.5" cy="15.5" r="1.5"/></svg>
-                <span>Permutation Tests</span>
-              </div>
-              <div class="analysis-pillar-item">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                <span>Pairwise Rank Tests</span>
-              </div>
-            </div>
           </div>
 
-          <!-- Bottom right result box restored to original 24px icon -->
+          <!-- Step 10 -->
+          <div class="card" id="card-10">
+            <div class="card-title-row">
+              <span class="step-badge">10</span>
+              <span class="card-title">Analyze-combine</span>
+            </div>
+            <div class="card-subtitle">equal-split fan-in</div>
+            <ul>
+              <li>Aggregate the 3 splits' comparisons</li>
+              <li>Equal-split interval tables</li>
+              <li>Cross-split pairwise rank tests</li>
+            </ul>
+          </div>
+
+          <!-- Step 11 -->
+          <div class="card" id="card-11">
+            <div class="card-title-row">
+              <span class="step-badge">11</span>
+              <span class="card-title">Combine-RQ3</span>
+            </div>
+            <div class="card-subtitle">manual &middot; outside the per-dataset DAG</div>
+            <ul>
+              <li>Run once, after every dataset's split-level analysis is in</li>
+              <li>Cross-dataset RQ3 predictors, separability, hierarchical models</li>
+            </ul>
+          </div>
+
+          <!-- Bottom right result box -->
           <div class="analysis-result-card" id="analysis-result">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             <div>final metrics, statistical comparisons, and study conclusions</div>
@@ -983,7 +979,7 @@
       <div class="legend-stacked-col">
         <div class="legend-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span><strong>Parallelism:</strong> 3 split instances (left); many parallel shards (cluster)</span>
+          <span><strong>Parallelism:</strong> Construction: 1&times;/dataset&times;regime (prepare), 3 split instances (pilot/freeze); elsewhere many parallel shards</span>
         </div>
         <div class="legend-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
@@ -1049,6 +1045,8 @@
       const phaseDep = getRelRect('phase-dependent');
       const c7 = getRelRect('card-7');
       const c9 = getRelRect('card-9');
+      const c10 = getRelRect('card-10');
+      const c11 = getRelRect('card-11');
       const aResult = getRelRect('analysis-result');
 
       let pathsHTML = '';
@@ -1078,16 +1076,18 @@
       }
 
       // --- Inter-Phase Main Flow Arrows ---
-      // 1. Setup -> Tuning
-      if (colSetup && colTuning && c3 && c5) {
-        const yPos = (c3.centerY + c5.centerY) / 2;
+      // 1. Setup -> Tuning (aim below the phase-base label, not through it)
+      if (colSetup && colTuning) {
+        const yPos = phaseBase ? phaseBase.top + 45 : colTuning.top + 45;
         pathsHTML += drawLine(colSetup.right, yPos, colTuning.left - 4, yPos);
       }
 
-      // 2. Tuning -> Confirmation
+      // 2. Tuning -> Confirmation: never statically chained, submitted as a manual gate
       if (colTuning && colConfirm) {
         const yPos = (colTuning.top + colTuning.bottom) / 2;
-        pathsHTML += drawLine(colTuning.right, yPos, colConfirm.left - 4, yPos);
+        pathsHTML += drawLine(colTuning.right, yPos, colConfirm.left - 4, yPos, '#0f172a', true);
+        const gateX = (colTuning.right + colConfirm.left) / 2;
+        pathsHTML += `<text x="${gateX}" y="${yPos - 6}" font-size="8" font-style="italic" font-family="Inter, sans-serif" fill="#1b6338" text-anchor="middle" transform="rotate(-90 ${gateX} ${yPos - 6})">manual gate: submit --confirm-only</text>`;
       }
 
       // 3. Confirmation -> Analysis
@@ -1096,9 +1096,15 @@
         pathsHTML += drawLine(colConfirm.right, yPos, colAnalysis.left - 4, yPos);
       }
 
-      // --- Analysis Down Arrow ---
-      if (c9 && aResult) {
-        pathsHTML += drawLine(c9.centerX, c9.bottom, c9.centerX, aResult.top - 4, '#d9531e', true, 'arrow-orange');
+      // --- Analysis Down Arrows: 9 -> 10 -> 11 -> result ---
+      if (c9 && c10) {
+        pathsHTML += drawLine(c9.centerX, c9.bottom, c10.centerX, c10.top - 4, '#d9531e', false, 'arrow-orange');
+      }
+      if (c10 && c11) {
+        pathsHTML += drawLine(c10.centerX, c10.bottom, c11.centerX, c11.top - 4, '#d9531e', false, 'arrow-orange');
+      }
+      if (c11 && aResult) {
+        pathsHTML += drawLine(c11.centerX, c11.bottom, aResult.centerX, aResult.top - 4, '#d9531e', true, 'arrow-orange');
       }
 
       svg.innerHTML = svg.children[0].outerHTML + pathsHTML;

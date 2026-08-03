@@ -695,7 +695,7 @@ Computational cost is separated into validation search and locked-configuration 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.92\linewidth,keepaspectratio]{assets/cls_imb_benchmark.png}
-  \caption{Operational workflow of the controlled class-imbalance benchmark.}
+  \caption{Operational workflow of the controlled class-imbalance benchmark. The validation search is split into a self-contained phase, in which every candidate is fitted from scratch and needs no other method's result, and a CE-inherited phase, in which post-hoc logit adjustment and cRT reuse a condition's selected CE configuration and so cannot begin until that condition's CE search has resolved.}
   \label{fig:benchmark-overview}
 \end{figure}
 \end{landscape}
@@ -748,6 +748,8 @@ For every realized condition, the experiment record contains dataset version; el
   \item[Intraclass correlation.] The estimated similarity of class margins from patches belonging to the same split-unit or slide cluster.
   \item[Patch-micro estimate.] A metric computed over eligible patch predictions, with split-unit-clustered uncertainty.
   \item[Case-macro estimate.] An equal-weight aggregation over slides or split units, limiting domination by heavily tiled cases.
+  \item[Self-contained search.] The validation-search phase in which every candidate is fitted from scratch, needing no other method's result.
+  \item[CE-inherited search.] The validation-search phase for post-hoc logit adjustment and cRT, which reuse a condition's selected CE configuration and tune only what remains open for that method ($\tau$ for post-hoc logit adjustment; the stage-two learning rate for cRT), and so cannot begin until that condition's CE search has resolved.
 \end{description}
 
 \clearpage
