@@ -302,7 +302,7 @@ def test_smoke_workflow_uses_test_partition() -> None:
     assert jobs[0].command == "smoke"
 
 
-def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> None:
+def test_camelyon_natural_jobs_use_three_shards_on_40gb(monkeypatch) -> None:
     """Natural keeps the 40 GB pool: its ~32 GB bank only stays on the card
     because _BANK_DEVICE_FRACTION is 0.85 (0.75 pushed it to host memory and
     cost roughly a 4x slowdown)."""
@@ -320,15 +320,19 @@ def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> N
 
     assert "--shards-per-task 3" in base_natural.command
     assert "--shards-per-task 8" in base_controlled.command
-    assert base_natural.partition == confirm_natural.partition == "gpu-5h"
+    assert base_natural.partition == "gpu-5h"
+    # Each confirm-natural task is a single fit (unlike base_natural's
+    # bundled round-0 candidates), so it fits gpu-2h with headroom.
+    assert confirm_natural.partition == "gpu-2h"
     # Controlled fits use the shared budget T and finish well inside 2h.
     assert base_controlled.partition == "gpu-2h"
     assert "40gb" in base_natural.constraint
     assert "40gb" in confirm_natural.constraint
     assert "40gb" in base_controlled.constraint
     assert "40gb" in confirm_controlled.constraint
+    assert config["slurm"]["resources"]["tune_natural"]["partition"] == "gpu-5h"
+    assert config["slurm"]["resources"]["confirm_natural"]["partition"] == "gpu-2h"
     for resource in ("tune_natural", "confirm_natural"):
-        assert config["slurm"]["resources"][resource]["partition"] == "gpu-5h"
         assert "40gb" in config["slurm"]["resources"][resource]["constraint"]
     assert "%35" in render_sbatch(base_natural, config)
     assert "%35" in render_sbatch(confirm_natural, config)
