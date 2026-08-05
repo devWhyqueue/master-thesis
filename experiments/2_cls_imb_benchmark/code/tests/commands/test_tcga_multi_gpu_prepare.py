@@ -14,7 +14,7 @@ def test_tcga_patch_prepare_is_one_staged_multi_gpu_job() -> None:
     script = render_sbatch(prepare, config)
 
     assert (prepare.partition, prepare.gpus, prepare.cpus, prepare.memory) == (
-        "gpu-2h",
+        "gpu-2d",
         4,
         32,
         "64G",
