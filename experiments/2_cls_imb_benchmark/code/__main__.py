@@ -15,6 +15,7 @@ from imbalance_benchmark.commands import (
     cmd_confirm,
     cmd_confirm_shard,
     cmd_freeze,
+    cmd_materialize_tcga_ut,
     cmd_pilot,
     cmd_prepare,
     cmd_smoke,
@@ -54,6 +55,7 @@ def _parser() -> argparse.ArgumentParser:
         "combine-rq3",
         "smoke",
         "tile-wsi-reduce",
+        "materialize-tcga-ut",
     ):
         sub.add_parser(command)
     submit = sub.add_parser("submit")
@@ -122,6 +124,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "smoke": cmd_smoke,
         "tile-wsi": cmd_tile_wsi,
         "tile-wsi-reduce": cmd_tile_wsi_reduce,
+        "materialize-tcga-ut": cmd_materialize_tcga_ut,
     }
 
 

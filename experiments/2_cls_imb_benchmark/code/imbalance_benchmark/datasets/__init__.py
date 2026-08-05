@@ -31,11 +31,19 @@ def build_manifest(config: dict[str, Any]) -> pd.DataFrame:
         "bracs": _build_bracs,
         "camelyon16": _build_camelyon16,
         "panda": _build_panda,
-        "tcga_ut": tcga_ut.build_manifest,
+        "tcga_ut": _build_tcga_ut,
     }
     if name not in builders:
         raise ValueError(f"Unknown dataset {name!r}; expected one of {DATASET_NAMES}")
     return builders[name](config)
+
+
+def _build_tcga_ut(config: dict[str, Any]) -> pd.DataFrame:
+    """Dispatch TCGA-UT by regime: WSI keeps pre-extracted chunks, patch reads images."""
+    dataset_cfg = config["dataset"]
+    if dataset_cfg.get("regime") == "wsi":
+        return tcga_ut.build_manifest(config)
+    return tcga_ut.build_image_manifest(config)
 
 
 def _build_bracs(config: dict[str, Any]) -> pd.DataFrame:

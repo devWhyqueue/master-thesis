@@ -10,6 +10,7 @@ from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.prepare import (
+    cmd_materialize_tcga_ut,
     cmd_prepare,
     cmd_tile_wsi,
     cmd_tile_wsi_reduce,
@@ -24,6 +25,7 @@ __all__ = [
     "cmd_prepare",
     "cmd_pilot",
     "cmd_freeze",
+    "cmd_materialize_tcga_ut",
     "cmd_tune",
     "cmd_tune_shard",
     "cmd_tune_reduce",

@@ -8,18 +8,29 @@ import pytest
 import torch
 
 from imbalance_benchmark.commands import pilot
-from imbalance_benchmark.common import compute_data_hash, compute_sha256, sign_file
+from imbalance_benchmark.common import (
+    compute_data_hash,
+    compute_sha256,
+    sign_file,
+    write_json,
+)
 from imbalance_benchmark.datasets import build_manifest
 from imbalance_benchmark.datasets.feature_provenance import resolve_feature_provenance
 from imbalance_benchmark.datasets.tcga_ut import (
     assert_case_disjoint,
     assign_class_splits,
     build_feature_manifest,
+    build_image_manifest,
+    build_image_rows,
     collect_slide_labels,
+    iter_class_slide_images,
     split_cases,
     strip_feature_suffix,
     tcga_case_id,
+    validate_image_cohort,
+    validate_source_provenance,
 )
+from imbalance_benchmark.datasets.tcga_ut.source import ZENODO_RECORD_ID, ZENODO_VERSION
 from imbalance_benchmark.manifest.freeze import (
     lock_manifest_freeze,
     verify_manifest_freeze,
@@ -66,7 +77,7 @@ def _tcga_config(
     return {
         "dataset": {
             "name": "tcga_ut",
-            "regime": "patch",
+            "regime": "wsi",
             "raw_root": str(raw_root),
             "feature_dir": str(feature_dir),
             "feature_provenance_manifest": str(manifest_path),
@@ -381,6 +392,149 @@ def test_assign_class_splits_covers_all_units_without_overlap() -> None:
 
     assert set(assignments) == set(units)
     assert set(assignments.values()) <= {"train", "validation", "test"}
+
+def _make_image_slide(root: Path, cls: str, subdir: str, slide: str, n_images: int) -> None:
+    slide_dir = root / cls / subdir / slide
+    slide_dir.mkdir(parents=True)
+    for index in range(n_images):
+        (slide_dir / f"{index}_0.jpg").write_bytes(f"img-{cls}-{slide}-{index}".encode())
+
+
+def _sign_sidecar(path: Path, payload: dict) -> None:
+    write_json(path, payload)
+    sign_file(path)
+
+
+def _materialization_sidecar(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "zenodo_record_id": ZENODO_RECORD_ID,
+        "zenodo_version": ZENODO_VERSION,
+        "validated": True,
+        "sqfs_path": "unused",
+        "sqfs_sha256": "0" * 64,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_iter_class_slide_images_enumerates_every_jpg(tmp_path: Path) -> None:
+    _make_image_slide(tmp_path, "LUAD", "TCGA-AB", "TCGA-AB-0001-01Z", 2)
+    _make_image_slide(tmp_path, "LUSC", "TCGA-CD", "TCGA-CD-0002-01Z", 1)
+
+    rows = sorted(iter_class_slide_images(tmp_path))
+
+    assert [(cls, slide) for cls, slide, _ in rows] == [
+        ("LUAD", "TCGA-AB-0001-01Z"),
+        ("LUAD", "TCGA-AB-0001-01Z"),
+        ("LUSC", "TCGA-CD-0002-01Z"),
+    ]
+
+
+def test_build_image_rows_reports_label_conflicts(tmp_path: Path) -> None:
+    _make_image_slide(tmp_path, "LUAD", "sub", "TCGA-AB-0001-01Z", 1)
+    _make_image_slide(tmp_path, "LUSC", "sub", "TCGA-AB-0001-01Z", 1)
+
+    frame, conflicts = build_image_rows(tmp_path)
+
+    assert conflicts["TCGA-AB-0001-01Z"] == ["LUAD", "LUSC"]
+    assert len(frame) == 2
+
+
+def test_validate_image_cohort_rejects_wrong_patch_count() -> None:
+    frame = pd.DataFrame(
+        {
+            "patch_id": ["a", "b"],
+            "cancer_type": ["LUAD", "LUAD"],
+            "slide_id": ["s1", "s1"],
+        }
+    )
+    with pytest.raises(ValueError, match="patch count"):
+        validate_image_cohort(frame, {}, 3, 1, 1)
+
+
+def test_validate_image_cohort_rejects_duplicate_patch_ids() -> None:
+    frame = pd.DataFrame(
+        {
+            "patch_id": ["a", "a"],
+            "cancer_type": ["LUAD", "LUAD"],
+            "slide_id": ["s1", "s1"],
+        }
+    )
+    with pytest.raises(ValueError, match="duplicate patch identities"):
+        validate_image_cohort(frame, {}, 2, 1, 1)
+
+
+def test_validate_source_provenance_requires_signed_sidecar(tmp_path: Path) -> None:
+    sidecar = tmp_path / "provenance.json"
+
+    with pytest.raises(RuntimeError, match="no signed lock"):
+        validate_source_provenance({"materialization_sidecar": str(sidecar)})
+
+
+def test_validate_source_provenance_rejects_unvalidated_build(tmp_path: Path) -> None:
+    sidecar = tmp_path / "provenance.json"
+    _sign_sidecar(sidecar, _materialization_sidecar(validated=False))
+
+    with pytest.raises(ValueError, match="not validated"):
+        validate_source_provenance({"materialization_sidecar": str(sidecar)})
+
+
+def test_validate_source_provenance_rejects_wrong_zenodo_record(tmp_path: Path) -> None:
+    sidecar = tmp_path / "provenance.json"
+    _sign_sidecar(sidecar, _materialization_sidecar(zenodo_record_id="9999999"))
+
+    with pytest.raises(ValueError, match="Zenodo record"):
+        validate_source_provenance({"materialization_sidecar": str(sidecar)})
+
+
+def _image_backed_config(tmp_path: Path) -> dict[str, object]:
+    root = tmp_path / "materialized"
+    _make_image_slide(root, "LUAD", "sub", "TCGA-AB-0001-01Z", 2)
+    _make_image_slide(root, "LUSC", "sub", "TCGA-CD-0002-01Z", 1)
+    sidecar = tmp_path / "provenance.json"
+    _sign_sidecar(sidecar, _materialization_sidecar())
+    return {
+        "dataset": {
+            "name": "tcga_ut",
+            "regime": "patch",
+            "root": str(root),
+            "materialization_sidecar": str(sidecar),
+            "expected_slide_count": 2,
+            "expected_class_count": 2,
+            "expected_patch_count": 3,
+            "seed": 0,
+        }
+    }
+
+
+def test_build_image_manifest_returns_disjoint_split_rows(tmp_path: Path) -> None:
+    config = _image_backed_config(tmp_path)
+
+    frame = build_image_manifest(config)
+
+    assert len(frame) == 3
+    assert set(frame["cancer_type"]) == {"LUAD", "LUSC"}
+    assert_case_disjoint(frame)
+
+
+def test_build_image_manifest_rejects_wrong_cohort_size(tmp_path: Path) -> None:
+    config = _image_backed_config(tmp_path)
+    config["dataset"]["expected_patch_count"] = 999
+
+    with pytest.raises(ValueError, match="patch count"):
+        build_image_manifest(config)
+
+
+def test_build_image_manifest_rejects_conflicting_labels(tmp_path: Path) -> None:
+    config = _image_backed_config(tmp_path)
+    _make_image_slide(
+        Path(config["dataset"]["root"]), "LUSC", "sub2", "TCGA-AB-0001-01Z", 1
+    )
+    config["dataset"]["expected_patch_count"] = 4
+
+    with pytest.raises(ValueError, match="label conflicts"):
+        build_image_manifest(config)
+
 
 def test_split_cases_are_case_disjoint() -> None:
     slide_manifest = pd.DataFrame(

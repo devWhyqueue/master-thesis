@@ -219,20 +219,17 @@ def test_panda_configs_use_the_completed_native_tiles_image() -> None:
         ]
 
 def test_tcga_configs_lock_the_same_participant_cohort() -> None:
+    """Patch (image-backed, Zenodo-materialized) and WSI (pre-extracted tensors)
+    read TCGA-UT from different evidence sources, but must lock the same cohort.
+    """
     patch = _load_config(CONFIG_ROOT / "tcga_ut_patch.yaml")
     wsi = _load_config(CONFIG_ROOT / "tcga_ut_wsi.yaml")
 
     cohort_keys = {
-        "raw_root",
-        "feature_dir",
-        "feature_glob",
-        "feature_suffix_pattern",
-        "feature_provenance_manifest",
         "expected_slide_count",
         "expected_class_count",
         "expected_patch_count",
         "seed",
-        "eligibility_rules",
     }
     assert {key: patch["dataset"][key] for key in cohort_keys} == {
         key: wsi["dataset"][key] for key in cohort_keys

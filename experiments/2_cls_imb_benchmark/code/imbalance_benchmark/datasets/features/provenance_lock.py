@@ -50,10 +50,21 @@ def attach_frozen_provenance(
 def current_feature_provenance_lock(
     config: dict[str, Any],
 ) -> dict[str, str] | None:
-    """Return stable manifest and complete-inventory digests for TCGA-UT."""
+    """Return stable digests locking TCGA-UT's frozen evidence source.
+
+    The WSI regime still locks the pre-extracted tensor-chunk inventory; the
+    patch regime locks the materialized image SqFS instead (see
+    :mod:`imbalance_benchmark.datasets.tcga_ut_source`).
+    """
     dataset = config.get("dataset", {})
     if not isinstance(dataset, dict) or dataset.get("name") != "tcga_ut":
         return None
+    if dataset.get("regime") == "wsi":
+        return _current_tensor_lock(dataset)
+    return _current_source_lock(dataset)
+
+
+def _current_tensor_lock(dataset: dict[str, Any]) -> dict[str, str]:
     manifest_path = Path(dataset["feature_provenance_manifest"])
     payload = load_signed_feature_provenance(manifest_path)
     chunks = payload.get("chunks")
@@ -63,6 +74,17 @@ def current_feature_provenance_lock(
         "manifest_path": str(manifest_path),
         "manifest_sha256": compute_sha256(manifest_path),
         "inventory_sha256": compute_data_hash(chunks),
+    }
+
+
+def _current_source_lock(dataset: dict[str, Any]) -> dict[str, str]:
+    sidecar_path = Path(dataset["materialization_sidecar"])
+    verify_signed_file(sidecar_path)
+    payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    return {
+        "manifest_path": str(sidecar_path),
+        "manifest_sha256": compute_sha256(sidecar_path),
+        "inventory_sha256": str(payload["sqfs_sha256"]),
     }
 
 
@@ -117,22 +139,42 @@ def _verify_feature_provenance(
     config: dict[str, Any], locked: dict[str, object]
 ) -> None:
     try:
+        dataset = config["dataset"]
         current = current_feature_provenance_lock(config)
         if current is None or any(
             current[field] != locked.get(field) for field in LOCK_FIELDS
         ):
             raise ValueError("manifest or complete chunk inventory digest changed")
-        dataset = config["dataset"]
-        payload = load_signed_feature_provenance(Path(current["manifest_path"]))
-        chunks = payload.get("chunks")
-        if not isinstance(chunks, dict):
-            raise ValueError("chunk inventory is missing")
-        validate_preextracted_features(
-            Path(current["manifest_path"]),
-            [Path(dataset["feature_dir"]) / name for name in sorted(chunks)],
-            resolve_feature_provenance(config.get("feature_extraction", {})),
-        )
+        if dataset.get("regime") == "wsi":
+            _verify_tensor_provenance(dataset, current, config)
+        else:
+            _verify_source_provenance(dataset, locked)
     except (KeyError, OSError, TypeError, ValueError) as error:
         raise RuntimeError(
             f"Frozen TCGA-UT feature provenance invalid: {error}"
         ) from error
+
+
+def _verify_tensor_provenance(
+    dataset: dict[str, Any], current: dict[str, str], config: dict[str, Any]
+) -> None:
+    payload = load_signed_feature_provenance(Path(current["manifest_path"]))
+    chunks = payload.get("chunks")
+    if not isinstance(chunks, dict):
+        raise ValueError("chunk inventory is missing")
+    validate_preextracted_features(
+        Path(current["manifest_path"]),
+        [Path(dataset["feature_dir"]) / name for name in sorted(chunks)],
+        resolve_feature_provenance(config.get("feature_extraction", {})),
+    )
+
+
+def _verify_source_provenance(
+    dataset: dict[str, Any], locked: dict[str, object]
+) -> None:
+    """Re-hash the published SqFS itself, not just its signed sidecar."""
+    sidecar_path = Path(dataset["materialization_sidecar"])
+    payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    sqfs_path = Path(str(payload["sqfs_path"]))
+    if compute_sha256(sqfs_path) != locked.get("inventory_sha256"):
+        raise ValueError("materialized SqFS content changed since it was frozen")

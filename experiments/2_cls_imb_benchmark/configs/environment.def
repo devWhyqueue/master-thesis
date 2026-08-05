@@ -5,6 +5,8 @@ From: python:3.11-slim
     requirements-experiment.txt /opt/requirements-experiment.txt
 
 %post
+    apt-get update && apt-get install -y --no-install-recommends squashfs-tools git \
+        && rm -rf /var/lib/apt/lists/*
     python -m pip install --upgrade pip
     python -m pip install -r /opt/requirements-experiment.txt
 

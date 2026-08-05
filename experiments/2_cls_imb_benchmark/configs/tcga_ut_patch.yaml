@@ -10,15 +10,12 @@ dataset:
   seed: 0
   version: tcga-ut-komura-2022
   eligibility_rules:
-    source: author_supplied_tumor_region_patches_from_diagnostic_slides
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
     labels: 32_cancer_types_from_source_slide
-    evidence: readable_virchow2_cls_patchmean_feature_chunks
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
     split_unit: tcga_participant
-  raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
-  feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
-  feature_glob: "*.pt"
-  feature_suffix_pattern: "_[0-9]+"
-  feature_provenance_manifest: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw/feature_provenance_manifest.json
+  root: /mnt/tcga-ut-full
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut-full.provenance.json
   expected_slide_count: 8736
   expected_class_count: 32
   expected_patch_count: 1608060
@@ -31,6 +28,17 @@ feature_extraction:
   dtype: float16
   device: auto
 
+# Standalone materialization step (run once via `materialize-tcga-ut`, not part
+# of the submitted workflow): authenticates the shared archive against Zenodo
+# and publishes the project-owned SqFS that `dataset.root` mounts above.
+materialize_tcga_ut:
+  record_id: "5889558"
+  zenodo_version: "1.0"
+  shared_zip: /home/space/datasets/patho_ds/tcga-ut/data_raw.zip
+  scratch_root: /tmp/tcga-ut-materialize
+  output_sqfs: /home/space/datasets-sqfs/tcga-ut-full.sqfs
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut-full.provenance.json
+  manifest_partials_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/materialize/partials
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
@@ -38,18 +46,27 @@ slurm:
   output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/patch
   partition: gpu-2h
   test_partition: gpu-test
+  tune_natural_observations_per_candidate: 6
+  tune_shards_per_task: 8
+  tune_natural_shards_per_task: 3
+  confirm_natural_shards_per_task: 3
+  confirm_controlled_shards_per_task: 10
+  max_array_concurrency: 35
   container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
   resources:
-    prepare: {partition: gpu-5h, gpus: 1, cpus: 8}
-    pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
-    freeze: {partition: cpu-2h, gpus: 0, cpus: 4}
+    prepare: {partition: gpu-2h, gpus: 4, cpus: 32, memory: 64G}
+    pilot: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 32G}
+    freeze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 256G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
-    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
-    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
-    tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
+    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 256G}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
-    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8}
-    confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
-    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
+    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
-  squashfs: []
+  squashfs:
+    - source: /home/space/datasets-sqfs/tcga-ut-full.sqfs
+      mount: /mnt/tcga-ut-full
+      stages: [prepare]

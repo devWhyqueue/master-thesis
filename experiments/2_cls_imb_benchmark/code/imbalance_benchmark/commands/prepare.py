@@ -23,9 +23,15 @@ from imbalance_benchmark.datasets.features import (
 from imbalance_benchmark.datasets.features.provenance_lock import (
     write_prepared_feature_provenance,
 )
+from imbalance_benchmark.datasets.tcga_ut.pack import materialize as materialize_tcga_ut
 from imbalance_benchmark.manifest.seeds import derive_seed
 
-__all__ = ["cmd_prepare", "cmd_tile_wsi", "cmd_tile_wsi_reduce"]
+__all__ = [
+    "cmd_prepare",
+    "cmd_tile_wsi",
+    "cmd_tile_wsi_reduce",
+    "cmd_materialize_tcga_ut",
+]
 
 
 SYNTHETIC_PATCHES_PER_SLIDE = 30
@@ -124,6 +130,11 @@ def cmd_prepare(args: argparse.Namespace) -> None:
             paths["data"] / "slide_manifest.csv", index=False
         )
         write_prepared_feature_provenance(config, paths["data"])
+
+
+def cmd_materialize_tcga_ut(args: argparse.Namespace) -> None:
+    """Authenticate the shared TCGA-UT archive and publish its project SqFS."""
+    materialize_tcga_ut(load_config(args.config))
 
 
 def _wsi_tile_root(config: dict[str, object]) -> Path:
