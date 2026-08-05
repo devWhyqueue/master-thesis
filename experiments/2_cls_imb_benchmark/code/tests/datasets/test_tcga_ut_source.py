@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -310,3 +311,20 @@ def test_materialize_resumes_without_reextracting_completed_classes(
     sidecar = materialize(config)
 
     assert sidecar["validated"] is True
+
+
+def test_materialize_reextracts_a_verified_class_missing_from_scratch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A signed partial only proves past correctness, not that scratch (job-local
+    /tmp, wiped between attempts and not guaranteed to be the same node across a
+    resubmit) still holds the bytes -- a resubmit must re-extract them."""
+    config = _setup_two_class_materialize(tmp_path, monkeypatch)
+    materialize(config)
+    scratch_images = Path(config["materialize_tcga_ut"]["scratch_root"]) / "images"
+    shutil.rmtree(scratch_images)
+
+    sidecar = materialize(config)
+
+    assert sidecar["validated"] is True
+    assert scratch_images.is_dir()

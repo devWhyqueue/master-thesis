@@ -106,6 +106,20 @@ def validate_manifest_cohort(
         )
 
 
+def _class_images_present(scratch_root: Path, name: str, expected_count: int) -> bool:
+    """Whether this node's scratch already holds every image a class's partial expects.
+
+    A signed partial only proves the images were once correctly extracted and
+    hashed; scratch is job-local ``/tmp``, wiped between job attempts (and not
+    guaranteed to be the same node across a resubmit), so the bytes may be gone
+    even when the partial is complete.
+    """
+    class_dir = scratch_root / "images" / name
+    if not class_dir.is_dir():
+        return False
+    return sum(1 for path in class_dir.rglob("*") if path.is_file()) == expected_count
+
+
 def _materialize_one_class(
     file: dict[str, Any],
     matched: dict[str, Any],
@@ -113,12 +127,20 @@ def _materialize_one_class(
     partials_dir: Path,
     scratch_root: Path,
 ) -> None:
-    """Extract and hash one class archive's images, or skip it if already done."""
+    """Extract and hash one class archive's images, or skip it if already present."""
     name = source.class_name(file["key"])
     if class_partial_done(partials_dir, name):
-        logger.info("TCGA-UT class %s already materialized; skipping", name)
-        return
-    logger.info("Materializing TCGA-UT class %s", name)
+        rows = read_class_partial(partials_dir, name)
+        if _class_images_present(scratch_root, name, len(rows)):
+            logger.info("TCGA-UT class %s already materialized; skipping", name)
+            return
+        logger.info(
+            "TCGA-UT class %s verified but missing from this node's scratch;"
+            " re-extracting",
+            name,
+        )
+    else:
+        logger.info("Materializing TCGA-UT class %s", name)
     archives_dir = scratch_root / "archives"
     try:
         nested_zip = source.stage_nested_archive(
