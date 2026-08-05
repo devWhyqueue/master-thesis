@@ -20,4 +20,4 @@ def test_tcga_patch_prepare_is_one_staged_multi_gpu_job() -> None:
         "64G",
     )
     assert "#SBATCH --array=" not in script
-    assert script.count("cp /home/space/datasets-sqfs/tcga-ut-full.sqfs") == 1
+    assert script.count("cp /home/space/datasets-sqfs/tcga-ut/patch.sqfs") == 1

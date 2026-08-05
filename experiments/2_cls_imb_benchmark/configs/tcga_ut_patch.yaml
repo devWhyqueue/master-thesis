@@ -14,8 +14,8 @@ dataset:
     labels: 32_cancer_types_from_source_slide
     evidence: materialized_project_owned_squashfs_of_source_jpgs
     split_unit: tcga_participant
-  root: /mnt/tcga-ut-full
-  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut-full.provenance.json
+  root: /mnt/tcga-ut
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
   expected_slide_count: 8736
   expected_class_count: 32
   expected_patch_count: 1608060
@@ -36,8 +36,8 @@ materialize_tcga_ut:
   zenodo_version: "1.0"
   shared_zip: /home/space/datasets/patho_ds/tcga-ut/data_raw.zip
   scratch_root: /tmp/tcga-ut-materialize
-  output_sqfs: /home/space/datasets-sqfs/tcga-ut-full.sqfs
-  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut-full.provenance.json
+  output_sqfs: /home/space/datasets-sqfs/tcga-ut/patch.sqfs
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
   manifest_partials_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/tcga_ut/materialize/partials
 
 slurm:
@@ -67,6 +67,6 @@ slurm:
     analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
   squashfs:
-    - source: /home/space/datasets-sqfs/tcga-ut-full.sqfs
-      mount: /mnt/tcga-ut-full
+    - source: /home/space/datasets-sqfs/tcga-ut/patch.sqfs
+      mount: /mnt/tcga-ut
       stages: [prepare]
