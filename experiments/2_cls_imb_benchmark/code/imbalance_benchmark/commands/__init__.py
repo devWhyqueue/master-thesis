@@ -12,6 +12,7 @@ from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.prepare import (
     cmd_materialize_tcga_ut,
     cmd_prepare,
+    cmd_prepare_extract_shard,
     cmd_tile_wsi,
     cmd_tile_wsi_reduce,
 )
@@ -23,6 +24,7 @@ from imbalance_benchmark.hydra import cmd_submit
 
 __all__ = [
     "cmd_prepare",
+    "cmd_prepare_extract_shard",
     "cmd_pilot",
     "cmd_freeze",
     "cmd_materialize_tcga_ut",

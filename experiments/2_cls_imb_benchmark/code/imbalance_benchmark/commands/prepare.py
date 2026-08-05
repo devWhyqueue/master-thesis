@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 import torch
@@ -28,6 +29,7 @@ from imbalance_benchmark.manifest.seeds import derive_seed
 
 __all__ = [
     "cmd_prepare",
+    "cmd_prepare_extract_shard",
     "cmd_tile_wsi",
     "cmd_tile_wsi_reduce",
     "cmd_materialize_tcga_ut",
@@ -130,6 +132,52 @@ def cmd_prepare(args: argparse.Namespace) -> None:
             paths["data"] / "slide_manifest.csv", index=False
         )
         write_prepared_feature_provenance(config, paths["data"])
+
+
+def _slide_shard(df: pd.DataFrame, shard_index: int, shard_count: int) -> pd.DataFrame:
+    """Return one round-robin slice of an image-backed manifest's slides."""
+    slide_ids = sorted(df["slide_id"].astype(str).unique())
+    shard_slides = slide_ids[shard_index::shard_count]
+    selected = cast(pd.DataFrame, df[df["slide_id"].astype(str).isin(shard_slides)])
+    return selected.reset_index(drop=True)
+
+
+def _eligible_image_manifest(config: dict[str, object]) -> pd.DataFrame | None:
+    """Build the eligible manifest, or None if it isn't image-backed."""
+    feature_cfg = config.get("feature_extraction", {})
+    if not isinstance(feature_cfg, dict):
+        raise ValueError("feature_extraction config must be a mapping")
+    resolve_feature_provenance(feature_cfg)
+    df = build_manifest(config)
+    if "image_path" not in df.columns or "feature_path" in df.columns:
+        return None
+    return df
+
+
+def cmd_prepare_extract_shard(args: argparse.Namespace) -> None:
+    """Extract one slide shard's Virchow2 features into prepare's shared cache.
+
+    Splits the heavy per-dataset extraction across many short single-GPU
+    array tasks instead of one long multi-GPU job -- ``attach_extracted_features``
+    caches per slide atomically, so a plain ``prepare`` afterward just reuses
+    whatever every shard already extracted.
+    """
+    config = load_config(args.config)
+    dataset_cfg = config["dataset"]
+    if not isinstance(dataset_cfg, dict):
+        raise ValueError("dataset config must be a mapping")
+    df = _eligible_image_manifest(config)
+    if df is None:
+        return
+    shard_df = _slide_shard(df, args.shard_index, args.shard_count)
+    if shard_df.empty:
+        return
+    attach_extracted_features(
+        shard_df,
+        ensure_dirs(config)["data"] / "features" / str(dataset_cfg["name"]),
+        config.get("feature_extraction", {}),
+        gpu_workers=1,
+    )
 
 
 def cmd_materialize_tcga_ut(args: argparse.Namespace) -> None:

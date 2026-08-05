@@ -18,6 +18,7 @@ from imbalance_benchmark.commands import (
     cmd_materialize_tcga_ut,
     cmd_pilot,
     cmd_prepare,
+    cmd_prepare_extract_shard,
     cmd_smoke,
     cmd_submit,
     cmd_tile_wsi,
@@ -66,6 +67,9 @@ def _parser() -> argparse.ArgumentParser:
     tile_wsi = sub.add_parser("tile-wsi")
     tile_wsi.add_argument("--slide-index", type=int, required=True)
     tile_wsi.add_argument("--shard-size", type=int, default=1)
+    extract_shard = sub.add_parser("prepare-extract-shard")
+    extract_shard.add_argument("--shard-index", type=int, required=True)
+    extract_shard.add_argument("--shard-count", type=int, required=True)
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
             "--condition", choices=("natural", "balanced", "moderate", "severe")
@@ -109,6 +113,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
     """Return CLI command handlers keyed by their subcommand names."""
     return {
         "prepare": cmd_prepare,
+        "prepare-extract-shard": cmd_prepare_extract_shard,
         "pilot": cmd_pilot,
         "freeze": cmd_freeze,
         "tune": cmd_tune,
