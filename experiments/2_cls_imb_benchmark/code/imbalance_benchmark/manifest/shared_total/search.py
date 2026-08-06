@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import cast
 
 import pandas as pd
@@ -19,30 +18,19 @@ from imbalance_benchmark.manifest.construction_helpers import (
 )
 from imbalance_benchmark.manifest.sampling.patch import select_patches_round_robin
 from imbalance_benchmark.manifest.sampling.slide import select_slides_round_robin
+from imbalance_benchmark.manifest.shared_total.context import (
+    _Candidate,
+    _FeasibilityContext,
+)
+from imbalance_benchmark.manifest.shared_total.exact_scan import _scan_candidates
 from imbalance_benchmark.manifest.shared_total.severity import (
-    geometric_descent,
     severity_aware_upper_bound,
-    severity_optimal_total,
 )
 from imbalance_benchmark.manifest.statistics.selection_capacity import (
     feasible_selection_counts,
 )
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class _FeasibilityContext:
-    """Everything a feasibility probe needs except the ``total`` being tried."""
-
-    train_df: pd.DataFrame
-    is_mil: bool
-    seed: int
-    independent_floor: int
-    min_support: int
-    locked_assignments: Mapping[str, list[str]]
-    supports: Mapping[str, int]
-    feasible_counts: Mapping[str, set[int]]
 
 
 def cap_feasible_shared_total(
@@ -57,19 +45,21 @@ def cap_feasible_shared_total(
     """Largest total realizing the best joint severity every locked assignment
     can attain, subject to the actual unit caps.
 
-    The largest total does not maximize severity: whichever assignment puts
-    the scarcest class in the head role is bottlenecked by that class's own
-    availability, not by ``total`` (see ``shared_total.severity``). The
-    search first finds the severity-optimal total via cheap ratio checks,
-    then scans downward for the largest total also surviving cap checks.
+    Every integer total in ``[floor, ceiling]`` is scored exactly from its
+    integer allocation and cheaply rejected against the precomputed
+    contribution caps. The largest total attaining both the global moderate
+    and severe maxima simultaneously is then confirmed against the true
+    fixed-pool selection - the only place an expensive probe runs.
     """
     ctx, floor, ceiling = _build_search_context(
         train_df, classes, min_support, is_mil, seed, independent_floor, assignments
     )
-    severity_optimal = severity_optimal_total(
-        ctx.supports, ctx.locked_assignments, min_support, floor, ceiling
-    )
-    return _largest_feasible_total(ctx, severity_optimal, floor)
+    candidates = _scan_candidates(ctx, floor, ceiling)
+    if not candidates:
+        raise ValueError(
+            "No shared total satisfies the independent-support and contribution caps"
+        )
+    return _largest_jointly_optimal_total(ctx, candidates)
 
 
 def _build_search_context(
@@ -81,7 +71,7 @@ def _build_search_context(
     independent_floor: int,
     assignments: Mapping[str, list[str]] | None,
 ) -> tuple[_FeasibilityContext, int, int]:
-    """Everything the two-phase search needs: probe context, floor, ceiling."""
+    """Everything the exact search needs: probe context, floor, ceiling."""
     supports = class_support_counts(train_df, is_mil)
     locked_assignments = assignments or {"native": classes}
     floor = len(classes) * min_support
@@ -89,6 +79,7 @@ def _build_search_context(
         max_shared_total([supports[name] for name in classes], min_support),
         severity_aware_upper_bound(supports, locked_assignments, min_support),
     )
+    feasible_counts = feasible_selection_counts(train_df, min_support, is_mil)
     ctx = _FeasibilityContext(
         train_df,
         is_mil,
@@ -97,26 +88,70 @@ def _build_search_context(
         min_support,
         locked_assignments,
         supports,
-        feasible_selection_counts(train_df, min_support, is_mil),
+        feasible_counts,
+        classes,
+        sorted(classes, key=lambda name: len(feasible_counts[name])),
     )
     return ctx, floor, ceiling
 
 
-def _log_scan_progress(last_logged: float, total: int, start: int, floor: int) -> float:
-    if time.perf_counter() - last_logged <= 30:
-        return last_logged
-    logger.info("freeze: shared-total scan at %d (range [%d, %d])", total, floor, start)
-    return time.perf_counter()
+# --- joint-maximum selection and pool confirmation -----------------------
 
 
-def _total_is_feasible(ctx: _FeasibilityContext, total: int) -> bool:
-    """Whether one candidate total is realizable under every selection cap.
+def _largest_jointly_optimal_total(
+    ctx: _FeasibilityContext, candidates: list[_Candidate]
+) -> int:
+    """The largest total attaining both global maxima that also clears the pool probe.
 
-    The severity-aware search range can reach totals too large even for a
-    balanced (ρ=1) split of the scarcest class - ``effective_rho`` raises
-    rather than returning a degenerate ratio there, which simply marks the
-    candidate infeasible rather than aborting the search.
+    A total tying both the moderate and severe maxima can still fail the
+    true fixed-pool selection (a contribution cap is not monotone in the
+    total). When every currently-tied total fails, those totals are
+    excluded and the maxima are recomputed over what remains, rather than
+    settling for a total that only ties one of the two ratios.
     """
+    start = time.perf_counter()
+    probes = 0
+    excluded: set[int] = set()
+    while True:
+        remaining = [
+            candidate for candidate in candidates if candidate.total not in excluded
+        ]
+        if not remaining:
+            raise ValueError(
+                "No shared total satisfies the independent-support and contribution caps"
+            )
+        best_moderate = max(candidate.worst_moderate for candidate in remaining)
+        best_severe = max(candidate.worst_severe for candidate in remaining)
+        joint = sorted(
+            (
+                candidate
+                for candidate in remaining
+                if candidate.worst_moderate == best_moderate
+                and candidate.worst_severe == best_severe
+            ),
+            key=lambda candidate: candidate.total,
+            reverse=True,
+        )
+        if not joint:
+            raise ValueError(
+                "No shared total attains the moderate and severe rho maxima "
+                "simultaneously across every locked assignment"
+            )
+        for candidate in joint:
+            probes += 1
+            if _total_cap_feasible(ctx, candidate.total):
+                logger.info(
+                    "freeze: shared-total pool probes: %d, %.1fs",
+                    probes,
+                    time.perf_counter() - start,
+                )
+                return candidate.total
+            excluded.add(candidate.total)
+
+
+def _total_cap_feasible(ctx: _FeasibilityContext, total: int) -> bool:
+    """Whether one total is realizable under every cap via the true fixed-pool
+    construction - the same path ``_build_conditions`` uses downstream."""
     try:
         allocations = assignment_allocations(
             ctx.train_df,
@@ -128,38 +163,7 @@ def _total_is_feasible(ctx: _FeasibilityContext, total: int) -> bool:
         )
     except ValueError:
         return False
-    fits = all(
-        count in ctx.feasible_counts[class_name]
-        for condition_sets in allocations.values()
-        for counts in condition_sets.values()
-        for class_name, count in counts.items()
-    )
-    return fits and _cap_feasible(ctx, allocations)
-
-
-def _largest_feasible_total(ctx: _FeasibilityContext, start: int, floor: int) -> int:
-    """Coarse-to-fine downward search for the largest cap-feasible total.
-
-    A full per-integer scan across a range that can span tens of thousands of
-    candidates re-probes an expensive pool designation at every step. A
-    geometric sweep narrows to the bracket where feasibility first appears
-    scanning downward, then that bracket alone is scanned exhaustively.
-    Feasibility is not guaranteed monotone in the total (a contribution cap
-    can reject one total while accepting a smaller one), so the bracket is
-    probed in full rather than bisected.
-    """
-    last_logged = time.perf_counter()
-    previous = start
-    for candidate in geometric_descent(start, floor):
-        last_logged = _log_scan_progress(last_logged, candidate, start, floor)
-        if _total_is_feasible(ctx, candidate):
-            for total in range(previous, candidate - 1, -1):
-                if _total_is_feasible(ctx, total):
-                    return total
-        previous = candidate - 1
-    raise ValueError(
-        "No shared total satisfies the independent-support and contribution caps"
-    )
+    return _cap_feasible(ctx, allocations)
 
 
 def _cap_feasible(

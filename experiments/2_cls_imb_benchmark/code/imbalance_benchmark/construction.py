@@ -138,8 +138,7 @@ def allocate_counts(
     sum_w = sum(w)
     target = [total_t * val / sum_w for val in w]
     allocated = [
-        int(np.clip(round(t), min_support, avail))
-        for t, avail in zip(target, available)
+        min(max(round(t), min_support), avail) for t, avail in zip(target, available)
     ]
     _adjust_alloc(allocated, available, target, total_t - sum(allocated), min_support)
     return allocated
@@ -168,20 +167,19 @@ def _allocation_is_feasible(
     k = len(available)
     if k == 1:
         return min_support <= total_t <= available[0]
-    weights = np.asarray([rho ** (-i / (k - 1)) for i in range(k)], dtype=float)
-    target = total_t * weights / weights.sum()
+    weights = [rho ** (-i / (k - 1)) for i in range(k)]
+    sum_w = sum(weights)
+    target = [total_t * val / sum_w for val in weights]
     if any(
         value < min_support - 0.5 or value >= capacity + 1.0
         for value, capacity in zip(target, available, strict=True)
     ):
         return False
     allocated = [
-        int(np.clip(round(value), min_support, capacity))
+        min(max(round(value), min_support), capacity)
         for value, capacity in zip(target, available, strict=True)
     ]
-    _adjust_alloc(
-        allocated, available, target.tolist(), total_t - sum(allocated), min_support
-    )
+    _adjust_alloc(allocated, available, target, total_t - sum(allocated), min_support)
     return sum(allocated) == total_t and all(
         min_support <= count <= cap
         for count, cap in zip(allocated, available, strict=True)

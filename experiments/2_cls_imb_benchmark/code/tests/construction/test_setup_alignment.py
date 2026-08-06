@@ -16,7 +16,7 @@ from imbalance_benchmark.analysis.inference.permutation import (
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.prepare import cmd_prepare
 from imbalance_benchmark.common import sign_file
-from imbalance_benchmark.construction import allocate_counts, effective_rho, max_shared_total
+from imbalance_benchmark.construction import allocate_counts, max_shared_total
 from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.manifest.shared_total import search as shared_total_search
 from imbalance_benchmark.datasets.data import BagFeatureDataset
@@ -83,13 +83,20 @@ def test_shared_total_keeps_all_naturally_balanced_support() -> None:
         assert sum(allocation) == shared_total
         assert all(count <= support for count, support in zip(allocation, available))
 
-def test_shared_total_prefers_severity_over_the_largest_balanced_total() -> None:
-    """A total right at the balanced ceiling can starve severity, not help it.
+def test_shared_total_search_fails_when_moderate_and_severe_maxima_never_coincide() -> (
+    None
+):
+    """Moderate and severe can each cap at the same ratio without ever doing so together.
 
-    At ``max_shared_total`` (301 here), the balanced condition's equal share
-    already sits nearly at B/C's own availability (100), leaving them no
-    slack to shrink toward the floor for a severe profile - achieved severity
-    is *worse* there than at a slightly smaller, deliberately chosen total.
+    Two equally-sized classes: the achieved-moderate maximum and the
+    achieved-severe maximum are each real, individually reachable values,
+    but no single total realizes both at once. Summing the two achieved
+    ratios (the old approach) would silently pick a compromise total that
+    matches neither window; the report's protocol instead requires a single
+    total to realize both maxima at once, so the exact search must refuse
+    rather than substitute a compromise. See
+    ``test_shared_total_search.test_no_simultaneous_maxima_raises_rather_than_a_summed_compromise``
+    for the same property with the maxima windows inspected directly.
     """
     frame = pd.DataFrame(
         [
@@ -98,26 +105,20 @@ def test_shared_total_prefers_severity_over_the_largest_balanced_total() -> None
                 "slide_id": f"{name}_{index}",
                 "cancer_type": name,
             }
-            for name, support in (("A", 200), ("B", 100), ("C", 100))
+            for name, support in (("A", 400), ("B", 400))
             for index in range(support)
         ]
     )
 
-    total = cap_feasible_shared_total(
-        frame,
-        ["A", "B", "C"],
-        min_support=20,
-        is_mil=True,
-        seed=1,
-        independent_floor=10,
-    )
-
-    assert total < max_shared_total([200, 100, 100], min_support=20)
-    severe_at_total = effective_rho([200, 100, 100], 100.0, min_support=20, total_t=total)
-    severe_at_balanced_ceiling = effective_rho(
-        [200, 100, 100], 100.0, min_support=20, total_t=301
-    )
-    assert severe_at_total > severe_at_balanced_ceiling
+    with pytest.raises(ValueError, match="simultaneously"):
+        cap_feasible_shared_total(
+            frame,
+            ["A", "B"],
+            min_support=10,
+            is_mil=True,
+            seed=1,
+            independent_floor=10,
+        )
 
 def test_retains_fixed_pool_checks_full_designated_coverage() -> None:
     """The primitive itself is unchanged: it still tests pool-vs-selection coverage.
@@ -361,7 +362,10 @@ def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
         # Three classes, each comfortably above the 20-patch floor whichever
         # role a tail assignment gives it, so moderate/severe can genuinely
         # differ instead of both saturating the same head-capacity ceiling.
-        for cls, total, train_n in (("A", 340, 300), ("B", 240, 200), ("C", 190, 150))
+        # C's train count (100) is chosen so the moderate and severe rho
+        # maxima are simultaneously attainable across native and reversed
+        # assignments - the exact search refuses a total otherwise.
+        for cls, total, train_n in (("A", 340, 300), ("B", 240, 200), ("C", 140, 100))
         for index in range(total)
     ]
     for split_index in range(3):
