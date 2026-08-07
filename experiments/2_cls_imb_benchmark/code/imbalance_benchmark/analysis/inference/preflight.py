@@ -28,7 +28,9 @@ def _class_preflight(
         max_frac = np.where(sum_w > 0, max_w / np.maximum(sum_w, 1e-12), 0.0)
     frac_dominant = float(np.mean(max_frac > 0.5))
     mean_kish = float(np.mean(kish))
-    min_kish = float(np.min(kish))
+    # Percentile, not minimum: the minimum keeps falling as `n_replicates` grows,
+    # so a floor on it would measure the replicate budget, not the cell.
+    p2_5_kish = float(np.percentile(kish, 2.5))
     # Under the Bayesian bootstrap every patient's weight is a.s. positive in
     # every replicate, so this is really a structural patient-count check
     # (distinct from Kish's weight-concentration check), not a resampling
@@ -37,11 +39,11 @@ def _class_preflight(
     return {
         "unique_resampled_patients": unique_resampled,
         "kish_effective_count": mean_kish,
-        "min_kish_effective_count": min_kish,
+        "p2_5_kish_effective_count": p2_5_kish,
         "max_patient_weight_fraction": float(np.mean(max_frac)),
         "frac_replicates_dominant": frac_dominant,
         "is_descriptive_only": bool(
-            min_kish < 5.0 or frac_dominant > 0.05 or unique_resampled < 5.0
+            p2_5_kish < 5.0 or frac_dominant > 0.05 or unique_resampled < 5.0
         ),
     }
 
@@ -112,9 +114,8 @@ def _split_class_diagnostic(
     diagnostic = _class_preflight(
         identity.loc[mask, "case_id"].to_numpy(), weights[mask, :], n_replicates
     )
-    # Defensive: under the Bayesian bootstrap every weight is a.s. positive,
-    # so this is always True in practice; kept as a guard against a future
-    # resampling change reintroducing an unrepresented cell.
+    # Defensive: under the Bayesian bootstrap every weight is a.s. positive, so
+    # this is always True; kept as a guard against a future resampling change.
     represented = bool((weights[mask, :].sum(axis=0) > 0).all())
     diagnostic.update(
         all_replicates_represented=represented, metric_computable=represented
@@ -141,10 +142,9 @@ def _weights_vary(
 ) -> bool:
     """True iff every patient's resampled weight actually varies across replicates.
 
-    A Bayesian-bootstrap sanity check: a patient whose weight were constant
-    across replicates would mean the Dirichlet draw is not doing its job for
-    that patient (e.g. a regression reintroducing a degenerate weight), so
-    this must hold for every patient whenever more than one replicate exists.
+    A Bayesian-bootstrap sanity check: a constant weight would mean the Dirichlet
+    draw is not doing its job for that patient (e.g. a regression reintroducing a
+    degenerate weight), so this holds for every patient given several replicates.
     """
     if n_replicates <= 1:
         return True
@@ -189,11 +189,11 @@ def run_preflight(
 ) -> dict[str, Any]:
     """Per split-frame, by-class preflight: unique resampled patients, Kish, max weight.
 
-    Mean Kish and max-weight fractions are reported across replicates. Inference
-    is descriptive-only when any replicate's Kish count is below five, when one
-    patient supplies more than 50% of a class's weight in more than 5% of
-    replicates, or when a split/class cell has fewer than five contributing
-    patients, per report §"Imbalance deficit, recovery, and inference".
+    Mean Kish and max-weight fractions are reported across replicates. Per report
+    §"Imbalance deficit, recovery, and inference", inference is descriptive-only
+    when the 2.5th percentile of the Kish count is below five, one patient
+    supplies over 50% of a class's weight in over 5% of replicates, or a
+    split/class cell has fewer than five contributing patients.
     """
     row_weights = _preflight_row_weights(identity, n_replicates, seed)
     by_class = _diagnostics_by_class(identity, row_weights, n_replicates)

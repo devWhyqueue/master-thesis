@@ -180,14 +180,31 @@ def test_intraclass_correlation_high_when_clusters_dominate():
     icc = intraclass_correlation(margin, clusters)
     assert icc > 0.9
 
-def test_kish_preflight_is_descriptive_when_any_replicate_is_below_five() -> None:
-    weights = np.eye(6, dtype=np.int64)
-    weights[:, 0] = [6, 0, 0, 0, 0, 0]
+def test_kish_preflight_is_descriptive_when_the_low_percentile_is_below_five() -> None:
+    # Concentration mild enough that neither the dominance nor the contributing
+    # unit criterion fires, so only the Kish floor can designate the cell.
+    weights = np.ones((6, 100), dtype=np.float64)
+    weights[0, :10] = 3.0
 
-    result = _class_preflight(np.arange(6), weights, n_replicates=6)
+    result = _class_preflight(np.arange(6), weights, n_replicates=100)
 
-    assert result["min_kish_effective_count"] == 1.0
+    assert result["p2_5_kish_effective_count"] == pytest.approx(64 / 14)
+    assert result["frac_replicates_dominant"] == 0.0
     assert result["is_descriptive_only"] is True
+
+def test_kish_preflight_ignores_a_rare_dominated_replicate() -> None:
+    """A tail replicate must not condemn a cell the other 99% support well.
+
+    The floor is on the 2.5th percentile, so one dominated draw out of a hundred
+    leaves the cell inferential; only sustained weight concentration removes it.
+    """
+    weights = np.ones((6, 100), dtype=np.float64)
+    weights[:, 0] = [6.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    result = _class_preflight(np.arange(6), weights, n_replicates=100)
+
+    assert result["p2_5_kish_effective_count"] == pytest.approx(6.0)
+    assert result["is_descriptive_only"] is False
 
 def test_exploratory_methods_are_not_hypothesis_tested() -> None:
     """Exploratory methods keep effects/CIs but carry no p-value or "tested" status.
