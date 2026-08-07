@@ -50,7 +50,7 @@ slurm:
   partition: gpu-2h
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
-  tune_shards_per_task: 6
+  tune_shards_per_task: 4
   tune_natural_shards_per_task: 3
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
