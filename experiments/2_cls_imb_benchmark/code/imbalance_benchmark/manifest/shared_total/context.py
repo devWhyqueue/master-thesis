@@ -29,3 +29,7 @@ class _Candidate:
     total: int
     worst_moderate: float
     worst_severe: float
+    # Whether every locked assignment's moderate and severe ratio fall within
+    # the shared-total tolerance bands (see ``exact_scan``), not just the
+    # worst-case (min) tracked by worst_moderate/worst_severe.
+    tolerance_ok: bool = False

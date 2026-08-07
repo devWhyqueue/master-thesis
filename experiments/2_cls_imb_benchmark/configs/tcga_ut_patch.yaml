@@ -11,9 +11,12 @@ dataset:
   version: tcga-ut-komura-2022
   eligibility_rules:
     source: zenodo_record_5889558_v1_0_authenticated_class_archives
-    labels: 32_cancer_types_from_source_slide
+    labels: 31_of_32_cancer_types_from_source_slide
     evidence: materialized_project_owned_squashfs_of_source_jpgs
     split_unit: tcga_participant
+    class_exclusions: dlbcl_contribution_cap_infeasible
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
   root: /mnt/tcga-ut
   materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
   expected_slide_count: 8736

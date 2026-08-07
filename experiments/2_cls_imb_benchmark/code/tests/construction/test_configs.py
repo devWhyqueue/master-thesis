@@ -21,6 +21,7 @@ from imbalance_benchmark.construction import (
     allocate_counts,
     select_patches_round_robin,
 )
+from imbalance_benchmark.manifest.construction_helpers import apply_class_exclusions
 from imbalance_benchmark.modeling.losses import (
     FocalLoss,
     ScholzCombinedLoss,
@@ -68,6 +69,33 @@ def test_split_cases():
     # Patient disjoint validation
     grouped = df_splits.groupby("case_id")["split"].nunique()
     assert (grouped == 1).all()
+
+def test_apply_class_exclusions_drops_only_the_named_classes():
+    df = pd.DataFrame(
+        {
+            "case_id": ["P0", "P1", "P2"],
+            "slide_id": ["S0", "S1", "S2"],
+            "cancer_type": ["class_A", "class_B", "class_A"],
+        }
+    )
+
+    filtered = apply_class_exclusions(df, ["class_B"])
+
+    assert set(filtered["cancer_type"]) == {"class_A"}
+    assert len(filtered) == 2
+
+def test_apply_class_exclusions_is_a_no_op_when_nothing_is_excluded():
+    df = pd.DataFrame(
+        {
+            "case_id": ["P0", "P1"],
+            "slide_id": ["S0", "S1"],
+            "cancer_type": ["class_A", "class_B"],
+        }
+    )
+
+    filtered = apply_class_exclusions(df, [])
+
+    assert filtered.equals(df)
 
 def test_allocate_counts():
     # 4 classes with these available counts

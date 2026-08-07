@@ -42,14 +42,17 @@ def cap_feasible_shared_total(
     independent_floor: int = 10,
     assignments: Mapping[str, list[str]] | None = None,
 ) -> int:
-    """Largest total realizing the best joint severity every locked assignment
-    can attain, subject to the actual unit caps.
+    """Largest total within tolerance of the requested severities, subject to
+    the actual unit caps; falls back to the best jointly attainable total.
 
     Every integer total in ``[floor, ceiling]`` is scored exactly from its
     integer allocation and cheaply rejected against the precomputed
-    contribution caps. The largest total attaining both the global moderate
-    and severe maxima simultaneously is then confirmed against the true
-    fixed-pool selection - the only place an expensive probe runs.
+    contribution caps. Among the survivors, the largest total whose moderate
+    and severe ratios both fall within tolerance of the requested severities
+    for every locked assignment is preferred, confirmed against the true
+    fixed-pool selection - the only place an expensive probe runs. A
+    dataset-regime with no such total (or where every one fails the probe)
+    falls back to the total attaining the best jointly attainable severity.
     """
     ctx, floor, ceiling = _build_search_context(
         train_df, classes, min_support, is_mil, seed, independent_floor, assignments
@@ -59,7 +62,26 @@ def cap_feasible_shared_total(
         raise ValueError(
             "No shared total satisfies the independent-support and contribution caps"
         )
+    tolerance_total = _largest_tolerance_feasible_total(ctx, candidates)
+    if tolerance_total is not None:
+        return tolerance_total
     return _largest_jointly_optimal_total(ctx, candidates)
+
+
+def _largest_tolerance_feasible_total(
+    ctx: _FeasibilityContext, candidates: list[_Candidate]
+) -> int | None:
+    """Largest cap-feasible total within tolerance of both requested severities.
+
+    Tried largest-first against the true fixed-pool construction; a probe
+    rejection excludes only that total and falls through to the next, never
+    substituting a total the tolerance band did not already accept and never
+    falling back silently to a compromise the caller cannot see.
+    """
+    for total in sorted((c.total for c in candidates if c.tolerance_ok), reverse=True):
+        if _total_cap_feasible(ctx, total):
+            return total
+    return None
 
 
 def _build_search_context(

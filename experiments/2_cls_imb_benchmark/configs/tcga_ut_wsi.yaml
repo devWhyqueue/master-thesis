@@ -11,9 +11,12 @@ dataset:
   version: tcga-ut-komura-2022
   eligibility_rules:
     source: author_supplied_tumor_region_patches_from_diagnostic_slides
-    labels: 32_cancer_types_from_source_slide
+    labels: 31_of_32_cancer_types_from_source_slide
     evidence: readable_virchow2_cls_patchmean_feature_chunks
     split_unit: tcga_participant
+    class_exclusions: dlbcl_contribution_cap_infeasible
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
   raw_root: /home/space/datasets/patho_ds/tcga-ut/raw
   feature_dir: /home/space/datasets/patho_ds/tcga-ut/patch_features/cls_patchmean/virchow_virchow2/raw
   feature_glob: "*.pt"

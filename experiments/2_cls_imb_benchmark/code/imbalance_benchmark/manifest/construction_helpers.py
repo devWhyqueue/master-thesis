@@ -23,6 +23,22 @@ from imbalance_benchmark.manifest.statistics import (
 CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
 
 
+def apply_class_exclusions(
+    df: pd.DataFrame, excluded_classes: list[str]
+) -> pd.DataFrame:
+    """Drop configured target classes from the eligible pool before splitting.
+
+    Applied once, before ``split_cases``, so an excluded class never enters
+    any partition or downstream construction rather than being filtered out
+    piecemeal by later stages.
+    """
+    if not excluded_classes:
+        return df
+    return cast(
+        pd.DataFrame, df[~df["cancer_type"].isin(excluded_classes)]
+    ).reset_index(drop=True)
+
+
 def condition_metadata(
     path: Path,
     condition: pd.DataFrame,

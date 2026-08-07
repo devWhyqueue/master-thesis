@@ -14,6 +14,7 @@ from imbalance_benchmark.common import (
     split_paths,
 )
 from imbalance_benchmark.construction import split_cases
+from imbalance_benchmark.manifest.construction_helpers import apply_class_exclusions
 from imbalance_benchmark.datasets import build_manifest
 from imbalance_benchmark.datasets.bracs import discover_slides, tile_slide
 from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
@@ -122,6 +123,11 @@ def cmd_prepare(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     base_paths = ensure_dirs(config)
     df = _base_manifest(config, base_paths)
+    dataset_cfg = config.get("dataset", {})
+    excluded_classes = (
+        dataset_cfg.get("excluded_classes", []) if isinstance(dataset_cfg, dict) else []
+    )
+    df = apply_class_exclusions(df, excluded_classes)
     for index in split_indices(args.split_index):
         paths = split_paths(base_paths, index)
         split_df = split_cases(

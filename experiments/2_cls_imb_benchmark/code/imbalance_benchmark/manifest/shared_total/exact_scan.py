@@ -22,6 +22,17 @@ _MODERATE_RHO = 10.0
 _SEVERE_RHO = 100.0
 _BALANCED_RHO = 1.0
 
+# +/-10% of the requested ratio: the largest total whose achieved moderate
+# and severe ratios both fall inside these bands, for every locked
+# assignment, is preferred over the joint-maxima fallback (search.py).
+_MODERATE_BAND = (9.0, 11.0)
+_SEVERE_BAND = (90.0, 110.0)
+
+
+def _within_band(rho: float, band: tuple[float, float]) -> bool:
+    low, high = band
+    return low <= rho <= high
+
 
 def _counts_feasible(counts: Mapping[str, int], ctx: _FeasibilityContext) -> bool:
     """Cheap membership check against precomputed feasible counts, tightest class first."""
@@ -65,6 +76,7 @@ def _score_total(
         return None
     worst_moderate = float("inf")
     worst_severe = float("inf")
+    tolerance_ok = True
     for order, available in assignment_availability.values():
         moderate_rho = effective_rho(available, _MODERATE_RHO, ctx.min_support, total)
         moderate = dict(
@@ -86,9 +98,16 @@ def _score_total(
         )
         if not _counts_feasible(severe, ctx):
             return None
-        worst_moderate = min(worst_moderate, achieved_rho(moderate))
-        worst_severe = min(worst_severe, achieved_rho(severe))
-    return _Candidate(total, worst_moderate, worst_severe)
+        moderate_achieved = achieved_rho(moderate)
+        severe_achieved = achieved_rho(severe)
+        tolerance_ok = (
+            tolerance_ok
+            and _within_band(moderate_achieved, _MODERATE_BAND)
+            and _within_band(severe_achieved, _SEVERE_BAND)
+        )
+        worst_moderate = min(worst_moderate, moderate_achieved)
+        worst_severe = min(worst_severe, severe_achieved)
+    return _Candidate(total, worst_moderate, worst_severe, tolerance_ok)
 
 
 def _log_scan_progress(

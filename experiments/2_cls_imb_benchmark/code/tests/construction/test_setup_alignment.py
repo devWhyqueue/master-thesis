@@ -333,6 +333,24 @@ def test_prepare_writes_three_distinct_patient_split_manifests(tmp_path: Path) -
         for frame in manifests[1:]
     )
 
+def test_prepare_excludes_configured_classes_before_splitting(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    with config_path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(
+            {
+                "paths": {"outputs": str(tmp_path / "outputs")},
+                "dataset": {"excluded_classes": ["class_A"]},
+            },
+            handle,
+        )
+
+    cmd_prepare(Namespace(config=str(config_path), seed=3, split_index=None))
+
+    manifest = pd.read_csv(tmp_path / "outputs" / "split=0" / "data" / "manifest.csv")
+
+    assert "class_A" not in set(manifest["cancer_type"])
+    assert {"class_B", "class_C", "class_D"}.issubset(set(manifest["cancer_type"]))
+
 def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(

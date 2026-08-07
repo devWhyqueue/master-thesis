@@ -402,6 +402,91 @@ def test_integer_rounding_produces_fractional_achieved_ratios() -> None:
     assert any(c.worst_severe != int(c.worst_severe) for c in candidates)
 
 
+def test_tolerance_feasible_total_lands_within_both_bands() -> None:
+    """With generous supports, the selected total realizes both requested severities."""
+    counts = {"A": 5000, "B": 5000}
+    train_df = _flat_frame(counts, is_mil=True)
+    min_support = 10
+
+    total = cap_feasible_shared_total(train_df, ["A", "B"], min_support, True, 1)
+
+    available = [counts["A"], counts["B"]]
+    moderate_rho = effective_rho(available, 10.0, min_support, total)
+    moderate = dict(
+        zip(["A", "B"], allocate_counts(available, total, moderate_rho, min_support), strict=True)
+    )
+    severe_rho = effective_rho(available, 100.0, min_support, total)
+    severe = dict(
+        zip(["A", "B"], allocate_counts(available, total, severe_rho, min_support), strict=True)
+    )
+
+    assert 9.0 <= achieved_rho(moderate) <= 11.0
+    assert 90.0 <= achieved_rho(severe) <= 110.0
+
+
+def test_largest_tolerance_feasible_total_is_selected() -> None:
+    """Among several totals inside both bands, the largest one wins."""
+    counts = {"A": 5000, "B": 5000}
+    train_df = _flat_frame(counts, is_mil=True)
+    min_support = 10
+    ctx, floor, ceiling = _build_search_context(
+        train_df, ["A", "B"], min_support, True, 1, 10, None
+    )
+    candidates = _scan_candidates(ctx, floor, ceiling)
+    tolerance_totals = [c.total for c in candidates if c.tolerance_ok]
+    assert len(tolerance_totals) > 1, "fixture should offer more than one in-band total"
+
+    chosen = cap_feasible_shared_total(train_df, ["A", "B"], min_support, True, 1)
+
+    assert chosen == max(tolerance_totals)
+
+
+def test_tolerance_probe_failure_falls_through_within_the_tolerance_tier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blocked largest in-band total excludes only itself, not the whole tier."""
+    counts = {"A": 5000, "B": 5000}
+    train_df = _flat_frame(counts, is_mil=True)
+    min_support = 10
+    ctx, floor, ceiling = _build_search_context(
+        train_df, ["A", "B"], min_support, True, 1, 10, None
+    )
+    candidates = _scan_candidates(ctx, floor, ceiling)
+    tolerance_totals = sorted((c.total for c in candidates if c.tolerance_ok), reverse=True)
+    assert len(tolerance_totals) >= 2
+    largest = tolerance_totals[0]
+
+    real_probe = shared_total_search._total_cap_feasible
+
+    def blocked_probe(ctx_arg, total):
+        if total == largest:
+            return False
+        return real_probe(ctx_arg, total)
+
+    monkeypatch.setattr(shared_total_search, "_total_cap_feasible", blocked_probe)
+
+    chosen = cap_feasible_shared_total(train_df, ["A", "B"], min_support, True, 1)
+
+    assert chosen != largest
+    assert chosen in tolerance_totals[1:]
+
+
+def test_no_tolerance_feasible_total_falls_back_to_joint_maxima() -> None:
+    """Supports too small for the severe band fall back to the best jointly attainable total."""
+    counts = {"A": 300, "B": 150, "C": 18}
+    train_df = _flat_frame(counts, is_mil=True)
+    min_support = 10
+    ctx, floor, ceiling = _build_search_context(
+        train_df, ["A", "B", "C"], min_support, True, 1, 10, None
+    )
+    candidates = _scan_candidates(ctx, floor, ceiling)
+    assert not any(c.tolerance_ok for c in candidates)
+
+    chosen = cap_feasible_shared_total(train_df, ["A", "B", "C"], min_support, True, 1)
+
+    assert chosen == _largest_jointly_optimal_total(ctx, candidates)
+
+
 def test_degenerate_totals_at_the_floor_score_as_balanced() -> None:
     """At the exact floor, every class is pinned to min_support: rho collapses to 1."""
     counts = {"A": 500, "B": 200}
