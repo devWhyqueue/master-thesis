@@ -17,6 +17,7 @@ __all__ = [
     "probabilities_to_logits",
     "softmax",
     "apply_temperature",
+    "temperature_scaled_probabilities",
     "fit_temperature",
     "reliability_curve",
     "seed_averaged_reliability_curve",
@@ -126,15 +127,13 @@ def temperature_scaled_payload(
     test_logits: np.ndarray,
     test_labels: np.ndarray,
 ) -> dict[str, object]:
-    """Fit validation temperature and retain every scaled test calibration output."""
+    """Fit validation temperature and retain scalar test calibration outputs."""
     fit = fit_temperature(validation_logits, validation_labels)
     probabilities = apply_temperature(test_logits, fit.temperature)
     centers, confidence, accuracy = reliability_curve(probabilities, test_labels)
     metrics = _temperature_metrics(test_labels, probabilities)
     return {
         "temperature": fit.temperature,
-        "temperature_scaled_logits": (test_logits / fit.temperature).tolist(),
-        "temperature_scaled_probabilities": probabilities.tolist(),
         **metrics,
         "temperature_scaled_reliability": {
             "bin_centers": centers.tolist(),
@@ -142,6 +141,17 @@ def temperature_scaled_payload(
             "accuracy": accuracy.tolist(),
         },
     }
+
+
+def temperature_scaled_probabilities(payload: dict[str, object]) -> np.ndarray:
+    """Load legacy scaled probabilities or reconstruct them from stored logits."""
+    if "temperature_scaled_probabilities" in payload:
+        return np.asarray(payload["temperature_scaled_probabilities"])
+    temperature = payload.get("temperature")
+    logits = payload.get("target_prior_logits", payload.get("logits"))
+    if isinstance(temperature, (int, float)) and logits is not None:
+        return apply_temperature(np.asarray(logits), float(temperature))
+    return np.asarray(payload["probabilities"])
 
 
 def _temperature_metrics(

@@ -8,6 +8,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+from imbalance_benchmark.analysis.calibration import temperature_scaled_probabilities
 from imbalance_benchmark.common import read_run_record
 
 __all__ = [
@@ -91,7 +92,7 @@ def load_classwise(conn: sqlite3.Connection) -> pd.DataFrame:
 
 def load_split_payload(result_dir: Path, split: str) -> dict[str, Any] | None:
     """Load one run's evaluated split (with labels/preds/probabilities/logits reattached)."""
-    record = read_run_record(result_dir)
+    record = read_run_record(result_dir, splits=(split,))
     if record is None:
         return None
     return record.get("splits", {}).get(split)
@@ -121,7 +122,7 @@ def load_test_identity(
 
 def _require_complete_confirmation_block(
     method_dir: Path, seed_dirs: list[Path]
-) -> None:
+) -> list[dict[str, Any]]:
     """Refuse to stack a partial confirmation block; report missing/failed seeds.
 
     A method directory that exists must carry exactly the five confirmation
@@ -131,11 +132,18 @@ def _require_complete_confirmation_block(
     """
     present = {int(d.name.split("=")[1]) for d in seed_dirs}
     expected = set(range(EXPECTED_CONFIRMATION_SEEDS))
+    records = [
+        read_run_record(
+            directory,
+            splits=("test",),
+            array_fields=("labels", "preds", "probabilities", "logits"),
+        )
+        for directory in seed_dirs
+    ]
     unreadable = {
-        int(d.name.split("=")[1])
-        for d in seed_dirs
-        if (record := read_run_record(d)) is None
-        or "test" not in record.get("splits", {})
+        int(directory.name.split("=")[1])
+        for directory, record in zip(seed_dirs, records, strict=True)
+        if record is None or "test" not in record.get("splits", {})
     }
     missing = sorted((expected - present) | unreadable)
     extra = sorted(present - expected)
@@ -146,6 +154,7 @@ def _require_complete_confirmation_block(
             f"missing/failed {missing}, unexpected {extra}. "
             "Inference requires exactly five valid confirmation runs."
         )
+    return [record for record in records if record is not None]
 
 
 def load_seed_predictions(
@@ -163,8 +172,7 @@ def load_seed_predictions(
     )
     if not seed_dirs:
         raise RuntimeError(f"Confirmation block is missing seed runs: {method_dir}")
-    _require_complete_confirmation_block(method_dir, seed_dirs)
-    records = [r for d in seed_dirs if (r := read_run_record(d)) is not None]
+    records = _require_complete_confirmation_block(method_dir, seed_dirs)
     if not records:
         return None
     test_splits = [r["splits"]["test"] for r in records]
@@ -184,14 +192,7 @@ def _stack_prediction_arrays(
         "preds": np.stack([np.array(split["preds"]) for split in test_splits]),
         "probs": np.stack([np.array(split["probabilities"]) for split in test_splits]),
         "temperature_scaled_probs": np.stack(
-            [
-                np.array(
-                    split.get(
-                        "temperature_scaled_probabilities", split["probabilities"]
-                    )
-                )
-                for split in test_splits
-            ]
+            [temperature_scaled_probabilities(split) for split in test_splits]
         ),
         "logits": np.stack([np.array(split["logits"]) for split in test_splits]),
     }

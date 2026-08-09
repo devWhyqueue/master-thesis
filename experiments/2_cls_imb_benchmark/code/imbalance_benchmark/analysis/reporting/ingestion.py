@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,8 @@ from imbalance_benchmark.common import read_run_record, write_json
 
 __all__ = ["ingest_all_runs", "calibration_summary", "write_diagnostics"]
 
+logger = logging.getLogger(__name__)
+
 
 def ingest_all_runs(
     conn: sqlite3.Connection, paths: dict[str, Path], freeze: dict[str, Any]
@@ -31,7 +34,7 @@ def ingest_all_runs(
     for condition, method, seed_idx, result_dir in discover_result_dirs(
         paths["results"]
     ):
-        record = read_run_record(result_dir)
+        record = read_run_record(result_dir, array_fields=())
         if record is None:
             continue
         _ingest_discovered_run(
@@ -136,15 +139,21 @@ def calibration_summary(paths: dict[str, Path]) -> dict[str, Any]:
     ... after the appropriate target-prior correction".
     """
     summary: dict[str, Any] = {}
-    for condition, method, seed_idx, result_dir in discover_result_dirs(
-        paths["results"]
+    for count, (condition, method, seed_idx, result_dir) in enumerate(
+        discover_result_dirs(paths["results"]), start=1
     ):
-        record = read_run_record(result_dir)
-        if record is None:
-            continue
-        entry = _run_calibration(record)
-        if entry is not None:
-            assignment = record.get("assignment", "native")
-            run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
-            summary[run_id] = entry
+        record = read_run_record(
+            result_dir,
+            splits=("validation", "test"),
+            array_fields=("labels", "logits", "probabilities", "raw_probabilities"),
+        )
+        if record is not None:
+            entry = _run_calibration(record)
+            if entry is not None:
+                assignment = record.get("assignment", "native")
+                run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
+                summary[run_id] = entry
+        if count % 25 == 0:
+            logger.info("analyze: calibrated %d records", count)
+    logger.info("analyze: calibrated %d records", len(summary))
     return summary

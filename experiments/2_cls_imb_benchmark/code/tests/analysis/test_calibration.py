@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from imbalance_benchmark.analysis.calibration import (
+    apply_temperature,
     apply_target_prior_correction,
     balanced_decision_logits,
     fit_temperature,
+    temperature_scaled_probabilities,
 )
 from imbalance_benchmark.analysis.calibration import (
     seed_averaged_reliability_curve,
@@ -22,7 +25,11 @@ from imbalance_benchmark.analysis.metrics import (
 from imbalance_benchmark.analysis.reporting.calibration_intervals import (
     _distribution_summary,
 )
-from imbalance_benchmark.analysis.reporting.ingestion import _run_calibration
+from imbalance_benchmark.analysis.reporting.ingestion import (
+    _run_calibration,
+    calibration_summary,
+)
+from imbalance_benchmark.common import read_run_record, write_run_record
 
 def test_temperature_scaling_lowers_synthetic_overconfidence_nll():
     rng = np.random.default_rng(0)
@@ -84,6 +91,46 @@ def test_temperature_scaled_ece_is_computed_without_a_per_run_bootstrap() -> Non
 
     assert "temperature_scaled_ece_ci" not in payload
 
+
+def test_temperature_payload_omits_reconstructible_sample_arrays() -> None:
+    payload = temperature_scaled_payload(
+        np.array([[2.0, 0.0], [0.0, 2.0]]),
+        np.array([0, 1]),
+        np.array([[1.0, 0.0], [0.0, 1.0]]),
+        np.array([0, 1]),
+    )
+
+    assert {"temperature_scaled_logits", "temperature_scaled_probabilities"}.isdisjoint(
+        payload
+    )
+
+
+def test_temperature_scaled_probabilities_reconstruct_and_preserve_legacy_order() -> None:
+    logits = np.array([[2.0, 0.0], [0.0, 2.0]])
+    temperature = 1.7
+    scaled = apply_temperature(logits, temperature)
+
+    assert np.allclose(
+        temperature_scaled_probabilities(
+            {"temperature": temperature, "target_prior_logits": logits.tolist()}
+        ),
+        scaled,
+    )
+    assert np.array_equal(
+        temperature_scaled_probabilities(
+            {
+                "temperature": temperature,
+                "target_prior_logits": logits.tolist(),
+                "temperature_scaled_probabilities": [[0.4, 0.6], [0.7, 0.3]],
+            }
+        ),
+        [[0.4, 0.6], [0.7, 0.3]],
+    )
+    assert np.array_equal(
+        temperature_scaled_probabilities({"probabilities": [[0.8, 0.2]]}),
+        [[0.8, 0.2]],
+    )
+
 def test_reliability_bins_are_averaged_over_seeds_not_probabilities() -> None:
     probabilities = np.array(
         [
@@ -123,3 +170,34 @@ def test_calibration_summary_reports_all_claimed_metrics() -> None:
         "temperature_scaled_test_ece",
     } <= set(summary)
     assert "temperature_scaled_reliability" in summary
+
+
+def test_selective_calibration_matches_full_record_output(tmp_path: Path) -> None:
+    result_dir = tmp_path / "results" / "balanced" / "ce" / "seed=0"
+    record = {
+        "benchmark": "patch",
+        "condition": "balanced",
+        "method": "ce",
+        "splits": {
+            "validation": {
+                "labels": [0, 1],
+                "logits": [[4.0, 0.0], [0.0, 4.0]],
+                "probabilities": [[0.98, 0.02], [0.02, 0.98]],
+                "raw_probabilities": [[0.95, 0.05], [0.05, 0.95]],
+            },
+            "test": {
+                "labels": [0, 1],
+                "logits": [[2.0, 0.0], [0.0, 2.0]],
+                "probabilities": [[0.88, 0.12], [0.12, 0.88]],
+                "raw_probabilities": [[0.8, 0.2], [0.2, 0.8]],
+            },
+        },
+    }
+    write_run_record(result_dir, record)
+    full_record = read_run_record(result_dir)
+    assert full_record is not None
+    expected = _run_calibration(full_record)
+
+    summary = calibration_summary({"results": tmp_path / "results"})
+
+    assert summary == {"patch:native:balanced:ce:seed=0": expected}

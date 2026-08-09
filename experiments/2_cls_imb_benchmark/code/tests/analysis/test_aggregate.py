@@ -43,7 +43,10 @@ from imbalance_benchmark.analysis.query import (
     load_eval_details,
     load_test_identity,
 )
-from imbalance_benchmark.analysis.reporting.ingestion import _ingest_discovered_run
+from imbalance_benchmark.analysis.reporting.ingestion import (
+    _ingest_discovered_run,
+    ingest_all_runs,
+)
 from imbalance_benchmark.analysis.reporting.tables import (
     calibration_table,
     results_table,
@@ -354,6 +357,85 @@ def test_ingest_and_tables_end_to_end(tmp_path: Path):
     assert "balanced" in table and "ce" in table
     cal_table = calibration_table(conn)
     assert "negative_log_likelihood" not in cal_table or "\\begin{tabular}" in cal_table
+
+
+def test_read_run_record_selectively_loads_only_requested_sidecar_arrays(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import imbalance_benchmark.common as common
+
+    result_dir = tmp_path / "seed=0"
+    source = {
+        "splits": {
+            "validation": {"labels": [0], "logits": [[1.0, 0.0]]},
+            "test": {
+                "labels": [1],
+                "preds": [1],
+                "probabilities": [[0.1, 0.9]],
+                "logits": [[0.0, 1.0]],
+            },
+        }
+    }
+    write_run_record(result_dir, source)
+    loaded: list[str] = []
+    original_load = common.np.load
+
+    class TrackingNpz:
+        def __init__(self, arrays: object) -> None:
+            self.arrays = arrays
+
+        def __enter__(self) -> object:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            self.arrays.close()  # type: ignore[union-attr]
+
+        def __contains__(self, key: object) -> bool:
+            return key in self.arrays  # type: ignore[operator]
+
+        def __getitem__(self, key: str) -> object:
+            loaded.append(key)
+            return self.arrays[key]  # type: ignore[index]
+
+    monkeypatch.setattr(
+        common.np, "load", lambda *args, **kwargs: TrackingNpz(original_load(*args, **kwargs))
+    )
+    selected = read_run_record(
+        result_dir, splits=("test",), array_fields=("labels",)
+    )
+    full = read_run_record(result_dir)
+
+    assert selected == {"splits": {"test": {"labels": [1]}}}
+    assert loaded[0] == "test_labels"
+    assert set(loaded[1:]) == {
+        "validation_labels",
+        "validation_logits",
+        "test_labels",
+        "test_preds",
+        "test_probabilities",
+        "test_logits",
+    }
+    assert full == source
+
+
+def test_ingestion_does_not_open_eval_array_sidecars(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import imbalance_benchmark.common as common
+
+    result_dir = tmp_path / "results" / "balanced" / "ce" / "seed=0"
+    _write_fake_run(result_dir.parents[2], "balanced", "ce", 0, ["A", "B"], 0)
+    record = read_run_record(result_dir)
+    assert record is not None
+    record["provenance"] = {"freeze_content_sha256": "freeze"}
+    write_run_record(result_dir, record)
+    monkeypatch.setattr(common.np, "load", lambda *_args, **_kwargs: pytest.fail("NPZ opened"))
+
+    conn = connect_db(tmp_path / "results.sqlite")
+    init_schema(conn)
+    ingest_all_runs(conn, {"results": tmp_path / "results"}, {"content_sha256": "freeze"})
+
+    assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
 
 def test_balanced_ingestion_leaves_classwise_tiers_null(tmp_path: Path):
     """Balanced runs have no tail assignment, so classwise tiers stay undefined."""

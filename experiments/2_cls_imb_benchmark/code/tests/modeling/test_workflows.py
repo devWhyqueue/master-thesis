@@ -451,6 +451,41 @@ def test_complete_confirmation_block_stacks_all_five_seeds(tmp_path: Path) -> No
     assert stacked["preds"].shape[0] == 5
 
 
+def test_confirmation_block_reads_each_valid_seed_once(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from imbalance_benchmark.analysis import query
+
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    for seed_idx in range(5):
+        _write_seed_record(method_dir, seed_idx)
+    calls: list[Path] = []
+    original_read = query.read_run_record
+
+    def tracking_read(*args: object, **kwargs: object) -> dict[str, object] | None:
+        calls.append(args[0])  # type: ignore[arg-type]
+        return original_read(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(query, "read_run_record", tracking_read)
+
+    stacked = load_seed_predictions(paths, "severe", "weighted_ce", "native")
+
+    assert stacked is not None
+    assert calls == [method_dir / f"seed={seed_idx}" for seed_idx in range(5)]
+
+
+def test_confirmation_block_rejects_unreadable_seed(tmp_path: Path) -> None:
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    for seed_idx in range(5):
+        _write_seed_record(method_dir, seed_idx)
+    (method_dir / "seed=3" / "run.json").unlink()
+
+    with pytest.raises(RuntimeError, match=r"missing/failed \[3\]"):
+        load_seed_predictions(paths, "severe", "weighted_ce", "native")
+
+
 def test_missing_confirmation_method_is_not_silently_skipped(tmp_path: Path) -> None:
     """A roster method with no directory is a failed confirmation block."""
     with pytest.raises(RuntimeError, match="missing"):

@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from collections.abc import Collection
 from typing import Any, cast
 import numpy as np
 import yaml
@@ -208,20 +209,40 @@ def write_run_record(
     write_json(result_dir / RUN_RECORD_NAME, slim)
 
 
-def read_run_record(result_dir: Path) -> dict[str, Any] | None:
-    """Load a run record and merge sidecar arrays if present."""
+def _load_requested_arrays(
+    record: dict[str, Any], npz_path: Path, requested_fields: set[str]
+) -> None:
+    """Merge requested sidecar arrays into a loaded run record."""
+    with np.load(npz_path, allow_pickle=False) as arrays:
+        for split, payload in record.get("splits", {}).items():
+            if not isinstance(payload, dict):
+                continue
+            for field in requested_fields:
+                name = f"{split}_{field}"
+                if name in arrays:
+                    payload[field] = arrays[name].tolist()
+
+
+def read_run_record(
+    result_dir: Path,
+    splits: Collection[str] | None = None,
+    array_fields: Collection[str] | None = None,
+) -> dict[str, Any] | None:
+    """Load a run record with optional split and NPZ-array filters."""
     path = result_dir / RUN_RECORD_NAME
     if not path.exists():
         return None
     with path.open("r", encoding="utf-8") as handle:
         record = json.load(handle)
+    if splits is not None:
+        requested_splits = set(splits)
+        record["splits"] = {
+            split: payload
+            for split, payload in record.get("splits", {}).items()
+            if split in requested_splits
+        }
+    requested_fields = set(ARRAY_FIELDS if array_fields is None else array_fields)
     npz_path = result_dir / EVAL_ARRAYS_NAME
-    if npz_path.exists():
-        with np.load(npz_path, allow_pickle=False) as arrays:
-            for split, payload in record.get("splits", {}).items():
-                if not isinstance(payload, dict):
-                    continue
-                for f in ARRAY_FIELDS:
-                    if f"{split}_{f}" in arrays:
-                        payload[f] = arrays[f"{split}_{f}"].tolist()
+    if requested_fields and npz_path.exists():
+        _load_requested_arrays(record, npz_path, requested_fields)
     return record
