@@ -23,6 +23,22 @@ from imbalance_benchmark.datasets.data.panda.slide_audit import copy_audited_til
 LOCKED_SLIDES, LOCKED_LABELLED_SLIDES = 10_616, 10_514
 LOCKED_BENIGN_PATCHES, LOCKED_CANCER_PATCHES = 3_702_544, 803_785
 
+# These 4 slides segfault OpenSlide/libtiff/libjpeg deterministically, at
+# multiple band-read sizes, in a native crash that Python cannot catch. The
+# audit stage isolates and excludes them instead of losing a whole shard's
+# work; the combine stage accepts them as a known exclusion rather than
+# failing on an unrecognized crash. The slide count above still counts the
+# true official cohort, since these slides do genuinely exist upstream; the
+# labelled and per-class patch counts already reflect their absence.
+EXCLUDED_SLIDE_IDS = frozenset(
+    {
+        "00e6511435645e50673991768a713c66",
+        "1e23449104568325e9c5a032351dfdc6",
+        "5930e03671314482e9aedb6050d1776d",
+        "8e8067699657d35ca314a76b3892307b",
+    }
+)
+
 
 _REQUIRED_FIELDS = {
     "raw_root",

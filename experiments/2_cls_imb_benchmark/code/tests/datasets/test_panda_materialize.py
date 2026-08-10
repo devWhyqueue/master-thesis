@@ -224,6 +224,27 @@ def test_combine_raises_when_a_shard_reports_crashed_slides(
         panda_materialize.combine(config, shard_count=1)
 
 
+def test_combine_accepts_a_known_excluded_crashed_slide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _materialize_config(tmp_path)
+    monkeypatch.setattr(panda_materialize, "LOCKED_SLIDES", 1)
+    monkeypatch.setattr(
+        panda_materialize,
+        "load_slide_frame",
+        lambda _: pd.DataFrame({"slide_id": ["slide"]}),
+    )
+    monkeypatch.setattr(panda_materialize, "assert_locked_counts", lambda *_: None)
+    excluded_id = next(iter(panda_materialize.EXCLUDED_SLIDE_IDS))
+    cfg = panda_materialize.materialize_config(config)
+    frame = pd.DataFrame({"slide_id": [], "patch_label": []})
+    panda_materialize.write_audit_partial(
+        cfg, 0, frame, {"slide": {"image": "x"}}, [excluded_id]
+    )
+
+    panda_materialize.combine(config, shard_count=1)  # must not raise
+
+
 def test_audit_slides_isolates_a_crashing_slide(monkeypatch: pytest.MonkeyPatch) -> None:
     from concurrent.futures.process import BrokenProcessPool
 

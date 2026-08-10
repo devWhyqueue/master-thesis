@@ -37,6 +37,7 @@ from imbalance_benchmark.datasets.data.panda.partials import (
     write_combined_inventory,
 )
 from imbalance_benchmark.datasets.data.panda.publish import (
+    EXCLUDED_SLIDE_IDS,
     LOCKED_SLIDES,
     assert_locked_counts,
     balanced_shards,
@@ -116,10 +117,13 @@ def combine(config: dict[str, Any], shard_count: int | None = None) -> None:
         frames.append(frame)
         raw_hashes.update(raw)
         crashed.extend(shard_crashed)
-    if crashed:
+    unexpected_crashed = [
+        slide_id for slide_id in crashed if slide_id not in EXCLUDED_SLIDE_IDS
+    ]
+    if unexpected_crashed:
         raise ValueError(
-            f"PANDA audit worker crashed on {len(crashed)} slide(s), excluded from "
-            f"their shard's partial: {sorted(crashed)}"
+            f"PANDA audit worker crashed on {len(unexpected_crashed)} unrecognized "
+            f"slide(s), excluded from their shard's partial: {sorted(unexpected_crashed)}"
         )
     inventory = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     assert_locked_counts(official, inventory)
@@ -192,12 +196,16 @@ def _audit_slide_job(job: AuditJob) -> pd.DataFrame:
     )
 
 
+def _drop_excluded_slides(official: pd.DataFrame) -> pd.DataFrame:
+    excluded = official["slide_id"].isin(list(EXCLUDED_SLIDE_IDS))
+    return cast(pd.DataFrame, official[~excluded].reset_index(drop=True))
+
+
 def audit_canary(config: dict[str, Any]) -> None:
     """Audit providers, grades, mask states and tile-count extremes without publishing."""
     cfg = materialize_config(config)
-    rows = canary_rows(
-        load_slide_frame(Path(cfg["raw_root"])), Path(cfg["legacy_tiles_dir"])
-    )
+    official = _drop_excluded_slides(load_slide_frame(Path(cfg["raw_root"])))
+    rows = canary_rows(official, Path(cfg["legacy_tiles_dir"]))
     for position, (_, row) in enumerate(rows.iterrows(), start=1):
         started = time.monotonic()
         audit_slide(
