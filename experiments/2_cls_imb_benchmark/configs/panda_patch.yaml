@@ -72,7 +72,7 @@ slurm:
     materialize_combine: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 128G}
     materialize_pack: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G}
     materialize_publish: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 64G}
-    extract: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 64G, constraint: "40gb|80gb|h100|h200"}
+    extract: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 64G, constraint: "40gb|80gb|h100|h200"}
     extract_reduce: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
     prepare: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     pilot: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
