@@ -16,6 +16,10 @@ from imbalance_benchmark.commands import (
     cmd_confirm_shard,
     cmd_freeze,
     cmd_materialize_panda,
+    cmd_materialize_panda_audit,
+    cmd_materialize_panda_combine,
+    cmd_materialize_panda_pack,
+    cmd_materialize_panda_publish,
     cmd_materialize_tcga_ut,
     cmd_pilot,
     cmd_prepare,
@@ -60,6 +64,8 @@ def _parser() -> argparse.ArgumentParser:
         "tile-wsi-reduce",
         "materialize-tcga-ut",
         "materialize-panda",
+        "materialize-panda-combine",
+        "materialize-panda-publish",
         "prepare-extract-reduce",
     ):
         sub.add_parser(command)
@@ -78,6 +84,10 @@ def _parser() -> argparse.ArgumentParser:
     extract_shard.add_argument("--shard-index", type=int, required=True)
     extract_shard.add_argument("--shard-count", type=int, required=True)
     sub.choices["materialize-panda"].add_argument("--canary", action="store_true")
+    materialize_audit = sub.add_parser("materialize-panda-audit")
+    materialize_audit.add_argument("--shard-index", type=int, required=True)
+    materialize_pack = sub.add_parser("materialize-panda-pack")
+    materialize_pack.add_argument("--shard-index", type=int, required=True)
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
             "--condition", choices=("natural", "balanced", "moderate", "severe")
@@ -140,6 +150,10 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "tile-wsi-reduce": cmd_tile_wsi_reduce,
         "materialize-tcga-ut": cmd_materialize_tcga_ut,
         "materialize-panda": cmd_materialize_panda,
+        "materialize-panda-audit": cmd_materialize_panda_audit,
+        "materialize-panda-combine": cmd_materialize_panda_combine,
+        "materialize-panda-pack": cmd_materialize_panda_pack,
+        "materialize-panda-publish": cmd_materialize_panda_publish,
     }
 
 

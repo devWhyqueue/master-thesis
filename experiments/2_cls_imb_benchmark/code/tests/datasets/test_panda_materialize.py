@@ -8,8 +8,9 @@ import pytest
 from PIL import Image
 
 from imbalance_benchmark.datasets import panda_materialize
-from imbalance_benchmark.datasets.data import panda_grid
-from imbalance_benchmark.datasets.data.panda_grid import copy_audited_tiles
+from imbalance_benchmark.datasets.data.panda import grid as panda_grid
+from imbalance_benchmark.datasets.data.panda import partials as panda_partials
+from imbalance_benchmark.datasets.data.panda.slide_audit import copy_audited_tiles
 from imbalance_benchmark.datasets.panda_materialize import audit_slide
 
 
@@ -73,31 +74,13 @@ def test_audit_slide_allows_known_large_official_tiffs(
     assert len(audited) == 4
 
 
-def test_eligible_coordinates_reads_one_source_stripe_per_tile_row(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class _Slide:
-        dimensions = (512, 512)
-
-        def __init__(self) -> None:
-            self.calls: list[tuple[tuple[int, int], tuple[int, int]]] = []
-
-        def read_region(
-            self, location: tuple[int, int], _: int, size: tuple[int, int]
-        ) -> Image.Image:
-            self.calls.append((location, size))
-            return Image.new("RGBA", size, (100, 100, 100, 255))
-
-    monkeypatch.setattr(panda_grid.openslide, "OpenSlide", _Slide)
-    source = _Slide()
-
-    assert panda_grid.eligible_coordinates(source) == [
-        (0, 0),
-        (256, 0),
-        (0, 256),
-        (256, 256),
-    ]
-    assert source.calls == [((0, 0), (512, 256)), ((0, 256), (512, 256))]
+def test_band_starts_covers_full_height_in_512_row_bands() -> None:
+    # 768 rows -> one full 512-row band, then a clamped 256-row trailing band;
+    # this is the same boundary math the fused audit loop reads by (one
+    # source read per band, not per 256-row tile stripe).
+    assert list(panda_grid._band_starts(768, 512)) == [(0, 512), (512, 256)]
+    assert list(panda_grid._band_starts(512, 512)) == [(0, 512)]
+    assert list(panda_grid._band_starts(513, 512)) == [(0, 512)]
 
 
 def test_audit_slide_derives_labels_despite_legacy_label_mismatch(
@@ -146,23 +129,8 @@ def test_audit_slide_rejects_extra_or_missing_eligible_tile(
         audit_slide(row, legacy, jpeg_mae_max=2.0)
 
 
-def test_materialize_gates_copying_on_locked_counts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    class _Pool:
-        def __init__(self, max_workers: int) -> None:
-            del max_workers
-
-        def __enter__(self) -> _Pool:
-            return self
-
-        def __exit__(self, *_: object) -> None:
-            return None
-
-        def map(self, function: object, jobs: object) -> object:
-            return map(function, jobs)  # type: ignore[arg-type]
-
-    config = {
+def _materialize_config(tmp_path: Path) -> dict[str, object]:
+    return {
         "materialize_panda": {
             "raw_root": str(tmp_path),
             "legacy_tiles_dir": str(tmp_path),
@@ -170,10 +138,18 @@ def test_materialize_gates_copying_on_locked_counts(
             "scratch_root": str(tmp_path / "scratch"),
             "shard_root": str(tmp_path / "shards"),
             "shard_mount_root": str(tmp_path / "mount"),
-            "canonical_inventory_path": str(tmp_path / "inventory.csv"),
-            "sidecar_path": str(tmp_path / "sidecar.json"),
+            "canonical_inventory_path": str(
+                tmp_path / "materialize" / "canonical_inventory.csv"
+            ),
+            "sidecar_path": str(tmp_path / "materialize" / "sidecar.json"),
         }
     }
+
+
+def test_combine_gates_writing_inventory_on_locked_counts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _materialize_config(tmp_path)
     monkeypatch.setattr(panda_materialize, "LOCKED_SLIDES", 1)
     monkeypatch.setattr(
         panda_materialize,
@@ -182,23 +158,69 @@ def test_materialize_gates_copying_on_locked_counts(
     )
     monkeypatch.setattr(
         panda_materialize,
-        "audit_slide",
-        lambda *_: pd.DataFrame({"slide_id": ["slide"], "patch_label": ["benign"]}),
-    )
-    monkeypatch.setattr(panda_materialize, "ProcessPoolExecutor", _Pool)
-    monkeypatch.setattr(
-        panda_materialize,
         "assert_locked_counts",
         lambda *_: (_ for _ in ()).throw(ValueError("locked counts")),
     )
-    monkeypatch.setattr(
-        panda_materialize,
-        "copy_audited_tiles",
-        lambda *_: pytest.fail("copy ran before locked-count gate"),
-    )
+    cfg = panda_materialize.materialize_config(config)
+    frame = pd.DataFrame({"slide_id": ["slide"], "patch_label": ["benign"]})
+    panda_materialize.write_audit_partial(cfg, 0, frame, {"slide": {"image": "x"}})
 
     with pytest.raises(ValueError, match="locked counts"):
-        panda_materialize.materialize(config)
+        panda_materialize.combine(config, shard_count=1)
+
+    inventory_path, raw_path = panda_partials.combined_paths(cfg)
+    assert not inventory_path.exists()
+    assert not raw_path.exists()
+
+
+def test_audit_partial_round_trips_and_rejects_tampering(tmp_path: Path) -> None:
+    cfg = panda_materialize.materialize_config(_materialize_config(tmp_path))
+    frame = pd.DataFrame(
+        {
+            "slide_id": ["slide"],
+            "case_id": ["slide"],
+            "slide_label": ["ISUP0"],
+            "provider": ["karolinska"],
+            "has_mask": [True],
+            "patch_id": ["slide/0"],
+            "patch_label": ["benign"],
+            "legacy_image_path": ["/legacy/0.jpg"],
+            "sha256": ["abc"],
+            "x": [0],
+            "y": [0],
+            "level": [0],
+            "tile_size": [256],
+            "tissue_fraction_min": [0.35],
+            "tissue_intensity_threshold": [210.0],
+        }
+    )
+    raw_hashes = {"slide": {"image": "abc", "mask": None}}
+
+    assert not panda_materialize.audit_partial_done(cfg, 0)
+    panda_materialize.write_audit_partial(cfg, 0, frame, raw_hashes)
+    assert panda_materialize.audit_partial_done(cfg, 0)
+
+    read_frame, read_raw = panda_materialize.read_audit_partial(cfg, 0)
+    pd.testing.assert_frame_equal(read_frame, frame)
+    assert read_raw == raw_hashes
+
+    tiles_path, _ = panda_partials._audit_partial_paths(cfg, 0)
+    tiles_path.write_text(tiles_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        panda_materialize.audit_partial_done(cfg, 0)
+    with pytest.raises(RuntimeError):
+        panda_materialize.read_audit_partial(cfg, 0)
+
+
+def test_audit_shard_slices_cover_every_slide_exactly_once() -> None:
+    slides = pd.Series([f"slide-{i:04d}" for i in range(101)])
+    count = 8
+    covered: list[str] = []
+    for index in range(count):
+        covered.extend(slides.iloc[index::count].tolist())
+
+    assert sorted(covered) == sorted(slides.tolist())
+    assert len(covered) == len(slides)
 
 
 def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> None:

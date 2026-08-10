@@ -42,8 +42,10 @@ materialize_panda:
   sidecar_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
   shard_count: 48
   jpeg_mae_max: 8.0
-  audit_workers: 1
-  audit_io_workers: 8
+  audit_shard_count: 32
+  audit_workers: null
+  audit_io_workers: 2
+  audit_band_rows: 512
 
 
 slurm:
@@ -56,7 +58,10 @@ slurm:
   max_array_concurrency: 35
   tune_natural_observations_per_candidate: 6
   resources:
-    materialize: {partition: cpu-2d, gpus: 0, cpus: 8, memory: 256G}
+    materialize_audit: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G}
+    materialize_combine: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 128G}
+    materialize_pack: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G}
+    materialize_publish: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 64G}
     extract: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 64G, constraint: "40gb|80gb|h100|h200"}
     extract_reduce: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
     prepare: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
@@ -74,13 +79,13 @@ slurm:
   shared_squashfs:
     - source: /home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs
       mount: /home/space/datasets/panda/native_tiles_20x_256
-      stages: [materialize]
+      stages: [materialize_audit, materialize_pack]
   writable_paths:
     - path: /home/space/datasets-sqfs/panda/patch
-      stages: [materialize]
+      stages: [materialize_pack, materialize_publish]
   readonly_paths:
     - path: /home/space/datasets/panda/raw
-      stages: [materialize]
+      stages: [materialize_audit, materialize_combine, materialize_pack, materialize_publish]
   sharded_squashfs:
     - source_template: /home/space/datasets-sqfs/panda/patch/shard={index}.sqfs
       mount_template: /home/space/datasets/panda/patch/shard={index}

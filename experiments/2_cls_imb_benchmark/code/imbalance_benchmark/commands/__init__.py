@@ -11,6 +11,10 @@ from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.tuning.panda_prepare import (
     cmd_materialize_panda,
+    cmd_materialize_panda_audit,
+    cmd_materialize_panda_combine,
+    cmd_materialize_panda_pack,
+    cmd_materialize_panda_publish,
     cmd_prepare_extract_reduce,
 )
 from imbalance_benchmark.commands.prepare import (
@@ -34,6 +38,10 @@ __all__ = [
     "cmd_freeze",
     "cmd_materialize_tcga_ut",
     "cmd_materialize_panda",
+    "cmd_materialize_panda_audit",
+    "cmd_materialize_panda_combine",
+    "cmd_materialize_panda_pack",
+    "cmd_materialize_panda_publish",
     "cmd_tune",
     "cmd_tune_shard",
     "cmd_tune_reduce",

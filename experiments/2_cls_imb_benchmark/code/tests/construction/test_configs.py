@@ -239,7 +239,11 @@ def test_panda_patch_uses_project_owned_shards_after_materialization() -> None:
     assert config["materialize_panda"]["shard_count"] == 48
     assert config["slurm"]["max_array_concurrency"] == 35
     assert config["slurm"]["shared_squashfs"] == [
-        {"source": PANDA_SQUASHFS, "mount": PANDA_MOUNT, "stages": ["materialize"]}
+        {
+            "source": PANDA_SQUASHFS,
+            "mount": PANDA_MOUNT,
+            "stages": ["materialize_audit", "materialize_pack"],
+        }
     ]
     assert config["slurm"]["sharded_squashfs"][0]["stages"] == [
         "prepare-extract-shard"

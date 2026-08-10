@@ -57,7 +57,7 @@ def stage_jobs(
     if config.get("dataset", {}).get("name") != "panda":
         raise ValueError("Stage-only submission is reserved for PANDA readiness")
     if stage == "materialize":
-        return [build_job(config, "materialize", "materialize-panda", False)]
+        return _materialize_stage_jobs(config)
     if stage == "extract":
         return _extract_stage_jobs(config)
     if stage == "prepare":
@@ -66,6 +66,30 @@ def stage_jobs(
         splits = (split_index,) if split_index is not None else (0, 1, 2)
         return [replace(build_job(config, stage, stage, False), array_splits=splits)]
     raise ValueError(f"Unknown stage-only boundary: {stage}")
+
+
+def _materialize_stage_jobs(config: dict[str, Any]) -> list[SlurmJob]:
+    """Build the audit array -> combine -> pack array -> publish dependency chain."""
+    mp = config.get("materialize_panda", {})
+    audit_count = int(mp.get("audit_shard_count", 32))
+    pack_count = int(mp.get("shard_count", 48))
+    audit = replace(
+        build_job(config, "materialize_audit", "materialize-panda-audit", False),
+        array_size=audit_count,
+    )
+    combine = build_job(
+        config, "materialize_combine", "materialize-panda-combine", False, (audit.name,)
+    )
+    pack = replace(
+        build_job(
+            config, "materialize_pack", "materialize-panda-pack", False, (combine.name,)
+        ),
+        array_size=pack_count,
+    )
+    publish = build_job(
+        config, "materialize_publish", "materialize-panda-publish", False, (pack.name,)
+    )
+    return [audit, combine, pack, publish]
 
 
 def _extract_stage_jobs(config: dict[str, Any]) -> list[SlurmJob]:

@@ -10,14 +10,17 @@ from imbalance_benchmark.hydra.workflow import build_workflow
 def _config() -> dict[str, object]:
     return {
         "dataset": {"name": "panda", "regime": "patch"},
-        "materialize_panda": {"shard_count": 48},
+        "materialize_panda": {"shard_count": 48, "audit_shard_count": 32},
         "slurm": {
             "project_root": "/home/example/master-thesis",
             "code_dir": "/home/example/code",
             "output_dir": "/home/example/outputs",
             "container": "/home/example/environment.sif",
             "resources": {
-                "materialize": {"partition": "cpu-2d", "gpus": 0, "cpus": 8},
+                "materialize_audit": {"partition": "cpu-5h", "gpus": 0, "cpus": 8},
+                "materialize_combine": {"partition": "cpu-5h", "gpus": 0, "cpus": 4},
+                "materialize_pack": {"partition": "cpu-5h", "gpus": 0, "cpus": 8},
+                "materialize_publish": {"partition": "cpu-2h", "gpus": 0, "cpus": 4},
                 "extract": {"partition": "gpu-5h", "gpus": 1, "cpus": 8},
                 "extract_reduce": {"partition": "cpu-2h", "gpus": 0, "cpus": 2},
             },
@@ -31,13 +34,18 @@ def _config() -> dict[str, object]:
             "writable_paths": [
                 {
                     "path": "/home/space/datasets-sqfs/panda/patch",
-                    "stages": ["materialize"],
+                    "stages": ["materialize_pack", "materialize_publish"],
                 }
             ],
             "readonly_paths": [
                 {
                     "path": "/home/space/datasets/panda/raw",
-                    "stages": ["materialize"],
+                    "stages": [
+                        "materialize_audit",
+                        "materialize_combine",
+                        "materialize_pack",
+                        "materialize_publish",
+                    ],
                 }
             ],
         },
@@ -63,13 +71,32 @@ def test_panda_stage_only_pilot_can_run_one_split() -> None:
     assert jobs[0].array_splits == (0,)
 
 
+def test_panda_materialize_is_a_4_stage_dependency_chain() -> None:
+    jobs = build_workflow(_config(), stage="materialize")
+
+    assert [job.name for job in jobs] == [
+        "materialize_audit",
+        "materialize_combine",
+        "materialize_pack",
+        "materialize_publish",
+    ]
+    assert jobs[0].array_size == 32
+    assert jobs[1].dependencies == ("materialize_audit",)
+    assert jobs[2].array_size == 48
+    assert jobs[2].dependencies == ("materialize_combine",)
+    assert jobs[3].dependencies == ("materialize_pack",)
+
+
 def test_panda_materialize_writes_only_its_project_shard_root() -> None:
-    materialize = build_workflow(_config(), stage="materialize")[0]
-    script = render_sbatch(materialize, _config(), "config.yaml")
+    audit = build_workflow(_config(), stage="materialize")[0]
+    script = render_sbatch(audit, _config(), "config.yaml")
 
     assert "-B /home/space/datasets/panda/raw:/home/space/datasets/panda/raw:ro" in script
-    assert "-B /home/space/datasets-sqfs/panda/patch:/home/space/datasets-sqfs/panda/patch:rw" in script
     assert '"/home/space:/home/space:ro"' not in script
+
+    pack = build_workflow(_config(), stage="materialize")[2]
+    script = render_sbatch(pack, _config(), "config.yaml")
+    assert "-B /home/space/datasets-sqfs/panda/patch:/home/space/datasets-sqfs/panda/patch:rw" in script
 
 
 def test_panda_extract_stages_only_its_array_shard() -> None:

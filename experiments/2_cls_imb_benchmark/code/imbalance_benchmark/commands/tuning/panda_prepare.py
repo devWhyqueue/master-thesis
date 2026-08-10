@@ -8,7 +8,11 @@ from imbalance_benchmark.common import ensure_dirs, load_config
 from imbalance_benchmark.commands.prepare import _eligible_image_manifest
 from imbalance_benchmark.datasets.panda_materialize import (
     audit_canary,
+    audit_shard,
+    combine,
     materialize,
+    pack_shard_stage,
+    publish,
     reduce_feature_inventory,
 )
 
@@ -34,3 +38,23 @@ def cmd_materialize_panda(args: argparse.Namespace) -> None:
         audit_canary(config)
     else:
         materialize(config)
+
+
+def cmd_materialize_panda_audit(args: argparse.Namespace) -> None:
+    """Audit one shard of slides into a signed partial, resuming if verified."""
+    audit_shard(load_config(args.config), args.shard_index)
+
+
+def cmd_materialize_panda_combine(args: argparse.Namespace) -> None:
+    """Concatenate every audit partial and gate on the locked cohort counts."""
+    combine(load_config(args.config))
+
+
+def cmd_materialize_panda_pack(args: argparse.Namespace) -> None:
+    """Copy and pack one publish shard from the combined audit inventory."""
+    pack_shard_stage(load_config(args.config), args.shard_index)
+
+
+def cmd_materialize_panda_publish(args: argparse.Namespace) -> None:
+    """Verify every packed shard and publish the signed canonical inventory."""
+    publish(load_config(args.config))

@@ -18,32 +18,43 @@ from imbalance_benchmark.common import (
     verify_signed_file,
     write_json,
 )
+from imbalance_benchmark.datasets.data.panda.slide_audit import copy_audited_tiles
 
 LOCKED_SLIDES, LOCKED_LABELLED_SLIDES = 10_616, 10_514
 LOCKED_BENIGN_PATCHES, LOCKED_CANCER_PATCHES = 3_702_544, 803_785
 
 
+_REQUIRED_FIELDS = {
+    "raw_root",
+    "legacy_tiles_dir",
+    "legacy_manifest_dir",
+    "scratch_root",
+    "shard_root",
+    "shard_mount_root",
+    "canonical_inventory_path",
+    "sidecar_path",
+}
+_DEFAULT_FIELDS = {
+    "shard_count": 48,
+    "jpeg_mae_max": 5.0,
+    "audit_shard_count": 32,
+    "audit_workers": None,
+    "audit_io_workers": 2,
+    "audit_band_rows": 512,
+}
+
+
 def materialize_config(config: dict[str, Any]) -> dict[str, Any]:
     """Validate required project-owned PANDA materialization paths."""
     cfg = config.get("materialize_panda")
-    required = {
-        "raw_root",
-        "legacy_tiles_dir",
-        "legacy_manifest_dir",
-        "scratch_root",
-        "shard_root",
-        "shard_mount_root",
-        "canonical_inventory_path",
-        "sidecar_path",
-    }
     if not isinstance(cfg, dict):
         raise ValueError(
-            f"PANDA materialization fields are missing: {sorted(required)}"
+            f"PANDA materialization fields are missing: {sorted(_REQUIRED_FIELDS)}"
         )
-    missing = sorted(required - set(cfg))
+    missing = sorted(_REQUIRED_FIELDS - set(cfg))
     if missing:
         raise ValueError(f"PANDA materialization fields are missing: {missing}")
-    return {"shard_count": 48, "jpeg_mae_max": 5.0, **cfg}
+    return {**_DEFAULT_FIELDS, **cfg}
 
 
 def assert_locked_counts(official: pd.DataFrame, inventory: pd.DataFrame) -> None:
@@ -79,35 +90,27 @@ def balanced_shards(inventory: pd.DataFrame, shard_count: int) -> pd.Series:
     return inventory.slide_id.astype(str).map(assignment).astype(int)
 
 
-def publish_shards(inventory: pd.DataFrame, scratch: Path, cfg: dict[str, Any]) -> None:
-    """Pack verified shard trees through partial images and atomic publication."""
-    for index, shard in inventory.groupby("shard_index", sort=True):
-        root = scratch / f"shard={index}"
-        move_images(shard, scratch, root)
-        manifest = root / "manifest.csv"
-        shard.assign(
-            image_path=shard.apply(lambda row: mounted_path(cfg, row), axis=1)
-        ).to_csv(manifest, index=False)
-        destination = Path(cfg["shard_root"]) / f"shard={index}.sqfs"
-        if pack_shard(
-            root, destination, str(cfg.get("squash_command", "squash-dataset"))
-        ):
-            write_shard_sidecar(manifest, destination)
-        else:
-            verify_existing_shard(manifest, destination)
-        shutil.rmtree(root)
+def pack_one_shard(
+    shard: pd.DataFrame, shard_index: int, scratch_root: Path, cfg: dict[str, Any]
+) -> None:
+    """Copy one shard's verified JPEGs straight into its tree, then pack it.
 
-
-def move_images(shard: pd.DataFrame, scratch: Path, root: Path) -> None:
-    """Move each once-verified JPEG into its project-owned shard tree."""
-    for patch_id, slide_id in shard[["patch_id", "slide_id"]].itertuples(
-        index=False, name=None
-    ):
-        index = str(patch_id).split("/")[-1]
-        source = scratch / "tiles" / str(slide_id) / f"{index}.jpg"
-        target = root / "tiles" / str(slide_id) / f"{index}.jpg"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(source, target)
+    Copies directly from each tile's audited ``legacy_image_path`` into this
+    shard's own scratch tree (no intermediate shared-tiles staging), so
+    concurrent pack tasks for different shards never share scratch state.
+    """
+    root = scratch_root / f"shard={shard_index}"
+    copied = copy_audited_tiles(shard, root)
+    manifest = root / "manifest.csv"
+    copied.assign(
+        image_path=copied.apply(lambda row: mounted_path(cfg, row), axis=1)
+    ).to_csv(manifest, index=False)
+    destination = Path(cfg["shard_root"]) / f"shard={shard_index}.sqfs"
+    if pack_shard(root, destination, str(cfg.get("squash_command", "squash-dataset"))):
+        write_shard_sidecar(manifest, destination)
+    else:
+        verify_existing_shard(manifest, destination)
+    shutil.rmtree(root)
 
 
 def pack_shard(root: Path, destination: Path, command: str) -> bool:
@@ -149,7 +152,10 @@ def verify_existing_shard(manifest: Path, shard: Path) -> None:
 
 
 def publish_inventory(
-    official: pd.DataFrame, inventory: pd.DataFrame, cfg: dict[str, Any]
+    official: pd.DataFrame,
+    inventory: pd.DataFrame,
+    cfg: dict[str, Any],
+    raw_hashes: dict[str, dict[str, str | None]],
 ) -> dict[str, Any]:
     """Publish signed canonical inventory plus aggregate raw and shard provenance."""
     inventory = inventory.copy()
@@ -160,7 +166,7 @@ def publish_inventory(
     path.parent.mkdir(parents=True, exist_ok=True)
     inventory.to_csv(path, index=False)
     sign_file(path)
-    sidecar = _sidecar_payload(official, inventory, cfg, path)
+    sidecar = _sidecar_payload(official, inventory, cfg, path, raw_hashes)
     sidecar_path = Path(cfg["sidecar_path"])
     write_json(sidecar_path, sidecar)
     sign_file(sidecar_path)
@@ -168,7 +174,11 @@ def publish_inventory(
 
 
 def _sidecar_payload(
-    official: pd.DataFrame, inventory: pd.DataFrame, cfg: dict[str, Any], path: Path
+    official: pd.DataFrame,
+    inventory: pd.DataFrame,
+    cfg: dict[str, Any],
+    path: Path,
+    raw_hashes: dict[str, dict[str, str | None]],
 ) -> dict[str, Any]:
     root = Path(cfg["shard_root"])
     shards = sorted(root.glob("shard=*.manifest.json"))
@@ -178,17 +188,7 @@ def _sidecar_payload(
         verify_signed_file(sidecar)
     counts = inventory.patch_label.value_counts()
     return {
-        "raw_inventory_sha256": compute_data_hash(
-            {
-                str(row.slide_id): {
-                    "image": compute_sha256(Path(str(row.image_path))),
-                    "mask": compute_sha256(Path(str(row.mask_path)))
-                    if row.has_mask
-                    else None,
-                }
-                for _, row in official.iterrows()
-            }
-        ),
+        "raw_inventory_sha256": compute_data_hash(raw_hashes),
         "inventory_path": str(path),
         "inventory_sha256": compute_sha256(path),
         "shard_count": int(cfg["shard_count"]),

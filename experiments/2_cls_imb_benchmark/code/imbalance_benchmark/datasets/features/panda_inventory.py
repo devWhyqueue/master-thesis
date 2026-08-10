@@ -14,7 +14,7 @@ from imbalance_benchmark.common import (
     verify_signed_file,
     write_json,
 )
-from imbalance_benchmark.datasets.data.panda_publish import (
+from imbalance_benchmark.datasets.data.panda.publish import (
     LOCKED_BENIGN_PATCHES,
     LOCKED_CANCER_PATCHES,
     LOCKED_LABELLED_SLIDES,
