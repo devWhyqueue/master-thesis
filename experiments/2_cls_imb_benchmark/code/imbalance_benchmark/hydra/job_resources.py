@@ -26,6 +26,17 @@ def resources_for(
     }
 
 
+_HOST_ONLY_RESOURCES = {
+    # tune_decide shells out to sbatch/squeue to self-chain the adaptive
+    # search; materialize_pack and materialize_publish shell out to
+    # squash-dataset and git. The Apptainer container has none of these
+    # host tools, so these stages always run on the host instead.
+    "tune_decide",
+    "materialize_pack",
+    "materialize_publish",
+}
+
+
 def build_job(
     config: dict[str, Any],
     stage: str,
@@ -35,17 +46,12 @@ def build_job(
     resource: str | None = None,
     fallback: str | None = None,
 ) -> SlurmJob:
-    """Build one stage's job with its resolved SLURM resources.
-
-    ``tune-decide`` shells out to ``sbatch``/``squeue`` itself to self-chain
-    the adaptive search - the Apptainer container has no SLURM client, so
-    that resource type always runs on the host instead.
-    """
+    """Build one stage's job with its resolved SLURM resources."""
     return SlurmJob(
         stage,
         cmd,
         dependencies=dependencies,
-        on_host=resource == "tune_decide",
+        on_host=(resource or stage) in _HOST_ONLY_RESOURCES,
         **resources_for(config, resource or stage, gpu, fallback),
     )
 

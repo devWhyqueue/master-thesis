@@ -94,9 +94,13 @@ def test_panda_materialize_writes_only_its_project_shard_root() -> None:
     assert "-B /home/space/datasets/panda/raw:/home/space/datasets/panda/raw:ro" in script
     assert '"/home/space:/home/space:ro"' not in script
 
+    # pack shells out to squash-dataset, a host-only compute-node tool absent
+    # from the Apptainer container, so it runs on the host instead.
     pack = build_workflow(_config(), stage="materialize")[2]
     script = render_sbatch(pack, _config(), "config.yaml")
-    assert "-B /home/space/datasets-sqfs/panda/patch:/home/space/datasets-sqfs/panda/patch:rw" in script
+    assert "uv run" in script
+    assert "materialize-panda-pack" in script
+    assert "apptainer" not in script
 
 
 def test_panda_extract_stages_only_its_array_shard() -> None:
