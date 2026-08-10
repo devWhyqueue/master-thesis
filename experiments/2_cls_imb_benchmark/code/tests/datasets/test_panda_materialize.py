@@ -129,6 +129,36 @@ def test_audit_slide_rejects_extra_or_missing_eligible_tile(
         audit_slide(row, legacy, jpeg_mae_max=2.0)
 
 
+def test_audit_slide_handles_a_zero_eligible_tile_manifest(tmp_path: Path) -> None:
+    # Some real PANDA slides have zero eligible tissue tiles; their legacy
+    # manifest is a bare newline with no header, which pandas otherwise
+    # rejects with EmptyDataError.
+    raw = tmp_path / "raw"
+    images = raw / "train_images"
+    images.mkdir(parents=True)
+    slide_id = "blank"
+    background = np.full((512, 512, 3), 255, dtype=np.uint8)
+    Image.fromarray(background).save(images / f"{slide_id}.tiff")
+    legacy = tmp_path / "legacy" / slide_id
+    legacy.mkdir(parents=True)
+    manifest = tmp_path / "legacy.csv"
+    manifest.write_text("\n")
+    row = pd.Series(
+        {
+            "slide_id": slide_id,
+            "provider": "karolinska",
+            "slide_label": "ISUP0",
+            "image_path": str(images / f"{slide_id}.tiff"),
+            "mask_path": "",
+            "has_mask": False,
+        }
+    )
+
+    audited = audit_slide(row, legacy, jpeg_mae_max=2.0, manifest_path=manifest)
+
+    assert audited.empty
+
+
 def _materialize_config(tmp_path: Path) -> dict[str, object]:
     return {
         "materialize_panda": {

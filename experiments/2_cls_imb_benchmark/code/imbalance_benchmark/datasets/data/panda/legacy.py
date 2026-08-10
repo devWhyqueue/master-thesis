@@ -54,6 +54,10 @@ def _glob_resolver(directory: Path) -> tuple[Resolver, int]:
 
 
 def _manifest_records(path: Path) -> list[dict[str, object]]:
+    # A slide with zero eligible tissue tiles has a manifest with no header
+    # (observed as a bare newline), which pandas otherwise rejects outright.
+    if not path.read_text(encoding="utf-8").strip():
+        return []
     required = {"patch_id", "x", "y", "image_path"}
     frame = pd.read_csv(path)
     if (
