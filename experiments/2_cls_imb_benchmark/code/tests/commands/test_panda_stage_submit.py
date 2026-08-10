@@ -34,6 +34,12 @@ def _config() -> dict[str, object]:
                     "stages": ["materialize"],
                 }
             ],
+            "readonly_paths": [
+                {
+                    "path": "/home/space/datasets/panda/raw",
+                    "stages": ["materialize"],
+                }
+            ],
         },
     }
 
@@ -61,7 +67,9 @@ def test_panda_materialize_writes_only_its_project_shard_root() -> None:
     materialize = build_workflow(_config(), stage="materialize")[0]
     script = render_sbatch(materialize, _config(), "config.yaml")
 
+    assert "-B /home/space/datasets/panda/raw:/home/space/datasets/panda/raw:ro" in script
     assert "-B /home/space/datasets-sqfs/panda/patch:/home/space/datasets-sqfs/panda/patch:rw" in script
+    assert '"/home/space:/home/space:ro"' not in script
 
 
 def test_panda_extract_stages_only_its_array_shard() -> None:

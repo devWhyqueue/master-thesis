@@ -76,6 +76,9 @@ slurm:
   writable_paths:
     - path: /home/space/datasets-sqfs/panda/patch
       stages: [materialize]
+  readonly_paths:
+    - path: /home/space/datasets/panda/raw
+      stages: [materialize]
   sharded_squashfs:
     - source_template: /home/space/datasets-sqfs/panda/patch/shard={index}.sqfs
       mount_template: /home/space/datasets/panda/patch/shard={index}

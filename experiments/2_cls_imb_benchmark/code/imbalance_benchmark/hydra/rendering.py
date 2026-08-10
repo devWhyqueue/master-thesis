@@ -170,10 +170,8 @@ def _execution_lines(
     lines.extend(_staging_lines(images))
     lines.extend(sharded_images)
     lines.extend(_mount_generated_tile_lines(generated_squashfs))
-    writable = _writable_binds(config, job.name)
-    binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" -B "/home/space:/home/space:ro"'
-    if writable:
-        binds += f" {writable}"
+    data_binds = _data_binds(config, job.name)
+    binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" {data_binds}'
     if dataset_root:
         binds += f' -B "{dataset_root}:{dataset_root}:ro"'
     for source, mount in shared_images:
@@ -197,14 +195,28 @@ def _execution_lines(
     return lines
 
 
-def _writable_binds(config: dict[str, Any], stage: str) -> str:
-    """Return stage-scoped writable mounts over otherwise read-only data roots."""
-    paths = config.get("slurm", {}).get("writable_paths", [])
-    return " ".join(
-        f"-B {shlex.quote('{path}:{path}:rw'.format(path=str(item['path'])))}"
-        for item in paths
+def _data_binds(config: dict[str, Any], stage: str) -> str:
+    """Return stage-scoped data mounts, defaulting to read-only shared storage."""
+    slurm = config.get("slurm", {})
+    readonly = [
+        str(item["path"])
+        for item in slurm.get("readonly_paths", [])
         if stage in item.get("stages", ())
+    ]
+    writable = [
+        str(item["path"])
+        for item in slurm.get("writable_paths", [])
+        if stage in item.get("stages", ())
+    ]
+    readonly_binds = " ".join(
+        f"-B {shlex.quote(f'{path}:{path}:ro')}" for path in readonly
     )
+    if not readonly_binds:
+        readonly_binds = '-B "/home/space:/home/space:ro"'
+    writable_binds = " ".join(
+        f"-B {shlex.quote(f'{path}:{path}:rw')}" for path in writable
+    )
+    return " ".join(part for part in (readonly_binds, writable_binds) if part)
 
 
 def _host_execution_lines(root: str, command: str) -> list[str]:
