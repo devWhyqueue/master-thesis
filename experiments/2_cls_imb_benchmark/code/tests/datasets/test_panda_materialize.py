@@ -121,6 +121,19 @@ def test_audit_slide_rejects_extra_or_missing_eligible_tile(
 def test_materialize_gates_copying_on_locked_counts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    class _Pool:
+        def __init__(self, max_workers: int) -> None:
+            del max_workers
+
+        def __enter__(self) -> _Pool:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def map(self, function: object, jobs: object) -> object:
+            return map(function, jobs)  # type: ignore[arg-type]
+
     config = {
         "materialize_panda": {
             "raw_root": str(tmp_path),
@@ -144,6 +157,7 @@ def test_materialize_gates_copying_on_locked_counts(
         "audit_slide",
         lambda *_: pd.DataFrame({"slide_id": ["slide"], "patch_label": ["benign"]}),
     )
+    monkeypatch.setattr(panda_materialize, "ProcessPoolExecutor", _Pool)
     monkeypatch.setattr(
         panda_materialize,
         "assert_locked_counts",
@@ -176,7 +190,7 @@ def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> No
             return map(function, jobs)  # type: ignore[arg-type]
 
     monkeypatch.setenv("SLURM_CPUS_PER_TASK", "2")
-    monkeypatch.setattr(panda_materialize, "ThreadPoolExecutor", _Pool)
+    monkeypatch.setattr(panda_materialize, "ProcessPoolExecutor", _Pool)
     monkeypatch.setattr(
         panda_materialize,
         "audit_slide",
@@ -194,3 +208,29 @@ def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert captured == [2]
     assert [frame.iloc[0].slide_id for frame in audited] == ["a", "b", "c"]
+
+
+def test_audit_slides_runs_a_real_process(tmp_path: Path) -> None:
+    row, legacy, _ = _source(tmp_path)
+    manifests = tmp_path / "manifests"
+    manifests.mkdir()
+    pd.DataFrame(
+        {
+            "patch_id": range(4),
+            "x": [0, 256, 0, 256],
+            "y": [0, 0, 256, 256],
+            "image_path": [str(legacy / f"{index}.jpg") for index in range(4)],
+        }
+    ).to_csv(manifests / "slide.csv", index=False)
+
+    audited = panda_materialize._audit_slides(
+        pd.DataFrame([row]),
+        {
+            "legacy_tiles_dir": str(legacy.parent),
+            "legacy_manifest_dir": str(manifests),
+            "jpeg_mae_max": 2.0,
+        },
+    )
+
+    assert len(audited) == 1
+    assert audited[0].patch_label.tolist() == ["cancer", "benign", "benign", "benign"]

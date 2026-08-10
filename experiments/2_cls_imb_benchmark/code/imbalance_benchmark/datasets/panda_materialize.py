@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
@@ -66,7 +66,7 @@ def _audit_slides(official: pd.DataFrame, cfg: dict[str, Any]) -> list[pd.DataFr
         (position, len(slides), row, cfg)
         for position, (_, row) in enumerate(slides.iterrows(), start=1)
     ]
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+    with ProcessPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(_audit_slide_job, jobs))
 
 
