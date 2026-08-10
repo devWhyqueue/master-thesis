@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from imbalance_benchmark.hydra.rendering import SlurmJob
@@ -47,3 +48,44 @@ def build_job(
         on_host=resource == "tune_decide",
         **resources_for(config, resource or stage, gpu, fallback),
     )
+
+
+def stage_jobs(
+    config: dict[str, Any], stage: str, split_index: int | None
+) -> list[SlurmJob]:
+    """Build one selected PANDA readiness boundary without later work."""
+    if config.get("dataset", {}).get("name") != "panda":
+        raise ValueError("Stage-only submission is reserved for PANDA readiness")
+    if stage == "materialize":
+        return [build_job(config, "materialize", "materialize-panda", False)]
+    if stage == "extract":
+        return _extract_stage_jobs(config)
+    if stage == "prepare":
+        return [build_job(config, "prepare", "prepare", False)]
+    if stage in {"pilot", "freeze"}:
+        splits = (split_index,) if split_index is not None else (0, 1, 2)
+        return [replace(build_job(config, stage, stage, False), array_splits=splits)]
+    raise ValueError(f"Unknown stage-only boundary: {stage}")
+
+
+def _extract_stage_jobs(config: dict[str, Any]) -> list[SlurmJob]:
+    count = int(config.get("materialize_panda", {}).get("shard_count", 48))
+    extract = replace(
+        build_job(
+            config,
+            "prepare-extract-shard",
+            f"prepare-extract-shard --shard-count {count}",
+            True,
+            resource="extract",
+        ),
+        array_size=count,
+    )
+    reduce = build_job(
+        config,
+        "prepare-extract-reduce",
+        "prepare-extract-reduce",
+        False,
+        (extract.name,),
+        "extract_reduce",
+    )
+    return [extract, reduce]

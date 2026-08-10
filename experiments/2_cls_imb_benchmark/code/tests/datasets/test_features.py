@@ -28,7 +28,7 @@ from imbalance_benchmark.datasets.data.patch import ImbalanceDataset
 
 def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
     from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
-    from imbalance_benchmark.datasets.panda_audit import validate_tile_inventory
+    from imbalance_benchmark.datasets.features.panda_audit import validate_tile_inventory
 
     with pytest.raises(ValueError, match="audit"):
         validate_tile_manifest(

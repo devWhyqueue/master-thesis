@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import logging
 import os
 import subprocess
@@ -11,6 +11,7 @@ from imbalance_benchmark.common import load_config
 from imbalance_benchmark.hydra.confirm_jobs import confirm_jobs as _confirm_jobs
 from imbalance_benchmark.hydra.job_resources import build_job as _job
 from imbalance_benchmark.hydra.job_resources import resources_for as _resources
+from imbalance_benchmark.hydra.job_resources import stage_jobs
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
 from imbalance_benchmark.modeling.context import CONDITIONS
@@ -22,6 +23,17 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SubmitOptions:
+    """Optional workflow mode and one explicit stage boundary."""
+
+    smoke: bool = False
+    resume_tuning: bool = False
+    confirm_only: bool = False
+    stage: str | None = None
+    split_index: int | None = None
 
 
 def _analyze_jobs(
@@ -51,6 +63,8 @@ def build_workflow(
     smoke: bool = False,
     resume_tuning: bool = False,
     confirm_only: bool = False,
+    stage: str | None = None,
+    split_index: int | None = None,
 ) -> list[SlurmJob]:
     """Build the benchmark DAG, or its test-partition synthetic smoke variant.
 
@@ -64,6 +78,8 @@ def build_workflow(
         res = _resources(config, "smoke", True)
         res["partition"] = config.get("slurm", {}).get("test_partition", "gpu-test")
         return [SlurmJob("smoke", "smoke", **res)]
+    if stage:
+        return stage_jobs(config, stage, split_index)
     arr = (0, 1, 2)
     if confirm_only:
         confirm_natural, confirm_controlled = _confirm_jobs(config)
@@ -184,14 +200,19 @@ def submit_workflow(
     config: dict[str, Any],
     config_path: str | None = None,
     dry_run: bool = False,
-    smoke: bool = False,
-    resume_tuning: bool = False,
-    confirm_only: bool = False,
+    options: SubmitOptions = SubmitOptions(),
     submit: Callable[[str, bool], str] = _submit_script,
 ) -> dict[str, str]:
     """Render and submit the workflow in topological order, returning job IDs by stage."""
     submitted: dict[str, str] = {}
-    for job in build_workflow(config, smoke, resume_tuning, confirm_only):
+    for job in build_workflow(
+        config,
+        options.smoke,
+        options.resume_tuning,
+        options.confirm_only,
+        options.stage,
+        options.split_index,
+    ):
         dependencies = tuple(submitted[name] for name in job.dependencies)
         scheduled = replace(job, dependencies=dependencies)
         script = render_sbatch(scheduled, config, config_path)
@@ -209,11 +230,11 @@ def cmd_submit(args: argparse.Namespace) -> None:
     # Baked into rendered sbatch scripts, which cd to the project root before
     # running — a relative --config path must be resolved before embedding.
     config_path = os.path.abspath(args.config)
-    submit_workflow(
-        config,
-        config_path,
-        args.dry_run,
+    options = SubmitOptions(
         getattr(args, "smoke", False),
         getattr(args, "resume_tuning", False),
         getattr(args, "confirm_only", False),
+        getattr(args, "stage", None),
+        args.split_index,
     )
+    submit_workflow(config, config_path, args.dry_run, options)

@@ -23,7 +23,7 @@ from imbalance_benchmark.datasets.features.cache_manifest import (
     validate_cached_slide,
 )
 
-__all__ = ["attach_extracted_features"]
+__all__ = ["attach_extracted_features", "validate_cached_features"]
 
 SlideWork = tuple[str, list[str], list[str]]
 
@@ -34,12 +34,15 @@ def attach_extracted_features(
     feature_cfg: dict[str, Any] | None = None,
     device: torch.device | None = None,
     gpu_workers: int = 1,
+    aggregate_cache: bool = True,
 ) -> pd.DataFrame:
     """Extract ordered per-slide tensors, using configured visible GPUs when possible."""
     options = _extraction_options(feature_cfg or {}, device)
     _prepare_feature_cache(feature_root, options)
     enriched = frame.copy()
-    paths, indices = _feature_references(enriched, feature_root, options, gpu_workers)
+    paths, indices = _feature_references(
+        enriched, feature_root, options, gpu_workers, aggregate_cache
+    )
     enriched["feature_path"] = paths
     enriched["feature_index"] = indices.astype(int)
     return enriched
@@ -68,16 +71,34 @@ def _feature_references(
     feature_root: Path,
     options: dict[str, Any],
     requested_workers: int,
+    aggregate_cache: bool,
 ) -> tuple[pd.Series, pd.Series]:
     work = _slide_work(frame)
     expected = {
         slide_id: (feature_root / f"{slide_id}.pt", identities)
         for slide_id, _, identities in work
     }
-    merge_pending_slides(feature_root, expected)
+    if aggregate_cache:
+        merge_pending_slides(feature_root, expected)
     _extract_missing_slides(work, feature_root, options, requested_workers)
-    merge_pending_slides(feature_root, expected)
+    if aggregate_cache:
+        merge_pending_slides(feature_root, expected)
     return _references(frame, feature_root)
+
+
+def validate_cached_features(frame: pd.DataFrame, feature_root: Path) -> None:
+    """Require cache records for every ordered slide without extracting anything."""
+    expected = {
+        slide_id: (feature_root / f"{slide_id}.pt", identities)
+        for slide_id, _, identities in _slide_work(frame)
+    }
+    cached = cached_slide_ids(feature_root)
+    if cached != set(expected):
+        raise ValueError(
+            "Feature cache slide inventory is incomplete or has extra slides"
+        )
+    for slide_id, (path, identities) in expected.items():
+        validate_cached_slide(feature_root, slide_id, path, identities, len(identities))
 
 
 def _slide_work(frame: pd.DataFrame) -> list[SlideWork]:

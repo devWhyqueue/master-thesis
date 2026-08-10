@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
+from uuid import uuid4
 from functools import lru_cache
 from pathlib import Path
 
@@ -72,9 +74,13 @@ def validate_feature_cache(feature_root: Path, provenance: dict[str, object]) ->
         return
     if any(feature_root.glob("*.pt")):
         raise ValueError("Cached features lack feature provenance metadata")
-    metadata_path.write_text(
+    temporary = metadata_path.with_suffix(
+        metadata_path.suffix + f".{uuid4().hex}.partial"
+    )
+    temporary.write_text(
         json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    os.replace(temporary, metadata_path)
 
 
 def validate_preextracted_features(

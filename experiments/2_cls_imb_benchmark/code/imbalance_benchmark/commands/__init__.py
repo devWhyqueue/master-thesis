@@ -9,6 +9,10 @@ from imbalance_benchmark.commands.confirm import cmd_confirm
 from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
 from imbalance_benchmark.commands.freeze import cmd_freeze
 from imbalance_benchmark.commands.pilot import cmd_pilot
+from imbalance_benchmark.commands.tuning.panda_prepare import (
+    cmd_materialize_panda,
+    cmd_prepare_extract_reduce,
+)
 from imbalance_benchmark.commands.prepare import (
     cmd_materialize_tcga_ut,
     cmd_prepare,
@@ -25,9 +29,11 @@ from imbalance_benchmark.hydra import cmd_submit
 __all__ = [
     "cmd_prepare",
     "cmd_prepare_extract_shard",
+    "cmd_prepare_extract_reduce",
     "cmd_pilot",
     "cmd_freeze",
     "cmd_materialize_tcga_ut",
+    "cmd_materialize_panda",
     "cmd_tune",
     "cmd_tune_shard",
     "cmd_tune_reduce",

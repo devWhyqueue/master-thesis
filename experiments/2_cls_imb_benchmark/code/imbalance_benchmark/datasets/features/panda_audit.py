@@ -1,3 +1,5 @@
+"""PANDA legacy audit validation used before project-owned materialization."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,11 +37,9 @@ _TILE_COLUMNS = {
 
 
 def validate_selection(
-    selection: pd.DataFrame,
-    official: pd.DataFrame,
-    expected_slides: int,
+    selection: pd.DataFrame, official: pd.DataFrame, expected_slides: int
 ) -> None:
-    """Match selected PANDA IDs and targets to the official released cohort."""
+    """Match selected PANDA IDs and targets to official released cohort."""
     missing = _SELECTION_COLUMNS - set(selection.columns)
     if missing:
         raise ValueError(f"PANDA selection audit fields are missing: {sorted(missing)}")
@@ -51,9 +51,9 @@ def validate_selection(
         raise ValueError("PANDA selection and official train.csv slide IDs differ")
     expected = official.set_index("slide_id").loc[selected_ids]
     for column in ("slide_label", "provider", "has_mask"):
-        actual_values = selection[column].astype(str).str.lower().to_numpy()
-        expected_values = expected[column].astype(str).str.lower().to_numpy()
-        if not np.array_equal(actual_values, expected_values):
+        actual = selection[column].astype(str).str.lower().to_numpy()
+        wanted = expected[column].astype(str).str.lower().to_numpy()
+        if not np.array_equal(actual, wanted):
             raise ValueError(f"PANDA selection differs from official {column}")
 
 
@@ -130,7 +130,7 @@ def _validate_mask_labels(tiles: pd.DataFrame, official: pd.Series) -> None:
 
 
 def _validate_selection_row(row: pd.Series, tiles: pd.DataFrame) -> None:
-    declared = (
+    valid = (
         int(row["source_level"]) == 0
         and int(row["tile_size"]) == 256
         and np.isclose(float(row["tissue_fraction_min"]), 0.35)
@@ -138,5 +138,5 @@ def _validate_selection_row(row: pd.Series, tiles: pd.DataFrame) -> None:
         and int(row["eligible_tile_count"]) == len(tiles)
         and not tiles.empty
     )
-    if not declared:
+    if not valid:
         raise ValueError(f"PANDA selection audit is inconsistent for {row['slide_id']}")

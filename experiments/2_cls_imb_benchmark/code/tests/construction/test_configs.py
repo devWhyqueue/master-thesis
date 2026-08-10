@@ -232,19 +232,25 @@ def test_bracs_patch_bundle_uses_one_32g_allocation() -> None:
     assert config["slurm"]["resources"]["tune_natural"]["memory"] == "32G"
 
 
-def test_panda_configs_use_the_completed_native_tiles_image() -> None:
-    for name in ("panda_patch.yaml", "panda_wsi.yaml"):
-        config = _load_config(CONFIG_ROOT / name)
+def test_panda_patch_uses_project_owned_shards_after_materialization() -> None:
+    config = _load_config(CONFIG_ROOT / "panda_patch.yaml")
 
-        assert config["dataset"]["selection_path"] == f"{PANDA_MOUNT}/selected_slides.csv"
-        assert config["dataset"]["tiles_dir"] == f"{PANDA_MOUNT}/tiles"
-        assert config["slurm"]["squashfs"] == [
-            {
-                "source": PANDA_SQUASHFS,
-                "mount": PANDA_MOUNT,
-                "stages": ["prepare"],
-            }
-        ]
+    assert "selection_path" not in config["dataset"]
+    assert config["materialize_panda"]["shard_count"] == 48
+    assert config["slurm"]["max_array_concurrency"] == 35
+    assert config["slurm"]["shared_squashfs"] == [
+        {"source": PANDA_SQUASHFS, "mount": PANDA_MOUNT, "stages": ["materialize"]}
+    ]
+    assert config["slurm"]["sharded_squashfs"][0]["stages"] == [
+        "prepare-extract-shard"
+    ]
+
+
+def test_panda_wsi_keeps_the_completed_native_tiles_image() -> None:
+    config = _load_config(CONFIG_ROOT / "panda_wsi.yaml")
+
+    assert config["dataset"]["selection_path"] == f"{PANDA_MOUNT}/selected_slides.csv"
+    assert config["dataset"]["tiles_dir"] == f"{PANDA_MOUNT}/tiles"
 
 def test_tcga_configs_lock_the_same_participant_cohort() -> None:
     """Patch (image-backed, Zenodo-materialized) and WSI (pre-extracted tensors)

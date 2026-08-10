@@ -57,7 +57,11 @@ def current_feature_provenance_lock(
     :mod:`imbalance_benchmark.datasets.tcga_ut_source`).
     """
     dataset = config.get("dataset", {})
-    if not isinstance(dataset, dict) or dataset.get("name") != "tcga_ut":
+    if not isinstance(dataset, dict):
+        return None
+    if dataset.get("name") == "panda" and dataset.get("regime") == "patch":
+        return _current_panda_lock(config, dataset)
+    if dataset.get("name") != "tcga_ut":
         return None
     if dataset.get("regime") == "wsi":
         return _current_tensor_lock(dataset)
@@ -88,8 +92,30 @@ def _current_source_lock(dataset: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _current_panda_lock(
+    config: dict[str, Any], dataset: dict[str, Any]
+) -> dict[str, str]:
+    materialization = Path(dataset["materialization_sidecar"])
+    feature_inventory = Path(config["feature_inventory_path"])
+    verify_signed_file(materialization)
+    verify_signed_file(feature_inventory)
+    material_payload = json.loads(materialization.read_text(encoding="utf-8"))
+    feature_payload = json.loads(feature_inventory.read_text(encoding="utf-8"))
+    return {
+        "manifest_path": str(feature_inventory),
+        "manifest_sha256": compute_sha256(feature_inventory),
+        "inventory_sha256": compute_data_hash(
+            {
+                "materialization_sha256": compute_sha256(materialization),
+                "materialization_inventory": material_payload["inventory_sha256"],
+                "feature_cache_manifest": feature_payload["cache_manifest_sha256"],
+            }
+        ),
+    }
+
+
 def write_prepared_feature_provenance(config: dict[str, Any], data_dir: Path) -> None:
-    """Persist the TCGA-UT provenance digests validated during prepare."""
+    """Persist validated TCGA-UT or PANDA feature provenance during prepare."""
     if lock := current_feature_provenance_lock(config):
         lock_path = data_dir / LOCK_NAME
         write_json(lock_path, lock)
@@ -101,7 +127,7 @@ def verify_prepared_feature_provenance(
 ) -> dict[str, str] | None:
     """Revalidate prepared TCGA-UT provenance and all tensor hashes."""
     dataset = config.get("dataset", {})
-    if not isinstance(dataset, dict) or dataset.get("name") != "tcga_ut":
+    if not isinstance(dataset, dict) or dataset.get("name") not in {"tcga_ut", "panda"}:
         return None
     lock_path = data_dir / LOCK_NAME
     if not lock_path.is_file():
@@ -119,19 +145,19 @@ def verify_prepared_feature_provenance(
 
 
 def verify_frozen_feature_provenance(meta: dict[str, Any]) -> None:
-    """Revalidate TCGA-UT tensors against the provenance frozen before fitting."""
+    """Revalidate frozen TCGA-UT or PANDA evidence before fitting."""
     config = meta.get("runtime_config", {})
     dataset = config.get("dataset", {}) if isinstance(config, dict) else {}
-    if not isinstance(dataset, dict) or dataset.get("name") != "tcga_ut":
+    if not isinstance(dataset, dict) or dataset.get("name") not in {"tcga_ut", "panda"}:
         return
     locked = meta.get("feature_provenance")
     if not isinstance(locked, dict):
-        raise RuntimeError("Frozen TCGA-UT feature provenance is missing")
+        raise RuntimeError("Frozen feature provenance is missing")
     lock_path = Path(str(locked.get("prepared_lock_path", "")))
     if not lock_path.is_file() or locked.get("prepared_lock_sha256") != compute_sha256(
         lock_path
     ):
-        raise RuntimeError("Prepared TCGA-UT feature provenance lock was altered")
+        raise RuntimeError("Prepared feature provenance lock was altered")
     _verify_feature_provenance(config, locked)
 
 
@@ -145,14 +171,14 @@ def _verify_feature_provenance(
             current[field] != locked.get(field) for field in LOCK_FIELDS
         ):
             raise ValueError("manifest or complete chunk inventory digest changed")
-        if dataset.get("regime") == "wsi":
+        if dataset.get("name") == "panda":
+            _verify_panda_provenance(config, dataset)
+        elif dataset.get("regime") == "wsi":
             _verify_tensor_provenance(dataset, current, config)
         else:
             _verify_source_provenance(dataset, locked)
     except (KeyError, OSError, TypeError, ValueError) as error:
-        raise RuntimeError(
-            f"Frozen TCGA-UT feature provenance invalid: {error}"
-        ) from error
+        raise RuntimeError(f"Frozen feature provenance invalid: {error}") from error
 
 
 def _verify_tensor_provenance(
@@ -178,3 +204,10 @@ def _verify_source_provenance(
     sqfs_path = Path(str(payload["sqfs_path"]))
     if compute_sha256(sqfs_path) != locked.get("inventory_sha256"):
         raise ValueError("materialized SqFS content changed since it was frozen")
+
+
+def _verify_panda_provenance(config: dict[str, Any], dataset: dict[str, Any]) -> None:
+    materialization = Path(dataset["materialization_sidecar"])
+    feature_inventory = Path(config["feature_inventory_path"])
+    verify_signed_file(materialization)
+    verify_signed_file(feature_inventory)

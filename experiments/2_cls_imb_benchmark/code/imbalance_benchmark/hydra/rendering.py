@@ -12,6 +12,8 @@ from imbalance_benchmark.hydra.squashfs import (
     _pack_generated_tile_lines,
     _stage_images,
     _staging_lines,
+    shared_squashfs,
+    sharded_staging_lines,
 )
 
 
@@ -43,9 +45,7 @@ def render_sbatch(
     command = _command(job, config_path, code)
     lines = _directives(job, root, config)
     images = _stage_images(config, job.name)
-    dataset = (
-        str(config.get("dataset", {}).get("root", "")) if job.name == "prepare" else ""
-    )
+    dataset = _prepare_dataset(config, job.name)
     lines += (
         _host_execution_lines(root, command)
         if job.on_host
@@ -57,6 +57,8 @@ def render_sbatch(
             container,
             command,
             images,
+            shared_squashfs(config, job.name),
+            sharded_staging_lines(config, job.name),
             dataset,
             _generated_tile_squashfs(config, job.name),
         )
@@ -87,6 +89,10 @@ def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
     else:
         lines.append(f'{command} --condition "${{CONDITIONS[$SLURM_ARRAY_TASK_ID]}}"')
     return "\n".join(lines)
+
+
+def _prepare_dataset(config: dict[str, Any], stage: str) -> str:
+    return str(config.get("dataset", {}).get("root", "")) if stage == "prepare" else ""
 
 
 def _crossed_array_lines(job: SlurmJob, prefix: str) -> list[str]:
@@ -141,6 +147,8 @@ def _execution_lines(
     container: str,
     command: str,
     images: list[tuple[str, str]],
+    shared_images: list[tuple[str, str]],
+    sharded_images: list[str],
     dataset_root: str,
     generated_squashfs: tuple[str, str] | None,
 ) -> list[str]:
@@ -158,10 +166,13 @@ def _execution_lines(
         "BINDS=()",
     ]
     lines.extend(_staging_lines(images))
+    lines.extend(sharded_images)
     lines.extend(_mount_generated_tile_lines(generated_squashfs))
     binds = f'-B "{root}:{root}:ro" -B "{output_dir}:{output_dir}:rw" -B "/home/space:/home/space:ro"'
     if dataset_root:
         binds += f' -B "{dataset_root}:{dataset_root}:ro"'
+    for source, mount in shared_images:
+        binds += f' -B "{source}:{mount}:image-src=/"'
     gpu = "--nv " if job.gpus else ""
     app = (
         f'apptainer exec {gpu}{binds} "${{BINDS[@]}}" '

@@ -15,9 +15,11 @@ from imbalance_benchmark.commands import (
     cmd_confirm,
     cmd_confirm_shard,
     cmd_freeze,
+    cmd_materialize_panda,
     cmd_materialize_tcga_ut,
     cmd_pilot,
     cmd_prepare,
+    cmd_prepare_extract_reduce,
     cmd_prepare_extract_shard,
     cmd_smoke,
     cmd_submit,
@@ -57,6 +59,8 @@ def _parser() -> argparse.ArgumentParser:
         "smoke",
         "tile-wsi-reduce",
         "materialize-tcga-ut",
+        "materialize-panda",
+        "prepare-extract-reduce",
     ):
         sub.add_parser(command)
     submit = sub.add_parser("submit")
@@ -64,12 +68,16 @@ def _parser() -> argparse.ArgumentParser:
     submit.add_argument("--smoke", action="store_true")
     submit.add_argument("--resume-tuning", action="store_true")
     submit.add_argument("--confirm-only", action="store_true")
+    submit.add_argument(
+        "--stage", choices=("materialize", "extract", "prepare", "pilot", "freeze")
+    )
     tile_wsi = sub.add_parser("tile-wsi")
     tile_wsi.add_argument("--slide-index", type=int, required=True)
     tile_wsi.add_argument("--shard-size", type=int, default=1)
     extract_shard = sub.add_parser("prepare-extract-shard")
     extract_shard.add_argument("--shard-index", type=int, required=True)
     extract_shard.add_argument("--shard-count", type=int, required=True)
+    sub.choices["materialize-panda"].add_argument("--canary", action="store_true")
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
             "--condition", choices=("natural", "balanced", "moderate", "severe")
@@ -114,6 +122,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
     return {
         "prepare": cmd_prepare,
         "prepare-extract-shard": cmd_prepare_extract_shard,
+        "prepare-extract-reduce": cmd_prepare_extract_reduce,
         "pilot": cmd_pilot,
         "freeze": cmd_freeze,
         "tune": cmd_tune,
@@ -130,6 +139,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "tile-wsi": cmd_tile_wsi,
         "tile-wsi-reduce": cmd_tile_wsi_reduce,
         "materialize-tcga-ut": cmd_materialize_tcga_ut,
+        "materialize-panda": cmd_materialize_panda,
     }
 
 

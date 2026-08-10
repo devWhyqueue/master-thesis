@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from imbalance_benchmark.commands import prepare
-from imbalance_benchmark.commands.prepare import _slide_shard
+from imbalance_benchmark.datasets.panda_materialize import select_physical_shard
 from imbalance_benchmark.common import load_config
 from imbalance_benchmark.hydra.workflow import build_workflow, render_sbatch
 
@@ -42,8 +42,8 @@ def test_slide_shard_splits_round_robin_by_slide() -> None:
     )
 
     # sorted slide ids: s1, s2, s3 -> shard 0 takes s1, s3; shard 1 takes s2
-    shard0 = _slide_shard(frame, 0, 2)
-    shard1 = _slide_shard(frame, 1, 2)
+    shard0 = select_physical_shard(frame, {"name": "tcga_ut"}, 0, 2)
+    shard1 = select_physical_shard(frame, {"name": "tcga_ut"}, 1, 2)
 
     assert sorted(shard0["slide_id"].unique()) == ["s1", "s3"]
     assert sorted(shard1["slide_id"].unique()) == ["s2"]

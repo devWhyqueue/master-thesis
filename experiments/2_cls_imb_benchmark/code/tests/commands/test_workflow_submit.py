@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from imbalance_benchmark.hydra.workflow import (
+    SubmitOptions,
     build_workflow,
     render_sbatch,
     submit_workflow,
@@ -17,6 +18,7 @@ GENERATED_SQUASHFS = "/home/example/outputs/bracs/roi_tiles.sqfs"
 CAMELYON_CONFIG = (
     Path(__file__).resolve().parents[3] / "configs" / "camelyon16_patch.yaml"
 )
+
 
 def _config() -> dict[str, object]:
     return {
@@ -44,8 +46,9 @@ def _config() -> dict[str, object]:
                     "stages": ["prepare"],
                 }
             ],
-        }
+        },
     }
+
 
 def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     """Base tuning fans out by candidate, reduces, then hands off to tune-decide.
@@ -119,6 +122,7 @@ def test_confirm_only_builds_just_confirm_and_analyze() -> None:
     assert jobs[2].array_splits == (0, 1, 2)
     assert jobs[3].dependencies == ("analyze",)
 
+
 def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None:
     """Confirmation no longer shares one two-day array across every condition."""
     jobs = build_workflow(_config(), confirm_only=True)
@@ -143,6 +147,7 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in natural_script
     assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in controlled_script
 
+
 def test_submit_links_actual_job_ids() -> None:
     """Submission turns stage names into the preceding scheduler job IDs."""
     submitted_scripts: list[str] = []
@@ -166,7 +171,9 @@ def test_confirm_only_links_actual_job_ids() -> None:
         submitted_scripts.append(script)
         return str(len(submitted_scripts))
 
-    submitted = submit_workflow(_config(), confirm_only=True, submit=fake_submit)
+    submitted = submit_workflow(
+        _config(), options=SubmitOptions(confirm_only=True), submit=fake_submit
+    )
     assert submitted["confirm-natural"] == "1"
     assert submitted["confirm-controlled"] == "2"
     assert "#SBATCH --dependency=" not in submitted_scripts[0]
@@ -179,7 +186,9 @@ def test_confirm_only_links_actual_job_ids() -> None:
 def test_resume_tuning_skips_completed_setup(monkeypatch) -> None:
     monkeypatch.setattr(
         "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type("Plan", (), {"natural_indices": (2, 5), "controlled_indices": (0,)})(),
+        lambda *_: type(
+            "Plan", (), {"natural_indices": (2, 5), "controlled_indices": (0,)}
+        )(),
     )
     jobs = build_workflow(_config(), resume_tuning=True)
 
@@ -192,7 +201,9 @@ def test_resume_omits_only_a_fingerprint_valid_base_natural_array(monkeypatch) -
     config = _config()
     monkeypatch.setattr(
         "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type("Plan", (), {"natural_indices": (), "controlled_indices": (1, 3)})(),
+        lambda *_: type(
+            "Plan", (), {"natural_indices": (), "controlled_indices": (1, 3)}
+        )(),
     )
 
     jobs = build_workflow(config, resume_tuning=True)
@@ -205,6 +216,7 @@ def test_resume_omits_only_a_fingerprint_valid_base_natural_array(monkeypatch) -
     assert next(job for job in jobs if job.name == "tune-base-reduce").dependencies == (
         "tune-base-controlled",
     )
+
 
 def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
     """Large image copies must not be repeated across downstream array jobs."""
@@ -237,6 +249,7 @@ def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
         # patch-regime features are read by absolute path during tune/confirm.
         assert '-B "/home/space:/home/space:ro"' in scripts[stage]
 
+
 def test_staged_binds_get_their_own_dash_b_flag() -> None:
     """A ``BINDS`` array entry with no ``-B`` flag is passed as a bare apptainer
     positional argument instead of a bind spec, so apptainer tries to open it
@@ -246,6 +259,7 @@ def test_staged_binds_get_their_own_dash_b_flag() -> None:
         for job in build_workflow(_config())
     }
     assert 'BINDS+=("-B" "$STAGE_DIR/0.sqfs' in scripts["prepare"]
+
 
 def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     """BRACS tiles stay node-local and persist as one reusable image."""
@@ -278,6 +292,7 @@ def test_prepare_packs_generated_tiles_and_reuses_the_squashfs() -> None:
     ):
         assert GENERATED_SQUASHFS not in scripts[stage]
 
+
 def test_time_limit_directive_is_omitted_unless_explicitly_configured() -> None:
     """Partitions already cap wall time (e.g. cpu-2h -> 2h); an explicit
     --time should only appear when a stage config asks for less than that."""
@@ -293,6 +308,7 @@ def test_time_limit_directive_is_omitted_unless_explicitly_configured() -> None:
     freeze_job = next(j for j in build_workflow(config) if j.name == "freeze")
     script = render_sbatch(freeze_job, config, "config.yaml")
     assert "#SBATCH --time=00:30:00" in script
+
 
 def test_smoke_workflow_uses_test_partition() -> None:
     """The synthetic validation has a one-job test-partition submission path."""
@@ -376,8 +392,6 @@ def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(
 
     pending = resume._pending_natural(config, {}, False, {}, [], 3)
 
-    expected = bundled_observation_array_size(
-        candidate_array_size(methods), 6, 3
-    )
+    expected = bundled_observation_array_size(candidate_array_size(methods), 6, 3)
     assert pending == tuple(range(expected))
     assert seen == list(range(expected))

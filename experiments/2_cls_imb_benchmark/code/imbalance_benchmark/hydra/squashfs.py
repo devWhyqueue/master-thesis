@@ -32,6 +32,43 @@ def _staging_lines(images: list[tuple[str, str]]) -> list[str]:
     return lines
 
 
+def sharded_staging_lines(config: dict[str, Any], stage: str) -> list[str]:
+    """Stage only this array worker's immutable PANDA image shard."""
+    images = config.get("slurm", {}).get("sharded_squashfs", [])
+    selected = [image for image in images if stage in image.get("stages", ())]
+    if not selected:
+        return []
+    lines = [
+        'STAGE_DIR="/tmp/imbalance-benchmark-${SLURM_JOB_ID}"',
+        'mkdir -p "$STAGE_DIR"',
+    ]
+    for index, image in enumerate(selected):
+        source = str(image["source_template"]).replace(
+            "{index}", "${SLURM_ARRAY_TASK_ID}"
+        )
+        mount = str(image["mount_template"]).replace(
+            "{index}", "${SLURM_ARRAY_TASK_ID}"
+        )
+        local = f"$STAGE_DIR/{index}.sqfs"
+        lines.extend(
+            [
+                f'cp "{source}" "{local}"',
+                f'BINDS+=("-B" "{local}:{mount}:image-src=/")',
+            ]
+        )
+    return lines
+
+
+def shared_squashfs(config: dict[str, Any], stage: str) -> list[tuple[str, str]]:
+    """Return read-only SqFS mounts deliberately kept on shared storage."""
+    images = config.get("slurm", {}).get("shared_squashfs", [])
+    return [
+        (str(image["source"]), str(image["mount"]))
+        for image in images
+        if stage in image.get("stages", ())
+    ]
+
+
 def _generated_tile_squashfs(
     config: dict[str, Any], stage: str
 ) -> tuple[str, str] | None:

@@ -14,9 +14,10 @@ from imbalance_benchmark.datasets import (
     bracs,
     camelyon16,
     panda,
-    panda_audit,
     tcga_ut,
 )
+from imbalance_benchmark.datasets.panda_materialize import load_materialized_inventory
+from imbalance_benchmark.datasets.features import panda_audit
 
 __all__ = ["DATASET_NAMES", "build_manifest"]
 
@@ -158,6 +159,8 @@ def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
     """Build PANDA rows from a validated full-cohort level-0 tile inventory."""
     dataset_cfg = config["dataset"]
     regime = dataset_cfg.get("regime", "patch")
+    if regime == "patch" and "canonical_inventory_path" in dataset_cfg:
+        return _build_materialized_panda(dataset_cfg)
     official = panda.load_slide_frame(Path(dataset_cfg["root"]))
     selection = pd.read_csv(dataset_cfg["selection_path"])
     expected_slides = int(dataset_cfg.get("expected_slide_count", 10_616))
@@ -191,6 +194,25 @@ def _build_panda(config: dict[str, Any]) -> pd.DataFrame:
                 tagged["exhaustive"] & tagged["patch_label"].isin(panda.PATCH_LABELS)
             ],
         ).reset_index(drop=True)
+    return tagged
+
+
+def _build_materialized_panda(dataset_cfg: dict[str, Any]) -> pd.DataFrame:
+    """Use canonical signed metadata after extraction, never raw TIFFs or tiles."""
+    frame = load_materialized_inventory(dataset_cfg)
+    frame["dataset"] = "panda"
+    frame["exhaustive"] = frame["has_mask"].astype(bool)
+    frame = cast(
+        pd.DataFrame,
+        frame[frame["exhaustive"] & frame["patch_label"].isin(panda.PATCH_LABELS)],
+    ).reset_index(drop=True)
+    slide_frame = cast(
+        pd.DataFrame, frame.drop_duplicates("case_id")[["case_id", "slide_label"]]
+    )
+    assignment = panda.split_cases(slide_frame, int(dataset_cfg.get("seed", 0)))
+    tagged = frame.merge(assignment, on="case_id", how="inner")
+    panda.assert_slide_disjoint(tagged)
+    tagged["cancer_type"] = tagged["patch_label"]
     return tagged
 
 

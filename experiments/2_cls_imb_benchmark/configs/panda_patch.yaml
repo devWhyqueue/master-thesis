@@ -11,14 +11,14 @@ dataset:
   version: panda-kaggle-2020
   root: /home/space/datasets/panda/raw
   eligibility_rules:
-    source: official_train_csv_slides_with_nonempty_tissue_tile_manifest
-    tiled_evidence: panda_native_tiles_20x_256_full_cohort
+    source: signed_project_owned_panda_patch_materialization
+    tiled_evidence: complete_level_0_grid_tissue_audit
     masks: released_provider_specific_mask_required
     labels: at_least_50_percent_provider_specific_cancer_mask_values
     classes: benign_or_cancer
     split_unit: biopsy
-  selection_path: /home/space/datasets/panda/native_tiles_20x_256/selected_slides.csv
-  tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/tiles
+  canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/canonical_inventory.csv
+  materialization_sidecar: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
   expected_slide_count: 10616
 
 feature_extraction:
@@ -29,6 +29,19 @@ feature_extraction:
   dtype: float16
   device: auto
 
+feature_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/data/features/panda/feature_inventory.json
+
+materialize_panda:
+  raw_root: /home/space/datasets/panda/raw
+  legacy_tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/patches/20x
+  scratch_root: /tmp/panda-materialize
+  shard_root: /home/space/datasets-sqfs/panda/patch
+  shard_mount_root: /home/space/datasets/panda/patch
+  canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/canonical_inventory.csv
+  sidecar_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
+  shard_count: 48
+  jpeg_mae_max: 5.0
+
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
@@ -37,20 +50,29 @@ slurm:
   partition: gpu-2h
   test_partition: gpu-test
   container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
+  max_array_concurrency: 35
+  tune_natural_observations_per_candidate: 6
   resources:
-    prepare: {partition: gpu-5h, gpus: 1, cpus: 8}
-    pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
-    freeze: {partition: cpu-2h, gpus: 0, cpus: 4}
-    tune: {partition: gpu-2d, gpus: 1, cpus: 8}
-    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
-    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
+    materialize: {partition: cpu-2d, gpus: 0, cpus: 8, memory: 256G}
+    extract: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 64G, constraint: "40gb|80gb|h100|h200"}
+    extract_reduce: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
+    prepare: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
+    pilot: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 96G}
+    freeze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
+    tune: {partition: gpu-2d, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
+    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
+    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 1}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8}
-    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
-  squashfs:
+  shared_squashfs:
     - source: /home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs
       mount: /home/space/datasets/panda/native_tiles_20x_256
-      stages: [prepare]
+      stages: [materialize]
+  sharded_squashfs:
+    - source_template: /home/space/datasets-sqfs/panda/patch/shard={index}.sqfs
+      mount_template: /home/space/datasets/panda/patch/shard={index}
+      stages: [prepare-extract-shard]

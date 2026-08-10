@@ -15,7 +15,7 @@ from imbalance_benchmark.datasets.panda import (
     select_subset,
     split_cases,
 )
-from imbalance_benchmark.datasets.panda_audit import (
+from imbalance_benchmark.datasets.features.panda_audit import (
     validate_selection,
     validate_tile_inventory,
 )
