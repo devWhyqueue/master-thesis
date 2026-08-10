@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
@@ -59,20 +61,32 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
 
 def _audit_slides(official: pd.DataFrame, cfg: dict[str, Any]) -> list[pd.DataFrame]:
     slides = official.sort_values("slide_id").reset_index(drop=True)
-    audited = []
-    for position, (_, row) in enumerate(slides.iterrows(), start=1):
-        logger.info(
-            "PANDA auditing slide %d/%d: %s", position, len(slides), row.slide_id
-        )
-        audited.append(
-            audit_slide(
-                row,
-                Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
-                float(cfg["jpeg_mae_max"]),
-                Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
-            )
-        )
-    return audited
+    workers = min(_worker_count(), len(slides))
+    jobs = [
+        (position, len(slides), row, cfg)
+        for position, (_, row) in enumerate(slides.iterrows(), start=1)
+    ]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(_audit_slide_job, jobs))
+
+
+def _worker_count() -> int:
+    """Use the CPUs allocated to the materialization job."""
+    cpus = os.environ.get("SLURM_CPUS_PER_TASK")
+    return max(1, int(cpus)) if cpus else os.cpu_count() or 1
+
+
+def _audit_slide_job(
+    job: tuple[int, int, pd.Series, dict[str, Any]],
+) -> pd.DataFrame:
+    position, total, row, cfg = job
+    logger.info("PANDA auditing slide %d/%d: %s", position, total, row.slide_id)
+    return audit_slide(
+        row,
+        Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
+        float(cfg["jpeg_mae_max"]),
+        Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
+    )
 
 
 def audit_canary(config: dict[str, Any]) -> None:

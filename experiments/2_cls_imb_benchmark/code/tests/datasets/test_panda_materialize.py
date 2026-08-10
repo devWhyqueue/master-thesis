@@ -72,7 +72,9 @@ def test_audit_slide_allows_known_large_official_tiffs(
     assert len(audited) == 4
 
 
-def test_audit_slide_derives_labels_despite_legacy_label_mismatch(tmp_path: Path) -> None:
+def test_audit_slide_derives_labels_despite_legacy_label_mismatch(
+    tmp_path: Path,
+) -> None:
     row, legacy, _ = _source(tmp_path)
     manifest = tmp_path / "legacy.csv"
     pd.DataFrame(
@@ -155,3 +157,40 @@ def test_materialize_gates_copying_on_locked_counts(
 
     with pytest.raises(ValueError, match="locked counts"):
         panda_materialize.materialize(config)
+
+
+def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: list[int] = []
+
+    class _Pool:
+        def __init__(self, max_workers: int) -> None:
+            captured.append(max_workers)
+
+        def __enter__(self) -> _Pool:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def map(self, function: object, jobs: object) -> object:
+            return map(function, jobs)  # type: ignore[arg-type]
+
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "2")
+    monkeypatch.setattr(panda_materialize, "ThreadPoolExecutor", _Pool)
+    monkeypatch.setattr(
+        panda_materialize,
+        "audit_slide",
+        lambda row, *_: pd.DataFrame({"slide_id": [row.slide_id]}),
+    )
+
+    audited = panda_materialize._audit_slides(
+        pd.DataFrame({"slide_id": ["b", "a", "c"]}),
+        {
+            "legacy_tiles_dir": "/tiles",
+            "legacy_manifest_dir": "/manifests",
+            "jpeg_mae_max": 8.0,
+        },
+    )
+
+    assert captured == [2]
+    assert [frame.iloc[0].slide_id for frame in audited] == ["a", "b", "c"]
