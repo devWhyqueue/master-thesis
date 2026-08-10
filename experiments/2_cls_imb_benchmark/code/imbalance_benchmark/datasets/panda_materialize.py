@@ -48,6 +48,7 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
             Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
             scratch,
             float(cfg["jpeg_mae_max"]),
+            Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
         )
         for _, row in official.sort_values("slide_id").iterrows()
     ]
@@ -71,6 +72,7 @@ def audit_canary(config: dict[str, Any]) -> None:
                 Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
                 scratch,
                 float(cfg["jpeg_mae_max"]),
+                Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
             )
     finally:
         if scratch.exists():

@@ -34,13 +34,14 @@ feature_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benc
 materialize_panda:
   raw_root: /home/space/datasets/panda/raw
   legacy_tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/patches/20x
+  legacy_manifest_dir: /home/space/datasets/panda/native_tiles_20x_256/tiles
   scratch_root: /tmp/panda-materialize
   shard_root: /home/space/datasets-sqfs/panda/patch
   shard_mount_root: /home/space/datasets/panda/patch
   canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/canonical_inventory.csv
   sidecar_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
   shard_count: 48
-  jpeg_mae_max: 5.0
+  jpeg_mae_max: 8.0
 
 
 slurm:

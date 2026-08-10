@@ -28,21 +28,22 @@ class _AuditContext:
 
 
 def audit_slide(
-    row: pd.Series, legacy_dir: Path, target_root: Path, jpeg_mae_max: float
+    row: pd.Series,
+    legacy_dir: Path,
+    target_root: Path,
+    jpeg_mae_max: float,
+    manifest_path: Path | None = None,
 ) -> pd.DataFrame:
     """Recompute one level-0 grid and verify every legacy JPEG crop."""
     with _official_tiff_guard(), Image.open(str(row["image_path"])) as source:
         coords = eligible_coordinates(source)
-        legacy = _legacy_tiles(legacy_dir)
-        if set(legacy) != set(range(len(coords))):
+        legacy = _legacy_records(legacy_dir, coords, manifest_path)
+        if {(item["x"], item["y"]) for item in legacy} != set(coords):
             raise ValueError("PANDA eligible tile coordinates are missing or extra")
         mask = _load_mask(row)
         try:
             context = _AuditContext(row, source, mask, target_root, jpeg_mae_max)
-            records = [
-                _audit_tile(context, legacy[index], coord, index)
-                for index, coord in enumerate(coords)
-            ]
+            records = [_audit_tile(context, item) for item in legacy]
         finally:
             if mask is not None:
                 mask.close()
@@ -90,13 +91,32 @@ def eligible_coordinates(source: Image.Image) -> list[tuple[int, int]]:
     return coords
 
 
-def _legacy_tiles(directory: Path) -> dict[int, Path]:
+def _legacy_records(
+    directory: Path, coords: list[tuple[int, int]], manifest_path: Path | None
+) -> list[dict[str, object]]:
+    if manifest_path is not None:
+        return _manifest_records(manifest_path)
     paths = {
         int(path.stem): path for path in directory.glob("*.jpg") if path.stem.isdigit()
     }
     if len(paths) != len(list(directory.glob("*.jpg"))):
         raise ValueError(f"PANDA legacy tiles have non-numeric names: {directory}")
-    return paths
+    if set(paths) != set(range(len(coords))):
+        raise ValueError("PANDA eligible tile coordinates are missing or extra")
+    return [
+        {"patch_id": index, "x": x, "y": y, "image_path": path}
+        for index, ((x, y), path) in enumerate(
+            zip(coords, (paths[i] for i in range(len(coords))), strict=True)
+        )
+    ]
+
+
+def _manifest_records(path: Path) -> list[dict[str, object]]:
+    required = {"patch_id", "x", "y", "image_path"}
+    frame = pd.read_csv(path)
+    if required - set(frame) or frame.duplicated(["x", "y"]).any():
+        raise ValueError(f"PANDA legacy tile manifest is invalid: {path}")
+    return [dict(record) for record in frame.to_dict(orient="records")]
 
 
 def _load_mask(row: pd.Series) -> Image.Image | None:
@@ -108,14 +128,10 @@ def _load_mask(row: pd.Series) -> Image.Image | None:
     return Image.open(path)
 
 
-def _audit_tile(
-    context: _AuditContext,
-    legacy: Path,
-    coord: tuple[int, int],
-    index: int,
-) -> dict[str, object]:
+def _audit_tile(context: _AuditContext, record: dict[str, object]) -> dict[str, object]:
     row, source, mask = context.row, context.source, context.mask
-    x, y = coord
+    x, y = int(record["x"]), int(record["y"])
+    legacy = Path(str(record["image_path"]))
     with Image.open(legacy) as tile:
         actual = np.asarray(tile.convert("RGB"), dtype=np.int16)
     expected = np.asarray(
@@ -126,7 +142,8 @@ def _audit_tile(
         or float(np.abs(actual - expected).mean()) > context.jpeg_mae_max
     ):
         raise ValueError(f"PANDA tile source-crop mismatch: {legacy}")
-    target = context.target_root / "tiles" / str(row.slide_id) / f"{index}.jpg"
+    patch_id = str(record["patch_id"])
+    target = context.target_root / "tiles" / str(row.slide_id) / f"{patch_id}.jpg"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(legacy, target)
     cell = np.asarray(mask.crop((x, y, x + TILE_SIZE, y + TILE_SIZE))) if mask else None
@@ -135,13 +152,16 @@ def _audit_tile(
         if cell is None
         else cell_label(cell[..., 0] if cell.ndim == 3 else cell, str(row.provider))
     )
+    declared = record.get("patch_label")
+    if declared is not None and str(declared) != label:
+        raise ValueError(f"PANDA legacy mask label mismatch: {legacy}")
     return {
         "slide_id": str(row.slide_id),
         "case_id": str(row.slide_id),
         "slide_label": str(row.slide_label),
         "provider": str(row.provider),
         "has_mask": bool(row.has_mask),
-        "patch_id": f"{row.slide_id}/{index}",
+        "patch_id": f"{row.slide_id}/{patch_id}",
         "patch_label": label,
         "image_path": str(target),
         "sha256": compute_sha256(target),

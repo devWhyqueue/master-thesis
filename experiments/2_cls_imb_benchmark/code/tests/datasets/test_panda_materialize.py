@@ -69,6 +69,34 @@ def test_audit_slide_allows_known_large_official_tiffs(
     assert len(audited) == 4
 
 
+def test_audit_slide_uses_declared_legacy_coordinates(tmp_path: Path) -> None:
+    row, legacy, target = _source(tmp_path)
+    manifest = tmp_path / "legacy.csv"
+    pd.DataFrame(
+        {
+            "patch_id": ["13", "7", "99", "2"],
+            "x": [256, 0, 256, 0],
+            "y": [256, 0, 0, 256],
+            "image_path": [
+                str(legacy / "3.jpg"),
+                str(legacy / "0.jpg"),
+                str(legacy / "1.jpg"),
+                str(legacy / "2.jpg"),
+            ],
+            "patch_label": ["benign", "cancer", "benign", "benign"],
+        }
+    ).to_csv(manifest, index=False)
+
+    audited = audit_slide(row, legacy, target, jpeg_mae_max=2.0, manifest_path=manifest)
+
+    assert audited["patch_id"].tolist() == [
+        "slide/13",
+        "slide/7",
+        "slide/99",
+        "slide/2",
+    ]
+
+
 @pytest.mark.parametrize("filename", ["4.jpg", "0.jpg"])
 def test_audit_slide_rejects_extra_or_missing_eligible_tile(
     tmp_path: Path, filename: str

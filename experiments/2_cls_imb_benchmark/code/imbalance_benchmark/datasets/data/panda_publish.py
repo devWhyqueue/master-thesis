@@ -29,6 +29,7 @@ def materialize_config(config: dict[str, Any]) -> dict[str, Any]:
     required = {
         "raw_root",
         "legacy_tiles_dir",
+        "legacy_manifest_dir",
         "scratch_root",
         "shard_root",
         "shard_mount_root",
