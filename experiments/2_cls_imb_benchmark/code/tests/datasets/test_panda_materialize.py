@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 
 from imbalance_benchmark.datasets import panda_materialize
+from imbalance_benchmark.datasets.data import panda_grid
 from imbalance_benchmark.datasets.data.panda_grid import copy_audited_tiles
 from imbalance_benchmark.datasets.panda_materialize import audit_slide
 
@@ -70,6 +71,33 @@ def test_audit_slide_allows_known_large_official_tiffs(
     audited = audit_slide(row, legacy, jpeg_mae_max=2.0)
 
     assert len(audited) == 4
+
+
+def test_eligible_coordinates_reads_one_source_stripe_per_tile_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Slide:
+        dimensions = (512, 512)
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[tuple[int, int], tuple[int, int]]] = []
+
+        def read_region(
+            self, location: tuple[int, int], _: int, size: tuple[int, int]
+        ) -> Image.Image:
+            self.calls.append((location, size))
+            return Image.new("RGBA", size, (100, 100, 100, 255))
+
+    monkeypatch.setattr(panda_grid.openslide, "OpenSlide", _Slide)
+    source = _Slide()
+
+    assert panda_grid.eligible_coordinates(source) == [
+        (0, 0),
+        (256, 0),
+        (0, 256),
+        (256, 256),
+    ]
+    assert source.calls == [((0, 0), (512, 256)), ((0, 256), (512, 256))]
 
 
 def test_audit_slide_derives_labels_despite_legacy_label_mismatch(

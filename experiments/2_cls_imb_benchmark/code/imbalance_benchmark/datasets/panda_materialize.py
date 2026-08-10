@@ -61,7 +61,7 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
 
 def _audit_slides(official: pd.DataFrame, cfg: dict[str, Any]) -> list[pd.DataFrame]:
     slides = official.sort_values("slide_id").reset_index(drop=True)
-    workers = min(_worker_count(), len(slides))
+    workers = min(int(cfg.get("audit_workers", _worker_count())), len(slides))
     jobs = [
         (position, len(slides), row, cfg)
         for position, (_, row) in enumerate(slides.iterrows(), start=1)

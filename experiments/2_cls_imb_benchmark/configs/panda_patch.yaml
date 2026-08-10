@@ -42,6 +42,7 @@ materialize_panda:
   sidecar_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
   shard_count: 48
   jpeg_mae_max: 8.0
+  audit_workers: 1
 
 
 slurm:

@@ -6,6 +6,7 @@ import shutil
 from contextlib import contextmanager
 from collections.abc import Iterator
 from dataclasses import dataclass
+from itertools import groupby
 from pathlib import Path
 
 import numpy as np
@@ -42,7 +43,7 @@ def audit_slide(
         mask = _load_mask(row)
         try:
             context = _AuditContext(row, source, mask, jpeg_mae_max)
-            records = [_audit_tile(context, item) for item in legacy]
+            records = _audit_tiles(context, legacy)
         finally:
             if mask is not None:
                 mask.close()
@@ -116,24 +117,27 @@ def eligible_coordinates(
 ) -> list[tuple[int, int]]:
     """Return every complete 256-pixel cell meeting locked tissue rule."""
     coords = []
-    width, height = (
-        source.dimensions if isinstance(source, openslide.OpenSlide) else source.size
-    )
+    width, height = _source_dimensions(source)
     for y in range(0, height - TILE_SIZE + 1, TILE_SIZE):
+        stripe = np.asarray(_source_crop(source, 0, y, width))
         for x in range(0, width - TILE_SIZE + 1, TILE_SIZE):
-            crop = np.asarray(_source_crop(source, x, y))
+            crop = stripe[:, x : x + TILE_SIZE]
             rgb = crop[..., :3] if crop.ndim == 3 else np.repeat(crop[..., None], 3, 2)
             if (rgb.mean(axis=2) < TISSUE_THRESHOLD).mean() >= TISSUE_MIN:
                 coords.append((x, y))
     return coords
 
 
+def _source_dimensions(source: Image.Image | openslide.OpenSlide) -> tuple[int, int]:
+    return source.dimensions if isinstance(source, openslide.OpenSlide) else source.size
+
+
 def _source_crop(
-    source: Image.Image | openslide.OpenSlide, x: int, y: int
+    source: Image.Image | openslide.OpenSlide, x: int, y: int, width: int = TILE_SIZE
 ) -> Image.Image:
     if isinstance(source, openslide.OpenSlide):
-        return source.read_region((x, y), 0, (TILE_SIZE, TILE_SIZE))
-    return source.crop((x, y, x + TILE_SIZE, y + TILE_SIZE))
+        return source.read_region((x, y), 0, (width, TILE_SIZE))
+    return source.crop((x, y, x + width, y + TILE_SIZE))
 
 
 def _legacy_records(
@@ -177,13 +181,30 @@ def _load_mask(row: pd.Series) -> Image.Image | None:
     return Image.open(path)
 
 
-def _audit_tile(context: _AuditContext, record: dict[str, object]) -> dict[str, object]:
-    row, source, mask = context.row, context.source, context.mask
+def _audit_tiles(
+    context: _AuditContext, legacy: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    width, _ = _source_dimensions(context.source)
+    audited: list[dict[str, object] | None] = [None] * len(legacy)
+    indexed = sorted(enumerate(legacy), key=lambda item: int(str(item[1]["y"])))
+    for y, items in groupby(indexed, key=lambda item: int(str(item[1]["y"]))):
+        stripe = np.asarray(
+            _source_crop(context.source, 0, y, width).convert("RGB"), dtype=np.int16
+        )
+        for index, record in items:
+            x = int(str(record["x"]))
+            audited[index] = _audit_tile(context, record, stripe[:, x : x + TILE_SIZE])
+    return [record for record in audited if record is not None]
+
+
+def _audit_tile(
+    context: _AuditContext, record: dict[str, object], expected: np.ndarray
+) -> dict[str, object]:
+    row, mask = context.row, context.mask
     x, y = int(str(record["x"])), int(str(record["y"]))
     legacy = Path(str(record["image_path"]))
     with Image.open(legacy) as tile:
         actual = np.asarray(tile.convert("RGB"), dtype=np.int16)
-    expected = np.asarray(_source_crop(source, x, y).convert("RGB"), dtype=np.int16)
     if (
         actual.shape != expected.shape
         or float(np.abs(actual - expected).mean()) > context.jpeg_mae_max
