@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import pandas as pd
+
+from imbalance_benchmark.datasets import panda_materialize
 from imbalance_benchmark.hydra.rendering import render_sbatch
 from imbalance_benchmark.hydra.workflow import build_workflow
-from imbalance_benchmark.datasets.panda_materialize import select_physical_shard
-import pandas as pd
 
 
 def _config() -> dict[str, object]:
@@ -25,6 +26,12 @@ def _config() -> dict[str, object]:
                     "source_template": "/home/space/datasets-sqfs/panda/patch/shard={index}.sqfs",
                     "mount_template": "/home/space/datasets/panda/patch/shard={index}",
                     "stages": ["prepare-extract-shard"],
+                }
+            ],
+            "writable_paths": [
+                {
+                    "path": "/home/space/datasets-sqfs/panda/patch",
+                    "stages": ["materialize"],
                 }
             ],
         },
@@ -50,6 +57,13 @@ def test_panda_stage_only_pilot_can_run_one_split() -> None:
     assert jobs[0].array_splits == (0,)
 
 
+def test_panda_materialize_writes_only_its_project_shard_root() -> None:
+    materialize = build_workflow(_config(), stage="materialize")[0]
+    script = render_sbatch(materialize, _config(), "config.yaml")
+
+    assert "-B /home/space/datasets-sqfs/panda/patch:/home/space/datasets-sqfs/panda/patch:rw" in script
+
+
 def test_panda_extract_stages_only_its_array_shard() -> None:
     extract = build_workflow(_config(), stage="extract")[0]
     script = render_sbatch(extract, _config(), "config.yaml")
@@ -63,6 +77,6 @@ def test_panda_extract_selects_the_physical_shard_it_stages() -> None:
         {"slide_id": ["a", "b"], "shard_index": [0, 1], "image_path": ["a.jpg", "b.jpg"]}
     )
 
-    result = select_physical_shard(frame, {"name": "panda"}, 1, 48)
+    result = panda_materialize.select_physical_shard(frame, {"name": "panda"}, 1, 48)
 
     assert result["slide_id"].tolist() == ["b"]

@@ -73,6 +73,9 @@ slurm:
     - source: /home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs
       mount: /home/space/datasets/panda/native_tiles_20x_256
       stages: [materialize]
+  writable_paths:
+    - path: /home/space/datasets-sqfs/panda/patch
+      stages: [materialize]
   sharded_squashfs:
     - source_template: /home/space/datasets-sqfs/panda/patch/shard={index}.sqfs
       mount_template: /home/space/datasets/panda/patch/shard={index}
