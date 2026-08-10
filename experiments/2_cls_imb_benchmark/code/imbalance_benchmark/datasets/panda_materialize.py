@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -27,6 +28,8 @@ from imbalance_benchmark.datasets.features.panda_inventory import (
 )
 from imbalance_benchmark.datasets.panda import load_slide_frame
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "audit_canary",
     "audit_slide",
@@ -45,21 +48,31 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
     if len(official) != LOCKED_SLIDES:
         raise ValueError(f"PANDA official cohort changed: {len(official)} slides")
     scratch = Path(cfg["scratch_root"])
-    audited = [
-        audit_slide(
-            row,
-            Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
-            float(cfg["jpeg_mae_max"]),
-            Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
-        )
-        for _, row in official.sort_values("slide_id").iterrows()
-    ]
+    audited = _audit_slides(official, cfg)
     inventory = pd.concat(audited, ignore_index=True) if audited else pd.DataFrame()
     assert_locked_counts(official, inventory)
     inventory = copy_audited_tiles(inventory, scratch)
     inventory["shard_index"] = balanced_shards(inventory, int(cfg["shard_count"]))
     publish_shards(inventory, scratch, cfg)
     return publish_inventory(official, inventory, cfg)
+
+
+def _audit_slides(official: pd.DataFrame, cfg: dict[str, Any]) -> list[pd.DataFrame]:
+    slides = official.sort_values("slide_id").reset_index(drop=True)
+    audited = []
+    for position, (_, row) in enumerate(slides.iterrows(), start=1):
+        logger.info(
+            "PANDA auditing slide %d/%d: %s", position, len(slides), row.slide_id
+        )
+        audited.append(
+            audit_slide(
+                row,
+                Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
+                float(cfg["jpeg_mae_max"]),
+                Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
+            )
+        )
+    return audited
 
 
 def audit_canary(config: dict[str, Any]) -> None:
