@@ -21,13 +21,13 @@ from __future__ import annotations
 import logging
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
 
 from imbalance_benchmark.common import compute_sha256
+from imbalance_benchmark.datasets.data.panda.audit_pool import AuditJob, run_audit_jobs
 from imbalance_benchmark.datasets.data.panda.partials import (
     audit_partial_done,
     read_audit_partial,
@@ -91,7 +91,7 @@ def audit_shard(
     official = _load_official(cfg)
     slides = official.sort_values("slide_id").reset_index(drop=True)
     shard = slides.iloc[shard_index::count]
-    audited = _audit_slides(shard, cfg)
+    audited, crashed = _audit_slides(shard, cfg)
     frame = pd.concat(audited, ignore_index=True) if audited else pd.DataFrame()
     raw_hashes = {
         str(row.slide_id): {
@@ -100,7 +100,7 @@ def audit_shard(
         }
         for _, row in shard.iterrows()
     }
-    write_audit_partial(cfg, shard_index, frame, raw_hashes)
+    write_audit_partial(cfg, shard_index, frame, raw_hashes, crashed)
 
 
 def combine(config: dict[str, Any], shard_count: int | None = None) -> None:
@@ -110,10 +110,17 @@ def combine(config: dict[str, Any], shard_count: int | None = None) -> None:
     official = _load_official(cfg)
     frames: list[pd.DataFrame] = []
     raw_hashes: dict[str, dict[str, str | None]] = {}
+    crashed: list[str] = []
     for index in range(count):
-        frame, raw = read_audit_partial(cfg, index)
+        frame, raw, shard_crashed = read_audit_partial(cfg, index)
         frames.append(frame)
         raw_hashes.update(raw)
+        crashed.extend(shard_crashed)
+    if crashed:
+        raise ValueError(
+            f"PANDA audit worker crashed on {len(crashed)} slide(s), excluded from "
+            f"their shard's partial: {sorted(crashed)}"
+        )
     inventory = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     assert_locked_counts(official, inventory)
     inventory = inventory.copy()
@@ -149,17 +156,18 @@ def _load_official(cfg: dict[str, Any]) -> pd.DataFrame:
     return official
 
 
-def _audit_slides(official: pd.DataFrame, cfg: dict[str, Any]) -> list[pd.DataFrame]:
+def _audit_slides(
+    official: pd.DataFrame, cfg: dict[str, Any]
+) -> tuple[list[pd.DataFrame], list[str]]:
     slides = official.sort_values("slide_id").reset_index(drop=True)
     if slides.empty:
-        return []
+        return [], []
     workers = min(_worker_count(cfg), len(slides))
-    jobs = [
+    jobs: list[AuditJob] = [
         (position, len(slides), row, cfg)
         for position, (_, row) in enumerate(slides.iterrows(), start=1)
     ]
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(_audit_slide_job, jobs))
+    return run_audit_jobs(jobs, workers, _audit_slide_job)
 
 
 def _worker_count(cfg: dict[str, Any] | None = None) -> int:
@@ -171,9 +179,7 @@ def _worker_count(cfg: dict[str, Any] | None = None) -> int:
     return max(1, int(cpus)) if cpus else os.cpu_count() or 1
 
 
-def _audit_slide_job(
-    job: tuple[int, int, pd.Series, dict[str, Any]],
-) -> pd.DataFrame:
+def _audit_slide_job(job: AuditJob) -> pd.DataFrame:
     position, total, row, cfg = job
     logger.info("PANDA auditing slide %d/%d: %s", position, total, row.slide_id)
     return audit_slide(

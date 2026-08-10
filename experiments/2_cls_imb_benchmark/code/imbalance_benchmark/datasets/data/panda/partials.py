@@ -34,18 +34,24 @@ def _partials_dir(cfg: dict[str, Any]) -> Path:
     return Path(cfg["canonical_inventory_path"]).parent / "partials"
 
 
-def _audit_partial_paths(cfg: dict[str, Any], shard_index: int) -> tuple[Path, Path]:
+def _audit_partial_paths(
+    cfg: dict[str, Any], shard_index: int
+) -> tuple[Path, Path, Path]:
     directory = _partials_dir(cfg)
-    return directory / f"audit-{shard_index}.csv", directory / f"raw-{shard_index}.json"
+    return (
+        directory / f"audit-{shard_index}.csv",
+        directory / f"raw-{shard_index}.json",
+        directory / f"crashed-{shard_index}.json",
+    )
 
 
 def audit_partial_done(cfg: dict[str, Any], shard_index: int) -> bool:
-    """Return whether one audit shard's signed partial pair is complete and unaltered."""
-    tiles_path, raw_path = _audit_partial_paths(cfg, shard_index)
-    if not tiles_path.is_file() or not raw_path.is_file():
+    """Return whether one audit shard's signed partial set is complete and unaltered."""
+    paths = _audit_partial_paths(cfg, shard_index)
+    if not all(path.is_file() for path in paths):
         return False
-    verify_signed_file(tiles_path)
-    verify_signed_file(raw_path)
+    for path in paths:
+        verify_signed_file(path)
     return True
 
 
@@ -54,26 +60,32 @@ def write_audit_partial(
     shard_index: int,
     frame: pd.DataFrame,
     raw_hashes: dict[str, dict[str, str | None]],
+    crashed_slide_ids: list[str],
 ) -> None:
-    """Persist one audit shard's signed tile records and raw-source hashes."""
-    tiles_path, raw_path = _audit_partial_paths(cfg, shard_index)
+    """Persist one audit shard's signed tile records, raw-source hashes, and any
+    slide IDs whose audit worker crashed (native crash, excluded from ``frame``)."""
+    tiles_path, raw_path, crashed_path = _audit_partial_paths(cfg, shard_index)
     tiles_path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(tiles_path, index=False)
     sign_file(tiles_path)
     write_json(raw_path, raw_hashes)
     sign_file(raw_path)
+    write_json(crashed_path, {"crashed_slide_ids": crashed_slide_ids})
+    sign_file(crashed_path)
 
 
 def read_audit_partial(
     cfg: dict[str, Any], shard_index: int
-) -> tuple[pd.DataFrame, dict[str, dict[str, str | None]]]:
-    """Load and re-verify one audit shard's signed partial pair."""
-    tiles_path, raw_path = _audit_partial_paths(cfg, shard_index)
+) -> tuple[pd.DataFrame, dict[str, dict[str, str | None]], list[str]]:
+    """Load and re-verify one audit shard's signed partial set."""
+    tiles_path, raw_path, crashed_path = _audit_partial_paths(cfg, shard_index)
     verify_signed_file(tiles_path)
     verify_signed_file(raw_path)
+    verify_signed_file(crashed_path)
     frame = pd.read_csv(tiles_path, dtype=cast(Any, _AUDIT_DTYPES))
     raw_hashes = json.loads(raw_path.read_text(encoding="utf-8"))
-    return frame, raw_hashes
+    crashed = json.loads(crashed_path.read_text(encoding="utf-8"))["crashed_slide_ids"]
+    return frame, raw_hashes, crashed
 
 
 def combined_paths(cfg: dict[str, Any]) -> tuple[Path, Path]:

@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 
 from imbalance_benchmark.datasets import panda_materialize
+from imbalance_benchmark.datasets.data.panda import audit_pool as panda_audit_pool
 from imbalance_benchmark.datasets.data.panda import grid as panda_grid
 from imbalance_benchmark.datasets.data.panda import partials as panda_partials
 from imbalance_benchmark.datasets.data.panda.slide_audit import copy_audited_tiles
@@ -193,7 +194,7 @@ def test_combine_gates_writing_inventory_on_locked_counts(
     )
     cfg = panda_materialize.materialize_config(config)
     frame = pd.DataFrame({"slide_id": ["slide"], "patch_label": ["benign"]})
-    panda_materialize.write_audit_partial(cfg, 0, frame, {"slide": {"image": "x"}})
+    panda_materialize.write_audit_partial(cfg, 0, frame, {"slide": {"image": "x"}}, [])
 
     with pytest.raises(ValueError, match="locked counts"):
         panda_materialize.combine(config, shard_count=1)
@@ -201,6 +202,77 @@ def test_combine_gates_writing_inventory_on_locked_counts(
     inventory_path, raw_path = panda_partials.combined_paths(cfg)
     assert not inventory_path.exists()
     assert not raw_path.exists()
+
+
+def test_combine_raises_when_a_shard_reports_crashed_slides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _materialize_config(tmp_path)
+    monkeypatch.setattr(panda_materialize, "LOCKED_SLIDES", 1)
+    monkeypatch.setattr(
+        panda_materialize,
+        "load_slide_frame",
+        lambda _: pd.DataFrame({"slide_id": ["slide"]}),
+    )
+    cfg = panda_materialize.materialize_config(config)
+    frame = pd.DataFrame({"slide_id": ["slide"], "patch_label": ["benign"]})
+    panda_materialize.write_audit_partial(
+        cfg, 0, frame, {"slide": {"image": "x"}}, ["deadbeef"]
+    )
+
+    with pytest.raises(ValueError, match="deadbeef"):
+        panda_materialize.combine(config, shard_count=1)
+
+
+def test_audit_slides_isolates_a_crashing_slide(monkeypatch: pytest.MonkeyPatch) -> None:
+    from concurrent.futures.process import BrokenProcessPool
+
+    class _Future:
+        def __init__(
+            self, value: object = None, error: Exception | None = None
+        ) -> None:
+            self._value = value
+            self._error = error
+
+        def result(self) -> object:
+            if self._error is not None:
+                raise self._error
+            return self._value
+
+    class _Pool:
+        def __init__(self, max_workers: int) -> None:
+            del max_workers
+
+        def __enter__(self) -> _Pool:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def submit(self, function: object, job: object) -> _Future:
+            _, _, row, _ = job  # type: ignore[misc]
+            if row.slide_id == "bad":
+                return _Future(error=BrokenProcessPool("boom"))
+            return _Future(value=function(job))  # type: ignore[operator]
+
+    monkeypatch.setattr(panda_audit_pool, "ProcessPoolExecutor", _Pool)
+    monkeypatch.setattr(
+        panda_materialize,
+        "audit_slide",
+        lambda row, *_: pd.DataFrame({"slide_id": [row.slide_id]}),
+    )
+
+    audited, crashed = panda_materialize._audit_slides(
+        pd.DataFrame({"slide_id": ["bad", "good"]}),
+        {
+            "legacy_tiles_dir": "/tiles",
+            "legacy_manifest_dir": "/manifests",
+            "jpeg_mae_max": 8.0,
+        },
+    )
+
+    assert crashed == ["bad"]
+    assert [frame.iloc[0].slide_id for frame in audited] == ["good"]
 
 
 def test_audit_partial_round_trips_and_rejects_tampering(tmp_path: Path) -> None:
@@ -227,14 +299,15 @@ def test_audit_partial_round_trips_and_rejects_tampering(tmp_path: Path) -> None
     raw_hashes = {"slide": {"image": "abc", "mask": None}}
 
     assert not panda_materialize.audit_partial_done(cfg, 0)
-    panda_materialize.write_audit_partial(cfg, 0, frame, raw_hashes)
+    panda_materialize.write_audit_partial(cfg, 0, frame, raw_hashes, [])
     assert panda_materialize.audit_partial_done(cfg, 0)
 
-    read_frame, read_raw = panda_materialize.read_audit_partial(cfg, 0)
+    read_frame, read_raw, read_crashed = panda_materialize.read_audit_partial(cfg, 0)
     pd.testing.assert_frame_equal(read_frame, frame)
     assert read_raw == raw_hashes
+    assert read_crashed == []
 
-    tiles_path, _ = panda_partials._audit_partial_paths(cfg, 0)
+    tiles_path, _, _ = panda_partials._audit_partial_paths(cfg, 0)
     tiles_path.write_text(tiles_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     with pytest.raises(RuntimeError):
         panda_materialize.audit_partial_done(cfg, 0)
@@ -256,6 +329,13 @@ def test_audit_shard_slices_cover_every_slide_exactly_once() -> None:
 def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[int] = []
 
+    class _Future:
+        def __init__(self, value: object) -> None:
+            self._value = value
+
+        def result(self) -> object:
+            return self._value
+
     class _Pool:
         def __init__(self, max_workers: int) -> None:
             captured.append(max_workers)
@@ -266,18 +346,18 @@ def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> No
         def __exit__(self, *_: object) -> None:
             return None
 
-        def map(self, function: object, jobs: object) -> object:
-            return map(function, jobs)  # type: ignore[arg-type]
+        def submit(self, function: object, job: object) -> _Future:
+            return _Future(function(job))  # type: ignore[operator]
 
     monkeypatch.setenv("SLURM_CPUS_PER_TASK", "2")
-    monkeypatch.setattr(panda_materialize, "ProcessPoolExecutor", _Pool)
+    monkeypatch.setattr(panda_audit_pool, "ProcessPoolExecutor", _Pool)
     monkeypatch.setattr(
         panda_materialize,
         "audit_slide",
         lambda row, *_: pd.DataFrame({"slide_id": [row.slide_id]}),
     )
 
-    audited = panda_materialize._audit_slides(
+    audited, crashed = panda_materialize._audit_slides(
         pd.DataFrame({"slide_id": ["b", "a", "c"]}),
         {
             "legacy_tiles_dir": "/tiles",
@@ -287,7 +367,8 @@ def test_audit_slides_uses_allocated_cpus(monkeypatch: pytest.MonkeyPatch) -> No
     )
 
     assert captured == [2]
-    assert [frame.iloc[0].slide_id for frame in audited] == ["a", "b", "c"]
+    assert sorted(frame.iloc[0].slide_id for frame in audited) == ["a", "b", "c"]
+    assert crashed == []
 
 
 def test_audit_slides_runs_a_real_process(tmp_path: Path) -> None:
@@ -303,7 +384,7 @@ def test_audit_slides_runs_a_real_process(tmp_path: Path) -> None:
         }
     ).to_csv(manifests / "slide.csv", index=False)
 
-    audited = panda_materialize._audit_slides(
+    audited, crashed = panda_materialize._audit_slides(
         pd.DataFrame([row]),
         {
             "legacy_tiles_dir": str(legacy.parent),
@@ -314,3 +395,4 @@ def test_audit_slides_runs_a_real_process(tmp_path: Path) -> None:
 
     assert len(audited) == 1
     assert audited[0].patch_label.tolist() == ["cancer", "benign", "benign", "benign"]
+    assert crashed == []
