@@ -23,18 +23,16 @@ class _AuditContext:
     row: pd.Series
     source: Image.Image
     mask: Image.Image | None
-    target_root: Path
     jpeg_mae_max: float
 
 
 def audit_slide(
     row: pd.Series,
     legacy_dir: Path,
-    target_root: Path,
     jpeg_mae_max: float,
     manifest_path: Path | None = None,
 ) -> pd.DataFrame:
-    """Recompute one level-0 grid and verify every legacy JPEG crop."""
+    """Recompute canonical coordinates and labels from official PANDA sources."""
     with _official_tiff_guard(), Image.open(str(row["image_path"])) as source:
         coords = eligible_coordinates(source)
         legacy = _legacy_records(legacy_dir, coords, manifest_path)
@@ -42,12 +40,30 @@ def audit_slide(
             raise ValueError("PANDA eligible tile coordinates are missing or extra")
         mask = _load_mask(row)
         try:
-            context = _AuditContext(row, source, mask, target_root, jpeg_mae_max)
+            context = _AuditContext(row, source, mask, jpeg_mae_max)
             records = [_audit_tile(context, item) for item in legacy]
         finally:
             if mask is not None:
                 mask.close()
     return pd.DataFrame(records)
+
+
+def copy_audited_tiles(inventory: pd.DataFrame, target_root: Path) -> pd.DataFrame:
+    """Copy verified legacy JPEGs only after the global protocol gate passes."""
+    copied = inventory.copy()
+    targets = []
+    for legacy_path, patch_id, sha256 in copied[
+        ["legacy_image_path", "patch_id", "sha256"]
+    ].itertuples(index=False, name=None):
+        slide_id, tile_id = str(patch_id).split("/", maxsplit=1)
+        target = target_root / "tiles" / slide_id / f"{tile_id}.jpg"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(legacy_path), target)
+        if compute_sha256(target) != sha256:
+            raise ValueError(f"PANDA copied tile differs from audited source: {target}")
+        targets.append(str(target))
+    copied["image_path"] = targets
+    return copied.drop(columns="legacy_image_path")
 
 
 @contextmanager
@@ -114,7 +130,11 @@ def _legacy_records(
 def _manifest_records(path: Path) -> list[dict[str, object]]:
     required = {"patch_id", "x", "y", "image_path"}
     frame = pd.read_csv(path)
-    if required - set(frame) or frame.duplicated(["x", "y"]).any():
+    if (
+        required - set(frame)
+        or frame.duplicated(["patch_id"]).any()
+        or frame.duplicated(["x", "y"]).any()
+    ):
         raise ValueError(f"PANDA legacy tile manifest is invalid: {path}")
     return [dict(record) for record in frame.to_dict(orient="records")]
 
@@ -130,7 +150,7 @@ def _load_mask(row: pd.Series) -> Image.Image | None:
 
 def _audit_tile(context: _AuditContext, record: dict[str, object]) -> dict[str, object]:
     row, source, mask = context.row, context.source, context.mask
-    x, y = int(record["x"]), int(record["y"])
+    x, y = int(str(record["x"])), int(str(record["y"]))
     legacy = Path(str(record["image_path"]))
     with Image.open(legacy) as tile:
         actual = np.asarray(tile.convert("RGB"), dtype=np.int16)
@@ -143,18 +163,12 @@ def _audit_tile(context: _AuditContext, record: dict[str, object]) -> dict[str, 
     ):
         raise ValueError(f"PANDA tile source-crop mismatch: {legacy}")
     patch_id = str(record["patch_id"])
-    target = context.target_root / "tiles" / str(row.slide_id) / f"{patch_id}.jpg"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(legacy, target)
     cell = np.asarray(mask.crop((x, y, x + TILE_SIZE, y + TILE_SIZE))) if mask else None
     label = (
         "unlabelled"
         if cell is None
         else cell_label(cell[..., 0] if cell.ndim == 3 else cell, str(row.provider))
     )
-    declared = record.get("patch_label")
-    if declared is not None and str(declared) != label:
-        raise ValueError(f"PANDA legacy mask label mismatch: {legacy}")
     return {
         "slide_id": str(row.slide_id),
         "case_id": str(row.slide_id),
@@ -163,8 +177,8 @@ def _audit_tile(context: _AuditContext, record: dict[str, object]) -> dict[str, 
         "has_mask": bool(row.has_mask),
         "patch_id": f"{row.slide_id}/{patch_id}",
         "patch_label": label,
-        "image_path": str(target),
-        "sha256": compute_sha256(target),
+        "legacy_image_path": str(legacy),
+        "sha256": compute_sha256(legacy),
         "x": x,
         "y": y,
         "level": 0,

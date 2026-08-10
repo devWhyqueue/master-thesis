@@ -7,6 +7,8 @@ import pandas as pd
 import pytest
 from PIL import Image
 
+from imbalance_benchmark.datasets import panda_materialize
+from imbalance_benchmark.datasets.data.panda_grid import copy_audited_tiles
 from imbalance_benchmark.datasets.panda_materialize import audit_slide
 
 
@@ -46,7 +48,7 @@ def test_audit_slide_recomputes_complete_grid_and_source_fidelity(
 ) -> None:
     row, legacy, target = _source(tmp_path)
 
-    audited = audit_slide(row, legacy, target, jpeg_mae_max=2.0)
+    audited = audit_slide(row, legacy, jpeg_mae_max=2.0)
 
     assert audited[["x", "y"]].values.tolist() == [
         [0, 0],
@@ -55,22 +57,23 @@ def test_audit_slide_recomputes_complete_grid_and_source_fidelity(
         [256, 256],
     ]
     assert audited["patch_label"].tolist() == ["cancer", "benign", "benign", "benign"]
-    assert all(Path(path).is_file() for path in audited["image_path"])
+    copied = copy_audited_tiles(audited, target)
+    assert all(Path(path).is_file() for path in copied["image_path"])
 
 
 def test_audit_slide_allows_known_large_official_tiffs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    row, legacy, target = _source(tmp_path)
+    row, legacy, _ = _source(tmp_path)
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
 
-    audited = audit_slide(row, legacy, target, jpeg_mae_max=2.0)
+    audited = audit_slide(row, legacy, jpeg_mae_max=2.0)
 
     assert len(audited) == 4
 
 
-def test_audit_slide_uses_declared_legacy_coordinates(tmp_path: Path) -> None:
-    row, legacy, target = _source(tmp_path)
+def test_audit_slide_derives_labels_despite_legacy_label_mismatch(tmp_path: Path) -> None:
+    row, legacy, _ = _source(tmp_path)
     manifest = tmp_path / "legacy.csv"
     pd.DataFrame(
         {
@@ -83,11 +86,11 @@ def test_audit_slide_uses_declared_legacy_coordinates(tmp_path: Path) -> None:
                 str(legacy / "1.jpg"),
                 str(legacy / "2.jpg"),
             ],
-            "patch_label": ["benign", "cancer", "benign", "benign"],
+            "patch_label": ["cancer", "cancer", "cancer", "cancer"],
         }
     ).to_csv(manifest, index=False)
 
-    audited = audit_slide(row, legacy, target, jpeg_mae_max=2.0, manifest_path=manifest)
+    audited = audit_slide(row, legacy, jpeg_mae_max=2.0, manifest_path=manifest)
 
     assert audited["patch_id"].tolist() == [
         "slide/13",
@@ -95,17 +98,60 @@ def test_audit_slide_uses_declared_legacy_coordinates(tmp_path: Path) -> None:
         "slide/99",
         "slide/2",
     ]
+    assert audited["patch_label"].tolist() == ["benign", "cancer", "benign", "benign"]
+    assert "legacy_patch_label" not in audited
 
 
 @pytest.mark.parametrize("filename", ["4.jpg", "0.jpg"])
 def test_audit_slide_rejects_extra_or_missing_eligible_tile(
     tmp_path: Path, filename: str
 ) -> None:
-    row, legacy, target = _source(tmp_path)
+    row, legacy, _ = _source(tmp_path)
     if filename == "4.jpg":
         (legacy / filename).write_bytes((legacy / "0.jpg").read_bytes())
     else:
         (legacy / filename).unlink()
 
     with pytest.raises(ValueError, match="eligible tile coordinates"):
-        audit_slide(row, legacy, target, jpeg_mae_max=2.0)
+        audit_slide(row, legacy, jpeg_mae_max=2.0)
+
+
+def test_materialize_gates_copying_on_locked_counts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = {
+        "materialize_panda": {
+            "raw_root": str(tmp_path),
+            "legacy_tiles_dir": str(tmp_path),
+            "legacy_manifest_dir": str(tmp_path),
+            "scratch_root": str(tmp_path / "scratch"),
+            "shard_root": str(tmp_path / "shards"),
+            "shard_mount_root": str(tmp_path / "mount"),
+            "canonical_inventory_path": str(tmp_path / "inventory.csv"),
+            "sidecar_path": str(tmp_path / "sidecar.json"),
+        }
+    }
+    monkeypatch.setattr(panda_materialize, "LOCKED_SLIDES", 1)
+    monkeypatch.setattr(
+        panda_materialize,
+        "load_slide_frame",
+        lambda _: pd.DataFrame({"slide_id": ["slide"]}),
+    )
+    monkeypatch.setattr(
+        panda_materialize,
+        "audit_slide",
+        lambda *_: pd.DataFrame({"slide_id": ["slide"], "patch_label": ["benign"]}),
+    )
+    monkeypatch.setattr(
+        panda_materialize,
+        "assert_locked_counts",
+        lambda *_: (_ for _ in ()).throw(ValueError("locked counts")),
+    )
+    monkeypatch.setattr(
+        panda_materialize,
+        "copy_audited_tiles",
+        lambda *_: pytest.fail("copy ran before locked-count gate"),
+    )
+
+    with pytest.raises(ValueError, match="locked counts"):
+        panda_materialize.materialize(config)

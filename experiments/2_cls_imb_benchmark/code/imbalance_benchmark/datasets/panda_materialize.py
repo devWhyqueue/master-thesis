@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
 
-from imbalance_benchmark.datasets.data.panda_grid import audit_slide, canary_rows
+from imbalance_benchmark.datasets.data.panda_grid import (
+    audit_slide,
+    canary_rows,
+    copy_audited_tiles,
+)
 from imbalance_benchmark.datasets.data.panda_publish import (
     LOCKED_SLIDES,
     assert_locked_counts,
@@ -36,7 +39,7 @@ __all__ = [
 
 
 def materialize(config: dict[str, Any]) -> dict[str, Any]:
-    """Audit legacy tiles, publish balanced immutable shards and provenance."""
+    """Audit candidate coordinates, gate global counts, then publish shards."""
     cfg = materialize_config(config)
     official = load_slide_frame(Path(cfg["raw_root"]))
     if len(official) != LOCKED_SLIDES:
@@ -46,7 +49,6 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
         audit_slide(
             row,
             Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
-            scratch,
             float(cfg["jpeg_mae_max"]),
             Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
         )
@@ -54,6 +56,7 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
     ]
     inventory = pd.concat(audited, ignore_index=True) if audited else pd.DataFrame()
     assert_locked_counts(official, inventory)
+    inventory = copy_audited_tiles(inventory, scratch)
     inventory["shard_index"] = balanced_shards(inventory, int(cfg["shard_count"]))
     publish_shards(inventory, scratch, cfg)
     return publish_inventory(official, inventory, cfg)
@@ -62,21 +65,15 @@ def materialize(config: dict[str, Any]) -> dict[str, Any]:
 def audit_canary(config: dict[str, Any]) -> None:
     """Audit providers, grades, mask states and tile-count extremes without publishing."""
     cfg = materialize_config(config)
-    scratch = Path(cfg["scratch_root"]) / "canary"
-    try:
-        for _, row in canary_rows(
-            load_slide_frame(Path(cfg["raw_root"])), Path(cfg["legacy_tiles_dir"])
-        ).iterrows():
-            audit_slide(
-                row,
-                Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
-                scratch,
-                float(cfg["jpeg_mae_max"]),
-                Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
-            )
-    finally:
-        if scratch.exists():
-            shutil.rmtree(scratch)
+    for _, row in canary_rows(
+        load_slide_frame(Path(cfg["raw_root"])), Path(cfg["legacy_tiles_dir"])
+    ).iterrows():
+        audit_slide(
+            row,
+            Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
+            float(cfg["jpeg_mae_max"]),
+            Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
+        )
 
 
 def select_physical_shard(
