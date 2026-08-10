@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import openslide
 import pandas as pd
 from PIL import Image
 
@@ -21,7 +22,7 @@ TILE_SIZE, TISSUE_MIN, TISSUE_THRESHOLD = 256, 0.35, 210
 @dataclass(frozen=True)
 class _AuditContext:
     row: pd.Series
-    source: Image.Image
+    source: Image.Image | openslide.OpenSlide
     mask: Image.Image | None
     jpeg_mae_max: float
 
@@ -33,7 +34,7 @@ def audit_slide(
     manifest_path: Path | None = None,
 ) -> pd.DataFrame:
     """Recompute canonical coordinates and labels from official PANDA sources."""
-    with _official_tiff_guard(), Image.open(str(row["image_path"])) as source:
+    with _official_tiff_guard(), _source_reader(str(row["image_path"])) as source:
         coords = eligible_coordinates(source)
         legacy = _legacy_records(legacy_dir, coords, manifest_path)
         if {(item["x"], item["y"]) for item in legacy} != set(coords):
@@ -77,6 +78,21 @@ def _official_tiff_guard() -> Iterator[None]:
         Image.MAX_IMAGE_PIXELS = previous
 
 
+@contextmanager
+def _source_reader(path: str) -> Iterator[Image.Image | openslide.OpenSlide]:
+    """Use streamed WSI regions, falling back for small test TIFFs."""
+    try:
+        source = openslide.OpenSlide(path)
+    except openslide.OpenSlideUnsupportedFormatError:
+        with Image.open(path) as source:
+            yield source
+    else:
+        try:
+            yield source
+        finally:
+            source.close()
+
+
 def canary_rows(official: pd.DataFrame, legacy_root: Path) -> pd.DataFrame:
     """Select both providers, all ISUP grades, mask states and count extremes."""
     ranked = official.assign(
@@ -95,16 +111,29 @@ def canary_rows(official: pd.DataFrame, legacy_root: Path) -> pd.DataFrame:
     return pd.DataFrame(selected).drop_duplicates("slide_id").reset_index(drop=True)
 
 
-def eligible_coordinates(source: Image.Image) -> list[tuple[int, int]]:
+def eligible_coordinates(
+    source: Image.Image | openslide.OpenSlide,
+) -> list[tuple[int, int]]:
     """Return every complete 256-pixel cell meeting locked tissue rule."""
     coords = []
-    for y in range(0, source.height - TILE_SIZE + 1, TILE_SIZE):
-        for x in range(0, source.width - TILE_SIZE + 1, TILE_SIZE):
-            crop = np.asarray(source.crop((x, y, x + TILE_SIZE, y + TILE_SIZE)))
+    width, height = (
+        source.dimensions if isinstance(source, openslide.OpenSlide) else source.size
+    )
+    for y in range(0, height - TILE_SIZE + 1, TILE_SIZE):
+        for x in range(0, width - TILE_SIZE + 1, TILE_SIZE):
+            crop = np.asarray(_source_crop(source, x, y))
             rgb = crop[..., :3] if crop.ndim == 3 else np.repeat(crop[..., None], 3, 2)
             if (rgb.mean(axis=2) < TISSUE_THRESHOLD).mean() >= TISSUE_MIN:
                 coords.append((x, y))
     return coords
+
+
+def _source_crop(
+    source: Image.Image | openslide.OpenSlide, x: int, y: int
+) -> Image.Image:
+    if isinstance(source, openslide.OpenSlide):
+        return source.read_region((x, y), 0, (TILE_SIZE, TILE_SIZE))
+    return source.crop((x, y, x + TILE_SIZE, y + TILE_SIZE))
 
 
 def _legacy_records(
@@ -154,9 +183,7 @@ def _audit_tile(context: _AuditContext, record: dict[str, object]) -> dict[str, 
     legacy = Path(str(record["image_path"]))
     with Image.open(legacy) as tile:
         actual = np.asarray(tile.convert("RGB"), dtype=np.int16)
-    expected = np.asarray(
-        source.crop((x, y, x + TILE_SIZE, y + TILE_SIZE)).convert("RGB"), dtype=np.int16
-    )
+    expected = np.asarray(_source_crop(source, x, y).convert("RGB"), dtype=np.int16)
     if (
         actual.shape != expected.shape
         or float(np.abs(actual - expected).mean()) > context.jpeg_mae_max
