@@ -20,8 +20,8 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.datasets.data.panda.slide_audit import copy_audited_tiles
 
-LOCKED_SLIDES, LOCKED_LABELLED_SLIDES = 10_616, 10_514
-LOCKED_BENIGN_PATCHES, LOCKED_CANCER_PATCHES = 3_702_544, 803_785
+LOCKED_SLIDES, LOCKED_LABELLED_SLIDES = 10_616, 10_510
+LOCKED_BENIGN_PATCHES, LOCKED_CANCER_PATCHES = 3_701_262, 802_902
 
 # These 4 slides segfault OpenSlide/libtiff/libjpeg deterministically, at
 # multiple band-read sizes, in a native crash that Python cannot catch. The
