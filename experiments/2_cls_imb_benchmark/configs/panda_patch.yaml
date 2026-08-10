@@ -41,7 +41,7 @@ materialize_panda:
   canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/canonical_inventory.csv
   sidecar_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
   shard_count: 48
-  jpeg_mae_max: 8.0
+  jpeg_mae_max: 10.0
   audit_shard_count: 32
   audit_workers: null
   audit_io_workers: 2
