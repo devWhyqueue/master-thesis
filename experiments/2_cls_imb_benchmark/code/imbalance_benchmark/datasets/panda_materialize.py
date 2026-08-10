@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, cast
@@ -188,14 +189,25 @@ def _audit_slide_job(
 def audit_canary(config: dict[str, Any]) -> None:
     """Audit providers, grades, mask states and tile-count extremes without publishing."""
     cfg = materialize_config(config)
-    for _, row in canary_rows(
+    rows = canary_rows(
         load_slide_frame(Path(cfg["raw_root"])), Path(cfg["legacy_tiles_dir"])
-    ).iterrows():
+    )
+    for position, (_, row) in enumerate(rows.iterrows(), start=1):
+        started = time.monotonic()
         audit_slide(
             row,
             Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
             float(cfg["jpeg_mae_max"]),
             Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
+            int(cfg.get("audit_io_workers", 1)),
+            int(cfg.get("audit_band_rows", 512)),
+        )
+        logger.info(
+            "PANDA canary audited slide %d/%d: %s (%.1fs)",
+            position,
+            len(rows),
+            row.slide_id,
+            time.monotonic() - started,
         )
 
 
