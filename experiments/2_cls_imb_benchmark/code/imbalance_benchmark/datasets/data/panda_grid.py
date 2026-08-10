@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shutil
+from contextlib import contextmanager
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,7 +31,7 @@ def audit_slide(
     row: pd.Series, legacy_dir: Path, target_root: Path, jpeg_mae_max: float
 ) -> pd.DataFrame:
     """Recompute one level-0 grid and verify every legacy JPEG crop."""
-    with Image.open(str(row["image_path"])) as source:
+    with _official_tiff_guard(), Image.open(str(row["image_path"])) as source:
         coords = eligible_coordinates(source)
         legacy = _legacy_tiles(legacy_dir)
         if set(legacy) != set(range(len(coords))):
@@ -45,6 +47,17 @@ def audit_slide(
             if mask is not None:
                 mask.close()
     return pd.DataFrame(records)
+
+
+@contextmanager
+def _official_tiff_guard() -> Iterator[None]:
+    """Disable Pillow's generic bomb limit only while reading trusted PANDA TIFFs."""
+    previous = Image.MAX_IMAGE_PIXELS
+    Image.MAX_IMAGE_PIXELS = None
+    try:
+        yield
+    finally:
+        Image.MAX_IMAGE_PIXELS = previous
 
 
 def canary_rows(official: pd.DataFrame, legacy_root: Path) -> pd.DataFrame:

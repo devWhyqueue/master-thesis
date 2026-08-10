@@ -41,7 +41,9 @@ def _source(tmp_path: Path) -> tuple[pd.Series, Path, Path]:
     )
 
 
-def test_audit_slide_recomputes_complete_grid_and_source_fidelity(tmp_path: Path) -> None:
+def test_audit_slide_recomputes_complete_grid_and_source_fidelity(
+    tmp_path: Path,
+) -> None:
     row, legacy, target = _source(tmp_path)
 
     audited = audit_slide(row, legacy, target, jpeg_mae_max=2.0)
@@ -54,6 +56,17 @@ def test_audit_slide_recomputes_complete_grid_and_source_fidelity(tmp_path: Path
     ]
     assert audited["patch_label"].tolist() == ["cancer", "benign", "benign", "benign"]
     assert all(Path(path).is_file() for path in audited["image_path"])
+
+
+def test_audit_slide_allows_known_large_official_tiffs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    row, legacy, target = _source(tmp_path)
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+
+    audited = audit_slide(row, legacy, target, jpeg_mae_max=2.0)
+
+    assert len(audited) == 4
 
 
 @pytest.mark.parametrize("filename", ["4.jpg", "0.jpg"])
