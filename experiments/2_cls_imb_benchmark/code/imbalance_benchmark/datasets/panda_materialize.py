@@ -86,6 +86,7 @@ def _audit_slide_job(
         Path(cfg["legacy_tiles_dir"]) / str(row["slide_id"]),
         float(cfg["jpeg_mae_max"]),
         Path(cfg["legacy_manifest_dir"]) / f"{row['slide_id']}.csv",
+        int(cfg.get("audit_io_workers", 1)),
     )
 
 

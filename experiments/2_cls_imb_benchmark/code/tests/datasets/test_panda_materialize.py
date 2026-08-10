@@ -49,7 +49,7 @@ def test_audit_slide_recomputes_complete_grid_and_source_fidelity(
 ) -> None:
     row, legacy, target = _source(tmp_path)
 
-    audited = audit_slide(row, legacy, jpeg_mae_max=2.0)
+    audited = audit_slide(row, legacy, jpeg_mae_max=2.0, jpeg_workers=2)
 
     assert audited[["x", "y"]].values.tolist() == [
         [0, 0],

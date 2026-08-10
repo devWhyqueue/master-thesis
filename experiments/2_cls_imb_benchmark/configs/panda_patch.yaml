@@ -43,6 +43,7 @@ materialize_panda:
   shard_count: 48
   jpeg_mae_max: 8.0
   audit_workers: 1
+  audit_io_workers: 8
 
 
 slurm:

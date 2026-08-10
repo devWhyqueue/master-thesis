@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from contextlib import contextmanager
-from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
@@ -16,6 +15,10 @@ from PIL import Image
 
 from imbalance_benchmark.common import compute_sha256
 from imbalance_benchmark.datasets.panda import cell_label
+from imbalance_benchmark.datasets.data.panda_tiff import (
+    official_tiff_guard,
+    source_reader,
+)
 
 TILE_SIZE, TISSUE_MIN, TISSUE_THRESHOLD = 256, 0.35, 210
 
@@ -26,6 +29,7 @@ class _AuditContext:
     source: Image.Image | openslide.OpenSlide
     mask: Image.Image | None
     jpeg_mae_max: float
+    jpeg_workers: int
 
 
 def audit_slide(
@@ -33,16 +37,19 @@ def audit_slide(
     legacy_dir: Path,
     jpeg_mae_max: float,
     manifest_path: Path | None = None,
+    jpeg_workers: int = 1,
 ) -> pd.DataFrame:
     """Recompute canonical coordinates and labels from official PANDA sources."""
-    with _official_tiff_guard(), _source_reader(str(row["image_path"])) as source:
+    if jpeg_workers < 1:
+        raise ValueError("PANDA JPEG audit workers must be positive")
+    with official_tiff_guard(), source_reader(str(row["image_path"])) as source:
         coords = eligible_coordinates(source)
         legacy = _legacy_records(legacy_dir, coords, manifest_path)
         if {(item["x"], item["y"]) for item in legacy} != set(coords):
             raise ValueError("PANDA eligible tile coordinates are missing or extra")
         mask = _load_mask(row)
         try:
-            context = _AuditContext(row, source, mask, jpeg_mae_max)
+            context = _AuditContext(row, source, mask, jpeg_mae_max, jpeg_workers)
             records = _audit_tiles(context, legacy)
         finally:
             if mask is not None:
@@ -68,32 +75,6 @@ def copy_audited_tiles(inventory: pd.DataFrame, target_root: Path) -> pd.DataFra
     return copied.drop(columns="legacy_image_path")
 
 
-@contextmanager
-def _official_tiff_guard() -> Iterator[None]:
-    """Disable Pillow's generic bomb limit only while reading trusted PANDA TIFFs."""
-    previous = Image.MAX_IMAGE_PIXELS
-    Image.MAX_IMAGE_PIXELS = None
-    try:
-        yield
-    finally:
-        Image.MAX_IMAGE_PIXELS = previous
-
-
-@contextmanager
-def _source_reader(path: str) -> Iterator[Image.Image | openslide.OpenSlide]:
-    """Use streamed WSI regions, falling back for small test TIFFs."""
-    try:
-        source = openslide.OpenSlide(path)
-    except openslide.OpenSlideUnsupportedFormatError:
-        with Image.open(path) as source:
-            yield source
-    else:
-        try:
-            yield source
-        finally:
-            source.close()
-
-
 def canary_rows(official: pd.DataFrame, legacy_root: Path) -> pd.DataFrame:
     """Select both providers, all ISUP grades, mask states and count extremes."""
     ranked = official.assign(
@@ -115,9 +96,11 @@ def canary_rows(official: pd.DataFrame, legacy_root: Path) -> pd.DataFrame:
 def eligible_coordinates(
     source: Image.Image | openslide.OpenSlide,
 ) -> list[tuple[int, int]]:
-    """Return every complete 256-pixel cell meeting locked tissue rule."""
+    """Return every complete tile meeting the locked tissue rule."""
     coords = []
-    width, height = _source_dimensions(source)
+    width, height = (
+        source.dimensions if isinstance(source, openslide.OpenSlide) else source.size
+    )
     for y in range(0, height - TILE_SIZE + 1, TILE_SIZE):
         stripe = np.asarray(_source_crop(source, 0, y, width))
         for x in range(0, width - TILE_SIZE + 1, TILE_SIZE):
@@ -126,10 +109,6 @@ def eligible_coordinates(
             if (rgb.mean(axis=2) < TISSUE_THRESHOLD).mean() >= TISSUE_MIN:
                 coords.append((x, y))
     return coords
-
-
-def _source_dimensions(source: Image.Image | openslide.OpenSlide) -> tuple[int, int]:
-    return source.dimensions if isinstance(source, openslide.OpenSlide) else source.size
 
 
 def _source_crop(
@@ -184,27 +163,42 @@ def _load_mask(row: pd.Series) -> Image.Image | None:
 def _audit_tiles(
     context: _AuditContext, legacy: list[dict[str, object]]
 ) -> list[dict[str, object]]:
-    width, _ = _source_dimensions(context.source)
+    width = (
+        context.source.dimensions
+        if isinstance(context.source, openslide.OpenSlide)
+        else context.source.size
+    )[0]
     audited: list[dict[str, object] | None] = [None] * len(legacy)
     indexed = sorted(enumerate(legacy), key=lambda item: int(str(item[1]["y"])))
-    for y, items in groupby(indexed, key=lambda item: int(str(item[1]["y"]))):
-        stripe = np.asarray(
-            _source_crop(context.source, 0, y, width).convert("RGB"), dtype=np.int16
-        )
-        for index, record in items:
-            x = int(str(record["x"]))
-            audited[index] = _audit_tile(context, record, stripe[:, x : x + TILE_SIZE])
+    with ThreadPoolExecutor(max_workers=context.jpeg_workers) as pool:
+        for y, items in groupby(indexed, key=lambda item: int(str(item[1]["y"]))):
+            stripe = np.asarray(
+                _source_crop(context.source, 0, y, width).convert("RGB"),
+                dtype=np.int16,
+            )
+            item_list = list(items)
+            jpgs = pool.map(
+                _legacy_pixels_and_hash,
+                (Path(str(record["image_path"])) for _, record in item_list),
+            )
+            for (index, record), (actual, sha256) in zip(item_list, jpgs, strict=True):
+                x = int(str(record["x"]))
+                audited[index] = _audit_tile(
+                    context, record, stripe[:, x : x + TILE_SIZE], actual, sha256
+                )
     return [record for record in audited if record is not None]
 
 
 def _audit_tile(
-    context: _AuditContext, record: dict[str, object], expected: np.ndarray
+    context: _AuditContext,
+    record: dict[str, object],
+    expected: np.ndarray,
+    actual: np.ndarray,
+    sha256: str,
 ) -> dict[str, object]:
     row, mask = context.row, context.mask
     x, y = int(str(record["x"])), int(str(record["y"]))
     legacy = Path(str(record["image_path"]))
-    with Image.open(legacy) as tile:
-        actual = np.asarray(tile.convert("RGB"), dtype=np.int16)
     if (
         actual.shape != expected.shape
         or float(np.abs(actual - expected).mean()) > context.jpeg_mae_max
@@ -226,7 +220,7 @@ def _audit_tile(
         "patch_id": f"{row.slide_id}/{patch_id}",
         "patch_label": label,
         "legacy_image_path": str(legacy),
-        "sha256": compute_sha256(legacy),
+        "sha256": sha256,
         "x": x,
         "y": y,
         "level": 0,
@@ -234,3 +228,8 @@ def _audit_tile(
         "tissue_fraction_min": TISSUE_MIN,
         "tissue_intensity_threshold": TISSUE_THRESHOLD,
     }
+
+
+def _legacy_pixels_and_hash(path: Path) -> tuple[np.ndarray, str]:
+    with Image.open(path) as tile:
+        return np.asarray(tile.convert("RGB"), dtype=np.int16), compute_sha256(path)
