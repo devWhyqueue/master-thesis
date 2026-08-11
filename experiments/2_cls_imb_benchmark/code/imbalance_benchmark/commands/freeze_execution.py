@@ -46,11 +46,13 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def _phase(name: str) -> Iterator[None]:
-    """Log a freeze phase's start and duration so a stuck run is visible live."""
+    """Log a freeze phase's start and duration, even if it raises."""
     start = time.perf_counter()
     logger.info("freeze: %s starting", name)
-    yield
-    logger.info("freeze: %s done in %.1fs", name, time.perf_counter() - start)
+    try:
+        yield
+    finally:
+        logger.info("freeze: %s done in %.1fs", name, time.perf_counter() - start)
 
 
 def _load_pilot_floor(
@@ -129,8 +131,9 @@ def freeze_split(args: argparse.Namespace) -> None:
     logger.info("freeze: split %s starting", args.split_index)
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
-    feature_provenance = verify_prepared_feature_provenance(config, paths["data"])
-    ctx = _load_split_context(args, paths)
+    with _phase("provenance verify and manifest load"):
+        feature_provenance = verify_prepared_feature_provenance(config, paths["data"])
+        ctx = _load_split_context(args, paths)
     if ctx is None:
         return
     with _phase("condition and tail-assignment construction"):

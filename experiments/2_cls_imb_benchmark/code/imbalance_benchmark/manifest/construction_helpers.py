@@ -14,7 +14,7 @@ from imbalance_benchmark.construction import (
     build_manifest_hash,
     effective_rho,
 )
-from imbalance_benchmark.manifest.sampling.patch import designate_patch_pool
+from imbalance_benchmark.manifest.sampling.patch_pool import designate_patch_pool
 from imbalance_benchmark.manifest.statistics import (
     natural_contribution_stats,
     support_statistics,

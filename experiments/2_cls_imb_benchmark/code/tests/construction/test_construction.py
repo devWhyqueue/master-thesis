@@ -600,7 +600,7 @@ def test_patch_conditions_retain_every_independent_unit_in_the_fixed_pool(
 
 def test_fixed_pool_expansion_adds_one_slide_per_patient_per_round() -> None:
     """A fixed evidence pool expands breadth-first over its selected patients."""
-    from imbalance_benchmark.manifest.sampling.patch import designate_patch_pool
+    from imbalance_benchmark.manifest.sampling.patch_pool import designate_patch_pool
 
     rows = []
     for patient in range(10):
@@ -636,7 +636,7 @@ def test_pool_capacity_check_matches_a_fresh_rebuild_per_required_count(
     time. That optimization is only valid if it reproduces the same per-count
     selection a naive rebuild-every-time reference would.
     """
-    from imbalance_benchmark.manifest.sampling.patch import _pool_has_capacity
+    from imbalance_benchmark.manifest.sampling.patch_pool import _pool_has_capacity
 
     def _naive_pool_has_capacity(
         df_class: pd.DataFrame,
@@ -713,3 +713,64 @@ def test_tail_classes_follow_the_analysed_severity_allocation():
     assert moderate == [2, 3]  # C, D are the scarcest under moderate
     assert severe == [1, 2]  # B, C are the scarcest under severe
     assert moderate != severe
+
+
+# --- Change 2 parity: single-groupby hierarchy vs. the retired per-patient scan --
+
+
+def _reference_build_patch_hierarchy(df_class, rng):
+    """The pre-Change-2 O(patients x rows) hierarchy builder, kept only as a test oracle."""
+    from typing import cast
+
+    import numpy as np
+
+    patients = cast("np.ndarray", df_class["case_id"].unique())
+    rng.shuffle(patients)
+    h: dict = {}
+    for pat in patients:
+        h[pat] = {}
+        pat_df = cast("pd.DataFrame", df_class[df_class["case_id"] == pat])
+        slides = cast("np.ndarray", pat_df["slide_id"].unique())
+        rng.shuffle(slides)
+        for sld in slides:
+            pids = cast("np.ndarray", pat_df[pat_df["slide_id"] == sld].index.to_numpy())
+            rng.shuffle(pids)
+            h[pat][sld] = list(pids)
+    return list(patients), h
+
+
+def _random_hierarchy_frame(seed: int, n_patients: int) -> pd.DataFrame:
+    """Rows deliberately interleaved across patients, not grouped contiguously."""
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    rows = []
+    for patient in range(n_patients):
+        for slide in range(rng.integers(1, 5)):
+            for _ in range(rng.integers(1, 8)):
+                rows.append({"case_id": f"P{patient}", "slide_id": f"P{patient}_S{slide}"})
+    return (
+        pd.DataFrame(rows)
+        .sample(frac=1.0, random_state=seed + 1)
+        .reset_index(drop=True)
+    )
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_build_patch_hierarchy_matches_retired_per_patient_scan(seed: int) -> None:
+    """Change 2's single-groupby hierarchy must reproduce the old scan's RNG sequence exactly."""
+    import numpy as np
+
+    from imbalance_benchmark.manifest.sampling.patch import _build_patch_hierarchy
+
+    df = _random_hierarchy_frame(seed, n_patients=20)
+
+    fast_patients, fast_h = _build_patch_hierarchy(df, np.random.default_rng(seed))
+    ref_patients, ref_h = _reference_build_patch_hierarchy(df, np.random.default_rng(seed))
+
+    assert list(fast_patients) == list(ref_patients)
+    assert set(fast_h.keys()) == set(ref_h.keys())
+    for patient in fast_h:
+        assert list(fast_h[patient].keys()) == list(ref_h[patient].keys())
+        for slide in fast_h[patient]:
+            assert fast_h[patient][slide] == ref_h[patient][slide]

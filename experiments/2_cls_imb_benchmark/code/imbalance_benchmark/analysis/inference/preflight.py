@@ -7,34 +7,42 @@ import pandas as pd
 
 from imbalance_benchmark.analysis.inference.bootstrap import (
     build_strata,
-    expand_to_rows,
     kish_effective_count,
     resample_patient_weights,
 )
 
 
+def _case_positions(
+    case_of_row: np.ndarray, case_pos: dict[Any, int]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Positions into the shared patient-weight matrix, and each case's row count.
+
+    ``sum_of_k_copies(w) == k * w``, so a patient's weight never needs
+    expanding to every row - only its position and row count do.
+    """
+    cases, multiplicity = np.unique(case_of_row, return_counts=True)
+    positions = np.asarray([case_pos[c] for c in cases], dtype=int)
+    return positions, multiplicity
+
+
 def _class_preflight(
-    case_of_row: np.ndarray, class_row_weights: np.ndarray, n_replicates: int
+    positions: np.ndarray,
+    multiplicity: np.ndarray,
+    patient_weights: np.ndarray,
+    n_replicates: int,
 ) -> dict[str, Any]:
-    """Aggregate one class's row weights to per-patient weights and summarize them."""
-    unique_cases = np.unique(case_of_row)
-    pos = {c: i for i, c in enumerate(unique_cases)}
-    idx = np.asarray([pos[c] for c in case_of_row])
-    patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.float64)
-    np.add.at(patient_w, idx, class_row_weights)
+    """Aggregate one class's per-patient weights and summarize them."""
+    patient_w = multiplicity[:, None] * patient_weights[positions, :]
     kish = kish_effective_count(patient_w)
     sum_w, max_w = patient_w.sum(axis=0), patient_w.max(axis=0)
     with np.errstate(divide="ignore", invalid="ignore"):
         max_frac = np.where(sum_w > 0, max_w / np.maximum(sum_w, 1e-12), 0.0)
     frac_dominant = float(np.mean(max_frac > 0.5))
     mean_kish = float(np.mean(kish))
-    # Percentile, not minimum: the minimum keeps falling as `n_replicates` grows,
-    # so a floor on it would measure the replicate budget, not the cell.
+    # Percentile, not minimum - the minimum keeps falling as replicates grow.
     p2_5_kish = float(np.percentile(kish, 2.5))
-    # Under the Bayesian bootstrap every patient's weight is a.s. positive in
-    # every replicate, so this is really a structural patient-count check
-    # (distinct from Kish's weight-concentration check), not a resampling
-    # artifact the way it was under the retired multinomial draw.
+    # Bayesian-bootstrap weights are a.s. positive, so this is a structural
+    # patient-count check, distinct from Kish's weight-concentration check.
     unique_resampled = float(np.mean((patient_w > 0).sum(axis=0)))
     return {
         "unique_resampled_patients": unique_resampled,
@@ -42,37 +50,37 @@ def _class_preflight(
         "p2_5_kish_effective_count": p2_5_kish,
         "max_patient_weight_fraction": float(np.mean(max_frac)),
         "frac_replicates_dominant": frac_dominant,
+        # Defensive: a.s. positive under the Bayesian bootstrap; guards a
+        # future resampling regression, not a real failure today.
+        "all_replicates_represented": bool((sum_w > 0).all()),
         "is_descriptive_only": bool(
             p2_5_kish < 5.0 or frac_dominant > 0.05 or unique_resampled < 5.0
         ),
     }
 
 
-def _preflight_row_weights(
-    identity: pd.DataFrame, n_replicates: int, seed: int
-) -> np.ndarray:
-    """Resample the identity frame's patients and broadcast weights back to its rows."""
-    strata = build_strata(identity)
-    rng = np.random.default_rng(seed)
-    case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)
-    return expand_to_rows(case_ids, patient_weights, identity["case_id"].to_numpy())
-
-
 def _diagnostics_by_class(
-    identity: pd.DataFrame, weights: np.ndarray, n_replicates: int
+    identity: pd.DataFrame,
+    patient_weights: np.ndarray,
+    case_pos: dict[Any, int],
+    n_replicates: int,
 ) -> dict[str, Any]:
     """Calculate aggregate diagnostics for every observed class."""
-    labels = identity["cancer_type"].to_numpy()
     return {
         str(label): _class_preflight(
-            rows["case_id"].to_numpy(), weights[labels == label, :], n_replicates
+            *_case_positions(rows["case_id"].to_numpy(), case_pos),
+            patient_weights,
+            n_replicates,
         )
         for label, rows in identity.groupby("cancer_type")
     }
 
 
 def _diagnostics_by_split(
-    identity: pd.DataFrame, weights: np.ndarray, n_replicates: int
+    identity: pd.DataFrame,
+    patient_weights: np.ndarray,
+    case_pos: dict[Any, int],
+    n_replicates: int,
 ) -> dict[str, dict[str, Any]]:
     """Calculate representation and support diagnostics in every split/class cell."""
     split_col = "patient_split" if "patient_split" in identity else None
@@ -81,14 +89,22 @@ def _diagnostics_by_split(
     result: dict[str, dict[str, Any]] = {}
     for split in sorted(splits):
         split_mask = _split_mask(identity, split_col, split)
-        result[str(split)] = {
-            label: _split_class_diagnostic(
-                identity, weights, labels, split_mask, label, n_replicates
+        cell = {
+            label: _class_preflight(
+                *_case_positions(
+                    identity.loc[split_mask & (labels == label), "case_id"].to_numpy(),
+                    case_pos,
+                ),
+                patient_weights,
+                n_replicates,
             )
             for label in sorted(
                 identity.loc[split_mask, "cancer_type"].astype(str).unique()
             )
         }
+        for diagnostic in cell.values():
+            diagnostic["metric_computable"] = diagnostic["all_replicates_represented"]
+        result[str(split)] = cell
     return result
 
 
@@ -101,45 +117,19 @@ def _split_mask(identity: pd.DataFrame, column: str | None, split: str) -> np.nd
     )
 
 
-def _split_class_diagnostic(
-    identity: pd.DataFrame,
-    weights: np.ndarray,
-    labels: np.ndarray,
-    split_mask: np.ndarray,
-    label: str,
-    n_replicates: int,
-) -> dict[str, Any]:
-    """Record one split/class bootstrap diagnostic with representation checks."""
-    mask = split_mask & (labels == label)
-    diagnostic = _class_preflight(
-        identity.loc[mask, "case_id"].to_numpy(), weights[mask, :], n_replicates
-    )
-    # Defensive: under the Bayesian bootstrap every weight is a.s. positive, so
-    # this is always True; kept as a guard against a future resampling change.
-    represented = bool((weights[mask, :].sum(axis=0) > 0).all())
-    diagnostic.update(
-        all_replicates_represented=represented, metric_computable=represented
-    )
-    return diagnostic
-
-
-def _multiplicities_match(identity: pd.DataFrame, weights: np.ndarray) -> bool:
-    """Check that a patient's resampling multiplicity is shared across appearances."""
-    cases = identity["case_id"].astype(str).to_numpy()
-    return bool(
-        all(
-            np.all(
-                weights[cases == case, :]
-                == weights[np.flatnonzero(cases == case)[0], :]
-            )
-            for case in np.unique(cases)
-        )
-    )
-
-
-def _weights_vary(
-    identity: pd.DataFrame, weights: np.ndarray, n_replicates: int
+def _multiplicities_match(
+    identity: pd.DataFrame, case_ids: np.ndarray, case_pos: dict[Any, int]
 ) -> bool:
+    """Structural guard: every row now looks up its weight by ``case_id`` through
+    ``case_pos``, so multiplicity is shared by construction, not by comparison.
+    Only the precondition is checked - ``case_ids`` unique and covering ``identity``.
+    """
+    return len(case_ids) == len(set(case_ids)) and set(identity["case_id"]).issubset(
+        set(case_pos)
+    )
+
+
+def _weights_vary(patient_weights: np.ndarray, n_replicates: int) -> bool:
     """True iff every patient's resampled weight actually varies across replicates.
 
     A Bayesian-bootstrap sanity check: a constant weight would mean the Dirichlet
@@ -148,10 +138,7 @@ def _weights_vary(
     """
     if n_replicates <= 1:
         return True
-    cases = identity["case_id"].to_numpy()
-    _, first_row_of_case = np.unique(cases, return_index=True)
-    patient_w = weights[first_row_of_case, :]
-    return bool(np.all(np.var(patient_w, axis=1) > 0))
+    return bool(np.all(np.var(patient_weights, axis=1) > 0))
 
 
 def _preflight_result(
@@ -195,16 +182,21 @@ def run_preflight(
     supplies over 50% of a class's weight in over 5% of replicates, or a
     split/class cell has fewer than five contributing patients.
     """
-    row_weights = _preflight_row_weights(identity, n_replicates, seed)
-    by_class = _diagnostics_by_class(identity, row_weights, n_replicates)
-    by_split_class = _diagnostics_by_split(identity, row_weights, n_replicates)
+    strata = build_strata(identity)
+    rng = np.random.default_rng(seed)
+    case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)
+    case_pos = {c: i for i, c in enumerate(case_ids)}
+    by_class = _diagnostics_by_class(identity, patient_weights, case_pos, n_replicates)
+    by_split_class = _diagnostics_by_split(
+        identity, patient_weights, case_pos, n_replicates
+    )
     return _preflight_result(
         n_replicates,
         seed,
         by_class,
         by_split_class,
-        _multiplicities_match(identity, row_weights),
-        _weights_vary(identity, row_weights, n_replicates),
+        _multiplicities_match(identity, case_ids, case_pos),
+        _weights_vary(patient_weights, n_replicates),
     )
 
 

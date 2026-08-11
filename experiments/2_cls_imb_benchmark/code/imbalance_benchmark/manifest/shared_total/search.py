@@ -78,8 +78,16 @@ def _largest_tolerance_feasible_total(
     substituting a total the tolerance band did not already accept and never
     falling back silently to a compromise the caller cannot see.
     """
-    for total in sorted((c.total for c in candidates if c.tolerance_ok), reverse=True):
-        if _total_cap_feasible(ctx, total):
+    totals = sorted((c.total for c in candidates if c.tolerance_ok), reverse=True)
+    start = time.perf_counter()
+    for index, total in enumerate(totals, start=1):
+        feasible = _total_cap_feasible(ctx, total)
+        outcome = "feasible" if feasible else "rejected"
+        logger.info(
+            f"freeze: probing total {total} ({index} of {len(totals)} tolerance "
+            f"candidates), elapsed {time.perf_counter() - start:.1f}s: {outcome}"
+        )
+        if feasible:
             return total
     return None
 
@@ -101,7 +109,12 @@ def _build_search_context(
         max_shared_total([supports[name] for name in classes], min_support),
         severity_aware_upper_bound(supports, locked_assignments, min_support),
     )
+    start = time.perf_counter()
     feasible_counts = feasible_selection_counts(train_df, min_support, is_mil)
+    logger.info(
+        f"freeze: feasible-count search done for {len(classes)} classes "
+        f"in {time.perf_counter() - start:.1f}s"
+    )
     ctx = _FeasibilityContext(
         train_df,
         is_mil,
@@ -161,12 +174,13 @@ def _largest_jointly_optimal_total(
             )
         for candidate in joint:
             probes += 1
-            if _total_cap_feasible(ctx, candidate.total):
-                logger.info(
-                    "freeze: shared-total pool probes: %d, %.1fs",
-                    probes,
-                    time.perf_counter() - start,
-                )
+            feasible = _total_cap_feasible(ctx, candidate.total)
+            outcome = "feasible" if feasible else "rejected"
+            logger.info(
+                f"freeze: shared-total pool probe {probes}: total {candidate.total}, "
+                f"{time.perf_counter() - start:.1f}s: {outcome}"
+            )
+            if feasible:
                 return candidate.total
             excluded.add(candidate.total)
 

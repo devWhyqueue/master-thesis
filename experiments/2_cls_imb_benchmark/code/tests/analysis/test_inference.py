@@ -186,7 +186,9 @@ def test_kish_preflight_is_descriptive_when_the_low_percentile_is_below_five() -
     weights = np.ones((6, 100), dtype=np.float64)
     weights[0, :10] = 3.0
 
-    result = _class_preflight(np.arange(6), weights, n_replicates=100)
+    result = _class_preflight(
+        np.arange(6), np.ones(6, dtype=int), weights, n_replicates=100
+    )
 
     assert result["p2_5_kish_effective_count"] == pytest.approx(64 / 14)
     assert result["frac_replicates_dominant"] == 0.0
@@ -201,7 +203,9 @@ def test_kish_preflight_ignores_a_rare_dominated_replicate() -> None:
     weights = np.ones((6, 100), dtype=np.float64)
     weights[:, 0] = [6.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    result = _class_preflight(np.arange(6), weights, n_replicates=100)
+    result = _class_preflight(
+        np.arange(6), np.ones(6, dtype=int), weights, n_replicates=100
+    )
 
     assert result["p2_5_kish_effective_count"] == pytest.approx(6.0)
     assert result["is_descriptive_only"] is False
@@ -332,17 +336,14 @@ def test_bayesian_weights_give_every_patient_positive_variance() -> None:
 
 def test_degenerate_patient_weights_fail_preflight() -> None:
     """A patient whose weight never varies must fail the new validity check."""
-    identity = pd.DataFrame(
-        {"case_id": ["p1", "p1", "p2"], "cancer_type": ["A", "A", "B"]}
-    )
-    constant_weights = np.ones((3, 5))
+    constant_weights = np.ones((2, 5))
 
-    assert _weights_vary(identity, constant_weights, n_replicates=5) is False
+    assert _weights_vary(constant_weights, n_replicates=5) is False
 
     varying_weights = np.array(
-        [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0], [5.0, 1.0, 4.0, 2.0, 3.0]]
+        [[1.0, 2.0, 3.0, 4.0, 5.0], [5.0, 1.0, 4.0, 2.0, 3.0]]
     )
-    assert _weights_vary(identity, varying_weights, n_replicates=5) is True
+    assert _weights_vary(varying_weights, n_replicates=5) is True
 
 
 def test_unique_resampled_patients_below_five_is_descriptive_even_with_good_kish() -> (
@@ -352,7 +353,9 @@ def test_unique_resampled_patients_below_five_is_descriptive_even_with_good_kish
     well-balanced weights (i.e. it is not merely a restatement of Kish)."""
     weights = np.ones((4, 100))  # 4 patients, equal weight every replicate: Kish == 4
 
-    result = _class_preflight(np.arange(4), weights, n_replicates=100)
+    result = _class_preflight(
+        np.arange(4), np.ones(4, dtype=int), weights, n_replicates=100
+    )
 
     assert result["kish_effective_count"] == pytest.approx(4.0)
     assert result["unique_resampled_patients"] == pytest.approx(4.0)

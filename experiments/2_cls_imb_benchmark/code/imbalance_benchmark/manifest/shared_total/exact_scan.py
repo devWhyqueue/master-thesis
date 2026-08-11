@@ -5,6 +5,7 @@ import time
 from collections.abc import Mapping
 
 
+from imbalance_benchmark.manifest import log_every
 from imbalance_benchmark.construction import (
     _allocation_is_feasible,
     allocate_counts,
@@ -118,10 +119,9 @@ def _log_scan_progress(
     scanned: int,
     rejected: int,
 ) -> float:
-    now = time.perf_counter()
-    if now - last_logged <= 30:
-        return last_logged
-    logger.info(
+    return log_every(
+        last_logged,
+        logger,
         "freeze: shared-total scan at %d (range [%d, %d]), %d scanned, %d rejected",
         total,
         floor,
@@ -129,7 +129,6 @@ def _log_scan_progress(
         scanned,
         rejected,
     )
-    return now
 
 
 def _scan_candidates(

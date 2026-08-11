@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import json
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,8 +15,7 @@ from imbalance_benchmark.construction import (
     select_slides_round_robin,
 )
 from imbalance_benchmark.manifest.freeze import write_condition
-from imbalance_benchmark.manifest.seeds import derive_seed
-from imbalance_benchmark.manifest.seeds import SEED_ROLES
+from imbalance_benchmark.manifest.seeds import SEED_ROLES, derive_seed
 from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
 from imbalance_benchmark.modeling.training import resolve_batch_size, update_budget
 from imbalance_benchmark.manifest.construction_helpers import (
@@ -30,6 +30,8 @@ from imbalance_benchmark.manifest.construction_helpers import (
 )
 from imbalance_benchmark.manifest.statistics import evidence_pool_hash
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class PilotConstraints:
@@ -42,15 +44,12 @@ class PilotConstraints:
 def _pilot_constraints(pilot_report_path: Path) -> PilotConstraints:
     """Freeze the pilot's independent-unit floor as both the unit and count floor.
 
-    The pilot's per-patient quota must not scale the patch floor. That quota is
-    the scarcest class's *minimum* per-patient inventory at the largest pilot
-    level (``pilot_levels_for`` ends at that class's full patient count, so
-    eligibility can drop nobody), which makes it a knife-edge: one patient
-    holding a single patch moves the frozen floor - and with it every
-    condition's achievable severity - by more than an order of magnitude, and
-    leaves splits of one dataset incomparable. The guarantee the floor exists
-    for is per-class independent support, and that is enforced directly by
-    ``independent_floor`` in pool designation plus the contribution caps.
+    The per-patient quota is the scarcest class's *minimum* per-patient
+    inventory at the largest pilot level, so one patient holding a single
+    patch could move the frozen floor - and every condition's achievable
+    severity - by an order of magnitude, making splits incomparable. Per-class
+    independent support is instead guaranteed directly by ``independent_floor``
+    in pool designation plus the contribution caps.
     """
     if not pilot_report_path.exists():
         return PilotConstraints(10, 10)
@@ -119,8 +118,7 @@ def _build_conditions(
                     cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
                 ),
                 allocated[idx],
-                # Each condition samples from this same explicit patient/slide
-                # pool; its hash records the actual designated units.
+                # Same explicit patient/slide pool per condition; hash records it.
                 seed=class_construction_seed(seed, cls),
             )
             for idx, cls in enumerate(classes)
@@ -147,6 +145,10 @@ def _build_conditions(
                 "available": available,
                 "minimum": min_support,
             }
+        )
+        logger.info(
+            f"freeze: condition {file_prefix}{name} done, "
+            f"rows={sum(len(r) for r in rows)}, path={conditions[name]['path']}"
         )
     return conditions
 

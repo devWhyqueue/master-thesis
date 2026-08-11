@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -19,6 +20,7 @@ from imbalance_benchmark.manifest.shared_total.search import (
 from imbalance_benchmark.manifest.shared_total.severity import severity_aware_upper_bound
 from imbalance_benchmark.manifest.statistics import achieved_rho
 from imbalance_benchmark.manifest.statistics.selection_capacity import (
+    _class_feasible_counts,
     feasible_selection_counts,
 )
 
@@ -499,3 +501,79 @@ def test_degenerate_totals_at_the_floor_score_as_balanced() -> None:
 
     assert floor_candidate.worst_moderate == 1.0
     assert floor_candidate.worst_severe == 1.0
+
+
+# --- Change 1 parity: vectorized _patch_capacity vs. the retired per-patient loop --
+
+
+def _reference_patch_capacity(
+    patient_slides: list[np.ndarray], patient_cap: int, slide_cap: int
+) -> int:
+    """The pre-vectorization per-patient Python loop, kept only as a test oracle."""
+    return sum(
+        min(patient_cap, int(np.minimum(slides, slide_cap).sum()))
+        for slides in patient_slides
+    )
+
+
+def _reference_mil_capacity(patient_counts: np.ndarray, patient_cap: int) -> int:
+    return int(np.minimum(patient_counts, patient_cap).sum())
+
+
+def _reference_class_feasible_counts(
+    rows: pd.DataFrame, minimum: int, is_mil: bool
+) -> set[int]:
+    slides = rows.drop_duplicates("slide_id")
+    patient_counts = slides["case_id"].value_counts().to_numpy(dtype=int)
+    slide_counts = rows.groupby(["case_id", "slide_id"]).size()
+    patient_slides = [
+        counts.to_numpy(dtype=int)
+        for _, counts in slide_counts.groupby(level="case_id", sort=False)
+    ]
+    available = len(slides) if is_mil else len(rows)
+    capacities: dict[tuple[int, int], int] = {}
+    feasible = set()
+    for count in range(minimum, available + 1):
+        caps = (
+            int(np.floor(count * 0.10)),
+            int(np.floor(count * 0.05)) if not is_mil else 0,
+        )
+        if caps not in capacities:
+            capacities[caps] = (
+                _reference_mil_capacity(patient_counts, caps[0])
+                if is_mil
+                else _reference_patch_capacity(patient_slides, *caps)
+            )
+        if count <= capacities[caps]:
+            feasible.add(count)
+    return feasible
+
+
+def _random_patch_frame(rng: random.Random, n_patients: int, is_mil: bool) -> pd.DataFrame:
+    """A patch/MIL frame with irregular per-patient slide counts and slide sizes."""
+    rows = []
+    for patient in range(n_patients):
+        for slide in range(rng.randint(1, 4)):
+            n_patches = 1 if is_mil else rng.randint(1, 8)
+            rows.extend(
+                {"case_id": f"P{patient}", "slide_id": f"P{patient}_S{slide}", "cancer_type": "A"}
+                for _ in range(n_patches)
+            )
+    return pd.DataFrame(rows).sample(frac=1.0, random_state=rng.randint(0, 1_000_000)).reset_index(
+        drop=True
+    )
+
+
+@pytest.mark.parametrize("is_mil", [False, True])
+@pytest.mark.parametrize("seed", range(5))
+def test_class_feasible_counts_matches_retired_per_patient_loop(
+    seed: int, is_mil: bool
+) -> None:
+    """Change 1's vectorized reduceat capacity must match the old loop exactly, not just approximately."""
+    df = _random_patch_frame(random.Random(seed), n_patients=25, is_mil=is_mil)
+    minimum = 5
+
+    fast = _class_feasible_counts(df, minimum, is_mil)
+    reference = _reference_class_feasible_counts(df, minimum, is_mil)
+
+    assert fast == reference

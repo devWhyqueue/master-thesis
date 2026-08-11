@@ -32,7 +32,10 @@ from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import (
     ci_excludes_zero,
 )
-from imbalance_benchmark.analysis.inference.preflight import bootstrap_preflight
+from imbalance_benchmark.analysis.inference.preflight import (
+    bootstrap_preflight,
+    run_preflight,
+)
 from imbalance_benchmark.analysis.metrics import (
     assign_tiers,
     classification_payload,
@@ -215,6 +218,61 @@ def test_bootstrap_preflight_flags_small_kish():
     identity = pd.DataFrame(rows)
     report = bootstrap_preflight(identity, n_replicates=200, seed=0)
     assert report["by_class"]["A"]["is_descriptive_only"] is True
+
+def _reference_by_class_via_row_expansion(
+    identity: pd.DataFrame, row_weights: np.ndarray, n_replicates: int
+) -> dict[str, dict[str, float]]:
+    """The pre-Change-4 row-expansion aggregation (``np.add.at`` over expanded rows).
+
+    Kept only as a test oracle: Change 4 replaces this with the algebraic
+    ``multiplicity * patient_weights`` identity so the (n_rows, n_replicates)
+    matrix is never materialized.
+    """
+    labels = identity["cancer_type"].to_numpy()
+    result = {}
+    for label in np.unique(labels):
+        mask = labels == label
+        case_of_row = identity.loc[mask, "case_id"].to_numpy()
+        weights = row_weights[mask, :]
+        unique_cases = np.unique(case_of_row)
+        pos = {c: i for i, c in enumerate(unique_cases)}
+        idx = np.asarray([pos[c] for c in case_of_row])
+        patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.float64)
+        np.add.at(patient_w, idx, weights)
+        kish = kish_effective_count(patient_w)
+        sum_w, max_w = patient_w.sum(axis=0), patient_w.max(axis=0)
+        max_frac = np.where(sum_w > 0, max_w / np.maximum(sum_w, 1e-12), 0.0)
+        result[str(label)] = {
+            "kish_effective_count": float(np.mean(kish)),
+            "p2_5_kish_effective_count": float(np.percentile(kish, 2.5)),
+            "max_patient_weight_fraction": float(np.mean(max_frac)),
+        }
+    return result
+
+def test_run_preflight_matches_old_row_expansion_path():
+    """Change 4's patient-level preflight must reproduce the row-expansion path's numbers."""
+    rows = []
+    for cls, n_patients in (("A", 8), ("B", 12)):
+        for p in range(n_patients):
+            rows.extend(
+                {"case_id": f"{cls}_{p}", "cancer_type": cls}
+                for _ in range(1 + p % 3)
+            )
+    identity = pd.DataFrame(rows)
+    n_replicates, seed = 50, 3
+
+    result = run_preflight(identity, n_replicates=n_replicates, seed=seed)
+
+    strata = build_strata(identity)
+    rng = np.random.default_rng(seed)
+    case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)
+    row_weights = expand_to_rows(case_ids, patient_weights, identity["case_id"].to_numpy())
+    reference = _reference_by_class_via_row_expansion(identity, row_weights, n_replicates)
+
+    for label, ref in reference.items():
+        got = result["by_class"][label]
+        for key, ref_value in ref.items():
+            assert got[key] == pytest.approx(ref_value, rel=1e-9)
 
 def test_weighted_balanced_accuracy_matches_unweighted_when_weights_are_one():
     labels = np.array([0, 0, 1, 1])
