@@ -76,7 +76,7 @@ slurm:
     extract_reduce: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
     prepare: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     pilot: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
-    freeze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 256G}
+    freeze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 96G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
