@@ -78,7 +78,8 @@ slurm:
   # keeps a comfortable margin; the old value of 5 (~22h/task) timed out
   # every task.
   tune_shards_per_task: 1
-  tune_natural_shards_per_task: 3
+  tune_natural_shards_per_task: 2
+  tuning_wave_task_limit: 90
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 7
   resources:
