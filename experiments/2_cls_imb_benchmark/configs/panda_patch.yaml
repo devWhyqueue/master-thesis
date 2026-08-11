@@ -31,6 +31,14 @@ feature_extraction:
 
 feature_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/data/features/panda/feature_inventory.json
 
+patch_training:
+  # Validation is ~98% of tune cost (full pass every checkpoint_interval steps).
+  # PANDA's controlled budget U=257790 is ~30x CAMELYON16's U=8490, so the
+  # interval is scaled to match: 50 * round(257790 / 8490) = 1500, giving
+  # PANDA's controlled runs 172 checkpoints against CAMELYON16's 170. The
+  # other three datasets keep the CHECKPOINT_INTERVAL default of 50.
+  checkpoint_interval: 1500
+
 materialize_panda:
   raw_root: /home/space/datasets/panda/raw
   legacy_tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/patches/20x
@@ -58,12 +66,16 @@ slurm:
   max_array_concurrency: 35
   tune_natural_observations_per_candidate: 6
   # tune_controlled/confirm_controlled moved to gpu-2h (50 slots, higher
-  # scheduling priority than gpu-5h's 35). CAMELYON16's 8-shard tune_controlled
-  # task tails at ~98min/120min cap; PANDA has ~1.41x the patches (4.5M vs
-  # 3.2M), so shard counts are floor-scaled by 1/1.41 to hold the same tail
-  # margin unmeasured. Re-check with `sacct` on the first completed tasks
-  # (see freeze checkpoint in the plan); revert to gpu-5h/8/10 on a timeout.
-  tune_shards_per_task: 5
+  # scheduling priority than gpu-5h's 35). PANDA has a single tail assignment
+  # (native only; difficulty_reversed duplicated it and was dropped by
+  # freeze), so every condition has exactly 6 observations (1 assignment x 3
+  # splits x 2 seeds) and one candidate shard = 6 fits. With
+  # patch_training.checkpoint_interval scaled above, one controlled fit is
+  # ~18-36 min, so 2 shards/task (~36-72 min + startup) stays safely under the
+  # 2h wall; the old value of 5 (~22h/task) timed out every task. Probe one
+  # array index (see plan §5) and adjust from measured accelerator_seconds
+  # before the full submit.
+  tune_shards_per_task: 2
   tune_natural_shards_per_task: 3
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 7
@@ -78,11 +90,11 @@ slurm:
     pilot: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     freeze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 96G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
-    tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
+    tune_natural: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 256G}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
-    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
+    confirm_natural: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}

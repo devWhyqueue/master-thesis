@@ -6,7 +6,12 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
+from torch.utils.data import (
+    BatchSampler,
+    DataLoader,
+    RandomSampler,
+    WeightedRandomSampler,
+)
 
 from imbalance_benchmark.datasets.data import bag_collate, patch_collate
 from imbalance_benchmark.modeling.context import (
@@ -20,13 +25,13 @@ from imbalance_benchmark.modeling.training.config import (
     build_optimizer,
     pin_memory_ok,
     resolve_batch_size,
+    resolve_checkpoint_interval,
 )
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
     run_evaluation,
     ClassAwareBatchSampler,
-    _RecordingSampler,
     _RecordingBatchSampler,
 )
 from imbalance_benchmark.modeling.losses import (
@@ -48,6 +53,7 @@ __all__ = [
     "run_evaluation",
     "update_budget",
     "resolve_batch_size",
+    "resolve_checkpoint_interval",
     "build_optimizer",
     "build_evaluation_loader",
     "pin_memory_ok",
@@ -162,10 +168,12 @@ def _build_train_loader(
         base = get_balanced_sampler(train_labels, 1.0, ctx["seed"])
     else:
         base = RandomSampler(ctx["train_dataset"], generator=gen)
+    sampler = _RecordingBatchSampler(
+        BatchSampler(base, b_size, drop_last=False), exposed
+    )
     return DataLoader(
         ctx["train_dataset"],
-        batch_size=b_size,
-        sampler=_RecordingSampler(base, exposed),
+        batch_sampler=sampler,
         collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
         pin_memory=pin_memory_ok(is_mil),
     )
@@ -181,6 +189,7 @@ def _run_training_loop(
 ) -> dict[str, Any]:
     """Execute the update-budgeted training loop, checkpointing on the tie-break rule."""
     step, device, is_mil, n_classes = 0, ctx["device"], ctx["is_mil"], ctx["n_classes"]
+    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], is_mil)
     while step < max_steps:
         for batch in train_loader:
             if step >= max_steps:
@@ -190,7 +199,7 @@ def _run_training_loop(
             _fit_step(batch, ctx, step, max_steps).backward()
             optimizer.step()
             step += 1
-            if step % CHECKPOINT_INTERVAL == 0 or step == max_steps:
+            if step % checkpoint_interval == 0 or step == max_steps:
                 best = checkpoint_step(
                     ctx["model"], val_loader, device, is_mil, n_classes, best, step
                 )

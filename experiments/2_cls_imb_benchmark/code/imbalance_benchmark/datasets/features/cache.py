@@ -114,7 +114,15 @@ def feature_rows(
     """Return bank row ids, reserving split manifests' full row capacity once."""
     ids = torch.empty(len(paths), dtype=torch.long)
     new_rows: list[torch.Tensor] = []
-    for position, (path, index) in enumerate(zip(paths, indices)):
+    # Process positions in path-sorted order so repeated positions sharing a
+    # path stay adjacent, keeping load_stored_feature_tensor's lru_cache hot
+    # instead of thrashing on a shuffled condition manifest. A key's assigned
+    # id is an arbitrary bank slot either way; only its content (the feature
+    # vector for that path/index) is observable downstream, and that is
+    # unchanged.
+    order = sorted(range(len(paths)), key=lambda position: paths[position])
+    for position in order:
+        path, index = paths[position], indices[position]
         key_index, row = _resolve_row(path, index)
         key = (path, key_index)
         if key not in _ROWS:

@@ -15,6 +15,7 @@ __all__ = [
     "OPTIMIZER_NAME",
     "WEIGHT_DECAY",
     "resolve_batch_size",
+    "resolve_checkpoint_interval",
     "build_optimizer",
     "build_evaluation_loader",
     "pin_memory_ok",
@@ -58,6 +59,12 @@ def resolve_batch_size(cfg: dict[str, Any], is_mil: bool) -> int:
     return cfg.get(k, {}).get(sk, 32 if is_mil else 128)
 
 
+def resolve_checkpoint_interval(cfg: dict[str, Any], is_mil: bool) -> int:
+    """Resolve the regime's validation checkpoint interval from config."""
+    k = "wsi_training" if is_mil else "patch_training"
+    return cfg.get(k, {}).get("checkpoint_interval", CHECKPOINT_INTERVAL)
+
+
 def build_optimizer(
     params: Iterable[torch.nn.Parameter], lr: float
 ) -> torch.optim.Optimizer:
@@ -81,7 +88,7 @@ def resolve_training_config(cfg: dict[str, Any], is_mil: bool) -> dict[str, Any]
     return {
         "optimizer": OPTIMIZER_NAME,
         "weight_decay": WEIGHT_DECAY,
-        "checkpoint_interval": CHECKPOINT_INTERVAL,
+        "checkpoint_interval": resolve_checkpoint_interval(cfg, is_mil),
         "batch_size": resolve_batch_size(cfg, is_mil),
         "update_budget_reference_passes": REFERENCE_PASSES,
         "precision": "float32",

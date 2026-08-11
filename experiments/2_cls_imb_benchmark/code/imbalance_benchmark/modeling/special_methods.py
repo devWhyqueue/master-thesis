@@ -12,18 +12,18 @@ from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
     initial_checkpoint,
     run_evaluation,
-    _RecordingSampler,
+    _RecordingBatchSampler,
 )
 from imbalance_benchmark.modeling.models import DualExpertMil
 from imbalance_benchmark.modeling.context import resolve_update_budget
 from imbalance_benchmark.modeling.oko import fit_oko
 from imbalance_benchmark.modeling.training import (
-    CHECKPOINT_INTERVAL,
     build_optimizer,
     fit_model,
     get_balanced_sampler,
     pin_memory_ok,
     resolve_batch_size,
+    resolve_checkpoint_interval,
 )
 from imbalance_benchmark.modeling.workflows.multistage import fit_crt, fit_rankmix
 
@@ -75,16 +75,21 @@ def _build_mde_loaders(
     )
     loader_u = DataLoader(
         dataset,
-        batch_size=b_size,
-        sampler=_RecordingSampler(natural, exposed),
+        batch_sampler=_RecordingBatchSampler(
+            torch.utils.data.BatchSampler(natural, b_size, drop_last=False), exposed
+        ),
         collate_fn=bag_collate,
         pin_memory=pin_memory_ok(True),
     )
     loader_b = DataLoader(
         dataset,
-        batch_size=b_size,
-        sampler=_RecordingSampler(
-            get_balanced_sampler(train_labels, 1.0, seed + 1), exposed
+        batch_sampler=_RecordingBatchSampler(
+            torch.utils.data.BatchSampler(
+                get_balanced_sampler(train_labels, 1.0, seed + 1),
+                b_size,
+                drop_last=False,
+            ),
+            exposed,
         ),
         collate_fn=bag_collate,
         pin_memory=pin_memory_ok(True),
@@ -104,6 +109,7 @@ def _mde_train_loop(
 ) -> dict[str, Any]:
     """Run MDE's U joint updates, each consuming one natural and one balanced minibatch."""
     device = ctx["device"]
+    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], True)
     step = 0
     while step < budget:
         for (bags_u, targets_u), (bags_b, targets_b) in zip(
@@ -129,7 +135,7 @@ def _mde_train_loop(
             loss.backward()
             opt.step()
             step += 1
-            if step % CHECKPOINT_INTERVAL == 0 or step == budget:
+            if step % checkpoint_interval == 0 or step == budget:
                 best = checkpoint_step(
                     model, ctx["val_loader"], device, True, ctx["n_classes"], best, step
                 )

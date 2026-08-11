@@ -27,9 +27,8 @@ def _gather_and_eval(
     loader: DataLoader,
     device: torch.device,
     is_mil: bool,
-    n_classes: int,
-) -> tuple[float, float, float, torch.Tensor, torch.Tensor]:
-    """Gather logits and compute balanced accuracy and F1."""
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Gather every batch's logits and targets over one evaluation pass."""
     was_training = model.training
     model.eval()
     all_logits, all_targets = [], []
@@ -54,25 +53,7 @@ def _gather_and_eval(
     model.train(was_training)
     logits = torch.cat(all_logits, dim=0).cpu()
     targets = torch.cat(all_targets, dim=0).long()
-    preds = logits.softmax(dim=-1).argmax(dim=-1)
-    recalls = [
-        float((preds[targets == c] == c).sum().item())
-        / max(1, (targets == c).sum().item())
-        for c in range(n_classes)
-    ]
-    f1s = []
-    for c in range(n_classes):
-        tp = float(((preds == c) & (targets == c)).sum().item())
-        fp = float(((preds == c) & (targets != c)).sum().item())
-        fn = float(((preds != c) & (targets == c)).sum().item())
-        f1s.append(2 * tp / max(1.0, 2 * tp + fp + fn))
-    return (
-        float(np.mean(recalls)),
-        float(np.mean(f1s)),
-        float(F.cross_entropy(logits, targets).item()),
-        logits,
-        targets,
-    )
+    return logits, targets
 
 
 def _compute_metrics(
@@ -106,9 +87,7 @@ def run_evaluation(
     class_priors: torch.Tensor | None = None,
 ) -> dict[str, Any]:
     """Evaluate model and return predictions, probs, and validation metrics."""
-    _, _, _, logits, targets = _gather_and_eval(
-        model, loader, device, is_mil, n_classes
-    )
+    logits, targets = _gather_and_eval(model, loader, device, is_mil)
     if logit_adj_tau is not None and class_priors is not None:
         logits = logits - logit_adj_tau * torch.log(class_priors.cpu() + 1e-8)
     probs = torch.softmax(logits, dim=-1)
@@ -135,7 +114,10 @@ def checkpoint_step(
     """Evaluate the current model and keep it if it wins the BA -> F1 -> NLL tie-break."""
     if val_loader is None:
         return best
-    acc, f1, nll, _, _ = _gather_and_eval(model, val_loader, device, is_mil, n_classes)
+    logits, targets = _gather_and_eval(model, val_loader, device, is_mil)
+    preds = logits.softmax(dim=-1).argmax(dim=-1)
+    metrics = _compute_metrics(preds, targets, logits, n_classes)
+    acc, f1, nll = metrics["balanced_accuracy"], metrics["macro_f1"], metrics["nll"]
     if acc > best["acc"] or (
         abs(acc - best["acc"]) < 1e-6
         and (f1 > best["f1"] or (abs(f1 - best["f1"]) < 1e-6 and nll < best["nll"]))
@@ -209,22 +191,6 @@ class ClassAwareBatchSampler(Sampler[list[int]]):
 
     def __len__(self) -> int:
         return self.n_batches
-
-
-class _RecordingSampler(Sampler[int]):
-    """Wrap an index sampler, recording every yielded index as an actual exposure."""
-
-    def __init__(self, base: Sampler[int], exposed: set[int]) -> None:
-        self.base = base
-        self.exposed = exposed
-
-    def __iter__(self):
-        for index in self.base:
-            self.exposed.add(int(index))
-            yield index
-
-    def __len__(self) -> int:
-        return len(cast(Any, self.base))
 
 
 class _RecordingBatchSampler(Sampler[list[int]]):

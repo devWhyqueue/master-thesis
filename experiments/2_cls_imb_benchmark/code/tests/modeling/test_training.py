@@ -260,9 +260,7 @@ def test_evaluation_transfers_concatenated_logits_once(
         return original_cpu(tensor, *args, **kwargs)
 
     monkeypatch.setattr(torch.Tensor, "cpu", record_cpu)
-    _, _, _, logits, targets = _gather_and_eval(
-        model, loader, torch.device("cpu"), False, 2
-    )
+    logits, targets = _gather_and_eval(model, loader, torch.device("cpu"), False)
 
     assert transfers == 1
     assert logits.shape == (4, 2)
@@ -352,3 +350,14 @@ def test_resolve_training_config_records_source_only_defaults() -> None:
     assert patch["checkpoint_interval"] == 50
     assert patch["dropout"] == 0.1
     assert resolve_training_config({}, is_mil=True)["batch_size"] == 32
+
+
+def test_resolve_training_config_honors_configured_checkpoint_interval() -> None:
+    from imbalance_benchmark.modeling.training.config import resolve_training_config
+
+    patch_cfg = {"patch_training": {"checkpoint_interval": 1500}}
+    wsi_cfg = {"wsi_training": {"checkpoint_interval": 200}}
+    assert (
+        resolve_training_config(patch_cfg, is_mil=False)["checkpoint_interval"] == 1500
+    )
+    assert resolve_training_config(wsi_cfg, is_mil=True)["checkpoint_interval"] == 200
