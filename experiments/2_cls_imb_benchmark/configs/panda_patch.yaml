@@ -71,11 +71,13 @@ slurm:
   # freeze), so every condition has exactly 6 observations (1 assignment x 3
   # splits x 2 seeds) and one candidate shard = 6 fits. With
   # patch_training.checkpoint_interval scaled above, one controlled fit is
-  # ~18-36 min, so 2 shards/task (~36-72 min + startup) stays safely under the
-  # 2h wall; the old value of 5 (~22h/task) timed out every task. Probe one
-  # array index (see plan §5) and adjust from measured accelerator_seconds
-  # before the full submit.
-  tune_shards_per_task: 2
+  # ~8 min measured (job 4698019, CE method, ~8 min startup + 12 fits x ~8 min
+  # for shards-per-task=2 = 106 min elapsed on a 120 min wall -- only ~11%
+  # margin, and CE is the cheapest method, so slower bundled methods risk
+  # timing out). 1 shard/task (~8 min startup + 6 fits x ~8 min = ~56 min)
+  # keeps a comfortable margin; the old value of 5 (~22h/task) timed out
+  # every task.
+  tune_shards_per_task: 1
   tune_natural_shards_per_task: 3
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 7
