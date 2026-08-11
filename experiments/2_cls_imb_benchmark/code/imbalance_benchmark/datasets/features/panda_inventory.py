@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import torch
 
 from imbalance_benchmark.common import (
     compute_sha256,
@@ -44,7 +45,7 @@ def reduce_feature_inventory(
     validate_cached_features(frame, root)
     provenance = resolve_feature_provenance(config["feature_extraction"])
     records = cache_records(root)
-    _validate_tensors(root, records, provenance)
+    _validate_tensors(root, records)
     path = Path(config["feature_inventory_path"])
     write_json(
         path,
@@ -79,7 +80,7 @@ def verify_feature_inventory(
     if not valid:
         raise ValueError("PANDA feature inventory coverage or provenance differs")
     validate_cached_features(frame, root)
-    _validate_tensors(root, cache_records(root), provenance)
+    _validate_tensors(root, cache_records(root))
 
 
 def load_materialized_inventory(dataset: dict[str, Any]) -> pd.DataFrame:
@@ -142,12 +143,10 @@ def _slide_identity(group: pd.DataFrame) -> list[str]:
     ]
 
 
-def _validate_tensors(
-    root: Path, records: dict[str, dict[str, object]], provenance: dict[str, object]
-) -> None:
+def _validate_tensors(root: Path, records: dict[str, dict[str, object]]) -> None:
     for slide in records:
         tensor = load_stored_feature_tensor(str(root / f"{slide}.pt"))
         if tensor.ndim != 2 or tensor.shape[1] != FEATURE_DIM:
             raise ValueError(f"PANDA feature dimension differs for {slide}")
-        if str(tensor.dtype).removeprefix("torch.") != provenance["dtype"]:
+        if tensor.dtype != torch.float32:
             raise ValueError(f"PANDA feature dtype differs for {slide}")
