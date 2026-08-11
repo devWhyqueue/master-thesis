@@ -196,13 +196,14 @@ class ClassAwareBatchSampler(Sampler[list[int]]):
 class _RecordingBatchSampler(Sampler[list[int]]):
     """Wrap a batch sampler, recording every yielded index as an actual exposure."""
 
-    def __init__(self, base: Sampler[list[int]], exposed: set[int]) -> None:
+    def __init__(self, base: Sampler[list[int]], exposed: set[int] | None) -> None:
         self.base = base
         self.exposed = exposed
 
     def __iter__(self):
         for batch in self.base:
-            self.exposed.update(int(index) for index in batch)
+            if self.exposed is not None:
+                self.exposed.update(int(index) for index in batch)
             yield batch
 
     def __len__(self) -> int:

@@ -33,6 +33,7 @@ from imbalance_benchmark.commands import (
     cmd_tune_decide,
     cmd_tune_reduce,
     cmd_tune_shard,
+    cmd_tune_wave,
 )
 
 
@@ -55,6 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         "tune",
         "tune-shard",
         "tune-reduce",
+        "tune-wave",
         "confirm",
         "confirm-shard",
         "analyze",
@@ -105,6 +107,12 @@ def _parser() -> argparse.ArgumentParser:
     shard.add_argument(
         "--condition", choices=("natural", "balanced", "moderate", "severe")
     )
+    wave = sub.choices["tune-wave"]
+    wave.add_argument("--phase", choices=("base", "dependent"), default="base")
+    wave.add_argument("--condition", choices=("natural", "balanced", "moderate", "severe"))
+    wave.add_argument("--group", choices=("controlled",))
+    wave.add_argument("--round", type=int, default=0)
+    wave.add_argument("--stalled-waves", type=int, default=0)
     reduce = sub.choices["tune-reduce"]
     reduce.add_argument("--phase", choices=("base", "final"), required=True)
     reduce.add_argument(
@@ -137,6 +145,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "freeze": cmd_freeze,
         "tune": cmd_tune,
         "tune-shard": cmd_tune_shard,
+        "tune-wave": cmd_tune_wave,
         "tune-reduce": cmd_tune_reduce,
         "tune-decide": cmd_tune_decide,
         "confirm": cmd_confirm,

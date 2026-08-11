@@ -5,7 +5,11 @@ import math
 from pathlib import Path
 from typing import Any
 
+import torch
+
+from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.modeling.context import group_conditions, roster_for_condition
+from imbalance_benchmark.modeling.workflows.tuning_aggregate import TuningScope
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
 )
@@ -17,6 +21,43 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
 
 MAX_CANDIDATES = 16
 DEPENDENT_METHODS = ("post_hoc_logit_adjustment", "crt")
+
+
+def combined_scopes(
+    raw_scopes: list[tuple[dict[str, Path], Any, torch.utils.data.DataLoader]],
+    condition: str,
+    assignments: tuple[str, ...],
+    cost_records: list[dict[str, int]] | None = None,
+) -> list[TuningScope]:
+    """Build canonical assignment-then-split tuning observations."""
+    records = cost_records if cost_records is not None else []
+    return [
+        TuningScope(
+            regime,
+            loader,
+            load_training_dataset(
+                paths["data"] / _manifest_name(condition, assignment),
+                regime.is_mil,
+                class_names=regime.locked_class_names,
+            ),
+            records,
+            regime.update_budgets.get(
+                "natural" if condition == "natural" else "controlled"
+            ),
+            assignment,
+            split_index,
+        )
+        for assignment in assignments
+        for split_index, (paths, regime, loader) in enumerate(raw_scopes)
+    ]
+
+
+def _manifest_name(condition: str, assignment: str) -> str:
+    return (
+        f"manifest_{condition}.csv"
+        if condition in {"natural", "balanced"}
+        else f"manifest_{assignment}_{condition}.csv"
+    )
 
 
 def bundled_array_size(shard_count: int, shards_per_task: int) -> int:

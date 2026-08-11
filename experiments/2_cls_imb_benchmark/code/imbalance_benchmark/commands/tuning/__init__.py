@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import torch
 
 from imbalance_benchmark.common import (
@@ -31,7 +32,11 @@ from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     reduce_tuning_shards,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import combined_scopes
+from imbalance_benchmark.modeling.workflows.tuning_aggregate import TuningScope
+from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    _manifest_name,
+    combined_scopes,
+)
 
 __all__ = ["cmd_tune", "cmd_tune_reduce"]
 
@@ -67,7 +72,7 @@ def write_serial_cost(
 
 
 def _tuning_inputs(
-    args: argparse.Namespace, paths: dict[str, Path]
+    args: argparse.Namespace, paths: dict[str, Path], capacity_hint: int | None = None
 ) -> tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]:
     """Load config, the natural-validation loader, and the regime for the tuning sweep."""
     freeze_path = paths["data"] / "manifest_freeze.json"
@@ -80,6 +85,7 @@ def _tuning_inputs(
         is_mil,
         "validation",
         class_names=list(freeze["class_names"]),
+        capacity_hint=capacity_hint,
     )
     return (
         paths,
@@ -166,6 +172,7 @@ def _combined_selections(
 
 def _frozen_shard_context(
     args: argparse.Namespace,
+    load_scopes: bool = True,
 ) -> tuple[
     dict[str, Path],
     list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
@@ -173,13 +180,56 @@ def _frozen_shard_context(
     list[str],
 ]:
     base = ensure_dirs(load_config(args.config))
-    scopes = [_tuning_inputs(args, split_paths(base, index)) for index in range(3)]
-    paths = [scope[0]["data"] / "manifest_freeze.json" for scope in scopes]
+    paths = [
+        split_paths(base, index)["data"] / "manifest_freeze.json" for index in range(3)
+    ]
+    freezes = [json.loads(path.read_text()) for path in paths]
+    for freeze in freezes:
+        verify_manifest_freeze(freeze)
+    scopes = (
+        [_tuning_inputs(args, split_paths(base, index)) for index in range(3)]
+        if load_scopes
+        else []
+    )
     return (
         base,
         scopes,
-        json.loads(paths[0].read_text()),
+        freezes[0],
         [compute_sha256(path) for path in paths],
+    )
+
+
+def load_shard_scope(
+    args: argparse.Namespace,
+    base: dict[str, Path],
+    condition: str,
+    assignment: str,
+    split_index: int,
+    scope_index: int,
+    cost_records: list[dict[str, int]],
+) -> TuningScope:
+    """Load one tuning observation's validation and training data into one bank."""
+    paths = split_paths(base, split_index)
+    manifest = paths["data"] / _manifest_name(condition, assignment)
+    frame = pd.read_csv(paths["data"] / "manifest.csv")
+    capacity = int((frame["split"] == "validation").sum()) + len(pd.read_csv(manifest))
+    paths, regime, loader = _tuning_inputs(args, paths, capacity)
+    return TuningScope(
+        regime,
+        loader,
+        load_training_dataset(
+            manifest,
+            regime.is_mil,
+            class_names=regime.locked_class_names,
+            capacity_hint=capacity,
+        ),
+        cost_records,
+        regime.update_budgets.get(
+            "natural" if condition == "natural" else "controlled"
+        ),
+        assignment,
+        split_index,
+        scope_index,
     )
 
 

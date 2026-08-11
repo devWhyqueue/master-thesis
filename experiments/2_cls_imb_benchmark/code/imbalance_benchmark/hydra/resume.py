@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from collections.abc import Callable
 from typing import Any
 
 from imbalance_benchmark.common import compute_sha256, ensure_dirs, split_paths
@@ -117,7 +118,7 @@ def _natural_bundle_complete(
     fingerprint: list[str],
     base: dict[str, Any],
 ) -> bool:
-    try:
+    def _load() -> None:
         for flat_index in _bundle_indices(task_index, bundle_size, observations, True):
             candidate_index, observation_index = divmod(flat_index, observations)
             spec = requested_shard(
@@ -131,9 +132,8 @@ def _natural_bundle_complete(
             if spec is None:
                 continue
             load_candidate(base["data"], spec, fingerprint, None)
-    except (OSError, ValueError, KeyError, RuntimeError):
-        return False
-    return True
+
+    return _complete_or_missing(_load)
 
 
 def _controlled_bundle_complete(
@@ -146,7 +146,7 @@ def _controlled_bundle_complete(
     assignments: tuple[str, ...],
     base: dict[str, Any],
 ) -> bool:
-    try:
+    def _load() -> None:
         for shard_index in range(
             task_index * bundle_size, min((task_index + 1) * bundle_size, total)
         ):
@@ -161,6 +161,16 @@ def _controlled_bundle_complete(
                 fingerprint,
                 expected_observations("controlled", assignments, freeze),
             )
-    except (OSError, ValueError, KeyError, RuntimeError):
-        return False
+
+    return _complete_or_missing(_load)
+
+
+def _complete_or_missing(load: Callable[[], None]) -> bool:
+    """Treat only absent artifacts as pending; corrupted artifacts stop resumption."""
+    try:
+        load()
+    except RuntimeError as error:
+        if str(error).startswith("Missing tuning"):
+            return False
+        raise
     return True

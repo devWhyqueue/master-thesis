@@ -155,7 +155,9 @@ def fit_mde(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
         ctx["train_labels"],
         b_size,
         ctx["seed"],
-        ctx.setdefault("exposed_indices", set()),
+        ctx.setdefault("exposed_indices", set())
+        if ctx.get("record_exposure", True)
+        else None,
     )
     opt = build_optimizer(model.parameters(), lr)
     best = initial_checkpoint(model, ctx["val_loader"], device, True, ctx["n_classes"])

@@ -27,10 +27,13 @@ def load_training_dataset(
     split_name: str | None = None,
     device: str | torch.device = "cpu",
     class_names: list[str] | None = None,
+    capacity_hint: int | None = None,
 ) -> TrainDataset:
     """Load one regime-appropriate CPU-resident frozen-feature dataset."""
     if not is_mil:
-        return ImbalanceDataset(manifest_path, split_name, device, class_names)
+        return ImbalanceDataset(
+            manifest_path, split_name, device, class_names, capacity_hint
+        )
     return BagFeatureDataset(
         manifest_path, split_name, device=device, class_names=class_names
     )

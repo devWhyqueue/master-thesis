@@ -190,8 +190,10 @@ def _merge_observation_shards(
     ]
     paths = [shard_path(root, observed) for observed in observed_specs]
     directory = paths[0].parent
-    if not directory.exists() or set(directory.glob("*.json")) != set(paths):
-        raise RuntimeError(f"Missing or duplicate tuning observations: {directory}")
+    if not directory.exists() or any(not path.exists() for path in paths):
+        raise RuntimeError(f"Missing tuning observations: {directory}")
+    if set(directory.glob("*.json")) != set(paths):
+        raise RuntimeError(f"Duplicate tuning observations: {directory}")
     payloads = []
     for observed, path in zip(observed_specs, paths, strict=True):
         payload = json.loads(path.read_text())

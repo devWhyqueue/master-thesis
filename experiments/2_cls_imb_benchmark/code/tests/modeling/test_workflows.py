@@ -7,7 +7,9 @@ import torch
 
 from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.commands import confirm
-from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import combined_scopes
+from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    combined_scopes,
+)
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     merge_round_state,
 )
@@ -270,7 +272,7 @@ def test_combined_tuning_scope_passes_the_frozen_class_order(
         return object()
 
     monkeypatch.setattr(
-        "imbalance_benchmark.modeling.workflows.tuning.tuning_shards.load_training_dataset",
+        "imbalance_benchmark.modeling.workflows.tuning.tuning_schedule.load_training_dataset",
         load_dataset,
     )
     combined_scopes([({"data": tmp_path}, regime, object())], "moderate", ("native",))

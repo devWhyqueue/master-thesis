@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path
@@ -133,17 +132,15 @@ def test_advance_submits_next_round_when_a_method_is_still_shifting(tmp_path, mo
 
     decide._advance(base, {}, "config.yaml", _args(round_index=0), states, windows, False, submit=fake_submit)
 
-    assert len(submitted) == 2  # the round-1 shard array, then its decide job
-    assert submitted[0].array_size > 0
-    assert "--round 1" in submitted[0].command
-    assert submitted[1].dependencies == ("id-1",)
-    assert "tune-decide --phase base --condition moderate --round 1" in submitted[1].command
+    assert len(submitted) == 1
+    assert submitted[0].on_host
+    assert submitted[0].command == "tune-wave --phase base --condition moderate --round 1"
     grids = load_round_grids(tmp_path, "moderate", "base")
     assert grids["round"] == 1
     assert grids["windows"]["ce"]["lr_window"] == LR_ENVELOPE[3:7]
 
 
-def test_natural_round_runs_one_fit_per_task_on_the_short_partition(tmp_path, monkeypatch):
+def test_natural_round_hands_off_to_an_artifact_driven_wave(tmp_path, monkeypatch):
     """A natural fit spans the full training partition, so a round task that
     ran every (split, seed) observation back to back would need six such fits
     in one allocation and blow its wall. One shard per task bounds a natural
@@ -172,21 +169,14 @@ def test_natural_round_runs_one_fit_per_task_on_the_short_partition(tmp_path, mo
             submit=lambda c, p, job: submitted.append(job) or "id-1",
         )
 
-    natural, moderate = submitted[0], submitted[2]
-    assert natural.partition == "gpu-2h"  # falls back to tune_controlled
-    assert "--observations-per-candidate 6" in natural.command
-    assert "--bundle-by-observation" in natural.command
-    assert "--shards-per-task 1" in natural.command
-    # ce's 4 candidate slots x 6 observations, one fit each.
-    assert natural.array_size == 24
-
-    assert moderate.partition == "gpu-2h"
-    assert "--observations-per-candidate" not in moderate.command
-    assert moderate.array_size == 4
+    natural, moderate = submitted
+    assert natural.on_host and moderate.on_host
+    assert natural.command == "tune-wave --phase base --condition natural --round 1"
+    assert moderate.command == "tune-wave --phase base --condition moderate --round 1"
 
 
-def test_natural_round_honours_an_explicit_round_resource(tmp_path, monkeypatch):
-    """``tune_natural_round`` overrides the fallback when a dataset needs it."""
+def test_round_wave_is_a_host_submission_controller(tmp_path, monkeypatch):
+    """Wave controller, not compute array, owns adaptive scheduling."""
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     config = {
         "slurm": {
@@ -207,7 +197,8 @@ def test_natural_round_honours_an_explicit_round_resource(tmp_path, monkeypatch)
         submit=lambda c, p, job: submitted.append(job) or "id-1",
     )
 
-    assert submitted[0].partition == "gpu-5h"
+    assert submitted[0].on_host
+    assert submitted[0].command.endswith("--round 1")
 
 
 def test_advance_keeps_the_resolved_strength_window_when_only_lr_still_shifts(
@@ -283,15 +274,6 @@ def test_advance_finalizes_natural_without_a_dependent_phase(tmp_path, monkeypat
 
 def test_advance_starts_dependent_phase_once_ce_resolves(tmp_path, monkeypatch):
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
-    monkeypatch.setattr(
-        decide,
-        "dependent_round_zero_jobs",
-        lambda config, is_mil: [
-            _fake_job("tune-dependent-posthoc-natural"),
-            _fake_job("tune-dependent-crt-natural"),
-            _fake_job("tune-dependent-controlled"),
-        ],
-    )
     submitted = []
 
     def fake_submit(config, config_path, job):
@@ -306,14 +288,8 @@ def test_advance_starts_dependent_phase_once_ce_resolves(tmp_path, monkeypatch):
         {"ce": (LEARNING_RATE_GRID, None)}, False, submit=fake_submit,
     )
 
-    names = [job.name for job in submitted]
-    assert names == [
-        "tune-dependent-posthoc-natural",
-        "tune-dependent-crt-natural",
-        "tune-dependent-controlled",
-        "tune-decide-moderate-dependent-r0",
-    ]
-    assert submitted[-1].dependencies == ("id-1", "id-2", "id-3")
+    assert [job.name for job in submitted] == ["tune-wave-dependent-r0"]
+    assert submitted[0].command == "tune-wave --phase dependent --group controlled --round 0"
 
 
 def test_advance_starts_dependent_phase_when_ce_resolved_in_an_earlier_round(
@@ -326,9 +302,6 @@ def test_advance_starts_dependent_phase_when_ce_resolved_in_an_earlier_round(
     the dependent phase on real cluster data: the round-2 decide job ran
     clean, found nothing to advance, and simply never started it."""
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
-    monkeypatch.setattr(
-        decide, "dependent_round_zero_jobs", lambda config, is_mil: [_fake_job("posthoc")]
-    )
     ce_resolved = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
     merge_round_state(tmp_path, "moderate", round_payload({"ce": ce_resolved}))
     oko_resolved = decide_next_round("oko", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
@@ -346,7 +319,7 @@ def test_advance_starts_dependent_phase_when_ce_resolved_in_an_earlier_round(
         submit=fake_submit,
     )
 
-    assert [job.name for job in submitted] == ["posthoc", "tune-decide-moderate-dependent-r0"]
+    assert [job.name for job in submitted] == ["tune-wave-dependent-r0"]
 
 
 def test_advance_skips_dependent_phase_if_already_started(tmp_path, monkeypatch):
@@ -450,9 +423,3 @@ def test_cmd_tune_decide_handles_a_later_round_with_only_some_methods_active(
     assert saved["ce"] == {"lr": 1e-4}
     assert "weighted_ce" in saved
     assert len(advanced) == 1
-
-
-def _fake_job(name: str):
-    from imbalance_benchmark.hydra.rendering import SlurmJob
-
-    return SlurmJob(name, f"tune-shard --phase dependent", "gpu-2h", 1, 4)

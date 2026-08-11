@@ -44,19 +44,17 @@ def test_observation_bundles_keep_split_and_seed_homogeneous() -> None:
 
 
 def test_wsi_bundle_reuses_one_context_for_two_exact_shards(monkeypatch) -> None:
-    """MIL candidates share one process-local feature cache, sequentially."""
+    """Patch candidates now construct scope-local banks, sequentially."""
     calls: list[int] = []
     context = (
-        object(),
-        [(object(), type("Regime", (), {"is_mil": True})(), object())],
-        {"method_grids": {}},
+        {"data": object()},
+        [],
+        {"runtime_config": {"dataset": {}}, "method_grids": {}},
         ["freeze"],
     )
     monkeypatch.setattr(tuning, "_frozen_shard_context", lambda *_: context)
-    monkeypatch.setattr(tuning, "_is_excluded", lambda *_: False)
-    monkeypatch.setattr(
-        tuning, "_run_shard", lambda *args: calls.append(args[-1].candidate_index)
-    )
+    monkeypatch.setattr(tuning, "_split_paths", lambda *_: [])
+    monkeypatch.setattr(tuning, "_run_scope_local_shard", lambda *args: calls.append(args[-1].candidate_index))
     monkeypatch.setattr(
         tuning,
         "requested_shard",

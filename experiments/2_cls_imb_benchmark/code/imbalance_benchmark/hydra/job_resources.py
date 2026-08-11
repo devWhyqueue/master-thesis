@@ -32,6 +32,7 @@ _HOST_ONLY_RESOURCES = {
     # squash-dataset and git. The Apptainer container has none of these
     # host tools, so these stages always run on the host instead.
     "tune_decide",
+    "tune-wave",
     "materialize_pack",
     "materialize_publish",
 }

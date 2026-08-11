@@ -54,6 +54,7 @@ def load_feature_row(path: str, index: int | None = None) -> torch.Tensor:
 _BANK: torch.Tensor | None = None
 _ROWS: dict[tuple[str, int], int] = {}
 _BANK_CAPACITY = 0
+_BANK_COPY_CHUNK = 1024
 
 
 def _resolve_row(path: str, index: int | None) -> tuple[int, torch.Tensor]:
@@ -88,24 +89,28 @@ def _reserve_bank(rows: list[torch.Tensor], capacity: int) -> None:
     global _BANK, _BANK_CAPACITY
     if not rows:
         return
+    if len(_ROWS) > max(_BANK_CAPACITY, capacity):
+        raise RuntimeError(
+            "Feature bank capacity hint is smaller than its unique rows."
+        )
     if _BANK is None:
-        first = rows[0]
+        first = rows[0].float()
         _BANK_CAPACITY = capacity
         _BANK = torch.empty(
             (capacity, *first.shape),
-            dtype=first.dtype,
+            dtype=torch.float32,
             device=_target_bank_device(
                 os.environ, capacity * first.numel() * first.element_size()
             ),
         )
-    if len(_ROWS) > _BANK_CAPACITY:
-        raise RuntimeError(
-            "Feature bank capacity hint is smaller than its unique rows."
-        )
-    if any(row.dtype != _BANK.dtype or row.shape != _BANK.shape[1:] for row in rows):
+    if any(row.shape != _BANK.shape[1:] for row in rows):
         raise ValueError("Feature bank rows must share dtype and shape.")
     start = len(_ROWS) - len(rows)
-    _BANK[start : start + len(rows)].copy_(torch.stack(rows), non_blocking=True)
+    for offset in range(0, len(rows), _BANK_COPY_CHUNK):
+        chunk = rows[offset : offset + _BANK_COPY_CHUNK]
+        _BANK[start + offset : start + offset + len(chunk)].copy_(
+            torch.stack(chunk).float(), non_blocking=True
+        )
 
 
 def feature_rows(
@@ -114,14 +119,13 @@ def feature_rows(
     """Return bank row ids, reserving split manifests' full row capacity once."""
     ids = torch.empty(len(paths), dtype=torch.long)
     new_rows: list[torch.Tensor] = []
-    # Process positions in path-sorted order so repeated positions sharing a
-    # path stay adjacent, keeping load_stored_feature_tensor's lru_cache hot
-    # instead of thrashing on a shuffled condition manifest. A key's assigned
-    # id is an arbitrary bank slot either way; only its content (the feature
-    # vector for that path/index) is observable downstream, and that is
-    # unchanged.
+    # Process equal paths together to keep the tensor cache hot.
     order = sorted(range(len(paths)), key=lambda position: paths[position])
     for position in order:
+        cached = _cached_row_id(paths[position], indices[position])
+        if cached is not None:
+            ids[position] = cached
+            continue
         path, index = paths[position], indices[position]
         key_index, row = _resolve_row(path, index)
         key = (path, key_index)
@@ -135,6 +139,11 @@ def feature_rows(
     # than letting a later, smaller frame undercut the rows already banked.
     _reserve_bank(new_rows, max(capacity_hint or 0, len(_ROWS)))
     return ids
+
+
+def _cached_row_id(path: str, index: int | None) -> int | None:
+    """Return an explicit feature key's bank row without touching storage."""
+    return _ROWS.get((path, int(index))) if index is not None else None
 
 
 def bank_index(rows: torch.Tensor) -> torch.Tensor:
@@ -152,11 +161,12 @@ def bank_is_cpu() -> bool:
 def reset_feature_bank() -> None:
     """Drop the bank and its row index.
 
-    A real process builds exactly one bank per run, so this exists for test
-    isolation (distinct tests use distinct feature dims, which the bank
-    cannot mix once seeded).
+    Scope-local tuning calls this between scopes so a 40 GB GPU need not hold
+    every split and condition at once. It also provides test isolation.
     """
     global _BANK, _BANK_CAPACITY
     _BANK = None
     _BANK_CAPACITY = 0
     _ROWS.clear()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()

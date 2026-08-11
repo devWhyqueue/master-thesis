@@ -271,7 +271,7 @@ def test_feature_bank_reserves_a_split_manifest_without_concatenation(
     assert training.rows.tolist() == [2, 3]
     assert feature_cache._BANK is not None
     assert feature_cache._BANK.shape == (4, 2)
-    assert feature_cache._BANK.dtype == torch.float16
+    assert feature_cache._BANK.dtype == torch.float32
     assert feature_cache._BANK.device.type == "cpu"
     assert torch.equal(
         bank_index(torch.tensor([3, 0])),

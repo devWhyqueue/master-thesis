@@ -30,6 +30,7 @@ class SlurmJob:
     time_limit: str | None = None
     constraint: str | None = None
     dependencies: tuple[str, ...] = ()
+    dependency_mode: str = "afterok"
     array_splits: tuple[int, ...] = ()
     array_conditions: tuple[str, ...] = ()
     array_size: int = 0
@@ -45,7 +46,7 @@ def render_sbatch(
     command = _command(job, config_path, code)
     lines = _directives(job, root, config)
     images = _stage_images(config, job.name)
-    dataset = _prepare_dataset(config, job.name)
+    dataset = config.get("dataset", {}).get("root", "") if job.name == "prepare" else ""
     lines += (
         _host_execution_lines(root, command)
         if job.on_host
@@ -92,10 +93,6 @@ def _command(job: SlurmJob, config_path: str | None, code_dir: str) -> str:
     return "\n".join(lines)
 
 
-def _prepare_dataset(config: dict[str, Any], stage: str) -> str:
-    return str(config.get("dataset", {}).get("root", "")) if stage == "prepare" else ""
-
-
 def _crossed_array_lines(job: SlurmJob, prefix: str) -> list[str]:
     run = f'{prefix} --split-index "$SPLIT_INDEX" {job.command}'
     return [
@@ -136,7 +133,9 @@ def _directives(job: SlurmJob, root: str, config: dict[str, Any]) -> list[str]:
         throttle = f"%{int(concurrency)}" if concurrency else ""
         lines.append(f"#SBATCH --array={indices}{throttle}")
     if job.dependencies:
-        lines.append(f"#SBATCH --dependency=afterok:{':'.join(job.dependencies)}")
+        lines.append(
+            f"#SBATCH --dependency={job.dependency_mode}:{':'.join(job.dependencies)}"
+        )
     return lines
 
 

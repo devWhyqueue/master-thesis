@@ -26,6 +26,7 @@ from imbalance_benchmark.commands.prepare import (
 )
 from imbalance_benchmark.commands.smoke import cmd_smoke
 from imbalance_benchmark.commands.tuning import cmd_tune, cmd_tune_reduce
+from imbalance_benchmark.commands.tuning.wave import cmd_tune_wave
 from imbalance_benchmark.commands.tuning.decide import cmd_tune_decide
 from imbalance_benchmark.commands.tuning.shard import cmd_tune_shard
 from imbalance_benchmark.hydra import cmd_submit
@@ -45,6 +46,7 @@ __all__ = [
     "cmd_tune",
     "cmd_tune_shard",
     "cmd_tune_reduce",
+    "cmd_tune_wave",
     "cmd_tune_decide",
     "cmd_confirm",
     "cmd_confirm_shard",

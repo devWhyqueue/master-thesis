@@ -5,11 +5,11 @@ import json
 import os
 from pathlib import Path
 import time
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import torch
 
-from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
     TuningScope,
     _evaluate,
@@ -23,44 +23,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
 )
 
 
-def combined_scopes(
-    raw_scopes: list[tuple[dict[str, Path], Any, torch.utils.data.DataLoader]],
-    condition: str,
-    assignments: tuple[str, ...],
-    cost_records: list[dict[str, int]] | None = None,
-) -> list[TuningScope]:
-    """Build the canonical assignment-then-split tuning observations."""
-    records = cost_records if cost_records is not None else []
-    result = []
-    for assignment in assignments:
-        for split_index, (paths, regime, loader) in enumerate(raw_scopes):
-            manifest = _manifest_name(condition, assignment)
-            result.append(
-                TuningScope(
-                    regime,
-                    loader,
-                    load_training_dataset(
-                        paths["data"] / manifest,
-                        regime.is_mil,
-                        class_names=regime.locked_class_names,
-                    ),
-                    records,
-                    regime.update_budgets.get(
-                        "natural" if condition == "natural" else "controlled"
-                    ),
-                    assignment,
-                    split_index,
-                )
-            )
-    return result
-
-
-def _manifest_name(condition: str, assignment: str) -> str:
-    return (
-        f"manifest_{condition}.csv"
-        if condition in {"natural", "balanced"}
-        else f"manifest_{assignment}_{condition}.csv"
-    )
+ScopeStream = tuple[Callable[[], Iterator[TuningScope]], int, list[dict[str, Any]]]
 
 
 def run_candidate_shard(
@@ -70,6 +33,7 @@ def run_candidate_shard(
     fingerprint: list[str],
     output_root: Path,
     stage_one_config: dict[str, Any] | None = None,
+    scope_stream: ScopeStream | None = None,
 ) -> Path:
     """Execute or reuse one candidate shard and persist its ordered observations."""
     complete = _reusable_path(spec, output_root, fingerprint)
@@ -79,23 +43,35 @@ def run_candidate_shard(
     started_at, started = time.time(), time.perf_counter()
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
-    payload = _fit_payload(spec, scopes, seeds, stage_one_config)
-    observation_keys = _observation_keys(scopes, seeds)
-    if spec.observation_index is not None:
-        observation_keys = observation_keys[
-            spec.observation_index : spec.observation_index + 1
-        ]
-    payload.update(
-        {
-            "seeds": seeds,
-            "scope_count": len(scopes),
-            "observation_keys": observation_keys,
-        }
+    payload = (
+        _fit_streamed_payload(spec, scope_stream[0], seeds, stage_one_config)
+        if scope_stream
+        else _fit_payload(spec, scopes, seeds, stage_one_config)
     )
+    _add_observation_metadata(payload, spec, scopes, seeds, scope_stream)
     payload.update(_runtime_payload(spec, fingerprint, started_at, started))
     validate_shard_payload(payload, fingerprint, spec)
     _write_atomic(target, payload)
     return target
+
+
+def _add_observation_metadata(
+    payload: dict[str, Any],
+    spec: ShardSpec,
+    scopes: list[TuningScope],
+    seeds: list[int],
+    stream: ScopeStream | None,
+) -> None:
+    descriptors = stream[2] if stream else None
+    payload.update(
+        {
+            "seeds": seeds,
+            "scope_count": stream[1] if stream else len(scopes),
+            "observation_keys": _observation_keys(
+                scopes, seeds, descriptors, spec.observation_index
+            ),
+        }
+    )
 
 
 def _reusable_path(
@@ -143,19 +119,73 @@ def _hardware() -> dict[str, Any]:
 
 
 def _observation_keys(
-    scopes: list[TuningScope], seeds: list[int]
+    scopes: list[TuningScope],
+    seeds: list[int],
+    descriptors: list[dict[str, Any]] | None = None,
+    observation_index: int | None = None,
 ) -> list[dict[str, Any]]:
-    return [
+    source = descriptors or [
         {
             "scope_index": scope_index,
             "assignment": scope.assignment,
             "split_index": scope.split_index,
+        }
+        for index, scope in enumerate(scopes)
+        for scope_index in (getattr(scope, "scope_index", index),)
+    ]
+    keys = [
+        {
+            **scope,
             "seed_index": seed_index,
             "seed": seed,
         }
-        for scope_index, scope in enumerate(scopes)
+        for scope in source
         for seed_index, seed in enumerate(seeds)
     ]
+    return (
+        keys
+        if observation_index is None
+        else keys[observation_index : observation_index + 1]
+    )
+
+
+def _fit_streamed_payload(
+    spec: ShardSpec,
+    scope_provider: Callable[[], Iterator[TuningScope]],
+    seeds: list[int],
+    stage_one_config: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Run one feature-bank scope at a time in canonical observation order."""
+    metrics: list[dict[str, Any]] = []
+    cost_records: list[dict[str, int]] = []
+    config: dict[str, Any] | None = None
+    for scope in scope_provider():
+        config = scope.regime.method_grids[spec.method][spec.candidate_index]
+        scope.cost_records = cost_records
+        for seed_index, seed in enumerate(seeds):
+            index = scope.scope_index * len(seeds) + seed_index
+            if spec.observation_index is not None and index != spec.observation_index:
+                continue
+            _, result = _evaluate(spec.method, config, scope, seed, stage_one_config)
+            metrics.append(
+                {
+                    "scope_index": scope.scope_index,
+                    "seed_index": seed_index,
+                    "seed": seed,
+                    **{
+                        name: float(result[name])
+                        for name in ("balanced_accuracy", "macro_f1", "nll")
+                    },
+                }
+            )
+    if config is None:
+        raise RuntimeError("Tuning shard has no scopes")
+    return {
+        "candidate_index": spec.candidate_index,
+        "config": config,
+        "metrics": metrics,
+        "cost_records": cost_records,
+    }
 
 
 def _fit_payload(
@@ -177,9 +207,9 @@ def _fit_payload(
         }
     config = scopes[0].regime.method_grids[spec.method][spec.candidate_index]
     metrics = []
-    for scope_index, scope in enumerate(scopes):
+    for scope in scopes:
         for seed_index, seed in enumerate(seeds):
-            observation_index = scope_index * len(seeds) + seed_index
+            observation_index = scope.scope_index * len(seeds) + seed_index
             if (
                 spec.observation_index is not None
                 and observation_index != spec.observation_index
@@ -188,7 +218,7 @@ def _fit_payload(
             _, result = _evaluate(spec.method, config, scope, seed, stage_one_config)
             metrics.append(
                 {
-                    "scope_index": scope_index,
+                    "scope_index": scope.scope_index,
                     "seed_index": seed_index,
                     "seed": seed,
                     **{

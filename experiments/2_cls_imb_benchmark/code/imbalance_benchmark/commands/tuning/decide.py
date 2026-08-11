@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
-from dataclasses import replace
 import os
 from typing import Any
 
@@ -10,10 +9,7 @@ from imbalance_benchmark.commands.tuning import _frozen_shard_context, _is_exclu
 from imbalance_benchmark.hydra.job_resources import build_job
 from imbalance_benchmark.hydra.queue import check_queue_cap
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
-from imbalance_benchmark.hydra.dependent_jobs import (
-    dependent_round_zero_jobs,
-    final_reduce_job,
-)
+from imbalance_benchmark.hydra.dependent_jobs import final_reduce_job
 from imbalance_benchmark.hydra.workflow import _submit_script
 from imbalance_benchmark.commands.tuning.round_windows import Window, this_round_windows
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
@@ -39,8 +35,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     round_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
-    bundled_observation_array_size,
-    candidate_array_size,
     phase_methods,
 )
 
@@ -150,45 +144,6 @@ def _advance(
         _start_dependent_phase(base, config, config_path, args, is_mil, submit)
 
 
-def _round_shard_job(
-    config: dict[str, Any],
-    args: argparse.Namespace,
-    next_round: int,
-    methods: tuple[str, ...],
-) -> SlurmJob:
-    """Build one adaptive round's shard array on the resources its condition needs.
-
-    A natural fit spans the full training partition, so one task must not run
-    every (split, seed) observation back to back the way a controlled task
-    can; natural rounds are sharded by observation exactly as round 0 is.
-    One shard per task then bounds a natural round task at a single fit, which
-    is why it asks for the short partition rather than round 0's long one:
-    round 0 bundles several candidates per task, a round shift never does.
-    """
-    name = f"tune-decide-shard-{args.condition}-{args.phase}-r{next_round}"
-    command = (
-        f"tune-shard --phase {args.phase} --condition {args.condition}"
-        f" --round {next_round}"
-    )
-    candidates = candidate_array_size(methods)
-    if args.condition != "natural":
-        job = build_job(config, name, command, True, (), "tune_controlled", "tune")
-        return replace(job, array_size=candidates)
-    observations = int(
-        config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
-    )
-    command += (
-        f" --observations-per-candidate {observations}"
-        " --bundle-by-observation --shards-per-task 1"
-    )
-    return replace(
-        build_job(
-            config, name, command, True, (), "tune_natural_round", "tune_controlled"
-        ),
-        array_size=bundled_observation_array_size(candidates, observations, 1),
-    )
-
-
 def _submit_next_round(
     base: dict[str, Any],
     config: dict[str, Any],
@@ -208,22 +163,19 @@ def _submit_next_round(
         for method, state in unresolved.items()
     }
     write_round_grids(base["data"], args.condition, args.phase, next_round, new_windows)
-    shard_id = submit(
+    submit(
         config,
         config_path,
-        _round_shard_job(config, args, next_round, tuple(new_windows)),
+        build_job(
+            config,
+            f"tune-wave-{args.condition}-{args.phase}-r{next_round}",
+            f"tune-wave --phase {args.phase} --condition {args.condition} --round {next_round}",
+            False,
+            (),
+            "tune_decide",
+            "tune_reduce",
+        ),
     )
-    decide = build_job(
-        config,
-        f"tune-decide-{args.condition}-{args.phase}-r{next_round}",
-        f"tune-decide --phase {args.phase} --condition {args.condition}"
-        f" --round {next_round}",
-        False,
-        (shard_id,),
-        "tune_decide",
-        "tune_reduce",
-    )
-    submit(config, config_path, decide)
 
 
 def _start_dependent_phase(
@@ -236,15 +188,17 @@ def _start_dependent_phase(
 ) -> None:
     """Submit the CE-inherited search's frozen round-0 jobs, now that this
     condition's CE config is locked."""
-    jobs = dependent_round_zero_jobs(config, is_mil)
-    job_ids = tuple(submit(config, config_path, job) for job in jobs)
-    decide = build_job(
+    del base, is_mil
+    submit(
         config,
-        f"tune-decide-{args.condition}-dependent-r0",
-        f"tune-decide --phase dependent --condition {args.condition} --round 0",
-        False,
-        job_ids,
-        "tune_decide",
-        "tune_reduce",
+        config_path,
+        build_job(
+            config,
+            "tune-wave-dependent-r0",
+            "tune-wave --phase dependent --group controlled --round 0",
+            False,
+            (),
+            "tune_decide",
+            "tune_reduce",
+        ),
     )
-    submit(config, config_path, decide)

@@ -6,12 +6,8 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import (
-    BatchSampler,
-    DataLoader,
-    RandomSampler,
-    WeightedRandomSampler,
-)
+from torch.utils.data import BatchSampler, DataLoader, RandomSampler
+from torch.utils.data import WeightedRandomSampler
 
 from imbalance_benchmark.datasets.data import bag_collate, patch_collate
 from imbalance_benchmark.modeling.context import (
@@ -150,7 +146,12 @@ def _build_train_loader(
     b_size: int,
     is_mil: bool,
 ) -> DataLoader:
-    method, exposed = ctx["method"], ctx.setdefault("exposed_indices", set())
+    method = ctx["method"]
+    exposed = (
+        ctx.setdefault("exposed_indices", set())
+        if ctx.get("record_exposure", True)
+        else None
+    )
     if method == "sc_mil":
         sampler = _RecordingBatchSampler(
             ClassAwareBatchSampler(train_labels, b_size, ctx["seed"]), exposed

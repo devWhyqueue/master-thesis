@@ -89,7 +89,12 @@ def _oko_train_loop(
 ) -> dict[str, Any]:
     """Run OKO's update-budgeted training loop, checkpointing on the tie-break rule."""
     model, dataset, n_classes = ctx["model"], ctx["train_dataset"], ctx["n_classes"]
-    device, exposed = ctx["device"], ctx.setdefault("exposed_indices", set())
+    device = ctx["device"]
+    exposed = (
+        ctx.setdefault("exposed_indices", set())
+        if ctx.get("record_exposure", True)
+        else None
+    )
     k = int(ctx["param_config"]["parameter"])
     b_size = resolve_batch_size(ctx["config"], False)
     checkpoint_interval = resolve_checkpoint_interval(ctx["config"], False)

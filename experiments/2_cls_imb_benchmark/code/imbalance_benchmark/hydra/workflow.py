@@ -8,12 +8,12 @@ import subprocess
 from typing import Any, Callable
 
 from imbalance_benchmark.common import load_config
-from imbalance_benchmark.hydra.confirm_jobs import confirm_jobs as _confirm_jobs
+from imbalance_benchmark.hydra.confirm_jobs import confirm_jobs
 from imbalance_benchmark.hydra.job_resources import build_job as _job
-from imbalance_benchmark.hydra.job_resources import resources_for as _resources
+from imbalance_benchmark.hydra.job_resources import resources_for
 from imbalance_benchmark.hydra.job_resources import stage_jobs
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
-from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
+from imbalance_benchmark.hydra.resume import ResumePlan
 from imbalance_benchmark.modeling.context import CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     bundled_array_size,
@@ -25,6 +25,38 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 logger = logging.getLogger(__name__)
 
 
+def smoke_workflow(config: dict[str, Any]) -> list[SlurmJob]:
+    """Build the single test-partition smoke allocation."""
+    resources = resources_for(config, "smoke", True)
+    resources["partition"] = config.get("slurm", {}).get("test_partition", "gpu-test")
+    return [SlurmJob("smoke", "smoke", **resources)]
+
+
+def confirm_workflow(config: dict[str, Any]) -> list[SlurmJob]:
+    """Build confirmation and its later analysis DAG."""
+    natural, controlled = confirm_jobs(config)
+    analyze = replace(
+        _job(config, "analyze", "analyze", False, (natural.name, controlled.name)),
+        array_splits=(0, 1, 2),
+    )
+    combine = _job(
+        config, "analyze-combine", "analyze-combine", False, (analyze.name,), "analyze"
+    )
+    return [natural, controlled, analyze, combine]
+
+
+def resume_tuning_job(config: dict[str, Any]) -> SlurmJob:
+    """Build one artifact-driven tuning-wave controller."""
+    return _job(
+        config,
+        "tune-wave",
+        "tune-wave",
+        False,
+        resource="tune_decide",
+        fallback="tune_reduce",
+    )
+
+
 @dataclass(frozen=True)
 class SubmitOptions:
     """Optional workflow mode and one explicit stage boundary."""
@@ -34,28 +66,6 @@ class SubmitOptions:
     confirm_only: bool = False
     stage: str | None = None
     split_index: int | None = None
-
-
-def _analyze_jobs(
-    config: dict[str, Any],
-    confirm_natural: SlurmJob,
-    confirm_controlled: SlurmJob,
-    arr: tuple[int, ...],
-) -> tuple[SlurmJob, SlurmJob]:
-    """The 3-way analyze array plus its dependent equal-split aggregation job."""
-    an = replace(
-        _job(
-            config,
-            "analyze",
-            "analyze",
-            False,
-            (confirm_natural.name, confirm_controlled.name),
-        ),
-        array_splits=arr,
-    )
-    return an, _job(
-        config, "analyze-combine", "analyze-combine", False, (an.name,), "analyze"
-    )
 
 
 def build_workflow(
@@ -75,20 +85,16 @@ def build_workflow(
     separately once every condition's tuning lock is resolved.
     """
     if smoke:
-        res = _resources(config, "smoke", True)
-        res["partition"] = config.get("slurm", {}).get("test_partition", "gpu-test")
-        return [SlurmJob("smoke", "smoke", **res)]
+        return smoke_workflow(config)
     if stage:
         return stage_jobs(config, stage, split_index)
-    arr = (0, 1, 2)
     if confirm_only:
-        confirm_natural, confirm_controlled = _confirm_jobs(config)
-        an, combine = _analyze_jobs(config, confirm_natural, confirm_controlled, arr)
-        return [confirm_natural, confirm_controlled, an, combine]
-    setup = _setup_jobs(config, arr) if not resume_tuning else []
+        return confirm_workflow(config)
+    if resume_tuning:
+        return [resume_tuning_job(config)]
+    setup = _setup_jobs(config, (0, 1, 2))
     freeze_dependency = ("freeze",) if setup else ()
-    plan = resume_plan(config) if resume_tuning else None
-    return [*setup, *_tuning_jobs(config, freeze_dependency, plan)]
+    return [*setup, *_tuning_jobs(config, freeze_dependency, None)]
 
 
 def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJob]:

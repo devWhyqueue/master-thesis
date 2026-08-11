@@ -183,39 +183,41 @@ def test_confirm_only_links_actual_job_ids() -> None:
     assert submitted["analyze-combine"] == "4"
 
 
-def test_resume_tuning_skips_completed_setup(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type(
-            "Plan", (), {"natural_indices": (2, 5), "controlled_indices": (0,)}
-        )(),
-    )
+def test_resume_tuning_skips_completed_setup() -> None:
     jobs = build_workflow(_config(), resume_tuning=True)
 
-    assert jobs[0].name == "tune-base-natural"
-    assert jobs[0].array_indices == (2, 5)
+    assert [job.name for job in jobs] == ["tune-wave"]
+    assert jobs[0].command == "tune-wave"
     assert all(job.name not in {"prepare", "pilot", "freeze"} for job in jobs)
 
 
-def test_resume_omits_only_a_fingerprint_valid_base_natural_array(monkeypatch) -> None:
+def test_resume_tuning_starts_one_host_wave_job() -> None:
+    """Resume delegates sparse selection and afterany recovery to the wave job."""
+    (wave,) = build_workflow(_config(), resume_tuning=True)
+
+    script = render_sbatch(wave, _config(), "config.yaml")
+
+    assert wave.on_host
+    assert "tune-wave" in script
+    assert "apptainer" not in script
+
+
+def test_wave_selection_is_sparse_natural_first_and_reserves_successor() -> None:
+    from imbalance_benchmark.commands.tuning.wave import select_wave
+    from imbalance_benchmark.hydra.resume import ResumePlan
+
+    wave = select_wave(ResumePlan((8, 2, 9), (1, 4)), queued=96, limit=90)
+
+    assert wave.natural_indices == (8, 2, 9)
+    assert wave.controlled_indices == ()
+
+
+def test_resume_omits_only_a_fingerprint_valid_base_natural_array() -> None:
     config = _config()
-    monkeypatch.setattr(
-        "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type(
-            "Plan", (), {"natural_indices": (), "controlled_indices": (1, 3)}
-        )(),
-    )
 
     jobs = build_workflow(config, resume_tuning=True)
-    names = [job.name for job in jobs]
-    controlled = next(job for job in jobs if job.name == "tune-base-controlled")
-
-    assert "tune-base-natural" not in names
-    assert controlled.array_indices == (1, 3)
-    assert "#SBATCH --array=1,3%8" in render_sbatch(controlled, config, "config.yaml")
-    assert next(job for job in jobs if job.name == "tune-base-reduce").dependencies == (
-        "tune-base-controlled",
-    )
+    assert [job.name for job in jobs] == ["tune-wave"]
+    assert "tune-wave" in render_sbatch(jobs[0], config, "config.yaml")
 
 
 def test_squashfs_is_staged_only_for_configured_workflow_stages() -> None:
@@ -354,21 +356,8 @@ def test_camelyon_natural_jobs_use_three_shards_on_40gb_gpu_5h(monkeypatch) -> N
     (dependent_controlled,) = dependent_round_zero_jobs(config, is_mil=False)
     assert "--shards-per-task 8" in dependent_controlled.command
 
-    monkeypatch.setattr(
-        "imbalance_benchmark.hydra.workflow.resume_plan",
-        lambda *_: type(
-            "Plan",
-            (),
-            {
-                "natural_indices": tuple(range(base_natural.array_size)),
-                "controlled_indices": tuple(range(base_controlled.array_size)),
-            },
-        )(),
-    )
     resumed = build_workflow(config, resume_tuning=True)
-    natural = next(job for job in resumed if job.name == "tune-base-natural")
-    assert len(natural.array_indices) == len(set(natural.array_indices))
-    assert natural.array_indices == tuple(range(base_natural.array_size))
+    assert [job.name for job in resumed] == ["tune-wave"]
 
 
 def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(

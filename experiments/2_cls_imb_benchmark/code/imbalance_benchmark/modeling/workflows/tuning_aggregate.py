@@ -12,13 +12,6 @@ from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
 from imbalance_benchmark.modeling.workflows.run_context import param_counts
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
 
-__all__ = [
-    "TuningScope",
-    "tune_across_splits",
-    "summarize_tuning_cost",
-    "combined_cost",
-]
-
 
 @dataclass
 class TuningScope:
@@ -31,6 +24,7 @@ class TuningScope:
     update_budget: int | None = None
     assignment: str = "native"
     split_index: int = 0
+    scope_index: int = 0
 
 
 def _frozen_grid(regime: Regime, method: str) -> list[dict[str, Any]]:
@@ -52,17 +46,16 @@ def summarize_tuning_cost(cost_records: list[dict[str, int]]) -> dict[str, float
         "processed_examples": processed,
         "processed_instances": processed_instances,
         "effective_passes_through_unique_examples": processed / max(unique, 1),
-        "maximum_total_parameters": max(
-            (record["total_parameters"] for record in cost_records), default=0
-        ),
-        "maximum_trainable_parameters": max(
-            (record["trainable_parameters"] for record in cost_records), default=0
-        ),
-        "maximum_training_footprint_parameters": max(
-            (record["training_footprint_parameters"] for record in cost_records),
-            default=0,
+        "maximum_total_parameters": _max_cost(cost_records, "total_parameters"),
+        "maximum_trainable_parameters": _max_cost(cost_records, "trainable_parameters"),
+        "maximum_training_footprint_parameters": _max_cost(
+            cost_records, "training_footprint_parameters"
         ),
     }
+
+
+def _max_cost(records: list[dict[str, int]], key: str) -> int:
+    return max((record[key] for record in records), default=0)
 
 
 def _selection_key(
@@ -93,6 +86,7 @@ def _evaluate(
         scope.val_loader,
         scope.update_budget,
     )
+    ctx["record_exposure"] = False
     if stage_one_config is not None:
         ctx["stage_one_config"] = stage_one_config
         state, _ = fit_crt(ctx)
@@ -179,8 +173,14 @@ def _select_post_hoc(
         for seed in seeds:
             state, _ = _evaluate("ce", ce_config, scope, seed)
             ctx = build_training_ctx(
-                "ce", scope.train_ds, scope.regime, seed, ce_config, scope.val_loader
+                "ce",
+                scope.train_ds,
+                scope.regime,
+                seed,
+                ce_config,
+                scope.val_loader,
             )
+            ctx["record_exposure"] = False
             ctx["model"].load_state_dict(state)
             for tau in taus:
                 result = run_evaluation(
