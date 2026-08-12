@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from contextlib import contextmanager
 from dataclasses import replace
 import os
@@ -14,7 +15,11 @@ from imbalance_benchmark.commands.tuning.wave_round import (
     run_group_wave,
     run_round_wave,
 )
-from imbalance_benchmark.commands.tuning.wave_support import next_stalled, submit_wave
+from imbalance_benchmark.commands.tuning.wave_support import (
+    record_attempted,
+    submit_wave,
+    unattempted,
+)
 from imbalance_benchmark.hydra.queue import DEFAULT_QUEUE_CAP, _squeue_count
 from imbalance_benchmark.hydra.rendering import render_sbatch
 from imbalance_benchmark.hydra.rendering import SlurmJob
@@ -22,6 +27,8 @@ from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
 from imbalance_benchmark.hydra.workflow import _submit_script, _tuning_jobs
 
 __all__ = ["cmd_tune_wave", "select_wave"]
+
+logger = logging.getLogger(__name__)
 
 
 def select_wave(plan: ResumePlan, queued: int, limit: int) -> ResumePlan:
@@ -84,16 +91,30 @@ def _run_base_wave(
     if not remaining.natural_indices and not remaining.controlled_indices:
         _submit_terminal(config, os.path.abspath(args.config))
         return
-    pending = [*remaining.natural_indices, *remaining.controlled_indices]
-    stalled = next_stalled(base["data"], pending, args.stalled_waves)
-    limit = int(config.get("slurm", {}).get("tuning_wave_task_limit", 90))
-    submit_wave(
-        config,
-        os.path.abspath(args.config),
-        _wave_jobs(config, select_wave(remaining, _squeue_count(), limit)),
-        args,
-        stalled,
+    fresh = ResumePlan(
+        tuple(
+            unattempted(base["data"], "base-natural", list(remaining.natural_indices))
+        ),
+        tuple(
+            unattempted(
+                base["data"], "base-controlled", list(remaining.controlled_indices)
+            )
+        ),
     )
+    if not fresh.natural_indices and not fresh.controlled_indices:
+        logger.warning(
+            "tune-wave base: %d natural + %d controlled shard(s) still missing after "
+            "a prior attempt; not retrying. Investigate the failed tasks, then "
+            "resume with: submit --resume-tuning",
+            len(remaining.natural_indices),
+            len(remaining.controlled_indices),
+        )
+        return
+    limit = int(config.get("slurm", {}).get("tuning_wave_task_limit", 90))
+    wave = select_wave(fresh, _squeue_count(), limit)
+    record_attempted(base["data"], "base-natural", list(wave.natural_indices))
+    record_attempted(base["data"], "base-controlled", list(wave.controlled_indices))
+    submit_wave(config, os.path.abspath(args.config), _wave_jobs(config, wave), args)
 
 
 def _submit_terminal(config: dict[str, Any], config_path: str) -> None:

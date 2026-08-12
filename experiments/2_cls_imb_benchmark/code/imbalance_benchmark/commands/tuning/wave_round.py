@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from dataclasses import replace
 import os
 from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.commands.tuning import _frozen_shard_context
-from imbalance_benchmark.commands.tuning.wave_support import next_stalled, submit_wave
+from imbalance_benchmark.commands.tuning.wave_support import (
+    record_attempted,
+    submit_wave,
+    unattempted,
+)
 from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
 from imbalance_benchmark.hydra.job_resources import build_job
 from imbalance_benchmark.hydra.queue import DEFAULT_QUEUE_CAP, _squeue_count
@@ -27,6 +32,8 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     resolve_round_shard_spec,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def run_round_wave(
     config: dict[str, Any], base: dict[str, Path], args: argparse.Namespace
@@ -36,14 +43,14 @@ def run_round_wave(
     if not pending:
         _submit_decide(config, os.path.abspath(args.config), args)
         return
-    stalled = _next_stalled(base["data"], pending, args.stalled_waves)
-    _submit_wave(
-        config,
-        os.path.abspath(args.config),
-        _limited(job, pending, config),
-        args,
-        stalled,
-    )
+    scope = f"round-{args.phase}-{args.condition}-{args.round}"
+    fresh = unattempted(base["data"], scope, pending)
+    if not fresh:
+        _warn_stalled(scope, len(pending))
+        return
+    limited = _limited(job, fresh, config)
+    record_attempted(base["data"], scope, list(limited.array_indices))
+    _submit_wave(config, os.path.abspath(args.config), limited, args)
 
 
 def run_group_wave(
@@ -63,13 +70,23 @@ def run_group_wave(
     if not pending:
         _submit_group_decides(config, os.path.abspath(args.config))
         return
-    stalled = _next_stalled(base["data"], pending, args.stalled_waves)
-    _submit_wave(
-        config,
-        os.path.abspath(args.config),
-        _limited(job, pending, config),
-        args,
-        stalled,
+    scope = "group-dependent"
+    fresh = unattempted(base["data"], scope, pending)
+    if not fresh:
+        _warn_stalled(scope, len(pending))
+        return
+    limited = _limited(job, fresh, config)
+    record_attempted(base["data"], scope, list(limited.array_indices))
+    _submit_wave(config, os.path.abspath(args.config), limited, args)
+
+
+def _warn_stalled(scope: str, missing: int) -> None:
+    logger.warning(
+        "tune-wave %s: %d shard(s) still missing after a prior attempt; not "
+        "retrying. Investigate the failed tasks, then resume with: "
+        "submit --resume-tuning",
+        scope,
+        missing,
     )
 
 
@@ -189,18 +206,13 @@ def _limited(job: SlurmJob, pending: list[int], config: dict[str, Any]) -> Slurm
     return replace(job, array_indices=tuple(pending[:available]))
 
 
-def _next_stalled(data: Path, pending: list[int], current: int) -> int:
-    return next_stalled(data, pending, current)
-
-
 def _submit_wave(
     config: dict[str, Any],
     config_path: str,
     job: SlurmJob,
     args: argparse.Namespace,
-    stalled: int,
 ) -> None:
-    submit_wave(config, config_path, [job], args, stalled)
+    submit_wave(config, config_path, [job], args)
 
 
 def _submit_decide(
