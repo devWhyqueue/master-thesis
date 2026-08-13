@@ -15,8 +15,10 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     validate_shard_payload,
 )
+from imbalance_benchmark.modeling.workflows.tuning import tuning_shards
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
+    _fit_streamed_payload,
     _observation_keys,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
@@ -181,6 +183,37 @@ def test_resume_accepts_only_a_complete_matching_observation_set() -> None:
     payload["observation_keys"] = [keys[0], keys[0]]
     with pytest.raises(RuntimeError, match="missing or duplicated"):
         validate_shard_payload(payload, ["a", "b", "c"], spec)
+
+
+def test_fit_streamed_payload_routes_post_hoc_through_the_selection_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: _fit_streamed_payload had no post_hoc_logit_adjustment
+    special case, so it fell into the regular per-step training loop and
+    crashed with KeyError('lr') reading a config post-hoc never has."""
+    scope = SimpleNamespace(cost_records=[{"n": 1}])
+    captured: list[object] = []
+
+    def fake_post_hoc(scopes, seeds, stage_one_config):
+        captured.append((scopes, seeds, stage_one_config))
+        return {"candidate_index": 0, "selection": {"tau": 1.0}, "cost_records": [{"n": 1}]}
+
+    monkeypatch.setattr(tuning_shards, "_post_hoc_payload", fake_post_hoc)
+    spec = ShardSpec("balanced", "post_hoc_logit_adjustment", 0, "dependent")
+
+    result = _fit_streamed_payload(spec, lambda: iter([scope]), [11, 22], {"lr": 1e-3})
+
+    assert result == {"candidate_index": 0, "selection": {"tau": 1.0}, "cost_records": [{"n": 1}]}
+    assert captured == [([scope], [11, 22], {"lr": 1e-3})]
+
+
+def test_fit_streamed_payload_rejects_post_hoc_with_an_observation_index() -> None:
+    spec = ShardSpec(
+        "balanced", "post_hoc_logit_adjustment", 0, "dependent", observation_index=0
+    )
+
+    with pytest.raises(RuntimeError, match="reduce all observations"):
+        _fit_streamed_payload(spec, lambda: iter([]), [11], {"lr": 1e-3})
 
 
 def test_parallel_cost_sums_exposure_and_accelerator_time() -> None:

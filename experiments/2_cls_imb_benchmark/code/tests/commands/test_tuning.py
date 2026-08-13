@@ -209,3 +209,48 @@ def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
     assert len({id(s.cost_records) for s in second}) == 1
     assert first[0].cost_records is not second[0].cost_records
     assert first[0].cost_records == [] and second[0].cost_records == []
+
+
+def test_run_scope_local_shard_threads_selected_ce_for_dependent_phase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: _run_scope_local_shard always passed stage_one_config=None,
+    so the dependent-controlled group (crt, post_hoc_logit_adjustment) crashed
+    with KeyError('stage_one_config')/KeyError('lr') even though selected_ce's
+    CE selection was already on disk and available."""
+    monkeypatch.setattr(tuning_shard, "condition_is_reusable", lambda *_: False)
+    monkeypatch.setattr(tuning_shard, "load_shard_scope", lambda *_a, **_k: object())
+    monkeypatch.setattr(tuning_shard, "reset_feature_bank", lambda: None)
+    monkeypatch.setattr(tuning_shard, "selected_ce", lambda *_a: {"lr": 1e-3})
+    captured: list[Any] = []
+
+    def fake_run_candidate_shard(
+        spec, scopes, seeds, fingerprint, output_root, stage, scope_stream=None
+    ):
+        del spec, scopes, seeds, fingerprint, output_root, scope_stream
+        captured.append(stage)
+
+    monkeypatch.setattr(tuning_shard, "run_candidate_shard", fake_run_candidate_shard)
+    freeze = {
+        "seed_roles": {"tuning_initialization_0": 1, "tuning_initialization_1": 2},
+        "tail_assignments": {"native": []},
+        "runtime_config": {"dataset": {"regime": "patch"}},
+    }
+    base = {"data": None}
+
+    tuning_shard._run_scope_local_shard(
+        argparse.Namespace(),
+        base,
+        freeze,
+        ["fp"],
+        tuning_shard.ShardSpec("balanced", "crt", 0, "dependent"),
+    )
+    tuning_shard._run_scope_local_shard(
+        argparse.Namespace(),
+        base,
+        freeze,
+        ["fp"],
+        tuning_shard.ShardSpec("balanced", "ce", 0, "base"),
+    )
+
+    assert captured == [{"lr": 1e-3}, None]

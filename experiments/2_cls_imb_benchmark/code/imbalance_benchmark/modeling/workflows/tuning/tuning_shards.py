@@ -156,6 +156,10 @@ def _fit_streamed_payload(
     stage_one_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Run one feature-bank scope at a time in canonical observation order."""
+    if spec.method == "post_hoc_logit_adjustment":
+        if spec.observation_index is not None:
+            raise RuntimeError("Post-hoc tuning must reduce all observations together")
+        return _post_hoc_payload(list(scope_provider()), seeds, stage_one_config)
     metrics: list[dict[str, Any]] = []
     cost_records: list[dict[str, int]] = []
     config: dict[str, Any] | None = None
@@ -188,6 +192,19 @@ def _fit_streamed_payload(
     }
 
 
+def _post_hoc_payload(
+    scopes: list[TuningScope], seeds: list[int], stage_one_config: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Select one post-hoc strength; shared by the materialized and streamed fits."""
+    if stage_one_config is None:
+        raise RuntimeError("Post-hoc tuning requires the selected CE configuration")
+    return {
+        "candidate_index": 0,
+        "selection": _select_post_hoc(stage_one_config, scopes, seeds),
+        "cost_records": scopes[0].cost_records,
+    }
+
+
 def _fit_payload(
     spec: ShardSpec,
     scopes: list[TuningScope],
@@ -197,14 +214,7 @@ def _fit_payload(
     if spec.method == "post_hoc_logit_adjustment":
         if spec.observation_index is not None:
             raise RuntimeError("Post-hoc tuning must reduce all observations together")
-        if stage_one_config is None:
-            raise RuntimeError("Post-hoc tuning requires the selected CE configuration")
-        selected = _select_post_hoc(stage_one_config, scopes, seeds)
-        return {
-            "candidate_index": 0,
-            "selection": selected,
-            "cost_records": scopes[0].cost_records,
-        }
+        return _post_hoc_payload(scopes, seeds, stage_one_config)
     config = scopes[0].regime.method_grids[spec.method][spec.candidate_index]
     metrics = []
     for scope in scopes:

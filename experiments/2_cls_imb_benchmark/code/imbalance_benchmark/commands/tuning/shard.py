@@ -165,7 +165,9 @@ def _run_scope_local_shard(
         _tuning_seeds(freeze),
         fingerprint,
         base["data"],
-        None,
+        selected_ce(base["data"], spec.condition)
+        if spec.phase == "dependent"
+        else None,
         scope_stream=(_scopes, len(descriptors), descriptors),
     )
 
