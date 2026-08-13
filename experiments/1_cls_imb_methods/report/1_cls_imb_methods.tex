@@ -10,6 +10,10 @@
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
 \usepackage{tikz}
+\usepackage{colortbl}
+\newcommand{\regimehead}[2]{%
+  \noalign{\vskip 2pt}%
+  \rowcolor{gray!18}\multicolumn{3}{@{}l@{}}{\rule{0pt}{2.4ex}\textbf{#1}\enspace\textnormal{\itshape#2}}\\[1pt]}
 \usetikzlibrary{arrows.meta,positioning}
 \sisetup{group-separator={,}, group-minimum-digits=4}
 
@@ -179,22 +183,25 @@ Signals are not to be confused with side effects. A method is treated as aware o
     \toprule
     Method & Mitigation signal & Intervention \\
     \midrule
+    \regimehead{Both regimes}{patch and WSI-bag}
     CE, MIL CE & None; observed distribution used as given & None (reference) \\
     Balanced sampling & Prevalence, through $n_{y_i}^{-s}$ & Minibatch composition \\
     Weighted CE & Prevalence, through $n_c^{-s}$ & Per-example loss weight \\
     Logit adjustment & Prevalence, through $\widehat{\pi}_c$ explicitly & Logit and prior correction \\
     cRT & Prevalence, through balanced stage-two exposure & Classifier refit on a frozen representation \\
     Focal loss & Difficulty, through the per-example confidence $p_y$ & Per-example loss weight \\
+    \regimehead{Patch regime}{only}
     CFAL & Evidence, through the effective number $E_c$ of class $c$; difficulty, through $(1-a_{i,y_i})^{\gamma}$; shapes coverage without measuring it & Prototype head and margin objective \\
     CE + soft F1 & Prevalence, through balanced sampling and equal classwise weight in the macro term & Sampler and auxiliary objective \\
     CE + soft MCC & Prevalence, through balanced sampling and the batch marginals $t_c,p_c$ & Sampler and auxiliary objective \\
     OKO & Prevalence, through uniform pair-class sampling & Set construction and set-aggregated loss \\
+    \regimehead{WSI-bag regime}{only}
     RankMix-inspired & Difficulty, through teacher instance ranking; shapes coverage without measuring it & Bag-level feature augmentation \\
     SC-MIL & Label structure only; prevalence enters through class-aware batching; shapes coverage without measuring it & Contrastive term and CE curriculum \\
     MDE-inspired & Prevalence, through paired natural and balanced loaders & Dual experts and consistency term \\
     \bottomrule
   \end{tabularx}
-  \caption{Each tested method read along both axes: the signal it consults to identify mitigation need, and the mechanism it changes to act on it. Methods sharing an intervention family can consult different signals, and methods sharing a signal can intervene at different levels. Method-specific symbols name the mechanism responsible and are defined with the method in Section~\ref{sec:methods}.}
+  \caption{Each tested method read along both axes: the signal it consults to identify mitigation need, and the mechanism it changes to act on it, grouped by the prediction regime the method applies to. Methods sharing an intervention family can consult different signals, and methods sharing a signal can intervene at different levels. Method-specific symbols name the mechanism responsible and are defined with the method in Section~\ref{sec:methods}.}
   \label{tab:signal-intervention}
 \end{table}
 
