@@ -280,6 +280,28 @@ def test_combined_tuning_scope_passes_the_frozen_class_order(
     assert observed == [locked]
 
 
+def test_combined_scopes_assigns_distinct_scope_index_per_split(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Each scope must get a unique scope_index; a stale default of 0 for every
+    scope makes _validate_observations see duplicate (scope_index, seed_index)
+    pairs and reject an otherwise-complete round-shard payload."""
+    locked = list(BRACS_LABELS)
+    regime = Regime(
+        torch.device("cpu"), {}, len(locked), False, locked_class_names=locked
+    )
+    monkeypatch.setattr(
+        "imbalance_benchmark.modeling.workflows.tuning.tuning_schedule.load_training_dataset",
+        lambda *_, **__: object(),
+    )
+    raw_scopes = [({"data": tmp_path}, regime, object()) for _ in range(3)]
+
+    scopes = combined_scopes(raw_scopes, "moderate", ("native",))
+
+    assert [scope.scope_index for scope in scopes] == [0, 1, 2]
+    assert [scope.split_index for scope in scopes] == [0, 1, 2]
+
+
 def test_roster_for_regime_matches_report_table():
     patch = roster_for_regime(False)
     wsi = roster_for_regime(True)

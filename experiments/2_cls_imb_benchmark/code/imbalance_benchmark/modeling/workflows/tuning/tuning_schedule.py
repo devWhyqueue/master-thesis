@@ -31,6 +31,7 @@ def combined_scopes(
 ) -> list[TuningScope]:
     """Build canonical assignment-then-split tuning observations."""
     records = cost_records if cost_records is not None else []
+    width = len(raw_scopes)
     return [
         TuningScope(
             regime,
@@ -46,8 +47,9 @@ def combined_scopes(
             ),
             assignment,
             split_index,
+            assignment_index * width + split_index,
         )
-        for assignment in assignments
+        for assignment_index, assignment in enumerate(assignments)
         for split_index, (paths, regime, loader) in enumerate(raw_scopes)
     ]
 
