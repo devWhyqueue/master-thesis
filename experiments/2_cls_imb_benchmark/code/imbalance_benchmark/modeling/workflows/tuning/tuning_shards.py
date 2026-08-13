@@ -159,7 +159,7 @@ def _fit_streamed_payload(
     if spec.method == "post_hoc_logit_adjustment":
         if spec.observation_index is not None:
             raise RuntimeError("Post-hoc tuning must reduce all observations together")
-        return _post_hoc_payload(list(scope_provider()), seeds, stage_one_config)
+        return _post_hoc_payload(scope_provider, seeds, stage_one_config)
     metrics: list[dict[str, Any]] = []
     cost_records: list[dict[str, int]] = []
     config: dict[str, Any] | None = None
@@ -171,17 +171,7 @@ def _fit_streamed_payload(
             if spec.observation_index is not None and index != spec.observation_index:
                 continue
             _, result = _evaluate(spec.method, config, scope, seed, stage_one_config)
-            metrics.append(
-                {
-                    "scope_index": scope.scope_index,
-                    "seed_index": seed_index,
-                    "seed": seed,
-                    **{
-                        name: float(result[name])
-                        for name in ("balanced_accuracy", "macro_f1", "nll")
-                    },
-                }
-            )
+            metrics.append(_observation_metric(scope, seed_index, seed, result))
     if config is None:
         raise RuntimeError("Tuning shard has no scopes")
     return {
@@ -193,15 +183,26 @@ def _fit_streamed_payload(
 
 
 def _post_hoc_payload(
-    scopes: list[TuningScope], seeds: list[int], stage_one_config: dict[str, Any] | None
+    scope_source: list[TuningScope] | Callable[[], Iterator[TuningScope]],
+    seeds: list[int],
+    stage_one_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Select one post-hoc strength; shared by the materialized and streamed fits."""
+    """Select one post-hoc strength; a callable source streams scopes live
+    (never materialize) rather than an already bank-resident base-phase list."""
     if stage_one_config is None:
         raise RuntimeError("Post-hoc tuning requires the selected CE configuration")
+    cost_records: list[dict[str, int]] = []
+
+    def _tagged() -> Iterator[TuningScope]:
+        source = scope_source() if callable(scope_source) else scope_source
+        for scope in source:
+            scope.cost_records = cost_records
+            yield scope
+
     return {
         "candidate_index": 0,
-        "selection": _select_post_hoc(stage_one_config, scopes, seeds),
-        "cost_records": scopes[0].cost_records,
+        "selection": _select_post_hoc(stage_one_config, _tagged(), seeds),
+        "cost_records": cost_records,
     }
 
 
@@ -226,20 +227,24 @@ def _fit_payload(
             ):
                 continue
             _, result = _evaluate(spec.method, config, scope, seed, stage_one_config)
-            metrics.append(
-                {
-                    "scope_index": scope.scope_index,
-                    "seed_index": seed_index,
-                    "seed": seed,
-                    **{
-                        name: float(result[name])
-                        for name in ("balanced_accuracy", "macro_f1", "nll")
-                    },
-                }
-            )
+            metrics.append(_observation_metric(scope, seed_index, seed, result))
     return {
         "candidate_index": spec.candidate_index,
         "config": config,
         "metrics": metrics,
         "cost_records": scopes[0].cost_records,
+    }
+
+
+def _observation_metric(
+    scope: TuningScope, seed_index: int, seed: int, result: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "scope_index": scope.scope_index,
+        "seed_index": seed_index,
+        "seed": seed,
+        **{
+            name: float(result[name])
+            for name in ("balanced_accuracy", "macro_f1", "nll")
+        },
     }

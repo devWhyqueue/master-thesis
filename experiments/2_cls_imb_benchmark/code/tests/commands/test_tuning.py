@@ -98,6 +98,53 @@ def test_select_post_hoc_persists_every_taus_averaged_metrics(
         "2.0": {"balanced_accuracy": 0.4, "macro_f1": 0.3, "nll": 1.2},
     }
 
+
+def test_select_post_hoc_evaluates_a_live_generator_scope_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: _select_post_hoc indexed scopes[0] to resolve the tau grid,
+    which crashes a generator (no __getitem__). Streamed scopes also reset
+    their feature bank in a finally block once the generator resumes past
+    their yield, so each scope must be fully evaluated before the next one
+    is pulled -- materializing the generator into a list first (draining it
+    up front) would evaluate every scope against an already-reset bank."""
+    regime = Regime(
+        torch.device("cpu"),
+        {},
+        2,
+        False,
+        method_grids={"post_hoc_logit_adjustment": [{"parameter": 1.0}]},
+    )
+    train_ds = type("DS", (), {"get_int_targets": lambda self: [0, 1]})()
+    fake_model = type("Model", (), {"load_state_dict": lambda self, state: None})()
+    bank = {"live": False}
+    observed_live: list[bool] = []
+    monkeypatch.setattr(tuning_aggregate, "_evaluate", lambda *a, **k: ({}, {}))
+    monkeypatch.setattr(
+        tuning_aggregate, "build_training_ctx", lambda *a, **k: {"model": fake_model}
+    )
+
+    def fake_run_evaluation(*args: Any, **kwargs: Any) -> dict[str, float]:
+        observed_live.append(bank["live"])
+        return {"balanced_accuracy": 0.5, "macro_f1": 0.5, "nll": 0.5}
+
+    monkeypatch.setattr(tuning_aggregate, "run_evaluation", fake_run_evaluation)
+
+    def scopes() -> Any:
+        for _ in range(3):
+            bank["live"] = True
+            try:
+                yield TuningScope(regime, object(), train_ds)
+            finally:
+                bank["live"] = False
+
+    result = _select_post_hoc({}, scopes(), [7])
+
+    assert result["parameter"] == 1.0
+    # If the generator had been drained into a list first, every bank would
+    # already read False by the time evaluation ran.
+    assert observed_live == [True, True, True]
+
 def test_tuning_cost_summarizes_parameter_counts_and_effective_passes() -> None:
     """Validation-search cost must expose its model size and realized data passes."""
     cost = summarize_tuning_cost(

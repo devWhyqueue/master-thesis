@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -20,6 +21,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
     _fit_streamed_payload,
     _observation_keys,
+    _post_hoc_payload,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
@@ -191,20 +193,67 @@ def test_fit_streamed_payload_routes_post_hoc_through_the_selection_helper(
     """Regression: _fit_streamed_payload had no post_hoc_logit_adjustment
     special case, so it fell into the regular per-step training loop and
     crashed with KeyError('lr') reading a config post-hoc never has."""
-    scope = SimpleNamespace(cost_records=[{"n": 1}])
     captured: list[object] = []
 
-    def fake_post_hoc(scopes, seeds, stage_one_config):
-        captured.append((scopes, seeds, stage_one_config))
-        return {"candidate_index": 0, "selection": {"tau": 1.0}, "cost_records": [{"n": 1}]}
+    def fake_post_hoc(scope_source, seeds, stage_one_config):
+        captured.append((scope_source, seeds, stage_one_config))
+        return {"candidate_index": 0, "selection": {"tau": 1.0}, "cost_records": []}
 
     monkeypatch.setattr(tuning_shards, "_post_hoc_payload", fake_post_hoc)
     spec = ShardSpec("balanced", "post_hoc_logit_adjustment", 0, "dependent")
 
-    result = _fit_streamed_payload(spec, lambda: iter([scope]), [11, 22], {"lr": 1e-3})
+    def provider() -> Any:
+        return iter([])
 
-    assert result == {"candidate_index": 0, "selection": {"tau": 1.0}, "cost_records": [{"n": 1}]}
-    assert captured == [([scope], [11, 22], {"lr": 1e-3})]
+    result = _fit_streamed_payload(spec, provider, [11, 22], {"lr": 1e-3})
+
+    assert result == {"candidate_index": 0, "selection": {"tau": 1.0}, "cost_records": []}
+    assert captured == [(provider, [11, 22], {"lr": 1e-3})]
+
+
+def test_post_hoc_payload_tags_every_streamed_scope_with_one_shared_cost_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each streamed scope arrives with its own fresh cost_records (unlike
+    combined_scopes' shared list for base-phase scopes), and its bank resets
+    once the generator resumes past its yield, so a callable source must be
+    evaluated live (never materialized into a list) with every scope tagged
+    onto one shared list before _select_post_hoc runs, or cost tracking and
+    bank-liveness both silently break."""
+    scopes = [SimpleNamespace(cost_records=[f"stale-{i}"]) for i in range(3)]
+    seen: list[list[str]] = []
+
+    def fake_select_post_hoc(stage_one_config, streamed_scopes, seeds):
+        for scope in streamed_scopes:
+            seen.append(scope.cost_records)
+        return {"parameter": 1.0}
+
+    monkeypatch.setattr(tuning_shards, "_select_post_hoc", fake_select_post_hoc)
+
+    result = _post_hoc_payload(lambda: iter(scopes), [11], {"lr": 1e-3})
+
+    assert result["selection"] == {"parameter": 1.0}
+    assert len({id(records) for records in seen}) == 1
+    assert result["cost_records"] is seen[0]
+
+
+def test_post_hoc_payload_accepts_an_already_materialized_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The base-phase call site passes a plain list, not a callable."""
+    scope = SimpleNamespace(cost_records=[])
+    monkeypatch.setattr(
+        tuning_shards, "_select_post_hoc", lambda *a: {"parameter": 1.0}
+    )
+
+    result = _post_hoc_payload([scope], [11], {"lr": 1e-3})
+
+    assert result["selection"] == {"parameter": 1.0}
+
+
+def test_post_hoc_payload_requires_a_selected_ce_config() -> None:
+    with pytest.raises(RuntimeError, match="selected CE configuration"):
+        _post_hoc_payload(lambda: iter([]), [11], None)
 
 
 def test_fit_streamed_payload_rejects_post_hoc_with_an_observation_index() -> None:

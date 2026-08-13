@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 import json
 from typing import Any
@@ -149,22 +150,23 @@ def _tau_metrics_summary(metrics: list[tuple[float, float, float]]) -> dict[str,
 
 
 def _select_post_hoc(
-    ce_config: dict[str, Any], scopes: list[TuningScope], seeds: list[int]
+    ce_config: dict[str, Any], scopes: Iterable[TuningScope], seeds: list[int]
 ) -> dict[str, Any]:
     """Select one post-hoc strength from all selected CE checkpoints.
 
-    Every tau's averaged metrics are persisted alongside the selected one,
-    not just the winner, so the selection is reproducible from the signed
-    tuning selection alone without rerunning evaluation.
+    Every tau's metrics are persisted, not just the winner's, for signed
+    reproducibility. ``scopes`` may be a live generator, so the tau grid is
+    resolved lazily on the first scope rather than indexing ``scopes[0]``.
     """
-    taus = [
-        cfg["parameter"]
-        for cfg in _frozen_grid(scopes[0].regime, "post_hoc_logit_adjustment")
-    ]
-    observations: dict[float, list[tuple[float, float, float]]] = {
-        tau: [] for tau in taus
-    }
+    observations: dict[float, list[tuple[float, float, float]]] | None = None
+    taus: list[float] = []
     for scope in scopes:
+        if observations is None:
+            taus = [
+                cfg["parameter"]
+                for cfg in _frozen_grid(scope.regime, "post_hoc_logit_adjustment")
+            ]
+            observations = {tau: [] for tau in taus}
         priors = class_priors(
             scope.train_ds.get_int_targets(),
             scope.regime.n_classes,
@@ -195,6 +197,8 @@ def _select_post_hoc(
                 observations[tau].append(
                     (result["balanced_accuracy"], result["macro_f1"], result["nll"])
                 )
+    if observations is None:
+        raise RuntimeError("Post-hoc tuning has no scopes")
     best_tau = max(taus, key=lambda tau: _selection_key(observations[tau]))
     return {
         "parameter": best_tau,
