@@ -127,7 +127,7 @@ This logic also explains the order of the report. Section~\ref{sec:data} establi
 
 \section{Prediction Tasks and Evidence Units}
 \label{sec:data}
-Patch counts and independent evidence are not interchangeable. Patch classification predicts a label for one directly labelled image crop. WSI-level MIL predicts one label for a complete slide represented as a bag of patch embeddings; its patches are instances, not independently labelled examples. The terms \emph{patch} and \emph{tile} both denote a $256\times256$ crop, but \emph{patch} is used throughout.
+The two prediction regimes differ in what counts as a labelled example. Patch classification predicts a label for one directly labelled image crop. WSI-level MIL predicts one label for a complete slide represented as a bag of patch embeddings; its patches are instances, not independently labelled examples. The terms \emph{patch} and \emph{tile} both denote a $256\times256$ crop, but \emph{patch} is used throughout.
 
 Table~\ref{tab:datasets} defines the prediction example, target, and split unit in each dataset--regime. A \emph{split unit} is the patient or participant where available and the biopsy or WSI otherwise. It is assigned to exactly one partition before any imbalance is constructed, and all slides from that unit follow the assignment.
 
@@ -213,7 +213,7 @@ Split-unit-disjoint training, natural-validation, and natural-test partitions ar
 The validation cohort also retains its natural distribution. It is used for hyperparameter and checkpoint selection but never resized to resemble a training condition. Training, validation, and test manifests are versioned with split-unit identifiers, class counts, construction seed, and content hashes before model fitting.
 
 \subsection{Independent support and feasibility}
-A patch is a training example, but thousands of patches from one patient do not constitute thousands of independent observations. \emph{Independent support} therefore means the distinct split units and slides underlying a class. Patch conditions draw from fixed per-class patient and slide pools, whereas MIL imbalance necessarily changes the number of labelled slides and thus independent-unit diversity.
+\emph{Independent support} is the distinct split units and slides underlying a class, in the sense defined in the companion methods report \citep{queisler2026imbalanceMethods}. Patch conditions draw from fixed per-class patient and slide pools, whereas MIL imbalance necessarily changes the number of labelled slides and thus independent-unit diversity.
 
 A \emph{support pilot} determines how little independent tail evidence remains defensible before definitive comparisons are built. The definitive floor is the larger of that empirical level and the design floor implied by the contribution caps (Table~\ref{tab:locked}). Conditions that cannot satisfy these floors are weakened or excluded rather than rescued by changing validation or test data.
 
@@ -372,7 +372,7 @@ Only quantities available without using test outcomes are eligible as predictors
   \label{tab:rq3-predictors}
 \end{table}
 
-Intrinsic separability asks whether frozen Virchow2 features distinguish classes in a common balanced reference. Condition-specific learnability asks what remains learnable from the exact controlled manifest. Both are measured on natural validation data without test outcomes. Minimum independent support and a patch-only redundancy-adjusted effective support are sensitivity predictors rather than replacements for patient or slide counts.
+Intrinsic separability asks whether frozen Virchow2 features distinguish classes in a common balanced reference. Condition-specific learnability asks what remains learnable from the exact controlled manifest. Both are measured on natural validation data without test outcomes. Minimum independent support and a patch-only redundancy-adjusted effective support are sensitivity predictors rather than replacements for patient or slide counts. Together these predictors measure the difficulty and independent-evidence dimensions of the signal taxonomy defined in the companion methods report \citep{queisler2026imbalanceMethods}, which the prespecified method roster itself covers only sparsely; RQ3 is therefore where those dimensions are examined directly rather than through a mitigation method.
 
 One deliberately small model is fitted for each outcome. Every primary model contains only log achieved imbalance ratio and support--difficulty alignment, and each remaining predictor enters a separate one-predictor sensitivity model rather than being added to that primary model. Weak Gaussian priors and leave-one-group-out checks stabilize interpretation without claiming predictive generalization. Appendix~\ref{app:rq3} specifies probes, cross-fitting, ICC, effective support, model forms, MAP fitting, and sensitivity analyses.
 
@@ -715,23 +715,9 @@ This appendix fixes diagnostic feature construction and deliberately small assoc
 The two diagnostics differ only in their reference set: intrinsic separability uses one fixed balanced reference subset per dataset, regime, and split, whereas condition-specific learnability uses the exact balanced or imbalanced training manifest of the condition being explained. Both are evaluated on the unchanged natural-validation cohort. Balanced $k$-nearest-neighbour (kNN) macro recall labels each validation embedding from its closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on the frozen reference embeddings; its macro recall is the primary separability or learnability summary. Per-class nearest-neighbour error is reported descriptively to show which classes overlap. None of these diagnostics uses test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of a slide's eligible instances, avoiding a learned attention summary from the model being explained.
 
 \paragraph{Sensitivity to correlated patches.}
-Unique split-unit and slide counts remain the primary support measures. As a secondary sensitivity analysis, within-case redundancy is summarized by the intraclass correlation (ICC) of a cross-fitted class margin: an ICC near zero means that patches from the same case are no more alike than patches from different cases, and an ICC near one indicates strong redundancy.
+Unique split-unit and slide counts remain the primary support measures. As a secondary sensitivity analysis, within-case redundancy is discounted through the effective support $N_{\mathrm{eff},c}$ defined in the companion methods report \citep{queisler2026imbalanceMethods}, whose intraclass correlation (ICC) is computed here over split-unit or slide clusters within a class.
 
-For class $c$, let $G_c$ be the number of split-unit or slide clusters, $m_{gc}$ their sizes, and $N_c=\sum_gm_{gc}$. With between-cluster and within-cluster mean squares $\mathrm{MS}_{B,c}$ and $\mathrm{MS}_{W,c}$, the unequal-cluster-size correction and ICC are
-\begin{equation}
-  m_{0,c}=\frac{N_c-\sum_{g=1}^{G_c}m_{gc}^2/N_c}{G_c-1},
-  \qquad
-  \operatorname{ICC}_c=
-  \frac{\mathrm{MS}_{B,c}-\mathrm{MS}_{W,c}}
-  {\mathrm{MS}_{B,c}+(m_{0,c}-1)\mathrm{MS}_{W,c}}.
-  \label{eq:icc}
-\end{equation}
-\noindent The estimate is clipped to $[0,1]$. The corresponding effective sample size is
-\begin{equation}
-  N_{\mathrm{eff},c}=\frac{N_c}{1+(\overline m_c-1)\operatorname{ICC}_c},
-  \label{eq:neff}
-\end{equation}
-\noindent where $\overline m_c$ is the arithmetic mean cluster size. The scalar margin is the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}: each observation is scored only by a probe trained without it. Equations~\eqref{eq:icc}--\eqref{eq:neff} provide a patch-only sensitivity measure, not a replacement for independent-unit counts. Slide count is used directly for WSI targets, with patient count also examined when patients contribute multiple slides.
+Two choices complete that definition for this benchmark. The clustered score is a class margin: the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}, so each observation is scored only by a probe trained without it, and the resulting ICC estimate is clipped to $[0,1]$. Effective support is a patch-only sensitivity measure and not a replacement for independent-unit counts: slide count is used directly for WSI targets, with patient count also examined when patients contribute multiple slides.
 
 \paragraph{Three deliberately small association models.}
 One model is fitted for each of the three RQ3 outcomes. The occurrence model handles the yes/no gate result; the magnitude and recovery models handle continuous outcomes. Every primary model contains exactly two predictors: the log achieved imbalance ratio and support--difficulty alignment $A$. The magnitude model also uses each deficit's bootstrap standard error so that a noisy estimated deficit is not treated as an exact observation.

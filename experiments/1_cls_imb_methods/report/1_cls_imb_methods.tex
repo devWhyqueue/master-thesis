@@ -22,7 +22,7 @@ Methods for Patch Classification and WSI-Level MIL}
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report is the authoritative method reference for the class-imbalance benchmark. It defines sampling, loss, prior-correction, decoupled-classifier, set-learning, feature-mixing, contrastive-MIL, and dual-expert interventions in the input form each consumes, with cross-entropy as the no-mitigation reference. It also distinguishes faithful source implementations from deliberately adapted variants and states the output semantics and assumptions needed to interpret each intervention.
+\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report is the authoritative method reference for the class-imbalance benchmark. It defines sampling, loss, prior-correction, decoupled-classifier, set-learning, feature-mixing, contrastive-MIL, and dual-expert interventions in the input form each consumes, with cross-entropy as the no-mitigation reference. The methods are characterized along two orthogonal axes: the signal that identifies a class or example as needing mitigation---prevalence, independent evidence, difficulty, or coverage---and the level at which the intervention acts. Read along the first axis, the roster is concentrated on prevalence, which locates the mechanisms the benchmark can separate and those it cannot. The report also distinguishes faithful source implementations from deliberately adapted variants and states the output semantics and assumptions needed to interpret each intervention.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -34,16 +34,26 @@ Class imbalance changes what a pathology classifier is rewarded for learning. Wh
 
 Imbalance methods often assume a specific prediction unit. Image-level methods use labeled images, image embeddings, or directly generated image samples, whereas WSI-level methods use weak labels over bags of instances together with attention, instance ranking, or bag-level representation learning. Each method family is therefore described in the input form it is designed to consume. The broader computational-pathology pipeline these regimes sit in---whole-slide imaging, patching into tiles, and weakly supervised multiple-instance learning over frozen foundation-model features---is introduced in the companion datasets report \citep{queisler2026datasets}.
 
-This report defines the class-imbalance mitigation methods themselves, organized by the level at which they intervene and stated in enough mathematical detail to make the imbalance mechanism explicit. The aim is not to introduce a new mitigation method, but to fix the method definitions, assumptions, and fidelity qualifications used when instantiating these methods on specific pathology datasets. The companion experimental protocol defines the controlled datasets, validation grids, evaluation endpoints, calibration procedure, aggregation units, and statistical analysis.
+This report defines the class-imbalance mitigation methods themselves, organized by the level at which they intervene and stated in enough mathematical detail to make the imbalance mechanism explicit. Established methods differ not only in that intervention level but also in the signal they use to infer which observations require mitigation, and most of them use class frequency for that purpose. A low class count, however, conflates several distinct shortages: a small share relative to the other classes, a small absolute amount of independent evidence, intrinsic difficulty under the available representation, and poor coverage of the class's own variation. Section~\ref{sec:taxonomy} therefore makes both readings of the roster explicit, so that frequency is treated as a proxy for mitigation need rather than as its established cause. The aim is not to introduce a new mitigation method, but to fix the method definitions, assumptions, and fidelity qualifications used when instantiating these methods on specific pathology datasets. The companion experimental protocol defines the controlled datasets, validation grids, evaluation endpoints, calibration procedure, aggregation units, and statistical analysis.
 
 \paragraph{Prediction regimes.}
 Two prediction regimes recur throughout the benchmarks. In the \emph{patch} regime, each labeled crop is an independent example: a frozen foundation-model encoder such as Virchow2 embeds the patch once, and a lightweight classifier head is trained on the resulting embedding \citep{zimmermann2024virchow2,vorontsov2024virchow}. In the \emph{WSI-bag} regime, a slide is represented as a bag of frozen patch-feature instances that share one weak slide-level label, and an attention-based MIL head aggregates the instances into a slide prediction. Both regimes consume embeddings from the same pathology foundation-model family but differ in supervision unit. Freezing the encoder isolates imbalance interventions from end-to-end backbone learning. Each non-baseline method exposes one imbalance-specific control; the concrete validation grids are reported in the companion experimental protocol.
 
-\section{Methods}
-\label{sec:methods}
-The methods are organized by the level at which they intervene in the imbalanced learning problem. Cross-entropy (CE) is treated as the no-mitigation reference condition: it uses the observed training distribution as given and does not rebalance samples, labels, costs, or representations. The remaining methods are grouped as data-level sampling and augmentation, algorithm-level losses and prior corrections, hybrid sampling--loss methods, and representation or architecture-level methods \citep{saini2023tacklingClass,zhang2023deepLong}.
+\section{Taxonomy}
+\label{sec:taxonomy}
+Two questions organize the benchmarked methods. The first asks which signal a method consults to infer \emph{that} a class or an example needs help; the second asks at which level of the training pipeline it acts on that inference. The questions are independent, and neither answers the other: class-weighted CE gives example $i$ a weight $w_i=f(n_{y_i})$ that depends only on how many training examples share its class, while focal loss gives it a weight $w_i=f(p_{y_i})$ that depends only on how confidently the model already predicts its label, so two methods that are both loss reweighting can rest on entirely different assumptions about what causes tail failure. This section fixes the notation used throughout and then defines both axes.
 
-The comparison is regime-specific. Patch methods consume frozen Virchow2 embeddings of controlled patches and optimize one shared MLP classifier head; CE-based patch methods use the same linear output layer, while CFAL replaces that layer with class prototypes and affinity-based prediction. WSI-bag methods consume complete eligible frozen-feature bags and optimize one shared attention-MIL head. Both regimes therefore rely on the same pathology foundation-model family, but they differ in supervision unit: one embedding per selected patch versus aggregation over every eligible instance on a slide, without bag truncation.
+\subsection{Notation}
+Let $C$ be the number of target classes and let $n_c$ denote the number of training examples from class $c$, so that $N=\sum_{j=1}^{C}n_j$ is the training-set size and $\pi_c=n_c/N$ is the empirical prevalence of class $c$. For a labeled patch or slide-level bag with label $y\in\{1,\ldots,C\}$, the model outputs logits $\mathbf{z}\in\mathbb{R}^{C}$ and class probabilities
+\begin{equation}
+  p_c = \frac{\exp(z_c)}{\sum_{j=1}^{C}\exp(z_j)}.
+  \label{eq:softmax}
+\end{equation}
+For WSI-bag methods, a slide is represented as a bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ of frozen patch-feature instances. The attention-MIL backbone maps each bag to a bag embedding $\mathbf{b}(B)$ and class logits. Unless a method explicitly changes the sampler, objective, or representation loss, the empirical class frequencies in the training set define the optimization signal.
+
+\subsection{Intervention Levels}
+\label{sec:intervention-axis}
+The intervention axis records where in the learning problem a method acts. Cross-entropy (CE) is the no-mitigation reference condition on this axis: it uses the observed training distribution as given and does not rebalance samples, labels, costs, or representations. The remaining methods group as data-level sampling and augmentation, algorithm-level losses and prior corrections, hybrid sampling--loss methods, and representation or architecture-level methods \citep{saini2023tacklingClass,zhang2023deepLong}. Figure~\ref{fig:method-taxonomy} places the tested roster in these families, and Section~\ref{sec:methods} defines the methods in that order, since a shared intervention level implies shared machinery to describe.
 
 \begin{figure}[ht]
   \centering
@@ -72,17 +82,127 @@ The comparison is regime-specific. Patch methods consume frozen Virchow2 embeddi
     \draw[arrow] (hybrid) -- (hybridMethods);
     \draw[arrow] (repr) -- (reprMethods);
   \end{tikzpicture}
-  \caption{Method organization used in the benchmarks. Cross-entropy is the no-mitigation reference; alternatives intervene through sampling, objectives, prior correction, feature mixing, or representation and classifier design.}
+  \caption{Intervention-level organization of the benchmarked methods. Cross-entropy is the no-mitigation reference; alternatives intervene through sampling, objectives, prior correction, feature mixing, or representation and classifier design. Table~\ref{tab:signal-intervention} adds the orthogonal signal axis.}
   \label{fig:method-taxonomy}
 \end{figure}
 
-\subsection{Notation}
-Let $C$ be the number of target classes and let $n_c$ denote the number of training examples from class $c$. For a labeled patch or slide-level bag with label $y\in\{1,\ldots,C\}$, the model outputs logits $\mathbf{z}\in\mathbb{R}^{C}$ and class probabilities
+\subsection{Mitigation Signals}
+\label{sec:signal-axis}
+The signal axis records what a method must observe before it concludes that mitigation is warranted. It is a descriptive reading of the prespecified roster rather than the criterion by which that roster was assembled: the methods were selected as established class-imbalance interventions, and the axis states which quantity each of them actually consults.
+
+Four signals suffice to describe the tested roster (Table~\ref{tab:signals}). They are stated as properties of a class or example, independently of the intervention that acts on them.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.15\linewidth}>{\raggedright\arraybackslash}p{0.44\linewidth}>{\raggedright\arraybackslash}X@{}}
+    \toprule
+    Signal & What it describes & Representative quantity \\
+    \midrule
+    Prevalence & Share of class $c$ relative to the remaining classes & $\pi_c$, support rank, imbalance ratio $\rho$ \\
+    Evidence & Absolute amount of independent observation available for $c$ & $n_c$, distinct slides or patients, effective support $N_{\mathrm{eff},c}$ \\
+    Difficulty & How hard a class or example is to classify under a fixed representation & Loss, predicted confidence $p_y$, decision margin, class difficulty $d_c$ \\
+    Coverage & How well the observed examples span the within-class variation of $c$ & Manifold coverage $\mathrm{cov}_c$, effective rank of the class spectrum \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Signals a mitigation method can use to decide that a class or example needs help. Prevalence is relative and evidence is absolute; difficulty and coverage are properties of the data rather than of the class-size profile.}
+  \label{tab:signals}
+\end{table}
+
+\subsubsection{Prevalence}
+Prevalence is the share $\pi_c$ of class $c$ in the training distribution, together with the monotone summaries derived from it: the support rank of a class and the head-to-tail imbalance ratio $\rho=\max_c n_c/\min_c n_c$. It is a relative quantity. Rescaling every class count by a common factor leaves all prevalences unchanged, so a prevalence-aware rule behaves identically on a small and a large copy of the same class profile. This is the signal long-tailed learning has developed most thoroughly, and it underlies inverse-frequency weights, class-balanced samplers, and prior-corrected decision rules alike, all of which target a uniform posterior over classes rather than the observed one.
+
+Prevalence is easily conflated with the amount of data a class actually carries, because both are usually read off the same counts $n_c$. The two come apart as soon as the profile changes shape rather than scale. Consider the training profiles $[8,8,8,8]$ and $[64,32,16,8]$. The scarcest class holds eight examples in both, so the material available for it is identical; its prevalence is $\tfrac{1}{4}$ in the first profile and $\tfrac{1}{15}$ in the second. A prevalence-aware rule treats that class very differently across the two profiles, whereas a rule driven by the absolute amount of evidence should treat it much the same. That absolute reading is the second signal.
+
+\subsubsection{Independent Evidence}
+Evidence is the absolute amount of independent observation available for a class, and in pathology it is not the raw example count. A patch is a training example, but patches drawn from one case are not independent observations of the class that case carries: they share its staining, scanner, preparation, and much of its morphology. Thousands of crops from a handful of participants therefore supply far less evidence than their number suggests, and the same holds inside a slide bag, whose instances share a single weak label. Evidence is consequently counted in \emph{split units}---the patients or cases over which partitions are drawn---together with the distinct slides beneath them. At WSI level the labelled slide is itself the independent unit, so a rare diagnosis represented by a few slides is evidence-poor however many instances those slides contain.
+
+Unique unit counts are the primary measure, but they are coarse: two classes with the same number of cases can still differ in how interchangeable their patches are. \emph{Effective support} refines the count by discounting within-case redundancy. For class $c$, let $G_c$ be the number of split-unit or slide clusters contributing to it, let $m_{gc}$ be their sizes, and let $n_c=\sum_{g}m_{gc}$. Redundancy is summarized by the intraclass correlation (ICC) of a scalar per-example score, computed from the between-cluster and within-cluster mean squares $\mathrm{MS}_{B,c}$ and $\mathrm{MS}_{W,c}$ with the usual correction $m_{0,c}$ for unequal cluster sizes:
 \begin{equation}
-  p_c = \frac{\exp(z_c)}{\sum_{j=1}^{C}\exp(z_j)}.
-  \label{eq:softmax}
+  m_{0,c}=\frac{n_c-\sum_{g=1}^{G_c}m_{gc}^2/n_c}{G_c-1},
+  \qquad
+  \operatorname{ICC}_c=
+  \frac{\mathrm{MS}_{B,c}-\mathrm{MS}_{W,c}}
+  {\mathrm{MS}_{B,c}+(m_{0,c}-1)\mathrm{MS}_{W,c}},
+  \label{eq:icc}
 \end{equation}
-For WSI-bag methods, a slide is represented as a bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ of frozen patch-feature instances. The attention-MIL backbone maps each bag to a bag embedding $\mathbf{b}(B)$ and class logits. Unless a method explicitly changes the sampler, objective, or representation loss, the empirical class frequencies in the training set define the optimization signal.
+\noindent clipped to $[0,1]$. An ICC near zero means that examples from one case are no more alike than examples from different cases; an ICC near one means the case is effectively a single observation repeated. The corresponding effective support is
+\begin{equation}
+  N_{\mathrm{eff},c}=\frac{n_c}{1+(\overline m_c-1)\operatorname{ICC}_c},
+  \label{eq:neff}
+\end{equation}
+\noindent where $\overline m_c$ is the mean cluster size. The two limits make the quantity readable: with $\operatorname{ICC}_c=0$ the class retains its full count $n_c$, and with $\operatorname{ICC}_c=1$ it collapses to $n_c/\overline m_c$, one observation per contributing case. Equations~\eqref{eq:icc}--\eqref{eq:neff} adjust a patch count for redundancy; they do not replace independent-unit counts, and the choice of per-example score, its cross-fitting, and the reference sets used to compute it are experimental decisions rather than part of the definition. A method is evidence-aware when a quantity of this kind---$n_c$ read absolutely, a case or slide count, or $N_{\mathrm{eff},c}$---enters its weights or its sampler, rather than the relative share $\pi_c$.
+
+\subsubsection{Difficulty}
+Difficulty is how hard a class or an example is to classify under a fixed representation, independently of how often it occurs. At example level it is read from the model's own state during training: the current loss, the predicted probability $p_y$ of the true class, or the margin between the true-class score and its strongest competitor. At class level it is measured as a probe error, for instance
+\begin{equation}
+  d_c = 1-\mathrm{recall}_c,
+  \label{eq:difficulty}
+\end{equation}
+\noindent where $\mathrm{recall}_c$ is obtained from a class-balanced probe fitted on frozen features and evaluated out of fold, so that class size does not enter the score. A class whose morphology overlaps a neighbouring class is then difficult even when its support is ample, which is precisely what distinguishes this signal from the previous two. Two readings are worth separating. Intrinsic difficulty is a property of the representation and holds across training conditions; condition-specific learnability describes what remains recoverable from one particular training set and therefore moves with allocated support. Example-level and class-level difficulty are also not interchangeable: a loss-based weight adapts continuously during training and can chase label noise, whereas $d_c$ is estimated once and is stable but blind to which individual examples are hard.
+
+\subsubsection{Coverage}
+Coverage is how well the observed examples span the within-class variation of their class. A class can hold many independent cases and still cover its own distribution poorly, if those cases present one growth pattern, one grade, or one preparation while the population it is deployed on contains several. Coverage is therefore a property of the spread of a class in feature space rather than of any count, and it is the one signal the imbalance literature has left largely implicit. Stating it operationally requires a reference sample that stands for what the class actually looks like, since spanning is only defined relative to a target distribution. The natural, unmanipulated held-out cohort serves that role here.
+
+Let $\{r_1,\ldots,r_{M_c}\}$ be the $M_c$ reference embeddings of class $c$ and $\{t_1,\ldots,t_{n_c}\}$ its $n_c$ observed training embeddings, both taken from the frozen encoder. Write $\mathrm{NND}_k(r_j)$ for the distance from $r_j$ to its $k$-th nearest neighbour among the remaining reference embeddings of the same class, which sets a local radius adapted to how densely the class populates that region; the neighbourhood size $k$ is fixed in advance. Coverage is the fraction of reference examples that have at least one training example inside their own neighbourhood,
+\begin{equation}
+  \mathrm{cov}_c=\frac{1}{M_c}\sum_{j=1}^{M_c}
+  \mathbf{1}\Bigl[\exists\, i\in\{1,\ldots,n_c\}:\
+  \lVert r_j-t_i\rVert<\mathrm{NND}_k(r_j)\Bigr].
+  \label{eq:coverage}
+\end{equation}
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\linewidth,keepaspectratio]{assets/coverage_plot.png}
+  \caption{Coverage is not a count. Both panels show the same reference cloud, whose class has two morphological modes, and both training samples contain the same number of examples; the circles are the reference neighbourhoods of radius $\mathrm{NND}_k(r_j)$ that Equation~\eqref{eq:coverage} tests. In (a) the training material sits entirely in one mode, so the second mode stays unreached and half the class is uncovered. In (b) the same budget is spread across both modes and coverage rises accordingly. Prevalence and evidence are identical across the two panels, which is why coverage is a separate signal.}
+  \label{fig:coverage}
+\end{figure}
+
+\noindent This is the manifold-coverage construction of \citet{naeem2020reliableFidelity}, which anchors the neighbourhood radii on the reference sample rather than on the observed one and is for that reason more robust to outlying training examples than the recall metric it refines \citep{kynkaanniemi2019improvedPrecision}. A region of the class that the training material never reaches lowers $\mathrm{cov}_c$ regardless of how many examples crowd the regions it does reach, which is exactly the failure mode a count cannot express and which Figure~\ref{fig:coverage} illustrates for a class with two morphological modes. Where no reference cohort is available, the covariance matrix of the class embeddings gives a reference-free substitute. Let $\lambda_1\geq\cdots\geq\lambda_D$ be its eigenvalues, each the variance of the class along one principal direction of the $D$-dimensional embedding space, and let $\widehat{\lambda}_i=\lambda_i/\sum_{j=1}^{D}\lambda_j$ be the same spectrum normalized to sum to one. With the Shannon entropy of that normalized spectrum,
+\begin{equation}
+  H(\widehat{\lambda})=-\sum_{i=1}^{D}\widehat{\lambda}_i\log\widehat{\lambda}_i,
+  \qquad
+  \mathrm{erank}_c=\exp\bigl(H(\widehat{\lambda})\bigr),
+  \label{eq:effective-rank}
+\end{equation}
+\noindent the effective rank $\mathrm{erank}_c$ counts how many directions the class occupies: it equals one when all variance lies along a single direction and $D$ when the spectrum is flat \citep{roy2007effectiveRank}. The participation ratio $\bigl(\sum_i\lambda_i\bigr)^2/\sum_i\lambda_i^2$ summarizes the same spectrum with a different weighting. Either statistic detects collapse within the observed material but is silent about what was missed.
+
+Two conditions keep Equation~\eqref{eq:coverage} from re-measuring a signal already defined above. Coverage estimated on more examples is mechanically larger, so classes must be compared at a matched sample size, by subsampling every class to the scarcest count and averaging over draws; otherwise the estimate tracks $n_c$ and reproduces prevalence or evidence under a different name. For the same reason the sampling unit must be the case rather than the patch, since several hundred crops of one biopsy occupy a single neighbourhood and would otherwise read as broad coverage. A further caution applies whenever training support is itself manipulated: subsampling a class changes which regions of it remain represented, so coverage of a constructed training manifest is partly an outcome of the allocation rather than a fixed property of the class. Read as a property of the class, it must be estimated on the eligible pool; read as a property of a training condition, it describes what that condition preserved. Neither reading is consulted by any method in the roster below.
+
+\subsubsection{Reading the Roster along Both Axes}
+Signals are not to be confused with side effects. A method is treated as aware of a signal only when a quantity of that type enters its sampler, its objective, or its decision rule. Several methods reshape a property they never measure: RankMix-inspired mixing interpolates feature subsequences and thereby broadens coverage, SC-MIL compacts and separates bag embeddings, and the CFAL diversity regularizer spreads class prototypes apart. None of them computes a coverage statistic and adapts its behaviour to it. Table~\ref{tab:signal-intervention} therefore records what each method consults alongside what it changes, and marks the difference between shaping a property and measuring it.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.20\linewidth}>{\raggedright\arraybackslash}p{0.44\linewidth}>{\raggedright\arraybackslash}X@{}}
+    \toprule
+    Method & Mitigation signal & Intervention \\
+    \midrule
+    CE, MIL CE & None; observed distribution used as given & None (reference) \\
+    Balanced sampling & Prevalence, through $n_{y_i}^{-s}$ & Minibatch composition \\
+    Weighted CE & Prevalence, through $n_c^{-s}$ & Per-example loss weight \\
+    Logit adjustment & Prevalence, through $\widehat{\pi}_c$ explicitly & Logit and prior correction \\
+    cRT & Prevalence, through balanced stage-two exposure & Classifier refit on a frozen representation \\
+    Focal loss & Difficulty, through the per-example confidence $p_y$ & Per-example loss weight \\
+    CFAL & Evidence, through the effective number $E_c$ of class $c$; difficulty, through $(1-a_{i,y_i})^{\gamma}$; shapes coverage without measuring it & Prototype head and margin objective \\
+    CE + soft F1 & Prevalence, through balanced sampling and equal classwise weight in the macro term & Sampler and auxiliary objective \\
+    CE + soft MCC & Prevalence, through balanced sampling and the batch marginals $t_c,p_c$ & Sampler and auxiliary objective \\
+    OKO & Prevalence, through uniform pair-class sampling & Set construction and set-aggregated loss \\
+    RankMix-inspired & Difficulty, through teacher instance ranking; shapes coverage without measuring it & Bag-level feature augmentation \\
+    SC-MIL & Label structure only; prevalence enters through class-aware batching; shapes coverage without measuring it & Contrastive term and CE curriculum \\
+    MDE-inspired & Prevalence, through paired natural and balanced loaders & Dual experts and consistency term \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Each tested method read along both axes: the signal it consults to identify mitigation need, and the mechanism it changes to act on it. Methods sharing an intervention family can consult different signals, and methods sharing a signal can intervene at different levels. Method-specific symbols name the mechanism responsible and are defined with the method in Section~\ref{sec:methods}.}
+  \label{tab:signal-intervention}
+\end{table}
+
+\noindent Read this way, the roster is concentrated on one signal. Eight of the twelve interventions consult prevalence alone, and SC-MIL adds a ninth partial case through class-aware batching. Focal loss is the only objective driven purely by difficulty, joined by the teacher ranking inside RankMix-inspired mixing at instance level. CFAL is the only method whose class weighting derives from an absolute count rather than a relative share, since its effective number $E_c$ is a function of $n_c$ and $\beta$ alone. No tested method measures coverage. That concentration is a property of the established literature these methods come from, and it identifies where the benchmark can and cannot separate mechanisms: contrasts between prevalence-aware methods vary the intervention while holding the signal fixed, whereas the difficulty and evidence dimensions are represented too sparsely for a comparable within-signal contrast. The companion experimental protocol takes up the quantities defined above---$d_c$, $N_{\mathrm{eff},c}$, and their alignment with allocated support---as exploratory predictors, which is where the difficulty and evidence dimensions are examined directly rather than through the method roster.
+
+\section{Methods}
+\label{sec:methods}
+Each method is defined below in the input form it consumes, following the intervention families of Figure~\ref{fig:method-taxonomy}. The comparison is regime-specific. Patch methods consume frozen Virchow2 embeddings of controlled patches and optimize one shared MLP classifier head; CE-based patch methods use the same linear output layer, while CFAL replaces that layer with class prototypes and affinity-based prediction. WSI-bag methods consume complete eligible frozen-feature bags and optimize one shared attention-MIL head. Both regimes therefore rely on the same pathology foundation-model family, but they differ in supervision unit: one embedding per selected patch versus aggregation over every eligible instance on a slide, without bag truncation.
 
 \subsection{Cross-Entropy Baseline}
 Unweighted cross-entropy is the baseline because it is the standard supervised objective without an explicit class-imbalance correction. For an example with label $y$, the loss is
@@ -410,7 +530,7 @@ At validation and test time, each slide bag is evaluated once in natural order w
 
 \section{Summary}
 \label{sec:summary}
-This report defines the benchmark's no-mitigation references (CE and MIL CE) and its retained interventions: balanced sampling, class-weighted CE, focal loss, train-time and post-hoc logit adjustment, soft-F1, soft-MCC, CFAL, OKO, RankMix-inspired feature mixing, cRT, SC-MIL, and MDE-inspired dual-expert MIL. Balanced Softmax is recorded as related prior-correction literature rather than an additional tested method. The definitions make the tested adaptations, output semantics, and ablations explicit; the companion experimental protocol defines how their discrimination, probability quality, and mitigation recovery are evaluated.
+This report defines the benchmark's no-mitigation references (CE and MIL CE) and its retained interventions: balanced sampling, class-weighted CE, focal loss, train-time and post-hoc logit adjustment, soft-F1, soft-MCC, CFAL, OKO, RankMix-inspired feature mixing, cRT, SC-MIL, and MDE-inspired dual-expert MIL. Balanced Softmax is recorded as related prior-correction literature rather than an additional tested method. Read along the signal axis, this roster is concentrated on prevalence: difficulty is represented only by focal loss and by the teacher ranking inside RankMix-inspired mixing, absolute evidence only by the effective-number weighting in CFAL, and coverage is measured by no tested method at all. The definitions make the tested adaptations, output semantics, and ablations explicit; the companion experimental protocol defines how their discrimination, probability quality, and mitigation recovery are evaluated.
 
 \clearpage
 \bibliographystyle{plainnat}
