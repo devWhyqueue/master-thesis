@@ -94,6 +94,35 @@ Interpretability depends on separating the intended intervention from everything
 
 \noindent One \emph{comparison unit} is a dataset, prediction regime, imbalance severity, and tail assignment evaluated together. A \emph{deficit gate} is a prespecified rule that asks whether imbalance caused enough damage, with sufficient precision, to make a recovery ratio interpretable. \emph{Recovery} is the fraction of that demonstrated deficit regained by a mitigation method. These are analysis concepts, not model components.
 
+Every quantity that this logic holds fixed is prespecified before the first definitive fit. Table~\ref{tab:locked} collects them with a pointer to the specification that derives each one, so the sections that follow can argue about the intervention rather than restate its settings.
+
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}Xl@{}}
+    \toprule
+    Locked quantity & Value & Spec \\
+    \midrule
+    Representation & Frozen Virchow2 features & \ref{app:construction} \\
+    Patch classifier & Two-layer MLP, 512 hidden units & \ref{app:construction} \\
+    Update budget & $U=30\lceil T/B\rceil$ optimizer updates & \ref{app:training} \\
+    Learning-rate envelope & Seven values, \num{1e-5} to \num{1e-2} & \ref{app:controls} \\
+    Support floor per class & $\geq10$ split units and $\geq20$ slides & \ref{app:construction-support} \\
+    Contribution caps & $\leq10\%$ per split unit; $\leq5\%$ per slide & \ref{app:construction-support} \\
+    Severity targets & $\rho_{\mathrm{target}}\in\{1,10,100\}$ & \ref{app:construction} \\
+    Severity tolerance & Achieved $\rho\in[9,11]$ and $[90,110]$ & \ref{app:construction-support} \\
+    Tail assignments & Native, difficulty-aligned, difficulty-reversed & \ref{app:construction} \\
+    Split-unit partitions & Three locked, patient- or case-disjoint & \ref{app:construction} \\
+    Initialization seeds & Two tuning; five disjoint confirmation & \ref{app:training} \\
+    Discrimination gate & $D_{\mathrm{BA}}\geq\num{0.02}$, paired CI excludes 0 & \ref{sec:recovery} \\
+    Calibration gate & $D_{\mathrm{cal}}\geq\num{0.05}$ nats, paired CI excludes 0 & \ref{sec:recovery} \\
+    Bootstrap replicates & \num{10000}, split-unit-clustered & \ref{app:endpoints} \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Quantities locked before the first definitive fit, with the section or appendix that specifies each. Only class allocation within the shared training support $T$ varies across conditions.}
+  \label{tab:locked}
+\end{table}
+
 This logic also explains the order of the report. Section~\ref{sec:data} establishes what constitutes a prediction and an independent unit of evidence. Section~\ref{sec:construction} constructs the training intervention. Section~\ref{sec:analysis} defines damage, recovery, and uncertainty. Section~\ref{sec:rq3} explains heterogeneity, and Section~\ref{sec:limits} states the resulting claim boundaries. Exact allocation, training, metric, resampling, and model specifications are collected in the appendices.
 
 \section{Prediction Tasks and Evidence Units}
@@ -164,7 +193,7 @@ The construction asks a simple counterfactual question: how would the same predi
   \label{fig:controlled-construction}
 \end{figure}
 
-\noindent The balanced, moderate, and severe conditions contain the same total training support $T$: patches for patch classification and slides for MIL. The shared $T$ is selected jointly with severity, not from size alone: among candidate totals satisfying the independent-support and contribution-cap constraints, construction retains the largest one whose realized moderate and severe ratios both lie within 10\% of $\rho_{\mathrm{target}}=10$ and $\rho_{\mathrm{target}}=100$ (that is, $\rho_{\mathrm{achieved}}\in[9,11]$ and $\rho_{\mathrm{achieved}}\in[90,110]$ respectively) for every locked tail assignment, confirmed against the true fixed-pool construction. Choosing $T$ from size alone could flatten the intended contrast, and this tolerance keeps both controlled conditions recognizably close to their nominal severities rather than only as separated as the data allow. Appendix~\ref{app:construction} specifies the tolerance search and its feasibility rules.
+\noindent The balanced, moderate, and severe conditions contain the same total training support $T$: patches for patch classification and slides for MIL. The shared $T$ is selected jointly with severity, not from size alone: construction retains the largest feasible total whose realized moderate and severe ratios lie within 10\% of their targets, that is $\rho_{\mathrm{achieved}}\in[9,11]$ and $\rho_{\mathrm{achieved}}\in[90,110]$, for every locked tail assignment. Choosing $T$ from size alone could flatten the intended contrast, and this tolerance keeps both controlled conditions recognizably close to their nominal severities rather than only as separated as the data allow. Appendix~\ref{app:construction} specifies the tolerance search and its feasibility rules.
 
 The target ratio $\rho_{\mathrm{target}}\in\{1,10,100\}$ specifies the intended intervention, but integer allocation and finite inventories can change the realized class distribution. The achieved ratio is therefore recomputed from every manifest. For realized class supports $N_1,\ldots,N_K$, it is
 \begin{equation}
@@ -186,7 +215,7 @@ The validation cohort also retains its natural distribution. It is used for hype
 \subsection{Independent support and feasibility}
 A patch is a training example, but thousands of patches from one patient do not constitute thousands of independent observations. \emph{Independent support} therefore means the distinct split units and slides underlying a class. Patch conditions draw from fixed per-class patient and slide pools, whereas MIL imbalance necessarily changes the number of labelled slides and thus independent-unit diversity.
 
-A \emph{support pilot} determines how little independent tail evidence remains defensible before definitive comparisons are built. Nested balanced CE pilots add units rather than extra patches from the same units and stop at the first stable level across all three construction orderings. The definitive floor is the larger of this empirical level and the design floor implied by contribution caps: at least 10 split units and 20 slides per class, or 20 slides when split unit and slide coincide. Conditions that cannot satisfy these floors are weakened or excluded rather than rescued by changing validation or test data.
+A \emph{support pilot} determines how little independent tail evidence remains defensible before definitive comparisons are built. The definitive floor is the larger of that empirical level and the design floor implied by the contribution caps (Table~\ref{tab:locked}). Conditions that cannot satisfy these floors are weakened or excluded rather than rescued by changing validation or test data.
 
 \subsection{Severity and tail placement}
 Severity controls how the shared total $T$ is distributed. Binary tasks have one head and one tail; multiclass tasks place intermediate supports at equal intervals on a logarithmic scale. Requested and achieved ratios are both reported because finite inventories and integer counts can weaken the realized contrast. A condition that collapses to the balanced allocation is recorded as degenerate and never pooled with genuine imbalanced conditions.
@@ -225,7 +254,18 @@ Table~\ref{tab:roster} lists only the methods evaluated in this benchmark. CE an
 
 \subsection{Matched training and selection}
 \label{sec:training}
-All matched methods retain the frozen encoder, model family, optimizer family, batch definition, augmentation, numerical precision, and optimizer-update budget within a regime. Hyperparameters and checkpoints are selected only on natural validation data using two tuning seeds. They are locked before five disjoint confirmation seeds and one-time test evaluation. Balanced CE, imbalanced CE, and mitigation runs share split, tail assignment, confirmation-seed index, and held-out cases. Appendix~\ref{app:training} gives update formulas, adaptive grids, tie-breakers, exposure accounting, failure rules, and cost reporting.
+All matched methods retain the frozen encoder, model family, optimizer family, batch definition, augmentation, numerical precision, and optimizer-update budget within a regime (Table~\ref{tab:locked}). Hyperparameters and checkpoints are selected only on natural validation data, and are locked before confirmation fitting and the one-time test evaluation. Balanced CE, imbalanced CE, and mitigation runs share split, tail assignment, confirmation-seed index, and held-out cases. Appendix~\ref{app:training} gives update formulas, adaptive grids, tie-breakers, exposure accounting, failure rules, and cost reporting.
+
+Figure~\ref{fig:benchmark-overview} places these steps in execution order. It also separates the validation search that is self-contained from the phase that cannot start until a condition's CE search has resolved, which is what fixes the order in which runs may be launched.
+
+\begin{landscape}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth,keepaspectratio]{assets/cls_imb_benchmark.png}
+  \caption{Operational workflow of the controlled class-imbalance benchmark.}
+  \label{fig:benchmark-overview}
+\end{figure}
+\end{landscape}
 
 This separation makes confirmation runs comparable without pretending that equal optimizer updates imply equal data exposure. With models fixed, evaluation can ask which endpoint was damaged and how much of that damage was recovered.
 
@@ -277,7 +317,7 @@ $R_M=0$ denotes no recovery, $R_M=1$ recovery to the size-matched balanced CE re
   \label{fig:gate-routing}
 \end{figure}
 
-The \emph{discrimination gate} opens when the CE balanced-accuracy deficit is at least \num{0.02} and its paired 95\% confidence interval excludes zero. The \emph{calibration gate} opens when the CE tail-group macro-NLL deficit, $\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$, is at least \num{0.05} nats with a paired 95\% confidence interval excluding zero. Both rules are computed from CE runs on the same held-out cases before any mitigation method is compared. A comparison unit entering through the discrimination gate is evaluated for balanced-accuracy recovery; one entering through the calibration gate is evaluated for tail-calibration recovery; it may enter through both.
+Figure~\ref{fig:gate-routing} shows the two routes. The \emph{discrimination gate} opens when the CE balanced-accuracy deficit is at least \num{0.02} and its paired 95\% confidence interval excludes zero. The \emph{calibration gate} opens when the CE tail-group macro-NLL deficit, $\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$, is at least \num{0.05} nats with a paired 95\% confidence interval excluding zero. Both rules are computed from CE runs on the same held-out cases before any mitigation method is compared. A comparison unit entering through the discrimination gate is evaluated for balanced-accuracy recovery; one entering through the calibration gate is evaluated for tail-calibration recovery; it may enter through both.
 
 The two routes preserve an important distinction. Strong frozen features may leave balanced accuracy nearly intact while imbalance still biases tail probabilities, in which case a single discrimination rule would exclude methods designed to correct class priors. Conversely, the gates avoid unstable recovery ratios when no meaningful damage exists to recover. All CE deficits on both axes remain reported, including units that fail both rules. For the lower-is-better calibration axis, the sign-corrected deficit $D_{\mathrm{cal}}=\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$ is the denominator and the method's tail-NLL improvement over imbalanced CE is the numerator, so Equation~\eqref{eq:recovery} retains the same interpretation. Recovery for other secondary metrics is descriptive and does not reopen a comparison unit that fails both gates.
 
@@ -295,7 +335,7 @@ A \emph{test family} is the set of related hypotheses interpreted together. Test
 
 The confirmatory family contains weighted CE, focal loss, train-time logit adjustment, and balanced sampling. These four primary methods directly target tail support or class priors and are shared across both prediction regimes. Within one dataset and regime, the family includes every gate-passing combination of primary method, gate, severity, and tail assignment; severities are not split into separate families. Holm adjustment is applied across the testable comparisons, while gated-out comparisons are recorded as not tested. All remaining methods and all secondary classwise, calibration, and cost analyses are exploratory. They retain the same effect estimates and confidence intervals but remain outside the confirmatory correction.
 
-\section{Explaining Heterogeneity (RQ3)}
+\section{Explaining Heterogeneity}
 \label{sec:rq3}
 Why do some controlled comparisons show more damage or recovery than others? RQ1 and RQ2 estimate matched effects within a dataset and task. RQ3 then takes one step back and relates prespecified properties of each comparison to those effects. It neither predicts patient outcomes nor creates another method ranking. For damage occurrence and magnitude, one observation is a dataset, prediction regime, severity, and tail assignment. Recovery observations additionally identify the method and gate.
 
@@ -334,7 +374,7 @@ Only quantities available without using test outcomes are eligible as predictors
 
 Intrinsic separability asks whether frozen Virchow2 features distinguish classes in a common balanced reference. Condition-specific learnability asks what remains learnable from the exact controlled manifest. Both are measured on natural validation data without test outcomes. Minimum independent support and a patch-only redundancy-adjusted effective support are sensitivity predictors rather than replacements for patient or slide counts.
 
-One deliberately small model is fitted for each outcome. Every primary model contains only log achieved imbalance ratio and support--difficulty alignment; occurrence uses a binary model, while magnitude and recovery use continuous models. Dataset--target random intercepts account for repeated comparisons, recovery omits method effects, and each remaining predictor enters only one separate sensitivity model. Weak Gaussian priors and leave-one-group-out checks stabilize interpretation without claiming predictive generalization. Appendix~\ref{app:rq3} specifies probes, cross-fitting, ICC, effective support, MAP fitting, and sensitivity analyses.
+One deliberately small model is fitted for each outcome. Every primary model contains only log achieved imbalance ratio and support--difficulty alignment, and each remaining predictor enters a separate one-predictor sensitivity model rather than being added to that primary model. Weak Gaussian priors and leave-one-group-out checks stabilize interpretation without claiming predictive generalization. Appendix~\ref{app:rq3} specifies probes, cross-fitting, ICC, effective support, model forms, MAP fitting, and sensitivity analyses.
 
 RQ3 can therefore suggest which combinations of severity, difficulty, and support deserve follow-up, but it cannot turn the small set of dataset--target groups into general predictive evidence. The final section makes this and the benchmark's other interpretation limits explicit.
 
@@ -368,9 +408,24 @@ For WSI-level MIL, every eligible embedding enters its slide bag. BRACS WSIs are
 
 \subsection{Independent evidence and support floors}
 \label{app:construction-support}
-A patch is a training example, but it is not independent evidence when thousands of patches come from the same case or slide. In this report, \emph{independent support} therefore means the number of distinct split units and slides that underlie a class's training examples. Controlling this support prevents an apparent patch-level head--tail contrast from being merely a contrast between many correlated crops from one case and fewer crops from another.
+The independent-support rule of Section~\ref{sec:construction} is realized differently in the two regimes. For patch classification, a fixed per-class split-unit pool and, within it, a fixed slide pool are made available to the balanced and all imbalanced conditions: every condition draws its patches only from this pool. For MIL, a slide is itself the labelled example, so reducing slide support necessarily reduces independent support, and MIL contrasts are interpreted as controlled slide-support imbalance including its induced change in independent-unit diversity. Table~\ref{tab:support-rules} states the selection order and caps.
 
-The rule is adapted to the prediction regime. For patch classification, a fixed per-class split-unit pool and, within it, a fixed slide pool are made available to the balanced and all imbalanced conditions: every condition draws its patches only from this pool, and the condition with the largest patch allocation for a class covers the pool in full, so no unit in it goes unused by every condition together. A smaller condition for the same class, in particular a severe tail count well below that maximum, may leave some pool units untouched; this is the intended shape of an imbalanced allocation, not a violation of the shared pool. Sampling visits split units, then slides within units, and only then patches. No split unit may supply more than 10\% of a class's patch allocation and no slide more than 5\%; deterministic round-robin selection enforces these caps before any unit is revisited. Patch imbalance can therefore change the number of patches per class without changing which split-unit and slide pools are available to draw from. For MIL, a slide is itself the labelled example, so reducing slide support necessarily reduces independent support. Selection visits split units before taking additional slides from the same unit; each slide contributes once, and no unit supplies more than 10\% of a class's slides. MIL contrasts are consequently interpreted as controlled slide-support imbalance, including its induced change in independent-unit diversity. Every manifest reports per-class split-unit, slide, and patch counts, maximum contributions, and the fraction of the eligible independent pool retained.
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{0.30\linewidth}>{\raggedright\arraybackslash}p{0.24\linewidth}X@{}}
+    \toprule
+    Regime & Selection order & Contribution caps & What imbalance changes \\
+    \midrule
+    Patch & Split units, then slides within units, then patches; deterministic round-robin before any unit is revisited & $\leq10\%$ of a class's patch allocation per split unit; $\leq5\%$ per slide & Patches per class; the available split-unit and slide pools are unchanged \\
+    MIL & Split units before additional slides from the same unit; each slide contributes once & $\leq10\%$ of a class's slides per split unit & Labelled slide support, and therefore independent-unit diversity \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Hierarchical selection and contribution caps by prediction regime. Every manifest reports per-class split-unit, slide, and patch counts, maximum contributions, and the fraction of the eligible independent pool retained.}
+  \label{tab:support-rules}
+\end{table}
+
+\noindent The condition with the largest patch allocation for a class covers the fixed pool in full, so no unit in it goes unused by every condition together. A smaller condition for the same class, in particular a severe tail count well below that maximum, may leave some pool units untouched; this is the intended shape of an imbalanced allocation, not a violation of the shared pool.
 
 The smallest defensible tail support is estimated before the definitive comparison with a \emph{support pilot}. These balanced CE runs ask when additional independent training units cease to materially improve natural-validation performance; they do not tune a hyperparameter or contribute observations to the definitive analysis. In the patch regime, one pilot unit is a split unit, or a slide where split unit and slide coincide. Each selected unit contributes the same fixed quota $q_{\mathrm{patch}}$ of patches, distributed as evenly as possible over its eligible slides. The quota is the largest value the patient and slide contribution caps admit at every candidate level and every construction ordering, held fixed so increasing a pilot level adds independent units rather than patches per unit. A caps-admissible quota is necessary but not sufficient: a unit cannot supply more patches than it holds, so a unit is eligible for a candidate level only if its own inventory meets the candidate quota, and the quota at a given level is set from that level's order statistic of per-unit inventory over the eligible units rather than from the scarcest unit in one seeded ordering. A candidate level that no quota can satisfy is dropped from the curve rather than reusing a looser quota from a larger level. In the MIL regime, one pilot unit is a labelled slide represented by all its eligible instances.
 
@@ -441,7 +496,7 @@ If a target ratio is infeasible, the same rule is applied to every dataset and r
 
 The fallback has a limit: a moderate or severe condition whose realized allocation is indistinguishable from the balanced condition---achieved ratio within a small tolerance of 1, or realized counts identical to the balanced manifest---is not a lower-severity instance of the intended contrast but a null one, since the imbalance intervention did not occur. Such a condition is reported as degenerate rather than fitted and averaged with genuine moderate or severe conditions from other splits or assignments, and it is excluded from the imbalance deficit and recovery estimands in Section~\ref{sec:recovery}. Its requested ratio, achieved ratio, limiting class, and binding support floor are recorded alongside the exclusion, using the same fields every condition already reports.
 
-The profile determines support by rank, so a second decision maps semantic classes to those ranks. Using only one mapping would confound scarcity with intrinsic class difficulty. Multiclass targets therefore use native, difficulty-aligned, and difficulty-reversed assignments where distinct: native retains clinical, ordinal, or natural-support order; aligned places easiest classes at the head and hardest classes at the tail, compounding scarcity with difficulty; reversed places hardest classes at the head and easiest classes at the tail, providing compensation. Binary tasks retain native and reversed orientations. A difficulty mapping that duplicates an earlier mapping in any locked split is omitted across that dataset--regime with its reason recorded. These three sensitivity assignments separate interpretable mechanisms but do not exhaust all possible class-support mappings. Figure~\ref{fig:tail-assignments} illustrates the design.
+The profile determines support by rank; the tail assignment maps semantic classes to those ranks. Native order is the clinical, ordinal, or natural-support order of the target; aligned and reversed order the classes by the difficulty scores $d_c$ measured above. Binary tasks retain native and reversed orientations only. A difficulty mapping that duplicates an earlier mapping in any locked split is omitted across that dataset--regime with its reason recorded. These three assignments separate interpretable mechanisms but do not exhaust all possible class-support mappings. Figure~\ref{fig:tail-assignments} illustrates the design.
 
 \begin{figure}[ht]
   \centering
@@ -507,8 +562,6 @@ The random quantities are separated into five seed families so that changing one
 This appendix defines secondary endpoints, score semantics, resampling, and diagnostics. Gates and recovery retain the main-text definitions in Section~\ref{sec:recovery}.
 
 \subsection{Ordinal outcomes for PANDA}
-Balanced accuracy treats every wrong class as an error of the same kind. PANDA WSI prediction is the only ordinal task in the benchmark, so it also receives two dataset-specific secondary outcomes that use the distance between ISUP grades. These measures complement rather than replace the common discrimination endpoints.
-
 Let $N$ be the number of held-out biopsies and $C$ the number of grades. Let $O_{ab}$ be the observed confusion-matrix count for true grade $a$ and predicted grade $b$. The count expected under independent true and predicted grades is $E_{ab}=O_{a\cdot}O_{\cdot b}/N$, which retains the observed marginal grade frequencies. With $a,b\in\{0,\ldots,C-1\}$ and quadratic disagreement weight $w_{ab}=(a-b)^2/(C-1)^2$, quadratic-weighted kappa is
 \begin{equation}
   \kappa_{\mathrm{QW}}
@@ -525,8 +578,6 @@ Let $N$ be the number of held-out biopsies and $C$ the number of grades. Let $O_
 \noindent where $g_i$ and $\widehat g_i$ are the true and predicted ISUP grades. It reports the average distance in grade levels and is lower-is-better. Kappa emphasizes agreement beyond the observed marginals, whereas MAE has the direct interpretation of grades missed per biopsy.
 
 \subsection{Probability quality and calibration}
-Discrimination metrics depend mainly on which class receives the highest score. Probability-quality metrics instead evaluate the full predicted distribution and whether confidence is compatible with observed outcomes. Tail-group macro negative log likelihood (NLL) is the co-primary calibration endpoint used by the recovery gate in Section~\ref{sec:recovery}. Natural-prevalence NLL, macro NLL, the Brier score, expected calibration error (ECE), and reliability diagrams provide complementary secondary views.
-
 Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$.
 
 Table~\ref{tab:score-variants} fixes which score variant enters each endpoint. For ordinary CE,
@@ -592,7 +643,7 @@ For each prediction, let $\hat{y}_i=\arg\max_c\hat{p}_{ic}$ and $q_i=\max_c\hat{
 Because checkpoints and hyperparameters are selected for natural-validation balanced accuracy, all probability-quality results describe discrimination-selected models rather than models optimized for calibration. The output semantics and prior-correction formulas of individual methods are defined in the companion methods report \citep{queisler2026imbalanceMethods}.
 
 \subsection{Uncertainty from split-unit resampling}
-A \emph{bootstrap} approximates sampling uncertainty by repeatedly constructing hypothetical test cohorts from the observed split units: patients or participants where available, and the biopsy/WSI for PANDA and CAMELYON16. Each hypothetical cohort reweights the observed split units rather than deterministically repeating each one exactly once; the resampling mechanism for split units and for confirmation seeds is detailed below. The metric is recomputed for every replicate, and the spread of those values shows how much the result could change under a similar case sample. Split units---not patches---are resampled because patches from one case are correlated.
+The resampled split unit is the patient or participant where one is available, and the biopsy/WSI for PANDA and CAMELYON16. Each replicate reweights the observed split units rather than deterministically repeating each one exactly once, and the complete statistic is recomputed from those weights.
 
 \paragraph{Label-only preflight.}
 Before model training, \num{10000} bootstrap replicates are constructed using only split-unit identifiers, split membership, and class labels. \emph{Label-only} means that no predictions, performance values, or method identities are used; these replicates test whether the planned resampling scheme is valid before results can influence it. The count of \num{10000} is a prespecified Monte Carlo budget. It places about 250 replicates in each 2.5\% tail of a percentile interval, reducing simulation noise in the interval endpoints while remaining inexpensive at this label-only stage.
@@ -605,18 +656,20 @@ Each split unit draws an independent, continuous bootstrap weight in every repli
     box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, font=\small, text width=3.15cm, minimum height=1.0cm},
     fixed/.style={box, fill=gray!10},
     sampled/.style={box, fill=blue!7},
-    result/.style={box, fill=green!7, text width=5.8cm},
-    arrow/.style={-{Latex[length=2mm]}, thick}
+    result/.style={box, fill=green!7, text width=4.4cm},
+    note/.style={box, fill=gray!10, text width=2.6cm, font=\scriptsize, dashed},
+    arrow/.style={-{Latex[length=2mm]}, thick},
+    sidearrow/.style={-{Latex[length=1.8mm]}, thick, dashed, gray!50!black}
   ]
     \node[fixed] (identity) {Observed test identities\\split unit, split, and class};
-    \node[sampled, right=0.35cm of identity] (draw) {Draw one independent\\Dirichlet weight per unit};
-    \node[sampled, right=0.35cm of draw] (weights) {Carry each weight to\\all matched predictions};
-    \node[fixed, below=0.55cm of identity] (strata) {Group by contribution\\stratum (diagnostics only)};
-    \node[result, below=0.65cm of draw, xshift=0.9cm] (interval) {Recompute the complete statistic in each replicate;\\the middle 95\% forms the percentile interval};
+    \node[sampled, right=0.25cm of identity] (draw) {Draw one independent\\Dirichlet weight per unit};
+    \node[sampled, right=0.25cm of draw] (weights) {Carry each weight to\\all matched predictions};
+    \node[result, right=0.25cm of weights] (interval) {Recompute the complete statistic in each replicate; the middle 95\% forms the percentile interval};
+    \node[note, below=0.55cm of identity] (strata) {Group by contribution stratum\\(diagnostics only)};
     \draw[arrow] (identity) -- (draw);
     \draw[arrow] (draw) -- (weights);
-    \draw[arrow] (identity) -- (strata);
-    \draw[arrow] (weights.south) |- (interval.east);
+    \draw[arrow] (weights) -- (interval);
+    \draw[sidearrow] (identity) -- (strata);
   \end{tikzpicture}
   \caption{Split-unit-clustered Bayesian bootstrap workflow. The label-only preflight executes the identity, weight-draw, and stratum-diagnostic steps before predictions exist. After model fitting, the same paired per-unit weights are applied to every matched run.}
   \label{fig:bootstrap-workflow}
@@ -629,7 +682,25 @@ The independent per-unit weight draw can still produce a replicate dominated by 
   n_{\mathrm{Kish}}=\frac{\left(\sum_i v_i\right)^2}{\sum_i v_i^2}.
   \label{eq:kish}
 \end{equation}
-\noindent translates unequal case weights into the equivalent number of equally weighted split units. It decreases as weight concentrates. The preflight also records each split/class cell's number of contributing units and its largest unit-weight share. If the 2.5th percentile of $n_{\mathrm{Kish}}$ across replicates is below five, one unit supplies more than 50\% of a class's weight in more than 5\% of replicates, or a split/class cell has fewer than five contributing units, inference for that dataset--regime is designated descriptive before training. A percentile rather than the minimum is used because the minimum across replicates is an extreme order statistic: its value falls as the replicate count rises, so a floor placed on it would encode the resampling budget rather than the support the cell actually carries. The diagnostic report and resampling seed are frozen with the analysis manifest.
+\noindent translates unequal case weights into the equivalent number of equally weighted split units. It decreases as weight concentrates. The preflight also records each split/class cell's number of contributing units and its largest unit-weight share. Table~\ref{tab:preflight} lists the three concentration checks; failing any one designates inference for that dataset--regime descriptive before training.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.34\linewidth}X@{}}
+    \toprule
+    Diagnostic & Threshold for descriptive-only designation \\
+    \midrule
+    Effective split-unit count & 2.5th percentile of $n_{\mathrm{Kish}}$ across replicates below five \\
+    Single-unit dominance & One unit supplies more than 50\% of a class's weight in more than 5\% of replicates \\
+    Cell support & A split/class cell has fewer than five contributing units \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Label-only preflight concentration checks. All three are evaluated before predictions exist; the designation is recorded rather than used to discard replicates.}
+  \label{tab:preflight}
+\end{table}
+
+\noindent A percentile rather than the minimum is used because the minimum across replicates is an extreme order statistic: its value falls as the replicate count rises, so a floor placed on it would encode the resampling budget rather than the support the cell actually carries. The diagnostic report and resampling seed are frozen with the analysis manifest.
 
 \paragraph{Intervals after model fitting.}
 The three split-unit partitions are fixed design repetitions and are averaged with equal weight; they are not treated as three independent cohorts. Tail assignments remain separate unless an assignment-averaged estimand is explicitly reported. Within each case-bootstrap replicate, the five matched confirmation-seed indices are also resampled as paired blocks and averaged before the splits are combined. This captures algorithmic variation without pretending that five model initializations create five additional case cohorts.
@@ -641,12 +712,10 @@ Balanced CE, imbalanced CE, and each mitigation method receive the same split-un
 This appendix fixes diagnostic feature construction and deliberately small association models used for RQ3. None of these quantities is allowed to use test outcomes as an input predictor.
 
 \paragraph{Measuring separability and learnability.}
-Intrinsic separability holds the evidence source constant. It uses one fixed balanced reference subset per dataset, regime, and split to ask whether Virchow2 already places the classes in distinguishable regions. Condition-specific learnability changes the reference to the exact balanced or imbalanced training manifest and asks how much class information remains accessible under that condition's realized support. The distinction is between inherent feature geometry and the evidence actually retained by one constructed condition.
-
-Both quantities are evaluated on the unchanged natural-validation cohort. Balanced $k$-nearest-neighbour (kNN) macro recall labels each validation embedding from its closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on the frozen reference embeddings; its macro recall is the primary separability or learnability summary. Per-class nearest-neighbour error is reported descriptively to show which classes overlap. None of these diagnostics uses test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of a slide's eligible instances, avoiding a learned attention summary from the model being explained.
+The two diagnostics differ only in their reference set: intrinsic separability uses one fixed balanced reference subset per dataset, regime, and split, whereas condition-specific learnability uses the exact balanced or imbalanced training manifest of the condition being explained. Both are evaluated on the unchanged natural-validation cohort. Balanced $k$-nearest-neighbour (kNN) macro recall labels each validation embedding from its closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on the frozen reference embeddings; its macro recall is the primary separability or learnability summary. Per-class nearest-neighbour error is reported descriptively to show which classes overlap. None of these diagnostics uses test labels or CE test performance. Patch probes operate on patch embeddings. WSI probes use the mean and componentwise standard deviation of a slide's eligible instances, avoiding a learned attention summary from the model being explained.
 
 \paragraph{Sensitivity to correlated patches.}
-Raw patch count can overstate evidence when many patches come from the same case. Unique split-unit and slide counts therefore remain the primary support measures. As a secondary sensitivity analysis, within-case redundancy is summarized by the intraclass correlation (ICC) of a cross-fitted class margin. An ICC near zero means that patches from the same case are no more alike than patches from different cases; an ICC near one indicates strong redundancy.
+Unique split-unit and slide counts remain the primary support measures. As a secondary sensitivity analysis, within-case redundancy is summarized by the intraclass correlation (ICC) of a cross-fitted class margin: an ICC near zero means that patches from the same case are no more alike than patches from different cases, and an ICC near one indicates strong redundancy.
 
 For class $c$, let $G_c$ be the number of split-unit or slide clusters, $m_{gc}$ their sizes, and $N_c=\sum_gm_{gc}$. With between-cluster and within-cluster mean squares $\mathrm{MS}_{B,c}$ and $\mathrm{MS}_{W,c}$, the unequal-cluster-size correction and ICC are
 \begin{equation}
@@ -677,44 +746,49 @@ Parameters are estimated by maximum a posteriori (MAP) fitting: ordinary model f
 \label{app:training}
 This appendix records exact update budgets, validation-search rules, replication, and resource accounting. Main-text interpretation depends only on their matched and test-blind use.
 
-\subsection{Update budgets, selection, and replication}
-The frozen encoder, classifier family, optimizer family, batch definition, augmentation, and numerical precision are held fixed within a regime. Training is budgeted only in optimizer updates; epochs are neither a stopping rule nor a unit of comparison. Let $B$ be the regime's locked batch size and $T$ the common controlled support. A single-stage model receives
+\subsection{Update budgets and checkpoint selection}
+The frozen encoder, classifier family, optimizer family, batch definition, augmentation, and numerical precision are held fixed within a regime. Training is budgeted only in optimizer updates; epochs are neither a stopping rule nor a unit of comparison. With $B$ the regime's locked batch size and $T$ the common controlled support, the reference budget is
 \begin{equation}
   U=30\left\lceil\frac{T}{B}\right\rceil
   \label{eq:update-budget}
 \end{equation}
-updates, corresponding to 30 reference passes through $T$ examples under ordinary sampling. Balanced sampling, replacement, synthetic bags, and dual loaders do not change $U$. RankMix receives $U$ teacher updates and, after reinitialization, $U$ student updates. cRT receives $U$ stage-one updates and $\lceil0.2U\rceil$ stage-two classifier updates. MDE performs $U$ joint updates, each consuming its prespecified natural and balanced minibatches. The natural anchor's CE run uses the same formula with its own support and is descriptive. Processed examples, unique-example exposures, and updates are all reported. Each run stores validation metrics at fixed update intervals; the interval is scaled per dataset so the number of stored validation checkpoints is comparable across the widely differing controlled supports $T$, and the resolved value is recorded with every run. The selected checkpoint maximizes natural-validation balanced accuracy, with macro F1 and then lower NLL as deterministic tie-breakers. Test predictions are produced once from that locked checkpoint.
+\noindent updates, corresponding to 30 reference passes through $T$ examples under ordinary sampling. Table~\ref{tab:budgets} allocates that budget to the methods that do not consume it in a single stage.
 
-Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity, and the search adapts within a prespecified envelope rather than committing to a single fixed grid. Every trainable method draws its learning rate from a common seven-value envelope (Appendix~\ref{app:controls}); the active search window is the four adjacent envelope values used in the fixed-grid design, crossed with the method's imbalance-specific control where one applies. If the winning learning rate falls on either edge of the active window, that edge value is not accepted as an optimum: the window shifts one position toward the edge, the three overlapping candidates are reused rather than retrained, and only the one new candidate is fitted before the method is reselected. This repeats until the winner is interior to its window or the envelope's boundary is reached, at which point the boundary value is retained and the axis is recorded as tuning-limited. Focal loss and the two soft-label hybrids, CE + soft F1 and CE + soft MCC, apply the same shifting rule to their auxiliary-strength axis over a dedicated seven-value envelope (Appendix~\ref{app:controls}); every other method's imbalance-specific control keeps the fixed four-value grid in Table~\ref{tab:controls}, since its domain is naturally bounded. For weighted CE, balanced sampling, focal loss, CE + soft F1, and CE + soft MCC, an imbalance-specific strength of zero is mathematically identical to plain CE at the same learning rate: it applies no class reweighting or sampling adjustment, reduces the focal term to the plain cross-entropy loss, or drops the auxiliary term entirely. That configuration's metrics are therefore copied from CE's already-fitted same-learning-rate run rather than retrained, giving each of these five methods one additional comparison point at no extra training cost. Each axis's search is bounded to at most three rounds by the size of its envelope, and a resolved or tuning-limited axis is never retrained in a later round. CE and methods without a meaningful imbalance-specific control search the adaptive learning-rate envelope alone. Train-time logit adjustment is tuned jointly over $\tau$ and learning rate, with $\tau$ held to its fixed grid; post-hoc logit adjustment inherits the selected CE model and tunes only $\tau$ because it performs no gradient optimization.
-
-Every hyperparameter candidate is fitted with the same two tuning initialization seeds for each prespecified split-unit partition and tail assignment. Selection is performed separately for each method, dataset, prediction regime, and imbalance severity. Within each such selection unit, natural-validation balanced accuracy is averaged across both tuning seeds, all tuning splits, and all tail assignments. The configuration with the highest aggregate value is selected; macro F1 and then lower NLL are deterministic tie-breakers. The chosen configuration is locked before any of the five disjoint confirmation initialization seeds are fitted and before test evaluation. Tuning runs never enter confirmation effect estimates. For cRT, stage one inherits the selected CE configuration, while the stage-two classifier learning rate is selected separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
-
-A \emph{controlled contrast} is the difference between two matched runs, such as balanced CE versus imbalanced CE or a mitigation method versus imbalanced CE. The two runs use the same split-unit partition, tail assignment, confirmation-seed index, and held-out cases, so the contrast does not mix the intended change with a different cohort or replication. Each locked partition and tail assignment is repeated with the five confirmation seeds. Exactly three split-unit partition seeds are used; a dataset--regime unable to produce all three valid splits under the independent-support floors is excluded from the corresponding confirmatory analysis. The split counts, support floors, condition manifests, tuning and confirmation seeds, method grids, and update budgets are frozen in the signed analysis manifest before the first definitive fit. The unit of replication and all missing or failed runs are reported. A failed run is not silently replaced using a test-informed seed.
-
-Computational cost is separated into validation search and locked-configuration fitting. Resource use is summarized by wall-clock training time, accelerator-hours, and peak accelerator memory. Model size is reported as total and trainable parameter counts, while data exposure is reported as effective passes through unique training examples. Costs include every method-specific stage, including both cRT stages, but exclude the one-time frozen-feature extraction shared by all methods. Hardware and software environments are recorded with each run.
-
-\begin{landscape}
-\section{Reproducibility and Execution Workflow}
-\label{app:overview}
-
-\begin{figure}[H]
+\begin{table}[ht]
   \centering
-  \includegraphics[width=0.92\linewidth,keepaspectratio]{assets/cls_imb_benchmark.png}
-  \caption{Operational workflow of the controlled class-imbalance benchmark. The validation search is split into a self-contained phase, in which every candidate is fitted from scratch and needs no other method's result, and a CE-inherited phase, in which post-hoc logit adjustment and cRT reuse a condition's selected CE configuration and so cannot begin until that condition's CE search has resolved.}
-  \label{fig:benchmark-overview}
-\end{figure}
-\end{landscape}
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.26\linewidth}X@{}}
+    \toprule
+    Method & Optimizer updates \\
+    \midrule
+    Single-stage default & $U$; every method not listed below \\
+    RankMix-inspired & $U$ teacher, then $U$ student after reinitialization \\
+    cRT & $U$ stage one, then $\lceil0.2U\rceil$ stage two on the classifier only \\
+    MDE-inspired & $U$ joint, each consuming its prespecified natural and balanced minibatch \\
+    Natural anchor (CE only) & Equation~\eqref{eq:update-budget} at its own support; descriptive, enters no matched contrast \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Allocation of the reference update budget $U$. Balanced sampling, replacement, synthetic bags, and dual loaders do not change $U$. Processed examples, unique-example exposures, and updates are all reported.}
+  \label{tab:budgets}
+\end{table}
 
-\section{Experimental Controls}
+\noindent Within a run, the reported checkpoint is fixed by three rules:
+\begin{enumerate}
+  \item Validation metrics are stored at fixed update intervals. The interval is scaled per dataset so the number of stored validation checkpoints is comparable across the widely differing controlled supports $T$, and the resolved value is recorded with every run.
+  \item The selected checkpoint maximizes natural-validation balanced accuracy; macro F1 and then lower NLL are deterministic tie-breakers.
+  \item Test predictions are produced once from that locked checkpoint.
+\end{enumerate}
+
+\subsection{Control grids and adaptive validation search}
 \label{app:controls}
-Every trainable method draws its learning rate from the common envelope
+Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity, and the search adapts within a prespecified envelope rather than committing to a single fixed grid. Every trainable method draws its learning rate from the common envelope
 \begin{equation}
-  \eta\in\{\num{1e-5},\num{3e-5},\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3},\num{1e-2}\},
+  \eta\in\{\num{1e-5},\num{3e-5},\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3},\num{1e-2}\}.
   \label{eq:learning-rate-grid}
 \end{equation}
-\noindent searched through a four-value active window that starts at the envelope's current-centered values $\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}$. Focal loss, CE + soft F1, and CE + soft MCC additionally draw their auxiliary strength from the seven-value envelopes listed in Table~\ref{tab:controls}, searched the same way through a four-value active window; a strength of zero is excluded from the searched window and instead serves as the CE-anchor point described in Section~\ref{sec:training}. Every other method's imbalance-specific control in Table~\ref{tab:controls} uses its listed four-value grid without an envelope. For a method with an active strength window, that window is crossed with the active learning-rate window; for a method without one, the learning-rate window is searched alone or crossed with the fixed grid in Table~\ref{tab:controls}. Either way the result is at most 16 candidate configurations per method, dataset, regime, and severity in any one search round. When a window's winning value is an edge value, the window shifts by one envelope position, and only the newly added candidates are fitted; the three overlapping candidates already fitted in an earlier round are always reused, never retrained. This can repeat for at most three rounds on the learning-rate axis, three rounds on focal loss's strength axis, and two rounds on the soft-F1/soft-MCC strength axis, bounded by each envelope's length. Every candidate fitted, every window shift, and the resolved-or-tuning-limited outcome of each axis are completed and recorded in the signed analysis manifest before the corresponding method enters confirmation. No test data and no confirmation-stage result ever informs a shift, and no grid is changed once confirmation training begins.
+\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC draw their strength from a seven-value envelope searched through the same adaptive window as the learning rate; every other control is a fixed four-value grid, since its domain is naturally bounded. Both axes follow the search below, in which an edge winner is never accepted as an optimum: a bounded number of window shifts replaces a single fixed grid, at the cost of one new candidate per shift.
 
-\begin{table}[H]
+\begin{table}[ht]
   \centering
   \footnotesize
   \begin{tabularx}{\linewidth}{@{}lX@{}}
@@ -732,13 +806,60 @@ Every trainable method draws its learning rate from the common envelope
     MDE-inspired & consistency weight $\lambda_{\mathrm{con}}\in\{0,0.1,0.25,0.5\}$ \\
     \bottomrule
   \end{tabularx}
-  \caption{Prespecified method-specific grids crossed with the active window of the learning-rate envelope in Equation~\eqref{eq:learning-rate-grid}. Focal loss and the two soft-label hybrids search their listed envelope through an adaptive four-value window, shifting as described in Section~\ref{sec:training}; every other row is a fixed four-value grid. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately.}
+  \caption{Prespecified method-specific controls, crossed with the active window of the learning-rate envelope in Equation~\eqref{eq:learning-rate-grid}. Focal loss and the two soft-label hybrids search their listed envelope through an adaptive four-value window; every other row is a fixed four-value grid. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately.}
   \label{tab:controls}
 \end{table}
 
-For every realized condition, the experiment record contains dataset version; eligibility rules; split-unit, slide, and patch identifiers by partition; requested and achieved $T$ and $\rho$; class assignment; all seed families and their tuning, confirmation, pilot, or definitive roles; pilot patch quota; bootstrap-preflight diagnostics; model and optimizer configuration; candidate grid; selected checkpoint; environment identifier; and test-prediction hash. Deviations are dated and justified before the affected test labels are accessed.
+\begin{center}
+  \fbox{%
+  \begin{minipage}{0.94\linewidth}
+    \small
+    \textbf{Adaptive window search}, run once per method, dataset, prediction regime, and imbalance severity.
+    \begin{enumerate}\setlength{\itemsep}{1pt}
+      \item Initialize each active window to four adjacent envelope values: $\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}$ for the learning rate, and the start listed in Table~\ref{tab:controls} for an adaptive strength axis.
+      \item Fit the active learning-rate window crossed with the method's strength window or fixed grid: at most 16 candidates in any one round. Candidates fitted in an earlier round are reused, never retrained.
+      \item If an axis's winning value is interior to its window, record the axis as \emph{resolved} and stop searching it.
+      \item If the winner is an edge value and the envelope extends further in that direction, shift the window one position toward that edge and return to step 2. Only the single newly added candidate is fitted; the three overlapping candidates are reused.
+      \item If the winner is an edge value at the envelope's boundary, retain the boundary value and record the axis as \emph{tuning-limited}.
+    \end{enumerate}
+    \textbf{Round bounds.} At most three rounds on the learning-rate axis, three on focal loss's $\gamma$ axis, and two on the soft-F1 and soft-MCC strength axis, each bounded by its envelope's length. A resolved or tuning-limited axis is never retrained in a later round.
+  \end{minipage}}
+\end{center}
+
+For weighted CE, balanced sampling, focal loss, CE + soft F1, and CE + soft MCC, an imbalance-specific strength of zero is mathematically identical to plain CE at the same learning rate: it applies no class reweighting or sampling adjustment, reduces the focal term to the plain cross-entropy loss, or drops the auxiliary term entirely. That value is therefore excluded from the searched window, and its metrics are copied from CE's already-fitted same-learning-rate run rather than retrained, giving each of these five methods one additional comparison point at no extra training cost.
+
+Four method families deviate from the search above. CE and methods without a meaningful imbalance-specific control search the learning-rate envelope alone. Train-time logit adjustment is tuned jointly over $\tau$ and learning rate, with $\tau$ held to its fixed grid. Post-hoc logit adjustment inherits the selected CE model and tunes only $\tau$, because it performs no gradient optimization. cRT inherits the selected CE configuration for stage one and selects its stage-two classifier learning rate separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
+
+\subsection{Replication, locking, and records}
+Selection and replication follow prespecified units rather than per-run judgement:
+\begin{itemize}\setlength{\itemsep}{1pt}
+  \item \textbf{Tuning seeds.} Every candidate is fitted with the same two tuning initialization seeds for each prespecified split-unit partition and tail assignment.
+  \item \textbf{Selection unit.} One method, dataset, prediction regime, and imbalance severity. Within it, natural-validation balanced accuracy is averaged across both tuning seeds, all tuning splits, and all tail assignments; the highest aggregate is selected, with macro F1 and then lower NLL as deterministic tie-breakers.
+  \item \textbf{Locking.} The chosen configuration is locked before any of the five disjoint confirmation initialization seeds is fitted and before test evaluation. Tuning runs never enter confirmation effect estimates.
+  \item \textbf{Confirmation.} Each locked partition and tail assignment is repeated with the five confirmation seeds. Exactly three split-unit partition seeds are used; a dataset--regime unable to produce all three valid splits under the independent-support floors is excluded from the corresponding confirmatory analysis.
+  \item \textbf{Matching.} The two runs of a controlled contrast (Appendix~\ref{app:terms}) share split-unit partition, tail assignment, confirmation-seed index, and held-out cases, so the contrast does not mix the intended change with a different cohort or replication.
+  \item \textbf{Failures.} The unit of replication and all missing or failed runs are reported. A failed run is never silently replaced using a test-informed seed.
+\end{itemize}
+
+Split counts, support floors, condition manifests, tuning and confirmation seeds, method grids, and update budgets are frozen in the signed analysis manifest before the first definitive fit. Every candidate fitted, every window shift, and the resolved-or-tuning-limited outcome of each axis are recorded there before the corresponding method enters confirmation. No test data and no confirmation-stage result ever informs a shift, and no grid is changed once confirmation training begins.
+
+For every realized condition, the experiment record contains
+\begin{itemize}\setlength{\itemsep}{1pt}
+  \item dataset version and eligibility rules;
+  \item split-unit, slide, and patch identifiers by partition;
+  \item requested and achieved $T$ and $\rho$, and the class assignment;
+  \item all seed families and their tuning, confirmation, pilot, or definitive roles;
+  \item pilot patch quota and bootstrap-preflight diagnostics;
+  \item model and optimizer configuration, candidate grid, and selected checkpoint;
+  \item environment identifier and test-prediction hash.
+\end{itemize}
+\noindent Deviations are dated and justified before the affected test labels are accessed.
+
+Computational cost is separated into validation search and locked-configuration fitting, and reported as wall-clock training time, accelerator-hours, and peak accelerator memory; total and trainable parameter counts; and effective passes through unique training examples. Costs include every method-specific stage, including both cRT stages, but exclude the one-time frozen-feature extraction shared by all methods. Hardware and software environments are recorded with each run.
+
 
 \section{Terminology}
+\label{app:terms}
 \begin{description}
   \item[Natural anchor.] The full eligible natural training partition, fitted with the CE reference alone. It is descriptive and may have a different size from controlled conditions.
   \item[Size-matched balanced reference.] A training subset with total support $T$ and approximately equal class counts; it defines the counterfactual reference in $D_M$.
