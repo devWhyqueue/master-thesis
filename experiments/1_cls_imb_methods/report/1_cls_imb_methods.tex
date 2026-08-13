@@ -26,7 +26,7 @@ Methods for Patch Classification and WSI-Level MIL}
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report is the authoritative method reference for the class-imbalance benchmark. It defines sampling, loss, prior-correction, decoupled-classifier, set-learning, feature-mixing, contrastive-MIL, and dual-expert interventions in the input form each consumes, with cross-entropy as the no-mitigation reference. The methods are characterized along two orthogonal axes: the signal that identifies a class or example as needing mitigation---prevalence, independent evidence, difficulty, or coverage---and the level at which the intervention acts. Read along the first axis, the roster is concentrated on prevalence, which locates the mechanisms the benchmark can separate and those it cannot. The report also distinguishes faithful source implementations from deliberately adapted variants and states the output semantics and assumptions needed to interpret each intervention.
+\noindent Class imbalance in computational pathology depends on the input regime: labeled image patches support ordinary classification, whereas whole-slide image (WSI) diagnosis is commonly modeled as weakly supervised learning over patch-feature bags. This report is the thesis's authoritative reference for class-imbalance mitigation methods. It defines sampling, loss, prior-correction, decoupled-classifier, set-learning, feature-mixing, feature-synthesis, contrastive-MIL, and dual-expert interventions in the input form each consumes, with cross-entropy as the no-mitigation reference. The methods are characterized along two orthogonal axes: the signal that identifies a class or example as needing mitigation---prevalence, independent evidence, difficulty, or coverage---and the level at which the intervention acts. Read along the first axis, the roster remains anchored on prevalence but carries explicit contrasts for diminishing count support, class-level difficulty, and the reconstruction of sparse tail support, which locates the mechanisms the tested roster can separate and those it cannot. The report also distinguishes faithful source implementations from deliberately adapted variants and states the output semantics and assumptions needed to interpret each intervention.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -38,14 +38,14 @@ Class imbalance changes what a pathology classifier is rewarded for learning. Wh
 
 Imbalance methods often assume a specific prediction unit. Image-level methods use labeled images, image embeddings, or directly generated image samples, whereas WSI-level methods use weak labels over bags of instances together with attention, instance ranking, or bag-level representation learning. Each method family is therefore described in the input form it is designed to consume. The broader computational-pathology pipeline these regimes sit in---whole-slide imaging, patching into tiles, and weakly supervised multiple-instance learning over frozen foundation-model features---is introduced in the companion datasets report \citep{queisler2026datasets}.
 
-This report defines the class-imbalance mitigation methods themselves, organized by the level at which they intervene and stated in enough mathematical detail to make the imbalance mechanism explicit. Established methods differ not only in that intervention level but also in the signal they use to infer which observations require mitigation, and most of them use class frequency for that purpose. A low class count, however, conflates several distinct shortages: a small share relative to the other classes, a small absolute amount of independent evidence, intrinsic difficulty under the available representation, and poor coverage of the class's own variation. Section~\ref{sec:taxonomy} therefore makes both readings of the roster explicit, so that frequency is treated as a proxy for mitigation need rather than as its established cause. The aim is not to introduce a new mitigation method, but to fix the method definitions, assumptions, and fidelity qualifications used when instantiating these methods on specific pathology datasets. The companion experimental protocol defines the controlled datasets, validation grids, evaluation endpoints, calibration procedure, aggregation units, and statistical analysis.
+This report defines the class-imbalance mitigation methods themselves, organized by the level at which they intervene and stated in enough mathematical detail to make the imbalance mechanism explicit. Established methods differ not only in that intervention level but also in the signal they use to infer which observations require mitigation, and most of them use class frequency for that purpose. A low class count, however, conflates several distinct shortages: a small share relative to the other classes, a small absolute amount of independent evidence, intrinsic difficulty under the available representation, and poor coverage of the class's own variation. Section~\ref{sec:taxonomy} therefore makes both readings of the roster explicit, so that frequency is treated as a proxy for mitigation need rather than as its established cause. The aim is not to introduce a new mitigation method, but to fix the method definitions, assumptions, and fidelity qualifications used when instantiating these methods on specific pathology datasets.
 
 \paragraph{Prediction regimes.}
-Two prediction regimes recur throughout the benchmarks. In the \emph{patch} regime, each labeled crop is an independent example: a frozen foundation-model encoder such as Virchow2 embeds the patch once, and a lightweight classifier head is trained on the resulting embedding \citep{zimmermann2024virchow2,vorontsov2024virchow}. In the \emph{WSI-bag} regime, a slide is represented as a bag of frozen patch-feature instances that share one weak slide-level label, and an attention-based MIL head aggregates the instances into a slide prediction. Both regimes consume embeddings from the same pathology foundation-model family but differ in supervision unit. Freezing the encoder isolates imbalance interventions from end-to-end backbone learning. Each non-baseline method exposes one imbalance-specific control; the concrete validation grids are reported in the companion experimental protocol.
+Two prediction regimes recur throughout this thesis. In the \emph{patch} regime, each labeled crop is an independent example: a frozen foundation-model encoder such as Virchow2 embeds the patch once, and a lightweight classifier head is trained on the resulting embedding \citep{zimmermann2024virchow2,vorontsov2024virchow}. In the \emph{WSI-bag} regime, a slide is represented as a bag of frozen patch-feature instances that share one weak slide-level label, and an attention-based MIL head aggregates the instances into a slide prediction. Both regimes consume embeddings from the same pathology foundation-model family but differ in supervision unit. Freezing the encoder isolates imbalance interventions from end-to-end backbone learning. Each non-baseline method exposes one imbalance-specific control, whose concrete search grid is an experimental decision rather than part of the method definition.
 
 \section{Taxonomy}
 \label{sec:taxonomy}
-Two questions organize the benchmarked methods. The first asks which signal a method consults to infer \emph{that} a class or an example needs help; the second asks at which level of the training pipeline it acts on that inference. The questions are independent, and neither answers the other: class-weighted CE gives example $i$ a weight $w_i=f(n_{y_i})$ that depends only on how many training examples share its class, while focal loss gives it a weight $w_i=f(p_{y_i})$ that depends only on how confidently the model already predicts its label, so two methods that are both loss reweighting can rest on entirely different assumptions about what causes tail failure. This section fixes the notation used throughout and then defines both axes.
+Two questions organize the tested methods. The first asks which signal a method consults to infer \emph{that} a class or an example needs help; the second asks at which level of the training pipeline it acts on that inference. The questions are independent, and neither answers the other: class-weighted CE gives example $i$ a weight $w_i=f(n_{y_i})$ that depends only on how many training examples share its class, while focal loss gives it a weight $w_i=f(p_{y_i})$ that depends only on how confidently the model already predicts its label, so two methods that are both loss reweighting can rest on entirely different assumptions about what causes tail failure. This section fixes the notation used throughout and then defines both axes.
 
 \subsection{Notation}
 Let $C$ be the number of target classes and let $n_c$ denote the number of training examples from class $c$, so that $N=\sum_{j=1}^{C}n_j$ is the training-set size and $\pi_c=n_c/N$ is the empirical prevalence of class $c$. For a labeled patch or slide-level bag with label $y\in\{1,\ldots,C\}$, the model outputs logits $\mathbf{z}\in\mathbb{R}^{C}$ and class probabilities
@@ -64,19 +64,19 @@ The intervention axis records where in the learning problem a method acts. Cross
   \begin{tikzpicture}[
     box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, font=\small, minimum height=0.72cm},
     baseline/.style={box, fill=gray!10, minimum width=3.0cm},
-    family/.style={box, fill=blue!6, text width=2.45cm},
-    method/.style={box, fill=white, text width=2.45cm},
+    family/.style={box, fill=blue!6, text width=2.75cm},
+    method/.style={box, fill=white, text width=2.75cm},
     arrow/.style={-{Latex[length=2mm]}, thick}
   ]
     \node[baseline] (ce) at (0,0) {No-mitigation\\baseline\\CE / MIL CE};
     \node[family] (data) at (-4.8,-1.95) {Data-level sampling and augmentation};
     \node[method, below=0.38cm of data] (dataMethods) {Balanced sampling\\RankMix-inspired};
     \node[family] (loss) at (-1.6,-1.95) {Losses and prior correction};
-    \node[method, below=0.38cm of loss] (lossMethods) {Weighted CE\\Focal loss\\Logit adjustment\\CFAL (patch)};
+    \node[method, below=0.38cm of loss] (lossMethods) {Weighted CE\\Class-balanced CE\\Focal loss\\Pilot-difficulty CE\\Logit adjustment\\CFAL (patch)};
     \node[family] (hybrid) at (1.6,-1.95) {Hybrid sampling--loss};
     \node[method, below=0.38cm of hybrid] (hybridMethods) {CE + soft F1\\CE + soft MCC\\OKO (patch)\\MDE-inspired (WSI)};
     \node[family] (repr) at (4.8,-1.95) {Representation and architecture};
-    \node[method, below=0.38cm of repr] (reprMethods) {cRT\\SC-MIL (WSI)};
+    \node[method, below=0.38cm of repr] (reprMethods) {cRT\\LADC-inspired (patch)\\SC-MIL (WSI)};
     \draw[arrow] (ce.south) -- (data.north);
     \draw[arrow] (ce.south) -- (loss.north);
     \draw[arrow] (ce.south) -- (hybrid.north);
@@ -86,7 +86,7 @@ The intervention axis records where in the learning problem a method acts. Cross
     \draw[arrow] (hybrid) -- (hybridMethods);
     \draw[arrow] (repr) -- (reprMethods);
   \end{tikzpicture}
-  \caption{Intervention-level organization of the benchmarked methods. Cross-entropy is the no-mitigation reference; alternatives intervene through sampling, objectives, prior correction, feature mixing, or representation and classifier design. Table~\ref{tab:signal-intervention} adds the orthogonal signal axis.}
+  \caption{Intervention-level organization of the tested methods. Cross-entropy is the no-mitigation reference; alternatives intervene through sampling, objectives, prior correction, feature mixing, feature synthesis, or representation and classifier design. Table~\ref{tab:signal-intervention} adds the orthogonal signal axis.}
   \label{fig:method-taxonomy}
 \end{figure}
 
@@ -104,7 +104,7 @@ Four signals suffice to describe the tested roster (Table~\ref{tab:signals}). Th
     Signal & What it describes & Representative quantity \\
     \midrule
     Prevalence & Share of class $c$ relative to the remaining classes & $\pi_c$, support rank, imbalance ratio $\rho$ \\
-    Evidence & Absolute amount of independent observation available for $c$ & $n_c$, distinct slides or patients, effective support $N_{\mathrm{eff},c}$ \\
+    Evidence & Absolute amount of independent observation available for $c$ & Distinct patients, cases, or slides, effective support $N_{\mathrm{eff},c}$; $n_c$ read absolutely rather than as a share \\
     Difficulty & How hard a class or example is to classify under a fixed representation & Loss, predicted confidence $p_y$, decision margin, class difficulty $d_c$ \\
     Coverage & How well the observed examples span the within-class variation of $c$ & Manifold coverage $\mathrm{cov}_c$, effective rank of the class spectrum \\
     \bottomrule
@@ -135,7 +135,9 @@ Unique unit counts are the primary measure, but they are coarse: two classes wit
   N_{\mathrm{eff},c}=\frac{n_c}{1+(\overline m_c-1)\operatorname{ICC}_c},
   \label{eq:neff}
 \end{equation}
-\noindent where $\overline m_c$ is the mean cluster size. The two limits make the quantity readable: with $\operatorname{ICC}_c=0$ the class retains its full count $n_c$, and with $\operatorname{ICC}_c=1$ it collapses to $n_c/\overline m_c$, one observation per contributing case. Equations~\eqref{eq:icc}--\eqref{eq:neff} adjust a patch count for redundancy; they do not replace independent-unit counts, and the choice of per-example score, its cross-fitting, and the reference sets used to compute it are experimental decisions rather than part of the definition. A method is evidence-aware when a quantity of this kind---$n_c$ read absolutely, a case or slide count, or $N_{\mathrm{eff},c}$---enters its weights or its sampler, rather than the relative share $\pi_c$.
+\noindent where $\overline m_c$ is the mean cluster size. The two limits make the quantity readable: with $\operatorname{ICC}_c=0$ the class retains its full count $n_c$, and with $\operatorname{ICC}_c=1$ it collapses to $n_c/\overline m_c$, one observation per contributing case. Equations~\eqref{eq:icc}--\eqref{eq:neff} adjust a patch count for redundancy; they do not replace independent-unit counts, and the choice of per-example score, its cross-fitting, and the reference sets used to compute it are experimental decisions rather than part of the definition. A method is evidence-aware when a quantity of this kind---an independent-unit count or $N_{\mathrm{eff},c}$---enters its weights or its sampler, rather than the relative share $\pi_c$.
+
+One distinction inside this signal matters for reading the roster, because two methods below weight classes by an \emph{effective number} that is not the quantity defined here. The class-balanced loss models diminishing returns as a function of the raw count alone through $E_c(\beta)$ in Equation~\eqref{eq:cb-effective-number}, and CFAL reuses the same construction. Both therefore read $n_c$ absolutely, which already separates them from the prevalence-driven methods, but neither asks how many independent units those examples came from: a class of \num{5000} patches drawn from four cases and one drawn from four hundred receive identical weights. Equation~\eqref{eq:neff} models the opposite quantity, redundancy-adjusted independent evidence, and is silent about diminishing returns. Substituting $N_{\mathrm{eff},c}$ for $n_c$ inside $E_c$ would combine them, but the result is a thesis-specific construction rather than the established class-balanced loss, so it belongs to a sensitivity analysis rather than to the tested roster.
 
 \subsubsection{Difficulty}
 Difficulty is how hard a class or an example is to classify under a fixed representation, independently of how often it occurs. At example level it is read from the model's own state during training: the current loss, the predicted probability $p_y$ of the true class, or the margin between the true-class score and its strongest competitor. At class level it is measured as a probe error, for instance
@@ -174,7 +176,7 @@ Let $\{r_1,\ldots,r_{M_c}\}$ be the $M_c$ reference embeddings of class $c$ and 
 Two conditions keep Equation~\eqref{eq:coverage} from re-measuring a signal already defined above. Coverage estimated on more examples is mechanically larger, so classes must be compared at a matched sample size, by subsampling every class to the scarcest count and averaging over draws; otherwise the estimate tracks $n_c$ and reproduces prevalence or evidence under a different name. For the same reason the sampling unit must be the case rather than the patch, since several hundred crops of one biopsy occupy a single neighbourhood and would otherwise read as broad coverage. A further caution applies whenever training support is itself manipulated: subsampling a class changes which regions of it remain represented, so coverage of a constructed training manifest is partly an outcome of the allocation rather than a fixed property of the class. Read as a property of the class, it must be estimated on the eligible pool; read as a property of a training condition, it describes what that condition preserved. Neither reading is consulted by any method in the roster below.
 
 \subsubsection{Reading the Roster along Both Axes}
-Signals are not to be confused with side effects. A method is treated as aware of a signal only when a quantity of that type enters its sampler, its objective, or its decision rule. Several methods reshape a property they never measure: RankMix-inspired mixing interpolates feature subsequences and thereby broadens coverage, SC-MIL compacts and separates bag embeddings, and the CFAL diversity regularizer spreads class prototypes apart. None of them computes a coverage statistic and adapts its behaviour to it. Table~\ref{tab:signal-intervention} therefore records what each method consults alongside what it changes, and marks the difference between shaping a property and measuring it.
+Signals are not to be confused with side effects. A method is treated as aware of a signal only when a quantity of that type enters its sampler, its objective, or its decision rule. Several methods reshape a property they never measure: RankMix-inspired mixing interpolates feature subsequences and thereby broadens coverage, SC-MIL compacts and separates bag embeddings, and the CFAL diversity regularizer spreads class prototypes apart. LADC-inspired feature calibration is the strongest instance of the same asymmetry, since repairing sparse tail support is its explicit purpose, yet it too is triggered by class support rather than by an estimate of what the class fails to span. None of them computes a coverage statistic and adapts its behaviour to it. Table~\ref{tab:signal-intervention} therefore records what each method consults alongside what it changes, and marks the difference between shaping a property and measuring it.
 
 \begin{table}[ht]
   \centering
@@ -189,9 +191,12 @@ Signals are not to be confused with side effects. A method is treated as aware o
     Weighted CE & Prevalence, through $n_c^{-s}$ & Per-example loss weight \\
     Logit adjustment & Prevalence, through $\widehat{\pi}_c$ explicitly & Logit and prior correction \\
     cRT & Prevalence, through balanced stage-two exposure & Classifier refit on a frozen representation \\
+    Class-balanced CE & Absolute count with diminishing returns, through the effective number $E_c(\beta)$ & Per-example loss weight \\
     Focal loss & Difficulty, through the per-example confidence $p_y$ & Per-example loss weight \\
+    Pilot-difficulty weighted CE & Difficulty, through the locked classwise probe score $d_c$ & Per-example class-dependent loss weight \\
     \regimehead{Patch regime}{only}
-    CFAL & Evidence, through the effective number $E_c$ of class $c$; difficulty, through $(1-a_{i,y_i})^{\gamma}$; shapes coverage without measuring it & Prototype head and margin objective \\
+    CFAL & Absolute count, through the effective number $E_c$ of class $c$; difficulty, through $(1-a_{i,y_i})^{\gamma}$; shapes coverage without measuring it & Prototype head and margin objective \\
+    LADC-inspired feature calibration & Tail-distribution sparsity and the feature statistics of neighbouring head classes; repairs coverage without measuring it & Calibrated feature synthesis and classifier refit on a frozen representation \\
     CE + soft F1 & Prevalence, through balanced sampling and equal classwise weight in the macro term & Sampler and auxiliary objective \\
     CE + soft MCC & Prevalence, through balanced sampling and the batch marginals $t_c,p_c$ & Sampler and auxiliary objective \\
     OKO & Prevalence, through uniform pair-class sampling & Set construction and set-aggregated loss \\
@@ -205,7 +210,7 @@ Signals are not to be confused with side effects. A method is treated as aware o
   \label{tab:signal-intervention}
 \end{table}
 
-\noindent Read this way, the roster is concentrated on one signal. Eight of the twelve interventions consult prevalence alone, and SC-MIL adds a ninth partial case through class-aware batching. Focal loss is the only objective driven purely by difficulty, joined by the teacher ranking inside RankMix-inspired mixing at instance level. CFAL is the only method whose class weighting derives from an absolute count rather than a relative share, since its effective number $E_c$ is a function of $n_c$ and $\beta$ alone. No tested method measures coverage. That concentration is a property of the established literature these methods come from, and it identifies where the benchmark can and cannot separate mechanisms: contrasts between prevalence-aware methods vary the intervention while holding the signal fixed, whereas the difficulty and evidence dimensions are represented too sparsely for a comparable within-signal contrast. The companion experimental protocol takes up the quantities defined above---$d_c$, $N_{\mathrm{eff},c}$, and their alignment with allocated support---as exploratory predictors, which is where the difficulty and evidence dimensions are examined directly rather than through the method roster.
+\noindent Read this way, the roster remains anchored on one signal but is no longer confined to it. Eight of the fifteen interventions consult prevalence alone, and SC-MIL adds a ninth partial case through class-aware batching. Difficulty is consulted at two different units: focal loss and the teacher ranking inside RankMix-inspired mixing score individual examples, while pilot-difficulty weighted CE scores whole classes from a locked balanced probe. Absolute count enters through the effective number of class-balanced CE and of CFAL, with CB-CE isolating that mechanism from the prototype head, margin objective, and affinity weighting that CFAL bundles with it. No tested method measures coverage, although LADC-inspired calibration intervenes on it directly by reconstructing tail feature support. The remaining concentration is a property of the established literature these methods come from, and it identifies where this roster can and cannot separate mechanisms: contrasts between prevalence-aware methods vary the intervention while holding the signal fixed, difficulty now admits a within-signal contrast between its example-level and class-level readings, and evidence and coverage remain represented by too few methods for a comparable comparison. The quantities defined above---$d_c$, $N_{\mathrm{eff},c}$, and their alignment with allocated support---are therefore carried forward as predictors in their own right, which is how the difficulty and evidence dimensions are examined directly rather than through the method roster.
 
 \section{Methods}
 \label{sec:methods}
@@ -231,7 +236,7 @@ Balanced sampling changes minibatch composition by sampling training examples wi
 After normalization across the training set, $s=0$ recovers ordinary sampling and $s=1$ gives equal expected exposure to every class; intermediate values partially rebalance the data. The patch variant applies this sampler to patch examples and still optimizes CE. The MIL variant applies the same idea at slide-bag level and also optimizes CE. Balanced sampling therefore tests a pure data-level intervention without changing the loss formula.
 
 \subsubsection{RankMix-Inspired Feature Mixing}
-RankMix is a WSI-native data-augmentation method for weakly supervised slide classification. Ordinary image mixup assumes two inputs with compatible spatial shapes, but WSI bags can contain different numbers of feature instances and lack instance-level labels. RankMix addresses this by mixing representative feature subsequences rather than raw slides \citep{chen2023rankmix}. The benchmark variant is called \emph{RankMix-inspired} because it preserves the source method's teacher ranking, representative subsequence selection, feature interpolation, mixed labels, and reinitialized student, but does not reproduce the paper's complete combination of instance-max and bag-level objectives. Its student instead uses soft-label CE on the mixed bag prediction. Results therefore test this specified adaptation, not a faithful reproduction of the full source method.
+RankMix is a WSI-native data-augmentation method for weakly supervised slide classification. Ordinary image mixup assumes two inputs with compatible spatial shapes, but WSI bags can contain different numbers of feature instances and lack instance-level labels. RankMix addresses this by mixing representative feature subsequences rather than raw slides \citep{chen2023rankmix}. The tested variant is called \emph{RankMix-inspired} because it preserves the source method's teacher ranking, representative subsequence selection, feature interpolation, mixed labels, and reinitialized student, but does not reproduce the paper's complete combination of instance-max and bag-level objectives. Its student instead uses soft-label CE on the mixed bag prediction. Results therefore test this specified adaptation, not a faithful reproduction of the full source method.
 
 The tested implementation follows the defining two-stage teacher--student procedure. First, a teacher attention-MIL model is trained with slide labels for exactly the protocol-defined budget $U$ of optimizer updates, using the same MIL architecture and optimization settings as plain MIL CE. For each bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ and target class, the teacher assigns ranking scores to instances using its softmax probability for that class; the top-$k$ instances are kept as a representative subsequence, where $k=\min(|B_a|,|B_b|)$ for the two bags being mixed, and their original within-bag order is preserved after selection. The student MIL model is then reinitialized and receives its own $U$ updates on bags built from these ranked subsequences.
 
@@ -268,6 +273,32 @@ Class-weighted CE multiplies each example's CE term by a class-dependent cost co
 \end{equation}
 The implementation normalizes these weights so that their mean across classes is one. Here $s=0$ recovers unweighted CE and $s=1$ gives inverse-frequency weighting; intermediate values reduce the correction. This method leaves the sample order and model architecture unchanged, but increases the loss contribution of classes with fewer training examples. It is evaluated for both patch classification and attention-MIL.
 
+\subsubsection{Class-Balanced Cross-Entropy by Effective Number}
+\label{sec:cb-ce}
+Class-balanced (CB) cross-entropy replaces inverse-frequency weighting by a saturating notion of how much a class count is worth \citep{cui2019classBalanced}. Its premise is that additional examples of a class need not contribute linearly increasing information: as support grows, examples increasingly resemble ones already seen, so the marginal contribution of the next example diminishes. For class $c$ with training count $n_c$, the effective number of samples is
+\begin{equation}
+  E_c(\beta)=\frac{1-\beta^{n_c}}{1-\beta},
+  \qquad 0\leq\beta<1,
+  \label{eq:cb-effective-number}
+\end{equation}
+\noindent and the class weight is proportional to its inverse. As for class-weighted CE, the implementation normalizes the weights to mean one across classes,
+\begin{equation}
+  w_c^{\mathrm{CB}}(\beta)=
+  \frac{\widetilde w_c^{\mathrm{CB}}(\beta)}
+       {\frac{1}{C}\sum_{j=1}^{C}\widetilde w_j^{\mathrm{CB}}(\beta)},
+  \qquad
+  \widetilde w_c^{\mathrm{CB}}(\beta)=\frac{1-\beta}{1-\beta^{n_c}},
+  \label{eq:cb-weight}
+\end{equation}
+\noindent and optimizes
+\begin{equation}
+  \mathcal{L}_{\mathrm{CB}}(\mathbf z,y;\beta)=-w_y^{\mathrm{CB}}(\beta)\log p_y.
+  \label{eq:cb-ce}
+\end{equation}
+\noindent The single control $\beta$ sets the count scale at which those diminishing returns take effect. At $\beta=0$ every effective number equals one and the objective reduces to ordinary CE; as $\beta\rightarrow1$ the normalized weights approach inverse-count weighting. Intermediate values are the informative ones, because they separate a \emph{saturating} count correction from the power-law correction $n_c^{-s}$ of Equation~\eqref{eq:weighted-ce}: under the power law every doubling of class support changes the weight by the same factor, whereas under Equation~\eqref{eq:cb-weight} the weight stops responding once $n_c$ exceeds roughly $(1-\beta)^{-1}$. The reference default is $\beta=\num{0.999}$; $\beta$ is the imbalance control selected on validation.
+
+Two properties make this method the cleanest available isolation of the effective-number mechanism. First, $n_c$ enters absolutely rather than as a share, so unlike the prevalence-driven methods the weights change when a class profile is scaled rather than reshaped. Here $n_c$ is the prediction-unit count of the training condition: labeled patches for patch classification and labeled slides for WSI-level MIL. Second, CB-CE changes neither the sampler, the head geometry, nor the output semantics, while CFAL couples the same effective number to class prototypes, a margin objective, an affinity-based difficulty factor, and a diversity regularizer (Equation~\eqref{eq:cfal-total}). An effect of CFAL therefore cannot be attributed to its effective-number term alone, whereas an effect of CB-CE can. The method is evaluated in both regimes.
+
 \subsubsection{Focal Loss}
 Focal loss reduces the contribution of confidently classified examples and concentrates optimization on examples that remain difficult. With focusing parameter $\gamma$, the multiclass focal objective is
 \begin{equation}
@@ -276,6 +307,32 @@ Focal loss reduces the contribution of confidently classified examples and conce
   \label{eq:focal}
 \end{equation}
 The reference default is $\gamma=\num{2.0}$ for both regimes; $\gamma$ is the imbalance control selected on validation while the rest of the training protocol is held fixed. The method is relevant to imbalance because many minority-class examples can remain hard under a classifier dominated by head-class gradients, but the focal term does not directly encode the class counts. It is therefore a difficulty-sensitive loss rather than a sampler or explicit prior correction.
+
+\subsubsection{Pilot-Difficulty Weighted Cross-Entropy}
+\label{sec:pdw-ce}
+Class-difficulty based weighting (CDB-W) replaces class frequency by measured classwise prediction difficulty as the signal for cost-sensitive learning \citep{sinha2022classDifficulty}. It separates the assumption that a class is difficult because it is rare from the possibility that a comparatively frequent class remains intrinsically difficult under the available representation. In the source method, difficulty after epoch $e$ is
+\begin{equation}
+  d_{c,e}=1-A_{c,e},
+  \label{eq:cdb-difficulty}
+\end{equation}
+\noindent where $A_{c,e}$ is classwise accuracy on a separate balanced monitor set, and examples of class $c$ receive the weight $d_{c,e}^{\tau_e}$, so that the objective at epoch $e$ uses the difficulties measured at $e-1$. The source additionally schedules the exponent $\tau_e$ from the imbalance of classwise performance, which makes CDB-W a dynamic class-difficulty method rather than a count-based reweighting rule. The mechanism differs from focal loss in the unit it describes: focal loss asks whether \emph{this example} is currently hard through $p_y$, whereas CDB-W asks whether \emph{this class} is currently hard. A frequent but morphologically ambiguous class can therefore be upweighted above a rare but already separable one.
+
+\paragraph{Thesis adaptation.}
+A source-faithful implementation requires a balanced monitor set that is re-evaluated throughout training. The natural-validation cohort is the only held-out data of that kind, and it is reserved for hyperparameter and checkpoint selection; feeding it back as a per-epoch training signal would dissolve the separation between training and model selection. The tested variant therefore uses the class difficulty $d_c$ of Equation~\eqref{eq:difficulty}, obtained once from the class-balanced out-of-fold probe and locked before the training conditions are constructed. With a fixed $\epsilon>0$ that only prevents zero weights for a perfectly separated class, the mean-one normalized weight is
+\begin{equation}
+  w_c^{\mathrm{PDW}}(\tau)=
+  \frac{(d_c+\epsilon)^{\tau}}
+       {\frac{1}{C}\sum_{j=1}^{C}(d_j+\epsilon)^{\tau}},
+  \label{eq:pdw-weight}
+\end{equation}
+\noindent and the objective is
+\begin{equation}
+  \mathcal{L}_{\mathrm{PDW}}(\mathbf z,y;\tau)=-w_y^{\mathrm{PDW}}(\tau)\log p_y.
+  \label{eq:pdw-ce}
+\end{equation}
+\noindent The exponent $\tau\geq0$ is the single imbalance control: $\tau=0$ recovers ordinary CE, and larger values concentrate loss weight on the classes the balanced probe found hardest. Because this variant fixes difficulty in advance instead of tracking it during training, it is reported as \emph{pilot-difficulty weighted CE (CDB-W-inspired)} rather than as a reproduction of CDB-W. It is not a dynamic method: it cannot react to a class whose difficulty changes as training proceeds, and it inherits whatever estimation error the probe carries.
+
+That static reading is nevertheless the more informative one for a controlled comparison. Because $d_c$ is estimated on a balanced reference before support is allocated, it stays fixed while the training conditions vary which classes are placed in the tail. Under a difficulty-aligned assignment the scarce classes are also the hard ones, so difficulty weighting and frequency weighting favor the same classes; under a difficulty-reversed assignment they issue opposite instructions. The contrast between this method and class-weighted CE therefore separates whether a class benefits from mitigation because it is rare or because it is hard, which a difficulty score re-estimated inside each condition would confound. The method leaves the sampler and architecture unchanged and is evaluated in both regimes.
 
 \subsubsection{Logit Adjustment}
 Logit adjustment explicitly corrects for the empirical training prior \citep{menon2021longTail}. Let
@@ -299,7 +356,7 @@ The positive prior term makes head classes harder to fit during training, induci
 \end{equation}
 The sign difference follows from where the correction is applied: the train-time loss learns against prior-shifted logits, whereas the post-hoc rule removes the observed training prior from ordinary CE logits. Both patch and WSI regimes use the same definition at their respective prediction unit. Because either form deliberately changes the implied target prior, its probabilities should not be interpreted as calibrated for the natural test prevalence without an explicit target-prior assumption. Discrimination and calibration are therefore reported together, with post-hoc temperature scaling kept conceptually separate from prior correction.
 
-The benchmark retains score variants with different interpretations as separate outputs. For an ordinary CE score $z_c^{\mathrm{CE}}$, post-hoc logit adjustment uses $z_c^{\mathrm{CE}}-\tau\log\widehat\pi_c$ for class-balanced decisions; this score is not reported as a probability calibrated to the natural target prevalence. Under the prior-shift assumption, probabilities for a target prior $\pi_c^{\mathrm{target}}$ instead normalize the logits
+Score variants with different interpretations are retained as separate outputs. For an ordinary CE score $z_c^{\mathrm{CE}}$, post-hoc logit adjustment uses $z_c^{\mathrm{CE}}-\tau\log\widehat\pi_c$ for class-balanced decisions; this score is not reported as a probability calibrated to the natural target prevalence. Under the prior-shift assumption, probabilities for a target prior $\pi_c^{\mathrm{target}}$ instead normalize the logits
 \begin{equation}
   z_c^{\mathrm{CE}}-\log\widehat\pi_c+\log\pi_c^{\mathrm{target}}.
   \label{eq:posthoc-target-prior}
@@ -311,7 +368,7 @@ The benchmark retains score variants with different interpretations as separate 
 \end{equation}
 \noindent The unadjusted $z_c$ is the train-time method's validation-selected discrimination score but is fully prior-stripped only when $\tau=1$. The target prior is estimated separately on each natural-validation split and applied only to the corresponding test split. Temperature scaling is fitted on natural-validation NLL after the applicable target-prior correction and then applied unchanged to test logits. Raw, balanced-decision, target-prior-corrected, and temperature-scaled outputs remain separate; a single temperature corrects overall sharpness rather than class-specific prior mismatch.
 
-Balanced Softmax is closely related prior-correction literature: it modifies the softmax denominator using class frequencies and motivates the same distinction between representation learning under a long-tailed source and decision rules for a balanced target \citep{ren2020balancedMeta}. It is not an additional benchmark method; it is included to situate logit adjustment among count-aware softmax objectives.
+Balanced Softmax is closely related prior-correction literature: it modifies the softmax denominator using class frequencies and motivates the same distinction between representation learning under a long-tailed source and decision rules for a balanced target \citep{ren2020balancedMeta}. It is not an additional tested method; it is included to situate logit adjustment among count-aware softmax objectives.
 
 \subsubsection{Center-Focused Affinity Loss (CFAL)}
 Center-focused affinity loss (CFAL) replaces the linear softmax head with learnable class prototypes and an affinity-based training objective \citep{mahbub2024centerFocused}. The motivation is that minority histology classes can remain visually similar in embedding space even when a frozen encoder already separates them coarsely; pulling examples toward compact class centers and penalizing confusion with nearby wrong-class prototypes can therefore improve tail-class boundaries without changing the sampler.
@@ -341,7 +398,7 @@ Training optimizes a margin term on affinities rather than cross-entropy on logi
 \end{equation}
 \noindent where $E_c$ is the effective number of training examples in class $c$ derived from class count $n_c$ and hyperparameter $\beta$, and $\gamma$ up-weights examples whose true-class affinity remains low. Unlike the CE plus soft-F1 and soft-MCC hybrids, CFAL does not use balanced oversampling: it is categorized as an algorithm-level patch method because it changes the head and loss while keeping the natural training distribution.
 
-The reference defaults are $\lambda=\num{0.1}$, $\beta=\num{0.999}$, and $\gamma=\num{2.0}$ following Mahbub et al.; all three are held fixed and the affinity bandwidth $\sigma$ is the imbalance control selected on validation. The paper's $\sigma=\num{130}$ was calibrated for un-normalized AlexNet FC features; on L2-normalized \num{2560}-dimensional Virchow2 vectors that scale is far too large and collapses all pairwise affinities, so the benchmark evaluates a range matched to the normalized embedding geometry. CFAL is evaluated only in the patch regime because the source method assumes instance-level labels rather than weak slide-level bags.
+The reference defaults are $\lambda=\num{0.1}$, $\beta=\num{0.999}$, and $\gamma=\num{2.0}$ following Mahbub et al.; all three are held fixed and the affinity bandwidth $\sigma$ is the imbalance control selected on validation. The paper's $\sigma=\num{130}$ was calibrated for un-normalized AlexNet FC features; on L2-normalized \num{2560}-dimensional Virchow2 vectors that scale is far too large and collapses all pairwise affinities, so the tested implementation evaluates a range matched to the normalized embedding geometry. CFAL is evaluated only in the patch regime because the source method assumes instance-level labels rather than weak slide-level bags.
 
 \subsection{Hybrid Sampling--Loss Methods}
 Hybrid methods combine data-level and algorithm-level changes. The Scholz-style patch objectives below adapt the metric-derived losses of Scholz et al.\ for imbalanced medical classification \citep{scholz2024imbalanceAware}. Both tested variants use class-balanced oversampling together with metric-derived losses, so their effect cannot be attributed only to a new loss or only to a new sampler.
@@ -370,7 +427,7 @@ The obstacle is that ordinary F1 is computed from hard counts after prediction, 
   \left(1-\frac{1}{C}\sum_{c=1}^{C}\mathrm{F1}_{\mathrm{soft},c}\right).
   \label{eq:ce-soft-f1}
 \end{equation}
-\noindent The auxiliary weight $\lambda_{\mathrm{aux}}>0$ controls the contribution of the soft-F1 term and is selected on validation. The benchmark trains this loss with balanced sampling on the patch manifest. That design is important for interpretation: the loss tries to optimize a macro-style class metric, while the sampler ensures that tail classes occur often enough in minibatches for their soft-F1 terms to provide a regular training signal.
+\noindent The auxiliary weight $\lambda_{\mathrm{aux}}>0$ controls the contribution of the soft-F1 term and is selected on validation. This loss is trained with balanced sampling on the patch manifest. That design is important for interpretation: the loss tries to optimize a macro-style class metric, while the sampler ensures that tail classes occur often enough in minibatches for their soft-F1 terms to provide a regular training signal.
 
 \subsubsection{Scholz-Style CE + Soft MCC}
 The soft-MCC variant uses the same principle as soft F1---replace hard evaluation counts with differentiable probability masses---but starts from the Matthews correlation coefficient (MCC). Whereas F1 for one class depends mainly on that class's positive predictions, MCC is built from the full confusion matrix and therefore reacts to false positives, false negatives, and true negatives at the same time. In binary problems it is often preferred in imbalanced settings because it can remain informative when one class dominates the dataset: accuracy can look high while predictions are still systematically biased, but MCC penalizes both kinds of mistakes jointly.
@@ -424,7 +481,7 @@ Hard MCC replaces $\widehat{Y}$ by one-hot argmax predictions, which again block
   \left(1-\mathrm{MCC}_{\mathrm{soft}}\right).
   \label{eq:ce-soft-mcc}
 \end{equation}
-\noindent The auxiliary weight $\lambda_{\mathrm{aux}}>0$ has the same role and validation grid as in the soft-F1 hybrid. This variant is also evaluated only in the patch benchmark and is trained with class-balanced oversampling. The soft-F1 and soft-MCC variants therefore ask a focused question: once tail classes are regularly presented to the optimizer, does adding a differentiable version of a class-balanced evaluation metric improve the controlled patch classifier beyond CE and simple balanced sampling?
+\noindent The auxiliary weight $\lambda_{\mathrm{aux}}>0$ has the same role and validation grid as in the soft-F1 hybrid. This variant is also evaluated only in the patch regime and is trained with class-balanced oversampling. The soft-F1 and soft-MCC variants therefore ask a focused question: once tail classes are regularly presented to the optimizer, does adding a differentiable version of a class-balanced evaluation metric improve the controlled patch classifier beyond CE and simple balanced sampling?
 
 \subsubsection{Odd-K-Out (OKO) Set Learning}
 Standard cross-entropy optimizes each example independently, which has two relevant consequences under class imbalance. First, the gradient signal for a tail class arrives only when that class is sampled, so rare examples can be overwhelmed by frequent ones. Second, hard-label cross-entropy encourages logit values to diverge without bound, which is a known driver of overconfidence and poor calibration \citep{guo2017calibration}. OKO \citep{muttenthaler2024setLearning} addresses both problems simultaneously by replacing per-example cross-entropy with a set-level objective. Calibration is inherently a property of a model's output distribution over a collection of examples, and training on sets is a natural way to expose the model to that distributional structure during learning.
@@ -453,7 +510,7 @@ Following the main-text configuration of the original paper, the implementation 
 \end{equation}
 \noindent The total per-set loss is $\ell_{\mathrm{OKO}}+\ell_{\mathrm{aux}}$. The auxiliary head is discarded at inference, and single-example evaluation proceeds exactly as for any other classifier: the model accepts one patch feature vector and returns the logits from the main head. There is no inference overhead or architecture change at test time.
 
-OKO belongs in the hybrid sampling--loss category because the set construction couples a balanced class-sampling policy with a modified training objective; neither component is meaningful on its own. Balanced sampling via uniform pair-class selection ensures that all $C$ classes contribute equally to the gradient signal in expectation, which directly addresses the data-level imbalance problem. The aggregated set-level loss then introduces an implicit regularization on logit magnitude. Together these are not separable in the same way that standard cross-entropy and a WeightedRandomSampler are separable. In this benchmark OKO is evaluated in the patch feature regime only; the set-construction mechanism does not extend naturally to the attention-MIL bag encoder used in the WSI-bag benchmark.
+OKO belongs in the hybrid sampling--loss category because the set construction couples a balanced class-sampling policy with a modified training objective; neither component is meaningful on its own. Balanced sampling via uniform pair-class selection ensures that all $C$ classes contribute equally to the gradient signal in expectation, which directly addresses the data-level imbalance problem. The aggregated set-level loss then introduces an implicit regularization on logit magnitude. Together these are not separable in the same way that standard cross-entropy and a WeightedRandomSampler are separable. OKO is evaluated in the patch feature regime only; the set-construction mechanism does not extend naturally to the attention-MIL bag encoder of the WSI-bag regime.
 
 The number of odd classes $k$ controls set size and therefore the degree of logit averaging, and it is the imbalance control selected on validation. The paper's ablation experiments show that accuracy and calibration are insensitive to the specific value of $k$, and the default of $k=1$ is the computationally cheapest option; a moderate set size can nonetheless work best in practice without requiring the largest sets.
 
@@ -472,7 +529,42 @@ Classifier re-training (cRT) separates representation learning from classifier f
 \end{equation}
 where $q_{\mathrm{bal}}$ gives classes equal expected exposure. This isolates whether imbalance primarily distorts the decision boundary after a useful representation has already been learned.
 
-In the patch regime, stage one learns the common MLP head on frozen Virchow2 embeddings; cRT freezes its learned hidden representation and retrains a reinitialized linear output layer with balanced patch sampling. In the WSI regime, stage one learns the instance projection and attention aggregator; cRT freezes both components and retrains only a reinitialized bag classifier with balanced slide sampling. Validation selects the stage-two checkpoint, and its compute is reported in addition to stage-one training. The original cRT study considers several classifier normalization variants; the benchmark uses only the reinitialized linear-classifier variant specified here.
+In the patch regime, stage one learns the common MLP head on frozen Virchow2 embeddings; cRT freezes its learned hidden representation and retrains a reinitialized linear output layer with balanced patch sampling. In the WSI regime, stage one learns the instance projection and attention aggregator; cRT freezes both components and retrains only a reinitialized bag classifier with balanced slide sampling. Validation selects the stage-two checkpoint, and its compute is reported in addition to stage-one training. The original cRT study considers several classifier normalization variants; the tested implementation uses only the reinitialized linear-classifier variant specified here.
+
+\subsubsection{LADC-Inspired Calibrated Feature Synthesis}
+\label{sec:ladc}
+Every method above redistributes attention over the examples that were observed. Label-aware distribution calibration (LADC) instead addresses the estimate those examples support: with few examples, the class-conditional feature distribution of a tail class is poorly identified, and its covariance especially so. LADC transfers distributional statistics from better-supported classes that lie nearby in feature space and samples additional tail features from the calibrated result \citep{wang2024ladc}. The intervention is therefore feature-space support rather than gradient allocation, which is what places it opposite the reweighting family.
+
+Let $\mathbf h\in\mathbb{R}^{d}$ denote a feature representation from a frozen stage-one model. For a sufficiently supported class $j$, the class-conditional feature distribution is approximated by a Gaussian,
+\begin{equation}
+  p(\mathbf h\mid y=j)=
+  \mathcal{N}\bigl(\mathbf h\mid\boldsymbol\mu_j,\boldsymbol\Sigma_j\bigr),
+  \label{eq:ladc-head-gaussian}
+\end{equation}
+\noindent whose mean and covariance are estimated from that class's own features. For an observed tail feature $\widehat{\mathbf h}$, a set $S$ of nearby head classes is selected by the distance between $\widehat{\mathbf h}$ and the head-class means, and their statistics are combined into a prior through similarity weights $a_j$:
+\begin{align}
+  \boldsymbol\mu_0&=\sum_{j\in S}a_j\boldsymbol\mu_j,
+  \label{eq:ladc-prior-mean}\\
+  \boldsymbol\Sigma_0&=\sum_{j\in S}a_j^{2}\boldsymbol\Sigma_j+\alpha I.
+  \label{eq:ladc-prior-cov}
+\end{align}
+\noindent The additive term $\alpha I$ keeps the transferred covariance from becoming degenerate when the selected classes are few or mutually similar. The calibrated tail distribution then interpolates this prior with the observed feature,
+\begin{equation}
+  \boldsymbol\mu'=
+  \frac{\beta}{n_s+\beta}\boldsymbol\mu_0+
+  \frac{n_s}{n_s+\beta}\widehat{\mathbf h},
+  \qquad
+  \boldsymbol\Sigma'=\frac{\beta}{n_s+\beta}\boldsymbol\Sigma_0,
+  \label{eq:ladc-posterior}
+\end{equation}
+\noindent with $n_s=1$ for the instance-wise calibration used here, and synthetic tail features are drawn as $\widetilde{\mathbf h}\sim\mathcal{N}(\boldsymbol\mu',\boldsymbol\Sigma')$. The prior confidence $\beta$ governs the trade-off directly: large values pull the calibrated distribution toward the head-class statistics, small values keep it close to the observed tail feature and reproduce little beyond it.
+
+\paragraph{Thesis adaptation.}
+The tested variant isolates calibrated feature synthesis instead of reproducing the full source recipe, which additionally specifies a resampling temperature, a stage-one representation-enhancement step, and its own classifier-rebalancing choices. It is reported as \emph{LADC-inspired calibrated feature synthesis}. In the patch regime, $\mathbf h$ is the \num{512}-dimensional hidden representation of the locked stage-one CE model, the same layer CFAL replaces with prototypes. That trunk is frozen, synthetic features are generated for the tail classes until a prespecified target support is reached, and only the final linear classifier is refitted on observed and synthetic features together. The neighbourhood size $|S|$ and the covariance regularizer $\alpha$ are held fixed after standardizing the stage-one feature coordinates, leaving the prior confidence $\beta$ as the single imbalance control selected on validation.
+
+This construction makes the added mechanism identifiable against cRT. Both methods inherit a frozen stage-one representation and refit a reinitialized classifier, and both give the tail more influence in stage two; only the calibrated variant refits on features the training set never contained. A difference between them is therefore attributable to synthetic feature support rather than to decoupling. The interpretation has a firm limit: synthetic features reconstruct within-class variation under a Gaussian assumption and a head-class transfer, so they can recover directions the observed tail material fails to span, but they add no independent patient evidence and cannot correct a systematic gap shared by every contributing case.
+
+An exploratory WSI variant applies the same procedure to the frozen \num{256}-dimensional bag representation of the selected attention-MIL model. It is reported separately from the patch results for two reasons: LADC was developed for instance-labeled images rather than weakly supervised bags, and a rare diagnosis represented by a few dozen slides supports a covariance estimate in that space only weakly, so the transferred prior carries correspondingly more of the calibrated distribution.
 
 \subsubsection{SC-MIL}
 SC-MIL extends supervised contrastive learning to MIL by applying the contrastive objective to bag representations instead of assigning noisy slide labels to individual patches \citep{juyal2024scMil}. The motivation is that a slide label usually does not describe every patch in a bag. A cancer-type label can be correct for the slide while many instances contain background, normal tissue, technical noise, or weakly informative morphology. Applying contrastive learning directly to instances would therefore treat many patches as positives or negatives using labels they do not truly carry. SC-MIL avoids that mismatch by contrasting the aggregated slide-level representation.
@@ -487,7 +579,7 @@ The attention-MIL backbone first maps bag $B_i$ to an embedding $\mathbf{b}_i=\m
        {\sum_{a\ne i}\exp(\mathbf{r}_i^\top\mathbf{r}_a/\tau)}.
   \label{eq:scl}
 \end{equation}
-\noindent The numerator rewards similarity to same-class bags. The denominator compares that similarity against all other bags in the minibatch, so the loss favors representations where class clusters are compact and mutually separated. The temperature $\tau$ controls how sharply these similarities are weighted. The source reference is $\tau=\num{1.0}$; the benchmark retains it in the validation grid together with lower temperatures.
+\noindent The numerator rewards similarity to same-class bags. The denominator compares that similarity against all other bags in the minibatch, so the loss favors representations where class clusters are compact and mutually separated. The temperature $\tau$ controls how sharply these similarities are weighted. The source reference is $\tau=\num{1.0}$; it is retained in the validation grid together with lower temperatures.
 
 SC-MIL does not rely on contrastive learning alone. The contrastive term shapes the representation space, while CE trains the final class predictor. The tested variant combines them through a linear curriculum:
 \begin{equation}
@@ -501,7 +593,7 @@ SC-MIL does not rely on contrastive learning alone. The contrastive term shapes 
 \noindent Early training therefore emphasizes class-structured bag embeddings, when the classifier head is still unstable. As training progresses, $\beta_t$ decreases and more weight moves to CE, so the learned representation is tied back to the actual slide-level classification objective. Class-aware batching draws at least two slides for each represented class whenever class support permits; otherwise an anchor would have $|P(i)|=0$ and contribute no contrastive term. Training logs the number of valid anchors, ordered positive pairs $\sum_i|P(i)|$, and represented classes per batch. The normalization in Equation~\eqref{eq:scl} uses the actual number of ordered positive pairs, so unequal class multiplicities do not silently change the scale of the contrastive objective.
 
 \subsubsection{MDE-Inspired Dual-Expert MIL}
-The MDE-inspired variant uses distribution-specific experts and a cross-expert consistency term for long-tailed WSI classification \citep{ling2025mdeMil}. The full source method combines a dual-expert ensemble with multimodal distillation from a pathology foundation model. The benchmark implements only the ensemble component: a shared attention aggregator, two expert classification heads, and optional logit consistency under the same frozen Virchow2 bags as the other MIL methods. It omits CONCH-based multimodal distillation and is therefore not called a faithful MDE-MIL reproduction.
+The MDE-inspired variant uses distribution-specific experts and a cross-expert consistency term for long-tailed WSI classification \citep{ling2025mdeMil}. The full source method combines a dual-expert ensemble with multimodal distillation from a pathology foundation model. The tested implementation includes only the ensemble component: a shared attention aggregator, two expert classification heads, and optional logit consistency under the same frozen Virchow2 bags as the other MIL methods. It omits CONCH-based multimodal distillation and is therefore not called a faithful MDE-MIL reproduction.
 
 The shared trunk matches plain attention MIL: each bag $B=\{\mathbf{x}_1,\ldots,\mathbf{x}_m\}$ is encoded instance-wise, attention weights are computed with a linear scorer and softmax over instances, and the weighted sum yields a bag embedding $S(B)\in\mathbb{R}^{d}$. Two separate feed-forward experts then map $S$ to logits:
 \begin{equation}
@@ -537,7 +629,7 @@ At validation and test time, each slide bag is evaluated once in natural order w
 
 \section{Summary}
 \label{sec:summary}
-This report defines the benchmark's no-mitigation references (CE and MIL CE) and its retained interventions: balanced sampling, class-weighted CE, focal loss, train-time and post-hoc logit adjustment, soft-F1, soft-MCC, CFAL, OKO, RankMix-inspired feature mixing, cRT, SC-MIL, and MDE-inspired dual-expert MIL. Balanced Softmax is recorded as related prior-correction literature rather than an additional tested method. Read along the signal axis, this roster is concentrated on prevalence: difficulty is represented only by focal loss and by the teacher ranking inside RankMix-inspired mixing, absolute evidence only by the effective-number weighting in CFAL, and coverage is measured by no tested method at all. The definitions make the tested adaptations, output semantics, and ablations explicit; the companion experimental protocol defines how their discrimination, probability quality, and mitigation recovery are evaluated.
+This report defines the no-mitigation references (CE and MIL CE) and the retained interventions: balanced sampling, class-weighted CE, class-balanced CE, focal loss, pilot-difficulty weighted CE, logit adjustment in train-time and post-hoc form, the soft-F1 and soft-MCC hybrids, CFAL, OKO, RankMix-inspired feature mixing, cRT, LADC-inspired feature synthesis, SC-MIL, and MDE-inspired dual-expert MIL. Balanced Softmax is recorded as related prior-correction literature rather than an additional tested method. Read along the signal axis, this roster stays anchored on prevalence while adding a contrast for each sparse dimension: class-balanced CE isolates a diminishing-count correction from the prototype and affinity components CFAL bundles with the same effective number, pilot-difficulty weighted CE supplies a class-level difficulty signal distinct from the example-level confidence used by focal loss, and LADC-inspired calibration reconstructs sparse tail support instead of reweighting the examples already observed. Coverage is still measured by no tested method, and independent evidence enters no method's weights at all. The definitions make the tested adaptations, output semantics, and ablations explicit, which is what the evaluation of their discrimination, probability quality, and mitigation recovery presupposes.
 
 \clearpage
 \bibliographystyle{plainnat}
