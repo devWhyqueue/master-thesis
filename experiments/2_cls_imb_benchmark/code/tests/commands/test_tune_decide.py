@@ -236,6 +236,28 @@ def test_advance_keeps_the_resolved_strength_window_when_only_lr_still_shifts(
     assert grids["windows"]["focal"]["strength_window"] == GRIDS["focal"]
 
 
+def _persist_round_state(tmp_path: Path, condition: str, states: dict) -> None:
+    """Mirror what cmd_tune_decide writes via merge_round_state before ever
+    calling _advance -- tuning_locked reads this persisted state, not the
+    in-memory ``states`` argument _advance itself receives."""
+    merge_round_state(tmp_path, condition, round_payload(states))
+
+
+def _lock_rest_of_roster(tmp_path: Path, condition: str, *already: str) -> None:
+    """Mark every controlled-roster method but ``already`` as resolved."""
+    from imbalance_benchmark.modeling.context import roster_for_regime
+
+    merge_round_state(
+        tmp_path,
+        condition,
+        {
+            method: {"resolved": True, "tuning_limited": False}
+            for method in roster_for_regime(False)
+            if method not in already
+        },
+    )
+
+
 def test_advance_submits_final_reduce_once_dependent_phase_resolves(tmp_path, monkeypatch):
     """Before this fix, a fully-resolved dependent phase just returned - no
     job ever signed ``tuning_selections_{condition}.json``, so confirm always
@@ -243,6 +265,8 @@ def test_advance_submits_final_reduce_once_dependent_phase_resolves(tmp_path, mo
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     submitted = []
     resolved = decide_next_round("crt", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+    _persist_round_state(tmp_path, "moderate", {"crt": resolved})
+    _lock_rest_of_roster(tmp_path, "moderate", "crt")
 
     decide._advance(
         {"data": tmp_path}, {}, "config.yaml", _args(condition="moderate", phase="dependent"),
@@ -255,6 +279,47 @@ def test_advance_submits_final_reduce_once_dependent_phase_resolves(tmp_path, mo
     assert submitted[0].command == "tune-reduce --phase final --condition moderate"
 
 
+def test_advance_does_not_finalize_dependent_before_base_methods_resolve(
+    tmp_path, monkeypatch
+):
+    """Regression: a fully-resolved dependent phase used to submit final
+    reduce unconditionally, ignoring the other ~9 base-phase methods, which
+    on real cluster data were still deep in their own adaptive rounds. The
+    resulting tune-reduce job crashed with "Tuning is not locked", and
+    nothing ever re-triggered it once base genuinely finished."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    submitted = []
+    resolved = decide_next_round("crt", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+    # Only crt is persisted; every other controlled-roster method is still open.
+    _persist_round_state(tmp_path, "moderate", {"crt": resolved})
+
+    decide._advance(
+        {"data": tmp_path}, {}, "config.yaml", _args(condition="moderate", phase="dependent"),
+        {"crt": resolved}, {"crt": (LEARNING_RATE_GRID, None)}, False,
+        submit=lambda config, config_path, job: submitted.append(job) or "id",
+    )
+
+    assert submitted == []
+
+
+def test_advance_finalizes_once_base_resolves_last_after_dependent(tmp_path, monkeypatch):
+    """The mirror gap: base finishing after an already-resolved dependent
+    phase must also submit final reduce, not just the other way around."""
+    monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
+    submitted = []
+    ce_resolved = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+    _persist_round_state(tmp_path, "moderate", {"ce": ce_resolved})
+    _lock_rest_of_roster(tmp_path, "moderate", "ce")
+
+    decide._advance(
+        {"data": tmp_path}, {}, "config.yaml", _args(condition="moderate", phase="base"),
+        {"ce": ce_resolved}, {"ce": (LEARNING_RATE_GRID, None)}, False,
+        submit=lambda config, config_path, job: submitted.append(job) or "id",
+    )
+
+    assert [job.name for job in submitted] == ["tune-final-reduce-moderate"]
+
+
 def test_advance_finalizes_natural_without_a_dependent_phase(tmp_path, monkeypatch):
     """The natural anchor fits ce alone, so crt/post-hoc never run there and
     its base decide must sign the selection itself rather than wait for a
@@ -262,6 +327,7 @@ def test_advance_finalizes_natural_without_a_dependent_phase(tmp_path, monkeypat
     monkeypatch.setattr(decide, "check_queue_cap", lambda: None)
     submitted = []
     ce_resolved = decide_next_round("ce", {"lr": LEARNING_RATE_GRID[1]}, LEARNING_RATE_GRID)
+    _persist_round_state(tmp_path, "natural", {"ce": ce_resolved})
 
     decide._advance(
         {"data": tmp_path}, {}, "config.yaml", _args(condition="natural", phase="base"),

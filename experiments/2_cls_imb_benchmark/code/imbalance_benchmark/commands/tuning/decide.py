@@ -12,10 +12,12 @@ from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.dependent_jobs import final_reduce_job
 from imbalance_benchmark.hydra.workflow import _submit_script
 from imbalance_benchmark.commands.tuning.round_windows import Window, this_round_windows
+from imbalance_benchmark.modeling.context import roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
     load_round_state,
     merge_round_state,
+    tuning_locked,
     write_round_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
@@ -120,7 +122,13 @@ def _advance(
     is_mil: bool,
     submit: Callable[[dict[str, Any], str | None, SlurmJob], str] = _real_submit,
 ) -> None:
-    """Shift unresolved methods to another round, or start the dependent phase."""
+    """Shift unresolved methods to another round, start the dependent phase,
+    or -- once every method in *both* phases is locked -- submit the final
+    reduce. Base and dependent run as separate, asynchronous round chains,
+    so either phase's decide call can be the one that finishes last; each
+    checks the full cross-phase lock rather than assuming its own phase is
+    the whole story, and only the one that actually finishes last submits.
+    """
     unresolved = {
         method: state
         for method, state in states.items()
@@ -130,18 +138,23 @@ def _advance(
         check_queue_cap()
         _submit_next_round(base, config, config_path, args, unresolved, windows, submit)
         return
-    if args.phase != "base" or not phase_methods(is_mil, "dependent", args.condition):
+    dependent_methods = phase_methods(is_mil, "dependent", args.condition)
+    if (
+        args.phase == "base"
+        and dependent_methods
+        and not _dependent_phase_started(base["data"], args.condition)
+    ):
+        # states only holds methods still active *this* round - CE's own
+        # readiness must come from the persisted, cross-round lock instead.
+        ce_state = load_round_state(base["data"], args.condition).get("ce", {})
+        if ce_state.get("resolved") or ce_state.get("tuning_limited"):
+            check_queue_cap()
+            _start_dependent_phase(base, config, config_path, args, is_mil, submit)
+        return
+    roster = roster_for_condition(is_mil, args.condition)
+    if tuning_locked(base["data"], args.condition, roster):
         check_queue_cap()
         submit(config, config_path, final_reduce_job(config, args.condition))
-        return
-    if _dependent_phase_started(base["data"], args.condition):
-        return
-    # states only holds methods still active *this* round - CE's own
-    # readiness must come from the persisted, cross-round lock instead.
-    ce_state = load_round_state(base["data"], args.condition).get("ce", {})
-    if ce_state.get("resolved") or ce_state.get("tuning_limited"):
-        check_queue_cap()
-        _start_dependent_phase(base, config, config_path, args, is_mil, submit)
 
 
 def _submit_next_round(
