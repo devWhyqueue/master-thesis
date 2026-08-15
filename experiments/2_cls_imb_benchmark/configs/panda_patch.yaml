@@ -81,7 +81,13 @@ slurm:
   tune_natural_shards_per_task: 2
   tuning_wave_task_limit: 90
   confirm_natural_shards_per_task: 3
-  confirm_controlled_shards_per_task: 7
+  # confirm_controlled units are single (split, seed) fits at the same
+  # controlled update budget as tune -- bundling 7 of them (even fast ones,
+  # ~70min avg) already exceeds gpu-2h's 2h wall on its own, independent of
+  # method mix. tune_controlled hit the identical bug (see tune_shards_per_task
+  # above) and settled on 1; mirroring that here rather than rediscovering it
+  # by watching every task in the array time out.
+  confirm_controlled_shards_per_task: 1
   resources:
     materialize_audit: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G}
     materialize_combine: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 128G}
