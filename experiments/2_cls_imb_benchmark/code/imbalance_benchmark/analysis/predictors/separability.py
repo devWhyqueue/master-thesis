@@ -53,6 +53,13 @@ def _knn_and_nn_probe(
         chunk_sq = (chunk**2).sum(axis=1, keepdims=True)
         for ref_start in range(0, ref_x.shape[0], _REFERENCE_CHUNK_SIZE):
             ref_end = min(ref_start + _REFERENCE_CHUNK_SIZE, ref_x.shape[0])
+            logger.info(
+                "rq3: knn query chunk %d/%d reference block %d/%d",
+                chunk_number,
+                n_chunks,
+                ref_start // _REFERENCE_CHUNK_SIZE + 1,
+                (ref_x.shape[0] + _REFERENCE_CHUNK_SIZE - 1) // _REFERENCE_CHUNK_SIZE,
+            )
             d2 = (
                 chunk_sq
                 - 2.0 * chunk @ ref_x[ref_start:ref_end].T
@@ -78,11 +85,11 @@ def _knn_and_nn_probe(
 
 def _macro_recall(preds: np.ndarray, val_y: np.ndarray, n_classes: int) -> float:
     """Class-balanced recall of ``preds`` against ``val_y`` over ``n_classes``."""
-    recalls = []
-    for c in range(n_classes):
-        mask = val_y == c
-        if mask.any():
-            recalls.append(float((preds[mask] == c).mean()))
+    recalls = [
+        float((preds[mask] == c).mean())
+        for c in range(n_classes)
+        if (mask := val_y == c).any()
+    ]
     return float(np.mean(recalls)) if recalls else 0.0
 
 
@@ -189,12 +196,7 @@ def class_margin_cross_fit(
     n_folds: int = 5,
     seed: int = 0,
 ) -> np.ndarray:
-    """Cross-fitted scalar class margin: the intrinsic probe's true-class logit minus its best competitor.
-
-    Folds are grouped by patient so an observation is never scored by a probe
-    fitted on its own patient's data, matching Eq. neff's cross-fitting
-    requirement.
-    """
+    """Grouped cross-fitted true-class-minus-best-competitor logit margin."""
     del seed  # GroupKFold is deterministic; retain the public cross-fit signature.
     margins = np.full(len(y), np.nan)
     n_folds = max(2, min(n_folds, len(np.unique(case_ids))))
@@ -217,11 +219,7 @@ def class_margin_cross_fit(
 
 
 def intraclass_correlation(margin: np.ndarray, cluster_ids: np.ndarray) -> float:
-    """One-way random-effects ICC(1) of a scalar measurement across clusters (patients/slides).
-
-    Standard ANOVA-based estimator with Fisher's unbalanced-group correction
-    for the average cluster size ``m0``.
-    """
+    """ANOVA ICC(1), including Fisher's unbalanced-group correction."""
     valid = ~np.isnan(margin)
     margin, cluster_ids = margin[valid], cluster_ids[valid]
     groups = {c: margin[cluster_ids == c] for c in np.unique(cluster_ids)}

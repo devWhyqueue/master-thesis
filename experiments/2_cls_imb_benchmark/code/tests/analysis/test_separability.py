@@ -75,10 +75,13 @@ def test_streamed_reference_blocks_match_unchunked_knn_and_1nn(monkeypatch):
 def test_knn_logs_chunk_progress(monkeypatch, caplog):
     ref_x, ref_y, val_x, val_y = _synthetic(seed=4, n_val=9)
     monkeypatch.setattr(sep, "_CHUNK_SIZE", 4)
+    monkeypatch.setattr(sep, "_REFERENCE_CHUNK_SIZE", 11)
     with caplog.at_level("INFO"):
         sep._knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes=4)
     assert "rq3: knn query chunk 1/3" in caplog.text
     assert "rq3: knn query chunk 3/3" in caplog.text
+    assert "rq3: knn query chunk 1/3 reference block 1/4" in caplog.text
+    assert "rq3: knn query chunk 3/3 reference block 4/4" in caplog.text
 
 
 def test_shared_pass_matches_public_functions():
