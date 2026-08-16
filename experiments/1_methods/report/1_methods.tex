@@ -370,14 +370,14 @@ Classes with smaller volume receive larger mean-one weights:
 \noindent The floor is fixed at $\varepsilon_S=\num{e-3}$ bits. The exponent $\tau\geq0$ is the only tuned control: $\tau=0$ recovers ordinary CE and $\tau=1$ gives inverse-volume weighting. Because the volumes are refreshed as the representation changes, this remains a dynamic weighting method.
 
 \paragraph{Thesis variant.}
-The method uses the \num{512}-dimensional hidden representation of the shared MLP head and is reported as \emph{semantic-scale weighted CE (DSB-CE-1-inspired)}. To isolate diversity from support, every refresh draws the same number of cases and patches per class.
+The method uses the \num{512}-dimensional hidden representation of the shared MLP head and is reported as \emph{semantic-scale weighted CE (DSB-CE-1-inspired)}. To isolate diversity from support, $R$ rolling feature pools $Q^{(r)}$ are constructed from matched draws in which every class contributes the same number of cases and patches.
 
-Beginning after four fifths of the update budget $U$, $R$ matched draws are evaluated once per epoch and their volumes are averaged:
+Training follows the source method's three-stage timing with $n=5$. A \emph{reference pass} comprises $\lceil T/B\rceil$ optimizer updates. During the first pass, each pool is filled by traversing its matched draw once, while the loss retains unit class weights. During passes two through five, one minibatch in each pool is refreshed from the current hidden representation at every optimizer update, progressively replacing the early features, but class weights remain one. From the sixth pass onward, the pools continue to be refreshed at every optimizer update; after each refresh, their classwise volumes are recomputed and averaged:
 \begin{equation}
   S'_{c,t}=\frac{1}{R}\sum_{r=1}^{R}S'_{c,t,r},
   \label{eq:semantic-volume-avg}
 \end{equation}
-\noindent Averaging volumes rather than covariances preserves the matched budget of each draw. If the full refresh is too expensive, $R=1$ is used and reported. Unlike the source's recent-minibatch pool, this estimator cannot recover class frequency through unequal pool sizes.
+\noindent The resulting weights from Equation~\eqref{eq:ssb-weight} are applied at that optimizer update. Since $U=30\lceil T/B\rceil$, reweighting begins after $U/6$ and remains active for the final five sixths of the budget. Averaging volumes rather than covariances preserves the matched budget of each draw. If maintaining all $R$ pools is too expensive, $R=1$ is used and reported. Unlike the source's recent-minibatch pool, the matched pools cannot recover class frequency through unequal class occupancy; this retained deviation prevents the diversity estimate from also encoding prevalence.
 
 Feature scale is stabilized at each refresh before Equation~\eqref{eq:semantic-volume} is evaluated. All matched features are divided by the pooled isotropic scale
 \begin{equation}
