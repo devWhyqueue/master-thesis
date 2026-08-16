@@ -74,30 +74,14 @@ def _split_distributions(
             is_mil=is_mil,
             ordinal=ordinal,
         )
-        scaled = context.secondary_distributions(
+        scaled = context.probability_secondary_distributions(
             np.asarray(record["labels"]),
-            np.asarray(record["preds"]),
             np.asarray(record["temperature_scaled_probs"]),
             class_names,
             tiers,
-            is_mil=is_mil,
-            ordinal=ordinal,
         )
         current.update(
-            {
-                f"temperature_scaled_{name}": values
-                for name, values in scaled.items()
-                if name
-                in {
-                    "negative_log_likelihood",
-                    "macro_nll",
-                    "brier_score",
-                    "expected_calibration_error",
-                }
-                or name.startswith(("nll:", "brier:", "tier_nll:", "tier_brier:"))
-                or name.endswith(("_macro_nll", "_macro_brier"))
-                or name in {"patch_micro_nll", "patch_micro_brier"}
-            }
+            {f"temperature_scaled_{name}": values for name, values in scaled.items()}
         )
         distributions.append(current)
     return distributions

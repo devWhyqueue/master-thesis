@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, cast
 
 import numpy as np
@@ -11,11 +12,11 @@ import numpy as np
 from imbalance_benchmark.analysis.inference.holm import PRIMARY_METHODS
 from imbalance_benchmark.analysis.inference.permutation import (
     _as_seed_stack,
-    _expand_swap_to_rows,
-    _p_value,
-    _seed_mean_ba,
-    _seed_mean_tail_nll,
-    _swap_batches,
+    _ba_patient_contributions,
+    _ba_observed,
+    _contribution_p_value,
+    _tail_nll_patient_contributions,
+    _tail_nll_observed,
 )
 from imbalance_benchmark.analysis.metrics import assign_tiers
 from imbalance_benchmark.analysis.query import load_seed_predictions, load_test_identity
@@ -39,67 +40,60 @@ def _prepare(blocks: list[Block], rank: int) -> list[Block]:
     ]
 
 
-def _ba_statistics(
+def _crossed_contributions(
     prepared: list[Block],
-    swaps: np.ndarray,
-    row_indices: list[np.ndarray],
-    classes: int,
+    contribution_for_block: Callable[
+        [int, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray],
+    ],
 ) -> np.ndarray:
-    """Evaluate equal-split BA differences for one batch of shared patient swaps."""
-    values = []
-    for (labels, method, ce, _), row_idx in zip(prepared, row_indices, strict=True):
-        swap = _expand_swap_to_rows(swaps, row_idx)[None, :, :]
-        first = np.where(swap, ce[:, :, None], method[:, :, None])
-        second = np.where(swap, method[:, :, None], ce[:, :, None])
-        values.append(
-            _seed_mean_ba(labels, first, classes)
-            - _seed_mean_ba(labels, second, classes)
-        )
-    return np.mean(values, axis=0)
+    """Average split contributions while sharing one swap for repeated patients."""
+    cases = np.unique(np.concatenate([block[3] for block in prepared]))
+    contributions = np.zeros(len(cases), dtype=np.float64)
+    for index, block in enumerate(prepared):
+        block_cases, block_contributions = contribution_for_block(index, *block)
+        contributions[np.searchsorted(cases, block_cases)] += block_contributions
+    return contributions / len(prepared)
 
 
 def crossed_block_permutation_ba(
     blocks: list[Block], n_classes: int, n_permutations: int = 100_000, seed: int = 0
 ) -> float:
     """Permute paired patient blocks while recomputing the equal-split BA mean."""
-    cases, prepared = (
-        np.unique(np.concatenate([block[3] for block in blocks])),
-        _prepare(blocks, 1),
+    prepared = _prepare(blocks, 1)
+    contributions = _crossed_contributions(
+        prepared,
+        lambda _, labels, method, ce, case_ids: _ba_patient_contributions(
+            labels, method, ce, case_ids, n_classes
+        ),
     )
-    observed = np.mean(
-        [
-            _seed_mean_ba(y, m[:, :, None], n_classes)[0]
-            - _seed_mean_ba(y, c[:, :, None], n_classes)[0]
-            for y, m, c, _ in prepared
-        ]
-    )
-    row_indices = [np.searchsorted(cases, block[3]) for block in prepared]
-    enumerated, batches = _swap_batches(len(cases), n_permutations, seed)
-    statistics = [
-        _ba_statistics(prepared, swaps, row_indices, n_classes) for swaps in batches
-    ]
-    return _p_value(float(observed), np.concatenate(statistics), enumerated)
-
-
-def _nll_statistics(
-    prepared: list[Block],
-    swaps: np.ndarray,
-    row_indices: list[np.ndarray],
-    tails: list[list[int]],
-) -> np.ndarray:
-    """Evaluate equal-split tail-NLL differences for one batch of shared swaps."""
-    values = []
-    for (labels, method, ce, _), row_idx, split_tails in zip(
-        prepared, row_indices, tails, strict=True
-    ):
-        swap = _expand_swap_to_rows(swaps, row_idx)[None, :, :, None]
-        first = np.where(swap, ce[:, :, None, :], method[:, :, None, :])
-        second = np.where(swap, method[:, :, None, :], ce[:, :, None, :])
-        values.append(
-            _seed_mean_tail_nll(labels, second, split_tails)
-            - _seed_mean_tail_nll(labels, first, split_tails)
+    observed = float(
+        np.mean(
+            [
+                _ba_observed(labels, method, n_classes)
+                - _ba_observed(labels, ce, n_classes)
+                for labels, method, ce, _ in prepared
+            ]
         )
-    return np.mean(values, axis=0)
+    )
+    contributions[-1] += observed - contributions.sum()
+    return _contribution_p_value(contributions, observed, n_permutations, seed)
+
+
+def _crossed_tail_observed(
+    prepared: list[Block], split_tails: list[list[int]]
+) -> float:
+    return float(
+        np.mean(
+            [
+                _tail_nll_observed(labels, ce, tails)
+                - _tail_nll_observed(labels, method, tails)
+                for (labels, method, ce, _), tails in zip(
+                    prepared, split_tails, strict=True
+                )
+            ]
+        )
+    )
 
 
 def crossed_block_permutation_tail_nll(
@@ -114,23 +108,16 @@ def crossed_block_permutation_tail_nll(
         split_tails = cast(list[list[int]], tail_classes)
     else:
         split_tails = [cast(list[int], tail_classes)] * len(blocks)
-    cases, prepared = (
-        np.unique(np.concatenate([block[3] for block in blocks])),
-        _prepare(blocks, 2),
+    prepared = _prepare(blocks, 2)
+    contributions = _crossed_contributions(
+        prepared,
+        lambda index, labels, method, ce, case_ids: _tail_nll_patient_contributions(
+            labels, method, ce, case_ids, split_tails[index]
+        ),
     )
-    observed = np.mean(
-        [
-            _seed_mean_tail_nll(y, c[:, :, None, :], tails)[0]
-            - _seed_mean_tail_nll(y, m[:, :, None, :], tails)[0]
-            for (y, m, c, _), tails in zip(prepared, split_tails, strict=True)
-        ]
-    )
-    row_indices = [np.searchsorted(cases, block[3]) for block in prepared]
-    enumerated, batches = _swap_batches(len(cases), n_permutations, seed)
-    statistics = [
-        _nll_statistics(prepared, swaps, row_indices, split_tails) for swaps in batches
-    ]
-    return _p_value(float(observed), np.concatenate(statistics), enumerated)
+    observed = _crossed_tail_observed(prepared, split_tails)
+    contributions[-1] += observed - contributions.sum()
+    return _contribution_p_value(contributions, observed, n_permutations, seed)
 
 
 def load_freeze(paths: dict[str, Path]) -> dict[str, Any]:

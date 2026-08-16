@@ -25,14 +25,8 @@ def _class_metrics(
     weights: PatientWeights,
     class_names: list[str],
 ) -> dict[str, np.ndarray]:
-    true_probability = np.clip(
-        probabilities[np.arange(len(labels)), labels], 1e-12, 1.0
-    )
-    nll_values = -np.log(true_probability)
-    one_hot = np.eye(probabilities.shape[1], dtype=np.float64)[labels]
-    brier_values = np.sum((probabilities - one_hot) ** 2, axis=1)
-    metrics: dict[str, np.ndarray] = {}
-    recalls, f1_by_class, nll_by_class = [], [], []
+    metrics = _probability_class_metrics(labels, probabilities, weights, class_names)
+    recalls, f1_by_class = [], []
     for class_index, class_name in enumerate(class_names):
         true_class = labels == class_index
         predicted_class = predictions == class_index
@@ -46,22 +40,41 @@ def _class_metrics(
                 2 * precision * recall / (precision + recall),
                 0.0,
             )
+        metrics[f"recall:{class_name}"] = recall
+        metrics[f"f1:{class_name}"] = f1
+        recalls.append(recall)
+        f1_by_class.append(f1)
+    metrics["balanced_accuracy"] = np.nanmean(np.stack(recalls), axis=0)
+    metrics["macro_f1"] = np.nanmean(np.stack(f1_by_class), axis=0)
+    return metrics
+
+
+def _probability_class_metrics(
+    labels: np.ndarray,
+    probabilities: np.ndarray,
+    weights: PatientWeights,
+    class_names: list[str],
+) -> dict[str, np.ndarray]:
+    true_probability = np.clip(
+        probabilities[np.arange(len(labels)), labels], 1e-12, 1.0
+    )
+    nll_values = -np.log(true_probability)
+    one_hot = np.eye(probabilities.shape[1], dtype=np.float64)[labels]
+    brier_values = np.sum((probabilities - one_hot) ** 2, axis=1)
+    metrics: dict[str, np.ndarray] = {}
+    nll_by_class = []
+    for class_index, class_name in enumerate(class_names):
+        true_class = labels == class_index
         class_nll = _weighted_mean(nll_values, weights, true_class)
         metrics.update(
             {
-                f"recall:{class_name}": recall,
-                f"f1:{class_name}": f1,
                 f"nll:{class_name}": class_nll,
                 f"brier:{class_name}": _weighted_mean(
                     brier_values, weights, true_class
                 ),
             }
         )
-        recalls.append(recall)
-        f1_by_class.append(f1)
         nll_by_class.append(class_nll)
-    metrics["balanced_accuracy"] = np.nanmean(np.stack(recalls), axis=0)
-    metrics["macro_f1"] = np.nanmean(np.stack(f1_by_class), axis=0)
     metrics["macro_nll"] = np.nanmean(np.stack(nll_by_class), axis=0)
     metrics["negative_log_likelihood"] = _weighted_mean(nll_values, weights)
     metrics["brier_score"] = _weighted_mean(brier_values, weights)

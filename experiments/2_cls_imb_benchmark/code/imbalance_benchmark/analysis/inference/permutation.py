@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import Callable
+from collections.abc import Iterator
 
 import numpy as np
 
@@ -16,90 +16,82 @@ _BATCH_SIZE = 2000
 
 def _swap_batches(
     n_patients: int, n_permutations: int, seed: int
-) -> tuple[bool, list[np.ndarray]]:
-    """Yield batches of a (n_patients, batch) boolean swap matrix.
-
-    Enumerates all ``2**n_patients`` patient-block swaps when feasible
-    (``n_patients <= 20``, matching the report's "all permutations are
-    enumerated when feasible"); otherwise draws ``n_permutations`` random
-    swaps for the plus-one-corrected Monte Carlo p-value. Batches keep peak
-    memory bounded regardless of how many permutations are requested.
-    """
+) -> tuple[bool, Iterator[np.ndarray]]:
+    """Stream patient-block swap batches without retaining permutation matrices."""
     if n_patients <= _ENUMERATE_PATIENT_LIMIT:
-        combos = np.array(
-            list(itertools.product([False, True], repeat=n_patients)), dtype=bool
-        ).T
-        return True, [
-            combos[:, i : i + _BATCH_SIZE]
-            for i in range(0, combos.shape[1], _BATCH_SIZE)
-        ]
+        return True, _enumerated_swap_batches(n_patients)
+    return False, _random_swap_batches(n_patients, n_permutations, seed)
+
+
+def _enumerated_swap_batches(n_patients: int) -> Iterator[np.ndarray]:
+    combinations = itertools.product([False, True], repeat=n_patients)
+    while batch := list(itertools.islice(combinations, _BATCH_SIZE)):
+        yield np.asarray(batch, dtype=bool).T
+
+
+def _random_swap_batches(
+    n_patients: int, n_permutations: int, seed: int
+) -> Iterator[np.ndarray]:
     rng = np.random.default_rng(seed)
-    batches = []
     remaining = n_permutations
-    while remaining > 0:
+    while remaining:
         size = min(_BATCH_SIZE, remaining)
-        batches.append(rng.random((n_patients, size)) < 0.5)
+        yield rng.random((n_patients, size)) < 0.5
         remaining -= size
-    return False, batches
 
 
-def _expand_swap_to_rows(swap_patients: np.ndarray, row_idx: np.ndarray) -> np.ndarray:
-    """Broadcast a (n_patients, batch) swap matrix to (n_rows, batch) via a precomputed row index."""
-    return swap_patients[row_idx, :]
-
-
-def _balanced_accuracy_batch(
-    labels: np.ndarray, preds: np.ndarray, n_classes: int
-) -> np.ndarray:
-    """Balanced accuracy per permutation column for a (n_rows, batch) preds matrix."""
-    batch = preds.shape[1]
-    out = np.zeros(batch, dtype=np.float64)
-    for c in range(n_classes):
-        mask = labels == c
-        if not mask.any():
-            continue
-        out += (preds[mask, :] == c).mean(axis=0)
-    return out / n_classes
-
-
-def _tail_nll_batch(
-    labels: np.ndarray, probs_stack: np.ndarray, n_rows: int, tail_classes: list[int]
-) -> np.ndarray:
-    """Tail-group macro NLL per permutation column for a (n_rows, batch, n_classes) probs stack."""
-    batch = probs_stack.shape[1]
-    out = np.zeros(batch, dtype=np.float64)
-    counted = 0
-    for c in tail_classes:
-        mask = labels == c
-        if not mask.any():
-            continue
-        p_true = np.clip(probs_stack[mask, :, c], 1e-12, 1.0)
-        out += -np.log(p_true).mean(axis=0)
-        counted += 1
-    return out / max(counted, 1)
-
-
-def _permuted_p_value(
-    case_ids: np.ndarray,
-    n_permutations: int,
-    seed: int,
-    observed: float,
-    batch_stat: Callable[[np.ndarray], np.ndarray],
-) -> float:
-    """Run the shared swap-batch loop and return the two-sided permutation p-value."""
-    unique_cases = np.unique(case_ids)
-    row_idx = np.searchsorted(unique_cases, case_ids)
-    enumerated, batches = _swap_batches(len(unique_cases), n_permutations, seed)
-    stats = [batch_stat(_expand_swap_to_rows(swap, row_idx)) for swap in batches]
-    return _p_value(observed, np.concatenate(stats), enumerated)
-
-
-def _p_value(observed: float, extremes: np.ndarray, enumerated: bool) -> float:
-    n = len(extremes)
-    exceed = int(np.sum(np.abs(extremes) >= abs(observed)))
+def _p_value_from_counts(exceed: int, total: int, enumerated: bool) -> float:
     if enumerated:
-        return exceed / n
-    return (exceed + 1) / (n + 1)
+        return exceed / total
+    return (exceed + 1) / (total + 1)
+
+
+def _contribution_p_value(
+    contributions: np.ndarray, observed: float, n_permutations: int, seed: int
+) -> float:
+    """Test a statistic represented by additive paired patient contributions."""
+    enumerated, batches = _swap_batches(len(contributions), n_permutations, seed)
+    exceed = total = 0
+    for swaps in batches:
+        statistics = observed - 2.0 * contributions @ swaps
+        magnitude = np.abs(statistics)
+        threshold = abs(observed)
+        exceed += np.count_nonzero(
+            (magnitude >= threshold)
+            | np.isclose(magnitude, threshold, rtol=1e-12, atol=1e-15)
+        )
+        total += statistics.size
+    return _p_value_from_counts(exceed, total, enumerated)
+
+
+def _ba_observed(labels: np.ndarray, predictions: np.ndarray, n_classes: int) -> float:
+    values = []
+    for seed_predictions in predictions:
+        value = 0.0
+        for class_index in range(n_classes):
+            mask = labels == class_index
+            if mask.any():
+                value += (seed_predictions[mask] == class_index).mean()
+        values.append(value / n_classes)
+    return float(np.mean(values))
+
+
+def _tail_nll_observed(
+    labels: np.ndarray, probabilities: np.ndarray, tail_classes: list[int]
+) -> float:
+    values = []
+    for seed_probabilities in probabilities:
+        value = 0.0
+        counted = 0
+        for class_index in tail_classes:
+            mask = labels == class_index
+            if mask.any():
+                value += -np.log(
+                    np.clip(seed_probabilities[mask, class_index], 1e-12, 1.0)
+                ).mean()
+                counted += 1
+        values.append(value / max(counted, 1))
+    return float(np.mean(values))
 
 
 def _as_seed_stack(values: np.ndarray, prediction_rank: int) -> np.ndarray:
@@ -111,28 +103,57 @@ def _as_seed_stack(values: np.ndarray, prediction_rank: int) -> np.ndarray:
     raise ValueError("Unexpected prediction-array rank for permutation test")
 
 
-def _seed_mean_ba(labels: np.ndarray, preds: np.ndarray, n_classes: int) -> np.ndarray:
-    """Compute one balanced-accuracy value per permutation after seed averaging."""
-    return np.mean(
-        [
-            _balanced_accuracy_batch(labels, seed_preds, n_classes)
-            for seed_preds in preds
-        ],
-        axis=0,
-    )
+def _patient_contributions(
+    case_ids: np.ndarray, row_contributions: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sum exact row-statistic contributions into one contribution per patient."""
+    cases, inverse = np.unique(case_ids, return_inverse=True)
+    contributions = np.zeros(len(cases), dtype=np.float64)
+    np.add.at(contributions, inverse, row_contributions)
+    return cases, contributions
 
 
-def _seed_mean_tail_nll(
-    labels: np.ndarray, probs: np.ndarray, tail_classes: list[int]
-) -> np.ndarray:
-    """Compute tail NLL per permutation after averaging matched seed blocks."""
-    return np.mean(
-        [
-            _tail_nll_batch(labels, seed_probs, len(labels), tail_classes)
-            for seed_probs in probs
-        ],
-        axis=0,
-    )
+def _ba_patient_contributions(
+    labels: np.ndarray,
+    method_preds: np.ndarray,
+    ce_preds: np.ndarray,
+    case_ids: np.ndarray,
+    n_classes: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return additive patient contributions to matched seed-mean BA difference."""
+    rows = np.zeros(len(labels), dtype=np.float64)
+    for class_index in range(n_classes):
+        mask = labels == class_index
+        if not mask.any():
+            continue
+        method_correct = method_preds[:, mask] == class_index
+        ce_correct = ce_preds[:, mask] == class_index
+        rows[mask] = (method_correct.astype(float) - ce_correct).mean(axis=0) / (
+            n_classes * mask.sum()
+        )
+    return _patient_contributions(case_ids, rows)
+
+
+def _tail_nll_patient_contributions(
+    labels: np.ndarray,
+    method_probs: np.ndarray,
+    ce_probs: np.ndarray,
+    case_ids: np.ndarray,
+    tail_classes: list[int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return additive patient contributions to matched seed-mean tail-NLL difference."""
+    rows = np.zeros(len(labels), dtype=np.float64)
+    present_tails = [
+        class_index for class_index in tail_classes if (labels == class_index).any()
+    ]
+    for class_index in present_tails:
+        mask = labels == class_index
+        method_nll = -np.log(np.clip(method_probs[:, mask, class_index], 1e-12, 1.0))
+        ce_nll = -np.log(np.clip(ce_probs[:, mask, class_index], 1e-12, 1.0))
+        rows[mask] = (ce_nll - method_nll).mean(axis=0) / (
+            len(present_tails) * mask.sum()
+        )
+    return _patient_contributions(case_ids, rows)
 
 
 def paired_block_permutation_ba(
@@ -155,20 +176,14 @@ def paired_block_permutation_ba(
     )
     if method_stack.shape != ce_stack.shape:
         raise ValueError("Permutation pairs require equal seed and prediction shapes")
-    observed = float(
-        _seed_mean_ba(labels, method_stack[:, :, None], n_classes)[0]
-        - _seed_mean_ba(labels, ce_stack[:, :, None], n_classes)[0]
+    _, contributions = _ba_patient_contributions(
+        labels, method_stack, ce_stack, case_ids, n_classes
     )
-
-    def _stat(swap_rows: np.ndarray) -> np.ndarray:
-        swap = swap_rows[None, :, :]
-        preds_a = np.where(swap, ce_stack[:, :, None], method_stack[:, :, None])
-        preds_b = np.where(swap, method_stack[:, :, None], ce_stack[:, :, None])
-        return _seed_mean_ba(labels, preds_a, n_classes) - _seed_mean_ba(
-            labels, preds_b, n_classes
-        )
-
-    return _permuted_p_value(case_ids, n_permutations, seed, observed, _stat)
+    observed = _ba_observed(labels, method_stack, n_classes) - _ba_observed(
+        labels, ce_stack, n_classes
+    )
+    contributions[-1] += observed - contributions.sum()
+    return _contribution_p_value(contributions, observed, n_permutations, seed)
 
 
 def paired_block_permutation_tail_nll(
@@ -191,17 +206,11 @@ def paired_block_permutation_tail_nll(
     )
     if method_stack.shape != ce_stack.shape:
         raise ValueError("Permutation pairs require equal seed and prediction shapes")
-    observed = float(
-        _seed_mean_tail_nll(labels, ce_stack[:, :, None, :], tail_classes)[0]
-        - _seed_mean_tail_nll(labels, method_stack[:, :, None, :], tail_classes)[0]
+    _, contributions = _tail_nll_patient_contributions(
+        labels, method_stack, ce_stack, case_ids, tail_classes
     )
-
-    def _stat(swap_rows: np.ndarray) -> np.ndarray:
-        swap3 = swap_rows[None, :, :, None]
-        probs_a = np.where(swap3, ce_stack[:, :, None, :], method_stack[:, :, None, :])
-        probs_b = np.where(swap3, method_stack[:, :, None, :], ce_stack[:, :, None, :])
-        nll_a = _seed_mean_tail_nll(labels, probs_a, tail_classes)
-        nll_b = _seed_mean_tail_nll(labels, probs_b, tail_classes)
-        return nll_b - nll_a
-
-    return _permuted_p_value(case_ids, n_permutations, seed, observed, _stat)
+    observed = _tail_nll_observed(labels, ce_stack, tail_classes) - _tail_nll_observed(
+        labels, method_stack, tail_classes
+    )
+    contributions[-1] += observed - contributions.sum()
+    return _contribution_p_value(contributions, observed, n_permutations, seed)

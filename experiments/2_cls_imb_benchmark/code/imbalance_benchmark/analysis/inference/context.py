@@ -21,9 +21,24 @@ from imbalance_benchmark.analysis.metrics import assign_tiers
 from imbalance_benchmark.analysis.reporting.secondary_intervals.metrics import (
     secondary_seed_metrics,
 )
+from imbalance_benchmark.analysis.reporting.secondary_intervals.probability import (
+    _secondary_distributions as probability_secondary_distributions,
+)
 from imbalance_benchmark.analysis.query import load_seed_predictions, load_test_identity
 
 __all__ = ["BootstrapContext", "Baseline", "balanced_baseline"]
+
+
+def _seed_distributions(
+    per_seed: list[dict[str, np.ndarray]], seed_indices: np.ndarray
+) -> dict[str, np.ndarray]:
+    return {
+        endpoint: gather_seed_resampled(
+            np.stack([seed_metrics[endpoint] for seed_metrics in per_seed]),
+            seed_indices,
+        )
+        for endpoint in per_seed[0]
+    }
 
 
 def _crossed_test_identity(paths: dict[str, Path], is_mil: bool) -> pd.DataFrame:
@@ -156,13 +171,19 @@ class BootstrapContext:
             for index in range(predictions.shape[0])
         ]
         seed_indices = self._paired_seed_indices(predictions.shape[0])
-        return {
-            endpoint: gather_seed_resampled(
-                np.stack([seed_metrics[endpoint] for seed_metrics in per_seed]),
-                seed_indices,
-            )
-            for endpoint in per_seed[0]
-        }
+        return _seed_distributions(per_seed, seed_indices)
+
+    def probability_secondary_distributions(
+        self,
+        labels: np.ndarray,
+        probabilities: np.ndarray,
+        class_names: list[str],
+        tiers: dict[str, str],
+    ) -> dict[str, np.ndarray]:
+        """Return paired-seed distributions for probability-only endpoints."""
+        return probability_secondary_distributions(
+            self, labels, probabilities, class_names, tiers
+        )
 
 
 def _tail_classes(
