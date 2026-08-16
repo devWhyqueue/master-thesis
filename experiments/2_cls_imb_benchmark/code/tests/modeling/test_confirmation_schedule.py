@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 from imbalance_benchmark.modeling.context import (
+    MATCHED_BETA_METHOD,
     NATURAL_ANCHOR_METHODS,
     roster_for_regime,
 )
@@ -20,9 +21,19 @@ def test_confirm_group_methods_excludes_post_hoc() -> None:
     for is_mil in (False, True):
         methods = confirm_group_methods(is_mil, "balanced")
         assert "post_hoc_logit_adjustment" not in methods
-        assert set(methods) == set(roster_for_regime(is_mil)) - {
-            "post_hoc_logit_adjustment"
-        }
+        expected = set(roster_for_regime(is_mil)) - {"post_hoc_logit_adjustment"}
+        if not is_mil:
+            expected |= {MATCHED_BETA_METHOD}
+        assert set(methods) == expected
+
+
+def test_matched_beta_arm_is_patch_only_and_controlled_only() -> None:
+    """The counting-unit diagnostic never runs on the natural anchor or WSI regime."""
+    assert MATCHED_BETA_METHOD in confirm_group_methods(False, "balanced")
+    assert MATCHED_BETA_METHOD in confirm_group_methods(False, "moderate")
+    assert MATCHED_BETA_METHOD in confirm_group_methods(False, "severe")
+    assert MATCHED_BETA_METHOD not in confirm_group_methods(False, "natural")
+    assert MATCHED_BETA_METHOD not in confirm_group_methods(True, "balanced")
 
 
 def test_natural_anchor_schedules_only_the_ce_reference() -> None:

@@ -92,12 +92,12 @@ def test_confirmatory_family_partition():
 def test_holm_marks_gated_out_as_not_tested():
     comparisons = [
         {"method": "weighted_ce", "gate_passed": True, "p_value": 0.01},
-        {"method": "focal", "gate_passed": False, "p_value": None},
+        {"method": "class_balanced_ce", "gate_passed": False, "p_value": None},
         {"method": "cfal", "gate_passed": True, "p_value": 0.03},
     ]
     out = apply_holm(comparisons)
     by_method = {c["method"]: c for c in out}
-    assert by_method["focal"]["status"] == "not tested"
+    assert by_method["class_balanced_ce"]["status"] == "not tested"
     assert by_method["weighted_ce"]["status"] == "tested"
     assert by_method["weighted_ce"]["family"] == "confirmatory"
     assert by_method["cfal"]["family"] == "exploratory"

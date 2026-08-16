@@ -26,7 +26,12 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
 from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
-from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_condition
+from imbalance_benchmark.modeling.context import (
+    CONDITIONS,
+    MATCHED_BETA_METHOD,
+    matched_beta_config,
+    roster_for_condition,
+)
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 
 __all__ = ["cmd_confirm"]
@@ -71,6 +76,14 @@ def _confirm_condition(
             confirm_crt(cond, cfg, cond_configs["ce"], train_ds, run)
         else:
             confirm_method(cond, method, cfg, train_ds, run)
+    if (
+        not run.is_mil
+        and "independent_support_ce" in methods
+        and "class_balanced_ce" in methods
+    ):
+        confirm_method(
+            cond, MATCHED_BETA_METHOD, matched_beta_config(cond_configs), train_ds, run
+        )
 
 
 def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -106,6 +119,7 @@ def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
         "seeds": seeds,
         "update_budgets": freeze["update_budgets"],
         "feature_provenance": freeze.get("feature_provenance"),
+        "difficulty": freeze.get("difficulty_evidence", {}).get("difficulty", {}),
     }
     return run_data, freeze
 

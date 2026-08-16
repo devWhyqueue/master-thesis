@@ -32,6 +32,10 @@ class MLP(nn.Module):
             nn.Linear(hidden_dim, output_dim),
         )
 
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """Hidden representation before the final linear head."""
+        return self.net[:-1](x)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass of the MLP."""
         return self.net(x)

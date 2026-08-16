@@ -6,10 +6,8 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import BatchSampler, DataLoader, RandomSampler
-from torch.utils.data import WeightedRandomSampler
+from torch.utils.data import DataLoader
 
-from imbalance_benchmark.datasets.data import bag_collate, patch_collate
 from imbalance_benchmark.modeling.context import (
     REFERENCE_PASSES,
     resolve_update_budget,
@@ -28,14 +26,26 @@ from imbalance_benchmark.modeling.evaluation import (
     initial_checkpoint,
     run_evaluation,
     ClassAwareBatchSampler,
-    _RecordingBatchSampler,
 )
 from imbalance_benchmark.modeling.losses import (
     FocalLoss,
     ScholzCombinedLoss,
     cfal_loss,
 )
+from imbalance_benchmark.modeling.training.loaders import (
+    FIXED_BALANCED_SAMPLER_METHODS,
+    build_train_loader,
+    get_balanced_sampler,
+)
 from imbalance_benchmark.modeling.training.mil import _fit_mil_step
+from imbalance_benchmark.modeling.training.semantic_scale import (
+    prepare_ssb_pool,
+    ssb_loss,
+)
+from imbalance_benchmark.modeling.training.signal_weights import (
+    mean_one as _mean_one,
+    signal_criterion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,34 +66,13 @@ __all__ = [
     "fit_model",
 ]
 
-# Scholz sampling-loss hybrids: class-balanced oversampling plus a metric loss.
-FIXED_BALANCED_SAMPLER_METHODS = frozenset({"ce_soft_f1", "ce_soft_mcc"})
-
 
 def get_class_weights(
     labels: np.ndarray, n_classes: int, strength: float = 1.0
 ) -> torch.Tensor:
     """Compute rescaled inverse-frequency weights."""
-    w = torch.tensor(
-        np.power(
-            1.0 / np.maximum(np.bincount(labels, minlength=n_classes), 1.0), strength
-        ),
-        dtype=torch.float32,
-    )
-    return w * (n_classes / w.sum())
-
-
-def get_balanced_sampler(
-    labels: np.ndarray, strength: float = 1.0, seed: int = 0
-) -> WeightedRandomSampler:
-    """Create a WeightedRandomSampler for class balancing."""
-    w = 1.0 / np.maximum(np.bincount(labels), 1.0)
-    return WeightedRandomSampler(
-        [float(w[label] ** strength) for label in labels],
-        len(labels),
-        replacement=True,
-        generator=torch.Generator().manual_seed(seed),
-    )
+    counts = np.maximum(np.bincount(labels, minlength=n_classes), 1.0)
+    return _mean_one(np.power(1.0 / counts, strength))
 
 
 def class_priors(
@@ -105,6 +94,7 @@ def _init_criterion(
     n_classes: int,
     train_labels: np.ndarray,
     device: torch.device,
+    ctx: dict[str, Any],
 ) -> nn.Module:
     """Instantiate the loss function according to the method config."""
     if method == "weighted_ce":
@@ -115,7 +105,8 @@ def _init_criterion(
     if method in ("ce_soft_f1", "ce_soft_mcc"):
         metric = "f1" if "f1" in method else "mcc"
         return ScholzCombinedLoss(n_classes, metric=metric, weight=float(param or 1.0))
-    return nn.CrossEntropyLoss()
+    signal = signal_criterion(method, param, device, ctx)
+    return signal if signal is not None else nn.CrossEntropyLoss()
 
 
 def _fit_step(
@@ -131,53 +122,14 @@ def _fit_step(
     ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
     if method == "cfal":
         return cfal_loss(model, inputs, targets, ctx["class_counts"])
+    if method == "semantic_scale_ce":
+        return ssb_loss(model, inputs, targets, ctx, step)
     logits = model(inputs)
     if method == "logit_adjustment" and param is not None:
         logits = logits + param * torch.log(ctx["priors"] + 1e-8)
     if method == "mde":
         return criterion(model.encode(inputs), logits, targets)
     return criterion(logits, targets)
-
-
-def _build_train_loader(
-    ctx: dict[str, Any],
-    train_labels: np.ndarray,
-    param: float | None,
-    b_size: int,
-    is_mil: bool,
-) -> DataLoader:
-    method = ctx["method"]
-    exposed = (
-        ctx.setdefault("exposed_indices", set())
-        if ctx.get("record_exposure", True)
-        else None
-    )
-    if method == "sc_mil":
-        sampler = _RecordingBatchSampler(
-            ClassAwareBatchSampler(train_labels, b_size, ctx["seed"]), exposed
-        )
-        return DataLoader(
-            ctx["train_dataset"],
-            batch_sampler=sampler,
-            collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
-            pin_memory=pin_memory_ok(is_mil),
-        )
-    gen = torch.Generator().manual_seed(ctx["seed"])
-    if method == "balanced_sampling" and param:
-        base = get_balanced_sampler(train_labels, param, ctx["seed"])
-    elif method in FIXED_BALANCED_SAMPLER_METHODS:
-        base = get_balanced_sampler(train_labels, 1.0, ctx["seed"])
-    else:
-        base = RandomSampler(ctx["train_dataset"], generator=gen)
-    sampler = _RecordingBatchSampler(
-        BatchSampler(base, b_size, drop_last=False), exposed
-    )
-    return DataLoader(
-        ctx["train_dataset"],
-        batch_sampler=sampler,
-        collate_fn=bag_collate if is_mil else patch_collate,  # type: ignore[arg-type]
-        pin_memory=pin_memory_ok(is_mil),
-    )
 
 
 def _run_training_loop(
@@ -223,7 +175,7 @@ def _prepare_training_context(
     ctx["priors"] = class_priors(train_labels, n_classes, device)
     ctx["class_counts"] = np.bincount(train_labels, minlength=n_classes)
     ctx["criterion"] = _init_criterion(
-        ctx["method"], param, n_classes, train_labels, device
+        ctx["method"], param, n_classes, train_labels, device, ctx
     )
 
 
@@ -235,13 +187,14 @@ def fit_model(
     train_labels, param_config = ctx["train_labels"], ctx["param_config"]
     lr, param = param_config["lr"], param_config.get("parameter")
     b_size = resolve_batch_size(ctx["config"], is_mil)
-    loader = _build_train_loader(ctx, train_labels, param, b_size, is_mil)
+    loader = build_train_loader(ctx, train_labels, param, b_size, is_mil)
     best = initial_checkpoint(
         model, ctx["val_loader"], device, is_mil, ctx["n_classes"]
     )
     set_training_mode(ctx)
     opt = build_optimizer(model.parameters(), lr)
     _prepare_training_context(ctx, param, device)
+    prepare_ssb_pool(ctx, b_size)
     budget = max_steps if max_steps is not None else resolve_update_budget(ctx, b_size)
     best = _run_training_loop(opt, loader, ctx["val_loader"], ctx, budget, best)
     model.load_state_dict({k: v.to(device) for k, v in best["state"].items()})

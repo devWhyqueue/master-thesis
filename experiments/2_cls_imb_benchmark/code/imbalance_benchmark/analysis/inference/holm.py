@@ -11,10 +11,20 @@ __all__ = [
     "apply_holm",
 ]
 
-# Report §"Imbalance deficit, recovery, and inference": the loss-reweighting,
-# prior-correction, and resampling references shared across both regimes.
+# Report §"Imbalance deficit, recovery, and inference": one confirmatory method per
+# signal (prevalence / nominal support / independent support / difficulty /
+# diversity), all a mean-one class weight on unmodified CE, so a difference
+# between members is attributable to the signal rather than the intervention
+# mechanism. Patch-regime family (protocol report tab:roster). focal,
+# logit_adjustment and balanced_sampling moved to exploratory.
 PRIMARY_METHODS = frozenset(
-    {"weighted_ce", "focal", "logit_adjustment", "balanced_sampling"}
+    {
+        "weighted_ce",
+        "class_balanced_ce",
+        "independent_support_ce",
+        "pilot_difficulty_ce",
+        "semantic_scale_ce",
+    }
 )
 
 

@@ -14,10 +14,16 @@ __all__ = [
     "SoftF1LossMulti",
     "SoftMCCLossMulti",
     "ScholzCombinedLoss",
+    "effective_number",
     "cfal_loss",
     "supervised_contrastive_loss",
     "rankmix_bag_loss",
 ]
+
+
+def effective_number(counts: np.ndarray, beta: float) -> np.ndarray:
+    """``E_c = (1 - beta**n_c) / (1 - beta)``, floored at ``n_c=1``."""
+    return (1.0 - beta ** np.maximum(counts, 1.0)) / (1.0 - beta)
 
 
 class FocalLoss(nn.Module):
@@ -105,11 +111,7 @@ class ScholzCombinedLoss(nn.Module):
 
 
 def _prototype_diversity(model: nn.Module) -> torch.Tensor:
-    """Penalize deviations of pairwise prototype distances from their mean.
-
-    Population variance: a single distance (binary task) contributes zero
-    rather than the undefined sample variance of one element.
-    """
+    """Population variance of pairwise prototype distances (zero for one distance)."""
     proto = F.normalize(
         cast(torch.Tensor, getattr(model, "prototypes")), dim=-1, eps=1e-8
     )
@@ -128,13 +130,8 @@ def cfal_loss(
     beta: float = 0.999,
     margin: float = 0.1,
 ) -> torch.Tensor:
-    """Compute Center-Focused Affinity Loss (CFAL).
-
-    Follows the companion methods report: per-class weight ``1/E_c`` (the raw
-    inverse effective number, not renormalized) and fixed margin ``lambda=0.1``.
-    """
-    counts = np.maximum(class_counts, 1.0)
-    eff = (1.0 - beta**counts) / (1.0 - beta)
+    """CFAL: per-class weight ``1/E_c`` (raw, not renormalized), fixed ``lambda=0.1``."""
+    eff = effective_number(class_counts, beta)
     inv_eff = torch.tensor(1.0 / eff, dtype=torch.float32, device=features.device)
     aff = cast(CfalPrototypeClassifier, model).affinities(features)
     true_aff = aff[torch.arange(len(targets), device=targets.device), targets]

@@ -17,7 +17,11 @@ from imbalance_benchmark.common import (
     split_paths,
 )
 from imbalance_benchmark.datasets.data import TrainDataset, load_training_dataset
-from imbalance_benchmark.modeling.context import roster_for_condition
+from imbalance_benchmark.modeling.context import (
+    MATCHED_BETA_METHOD,
+    matched_beta_config,
+    roster_for_condition,
+)
 from imbalance_benchmark.modeling.workflows.confirmation import (
     RunContext,
     confirm_ce_seed,
@@ -46,6 +50,8 @@ def _required_methods(cond: str, method: str, is_mil: bool) -> tuple[str, ...]:
     """Methods whose signed tuning selection a unit needs."""
     if method == "crt":
         return ("crt", "ce")
+    if method == MATCHED_BETA_METHOD:
+        return ("independent_support_ce", "class_balanced_ce")
     return _fitted_methods(cond, method, is_mil)
 
 
@@ -86,6 +92,10 @@ def _confirm_unit_method(
             )
     elif method == "crt":
         confirm_crt_seed(cond, configs["crt"], configs["ce"], train_ds, run, seed_idx)
+    elif method == MATCHED_BETA_METHOD:
+        confirm_method_seed(
+            cond, method, matched_beta_config(configs), train_ds, run, seed_idx
+        )
     else:
         confirm_method_seed(cond, method, configs[method], train_ds, run, seed_idx)
 
@@ -129,6 +139,8 @@ def _seed_already_done(
             selected = {"parameter": selected.get("parameter")}
         if name == "crt" and isinstance(selected, dict):
             selected = {**selected, "stage_one": configs.get("ce")}
+        if name == MATCHED_BETA_METHOD:
+            selected = matched_beta_config(configs)
         if record.get("tuning_params") != selected:
             return False
     return True

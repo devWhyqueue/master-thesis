@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from imbalance_benchmark.modeling.context import group_conditions, roster_for_condition
+from imbalance_benchmark.modeling.context import (
+    MATCHED_BETA_METHOD,
+    group_conditions,
+    roster_for_condition,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     bundled_array_size,
 )
@@ -40,13 +44,18 @@ def confirm_group_methods(is_mil: bool, condition: str) -> tuple[str, ...]:
 
     Post-hoc logit adjustment is excluded: it has no independent unit because
     it inherits its seed's CE checkpoint in-memory and rides with that seed's
-    "ce" unit (checkpoints are never persisted to disk between units).
+    "ce" unit (checkpoints are never persisted to disk between units). The
+    matched-beta diagnostic arm is appended for patch-regime controlled
+    conditions: it is never tuned, so it is not part of the roster proper.
     """
-    return tuple(
+    methods = tuple(
         method
         for method in roster_for_condition(is_mil, condition)
         if method != "post_hoc_logit_adjustment"
     )
+    if not is_mil and condition != "natural":
+        methods += (MATCHED_BETA_METHOD,)
+    return methods
 
 
 def confirm_units_for_group(

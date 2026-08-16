@@ -23,6 +23,7 @@ __all__ = [
     "PATCH_ONLY_METHODS",
     "WSI_ONLY_METHODS",
     "SHARED_METHODS",
+    "MATCHED_BETA_METHOD",
     "Regime",
     "roster_for_regime",
     "roster_for_condition",
@@ -32,6 +33,7 @@ __all__ = [
     "build_training_ctx",
     "resolve_update_budget",
     "set_training_mode",
+    "matched_beta_config",
 ]
 
 INPUT_DIM = 2560
@@ -64,13 +66,29 @@ GRIDS: dict[str, list[float] | list[int]] = {
     "rankmix": [0.5, 1.0, 2.0, 4.0],
     "sc_mil": [0.05, 0.1, 0.5, 1.0],
     "mde": [0.0, 0.1, 0.25, 0.5],
+    # E_c(beta) saturation points 1/(1-beta) in {10, 100, 1000, 10000}, matched to
+    # n_c's typical range (report methods §sec:cb-ce).
+    "class_balanced_ce": [0.9, 0.99, 0.999, 0.9999],
+    # Saturation points {5, 20, 100, 1000}, scaled down to G_c's observed range
+    # (~20-5000 across the four patch datasets; report methods §sec:isw-ce).
+    "independent_support_ce": [0.8, 0.95, 0.99, 0.999],
+    # Matches weighted_ce's tau grid so the two are directly comparable.
+    "pilot_difficulty_ce": [0.25, 0.5, 0.75, 1.0],
+    "semantic_scale_ce": [0.25, 0.5, 0.75, 1.0],
 }
 
 # No imbalance-specific control (Appendix, Table "Experimental Controls"):
 # only the common learning-rate grid applies.
 NO_STRENGTH_GRID_METHODS = frozenset({"ce", "crt"})
 
-PATCH_ONLY_METHODS = ("ce_soft_f1", "ce_soft_mcc", "cfal", "oko")
+PATCH_ONLY_METHODS = (
+    "ce_soft_f1",
+    "ce_soft_mcc",
+    "cfal",
+    "oko",
+    "independent_support_ce",
+    "semantic_scale_ce",
+)
 WSI_ONLY_METHODS = ("rankmix", "sc_mil", "mde")
 SHARED_METHODS = (
     "ce",
@@ -80,7 +98,24 @@ SHARED_METHODS = (
     "logit_adjustment",
     "post_hoc_logit_adjustment",
     "crt",
+    "class_balanced_ce",
+    "pilot_difficulty_ce",
 )
+
+# Confirm-only diagnostic arm (report §sec:isw-ce matched-beta comparison): reuses
+# independent_support_ce's weighting at class_balanced_ce's tuned beta, isolating the
+# counting-unit effect (G_c vs n_c) from the saturation-scale choice. Not tuned itself
+# and deliberately outside SHARED_METHODS/PATCH_ONLY_METHODS/roster_for_regime, so
+# tuning, completeness, and recovery machinery never expect it as a roster member.
+MATCHED_BETA_METHOD = "independent_support_ce_matched_beta"
+
+
+def matched_beta_config(configs: dict[str, Any]) -> dict[str, Any]:
+    """Derive the matched-beta arm's config from one condition's tuned selections."""
+    return {
+        "lr": configs["independent_support_ce"]["lr"],
+        "parameter": configs["class_balanced_ce"]["parameter"],
+    }
 
 
 def roster_for_regime(is_mil: bool) -> tuple[str, ...]:
@@ -155,6 +190,9 @@ class Regime:
         default_factory=dict, kw_only=True
     )
     update_budgets: dict[str, int] = field(default_factory=dict, kw_only=True)
+    # Frozen pilot difficulty evidence, class-name keyed (manifest_freeze.json
+    # difficulty_evidence.difficulty); consumed by pilot_difficulty_ce.
+    difficulty: dict[str, float] = field(default_factory=dict, kw_only=True)
 
 
 def build_training_ctx(
@@ -168,8 +206,7 @@ def build_training_ctx(
 ) -> dict[str, Any]:
     """Build the shared training context for one method/config/seed trial."""
     torch.manual_seed(seed)
-    kwargs = model_kwargs(regime.is_mil)
-    param = cfg.get("parameter")
+    kwargs, param = model_kwargs(regime.is_mil), cfg.get("parameter")
     _factory = lambda: build_model(
         method, regime.is_mil, n_classes=regime.n_classes, param=param, **kwargs
     ).to(regime.device)
@@ -186,6 +223,7 @@ def build_training_ctx(
         "is_mil": regime.is_mil,
         "n_classes": regime.n_classes,
         "train_labels": train_ds.get_int_targets(),
+        "difficulty": regime.difficulty,
         "exposed_indices": set(),
         "method_diagnostics": {},
         "processed_examples": 0,

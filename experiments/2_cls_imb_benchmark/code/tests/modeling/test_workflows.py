@@ -313,9 +313,18 @@ def test_roster_for_regime_matches_report_table():
         "logit_adjustment",
         "post_hoc_logit_adjustment",
         "crt",
+        "class_balanced_ce",
+        "pilot_difficulty_ce",
     }
     assert shared <= set(patch) and shared <= set(wsi)
-    assert set(patch) - shared == {"ce_soft_f1", "ce_soft_mcc", "cfal", "oko"}
+    assert set(patch) - shared == {
+        "ce_soft_f1",
+        "ce_soft_mcc",
+        "cfal",
+        "oko",
+        "independent_support_ce",
+        "semantic_scale_ce",
+    }
     assert set(wsi) - shared == {"rankmix", "sc_mil", "mde"}
 
 

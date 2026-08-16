@@ -80,7 +80,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert "--shards-per-task 2" in jobs[3].command
     assert "--bundle-by-observation" in jobs[3].command
     assert jobs[3].memory == "32G"
-    assert jobs[4].array_size == 198
+    # Patch roster of 15 methods (report tab:roster) crossed with each method's grid.
+    assert jobs[4].array_size == 294
     natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
     assert "#SBATCH --mem=32G" in natural_script
 
@@ -129,10 +130,11 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     confirm_natural = next(j for j in jobs if j.name == "confirm-natural")
     confirm_controlled = next(j for j in jobs if j.name == "confirm-controlled")
 
-    # patch roster minus post-hoc = 10 methods; 3 splits x 5 seeds each,
-    # bundled 5 per task. Natural fits ce alone, so it keeps one method.
+    # patch roster minus post-hoc = 14 methods, plus the matched-beta diagnostic
+    # arm = 15; 3 splits x 5 seeds each, bundled 5 per task. Natural fits ce
+    # alone, so it keeps one method.
     assert confirm_natural.array_size == 3 * 1
-    assert confirm_controlled.array_size == 3 * 3 * 10
+    assert confirm_controlled.array_size == 3 * 3 * 15
     assert confirm_natural.partition == "gpu-5h"
     assert confirm_controlled.partition == "gpu-2h"
     assert confirm_natural.partition != "gpu-2d"
@@ -141,7 +143,7 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     natural_script = render_sbatch(confirm_natural, _config(), "config.yaml")
     controlled_script = render_sbatch(confirm_controlled, _config(), "config.yaml")
     assert f"#SBATCH --array=0-{3 * 1 - 1}%8" in natural_script
-    assert f"#SBATCH --array=0-{3 * 3 * 10 - 1}%8" in controlled_script
+    assert f"#SBATCH --array=0-{3 * 3 * 15 - 1}%8" in controlled_script
     assert "confirm-shard --group natural" in natural_script
     assert "confirm-shard --group controlled" in controlled_script
     assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in natural_script

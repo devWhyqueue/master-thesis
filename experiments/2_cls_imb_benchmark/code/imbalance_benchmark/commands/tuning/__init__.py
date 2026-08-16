@@ -97,6 +97,7 @@ def _tuning_inputs(
             locked_class_names=list(freeze["class_names"]),
             method_grids=freeze.get("method_grids", {}),
             update_budgets=freeze.get("update_budgets", {}),
+            difficulty=freeze.get("difficulty_evidence", {}).get("difficulty", {}),
         ),
         build_evaluation_loader(val_ds, is_mil),
     )
