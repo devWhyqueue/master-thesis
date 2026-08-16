@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import sqlite3
 import json
+import sqlite3
+from functools import cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -98,6 +99,7 @@ def load_split_payload(result_dir: Path, split: str) -> dict[str, Any] | None:
     return record.get("splits", {}).get(split)
 
 
+@cache
 def load_test_identity(
     manifest_path: Path, is_mil: bool, split_name: str = "test"
 ) -> pd.DataFrame:
@@ -110,7 +112,8 @@ def load_test_identity(
     joined back to patient/slide identity by position without persisting
     patient IDs inside every run record.
     """
-    df = pd.read_csv(manifest_path)
+    identity_columns = {"case_id", "slide_id", "cancer_type", "split"}
+    df = pd.read_csv(manifest_path, usecols=lambda column: column in identity_columns)
     df["case_id"] = df["case_id"].astype(str)
     df = cast(pd.DataFrame, df[df["split"] == split_name]).reset_index(drop=True)
     if is_mil:

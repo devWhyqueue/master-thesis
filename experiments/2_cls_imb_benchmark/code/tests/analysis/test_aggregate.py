@@ -536,6 +536,49 @@ def test_load_test_identity_matches_row_order(tmp_path: Path):
     identity = load_test_identity(manifest_path, is_mil=False)
     assert identity["case_id"].tolist() == ["P0", "P1"]
 
+
+def test_load_test_identity_caches_projected_manifest_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path = tmp_path / "manifest.csv"
+    manifest = pd.DataFrame(
+        [
+            {
+                "case_id": "P0",
+                "slide_id": "S0",
+                "cancer_type": "A",
+                "split": "test",
+                "unused": "large payload",
+            }
+        ]
+    )
+    manifest.to_csv(manifest_path, index=False)
+    read_csv = pd.read_csv
+    calls: list[dict[str, object]] = []
+
+    def counted_read_csv(*args: object, **kwargs: object) -> pd.DataFrame:
+        calls.append(kwargs)
+        return read_csv(*args, **kwargs)
+
+    monkeypatch.setattr(pd, "read_csv", counted_read_csv)
+    load_test_identity.cache_clear()
+    try:
+        load_test_identity(manifest_path, is_mil=False)
+        load_test_identity(manifest_path, is_mil=False)
+    finally:
+        load_test_identity.cache_clear()
+
+    assert len(calls) == 1
+    usecols = calls[0]["usecols"]
+    assert callable(usecols)
+    assert {column for column in manifest.columns if usecols(column)} == {
+        "case_id",
+        "slide_id",
+        "cancer_type",
+        "split",
+    }
+
+
 def test_load_mil_test_identity_preserves_bag_dataset_order(tmp_path: Path):
     manifest = pd.DataFrame(
         [
