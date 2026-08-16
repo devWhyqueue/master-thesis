@@ -31,6 +31,39 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_gate_pass_model,
     fit_recovery_model,
 )
+
+
+def test_patch_feature_frame_gathers_resident_rows_without_sample_loop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """RQ3 must gather resident rows once, not materialize every patch item."""
+
+    class Patches:
+        rows = object()
+
+        def __len__(self) -> int:  # pragma: no cover - must not run
+            raise AssertionError("feature_frame must not index every patch")
+
+        def get_int_targets(self) -> np.ndarray:
+            return np.array([1, 0])
+
+    monkeypatch.setattr(
+        rq3_features, "load_training_dataset", lambda *_, **__: Patches()
+    )
+    monkeypatch.setattr(
+        rq3_features,
+        "bank_index",
+        lambda _: torch.tensor([[1.0, 2.0], [3.0, 4.0]]),
+    )
+
+    features, targets = rq3_features.feature_frame(
+        tmp_path / "manifest.csv", None, False, None
+    )
+
+    np.testing.assert_array_equal(features, [[1.0, 2.0], [3.0, 4.0]])
+    np.testing.assert_array_equal(targets, [1, 0])
+
+
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_linked_sensitivity_models,
 )
@@ -38,6 +71,7 @@ from imbalance_benchmark.common import (
     write_json,
     write_run_record,
 )
+
 
 def _toy_identity(n_patients_per_class: int = 6) -> pd.DataFrame:
     rows = []
@@ -53,6 +87,7 @@ def _toy_identity(n_patients_per_class: int = 6) -> pd.DataFrame:
                     }
                 )
     return pd.DataFrame(rows)
+
 
 def _write_fake_run(
     results_root: Path,
@@ -88,6 +123,7 @@ def _write_fake_run(
         },
     )
 
+
 def _rq3_cell(group: str, method: str, rho: float, deficit: float, gate: bool) -> dict:
     return {
         "group": group,
@@ -105,6 +141,7 @@ def _rq3_cell(group: str, method: str, rho: float, deficit: float, gate: bool) -
         "recovery_se": 0.1,
     }
 
+
 @pytest.mark.parametrize(
     "method_metric,imbalanced_ce,d,expected",
     [
@@ -117,11 +154,14 @@ def _rq3_cell(group: str, method: str, rho: float, deficit: float, gate: bool) -
 def test_recovery_sign_conventions(method_metric, imbalanced_ce, d, expected):
     assert recovery(method_metric, imbalanced_ce, d) == pytest.approx(expected)
 
+
 def test_recovery_nan_when_no_deficit():
     assert np.isnan(recovery(0.6, 0.5, 0.0))
 
+
 def test_deficit_higher_is_better():
     assert deficit(0.7, 0.5) == pytest.approx(0.2)
+
 
 def test_rq3_gate_pass_and_deficit_and_recovery_models_run():
     rng = np.random.default_rng(0)
@@ -151,6 +191,7 @@ def test_rq3_gate_pass_and_deficit_and_recovery_models_run():
     assert "slopes" in deficit_model
     assert "slopes" in recovery_model
 
+
 def test_rq3_recovery_model_empty_when_no_gated_cells():
     cells = [
         {
@@ -163,6 +204,7 @@ def test_rq3_recovery_model_empty_when_no_gated_cells():
         }
     ]
     assert fit_recovery_model(cells) == {}
+
 
 def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatch):
     """A calibration-only cell must use tail-NLL recovery, not BA recovery."""
@@ -209,7 +251,12 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
     freeze = {
         "difficulty_evidence": {"difficulty": {"A": 0.1, "B": 0.2}},
         "assignment_conditions": {
-            "native": {"severe": {"achieved_rho": 100.0, "allocated_counts": {"A": 10, "B": 100}}}
+            "native": {
+                "severe": {
+                    "achieved_rho": 100.0,
+                    "allocated_counts": {"A": 10, "B": 100},
+                }
+            }
         },
     }
 
@@ -219,6 +266,7 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
     assert recovery["gate"] == "calibration"
     assert recovery["gate_passed"] is True
     assert recovery["recovery"] == pytest.approx(0.5)
+
 
 def test_cross_split_rq3_keeps_gate_specific_calibration_outcome():
     rows = [
@@ -244,10 +292,12 @@ def test_cross_split_rq3_keeps_gate_specific_calibration_outcome():
     assert gates[("native", "severe", "calibration")]
     assert ("native", "severe", "weighted_ce", "calibration") in outcomes
 
+
 def test_log_scale_prior_prevents_random_effect_scale_collapse():
     collapsed = _log_scale_prior(torch.tensor([-20.0]))
     centered = _log_scale_prior(torch.tensor([0.0]))
     assert collapsed > centered
+
 
 def test_rq3_regime_specific_sensitivities_fit_their_eligible_cells(
     monkeypatch: pytest.MonkeyPatch,
@@ -291,6 +341,7 @@ def test_rq3_regime_specific_sensitivities_fit_their_eligible_cells(
 
     assert sensitivity["log_effective_support"]["deficit"]["values"] == [2.0, 3.0]
     assert sensitivity["log_min_patient_support"]["deficit"]["values"] == [4.0, 5.0]
+
 
 def test_rq3_icc_margin_uses_the_fixed_intrinsic_reference(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -440,6 +491,7 @@ def test_rq3_effective_support_uses_condition_support(
 
     assert result["log_effective_support"] == pytest.approx(0.0)
 
+
 def test_rq3_wsi_records_patient_support_without_patch_effective_support(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -491,6 +543,7 @@ def test_rq3_wsi_records_patient_support_without_patch_effective_support(
     assert result["log_min_patient_support"] == pytest.approx(np.log(2))
     assert "log_effective_support" not in result
 
+
 def test_rq3_crossed_cell_uses_observed_point_not_bootstrap_mean() -> None:
     """RQ3 crossed cells report the observed (index-0) deficit and recovery.
 
@@ -532,6 +585,7 @@ def test_rq3_crossed_cell_uses_observed_point_not_bootstrap_mean() -> None:
     assert rec_out["recovery"] == pytest.approx(0.5)  # observed 1/2, not mean 1.25
     assert rec_out["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
+
 def test_rq3_crossed_cell_treats_a_near_zero_denominator_as_undefined() -> None:
     """A tiny but nonzero deficit must not blow recovery up to an arbitrary value.
 
@@ -560,6 +614,7 @@ def test_rq3_crossed_cell_treats_a_near_zero_denominator_as_undefined() -> None:
         0.0
     )
 
+
 def test_cross_dataset_rq3_pools_groups_and_reports_stability() -> None:
     """RQ3's combined fit spans dataset-target groups with LODO and sensitivity fits."""
     from imbalance_benchmark.analysis.predictors.rq3_analysis import cross_dataset_rq3
@@ -580,6 +635,7 @@ def test_cross_dataset_rq3_pools_groups_and_reports_stability() -> None:
         "is_wsi",
     }
     assert set(report["leave_one_group_out"]) == set(report["groups"])
+
 
 def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) -> None:
     """Three patient splits are fixed repetitions, not independent RQ3 cells."""
@@ -651,6 +707,7 @@ def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) 
     # that wins the key is [0.1, 0.2, 0.3], so the point estimate is 0.1, not
     # the bootstrap mean (0.2).
     assert cells[0]["deficit_ba"] == pytest.approx(0.1)
+
 
 def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     monkeypatch: pytest.MonkeyPatch,
@@ -724,6 +781,7 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     assert report["cells"][0]["group"] == "panda:isup_grade"
     assert observed_regimes[-1] is True
 
+
 def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> None:
     """RQ3 uses the equal-split gate and ratio distribution, not split-level averages."""
     from imbalance_benchmark.analysis.predictors.rq3_analysis import load_rq3_cells
@@ -782,6 +840,7 @@ def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> N
     assert cells[0]["recovery"] == pytest.approx(0.5)
     assert cells[0]["recovery_se"] == pytest.approx(np.std([0.5, 2.0], ddof=1))
 
+
 def test_gate_uses_observed_deficit_not_bootstrap_mean():
     # Replicate 0 is the observed cohort: the observed deficit is 0.01 (must not
     # open the 0.02 gate) while bootstrap replicates 1.. average ~0.03 with a CI
@@ -794,6 +853,7 @@ def test_gate_uses_observed_deficit_not_bootstrap_mean():
     assert dist[0] == pytest.approx(0.01)  # observed deficit
     assert comparison["effect"] == pytest.approx(0.01)
     assert passed is False
+
 
 def test_recovery_is_ratio_of_observed_points_not_mean_of_ratios():
     inp = _SeverityInputs({}, "moderate", {}, {}, None, 2, 10, 0, "native")

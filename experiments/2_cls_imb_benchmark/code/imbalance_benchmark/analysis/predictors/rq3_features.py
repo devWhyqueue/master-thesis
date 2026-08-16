@@ -18,6 +18,7 @@ from imbalance_benchmark.datasets.data import (
     ImbalanceDataset,
     load_training_dataset,
 )
+from imbalance_benchmark.datasets.features.cache import bank_index
 
 
 def feature_frame(
@@ -33,9 +34,7 @@ def feature_frame(
         features = [np.r_[bag.mean(0).cpu(), bag.std(0).cpu()] for bag, _ in bags]
     else:
         patches = cast(ImbalanceDataset, dataset)
-        features = [
-            patches[index]["features"].cpu().numpy() for index in range(len(patches))
-        ]
+        features = bank_index(patches.rows).cpu().numpy()
     return np.asarray(features), dataset.get_int_targets()
 
 
