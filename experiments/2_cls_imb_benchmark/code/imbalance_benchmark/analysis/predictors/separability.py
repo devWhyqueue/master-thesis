@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -20,6 +21,8 @@ __all__ = [
 
 
 _CHUNK_SIZE = 4096
+_REFERENCE_CHUNK_SIZE = 32768
+logger = logging.getLogger(__name__)
 
 
 def _knn_and_nn_probe(
@@ -30,30 +33,46 @@ def _knn_and_nn_probe(
     n_classes: int,
     k: int = 5,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Shared (n_val, n_ref) distance pass: k-NN vote predictions and 1-NN correctness.
+    """Shared streamed distance pass: k-NN vote predictions and 1-NN correctness.
 
-    Both consumers (balanced k-NN macro recall, per-class 1-NN error) need the same
-    squared-distance matrix; computing it once per chunk instead of twice halves the
-    heaviest allocation in RQ3 covariates. Rows are processed in chunks so the full
-    ``(n_val, n_ref)`` matrix is never materialized at once.
+    Both consumers share distances. Reference blocks bound the temporary matrix.
     """
     k = min(k, ref_x.shape[0])
     ref_sq = (ref_x**2).sum(axis=1)[None, :]
     n_val = val_x.shape[0]
+    n_chunks = (n_val + _CHUNK_SIZE - 1) // _CHUNK_SIZE
     preds = np.empty(n_val, dtype=ref_y.dtype)
     nn_correct = np.empty(n_val, dtype=bool)
-    for start in range(0, n_val, _CHUNK_SIZE):
+    for chunk_number, start in enumerate(range(0, n_val, _CHUNK_SIZE), start=1):
         chunk = val_x[start : start + _CHUNK_SIZE]
-        d2 = (chunk**2).sum(axis=1, keepdims=True) - 2.0 * chunk @ ref_x.T + ref_sq
         end = start + chunk.shape[0]
-        # argpartition (unordered top-k) suffices: the k labels feed an
-        # order-insensitive bincount().argmax() vote, same as a full argsort.
-        neighbor_idx = np.argpartition(d2, k - 1, axis=1)[:, :k]
+        if chunk_number == 1 or chunk_number % 10 == 0 or chunk_number == n_chunks:
+            logger.info("rq3: knn query chunk %d/%d", chunk_number, n_chunks)
+        best_d2 = np.full((chunk.shape[0], k), np.inf, dtype=ref_x.dtype)
+        best_idx = np.full((chunk.shape[0], k), ref_x.shape[0], dtype=np.intp)
+        chunk_sq = (chunk**2).sum(axis=1, keepdims=True)
+        for ref_start in range(0, ref_x.shape[0], _REFERENCE_CHUNK_SIZE):
+            ref_end = min(ref_start + _REFERENCE_CHUNK_SIZE, ref_x.shape[0])
+            d2 = (
+                chunk_sq
+                - 2.0 * chunk @ ref_x[ref_start:ref_end].T
+                + ref_sq[:, ref_start:ref_end]
+            )
+            local_k = min(k, ref_end - ref_start)
+            local_idx = np.argpartition(d2, local_k - 1, axis=1)[:, :local_k]
+            local_d2 = np.take_along_axis(d2, local_idx, axis=1)
+            candidate_d2 = np.concatenate((best_d2, local_d2), axis=1)
+            candidate_idx = np.concatenate((best_idx, local_idx + ref_start), axis=1)
+            selected = np.argpartition(candidate_d2, k - 1, axis=1)[:, :k]
+            best_d2 = np.take_along_axis(candidate_d2, selected, axis=1)
+            best_idx = np.take_along_axis(candidate_idx, selected, axis=1)
+        neighbor_idx = best_idx
         neighbor_labels = ref_y[neighbor_idx]
         preds[start:end] = [
             np.bincount(row, minlength=n_classes).argmax() for row in neighbor_labels
         ]
-        nn_correct[start:end] = ref_y[d2.argmin(axis=1)] == val_y[start:end]
+        nearest = best_idx[np.arange(len(chunk)), best_d2.argmin(1)]
+        nn_correct[start:end] = ref_y[nearest] == val_y[start:end]
     return preds, nn_correct
 
 
@@ -176,10 +195,12 @@ def class_margin_cross_fit(
     fitted on its own patient's data, matching Eq. neff's cross-fitting
     requirement.
     """
+    del seed  # GroupKFold is deterministic; retain the public cross-fit signature.
     margins = np.full(len(y), np.nan)
     n_folds = max(2, min(n_folds, len(np.unique(case_ids))))
     splitter = GroupKFold(n_splits=n_folds)
-    for train_idx, test_idx in splitter.split(x, y, groups=case_ids):
+    for fold, (train_idx, test_idx) in enumerate(splitter.split(x, y, case_ids), 1):
+        logger.info("rq3: margin fold %d/%d", fold, n_folds)
         if len(np.unique(y[train_idx])) < 2:
             continue
         probe = LogisticRegression(class_weight="balanced", max_iter=1000)

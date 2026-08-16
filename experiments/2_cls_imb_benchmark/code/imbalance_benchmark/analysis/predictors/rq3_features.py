@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +20,8 @@ from imbalance_benchmark.datasets.data import (
     load_training_dataset,
 )
 from imbalance_benchmark.datasets.features.cache import bank_index
+
+logger = logging.getLogger(__name__)
 
 
 def feature_frame(
@@ -84,11 +87,14 @@ def _reference_block(
     """
     ref_path = paths["data"] / "manifest_balanced.csv"
     # Seed the resident bank at full-manifest capacity before loading subsets.
+    logger.info("rq3: loading validation reference features")
     val_x, val_y = feature_frame(
         paths["data"] / "manifest.csv", "validation", is_mil, class_names
     )
+    logger.info("rq3: loading balanced reference features")
     ref_x, ref_y = feature_frame(ref_path, None, is_mil, class_names)
     n_classes = len(np.unique(ref_y))
+    logger.info("rq3: intrinsic separability")
     intrinsic = intrinsic_separability(ref_x, ref_y, val_x, val_y, n_classes)
     block = {
         "ref_x": ref_x,
@@ -102,6 +108,7 @@ def _reference_block(
         return block
     reference_frame = feature_identity(ref_path, None, is_mil, class_names)
     reference_cases = reference_frame["case_id"].astype(str).to_numpy()
+    logger.info("rq3: cross-fitted class margins")
     margins = class_margin_cross_fit(ref_x, ref_y, reference_cases, n_classes)
     block["reference_frame"] = reference_frame
     block["reference_cases"] = reference_cases

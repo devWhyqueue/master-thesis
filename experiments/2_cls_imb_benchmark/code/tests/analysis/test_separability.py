@@ -23,7 +23,13 @@ def _reference_knn_and_nn(ref_x, ref_y, val_x, val_y, n_classes, k=5):
     return preds, nn_correct
 
 
-def _synthetic(seed: int, n_ref: int = 37, n_val: int = 130, n_classes: int = 4, n_features: int = 6):
+def _synthetic(
+    seed: int,
+    n_ref: int = 37,
+    n_val: int = 130,
+    n_classes: int = 4,
+    n_features: int = 6,
+):
     rng = np.random.default_rng(seed)
     ref_x = rng.normal(size=(n_ref, n_features))
     ref_y = rng.integers(0, n_classes, size=n_ref)
@@ -46,8 +52,33 @@ def test_chunked_distances_match_unchunked_1nn():
     # Force multiple chunks (val rows >> chunk size) via the module-level constant.
     assert val_x.shape[0] > sep._CHUNK_SIZE
     _, nn_correct = sep._knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes)
-    _, expected_nn_correct = _reference_knn_and_nn(ref_x, ref_y, val_x, val_y, n_classes)
+    _, expected_nn_correct = _reference_knn_and_nn(
+        ref_x, ref_y, val_x, val_y, n_classes
+    )
     np.testing.assert_array_equal(nn_correct, expected_nn_correct)
+
+
+def test_streamed_reference_blocks_match_unchunked_knn_and_1nn(monkeypatch):
+    ref_x, ref_y, val_x, val_y = _synthetic(seed=3, n_ref=79, n_val=23)
+    monkeypatch.setattr(sep, "_REFERENCE_CHUNK_SIZE", 11)
+    n_classes = 4
+
+    preds, nn_correct = sep._knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes)
+    expected_preds, expected_nn_correct = _reference_knn_and_nn(
+        ref_x, ref_y, val_x, val_y, n_classes
+    )
+
+    np.testing.assert_array_equal(preds, expected_preds)
+    np.testing.assert_array_equal(nn_correct, expected_nn_correct)
+
+
+def test_knn_logs_chunk_progress(monkeypatch, caplog):
+    ref_x, ref_y, val_x, val_y = _synthetic(seed=4, n_val=9)
+    monkeypatch.setattr(sep, "_CHUNK_SIZE", 4)
+    with caplog.at_level("INFO"):
+        sep._knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes=4)
+    assert "rq3: knn query chunk 1/3" in caplog.text
+    assert "rq3: knn query chunk 3/3" in caplog.text
 
 
 def test_shared_pass_matches_public_functions():
