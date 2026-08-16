@@ -1,0 +1,14 @@
+# Cross-dataset RQ3 combination. Reads split-level rq3.json + cross-split
+# gates/recovery from each dataset root below (all must have completed
+# `analyze` for all 3 splits and `analyze-combine`) and fits the combined
+# gate_pass/deficit/recovery models over pooled cells.
+
+paths:
+  outputs: experiments/2_benchmark_patch/outputs/rq3_combined
+
+rq3:
+  dataset_roots:
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/camelyon16/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch
