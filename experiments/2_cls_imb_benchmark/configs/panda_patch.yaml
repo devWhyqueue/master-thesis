@@ -105,7 +105,12 @@ slurm:
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "40gb|80gb|h100|h200"}
-    analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
+    # PANDA's permutation-test recovery loop (100k permutations x ~4.5M-row
+    # patch-level arrays per method) ran ~10% into the recovery phase alone
+    # after 3h on cpu-5h's 5h wall (see recovery.py's per-method progress
+    # log). analyze has zero checkpointing, so a timeout loses all progress;
+    # cpu-2d is the longest CPU partition available.
+    analyze: {partition: cpu-2d, gpus: 0, cpus: 8, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
   shared_squashfs:
     - source: /home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs
