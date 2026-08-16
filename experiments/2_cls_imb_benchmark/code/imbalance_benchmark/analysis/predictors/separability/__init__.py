@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import numpy as np
@@ -154,6 +155,18 @@ def condition_learnability(
     return probe_metrics(condition_x, condition_y, val_x, val_y, n_classes)
 
 
+def _margin_scores(
+    probe: LogisticRegression, x: np.ndarray, y: np.ndarray, test_idx: np.ndarray
+) -> np.ndarray:
+    """Return each held-out row's true-class logit minus its best competitor."""
+    logits = probe.decision_function(x[test_idx])
+    if logits.ndim == 1:
+        logits = np.stack([-logits, logits], axis=1)
+    true_logit = logits[np.arange(len(test_idx)), y[test_idx]]
+    logits[np.arange(len(test_idx)), y[test_idx]] = -np.inf
+    return true_logit - logits.max(axis=1)
+
+
 def class_margin_cross_fit(
     x: np.ndarray,
     y: np.ndarray,
@@ -171,16 +184,17 @@ def class_margin_cross_fit(
         logger.info("rq3: margin fold %d/%d", fold, n_folds)
         if len(np.unique(y[train_idx])) < 2:
             continue
+        started = time.monotonic()
         probe = LogisticRegression(class_weight="balanced", max_iter=1000)
         probe.fit(x[train_idx], y[train_idx])
-        logits = probe.decision_function(x[test_idx])
-        if logits.ndim == 1:
-            logits = np.stack([-logits, logits], axis=1)
-        true_logit = logits[np.arange(len(test_idx)), y[test_idx]]
-        masked = logits.copy()
-        masked[np.arange(len(test_idx)), y[test_idx]] = -np.inf
-        best_competitor = masked.max(axis=1)
-        margins[test_idx] = true_logit - best_competitor
+        margins[test_idx] = _margin_scores(probe, x, y, test_idx)
+        logger.info(
+            "rq3: margin fold %d/%d complete in %.1fs (%d lbfgs iterations)",
+            fold,
+            n_folds,
+            time.monotonic() - started,
+            int(np.max(probe.n_iter_)),
+        )
     return margins
 
 

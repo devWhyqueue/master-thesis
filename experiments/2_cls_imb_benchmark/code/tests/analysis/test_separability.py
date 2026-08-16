@@ -100,6 +100,16 @@ def test_knn_logs_chunk_progress(monkeypatch, caplog):
     assert "rq3: knn query chunk 3/3 reference block 4/4" in caplog.text
 
 
+def test_class_margin_logs_completed_folds(caplog):
+    ref_x, ref_y, _, _ = _synthetic(seed=6, n_ref=60)
+    case_ids = np.repeat(np.arange(20), 3)
+    with caplog.at_level("INFO"):
+        margins = sep.class_margin_cross_fit(ref_x, ref_y, case_ids, n_classes=4)
+    assert np.isfinite(margins).all()
+    assert "rq3: margin fold 1/5 complete" in caplog.text
+    assert "rq3: margin fold 5/5 complete" in caplog.text
+
+
 def test_shared_pass_matches_public_functions():
     ref_x, ref_y, val_x, val_y = _synthetic(seed=2)
     n_classes = 4
