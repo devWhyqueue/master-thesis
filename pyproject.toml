@@ -47,7 +47,7 @@ dev = [
 include-package-data = false
 
 [tool.setuptools.packages.find]
-where = [".agents/skills/bib/src", "experiments/2_cls_imb_benchmark/code"]
+where = [".agents/skills/bib/src", "experiments/2_benchmark_patch/code"]
 
 [tool.vulture]
 ignore_names = ["forward", "MAX_TEXT_CHUNK"]
@@ -56,7 +56,7 @@ ignore_names = ["forward", "MAX_TEXT_CHUNK"]
 addopts = "-s"
 testpaths = [
     ".agents/skills/bib/tests",
-    "experiments/2_cls_imb_benchmark/code/tests",
+    "experiments/2_benchmark_patch/code/tests",
 ]
 
 [tool.uv.sources]

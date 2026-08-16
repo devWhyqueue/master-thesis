@@ -1,7 +1,7 @@
 # PANDA patch-classification cell.
 
 paths:
-  outputs: experiments/2_cls_imb_benchmark/outputs/panda/patch
+  outputs: experiments/2_benchmark_patch/outputs/panda/patch
 
 dataset:
   name: panda
@@ -17,8 +17,8 @@ dataset:
     labels: at_least_50_percent_provider_specific_cancer_mask_values
     classes: benign_or_cancer
     split_unit: biopsy
-  canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/canonical_inventory.csv
-  materialization_sidecar: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
+  canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch/materialize/canonical_inventory.csv
+  materialization_sidecar: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch/materialize/materialization.json
   expected_slide_count: 10616
 
 feature_extraction:
@@ -29,7 +29,7 @@ feature_extraction:
   dtype: float16
   device: auto
 
-feature_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/data/features/panda/feature_inventory.json
+feature_inventory_path: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch/data/features/panda/feature_inventory.json
 
 patch_training:
   # Validation is ~98% of tune cost (full pass every checkpoint_interval steps).
@@ -46,8 +46,8 @@ materialize_panda:
   scratch_root: /tmp/panda-materialize
   shard_root: /home/space/datasets-sqfs/panda/patch
   shard_mount_root: /home/space/datasets/panda/patch
-  canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/canonical_inventory.csv
-  sidecar_path: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch/materialize/materialization.json
+  canonical_inventory_path: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch/materialize/canonical_inventory.csv
+  sidecar_path: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch/materialize/materialization.json
   shard_count: 48
   jpeg_mae_max: 10.0
   audit_shard_count: 32
@@ -58,11 +58,11 @@ materialize_panda:
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
-  code_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/panda/patch
+  code_dir: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch
   partition: gpu-2h
   test_partition: gpu-test
-  container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
+  container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
   max_array_concurrency: 35
   tune_natural_observations_per_candidate: 6
   # tune_controlled/confirm_controlled moved to gpu-2h (50 slots, higher

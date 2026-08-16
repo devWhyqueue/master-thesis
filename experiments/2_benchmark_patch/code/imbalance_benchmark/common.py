@@ -37,7 +37,7 @@ def find_repo_root() -> Path:
 
 
 REPO_ROOT = find_repo_root()
-EXPERIMENT_ROOT = REPO_ROOT / "experiments" / "2_cls_imb_benchmark"
+EXPERIMENT_ROOT = REPO_ROOT / "experiments" / "2_benchmark_patch"
 DEFAULT_CONFIG_PATH = EXPERIMENT_ROOT / "configs" / "default.yaml"
 N_PATIENT_SPLITS = 3
 RUN_RECORD_NAME = "run.json"
@@ -71,7 +71,7 @@ def output_root(config: dict[str, Any]) -> Path:
     """Resolve the configured output root path."""
     configured = Path(
         config.get("paths", {}).get(
-            "outputs", "experiments/2_cls_imb_benchmark/outputs"
+            "outputs", "experiments/2_benchmark_patch/outputs"
         )
     )
     return configured if configured.is_absolute() else REPO_ROOT / configured

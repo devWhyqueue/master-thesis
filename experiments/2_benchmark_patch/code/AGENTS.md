@@ -26,7 +26,7 @@ This directory is the unified `imbalance_benchmark` implementation. Use this map
 
 - The command order is `prepare` -> `pilot` -> `freeze` -> `tune` -> `confirm` -> `analyze`; run `combine-rq3` only after split-level analysis.
 - Use `__main__.py` from this directory: `uv run python __main__.py --config ../configs/default.yaml prepare`. `smoke` exercises the local end-to-end path; `submit --dry-run` previews Hydra submission.
-- [`../report/2_cls_imb_benchmark.tex`](../report/2_cls_imb_benchmark.tex) is the protocol authority. Do not edit it unless explicitly asked.
+- [`../report/2_benchmark_patch.tex`](../report/2_benchmark_patch.tex) is the protocol authority. Do not edit it unless explicitly asked.
 - Preserve patient splits, seed families, tuning locks, signed manifests, and frozen evidence. Never select a configuration or replace a failed run using test results.
 - Use the default configuration for paths. Outputs are generated evidence: do not hand-edit manifests, selections, or run records.
 
@@ -35,8 +35,8 @@ This directory is the unified `imbalance_benchmark` implementation. Use this map
 From the repository root:
 
 ```powershell
-uv run pytest experiments/2_cls_imb_benchmark/code/tests
-uv run python "$env:USERPROFILE\.codex\skills\clean-code\run.py" --scope experiments/2_cls_imb_benchmark/code --vulture-scope experiments/2_cls_imb_benchmark/code
+uv run pytest experiments/2_benchmark_patch/code/tests
+uv run python "$env:USERPROFILE\.codex\skills\clean-code\run.py" --scope experiments/2_benchmark_patch/code --vulture-scope experiments/2_benchmark_patch/code
 ```
 
 Run the clean-code gate after each Python change and fix findings without weakening rules. For Hydra or SLURM work, first follow the repository's `hydra-cluster` instructions and `CLUSTER.md`.

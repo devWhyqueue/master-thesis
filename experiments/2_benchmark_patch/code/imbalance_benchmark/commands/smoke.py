@@ -123,7 +123,7 @@ def _scaled_down_search() -> Iterator[None]:
 def _mock_config() -> dict[str, object]:
     """Synthetic-dataset config for the local end-to-end smoke path."""
     return {
-        "paths": {"outputs": "experiments/2_cls_imb_benchmark/smoke_outputs"},
+        "paths": {"outputs": "experiments/2_benchmark_patch/smoke_outputs"},
         "slurm": {"partition": "cpu-test", "container": "./environment.sif"},
         "dataset": {
             "name": "synthetic",
@@ -140,7 +140,7 @@ def cmd_smoke(args: argparse.Namespace) -> None:
     """Run local end-to-end smoke test."""
     logger.info("=== Running End-to-End Smoke Test ===")
     config_path = (
-        REPO_ROOT / "experiments/2_cls_imb_benchmark/smoke_outputs/configs/default.yaml"
+        REPO_ROOT / "experiments/2_benchmark_patch/smoke_outputs/configs/default.yaml"
     )
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with config_path.open("w", encoding="utf-8") as f:

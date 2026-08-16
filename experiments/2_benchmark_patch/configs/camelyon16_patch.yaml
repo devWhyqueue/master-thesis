@@ -1,7 +1,7 @@
 # CAMELYON16 patch-classification cell.
 
 paths:
-  outputs: experiments/2_cls_imb_benchmark/outputs/camelyon16/patch
+  outputs: experiments/2_benchmark_patch/outputs/camelyon16/patch
 
 dataset:
   name: camelyon16
@@ -29,8 +29,8 @@ feature_extraction:
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
-  code_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/outputs/camelyon16/patch
+  code_dir: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/camelyon16/patch
   partition: gpu-2h
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
@@ -41,7 +41,7 @@ slurm:
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
   max_array_concurrency: 35
-  container: /home/yannik.qu/master-thesis/experiments/2_cls_imb_benchmark/environment.sif
+  container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
   resources:
     prepare: {partition: gpu-2h, gpus: 4, cpus: 32, memory: 64G}
     pilot: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 32G}

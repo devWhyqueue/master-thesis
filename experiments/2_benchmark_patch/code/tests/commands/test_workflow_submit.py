@@ -25,7 +25,7 @@ def _config() -> dict[str, object]:
         "dataset": {"root": PANDA_RAW},
         "slurm": {
             "project_root": "/home/example/master-thesis",
-            "code_dir": "/home/example/master-thesis/experiments/2_cls_imb_benchmark/code",
+            "code_dir": "/home/example/master-thesis/experiments/2_benchmark_patch/code",
             "container": "/home/example/environment.sif",
             "test_partition": "gpu-test",
             "tune_natural_observations_per_candidate": 6,

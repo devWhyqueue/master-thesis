@@ -1,9 +1,9 @@
 {
   "include": [
-    "experiments/2_cls_imb_benchmark/code"
+    "experiments/2_benchmark_patch/code"
   ],
   "extraPaths": [
-    "experiments/2_cls_imb_benchmark/code"
+    "experiments/2_benchmark_patch/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"

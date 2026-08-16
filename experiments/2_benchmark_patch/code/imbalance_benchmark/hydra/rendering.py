@@ -104,7 +104,7 @@ def _crossed_array_lines(job: SlurmJob, prefix: str) -> list[str]:
 
 
 def _directives(job: SlurmJob, root: str, config: dict[str, Any]) -> list[str]:
-    log_dir = f"{shlex.quote(root)}/experiments/2_cls_imb_benchmark/outputs/logs"
+    log_dir = f"{shlex.quote(root)}/experiments/2_benchmark_patch/outputs/logs"
     lines = [
         "#!/bin/bash",
         f"#SBATCH --job-name=imb-{job.name}",
@@ -240,7 +240,7 @@ def _host_execution_lines(root: str, command: str) -> list[str]:
 def _cluster_paths(config: dict[str, Any]) -> tuple[str, str, str, str]:
     slurm = config.get("slurm", {})
     root = str(slurm.get("project_root", EXPERIMENT_ROOT.parent.parent))
-    benchmark = posixpath.join(root, "experiments/2_cls_imb_benchmark")
+    benchmark = posixpath.join(root, "experiments/2_benchmark_patch")
     code = str(slurm.get("code_dir", posixpath.join(benchmark, "code")))
     output = str(slurm.get("output_dir", posixpath.join(benchmark, "outputs")))
     container = str(

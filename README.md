@@ -6,9 +6,9 @@ Master's thesis: controlled class-imbalance mitigation in computational patholog
 
 | Path | Purpose |
 |---|---|
-| `experiments/2_cls_imb_benchmark/` | Unified controlled class-imbalance benchmark |
-| `experiments/2_cls_imb_benchmark/code/` | Importable benchmark package and test suite |
-| `experiments/2_cls_imb_benchmark/report/main.pdf` | Controlled-benchmark report |
+| `experiments/2_benchmark_patch/` | Unified controlled class-imbalance benchmark |
+| `experiments/2_benchmark_patch/code/` | Importable benchmark package and test suite |
+| `experiments/2_benchmark_patch/report/main.pdf` | Controlled-benchmark report |
 | `papers/sources.bib` | Main bibliography (local `file` paths + screening metadata) |
 | `papers/` | PDFs organised by topic |
 | `docs/` | Thesis reference PDFs, glossary, FAQ |
@@ -40,7 +40,7 @@ uv run bib pdf-sync papers/sources.bib --pdf-dir papers --in-place
 
 ```bash
 uv run pytest .agents/skills/bib/tests
-uv run pytest experiments/2_cls_imb_benchmark/code/tests
+uv run pytest experiments/2_benchmark_patch/code/tests
 uv run pyright
 uv run ruff check .
 ```
@@ -57,6 +57,6 @@ uv run ruff check .
 The unified benchmark CLI is available after `uv sync`:
 
 ```bash
-uv run python experiments/2_cls_imb_benchmark/code/__main__.py --help
-uv run python experiments/2_cls_imb_benchmark/code/__main__.py submit --dry-run
+uv run python experiments/2_benchmark_patch/code/__main__.py --help
+uv run python experiments/2_benchmark_patch/code/__main__.py submit --dry-run
 ```

@@ -16,7 +16,7 @@ with sync_playwright() as p:
     
     diagram = page.query_selector('#diagram')
     diagram.screenshot(path='rendered_diagram.png')
-    diagram.screenshot(path='cls_imb_benchmark.png')
+    diagram.screenshot(path='benchmark_patch.png')
     
     browser.close()
 
