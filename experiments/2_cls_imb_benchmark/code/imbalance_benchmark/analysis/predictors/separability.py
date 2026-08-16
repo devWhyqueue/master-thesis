@@ -21,7 +21,7 @@ __all__ = [
 
 
 _CHUNK_SIZE = 4096
-_REFERENCE_CHUNK_SIZE = 32768
+_REFERENCE_CHUNK_SIZE = 131072
 logger = logging.getLogger(__name__)
 
 
