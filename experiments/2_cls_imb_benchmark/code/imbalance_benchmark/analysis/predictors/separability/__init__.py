@@ -7,6 +7,12 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GroupKFold
 
+from imbalance_benchmark.analysis.predictors.separability.backend import (
+    KNNConfig,
+    ProbeData,
+    knn_and_nn_probe as _backend_knn_and_nn_probe,
+)
+
 __all__ = [
     "balanced_knn_macro_recall",
     "linear_probe_macro_recall",
@@ -37,50 +43,10 @@ def _knn_and_nn_probe(
 
     Both consumers share distances. Reference blocks bound the temporary matrix.
     """
-    k = min(k, ref_x.shape[0])
-    ref_sq = (ref_x**2).sum(axis=1)[None, :]
-    n_val = val_x.shape[0]
-    n_chunks = (n_val + _CHUNK_SIZE - 1) // _CHUNK_SIZE
-    preds = np.empty(n_val, dtype=ref_y.dtype)
-    nn_correct = np.empty(n_val, dtype=bool)
-    for chunk_number, start in enumerate(range(0, n_val, _CHUNK_SIZE), start=1):
-        chunk = val_x[start : start + _CHUNK_SIZE]
-        end = start + chunk.shape[0]
-        if chunk_number == 1 or chunk_number % 10 == 0 or chunk_number == n_chunks:
-            logger.info("rq3: knn query chunk %d/%d", chunk_number, n_chunks)
-        best_d2 = np.full((chunk.shape[0], k), np.inf, dtype=ref_x.dtype)
-        best_idx = np.full((chunk.shape[0], k), ref_x.shape[0], dtype=np.intp)
-        chunk_sq = (chunk**2).sum(axis=1, keepdims=True)
-        for ref_start in range(0, ref_x.shape[0], _REFERENCE_CHUNK_SIZE):
-            ref_end = min(ref_start + _REFERENCE_CHUNK_SIZE, ref_x.shape[0])
-            logger.info(
-                "rq3: knn query chunk %d/%d reference block %d/%d",
-                chunk_number,
-                n_chunks,
-                ref_start // _REFERENCE_CHUNK_SIZE + 1,
-                (ref_x.shape[0] + _REFERENCE_CHUNK_SIZE - 1) // _REFERENCE_CHUNK_SIZE,
-            )
-            d2 = (
-                chunk_sq
-                - 2.0 * chunk @ ref_x[ref_start:ref_end].T
-                + ref_sq[:, ref_start:ref_end]
-            )
-            local_k = min(k, ref_end - ref_start)
-            local_idx = np.argpartition(d2, local_k - 1, axis=1)[:, :local_k]
-            local_d2 = np.take_along_axis(d2, local_idx, axis=1)
-            candidate_d2 = np.concatenate((best_d2, local_d2), axis=1)
-            candidate_idx = np.concatenate((best_idx, local_idx + ref_start), axis=1)
-            selected = np.argpartition(candidate_d2, k - 1, axis=1)[:, :k]
-            best_d2 = np.take_along_axis(candidate_d2, selected, axis=1)
-            best_idx = np.take_along_axis(candidate_idx, selected, axis=1)
-        neighbor_idx = best_idx
-        neighbor_labels = ref_y[neighbor_idx]
-        preds[start:end] = [
-            np.bincount(row, minlength=n_classes).argmax() for row in neighbor_labels
-        ]
-        nearest = best_idx[np.arange(len(chunk)), best_d2.argmin(1)]
-        nn_correct[start:end] = ref_y[nearest] == val_y[start:end]
-    return preds, nn_correct
+    return _backend_knn_and_nn_probe(
+        ProbeData(ref_x, ref_y, val_x, val_y, n_classes),
+        KNNConfig(k, _CHUNK_SIZE, _REFERENCE_CHUNK_SIZE),
+    )
 
 
 def _macro_recall(preds: np.ndarray, val_y: np.ndarray, n_classes: int) -> float:

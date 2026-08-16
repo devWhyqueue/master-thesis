@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
+import torch
 
 from imbalance_benchmark.analysis.predictors import separability as sep
 
@@ -67,6 +69,20 @@ def test_streamed_reference_blocks_match_unchunked_knn_and_1nn(monkeypatch):
     expected_preds, expected_nn_correct = _reference_knn_and_nn(
         ref_x, ref_y, val_x, val_y, n_classes
     )
+
+    np.testing.assert_array_equal(preds, expected_preds)
+    np.testing.assert_array_equal(nn_correct, expected_nn_correct)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_cuda_knn_matches_unchunked_cpu_reference(monkeypatch):
+    ref_x, ref_y, val_x, val_y = _synthetic(seed=5, n_ref=79, n_val=23)
+    monkeypatch.setattr(sep, "_REFERENCE_CHUNK_SIZE", 11)
+    expected_preds, expected_nn_correct = _reference_knn_and_nn(
+        ref_x, ref_y, val_x, val_y, n_classes=4
+    )
+
+    preds, nn_correct = sep._knn_and_nn_probe(ref_x, ref_y, val_x, val_y, n_classes=4)
 
     np.testing.assert_array_equal(preds, expected_preds)
     np.testing.assert_array_equal(nn_correct, expected_nn_correct)
