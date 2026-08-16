@@ -40,14 +40,15 @@ def _method_recoveries(
 ) -> list[dict[str, Any]]:
     """Every non-CE method's discrimination/calibration recovery in one severity condition."""
     out: list[dict[str, Any]] = []
-    for method in expected_methods:
-        if method == "ce":
-            continue
+    methods = [method for method in expected_methods if method != "ce"]
+    for index, method in enumerate(methods, start=1):
         logger.info(
-            "recovery: %s assignment=%s severity=%s disc_gate=%s cal_gate=%s",
+            "recovery: %s assignment=%s severity=%s %d/%d disc_gate=%s cal_gate=%s",
             method,
             inp.assignment,
             inp.severity,
+            index,
+            len(methods),
             disc_gate,
             cal_gate,
         )
