@@ -80,12 +80,6 @@ class AttentionMil(nn.Module):
         """Forward pass for pre-pooled features."""
         return self.classifier(self.instance_encoder(x))
 
-    def rank_scores(self, bag: torch.Tensor, class_id: int) -> torch.Tensor:
-        """Score instances in a bag for a target class using the current model."""
-        return torch.softmax(self.classifier(self.instance_encoder(bag)), dim=-1)[
-            :, class_id
-        ]
-
     def project_bag_embeddings(self, embeddings: torch.Tensor) -> torch.Tensor:
         """Project and normalize bag embeddings."""
         return F.normalize(self.projector(embeddings), dim=1)

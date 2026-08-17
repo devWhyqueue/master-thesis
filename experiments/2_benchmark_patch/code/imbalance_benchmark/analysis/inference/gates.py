@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
-from imbalance_benchmark.analysis.inference.holm import PRIMARY_METHODS
+from imbalance_benchmark.analysis.inference.confirmatory.holm import PRIMARY_METHODS
 from imbalance_benchmark.analysis.inference.permutation import (
     paired_block_permutation_ba,
     paired_block_permutation_tail_nll,

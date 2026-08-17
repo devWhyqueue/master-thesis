@@ -87,9 +87,7 @@ def cost_payload(
 
 
 def updates_for(method: str, budget: int) -> int:
-    """Report's update accounting: RankMix doubles, cRT adds its stage-two budget."""
-    if method == "rankmix":
-        return 2 * budget
+    """Report's update accounting: cRT adds its stage-two budget."""
     if method == "crt":
         return budget + math.ceil(0.2 * budget)
     if method == "post_hoc_logit_adjustment":

@@ -62,6 +62,7 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "prepare",
         "pilot",
         "freeze",
+        "signals",
         "tune-base-natural",
         "tune-base-controlled",
         "tune-base-reduce",
@@ -70,19 +71,19 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "tune-decide-base-moderate",
         "tune-decide-base-severe",
     ]
-    assert jobs[5].dependencies == ("tune-base-natural", "tune-base-controlled")
-    assert jobs[6].dependencies == ("tune-base-reduce",)
-    assert jobs[6].command == "tune-decide --phase base --condition natural --round 0"
-    assert jobs[9].command == "tune-decide --phase base --condition severe --round 0"
+    assert jobs[6].dependencies == ("tune-base-natural", "tune-base-controlled")
+    assert jobs[7].dependencies == ("tune-base-reduce",)
+    assert jobs[7].command == "tune-decide --phase base --condition natural --round 0"
+    assert jobs[10].command == "tune-decide --phase base --condition severe --round 0"
     # Natural fits the CE anchor alone: 4 learning-rate candidates, 6 observations.
-    assert jobs[3].array_size == 12
-    assert "--observations-per-candidate 6" in jobs[3].command
-    assert "--shards-per-task 2" in jobs[3].command
-    assert "--bundle-by-observation" in jobs[3].command
-    assert jobs[3].memory == "32G"
+    assert jobs[4].array_size == 12
+    assert "--observations-per-candidate 6" in jobs[4].command
+    assert "--shards-per-task 2" in jobs[4].command
+    assert "--bundle-by-observation" in jobs[4].command
+    assert jobs[4].memory == "32G"
     # Patch roster of 15 methods (report tab:roster) crossed with each method's grid.
-    assert jobs[4].array_size == 294
-    natural_script = render_sbatch(jobs[3], _config(), "config.yaml")
+    assert jobs[5].array_size == 294
+    natural_script = render_sbatch(jobs[4], _config(), "config.yaml")
     assert "#SBATCH --mem=32G" in natural_script
 
 
@@ -161,8 +162,8 @@ def test_submit_links_actual_job_ids() -> None:
     submitted = submit_workflow(_config(), submit=fake_submit)
     assert submitted["prepare"] == "1"
     assert submitted["tune-decide-base-severe"] == str(len(submitted_scripts))
-    assert "#SBATCH --dependency=afterok:4:5" in submitted_scripts[5]
-    assert "#SBATCH --dependency=afterok:6" in submitted_scripts[6]
+    assert "#SBATCH --dependency=afterok:5:6" in submitted_scripts[6]
+    assert "#SBATCH --dependency=afterok:7" in submitted_scripts[7]
 
 
 def test_confirm_only_links_actual_job_ids() -> None:

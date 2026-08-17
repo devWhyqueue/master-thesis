@@ -13,7 +13,7 @@ from imbalance_benchmark.analysis.calibration import (
     reliability_curve,
 )
 from imbalance_benchmark.analysis.db import discover_result_dirs, ingest_run
-from imbalance_benchmark.analysis.inference.holm import apply_holm
+from imbalance_benchmark.analysis.inference.confirmatory.holm import apply_holm
 from imbalance_benchmark.analysis.metrics import (
     assign_tiers,
     brier_score,

@@ -112,20 +112,28 @@ def test_ssb_fit_step_runs_all_three_stages_without_crashing(tmp_path: Path) -> 
     assert pool.filled is not None and bool(pool.filled.all())  # full traversal
 
 
-def test_ssb_uses_unit_weights_before_pass_six(tmp_path: Path) -> None:
+def test_ssb_uses_unit_weights_for_exactly_five_passes(tmp_path: Path) -> None:
+    torch.manual_seed(0)
     ctx = _ctx(tmp_path, ["a", "b", "c"])
     b_size = 4
     prepare_ssb_pool(ctx, b_size)
     updates_per_pass = ctx["ssb_updates_per_pass"]
+    max_steps = 7 * updates_per_pass
 
     batch = {
         "features": torch.randn(b_size, DIM),
         "target": torch.randint(0, 3, (b_size,)),
     }
+    reference = torch.nn.functional.cross_entropy(
+        ctx["model"](batch["features"]), batch["target"]
+    )
     for step in range(5 * updates_per_pass):
-        _fit_step(batch, ctx, step, 7 * updates_per_pass)
+        loss = _fit_step(batch, ctx, step, max_steps)
+        assert torch.allclose(loss, reference)  # unit weights: plain CE
 
-    assert ctx["ssb_pool"].volumes == {}
+    weighted_loss = _fit_step(batch, ctx, 5 * updates_per_pass, max_steps)
+    assert not torch.allclose(weighted_loss, reference)  # SSB weights from here on
+    assert ctx["ssb_pool"].volumes  # computed ahead of the first weighted step
 
 
 def test_ssb_pool_class_names_match_dataset_order(tmp_path: Path) -> None:

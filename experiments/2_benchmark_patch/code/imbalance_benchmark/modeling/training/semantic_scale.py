@@ -176,15 +176,15 @@ def ssb_loss(
     _refresh(pool, model, device)
     logits = model(inputs)
     reweight_step = 5 * ctx["ssb_updates_per_pass"]
-    if step <= reweight_step:
-        if step == reweight_step:
+    diagnostics = ctx.setdefault("method_diagnostics", {})
+    diagnostics["ssb_pools"] = 1
+    if step < reweight_step:
+        if step == reweight_step - 1:
             _update_volumes(pool, n_classes)
-            ctx.setdefault("method_diagnostics", {})["ssb_invalid_draws"] = (
-                pool.invalid_draws
-            )
+            diagnostics["ssb_invalid_draws"] = pool.invalid_draws
         return F.cross_entropy(logits, targets)
     _update_volumes(pool, n_classes)
-    ctx.setdefault("method_diagnostics", {})["ssb_invalid_draws"] = pool.invalid_draws
+    diagnostics["ssb_invalid_draws"] = pool.invalid_draws
     tau = float(ctx["param"] if ctx["param"] is not None else 0.5)
     weight = _ssb_weights(pool, n_classes, tau).to(device)
     return F.cross_entropy(logits, targets, weight=weight)

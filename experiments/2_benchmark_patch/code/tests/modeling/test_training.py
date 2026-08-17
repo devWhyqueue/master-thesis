@@ -309,7 +309,6 @@ def test_patch_method_one_step_finite_training(tmp_path, method, param):
         ("crt", None),
         ("sc_mil", 0.1),
         ("mde", 0.25),
-        ("rankmix", 1.0),
     ],
 )
 def test_wsi_method_one_step_finite_training(tmp_path, method, param):

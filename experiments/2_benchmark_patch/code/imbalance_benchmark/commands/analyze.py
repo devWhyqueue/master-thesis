@@ -18,7 +18,7 @@ from imbalance_benchmark.analysis.aggregation.equal_split_endpoints import (
 )
 from imbalance_benchmark.analysis.db import connect_db, init_schema
 from imbalance_benchmark.analysis.inference.recovery import gates_and_recovery
-from imbalance_benchmark.analysis.inference.holm import apply_holm
+from imbalance_benchmark.analysis.inference.confirmatory.holm import apply_holm
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
     crossed_p_value,
     load_freeze,
@@ -27,6 +27,7 @@ from imbalance_benchmark.analysis.reporting.ingestion import (
     ingest_all_runs,
     write_diagnostics,
 )
+from imbalance_benchmark.analysis.predictors.signals.matching import cmd_match
 from imbalance_benchmark.analysis.predictors.rq3_analysis import (
     cross_dataset_rq3,
     load_rq3_cells,
@@ -56,7 +57,7 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.manifest.seeds import derive_seed
 
-__all__ = ["cmd_analyze", "cmd_analyze_combine", "cmd_combine_rq3"]
+__all__ = ["cmd_analyze", "cmd_analyze_combine", "cmd_combine_rq3", "cmd_match"]
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ from imbalance_benchmark.analysis.inference.gates import (
     confidence_interval,
     discrimination_gate,
 )
-from imbalance_benchmark.analysis.inference.holm import apply_holm
+from imbalance_benchmark.analysis.inference.confirmatory.holm import apply_holm
 from imbalance_benchmark.analysis.reporting.completeness import expected_comparison_keys
 from imbalance_benchmark.common import split_paths, write_json
 
@@ -109,6 +109,11 @@ def _aggregate_group(
             )
         },
     )
+    # Constant per unit (frozen by matching_record.json), carried through so
+    # the aggregated entry can be looked up as a matched-vs-unmatched contrast.
+    for column in ("dominant", "matched_methods", "unmatched_methods"):
+        if column in group:
+            entry[column] = group[column].iloc[0]
     if "bootstrap_numerator" in group and bool(
         group["bootstrap_numerator"].notna().all()
     ):

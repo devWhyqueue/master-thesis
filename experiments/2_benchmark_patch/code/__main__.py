@@ -15,6 +15,7 @@ from imbalance_benchmark.commands import (
     cmd_confirm,
     cmd_confirm_shard,
     cmd_freeze,
+    cmd_match,
     cmd_materialize_panda,
     cmd_materialize_panda_audit,
     cmd_materialize_panda_combine,
@@ -25,6 +26,7 @@ from imbalance_benchmark.commands import (
     cmd_prepare,
     cmd_prepare_extract_reduce,
     cmd_prepare_extract_shard,
+    cmd_signals,
     cmd_smoke,
     cmd_submit,
     cmd_tile_wsi,
@@ -53,6 +55,8 @@ def _parser() -> argparse.ArgumentParser:
         "prepare",
         "pilot",
         "freeze",
+        "signals",
+        "match",
         "tune",
         "tune-shard",
         "tune-reduce",
@@ -109,7 +113,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     wave = sub.choices["tune-wave"]
     wave.add_argument("--phase", choices=("base", "dependent"), default="base")
-    wave.add_argument("--condition", choices=("natural", "balanced", "moderate", "severe"))
+    wave.add_argument(
+        "--condition", choices=("natural", "balanced", "moderate", "severe")
+    )
     wave.add_argument("--group", choices=("controlled",))
     wave.add_argument("--round", type=int, default=0)
     wave.add_argument("--stalled-waves", type=int, default=0)
@@ -143,6 +149,8 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "prepare-extract-reduce": cmd_prepare_extract_reduce,
         "pilot": cmd_pilot,
         "freeze": cmd_freeze,
+        "signals": cmd_signals,
+        "match": cmd_match,
         "tune": cmd_tune,
         "tune-shard": cmd_tune_shard,
         "tune-wave": cmd_tune_wave,

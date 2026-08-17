@@ -325,7 +325,7 @@ def test_roster_for_regime_matches_report_table():
         "independent_support_ce",
         "semantic_scale_ce",
     }
-    assert set(wsi) - shared == {"rankmix", "sc_mil", "mde"}
+    assert set(wsi) - shared == {"sc_mil", "mde"}
 
 
 def test_ce_and_crt_grids_are_lr_only():

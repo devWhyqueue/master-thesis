@@ -52,6 +52,7 @@ slurm:
     prepare: {partition: gpu-5h, gpus: 1, cpus: 8}
     pilot: {partition: cpu-2h, gpus: 0, cpus: 4}
     freeze: {partition: cpu-2h, gpus: 0, cpus: 4}
+    signals: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
     tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}
     tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 32G}

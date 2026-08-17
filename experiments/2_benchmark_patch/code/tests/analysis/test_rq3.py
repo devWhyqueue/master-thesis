@@ -25,10 +25,7 @@ from imbalance_benchmark.analysis.predictors import (
     rq3_wiring,
 )
 from imbalance_benchmark.analysis.predictors.hierarchical_models import _log_scale_prior
-from imbalance_benchmark.analysis.predictors.rq3_analysis import (
-    _cells,
-    _covariates,
-)
+from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells
 from imbalance_benchmark.analysis.predictors.rq3_cross_split import _comparison_maps
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
@@ -68,6 +65,7 @@ def test_patch_feature_frame_gathers_resident_rows_without_sample_loop(
 
 
 from imbalance_benchmark.common import (
+    sign_file,
     write_json,
     write_run_record,
 )
@@ -240,16 +238,25 @@ def test_rq3_recovery_model_empty_when_no_gated_cells():
     assert fit_recovery_model(cells) == {}
 
 
-def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatch):
+def test_rq3_cells_keep_calibration_gate_recovery(tmp_path: Path):
     """A calibration-only cell must use tail-NLL recovery, not BA recovery."""
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._reference_block",
-        lambda *_: {},
+    write_json(
+        tmp_path / "signal_profile.json",
+        {
+            "comparisons": [
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "rho": 100.0,
+                    "independent_shortage": 0.3,
+                    "diversity_shortage": 0.1,
+                    "support_difficulty_alignment": 0.0,
+                }
+            ],
+            "freeze_content_sha256": "fixture-hash",
+        },
     )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
-        lambda *_: {"independent_shortage": 0.3, "diversity_shortage": 0.1},
-    )
+    sign_file(tmp_path / "signal_profile.json")
     comparisons = [
         {
             "assignment": "native",
@@ -285,6 +292,7 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
     freeze = {
         "conditions": {"balanced": {}},
         "construction_seed": 7,
+        "content_sha256": "fixture-hash",
         "difficulty_evidence": {"difficulty": {"A": 0.1, "B": 0.2}},
         "assignment_conditions": {
             "native": {
@@ -296,7 +304,7 @@ def test_rq3_cells_keep_calibration_gate_recovery(monkeypatch: pytest.MonkeyPatc
         },
     }
 
-    cells = _cells({}, comparisons, freeze, "dataset:target", False)
+    cells = _cells({"data": tmp_path}, comparisons, freeze, "dataset:target")
 
     recovery = next(cell for cell in cells if cell["method"] == "weighted_ce")
     assert recovery["gate"] == "calibration"
@@ -384,7 +392,7 @@ def test_rq3_covariates_contain_only_two_shortage_contrasts(
         },
     }
     monkeypatch.setattr(rq3_features, "_fixed_diversity", lambda *_: {0: 2.0, 1: 8.0})
-    result = rq3_analysis._covariates(
+    result = rq3_features._covariates(
         {"data": tmp_path},
         False,
         condition_meta,
@@ -558,29 +566,28 @@ def test_rq3_equal_averages_split_repetitions_by_dataset_target(tmp_path: Path) 
 
 
 def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     """RQ3 cells retain their crossed identity and never merge a dataset's targets."""
     from imbalance_benchmark.analysis.predictors.rq3_analysis import _cells, run_rq3
 
-    observed_regimes: list[bool] = []
-
-    def covariates(_: dict, is_mil: bool, __: dict, *args: object) -> dict[str, float]:
-        observed_regimes.append(is_mil)
-        return {
-            "independent_shortage": 0.3,
-            "diversity_shortage": 0.1,
-        }
-
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._reference_block",
-        lambda *_: {},
+    write_json(
+        tmp_path / "signal_profile.json",
+        {
+            "comparisons": [
+                {
+                    "assignment": "native",
+                    "severity": "severe",
+                    "rho": 10.0,
+                    "independent_shortage": 0.3,
+                    "diversity_shortage": 0.1,
+                    "support_difficulty_alignment": 0.0,
+                }
+            ],
+            "freeze_content_sha256": "fixture-hash",
+        },
     )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_analysis._covariates",
-        covariates,
-    )
+    sign_file(tmp_path / "signal_profile.json")
     comparisons = [
         {
             "assignment": "native",
@@ -595,6 +602,7 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     freeze = {
         "conditions": {"balanced": {}},
         "construction_seed": 7,
+        "content_sha256": "fixture-hash",
         "assignment_conditions": {
             "native": {
                 "severe": {
@@ -608,7 +616,7 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     }
     freeze["difficulty_evidence"] = {"difficulty": {"A": 0.1, "B": 0.2}}
 
-    cells = _cells({"data": tmp_path}, comparisons, freeze, "panda:wsi", True)
+    cells = _cells({"data": tmp_path}, comparisons, freeze, "panda:wsi")
     report = run_rq3(
         {"data": tmp_path},
         {"dataset": {"name": "panda", "regime": "patch", "target": "changed_target"}},
@@ -626,7 +634,6 @@ def test_rq3_cells_keep_assignment_and_severity_and_dataset_target_group(
     assert cells[0]["assignment"] == "native"
     assert cells[0]["severity"] == "severe"
     assert report["cells"][0]["group"] == "panda:isup_grade"
-    assert observed_regimes[-1] is True
 
 
 def test_rq3_cross_split_values_come_from_crossed_bootstrap(tmp_path: Path) -> None:

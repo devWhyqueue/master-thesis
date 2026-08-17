@@ -6,10 +6,16 @@ import numpy as np
 
 __all__ = [
     "PRIMARY_METHODS",
+    "MATCHED_CONTRAST_METHOD",
     "holm_adjust_pvalues",
     "confirmatory_family",
     "apply_holm",
 ]
+
+# Protocol app:testing: the one direct between-method contrast (matched vs.
+# unmatched confirmatory members) joins the five method-vs-CE tests in the
+# same Holm family, per gate-passing non-ambiguous comparison unit.
+MATCHED_CONTRAST_METHOD = "matched_vs_unmatched"
 
 # Report §"Imbalance deficit, recovery, and inference": one confirmatory method per
 # signal (prevalence / nominal support / independent support / difficulty /
@@ -53,8 +59,11 @@ def confirmatory_family(
     one dataset-regime (severities are not separate families); everything else,
     including gated-out primary-method comparisons, is exploratory or "not tested".
     """
-    confirmatory = [c for c in comparisons if c.get("method") in PRIMARY_METHODS]
-    exploratory = [c for c in comparisons if c.get("method") not in PRIMARY_METHODS]
+    confirmatory_methods = PRIMARY_METHODS | {MATCHED_CONTRAST_METHOD}
+    confirmatory = [c for c in comparisons if c.get("method") in confirmatory_methods]
+    exploratory = [
+        c for c in comparisons if c.get("method") not in confirmatory_methods
+    ]
     return confirmatory, exploratory
 
 

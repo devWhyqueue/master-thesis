@@ -18,7 +18,7 @@ from imbalance_benchmark.analysis.inference.gates import (
     discrimination_gate,
     recovery,
 )
-from imbalance_benchmark.analysis.inference.holm import (
+from imbalance_benchmark.analysis.inference.confirmatory.holm import (
     PRIMARY_METHODS,
     apply_holm,
     confirmatory_family,

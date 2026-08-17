@@ -13,7 +13,7 @@ from imbalance_benchmark.analysis.inference.crossed_permutation import (
 from imbalance_benchmark.analysis.inference.gates import (
     discrimination_gate,
 )
-from imbalance_benchmark.analysis.inference.holm import apply_holm, confirmatory_family
+from imbalance_benchmark.analysis.inference.confirmatory.holm import apply_holm, confirmatory_family
 from imbalance_benchmark.analysis.inference.permutation import (
     paired_block_permutation_ba,
 )
@@ -71,6 +71,20 @@ def test_crossed_permutation_uses_one_patient_swap_across_split_appearances():
     p_value = crossed_block_permutation_ba([first, second], n_classes=2)
     assert 0.0 <= p_value <= 1.0
 
+def test_crossed_permutation_multi_arm_matches_single_arm_when_reference_has_one_member():
+    """Regression guard: a length-1 member list must reproduce the bare-array result."""
+    labels = np.array([0, 1])
+    bare_block = (labels, np.array([[0, 1]]), np.array([[1, 0]]), np.array(["P0", "P1"]))
+    single = crossed_block_permutation_ba([bare_block, bare_block], n_classes=2)
+    listed_block = (
+        labels,
+        [np.array([[0, 1]])],
+        [np.array([[1, 0]])],
+        np.array(["P0", "P1"]),
+    )
+    listed = crossed_block_permutation_ba([listed_block, listed_block], n_classes=2)
+    assert listed == pytest.approx(single)
+
 def test_confirmatory_family_partition():
     comparisons = [
         {"method": "weighted_ce", "gate_passed": True, "p_value": 0.01},
@@ -79,6 +93,24 @@ def test_confirmatory_family_partition():
     confirmatory, exploratory = confirmatory_family(comparisons)
     assert [c["method"] for c in confirmatory] == ["weighted_ce"]
     assert [c["method"] for c in exploratory] == ["cfal"]
+
+def test_matched_vs_unmatched_contrast_joins_the_confirmatory_family():
+    comparisons = [
+        {"method": "weighted_ce", "gate_passed": True, "p_value": 0.01},
+        {"method": "class_balanced_ce", "gate_passed": True, "p_value": 0.02},
+        {"method": "independent_support_ce", "gate_passed": True, "p_value": 0.03},
+        {"method": "pilot_difficulty_ce", "gate_passed": True, "p_value": 0.04},
+        {"method": "semantic_scale_ce", "gate_passed": True, "p_value": 0.05},
+    ]
+    without_contrast, _ = confirmatory_family(comparisons)
+    contrast = {"method": "matched_vs_unmatched", "gate_passed": True, "p_value": 0.02}
+    with_contrast, _ = confirmatory_family([*comparisons, contrast])
+    assert len(with_contrast) == len(without_contrast) + 1
+
+    out = apply_holm([*comparisons, contrast])
+    by_method = {c["method"]: c for c in out}
+    assert by_method["matched_vs_unmatched"]["family"] == "confirmatory"
+    assert by_method["matched_vs_unmatched"]["status"] == "tested"
 
 def test_holm_marks_gated_out_as_not_tested():
     comparisons = [
@@ -133,7 +165,7 @@ def test_exploratory_methods_are_not_hypothesis_tested() -> None:
     Finding: "Exploratory methods receive hypothesis tests." Setup §3.6 limits
     hypothesis tests to the four primary methods.
     """
-    from imbalance_benchmark.analysis.inference.holm import apply_holm
+    from imbalance_benchmark.analysis.inference.confirmatory.holm import apply_holm
 
     out = apply_holm(
         [

@@ -9,9 +9,7 @@ import torch
 from imbalance_benchmark.modeling.losses import (
     SoftF1LossMulti,
     cfal_loss,
-    _mix_ranked_bags,
 )
-from imbalance_benchmark.modeling.losses import rankmix_bag_loss
 from imbalance_benchmark.modeling.models import (
     AttentionMil,
     CfalPrototypeClassifier,
@@ -46,19 +44,6 @@ def _cfal_reference(
     pw = (proto.unsqueeze(0) - proto.unsqueeze(1)).square().sum(dim=-1)
     reg = pw[torch.triu(torch.ones_like(pw), diagonal=1).bool()].var(unbiased=False)
     return cls + reg
-
-def test_rankmix_bag_loss_finite_and_differentiable():
-    student = AttentionMil(DIM, 8, 3, 0.0)
-    teacher = AttentionMil(DIM, 8, 3, 0.0)
-    for p in teacher.parameters():
-        p.requires_grad_(False)
-    bags = [torch.randn(4, DIM), torch.randn(4, DIM), torch.randn(4, DIM)]
-    targets = torch.tensor([0, 1, 2])
-    loss, mixed = rankmix_bag_loss(student, teacher, bags, targets, alpha=1.0)
-    assert mixed == len(bags)
-    assert torch.isfinite(loss)
-    loss.backward()
-    assert any(p.grad is not None for p in student.parameters())
 
 def test_supervised_contrastive_loss_reports_pairs_and_anchors():
     from imbalance_benchmark.modeling.losses import supervised_contrastive_loss
@@ -132,13 +117,6 @@ def test_soft_f1_is_softmax_normalized_not_independent_sigmoids():
     # A constant added to every logit leaves the softmax distribution unchanged;
     # independent sigmoids would move, so the loss must be shift-invariant.
     assert torch.allclose(loss(logits, one_hot), loss(logits + 5.0, one_hot), atol=1e-6)
-
-def test_rankmix_keeps_min_bag_length_subsequence():
-    torch.manual_seed(3)
-    teacher = AttentionMil(16, 8, 2, 0.0)
-    first, second = torch.randn(4, 16), torch.randn(6, 16)
-    mixed = _mix_ranked_bags(teacher, first, second, 0, 1, 0.5)
-    assert mixed.shape[0] == 4  # min(4, 6), not 4 // 2
 
 def test_oko_set_loss_sums_per_example_logits():
     torch.manual_seed(4)

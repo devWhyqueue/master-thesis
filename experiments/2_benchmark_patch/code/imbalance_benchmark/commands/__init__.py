@@ -4,10 +4,11 @@ from imbalance_benchmark.commands.analyze import (
     cmd_analyze,
     cmd_analyze_combine,
     cmd_combine_rq3,
+    cmd_match,
 )
 from imbalance_benchmark.commands.confirm import cmd_confirm
 from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
-from imbalance_benchmark.commands.freeze import cmd_freeze
+from imbalance_benchmark.commands.freeze import cmd_freeze, cmd_signals
 from imbalance_benchmark.commands.pilot import cmd_pilot
 from imbalance_benchmark.commands.tuning.panda_prepare import (
     cmd_materialize_panda,
@@ -37,6 +38,7 @@ __all__ = [
     "cmd_prepare_extract_reduce",
     "cmd_pilot",
     "cmd_freeze",
+    "cmd_signals",
     "cmd_materialize_tcga_ut",
     "cmd_materialize_panda",
     "cmd_materialize_panda_audit",
@@ -53,6 +55,7 @@ __all__ = [
     "cmd_analyze",
     "cmd_analyze_combine",
     "cmd_combine_rq3",
+    "cmd_match",
     "cmd_submit",
     "cmd_smoke",
     "cmd_tile_wsi",

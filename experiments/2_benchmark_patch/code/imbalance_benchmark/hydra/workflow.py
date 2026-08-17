@@ -107,7 +107,11 @@ def _setup_jobs(config: dict[str, Any], splits: tuple[int, ...]) -> list[SlurmJo
         _job(config, "freeze", "freeze", False, (pilot.name,)),
         array_splits=splits,
     )
-    return [prepare, pilot, freeze]
+    signals = replace(
+        _job(config, "signals", "signals", False, (freeze.name,)),
+        array_splits=splits,
+    )
+    return [prepare, pilot, freeze, signals]
 
 
 def _tuning_jobs(

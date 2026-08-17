@@ -60,23 +60,9 @@ def _record_multistage_outcome(
     context["selected_checkpoint_step"] = final["selected_checkpoint_step"]
 
 
-def _freeze_teacher(teacher: nn.Module) -> None:
-    """Switch the trained RankMix teacher to deterministic inference-only mode."""
-    teacher.eval()
-    for parameter in teacher.parameters():
-        parameter.requires_grad_(False)
-
-
 def _load_state(model: nn.Module, state: dict[str, Any], device: Any) -> None:
     """Load a checkpoint state onto the active training device."""
     model.load_state_dict({key: value.to(device) for key, value in state.items()})
-
-
-def _rankmix_footprint(teacher: nn.Module, student: nn.Module) -> int:
-    """Return the joint teacher-plus-student parameter footprint used for RankMix."""
-    return sum(parameter.numel() for parameter in teacher.parameters()) + sum(
-        parameter.numel() for parameter in student.parameters()
-    )
 
 
 def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
@@ -101,29 +87,4 @@ def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     }
     result = fit_model(stage_two_context, max_steps=math.ceil(0.2 * budget))
     _record_multistage_outcome(ctx, stage_one_context, stage_two_context)
-    return result
-
-
-def fit_rankmix(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
-    """Train a CE teacher, then a reinitialized RankMix-inspired student."""
-    budget = resolve_update_budget(ctx, resolve_batch_size(ctx["config"], True))
-    teacher = ctx["model_factory"]()
-    ctx["training_footprint_parameters"] = _rankmix_footprint(teacher, ctx["model"])
-    teacher_context = {
-        **ctx,
-        "model": teacher,
-        "method": "ce",
-        "param_config": {"lr": ctx["param_config"]["lr"]},
-    }
-    teacher_state, _ = fit_model(teacher_context, max_steps=budget)
-    _load_state(teacher, teacher_state, ctx["device"])
-    _freeze_teacher(teacher)
-    student_context = {
-        **ctx,
-        "model": ctx["model_factory"](),
-        "method": "rankmix",
-        "teacher": teacher,
-    }
-    result = fit_model(student_context, max_steps=budget)
-    _record_multistage_outcome(ctx, teacher_context, student_context)
     return result

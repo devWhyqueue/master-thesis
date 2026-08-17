@@ -63,7 +63,6 @@ GRIDS: dict[str, list[float] | list[int]] = {
     "ce_soft_mcc": [0.25, 1.0, 4.0, 16.0],
     "cfal": [0.25, 1.0, 2.0, 4.0],
     "oko": [1, 2, 4, 8],
-    "rankmix": [0.5, 1.0, 2.0, 4.0],
     "sc_mil": [0.05, 0.1, 0.5, 1.0],
     "mde": [0.0, 0.1, 0.25, 0.5],
     # E_c(beta) saturation points 1/(1-beta) in {10, 100, 1000, 10000}, matched to
@@ -89,7 +88,7 @@ PATCH_ONLY_METHODS = (
     "independent_support_ce",
     "semantic_scale_ce",
 )
-WSI_ONLY_METHODS = ("rankmix", "sc_mil", "mde")
+WSI_ONLY_METHODS = ("sc_mil", "mde")
 SHARED_METHODS = (
     "ce",
     "balanced_sampling",

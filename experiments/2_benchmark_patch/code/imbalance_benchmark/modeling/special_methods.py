@@ -25,11 +25,10 @@ from imbalance_benchmark.modeling.training import (
     resolve_batch_size,
     resolve_checkpoint_interval,
 )
-from imbalance_benchmark.modeling.workflows.multistage import fit_crt, fit_rankmix
+from imbalance_benchmark.modeling.workflows.multistage import fit_crt
 
 __all__ = [
     "fit_crt",
-    "fit_rankmix",
     "mde_bag_loss",
     "fit_mde",
     "fit_oko",
@@ -170,7 +169,7 @@ def fit_mde(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     return best["state"], best["acc"]
 
 
-_SPECIAL_FIT = {"crt": fit_crt, "rankmix": fit_rankmix, "mde": fit_mde, "oko": fit_oko}
+_SPECIAL_FIT = {"crt": fit_crt, "mde": fit_mde, "oko": fit_oko}
 
 
 def fit_method(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:

@@ -105,18 +105,6 @@ def test_post_hoc_cost_has_no_trainable_network_parameters() -> None:
 
     assert cost["trainable_parameters"] == 0
 
-def test_rankmix_cost_records_teacher_and_student_training_footprint() -> None:
-    """RankMix trains two networks, not only the final student checkpoint."""
-    cost = cost_payload(
-        "rankmix",
-        3,
-        1.0,
-        torch.nn.Linear(2, 2),
-        RunExposure(4, 4, 8, training_footprint_parameters=12),
-    )
-
-    assert cost["training_footprint_parameters"] == 12
-
 @pytest.mark.parametrize("is_mil", [False, True])
 def test_crt_freezes_the_full_representation_in_deterministic_eval_mode(
     is_mil: bool,
@@ -229,7 +217,6 @@ def test_fit_crt_freezes_representation_and_reinits_classifier(tmp_path):
 def test_scholz_methods_are_the_balanced_sampler_hybrids():
     assert "ce_soft_f1" in FIXED_BALANCED_SAMPLER_METHODS
     assert "ce_soft_mcc" in FIXED_BALANCED_SAMPLER_METHODS
-    assert "rankmix" not in FIXED_BALANCED_SAMPLER_METHODS
 
 def test_oko_prebuilt_pools_match_the_rebuilt_reference_draws():
     """Hoisting the per-fit sampling pools out of the step loop must not change draws."""

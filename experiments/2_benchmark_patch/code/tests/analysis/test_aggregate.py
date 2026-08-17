@@ -63,6 +63,47 @@ from imbalance_benchmark.common import (
     write_run_record,
 )
 
+def _write_confirmed_method(
+    results_root: Path,
+    severity: str,
+    method: str,
+    labels: np.ndarray,
+    class_names: list[str],
+    correct_fraction: float,
+    seed_base: int,
+) -> None:
+    """Write a full 5-seed confirmation block whose predictions are `correct_fraction` right."""
+    for seed_idx in range(5):
+        rng = np.random.default_rng(seed_base + seed_idx)
+        preds = labels.copy()
+        n_wrong = int(round((1 - correct_fraction) * len(labels)))
+        wrong_rows = rng.choice(len(labels), size=n_wrong, replace=False)
+        preds[wrong_rows] = (preds[wrong_rows] + 1) % len(class_names)
+        probs = np.full((len(labels), len(class_names)), 0.05)
+        probs[np.arange(len(labels)), preds] = 0.8
+        probs /= probs.sum(axis=1, keepdims=True)
+        payload = classification_payload(
+            labels.tolist(), preds.tolist(), probs.tolist(), class_names
+        )
+        payload["labels"] = labels.tolist()
+        payload["preds"] = preds.tolist()
+        payload["probabilities"] = probs.tolist()
+        payload["logits"] = np.log(np.clip(probs, 1e-6, 1.0)).tolist()
+        write_run_record(
+            results_root / severity / method / f"seed={seed_idx}",
+            {
+                "benchmark": "patch",
+                "condition": severity,
+                "method": method,
+                "seed": seed_idx,
+                "class_names": class_names,
+                "tuning_params": {"lr": 1e-3},
+                "cost": {"updates": 10},
+                "splits": {"validation": payload, "test": payload},
+            },
+        )
+
+
 def _toy_identity(n_patients_per_class: int = 6) -> pd.DataFrame:
     rows = []
     for cls in ["A", "B"]:
@@ -765,6 +806,110 @@ def test_require_consistent_achieved_severity_allows_modest_natural_variation(
         )
 
     require_consistent_achieved_severity(paths)
+
+def test_matched_vs_unmatched_row_survives_split_aggregation(tmp_path: Path) -> None:
+    """The contrast row aggregates like any other comparison and keeps its metadata."""
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index, effect in enumerate(([0.02, 0.04], [0.04, 0.08], [0.06, 0.12])):
+        ce = {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "ce",
+            "gate": "discrimination",
+            "effect": float(np.mean(effect)),
+            "bootstrap_effect": effect,
+            "gate_passed": True,
+            "p_value": None,
+        }
+        contrast = {
+            "assignment": "native",
+            "severity": "severe",
+            "method": "matched_vs_unmatched",
+            "gate": "discrimination",
+            "effect": float(effect[0]),
+            "bootstrap_effect": effect,
+            "gate_passed": True,
+            "p_value": None,
+            "dominant": "nominal",
+            "matched_methods": ["weighted_ce", "class_balanced_ce"],
+            "unmatched_methods": [
+                "independent_support_ce",
+                "pilot_difficulty_ce",
+                "semantic_scale_ce",
+            ],
+        }
+        write_json(
+            split_paths(paths, index)["data"] / "gates_and_recovery.json",
+            {"comparisons": [contrast, ce]},
+        )
+    _aggregate_split_comparisons(paths)  # no config: p_value stays None (as elsewhere)
+    output = json.loads(
+        (paths["data"] / "cross_split_gates_and_recovery.json").read_text()
+    )
+    contrast_out = next(
+        c for c in output["comparisons"] if c["method"] == "matched_vs_unmatched"
+    )
+    assert contrast_out["effect"] == pytest.approx(0.04)
+    assert contrast_out["dominant"] == "nominal"
+    assert contrast_out["matched_methods"] == ["weighted_ce", "class_balanced_ce"]
+    assert contrast_out["unmatched_methods"] == [
+        "independent_support_ce",
+        "pilot_difficulty_ce",
+        "semantic_scale_ce",
+    ]
+
+
+def test_matched_vs_unmatched_gets_a_crossed_permutation_p_value(tmp_path: Path) -> None:
+    """The contrast is eligible for and receives a real crossed permutation p-value."""
+    from imbalance_benchmark.analysis.inference.crossed_permutation import crossed_p_value
+    from imbalance_benchmark.analysis.inference.confirmatory.holm import MATCHED_CONTRAST_METHOD
+
+    class_names = ["A", "B"]
+    manifest_rows = [
+        {
+            "case_id": f"{cls}_P{p}",
+            "slide_id": f"{cls}_P{p}_S0",
+            "cancer_type": cls,
+            "split": "test",
+        }
+        for cls in class_names
+        for p in range(4)
+    ]
+    labels = np.array([class_names.index(row["cancer_type"]) for row in manifest_rows])
+    manifest = pd.DataFrame(manifest_rows)
+
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index in range(3):
+        split = split_paths(paths, index)
+        manifest.to_csv(split["data"] / "manifest.csv", index=False)
+        _write_confirmed_method(
+            split["results"], "severe", "weighted_ce", labels, class_names, 0.9, index * 10
+        )
+        _write_confirmed_method(
+            split["results"],
+            "severe",
+            "class_balanced_ce",
+            labels,
+            class_names,
+            0.6,
+            index * 10 + 5,
+        )
+
+    entry = {
+        "method": MATCHED_CONTRAST_METHOD,
+        "gate": "discrimination",
+        "severity": "severe",
+        "assignment": "native",
+        "gate_passed": True,
+        "matched_methods": ["weighted_ce"],
+        "unmatched_methods": ["class_balanced_ce"],
+    }
+    p_value = crossed_p_value(
+        entry, paths, {"dataset": {"regime": "patch"}}, seed=0
+    )
+    assert p_value is not None
+    assert 0.0 <= p_value <= 1.0
+
 
 def test_cross_split_aggregation_requires_every_comparison_in_all_three_splits() -> (
     None

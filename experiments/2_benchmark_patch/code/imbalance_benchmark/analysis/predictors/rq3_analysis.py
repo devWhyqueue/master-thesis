@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -7,20 +8,38 @@ from typing import Any
 import numpy as np
 
 from imbalance_benchmark.analysis.predictors.rq3_cross_split import load_rq3_cells
-from imbalance_benchmark.analysis.predictors.rq3_features import (
-    _covariates,
-    _reference_block,
-)
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
     fit_recovery_model,
     leave_one_group_out,
-    support_difficulty_alignment,
 )
+from imbalance_benchmark.common import verify_signed_file
 
 __all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
 
 logger = logging.getLogger(__name__)
+
+
+def _load_signal_profile(
+    paths: dict[str, Path], freeze: dict[str, Any]
+) -> dict[str, Any]:
+    """Load the pre-outcome signal profile the ``signals`` step must have written.
+
+    RQ3 and the matching rule (protocol app:testing) share this one source
+    instead of each recomputing the expensive diversity draw.
+    """
+    profile_path = paths["data"] / "signal_profile.json"
+    if not profile_path.exists():
+        raise RuntimeError(
+            "RQ3 requires signal_profile.json; run the `signals` step before `analyze`"
+        )
+    verify_signed_file(profile_path)
+    profile = json.loads(profile_path.read_text())
+    if profile.get("freeze_content_sha256") != freeze.get("content_sha256"):
+        raise RuntimeError(
+            "signal_profile.json is stale relative to its freeze; re-run `signals`"
+        )
+    return profile
 
 
 def _standard_error(comparison: dict[str, Any]) -> float:
@@ -44,7 +63,6 @@ def _cells(
     comparisons: list[dict[str, Any]],
     freeze: dict[str, Any],
     group: str,
-    is_mil: bool,
 ) -> list[dict[str, Any]]:
     """Turn gate/recovery output into RQ3 damage and recovery cells."""
     gate_map = {(row["assignment"], row["severity"]): False for row in comparisons}
@@ -52,38 +70,31 @@ def _cells(
         if row["method"] == "ce":
             gate_map[(row["assignment"], row["severity"])] |= bool(row["gate_passed"])
     cells = []
-    class_names = list(freeze.get("class_names", [])) or None
-    balanced = freeze["conditions"]["balanced"]
-    reference = _reference_block(
-        paths,
-        is_mil,
-        class_names,
-        balanced,
-        int(freeze["construction_seed"]),
-    )
-    # Shortages depend on the condition only, so each method reuses one calculation.
-    covariate_cache: dict[tuple[str, str], dict[str, Any]] = {}
+    profile = _load_signal_profile(paths, freeze)
+    shortages = {
+        (score["assignment"], score["severity"]): score
+        for score in profile["comparisons"]
+    }
     for row in comparisons:
         is_deficit_cell = row["method"] == "ce"
         if is_deficit_cell and row["gate"] != "discrimination":
             continue
         key = (row["assignment"], row["severity"])
-        allocated = freeze["assignment_conditions"][row["assignment"]][row["severity"]]
-        if key not in covariate_cache:
-            logger.info("rq3: covariates %s/%s", *key)
-            covariate_cache[key] = _covariates(
-                paths, is_mil, allocated, reference, freeze
+        if key not in shortages:
+            raise RuntimeError(
+                f"signal_profile.json is missing shortage scores for {key}"
             )
+        scores = shortages[key]
         cells.append(
             {
                 "group": group,
                 "assignment": row["assignment"],
                 "severity": row["severity"],
                 "gate": row["gate"],
-                "rho": allocated["achieved_rho"],
-                "support_difficulty_alignment": support_difficulty_alignment(
-                    allocated, freeze
-                ),
+                "rho": scores["rho"],
+                "support_difficulty_alignment": scores["support_difficulty_alignment"],
+                "independent_shortage": scores["independent_shortage"],
+                "diversity_shortage": scores["diversity_shortage"],
                 "gate_passed": (
                     gate_map[(row["assignment"], row["severity"])]
                     if is_deficit_cell
@@ -94,7 +105,6 @@ def _cells(
                 "recovery": row.get("recovery", np.nan),
                 "recovery_se": _recovery_standard_error(row),
                 "method": row["method"],
-                **covariate_cache[key],
             }
         )
     return cells
@@ -113,9 +123,8 @@ def run_rq3(
     the actual inferential unit -- this only emits each split's contribution.
     """
     del config
-    is_mil = freeze.get("dataset_provenance", {}).get("regime") == "wsi"
     group = _rq3_group(freeze)
-    cells = _cells(paths, comparisons, freeze, group, is_mil)
+    cells = _cells(paths, comparisons, freeze, group)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
     logger.info("rq3: %d cells ready, fitting damage model", len(cells))

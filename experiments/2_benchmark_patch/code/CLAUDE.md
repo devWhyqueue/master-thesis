@@ -16,7 +16,7 @@ This directory is the unified `imbalance_benchmark` implementation. Use this map
 | Metrics, calibration, and result aggregation | [`imbalance_benchmark/analysis/`](imbalance_benchmark/analysis/) |
 | Bootstrap, permutation tests, gates, recovery, Holm | `analysis/inference/` |
 | Tables, plots, ingestion, completeness, clustered endpoints | `analysis/reporting/` |
-| RQ3 predictors, separability, and hierarchical models | `analysis/predictors/` |
+| RQ3 predictors, signal profile, and hierarchical models | `analysis/predictors/` |
 | Hydra/SLURM submission generation | [`imbalance_benchmark/hydra/workflow.py`](imbalance_benchmark/hydra/workflow.py) |
 | Regression coverage | [`tests/`](tests/); start with the closest `test_<area>*.py` |
 
@@ -24,7 +24,7 @@ This directory is the unified `imbalance_benchmark` implementation. Use this map
 
 ## Workflow and protocol
 
-- The command order is `prepare` -> `pilot` -> `freeze` -> `tune` -> `confirm` -> `analyze`; run `combine-rq3` only after split-level analysis.
+- The command order is `prepare` -> `pilot` -> `freeze` -> `signals` -> `match` -> `tune` -> `confirm` -> `analyze`; `match` only needs `signals` and is cross-dataset like `combine-rq3`, which runs only after split-level analysis.
 - Use `__main__.py` from this directory: `uv run python __main__.py --config ../configs/default.yaml prepare`. `smoke` exercises the local end-to-end path; `submit --dry-run` previews Hydra submission.
 - [`../report/2_benchmark_protocol_patch.tex`](../report/2_benchmark_protocol_patch.tex) is the protocol authority. Do not edit it unless explicitly asked.
 - Preserve patient splits, seed families, tuning locks, signed manifests, and frozen evidence. Never select a configuration or replace a failed run using test results.

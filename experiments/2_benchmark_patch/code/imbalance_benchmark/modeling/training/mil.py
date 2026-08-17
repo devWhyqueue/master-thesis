@@ -5,10 +5,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from imbalance_benchmark.modeling.losses import (
-    rankmix_bag_loss,
-    supervised_contrastive_loss,
-)
+from imbalance_benchmark.modeling.losses import supervised_contrastive_loss
 
 __all__: list[str] = []
 
@@ -32,17 +29,6 @@ def _record_sc_mil_diagnostics(
         ("sc_mil_batches", 1),
     ):
         diagnostics[name] = diagnostics.get(name, 0) + value
-
-
-def _rankmix_step(
-    ctx: dict[str, Any], bags: list[torch.Tensor], targets: torch.Tensor
-) -> torch.Tensor:
-    exposure: list[int] = []
-    loss = rankmix_bag_loss(
-        ctx["model"], ctx["teacher"], bags, targets, ctx["param"], exposure
-    )[0]
-    ctx["processed_instances"] = ctx.get("processed_instances", 0) + exposure[0]
-    return loss
 
 
 def _sc_mil_step(
@@ -71,8 +57,6 @@ def _fit_mil_step(
     bags = [bag.to(device, non_blocking=True) for bag in batch_data[0]]
     targets = batch_data[1].to(device, non_blocking=True)
     ctx["processed_examples"] = ctx.get("processed_examples", 0) + len(targets)
-    if method == "rankmix":
-        return _rankmix_step(ctx, bags, targets)
     ctx["processed_instances"] = ctx.get("processed_instances", 0) + sum(
         len(bag) for bag in bags
     )

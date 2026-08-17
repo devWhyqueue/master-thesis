@@ -19,6 +19,10 @@ from imbalance_benchmark.analysis.inference.gates import (
     confidence_interval,
     discrimination_gate_comparison,
 )
+from imbalance_benchmark.analysis.inference.confirmatory.matched_contrast import (
+    contrast_rows,
+    load_matching_units,
+)
 from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.modeling.context import roster_for_regime
 
@@ -37,9 +41,12 @@ def _method_recoveries(
     severity_tail_nll: np.ndarray | None,
     tail_classes: list[int],
     expected_methods: tuple[str, ...],
+    matching_unit: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     """Every non-CE method's discrimination/calibration recovery in one severity condition."""
     out: list[dict[str, Any]] = []
+    disc_bootstrap: dict[str, np.ndarray] = {}
+    cal_bootstrap: dict[str, np.ndarray] = {}
     methods = [method for method in expected_methods if method != "ce"]
     for index, method in enumerate(methods, start=1):
         logger.info(
@@ -64,6 +71,7 @@ def _method_recoveries(
         discrimination["ece"] = float(ece_dist[0])
         discrimination["ece_ci"] = confidence_interval(ece_dist)
         out.append(discrimination)
+        disc_bootstrap[method] = np.asarray(discrimination["bootstrap_effect"])
         if cal_deficit_dist is not None and severity_tail_nll is not None:
             calibration = _method_calibration_recovery(
                 inp,
@@ -77,6 +85,10 @@ def _method_recoveries(
             calibration["ece"] = float(ece_dist[0])
             calibration["ece_ci"] = confidence_interval(ece_dist)
             out.append(calibration)
+            cal_bootstrap[method] = np.asarray(calibration["bootstrap_effect"])
+    out += contrast_rows(
+        inp.severity, disc_gate, cal_gate, disc_bootstrap, cal_bootstrap, matching_unit
+    )
     return out
 
 
@@ -86,6 +98,7 @@ def _severity_comparisons(
     balanced_tail_nll: np.ndarray | None,
     tail_classes: list[int],
     expected_methods: tuple[str, ...],
+    matching_unit: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     """CE-only gate checks for one severity, then every method's recovery if either gate opened."""
     severity_ba = inp.ctx.ba_distribution(
@@ -124,6 +137,7 @@ def _severity_comparisons(
         severity_tail_nll,
         tail_classes,
         expected_methods,
+        matching_unit,
     )
     for comparison in comparisons:
         comparison.setdefault("assignment", inp.assignment)
@@ -139,6 +153,7 @@ def _severity_result(
     assignment: str,
     descriptive_only: bool,
     expected_methods: tuple[str, ...],
+    matching_units: dict[tuple[str, str], Any],
 ) -> list[dict[str, Any]]:
     """One severity's gate/recovery comparisons against the shared balanced-CE baseline."""
     severity_ce = load_seed_predictions(paths, severity, "ce", assignment)
@@ -165,7 +180,12 @@ def _severity_result(
         descriptive_only,
     )
     return _severity_comparisons(
-        inp, baseline.ba, balanced_tail_nll, tail_classes, expected_methods
+        inp,
+        baseline.ba,
+        balanced_tail_nll,
+        tail_classes,
+        expected_methods,
+        matching_units.get((assignment, severity)),
     )
 
 
@@ -205,6 +225,7 @@ def gates_and_recovery(
     expected_methods = roster_for_regime(is_mil)
     total = len(freeze.get("tail_assignments", {"native": []})) * 2
     steps = _recovery_steps(paths, config, freeze, n_replicates, seed)
+    matching_units = load_matching_units(paths, freeze)
     comparisons: list[dict[str, Any]] = []
     for step, (assignment, baseline, severity) in enumerate(steps, start=1):
         logger.info("recovery: %s/%s %d/%d", assignment, severity, step, total)
@@ -216,5 +237,6 @@ def gates_and_recovery(
             assignment,
             descriptive_only,
             expected_methods,
+            matching_units,
         )
     return comparisons

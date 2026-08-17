@@ -5,6 +5,12 @@ from collections.abc import Iterator
 
 import numpy as np
 
+from imbalance_benchmark.analysis.inference.confirmatory.arms import (
+    _as_members,
+    _ba_observed,
+    _tail_nll_observed,
+)
+
 __all__ = [
     "paired_block_permutation_ba",
     "paired_block_permutation_tail_nll",
@@ -64,36 +70,6 @@ def _contribution_p_value(
     return _p_value_from_counts(exceed, total, enumerated)
 
 
-def _ba_observed(labels: np.ndarray, predictions: np.ndarray, n_classes: int) -> float:
-    values = []
-    for seed_predictions in predictions:
-        value = 0.0
-        for class_index in range(n_classes):
-            mask = labels == class_index
-            if mask.any():
-                value += (seed_predictions[mask] == class_index).mean()
-        values.append(value / n_classes)
-    return float(np.mean(values))
-
-
-def _tail_nll_observed(
-    labels: np.ndarray, probabilities: np.ndarray, tail_classes: list[int]
-) -> float:
-    values = []
-    for seed_probabilities in probabilities:
-        value = 0.0
-        counted = 0
-        for class_index in tail_classes:
-            mask = labels == class_index
-            if mask.any():
-                value += -np.log(
-                    np.clip(seed_probabilities[mask, class_index], 1e-12, 1.0)
-                ).mean()
-                counted += 1
-        values.append(value / max(counted, 1))
-    return float(np.mean(values))
-
-
 def _as_seed_stack(values: np.ndarray, prediction_rank: int) -> np.ndarray:
     """Normalize one prediction array or matched seed stack to ``(seed, row, ...)``."""
     if values.ndim == prediction_rank:
@@ -113,43 +89,80 @@ def _patient_contributions(
     return cases, contributions
 
 
+def _correctness_mean(
+    members: list[np.ndarray], mask: np.ndarray, class_index: int
+) -> np.ndarray:
+    """Mean per-seed correctness across confirmatory members, shape ``(seed, row)``."""
+    return np.mean(
+        [_as_seed_stack(member, 1)[:, mask] == class_index for member in members],
+        axis=0,
+    )
+
+
 def _ba_patient_contributions(
     labels: np.ndarray,
-    method_preds: np.ndarray,
-    ce_preds: np.ndarray,
+    method_preds: np.ndarray | list[np.ndarray],
+    ce_preds: np.ndarray | list[np.ndarray],
     case_ids: np.ndarray,
     n_classes: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return additive patient contributions to matched seed-mean BA difference."""
+    """Return additive patient contributions to matched seed-mean BA difference.
+
+    Either arm may be several confirmatory members (protocol app:testing's
+    matched-vs-unmatched contrast); their per-row correctness is averaged
+    before the paired per-seed difference, exact because BA is linear in
+    per-row correctness.
+    """
+    method_members, ce_members = _as_members(method_preds), _as_members(ce_preds)
     rows = np.zeros(len(labels), dtype=np.float64)
     for class_index in range(n_classes):
         mask = labels == class_index
         if not mask.any():
             continue
-        method_correct = method_preds[:, mask] == class_index
-        ce_correct = ce_preds[:, mask] == class_index
-        rows[mask] = (method_correct.astype(float) - ce_correct).mean(axis=0) / (
+        method_correct = _correctness_mean(method_members, mask, class_index)
+        ce_correct = _correctness_mean(ce_members, mask, class_index)
+        rows[mask] = (method_correct - ce_correct).mean(axis=0) / (
             n_classes * mask.sum()
         )
     return _patient_contributions(case_ids, rows)
 
 
+def _nll_mean(
+    members: list[np.ndarray], mask: np.ndarray, class_index: int
+) -> np.ndarray:
+    """Mean per-seed NLL across confirmatory members, shape ``(seed, row)``."""
+    return np.mean(
+        [
+            -np.log(
+                np.clip(_as_seed_stack(member, 2)[:, mask, class_index], 1e-12, 1.0)
+            )
+            for member in members
+        ],
+        axis=0,
+    )
+
+
 def _tail_nll_patient_contributions(
     labels: np.ndarray,
-    method_probs: np.ndarray,
-    ce_probs: np.ndarray,
+    method_probs: np.ndarray | list[np.ndarray],
+    ce_probs: np.ndarray | list[np.ndarray],
     case_ids: np.ndarray,
     tail_classes: list[int],
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return additive patient contributions to matched seed-mean tail-NLL difference."""
+    """Return additive patient contributions to matched seed-mean tail-NLL difference.
+
+    Either arm may be several confirmatory members, averaged per row before
+    the paired per-seed difference (see :func:`_ba_patient_contributions`).
+    """
+    method_members, ce_members = _as_members(method_probs), _as_members(ce_probs)
     rows = np.zeros(len(labels), dtype=np.float64)
     present_tails = [
         class_index for class_index in tail_classes if (labels == class_index).any()
     ]
     for class_index in present_tails:
         mask = labels == class_index
-        method_nll = -np.log(np.clip(method_probs[:, mask, class_index], 1e-12, 1.0))
-        ce_nll = -np.log(np.clip(ce_probs[:, mask, class_index], 1e-12, 1.0))
+        method_nll = _nll_mean(method_members, mask, class_index)
+        ce_nll = _nll_mean(ce_members, mask, class_index)
         rows[mask] = (ce_nll - method_nll).mean(axis=0) / (
             len(present_tails) * mask.sum()
         )

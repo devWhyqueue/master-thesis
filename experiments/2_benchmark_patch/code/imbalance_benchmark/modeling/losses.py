@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from imbalance_benchmark.modeling.models import AttentionMil, CfalPrototypeClassifier
+from imbalance_benchmark.modeling.models import CfalPrototypeClassifier
 
 __all__ = [
     "FocalLoss",
@@ -17,7 +17,6 @@ __all__ = [
     "effective_number",
     "cfal_loss",
     "supervised_contrastive_loss",
-    "rankmix_bag_loss",
 ]
 
 
@@ -170,77 +169,3 @@ def supervised_contrastive_loss(
         keepdim=True,
     )
     return -(log_prob * pos.float()).sum() / pos.float().sum(), n_pairs, n_anchors
-
-
-def _rank_representative_instances(
-    teacher: AttentionMil, bag: torch.Tensor, class_id: int, keep: int
-) -> torch.Tensor:
-    """Keep the teacher's top-ranked instances for class_id, in original bag order."""
-    scores = teacher.rank_scores(bag, class_id)
-    ranked = torch.topk(scores, keep).indices
-    return bag.index_select(0, torch.sort(ranked).values)
-
-
-def _mix_ranked_bags(
-    teacher: AttentionMil,
-    first_bag: torch.Tensor,
-    second_bag: torch.Tensor,
-    first_class: int,
-    second_class: int,
-    mix_lambda: float,
-) -> torch.Tensor:
-    """Interpolate two bags' teacher-ranked representative subsequences."""
-    keep = max(1, min(len(first_bag), len(second_bag)))
-    first = _rank_representative_instances(teacher, first_bag, first_class, keep)
-    second = _rank_representative_instances(teacher, second_bag, second_class, keep)
-    return mix_lambda * first + (1.0 - mix_lambda) * second
-
-
-def _mix_batch(
-    teacher: AttentionMil, bags: list[torch.Tensor], targets: torch.Tensor, alpha: float
-) -> tuple[list[torch.Tensor], torch.Tensor, torch.Tensor]:
-    """Mix each bag with a random partner's teacher-ranked representative subsequence."""
-    permutation = torch.randperm(len(bags), device=targets.device)
-    lambdas = (
-        torch.distributions.Beta(alpha, alpha).sample((len(bags),)).to(targets.device)
-    )
-    mixed_bags = [
-        _mix_ranked_bags(
-            teacher,
-            bags[idx],
-            bags[other_idx],
-            int(targets[idx].item()),
-            int(targets[other_idx].item()),
-            float(lambdas[idx].item()),
-        )
-        for idx, other_idx in enumerate(permutation.tolist())
-    ]
-    return mixed_bags, permutation, lambdas
-
-
-def rankmix_bag_loss(
-    student: AttentionMil,
-    teacher: AttentionMil,
-    bags: list[torch.Tensor],
-    targets: torch.Tensor,
-    alpha: float,
-    processed_instances: list[int] | None = None,
-) -> tuple[torch.Tensor, int]:
-    """RankMix-inspired soft-label CE: teacher-ranked, mixed-feature student loss."""
-    if len(bags) < 2:
-        logits, _, _ = student.forward_bags(bags)
-        if processed_instances is not None:
-            processed_instances.append(sum(len(bag) for bag in bags))
-        return F.cross_entropy(logits, targets), 0
-    mixed_bags, permutation, lambdas = _mix_batch(teacher, bags, targets, alpha)
-    logits, _, _ = student.forward_bags(mixed_bags)
-    one_hot = F.one_hot(targets, logits.shape[1]).float()
-    soft_targets = lambdas.unsqueeze(1) * one_hot + (1.0 - lambdas).unsqueeze(
-        1
-    ) * one_hot.index_select(0, permutation)
-    loss = -(soft_targets * F.log_softmax(logits, dim=1)).sum(dim=1).mean()
-    if processed_instances is not None:
-        processed_instances.append(
-            2 * sum(len(bag) for bag in bags) + sum(len(bag) for bag in mixed_bags)
-        )
-    return loss, len(mixed_bags)
