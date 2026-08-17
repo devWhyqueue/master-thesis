@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
+import pandas as pd
+import torch
 
 from imbalance_benchmark.common import sign_file, write_json
 from imbalance_benchmark.datasets.data import ImbalanceDataset
+from imbalance_benchmark.datasets.features import load_feature_row
 from imbalance_benchmark.analysis.predictors.rq3_features import (
     _covariates,
     _deprived_classes,
@@ -21,6 +24,39 @@ from imbalance_benchmark.analysis.predictors.signals.icc import (
     icc_estimate,
 )
 from imbalance_benchmark.modeling.training.semantic_scale import _matched_draw_indices
+
+
+class _RawManifest:
+    """Minimal ``.df``/``.classes`` stand-in avoiding ``ImbalanceDataset``'s eager load."""
+
+    def __init__(self, df: pd.DataFrame, classes: list[str]) -> None:
+        self.df = df
+        self.classes = classes
+
+
+def _load_rows(frame: pd.DataFrame, indices: np.ndarray) -> np.ndarray:
+    """Load exactly the requested rows' raw features, bypassing the resident feature bank.
+
+    The shared bank in ``datasets.features.cache`` never evicts, so building a
+    full ``ImbalanceDataset`` per condition to sample a capped subset would
+    still eagerly load and permanently retain every patch in that condition --
+    exactly the full feature pass the cap exists to avoid.
+    """
+    paths = frame["feature_path"].astype(str).to_numpy()
+    feature_index = (
+        frame["feature_index"].to_numpy() if "feature_index" in frame else None
+    )
+    rows = [
+        load_feature_row(
+            str(paths[i]),
+            int(feature_index[i])
+            if feature_index is not None and pd.notna(feature_index[i])
+            else None,
+        )
+        for i in indices
+    ]
+    return torch.stack(rows).numpy()
+
 
 __all__ = ["build_signal_profile", "write_signal_profile"]
 
@@ -51,40 +87,37 @@ def _pca_direction(features: np.ndarray) -> np.ndarray:
 
 
 def _reference_direction(
-    balanced_path: Path, class_names: list[str] | None, seed: int
+    balanced_path: Path, class_names: list[str], seed: int
 ) -> np.ndarray:
-    dataset = ImbalanceDataset(balanced_path, class_names=class_names)
-    indices, _ = _matched_draw_indices(dataset, seed)
-    features = dataset.__getitems__(indices.tolist())["features"]
-    return _pca_direction(np.asarray(features))
+    frame = pd.read_csv(balanced_path)
+    manifest = cast(ImbalanceDataset, _RawManifest(frame, class_names))
+    indices, _ = _matched_draw_indices(manifest, seed)
+    features = _load_rows(frame, indices)
+    return _pca_direction(features)
 
 
 def _sample_condition_scores(
-    dataset: ImbalanceDataset,
-    class_name: str,
-    direction: np.ndarray,
-    rng: np.random.Generator,
+    class_frame: pd.DataFrame, direction: np.ndarray, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
     """Capped, seeded case/patch sample of one class's projected scalar scores."""
-    class_column = dataset.df["cancer_type"].to_numpy()
-    class_rows = np.flatnonzero(class_column == class_name)
-    if len(class_rows) == 0:
+    frame = class_frame.reset_index(drop=True)
+    if frame.empty:
         return np.array([]), np.array([])
-    case_ids_all = dataset.df["case_id"].to_numpy()[class_rows]
+    case_ids_all = frame["case_id"].to_numpy()
     unique_cases = np.unique(case_ids_all)
     chosen_cases = rng.choice(
         unique_cases, size=min(ICC_CASE_CAP, len(unique_cases)), replace=False
     )
     rows, case_ids = [], []
     for case in chosen_cases:
-        case_rows = class_rows[case_ids_all == case]
+        case_rows = np.flatnonzero(case_ids_all == case)
         take = rng.choice(
             case_rows, size=min(ICC_PATCH_CAP, len(case_rows)), replace=False
         )
         rows.append(take)
         case_ids.append(np.full(len(take), case))
     indices = np.concatenate(rows)
-    features = np.asarray(dataset.__getitems__(indices.tolist())["features"])
+    features = _load_rows(frame, indices)
     return features @ direction, np.concatenate(case_ids)
 
 
@@ -95,16 +128,13 @@ def _condition_descriptives(
     seed: int,
 ) -> dict[str, dict[str, float | None]]:
     """Per-class descriptive ICC/m*/N_eff for one condition (report §sec:support-signal)."""
-    dataset = ImbalanceDataset(condition["path"], class_names=class_names)
+    frame = pd.read_csv(condition["path"])
     rng = np.random.default_rng(seed)
     out = {}
     for class_name in class_names:
-        counts = (
-            dataset.df.loc[dataset.df["cancer_type"] == class_name, "case_id"]
-            .value_counts()
-            .to_numpy()
-        )
-        scores, case_ids = _sample_condition_scores(dataset, class_name, direction, rng)
+        class_frame = frame.loc[frame["cancer_type"] == class_name]
+        counts = class_frame["case_id"].value_counts().to_numpy()
+        scores, case_ids = _sample_condition_scores(class_frame, direction, rng)
         out[class_name] = descriptive_support(counts, icc_estimate(scores, case_ids))
     return out
 
@@ -168,7 +198,7 @@ def _build_descriptive_support(
     """Per-class ICC/m*/N_eff for every condition (balanced plus each assignment)."""
     names = class_names or list(balanced["allocated_counts"])
     direction = _reference_direction(
-        Path(balanced["path"]), class_names, int(freeze["construction_seed"])
+        Path(balanced["path"]), names, int(freeze["construction_seed"])
     )
     return {
         key: _condition_descriptives(condition, names, direction, seed)
