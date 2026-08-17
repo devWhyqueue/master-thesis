@@ -265,13 +265,14 @@ A \emph{tail assignment} determines which semantic class receives each support r
 
 \section{Measuring Damage and Recovery}
 \label{sec:analysis}
-RQ1 and RQ2 are answered in a deliberately asymmetric sequence. Balanced CE is compared with imbalanced CE first. Only when that contrast shows a meaningful deficit on discrimination or calibration is a mitigation method interpreted in terms of recovery on the affected endpoint.
+Section~\ref{sec:design} established the controlled training conditions and the evidence held fixed across them. This section follows each controlled comparison from fitted models to an inferential claim. It first identifies the compared methods and their shared execution controls, then defines the endpoints used to detect imbalance-induced damage, measures mitigation recovery only where such damage is demonstrated, and finally quantifies uncertainty and tests the prespecified signal contrast. RQ1 and RQ2 are therefore answered in a deliberately asymmetric sequence: balanced CE is compared with imbalanced CE first, and only when that contrast shows a meaningful deficit on discrimination or calibration is a mitigation method interpreted in terms of recovery on the affected endpoint.
 
 For intuition, suppose balanced CE attains balanced accuracy \num{0.72}, imbalanced CE attains \num{0.62}, and a mitigation method attains \num{0.68}. Imbalance caused a \num{0.10} deficit and the method regained \num{0.06}, or 60\% of the demonstrated damage. This normalization distinguishes repair of an imbalance effect from a generic method improvement. Exact estimands and gates appear after the endpoints they use.
 
-\subsection{Methods compared under imbalance}
+\subsection{Compared methods and shared execution controls}
 \label{sec:methods}
-Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, grouped by the mitigation signal each one reads rather than by intervention family. This follows the signal--intervention table in the companion methods report so the two remain comparable at a glance. CE is the size-matched no-mitigation reference. The roster is the patch-applicable subset of that report's broader taxonomy; methods that consume a different input form are not evaluated here. The roster is fitted in the balanced, moderate, and severe conditions, which alone supply the paired contrast a mitigation claim requires; the natural anchor carries the CE reference only. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
+\label{sec:training}
+Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, grouped by the mitigation signal each one reads. CE is the size-matched no-mitigation reference. The roster is fitted in the balanced, moderate, and severe conditions, which alone supply the paired contrast a mitigation claim requires; the natural anchor carries the CE reference only. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
 
 \begin{table}[H]
   \centering
@@ -294,15 +295,7 @@ Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, group
   \label{tab:roster}
 \end{table}
 
-\subsection{The five-member signal contrast}
-\label{sec:five-family}
-Five roster members --- weighted CE, class-balanced CE, independent-support weighted CE, pilot-difficulty weighted CE, and semantic-scale weighted CE --- share exactly one intervention, a mean-one class weight applied to otherwise unmodified CE, and differ only in the per-class score that weight is built from: prevalence, nominal support, independent support, difficulty, or diversity respectively. Holding the mechanism fixed makes a difference in recovery between these five attributable to the signal rather than to how the signal is used (Section~\ref{sec:recovery-holm}), which is what RQ2 asks. This is the confirmatory family (Section~\ref{sec:recovery-holm}); every other roster member is exploratory.
-
-Class-balanced and independent-support weighted CE additionally isolate the counting unit itself: both weight by $1/E_c(\beta)$, the inverse effective number from the same saturating transform, evaluated at nominal count $n_c$ for the former and independent count $G_c$ for the latter, as defined in the companion methods report \citep{queisler2026imbalanceMethods}. Because $\beta$ sets both a saturation scale and, jointly with the counting unit, the realized weight shape, tuning $\beta$ separately for each method confounds the counting unit with the selected saturation scale. The tuning grid therefore includes a \emph{matched-beta} arm: independent-support weighted CE confirmed a second time at class-balanced CE's own tuned $\beta$, with its own tuned learning rate. Only this matched-$\beta$ comparison attributes a difference to the counting unit alone; it is a diagnostic arm reported alongside, not in place of, the five-family contrast, and it is not itself one of the five confirmatory members.
-
-\subsection{Matched training and selection}
-\label{sec:training}
-All matched methods retain the frozen encoder, model family, optimizer family, batch definition, augmentation, numerical precision, and optimizer-update budget (Table~\ref{tab:locked}). Hyperparameters and checkpoints are selected only on natural validation data, and are locked before confirmation fitting and the one-time test evaluation. Balanced CE, imbalanced CE, and mitigation runs share split, tail assignment, confirmation-seed index, and held-out cases. Appendix~\ref{app:training} gives update formulas, adaptive grids, tie-breakers, exposure accounting, failure rules, and cost reporting.
+All methods in a controlled comparison retain the frozen encoder, model family, optimizer family, batch definition, augmentation, numerical precision, and optimizer-update budget (Table~\ref{tab:locked}). Hyperparameters and checkpoints are selected only on natural validation data, and are locked before confirmation fitting and the one-time test evaluation. Balanced CE, imbalanced CE, and mitigation runs share split, tail assignment, confirmation-seed index, and held-out cases. Appendix~\ref{app:training} gives update formulas, adaptive grids, tie-breakers, exposure accounting, failure rules, and cost reporting.
 
 Figure~\ref{fig:benchmark-overview} places these steps in execution order. It also separates the validation search that is self-contained from the phase that cannot start until a condition's CE search has resolved, which is what fixes the order in which runs may be launched.
 
@@ -317,13 +310,14 @@ Figure~\ref{fig:benchmark-overview} places these steps in execution order. It al
 
 This separation makes confirmation runs comparable without pretending that equal optimizer updates imply equal data exposure. With models fixed, evaluation can ask which endpoint was damaged and how much of that damage was recovered.
 
-\subsection{Discrimination endpoints and aggregation units}
+\subsection{Evaluation endpoints}
+Damage and recovery are evaluated on two complementary axes: discrimination measures whether the predicted class is correct, whereas probability quality measures whether the complete predicted distribution is reliable. Both axes preserve the independent patient or case as the unit of evidence.
+
+\paragraph{Discrimination and aggregation.}
 The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Overall accuracy is descriptive. Patch predictions are summarized in two ways: patch-micro estimates treat eligible patches as predictions while uncertainty is clustered by partitioning unit, and case-macro estimates first aggregate the metric contribution within each partitioning unit so that heavily tiled cases do not dominate.
 
-\subsection{Probability quality}
-PANDA's patch target is binary (cancer versus benign), not the biopsy's ordinal ISUP grade; that grade is a slide-level label outside the patch prediction unit used here (Table~\ref{tab:datasets}), so no ordinal endpoint is reported. A patch-classification route to biopsy-level ordinal grading would require a new aggregation rule from patch-level cancer probability to a grade estimate, which the benchmark does not define; it is left to future work.
-
-Probability-quality metrics ask whether the complete predicted distribution is useful, not only whether its largest entry names the correct class. Tail-group macro negative log likelihood (NLL) is the co-primary calibration endpoint because it gives each tail class equal weight and penalizes confident errors. Natural-prevalence NLL, macro NLL, multiclass Brier score, expected calibration error (ECE), and reliability diagrams provide secondary views. ECE uses 10 fixed equal-width bins and remains secondary because small classwise samples make bin estimates unstable.
+\paragraph{Probability quality.}
+Probability-quality metrics ask whether the complete predicted distribution is useful, not only whether its largest entry names the correct class. Tail-group macro negative log likelihood (NLL) is the co-primary calibration endpoint because it gives each tail class equal weight and penalizes confident errors. Because NLL uses the natural logarithm, its values and differences are measured in nats. A nat is the unit of information obtained with logarithms of base $e$, just as a bit is obtained with logarithms of base 2. Natural-prevalence NLL, macro NLL, multiclass Brier score, expected calibration error (ECE), and reliability diagrams provide secondary views. ECE uses 10 fixed equal-width bins and remains secondary because small classwise samples make bin estimates unstable.
 
 Discrimination uses balanced-decision logits, whereas calibration uses target-prior-corrected probabilities before temperature scaling. Temperature-scaled outputs are secondary and never enter a recovery gate. Appendix~\ref{app:endpoints} defines every probability-quality equation, clipping at $10^{-12}$, score variants, and fixed-bin ECE.
 
@@ -369,36 +363,32 @@ Figure~\ref{fig:gate-routing} shows the two routes. The \emph{discrimination gat
 
 The two routes preserve an important distinction. Strong frozen features may leave balanced accuracy nearly intact while imbalance still biases tail probabilities, in which case a single discrimination rule would exclude methods designed to correct class priors. Conversely, the gates avoid unstable recovery ratios when no meaningful damage exists to recover. All CE deficits on both axes remain reported, including units that fail both rules. For the lower-is-better calibration axis, the sign-corrected deficit $D_{\mathrm{cal}}=\mathrm{NLL}_{\mathrm{tail}}(\mathrm{imbalanced\ CE})-\mathrm{NLL}_{\mathrm{tail}}(\mathrm{balanced\ CE})$ is the denominator and the method's tail-NLL improvement over imbalanced CE is the numerator, so Equation~\eqref{eq:recovery} retains the same interpretation. Recovery for other secondary metrics is descriptive and does not reopen a comparison unit that fails both gates.
 
-\subsection{Uncertainty from independent units}
-Uncertainty follows patients or cases rather than patches. A Bayesian bootstrap draws one positive Dirichlet weight per partitioning unit and carries that weight to all of its slides, patches, split appearances, and matched methods. Balanced CE, imbalanced CE, and mitigation runs receive the same unit weights and paired confirmation-seed draws; the complete deficit and recovery fraction are recomputed in every replicate.
+\subsection{Addressing uncertainty}
+The deficit and recovery estimates in Section~\ref{sec:recovery} summarize a finite held-out cohort rather than fixed population quantities. Their uncertainty has two sources: different patients or cases could produce different estimates, and repeated model fitting introduces algorithmic variation. Multiple patches from the same patient or case do not provide equivalent independent evidence, just as repeated fits do not create additional patient evidence.
 
-A label-only preflight fixes \num{10000} resamples before predictions exist and checks class-cell representation, metric computability, paired weights, and weight variation. Kish effective counts and largest-weight shares identify cells dominated by too little independent evidence. Three split partitions are averaged with equal weight and are not treated as independent cohorts; five model initializations measure algorithmic variation, not five additional patient samples. Exact diagnostics, descriptive-only thresholds, and percentile-interval construction appear in Appendix~\ref{app:endpoints}.
+Uncertainty is therefore estimated by resampling patients or cases as complete units and repeating the relevant comparisons. The same resampled cohort and corresponding model-initialization draws are used for the balanced CE, imbalanced CE, and mitigation results within each controlled comparison. For intuition, suppose one resample gives a particular patient greater influence. That patient's predictions receive the same greater influence when balanced CE, imbalanced CE, and the mitigation method are evaluated. The deficit and recovery fraction therefore remain comparisons on the same reweighted cohort rather than comparisons between differently sampled groups.
 
-\subsection{Paired testing and multiplicity control}
+Repeating this process and recomputing the complete deficit and recovery fraction shows how much both estimates vary with cohort composition and model initialization, producing their 95\% confidence intervals. Data splits are averaged as design repetitions rather than treated as independent cohorts. Appendix~\ref{app:endpoints} specifies the resampling construction, validity checks, support diagnostics, and interval calculation.
+
+\subsection{Interpreting the evidence}
+\label{sec:five-family}
 \label{sec:recovery-holm}
-Confidence intervals and raw effect sizes are the main evidence. Hypothesis tests provide a supporting check for the prespecified primary methods. On the discrimination axis, the tested effect is the balanced-accuracy improvement over imbalanced CE. On the calibration axis, it is the reduction in tail-group macro NLL, oriented so that positive values indicate improvement. Recovery fractions are normalized effect summaries, not test statistics.
+The preceding subsections establish how models are compared, which endpoints record damage, when recovery is interpretable, and how uncertainty is represented. RQ1 is answered by the signed CE deficit and its confidence interval: together they show the direction and magnitude of the allocation effect, while the gate identifies damage large and certain enough to support a recovery analysis. RQ2 begins only for those gate-passing comparisons. A method's improvement over imbalanced CE and its recovery fraction then show how much of the demonstrated damage was repaired. Raw effects and confidence intervals remain the main evidence; recovery fractions are normalized summaries rather than test statistics.
 
-The raw two-sided $p$-value comes from a paired partitioning-unit-block permutation test. This test represents the null hypothesis of no method difference by repeatedly swapping the method and imbalanced-CE labels within a partitioning unit. The same swap is used for all of that unit's patches, split appearances, and matched confirmation seeds, preserving the paired design. All possible swaps are enumerated when feasible. Otherwise, \num{100000} random swaps are used with a plus-one correction; this gives a minimum attainable Monte Carlo $p$-value of approximately $10^{-5}$ and avoids reporting a simulated value of zero.
+The method roster creates many related method-by-condition comparisons. Treating every result as an independent primary test would increase the chance of a false-positive claim, so the benchmark prespecifies a limited confirmatory family whose tests are adjusted jointly. The confirmatory part of RQ2 asks whether signal choice matters when the intervention mechanism is held fixed. It therefore compares the five weighted-CE methods in Table~\ref{tab:roster}, whose weights use prevalence, nominal support, independent support, difficulty, or diversity while leaving the CE mechanism unchanged. Differences among them can consequently be interpreted as evidence about the signal rather than the intervention. Within each dataset, paired tests support the gate-passing comparisons and Holm adjustment controls their joint family-wise error. Other roster members retain the same effect estimates and confidence intervals but remain exploratory. Appendix~\ref{app:testing} specifies the tests, multiplicity family, and protocol revision; Appendix~\ref{app:controls} gives method-specific diagnostic and tuning details.
 
-A \emph{test family} is the set of related hypotheses interpreted together. Testing many hypotheses increases the chance that at least one small $p$-value occurs by chance. Holm adjustment controls this family-wise error by ordering the raw $p$-values from smallest to largest, applying the strongest correction to the smallest value, and then proceeding stepwise with less stringent corrections. It provides this control without assuming that the tests are independent.
-
-The confirmatory family holds one method per signal --- weighted CE (prevalence), class-balanced CE (nominal support), independent-support weighted CE (independent support), pilot-difficulty weighted CE (difficulty), and semantic-scale weighted CE (diversity) --- selected because all five share exactly one intervention level, a mean-one class weight on unmodified CE (Section~\ref{sec:five-family}), so a difference among them is attributable to the signal rather than to the mechanism. The family is specific to the patch regime and to the roster fitted here. Within one dataset, the family includes every gate-passing combination of primary method, gate, severity, and tail assignment; severities are not split into separate families. Holm adjustment is applied across the testable comparisons, while gated-out comparisons are recorded as not tested. Focal loss, train-time and post-hoc logit adjustment, balanced sampling, and every other roster member are exploratory: they retain the same effect estimates and confidence intervals but remain outside the confirmatory correction.
-
-This is a revision of the family originally specified here, made before any recovery outcome was inspected: the prior family selected methods by intervention level (loss reweighting, prior correction, and resampling) with a rationale that assumed a second prediction regime the benchmark no longer carries. The revised, signal-based family is legitimate only because it was fixed before recovery outcomes were read, and only remains so if it is never revised again after that point.
+Section~\ref{sec:analysis} therefore produces three outputs from each controlled comparison: whether damage occurred, how large it was, and how much of it was recovered when recovery was defined. RQ1 and RQ2 estimate these quantities within a dataset and task. The remaining question is why they vary across datasets, severities, and tail assignments. Section~\ref{sec:rq3} treats the three outputs as outcomes and relates them to prespecified properties of each comparison.
 
 \section{Explaining Heterogeneity}
 \label{sec:rq3}
-Why do some controlled comparisons show more damage or recovery than others? RQ1 and RQ2 estimate matched effects within a dataset and task. RQ3 then takes one step back and relates prespecified properties of each comparison to those effects. It neither predicts patient outcomes nor creates another method ranking. A \emph{controlled comparison} is one dataset, severity, and tail assignment cell for damage occurrence and magnitude; recovery comparisons additionally identify method and gate.
+RQ3 follows this handoff by asking which prespecified properties are associated with damage occurrence, damage magnitude, and mitigation headroom. Controlled comparisons, rather than individual patients, are the observations in this exploratory analysis. For damage occurrence and magnitude, one \emph{controlled comparison} is a dataset, severity, and tail assignment cell; recovery comparisons additionally identify the method and gate. The analysis neither predicts patient outcomes nor creates another method ranking.
 
 \paragraph{Outcomes to explain.}
-The analysis is divided into three linked questions rather than one opaque combined model:
 \begin{enumerate}
-  \item \textbf{Damage occurrence:} did the comparison pass either prespecified deficit gate? Every controlled comparison contributes to this binary analysis.
-  \item \textbf{Damage magnitude:} how large was the signed balanced-accuracy deficit? Every comparison contributes, including those with no damage or an apparent improvement under imbalance.
-  \item \textbf{Mitigation headroom:} how much of the demonstrated deficit was recovered? Only gated comparisons contribute because recovery has no stable interpretation when there is no deficit to recover.
+  \item \textbf{Damage occurrence:} Did the comparison pass either prespecified deficit gate? Every controlled comparison contributes to this binary analysis.
+  \item \textbf{Damage magnitude:} How large was the signed balanced-accuracy deficit? Every comparison contributes, including those with no damage or an apparent improvement under imbalance.
+  \item \textbf{Mitigation headroom:} How much of the demonstrated deficit was recovered? Only gated comparisons contribute because recovery has no stable interpretation when there is no deficit to recover.
 \end{enumerate}
-
-\noindent These three outcomes correspond directly to the sequence introduced in RQ3: occurrence, magnitude, and conditional recovery.
 
 \paragraph{Candidate explanations.}
 Only quantities available without using test outcomes are eligible as predictors. Table~\ref{tab:rq3-predictors} separates the two primary predictors from the variables used only in sensitivity analyses.
@@ -593,7 +583,7 @@ The random quantities are separated into five seed families so that changing one
 
 \section{Endpoint and Inference Specification}
 \label{app:endpoints}
-This appendix defines secondary endpoints, score semantics, resampling, and diagnostics. Gates and recovery retain the main-text definitions in Section~\ref{sec:recovery}.
+This appendix defines secondary endpoints, score semantics, resampling, diagnostics, and confirmatory testing. Gates and recovery retain the main-text definitions in Section~\ref{sec:recovery}.
 
 \subsection{Probability quality and calibration}
 Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$.
@@ -725,6 +715,18 @@ The three partitioning-unit-disjoint data splits are fixed design repetitions an
 
 Balanced CE, imbalanced CE, and each mitigation method receive the same partitioning-unit multiplicities and confirmation-seed draws. The complete deficit and recovery fraction, including numerator and denominator, is recomputed in each replicate. The reported 95\% percentile interval spans the 2.5th to 97.5th percentiles of the resulting distribution. Patches are never bootstrapped independently.
 
+\subsection{Paired testing and multiplicity control}
+\label{app:testing}
+Hypothesis tests provide a supporting check for the prespecified primary methods. On the discrimination axis, the tested effect is the balanced-accuracy improvement over imbalanced CE. On the calibration axis, it is the reduction in tail-group macro NLL, oriented so that positive values indicate improvement. Recovery fractions are normalized effect summaries, not test statistics.
+
+The raw two-sided $p$-value comes from a paired partitioning-unit-block permutation test. This test represents the null hypothesis of no method difference by repeatedly swapping the method and imbalanced-CE labels within a partitioning unit. The same swap is used for all of that unit's patches, split appearances, and corresponding confirmation-seed indices, preserving the paired design. All possible swaps are enumerated when feasible. Otherwise, \num{100000} random swaps are used with a plus-one correction; this gives a minimum attainable Monte Carlo $p$-value of approximately $10^{-5}$ and avoids reporting a simulated value of zero.
+
+A \emph{test family} is the set of related hypotheses interpreted together. Testing many hypotheses increases the chance that at least one small $p$-value occurs by chance. Holm adjustment controls this family-wise error by ordering the raw $p$-values from smallest to largest, applying the strongest correction to the smallest value, and then proceeding stepwise with less stringent corrections. It provides this control without assuming that the tests are independent.
+
+The confirmatory family holds one method per signal: weighted CE (prevalence), class-balanced CE (nominal support), independent-support weighted CE (independent support), pilot-difficulty weighted CE (difficulty), and semantic-scale weighted CE (diversity). All five share one intervention level, a mean-one class weight on unmodified CE (Section~\ref{sec:five-family}), so a difference among them is attributable to the signal rather than the mechanism. Within one dataset, the family includes every gate-passing combination of primary method, gate, severity, and tail assignment; severities are not split into separate families. Holm adjustment is applied across the testable comparisons, while gated-out comparisons are recorded as not tested. Every other roster member remains exploratory and outside the confirmatory correction.
+
+This family replaces the intervention-based family originally specified here, whose rationale assumed a second prediction regime that the benchmark no longer carries. The change was fixed before any recovery outcome was inspected. The signal-based family is confirmatory only under that timing and must not be revised again after recovery outcomes are read.
+
 \section{RQ3 Model Specification}
 \label{app:rq3}
 This appendix fixes diagnostic feature construction and deliberately small association models used for RQ3. None of these quantities is allowed to use test outcomes as an input predictor.
@@ -790,6 +792,9 @@ Hyperparameter comparisons are bounded by a common validation-search budget rath
 \end{equation}
 \noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC draw their strength from a seven-value envelope searched through the same adaptive window as the learning rate; every other control is a fixed four-value grid, since its domain is naturally bounded. Both axes follow the search below, in which an edge winner is never accepted as an optimum: a bounded number of window shifts replaces a single fixed grid, at the cost of one new candidate per shift.
 
+\paragraph{Matched counting-unit diagnostic.}
+Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$, the inverse effective number from the same saturating transform, evaluated at nominal count $n_c$ for the former and independent count $G_c$ for the latter, as defined in the companion methods report \citep{queisler2026imbalanceMethods}. Because $\beta$ sets both a saturation scale and, jointly with the counting unit, the realized weight shape, tuning $\beta$ separately for each method confounds the counting unit with the selected saturation scale. The tuning grid therefore includes a \emph{matched-beta} arm: independent-support weighted CE is confirmed a second time at class-balanced CE's tuned $\beta$, with its own tuned learning rate. Only this matched-$\beta$ comparison attributes a difference to the counting unit alone; it is a diagnostic arm reported alongside, not in place of, the five-family contrast, and is not itself one of the five confirmatory members.
+
 \begin{table}[ht]
   \centering
   \footnotesize
@@ -804,9 +809,9 @@ Hyperparameter comparisons are bounded by a common validation-search budget rath
     CFAL & affinity bandwidth $\sigma\in\{0.25,1,2,4\}$ \\
     OKO & odd-class count $k\in\{1,2,4,8\}$, capped by $K-1$ \\
     Class-balanced CE & $\beta\in\{0.9,0.99,0.999,0.9999\}$; saturation points $1/(1-\beta)\in\{10,100,1000,10000\}$, matched to $n_c$'s range \\
-    Independent-support weighted CE & $\beta\in\{0.8,0.95,0.99,0.999\}$; saturation points $\{5,20,100,1000\}$, scaled down to $G_c$'s range, plus a matched-$\beta$ arm at class-balanced CE's tuned $\beta$ (Section~\ref{sec:five-family}) \\
+    Independent-support weighted CE & $\beta\in\{0.8,0.95,0.99,0.999\}$; saturation points $\{5,20,100,1000\}$, scaled down to $G_c$'s range, plus a matched-$\beta$ arm at class-balanced CE's tuned $\beta$ \\
     Pilot-difficulty weighted CE & $\tau\in\{0.25,0.5,0.75,1\}$ \\
-    Semantic-scale weighted CE & $\tau\in\{0.25,0.5,0.75,1\}$; reweighting begins at reference pass 6 of 30 (Section~\ref{sec:five-family}) \\
+    Semantic-scale weighted CE & $\tau\in\{0.25,0.5,0.75,1\}$; reweighting begins at reference pass 6 of 30 \\
     \bottomrule
   \end{tabularx}
   \caption{Prespecified method-specific controls, crossed with the active window of the learning-rate envelope in Equation~\eqref{eq:learning-rate-grid}. Focal loss and the two soft-label hybrids search their listed envelope through an adaptive four-value window; every other row is a fixed four-value grid. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately. The class-balanced and independent-support $\beta$ grids are matched saturation points on the effective-number transform, scaled to each method's own counting unit as defined in the companion methods report \citep{queisler2026imbalanceMethods}.}
