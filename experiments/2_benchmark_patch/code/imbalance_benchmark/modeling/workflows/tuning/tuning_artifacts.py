@@ -32,11 +32,25 @@ def validate_shard_payload(
     payload: dict[str, Any],
     fingerprint: list[str],
     spec: ShardSpec | None = None,
+    accepted: list[set[str]] | None = None,
 ) -> None:
-    """Reject incomplete, stale, or misaddressed shard output."""
+    """Reject incomplete, stale, or misaddressed shard output.
+
+    ``accepted`` (one hash set per split, from a freeze's own superseded
+    fingerprints) lets a shard written before a ``method_grids`` amendment
+    keep validating, so amending a freeze does not orphan already-tuned
+    shards for the methods it left untouched.
+    """
     if not payload.get("complete"):
         raise RuntimeError("Tuning shard is incomplete")
-    if payload.get("fingerprint") != fingerprint:
+    stored = payload.get("fingerprint")
+    in_chain = (
+        accepted is not None
+        and isinstance(stored, list)
+        and len(stored) == len(accepted)
+        and all(value in allowed for value, allowed in zip(stored, accepted))
+    )
+    if stored != fingerprint and not in_chain:
         raise RuntimeError("Tuning shard freeze fingerprint does not match")
     if spec is not None and payload.get("spec") != asdict(spec):
         raise RuntimeError("Tuning shard specification does not match its path")
@@ -115,6 +129,7 @@ def load_candidate(
     spec: ShardSpec,
     fingerprint: list[str],
     expected_observations: int | None,
+    accepted: list[set[str]] | None = None,
 ) -> dict[str, Any]:
     """Load one candidate artifact or its exact observation-shard equivalent."""
     path = shard_path(root, spec)
@@ -123,11 +138,13 @@ def load_candidate(
         if observation_dir.exists():
             raise RuntimeError(f"Duplicate candidate and observation shards: {path}")
         payload = json.loads(path.read_text())
-        validate_shard_payload(payload, fingerprint, spec)
+        validate_shard_payload(payload, fingerprint, spec, accepted)
         return payload
     if expected_observations is None:
         raise RuntimeError(f"Missing tuning shard: {path}")
-    return _merge_observation_shards(root, spec, fingerprint, expected_observations)
+    return _merge_observation_shards(
+        root, spec, fingerprint, expected_observations, accepted
+    )
 
 
 def condition_is_reusable(
@@ -183,7 +200,11 @@ def selected_ce(root: Path, condition: str) -> dict[str, Any]:
 
 
 def _merge_observation_shards(
-    root: Path, spec: ShardSpec, fingerprint: list[str], expected: int
+    root: Path,
+    spec: ShardSpec,
+    fingerprint: list[str],
+    expected: int,
+    accepted: list[set[str]] | None = None,
 ) -> dict[str, Any]:
     observed_specs = [
         replace(spec, observation_index=index) for index in range(expected)
@@ -197,7 +218,7 @@ def _merge_observation_shards(
     payloads = []
     for observed, path in zip(observed_specs, paths, strict=True):
         payload = json.loads(path.read_text())
-        validate_shard_payload(payload, fingerprint, observed)
+        validate_shard_payload(payload, fingerprint, observed, accepted)
         payloads.append(payload)
     return _merged_payload(spec, payloads)
 

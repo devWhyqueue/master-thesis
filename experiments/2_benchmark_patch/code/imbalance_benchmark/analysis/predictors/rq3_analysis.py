@@ -14,6 +14,7 @@ from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     leave_one_group_out,
 )
 from imbalance_benchmark.common import verify_signed_file
+from imbalance_benchmark.manifest.freeze import accepted_freeze_hashes
 
 __all__ = ["run_rq3", "cross_dataset_rq3", "load_rq3_cells"]
 
@@ -35,7 +36,7 @@ def _load_signal_profile(
         )
     verify_signed_file(profile_path)
     profile = json.loads(profile_path.read_text())
-    if profile.get("freeze_content_sha256") != freeze.get("content_sha256"):
+    if profile.get("freeze_content_sha256") not in accepted_freeze_hashes(freeze):
         raise RuntimeError(
             "signal_profile.json is stale relative to its freeze; re-run `signals`"
         )

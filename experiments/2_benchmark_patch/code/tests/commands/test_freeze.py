@@ -13,7 +13,9 @@ from imbalance_benchmark.analysis.reporting.secondary_intervals.report import (
 )
 from imbalance_benchmark.common import compute_sha256
 from imbalance_benchmark.common import dataset_provenance
+from imbalance_benchmark.common import load_config
 from imbalance_benchmark.common import sign_file
+from imbalance_benchmark.common import split_paths
 
 def _write_freeze_fixture(tmp_path: Path) -> Path:
     """Config + three signed patient-split manifests, ready for cmd_freeze."""
@@ -254,6 +256,104 @@ def test_freeze_metadata_is_content_locked(tmp_path: Path) -> None:
     freeze["shared_T"] = 200
     with pytest.raises(RuntimeError, match="content"):
         verify_manifest_freeze(freeze)
+
+def _write_amendable_freeze(tmp_path: Path, dropped: set[str] = frozenset()) -> Path:
+    """A minimal, fully signed frozen manifest that `cmd_amend_grids` can load.
+
+    Bypasses the full `cmd_freeze` pipeline (pilot difficulty evidence, bootstrap
+    preflight, feature provenance) since amendment only reads/rewrites
+    `method_grids`; ``_freeze_meta`` alone produces every field it touches.
+    """
+    from imbalance_benchmark.common import ensure_dirs, sign_file, write_json
+    from imbalance_benchmark.manifest.freeze import lock_manifest_freeze
+    from imbalance_benchmark.manifest.freezing import _freeze_meta
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "paths": {"outputs": str(tmp_path / "outputs")},
+                "dataset": {"name": "synthetic", "regime": "patch"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths = split_paths(ensure_dirs(load_config(config_path)), 0)
+    rows = []
+    for class_name in ("A", "B"):
+        for patient in range(10):
+            for slide in range(2):
+                for patch in range(10):
+                    rows.append(
+                        {
+                            "case_id": f"{class_name}_{patient}",
+                            "slide_id": f"{class_name}_{patient}_{slide}",
+                            "patch_id": f"{class_name}_{patient}_{slide}_{patch}",
+                            "cancer_type": class_name,
+                            "split": "train",
+                        }
+                    )
+    meta = _freeze_meta(
+        Namespace(seed=4, config=config_path),
+        paths,
+        pd.DataFrame(rows),
+        False,
+        ["A", "B"],
+        200,
+        20,
+        20,
+        False,
+        10,
+        {"native": ["A", "B"]},
+    )
+    meta["method_grids"] = {
+        method: grid
+        for method, grid in meta["method_grids"].items()
+        if method not in dropped
+    }
+    freeze_path = paths["data"] / "manifest_freeze.json"
+    meta["path"] = str(freeze_path)
+    write_json(freeze_path, lock_manifest_freeze(meta))
+    sign_file(freeze_path)
+    return config_path
+
+def test_amend_grids_adds_missing_methods_and_chains_the_superseded_hash(
+    tmp_path: Path,
+) -> None:
+    from imbalance_benchmark.commands.freeze import cmd_amend_grids
+
+    new_methods = {"class_balanced_ce", "pilot_difficulty_ce", "independent_support_ce"}
+    config_path = _write_amendable_freeze(tmp_path, dropped=new_methods)
+    freeze_path = tmp_path / "outputs" / "split=0" / "data" / "manifest_freeze.json"
+    truncated = json.loads(freeze_path.read_text())
+    kept_grids = dict(truncated["method_grids"])
+
+    cmd_amend_grids(Namespace(config=str(config_path), seed=7, split_index=0))
+
+    amended = json.loads(freeze_path.read_text())
+    assert new_methods <= amended["method_grids"].keys()
+    for method, grid in kept_grids.items():
+        assert amended["method_grids"][method] == grid
+    assert amended["supersedes"] == [truncated["content_sha256"]]
+    assert amended["content_sha256"] != truncated["content_sha256"]
+    for field in ("conditions", "assignment_conditions", "shared_T", "seed_roles"):
+        assert amended[field] == truncated[field]
+
+def test_amend_grids_refuses_when_an_existing_grid_would_change(tmp_path: Path) -> None:
+    from imbalance_benchmark.commands.freeze import cmd_amend_grids
+    from imbalance_benchmark.common import sign_file, write_json
+    from imbalance_benchmark.manifest.freeze import lock_manifest_freeze
+
+    config_path = _write_amendable_freeze(tmp_path)
+    freeze_path = tmp_path / "outputs" / "split=0" / "data" / "manifest_freeze.json"
+    meta = json.loads(freeze_path.read_text())
+    meta["method_grids"]["ce"] = [{"lr": 0.5}]
+    meta.pop("content_sha256", None)
+    write_json(freeze_path, lock_manifest_freeze(meta))
+    sign_file(freeze_path)
+
+    with pytest.raises(RuntimeError, match="refuses to change existing method 'ce'"):
+        cmd_amend_grids(Namespace(config=str(config_path), seed=7, split_index=0))
 
 def test_freeze_verifies_pilot_and_prepared_manifest_artifacts(tmp_path: Path) -> None:
     """Held-out manifest or pilot changes invalidate the frozen record."""

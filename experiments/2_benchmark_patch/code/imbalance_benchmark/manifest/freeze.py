@@ -30,6 +30,7 @@ __all__ = [
     "build_tail_assignments",
     "lock_manifest_freeze",
     "verify_manifest_freeze",
+    "accepted_freeze_hashes",
 ]
 
 
@@ -197,6 +198,11 @@ def verify_manifest_freeze(meta: dict[str, Any]) -> None:
                 f"Manifest '{name}' altered" if name else "Preflight altered"
             )
     verify_frozen_feature_provenance(meta)
+
+
+def accepted_freeze_hashes(freeze: dict[str, Any]) -> set[str | None]:
+    """Every content hash a freeze may present: its current lock plus superseded ones."""
+    return {freeze.get("content_sha256"), *freeze.get("supersedes", ())}
 
 
 def _get_constraints(

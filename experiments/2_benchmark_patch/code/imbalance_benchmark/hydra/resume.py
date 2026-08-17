@@ -50,13 +50,22 @@ def resume_plan(config: dict[str, Any]) -> ResumePlan:
     freeze_paths = [
         split_paths(base, index)["data"] / "manifest_freeze.json" for index in range(3)
     ]
-    freeze = json.loads(freeze_paths[0].read_text())
+    freezes = [json.loads(path.read_text()) for path in freeze_paths]
+    freeze = freezes[0]
     fingerprint = [compute_sha256(path) for path in freeze_paths]
+    accepted = [
+        {current, *split_freeze.get("superseded_freeze_file_hashes", [])}
+        for current, split_freeze in zip(fingerprint, freezes)
+    ]
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     natural_bundle, controlled_bundle = _bundle_sizes(config)
     return ResumePlan(
-        _pending_natural(config, base, is_mil, freeze, fingerprint, natural_bundle),
-        _pending_controlled(base, is_mil, freeze, fingerprint, controlled_bundle),
+        _pending_natural(
+            config, base, is_mil, freeze, fingerprint, natural_bundle, accepted
+        ),
+        _pending_controlled(
+            base, is_mil, freeze, fingerprint, controlled_bundle, accepted
+        ),
     )
 
 
@@ -72,6 +81,7 @@ def _pending_controlled(
     freeze: dict[str, Any],
     fingerprint: list[str],
     bundle_size: int,
+    accepted: list[set[str]],
 ) -> tuple[int, ...]:
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     total = 3 * candidate_array_size(phase_methods(is_mil, "base", "balanced"))
@@ -79,7 +89,15 @@ def _pending_controlled(
         index
         for index in range(bundled_array_size(total, bundle_size))
         if not _controlled_bundle_complete(
-            index, bundle_size, total, is_mil, freeze, fingerprint, assignments, base
+            index,
+            bundle_size,
+            total,
+            is_mil,
+            freeze,
+            fingerprint,
+            assignments,
+            base,
+            accepted,
         )
     )
 
@@ -91,6 +109,7 @@ def _pending_natural(
     freeze: dict[str, Any],
     fingerprint: list[str],
     bundle_size: int,
+    accepted: list[set[str]],
 ) -> tuple[int, ...]:
     observations = int(
         config.get("slurm", {}).get("tune_natural_observations_per_candidate", 1)
@@ -104,7 +123,14 @@ def _pending_natural(
         index
         for index in range(natural_size)
         if not _natural_bundle_complete(
-            index, bundle_size, observations, is_mil, freeze, fingerprint, base
+            index,
+            bundle_size,
+            observations,
+            is_mil,
+            freeze,
+            fingerprint,
+            base,
+            accepted,
         )
     )
 
@@ -117,6 +143,7 @@ def _natural_bundle_complete(
     freeze: dict[str, Any],
     fingerprint: list[str],
     base: dict[str, Any],
+    accepted: list[set[str]],
 ) -> bool:
     def _load() -> None:
         for flat_index in _bundle_indices(task_index, bundle_size, observations, True):
@@ -131,7 +158,7 @@ def _natural_bundle_complete(
             )
             if spec is None:
                 continue
-            load_candidate(base["data"], spec, fingerprint, None)
+            load_candidate(base["data"], spec, fingerprint, None, accepted)
 
     return _complete_or_missing(_load)
 
@@ -145,6 +172,7 @@ def _controlled_bundle_complete(
     fingerprint: list[str],
     assignments: tuple[str, ...],
     base: dict[str, Any],
+    accepted: list[set[str]],
 ) -> bool:
     def _load() -> None:
         for shard_index in range(
@@ -160,6 +188,7 @@ def _controlled_bundle_complete(
                 spec,
                 fingerprint,
                 expected_observations("controlled", assignments, freeze),
+                accepted,
             )
 
     return _complete_or_missing(_load)

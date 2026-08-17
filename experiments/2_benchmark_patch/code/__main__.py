@@ -9,6 +9,7 @@ from collections.abc import Callable
 from PIL import PngImagePlugin
 
 from imbalance_benchmark.commands import (
+    cmd_amend_grids,
     cmd_analyze,
     cmd_analyze_combine,
     cmd_combine_rq3,
@@ -55,6 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         "prepare",
         "pilot",
         "freeze",
+        "amend-grids",
         "signals",
         "match",
         "tune",
@@ -149,6 +151,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "prepare-extract-reduce": cmd_prepare_extract_reduce,
         "pilot": cmd_pilot,
         "freeze": cmd_freeze,
+        "amend-grids": cmd_amend_grids,
         "signals": cmd_signals,
         "match": cmd_match,
         "tune": cmd_tune,

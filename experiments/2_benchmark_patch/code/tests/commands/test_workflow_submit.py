@@ -382,7 +382,7 @@ def test_camelyon_resume_natural_indices_cover_three_shard_bundles_once(
         lambda index, *_args: seen.append(index) or False,
     )
 
-    pending = resume._pending_natural(config, {}, False, {}, [], 3)
+    pending = resume._pending_natural(config, {}, False, {}, [], 3, [])
 
     expected = bundled_observation_array_size(candidate_array_size(methods), 6, 3)
     assert pending == tuple(range(expected))

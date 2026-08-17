@@ -17,7 +17,51 @@ from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     ShardSpec,
     shard_path,
+    validate_shard_payload,
 )
+
+
+def _minimal_payload(fingerprint: list[str]) -> dict:
+    return {
+        "complete": True,
+        "fingerprint": fingerprint,
+        "seeds": [0],
+        "scope_count": 1,
+        "observation_keys": [{"scope_index": 0, "seed_index": 0, "seed": 0}],
+        "cost_records": [{}],
+    }
+
+
+def test_validate_shard_payload_accepts_an_exact_fingerprint_match():
+    validate_shard_payload(_minimal_payload(["a", "b", "c"]), ["a", "b", "c"])
+
+
+def test_validate_shard_payload_rejects_an_unrelated_fingerprint():
+    with pytest.raises(RuntimeError, match="fingerprint does not match"):
+        validate_shard_payload(_minimal_payload(["old"] * 3), ["new"] * 3)
+
+
+def test_validate_shard_payload_accepts_a_superseded_fingerprint_in_the_chain():
+    """A shard tuned before a `method_grids` amendment must keep validating.
+
+    ``accepted`` carries each split's superseded raw-file fingerprints
+    (manifest_freeze.json's freed content_sha256 changes on amendment, so its
+    whole-file hash changes too); an old shard's recorded fingerprint should
+    still be recognized via that chain even though it no longer equals the
+    freeze's current one.
+    """
+    payload = _minimal_payload(["old-0", "old-1", "old-2"])
+    accepted = [{"new-0", "old-0"}, {"new-1", "old-1"}, {"new-2", "old-2"}]
+
+    validate_shard_payload(payload, ["new-0", "new-1", "new-2"], accepted=accepted)
+
+
+def test_validate_shard_payload_rejects_a_fingerprint_outside_the_chain():
+    payload = _minimal_payload(["ancient-0", "ancient-1", "ancient-2"])
+    accepted = [{"new-0", "old-0"}, {"new-1", "old-1"}, {"new-2", "old-2"}]
+
+    with pytest.raises(RuntimeError, match="fingerprint does not match"):
+        validate_shard_payload(payload, ["new-0", "new-1", "new-2"], accepted=accepted)
 
 
 def test_shard_path_namespaces_by_round():

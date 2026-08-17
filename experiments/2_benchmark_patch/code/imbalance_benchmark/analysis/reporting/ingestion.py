@@ -21,6 +21,7 @@ from imbalance_benchmark.analysis.metrics import (
     negative_log_likelihood,
 )
 from imbalance_benchmark.common import read_run_record, write_json
+from imbalance_benchmark.manifest.freeze import accepted_freeze_hashes
 
 __all__ = ["ingest_all_runs", "calibration_summary", "write_diagnostics"]
 
@@ -53,7 +54,7 @@ def _ingest_discovered_run(
 ) -> None:
     """Add one run with tiers derived from its frozen assignment allocation."""
     provenance = record.get("provenance", {})
-    if provenance.get("freeze_content_sha256") != freeze.get("content_sha256"):
+    if provenance.get("freeze_content_sha256") not in accepted_freeze_hashes(freeze):
         raise RuntimeError("Run belongs to a stale manifest freeze; regenerate it")
     class_names = record.get("class_names", [])
     assignment = record.get("assignment", "native")

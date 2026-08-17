@@ -18,6 +18,7 @@ from imbalance_benchmark.common import (
     verify_signed_file,
     write_json,
 )
+from imbalance_benchmark.manifest.freeze import accepted_freeze_hashes
 
 __all__ = ["build_matching_record", "cmd_match", "unit_key"]
 
@@ -56,7 +57,7 @@ def _load_root_units(root: Path) -> list[dict[str, Any]]:
         verify_signed_file(profile_path)
         freeze = json.loads(freeze_path.read_text())
         profile = json.loads(profile_path.read_text())
-        if profile.get("freeze_content_sha256") != freeze.get("content_sha256"):
+        if profile.get("freeze_content_sha256") not in accepted_freeze_hashes(freeze):
             raise RuntimeError(
                 f"{profile_path} is stale relative to its freeze; re-run signals"
             )

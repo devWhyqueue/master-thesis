@@ -536,6 +536,44 @@ def test_ingestion_does_not_open_eval_array_sidecars(
 
     assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
 
+def test_ingestion_accepts_a_run_stamped_with_a_superseded_freeze_hash(
+    tmp_path: Path,
+) -> None:
+    """A `method_grids` amendment must not orphan runs made under the old lock."""
+    result_dir = tmp_path / "results" / "balanced" / "ce" / "seed=0"
+    _write_fake_run(result_dir.parents[2], "balanced", "ce", 0, ["A", "B"], 0)
+    record = read_run_record(result_dir)
+    assert record is not None
+    record["provenance"] = {"freeze_content_sha256": "old-freeze"}
+    write_run_record(result_dir, record)
+
+    conn = connect_db(tmp_path / "results.sqlite")
+    init_schema(conn)
+    ingest_all_runs(
+        conn,
+        {"results": tmp_path / "results"},
+        {"content_sha256": "new-freeze", "supersedes": ["old-freeze"]},
+    )
+
+    assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+
+def test_ingestion_rejects_a_run_from_an_unrelated_freeze(tmp_path: Path) -> None:
+    result_dir = tmp_path / "results" / "balanced" / "ce" / "seed=0"
+    _write_fake_run(result_dir.parents[2], "balanced", "ce", 0, ["A", "B"], 0)
+    record = read_run_record(result_dir)
+    assert record is not None
+    record["provenance"] = {"freeze_content_sha256": "unrelated-freeze"}
+    write_run_record(result_dir, record)
+
+    conn = connect_db(tmp_path / "results.sqlite")
+    init_schema(conn)
+    with pytest.raises(RuntimeError, match="stale manifest freeze"):
+        ingest_all_runs(
+            conn,
+            {"results": tmp_path / "results"},
+            {"content_sha256": "new-freeze", "supersedes": ["old-freeze"]},
+        )
+
 def test_balanced_ingestion_leaves_classwise_tiers_null(tmp_path: Path):
     """Balanced runs have no tail assignment, so classwise tiers stay undefined."""
     class_names = ["A", "B"]
