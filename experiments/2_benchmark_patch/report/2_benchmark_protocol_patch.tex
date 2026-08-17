@@ -52,82 +52,25 @@ Signal-Matched Interventions in Histopathology Patch Classification}
 \clearpage
 
 \section{Introduction}
-The need for mitigation is usually inferred from a count of examples per class. In pathology, that count is a weak diagnosis of what a class actually lacks. Thousands of patches may come from only a few patients, so a class with abundant patches can still rest on a thin pool of independent cases; patch selection draws round-robin from a per-class case pool under a patient contribution cap, so a severe patch count and the number of distinct cases behind it need not track each other, and a class can be patch-rich yet case-poor, or the reverse. The count is equally silent about how separable a class is under the available representation and about how much within-class variation its examples span. Frequent classes then dominate the empirical objective, while an underserved class may provide too little independent evidence for stable decision boundaries or reliable probabilities \citep{saini2023tacklingClass,zhang2023deepLong,mosquera2024classImbalance}.
+Choosing a mitigation method requires first identifying what limits a class. In histopathology patch classification, an underserved class may lack nominal patch support, independent evidence from patients or slides, learnable signal, or representational diversity. These shortages are not interchangeable. Thousands of patches from a few patients may provide less independent evidence than a smaller patch set drawn from many patients, while neither count reveals how difficult a class is to separate or how much variation it contains. A method that responds to one shortage may therefore be ineffective when another shortage limits performance.
 
-Comparing naturally imbalanced datasets cannot identify this effect by itself. Such datasets differ simultaneously in task difficulty, class separability, training volume, label granularity, and evaluation prevalence. The benchmark instead uses training allocation as a controlled lever and asks a narrower counterfactual question: \emph{for the same task and the same total training budget, what changes when support is allocated evenly rather than concentrated in head classes?} A size-matched balanced cross-entropy (CE) model provides the reference. Validation and test cases remain natural and unchanged, so any balanced--imbalanced difference is tied to training allocation rather than to a different evaluation population.
+This benchmark asks when such a shortage causes enough damage to warrant mitigation and whether recovery improves when a method reads the signal that identifies that shortage. Training allocation provides the controlled intervention needed to answer these questions. For the same task and total training budget, examples are distributed either evenly across classes or concentrated in head classes. A size-matched balanced cross-entropy (CE) model provides the reference. Validation and test cohorts retain their natural class distributions, so the resulting contrast reflects the training allocation rather than a change in the evaluation population.
 
-A second question follows from the first, and is the reason allocation is a lever rather than the subject: redistributing support creates more than one kind of shortage --- of raw prevalence, of nominal or independent support, of learnable signal in difficult classes, of representational diversity --- and a mitigation method that reads one signal need not help when a different shortage is the one actually present. Which shortage a condition realizes is therefore measured rather than assumed from its nominal severity. The companion methods report places the tested roster on this signal axis and defines the intervention level at which each method acts \citep{queisler2026imbalanceMethods}; this benchmark is where that axis is tested empirically, not only defined.
+Allocation is thus a way to create controlled variation in evidence, not the benchmark's main explanatory focus. Each condition is instead characterized by its realized \emph{signal profile}: class prevalence, nominal patch support, independent patient or slide support, class difficulty, and representational diversity. This profile is measured rather than inferred from the nominal imbalance ratio. The companion methods report defines the signal taxonomy and locates each tested method within it \citep{queisler2026imbalanceMethods}; the present benchmark tests whether matching method to signal matters empirically.
 
-These two questions create a sequence of three research questions:
+The study covers CAMELYON16, TCGA-UT, BRACS, and PANDA using frozen Virchow2 patch features. Patient- or case-disjoint partitions, model family, optimizer-update budget, and natural validation and test cohorts remain fixed while the allocation of a common training budget changes. Balanced, moderate, and severe allocations establish the controlled comparisons. To separate signal choice from intervention mechanism, the confirmatory family contains five methods that all apply a mean-one class weight to unmodified CE. Their weights differ only in whether they use prevalence, nominal support, independent support, difficulty, or diversity.
+
+This design yields three research questions:
 \begin{description}
-  \item[RQ1.] \textbf{Which shortage does controlled allocation create, and what does it damage?} At fixed task, split-unit partition, encoder, training-set size, and evaluation set, how does increasing training imbalance affect tail-class discrimination and calibration in patch classification, and what realized signal profile --- prevalence $\pi_c$, nominal support $n_c$ or $E_c(\beta)$, independent support $G_c$ or $N_{\mathrm{eff},c}$, difficulty $d_c$, diversity $S'_c$ --- does each controlled condition present?
-  \item[RQ2.] \textbf{Does mitigation recover more when the signal it reads matches the shortage present?} Which mitigation methods recover performance lost specifically to training imbalance, and does a method's recovery depend on whether the signal it reads corresponds to the shortage RQ1 identified? The roster is grouped by signal, and five methods --- weighted CE, class-balanced CE, independent-support weighted CE, pilot-difficulty weighted CE, and semantic-scale weighted CE --- share one intervention level, a mean-one class weight on unmodified CE, so a difference among them is attributable to the signal rather than the mechanism.
-  \item[RQ3.] \textbf{Predictors of damage and mitigation headroom.} Can small exploratory models help explain why some controlled comparisons are more vulnerable than others? Specifically, are achieved imbalance severity and support--difficulty alignment associated with whether damage occurs, how large it is, and how much is recovered after damage? Separability, learnability, and support measures are examined as sensitivity predictors.
+  \item[RQ1.] \textbf{Which shortage does controlled allocation create, and what does it damage?} Under otherwise fixed conditions, how do controlled changes in training allocation affect tail-class discrimination and calibration, and which signal profile does each condition realize?
+  \item[RQ2.] \textbf{Does signal-matched mitigation recover more of the damage?} Which methods recover performance lost specifically to training imbalance, and does recovery improve when a method reads the shortage identified in RQ1?
+  \item[RQ3.] \textbf{What explains variation in damage and mitigation headroom?} Are achieved imbalance severity and support--difficulty alignment associated with whether damage occurs, how large it is, and how much can be recovered? Separability, learnability, and support measures provide sensitivity analyses.
 \end{description}
-RQ1 first establishes whether a recoverable problem exists, and which signal(s) characterize it. RQ2 is evaluated only against that demonstrated deficit, and asks whether reading the right signal matters. RQ3 then asks why the size of the deficit and available headroom differ; it is an exploratory association analysis, not another method ranking. RQ1 gates RQ2, and RQ3 is exploratory throughout. The benchmark is scoped to patch classification, which is what makes the signal axis separable in the first place: the round-robin case-pool sampling above decouples nominal from independent support only because a patch redistributes evidence inside a fixed case pool, whereas redistributing labelled slides moves both counts together. Dataset provenance and detailed method objectives remain in the companion reports \citep{queisler2026datasets,queisler2026imbalanceMethods}. The next section turns this sequence into the benchmark's organizing logic.
+RQ1 first establishes whether a recoverable deficit exists and which signals characterize it. RQ2 is evaluated only after this deficit passes a prespecified gate. RQ3 then examines why deficit size and recovery headroom vary; it is an exploratory association analysis, not another method ranking.
 
-\section{Benchmark Logic}
-\label{sec:design}
-Interpretability depends on separating the intended intervention from everything else. The benchmark therefore freezes three layers of the comparison. Task definition fixes the data source, prediction target, and frozen representation. Evidence design fixes the split-unit partition and total controlled support. Model comparison fixes the natural validation and test cohorts and the training budget. Only class allocation within training support changes. Figure~\ref{fig:study-logic} follows that contrast from construction to interpretation.
+The benchmark is limited to patch classification because directly labelled patches allow nominal patch support to change within a fixed pool of patients or slides. At whole-slide level, reallocating labelled slides changes nominal and independent support together, making the two signals harder to separate. Dataset provenance and detailed method objectives remain in the companion reports \citep{queisler2026datasets,queisler2026imbalanceMethods}. The next section defines the prediction and evidence units on which the experimental design rests.
 
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}[
-    logicbox/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, font=\small, text width=2.35cm, minimum height=1.3cm},
-    fixed/.style={logicbox, fill=gray!10},
-    varied/.style={logicbox, fill=blue!7},
-    result/.style={logicbox, fill=green!7},
-    explain/.style={logicbox, fill=orange!8},
-    arrow/.style={-{Latex[length=2mm]}, thick}
-  ]
-    \node[fixed] (task) {Fix task, split units, features, and held-out cases};
-    \node[varied, right=0.28cm of task] (allocate) {Redistribute common training budget $T$ across classes};
-    \node[result, right=0.28cm of allocate] (damage) {Measure balanced--imbalanced damage};
-    \node[result, right=0.28cm of damage] (recover) {Open endpoint gate and measure recovery};
-    \node[explain, right=0.28cm of recover] (why) {Explain variation in damage and headroom};
-    \draw[arrow] (task) -- (allocate);
-    \draw[arrow] (allocate) -- (damage);
-    \draw[arrow] (damage) -- (recover);
-    \draw[arrow] (recover) -- (why);
-  \end{tikzpicture}
-  \caption{Logic of the benchmark. RQ1 concerns the damage contrast, RQ2 concerns gated recovery, and RQ3 concerns variation among those controlled comparisons.}
-  \label{fig:study-logic}
-\end{figure}
-
-\noindent One \emph{comparison unit} is a dataset, imbalance severity, and tail assignment evaluated together. A \emph{deficit gate} is a prespecified rule that asks whether imbalance caused enough damage, with sufficient precision, to make a recovery ratio interpretable. \emph{Recovery} is the fraction of that demonstrated deficit regained by a mitigation method. These are analysis concepts, not model components.
-
-Every quantity that this logic holds fixed is prespecified before the first definitive fit. Table~\ref{tab:locked} collects them with a pointer to the specification that derives each one, so the sections that follow can argue about the intervention rather than restate its settings.
-
-\begin{table}[H]
-  \centering
-  \footnotesize
-  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}Xl@{}}
-    \toprule
-    Locked quantity & Value & Spec \\
-    \midrule
-    Representation & Frozen Virchow2 features & \ref{app:construction} \\
-    Patch classifier & Two-layer MLP, 512 hidden units & \ref{app:construction} \\
-    Update budget & $U=30\lceil T/B\rceil$ optimizer updates & \ref{app:training} \\
-    Learning-rate envelope & Seven values, \num{1e-5} to \num{1e-2} & \ref{app:controls} \\
-    Support floor per class & $\geq10$ split units and $\geq20$ slides & \ref{app:construction-support} \\
-    Contribution caps & $\leq10\%$ per split unit; $\leq5\%$ per slide & \ref{app:construction-support} \\
-    Severity targets & $\rho_{\mathrm{target}}\in\{1,10,100\}$ & \ref{app:construction} \\
-    Severity tolerance & Achieved $\rho\in[9,11]$ and $[90,110]$ & \ref{app:construction-support} \\
-    Tail assignments & Native, difficulty-aligned, difficulty-reversed & \ref{app:construction} \\
-    Split-unit partitions & Three locked, patient- or case-disjoint & \ref{app:construction} \\
-    Initialization seeds & Two tuning; five disjoint confirmation & \ref{app:training} \\
-    Discrimination gate & $D_{\mathrm{BA}}\geq\num{0.02}$, paired CI excludes 0 & \ref{sec:recovery} \\
-    Calibration gate & $D_{\mathrm{cal}}\geq\num{0.05}$ nats, paired CI excludes 0 & \ref{sec:recovery} \\
-    Bootstrap replicates & \num{10000}, split-unit-clustered & \ref{app:endpoints} \\
-    \bottomrule
-  \end{tabularx}
-  \caption{Quantities locked before the first definitive fit, with the section or appendix that specifies each. Only class allocation within the shared training support $T$ varies across conditions.}
-  \label{tab:locked}
-\end{table}
-
-This logic also explains the order of the report. Section~\ref{sec:data} establishes what constitutes a prediction and an independent unit of evidence. Section~\ref{sec:construction} constructs the training intervention. Section~\ref{sec:analysis} defines damage, recovery, and uncertainty. Section~\ref{sec:rq3} explains heterogeneity, and Section~\ref{sec:limits} states the resulting claim boundaries. Exact allocation, training, metric, resampling, and model specifications are collected in the appendices.
-
-\section{Prediction Tasks and Evidence Units}
+\section{Study Setting}
 \label{sec:data}
 This benchmark covers one prediction regime: patch classification predicts a label for one directly labelled image crop, so every training example carries its own target and the split unit that contains it is the only source of statistical dependence between examples. The terms \emph{patch} and \emph{tile} both denote a $256\times256$ crop, but \emph{patch} is used throughout.
 
@@ -156,12 +99,13 @@ Eligible patches are embedded once with frozen Virchow2. Concatenating the CLS t
 
 With prediction and evidence units fixed, the next question is how to change class allocation without changing the task.
 
-\section{Constructing Controlled Imbalance}
+\section{Controlled Experimental Design}
+\label{sec:design}
 \label{sec:construction}
-Controlled imbalance must alter class allocation without quietly changing data volume, held-out prevalence, or the pool of available evidence. Four training conditions establish the comparison: a full natural anchor, a size-matched balanced reference, a moderate imbalance targeting $\rho=10$, and a severe imbalance targeting $\rho=100$ where feasible. The natural anchor describes performance with all eligible training data and with the dataset's own class prevalence; because it is descriptive, only its CE reference is fitted. Only the three controlled conditions share total support $T$, carry the full method roster, and enter imbalance-deficit and recovery estimands.
+Training allocation creates controlled differences in the evidence available to each class without changing the task or evaluation population. Four conditions establish the comparison: a full natural anchor, a size-matched balanced reference, a moderate imbalance targeting $\rho=10$, and a severe imbalance targeting $\rho=100$ where feasible. The natural anchor describes performance with all eligible training data and with the dataset's own class prevalence; because it is descriptive, only its CE reference is fitted. Only the three controlled conditions share total support $T$, carry the full method roster, and enter imbalance-deficit and recovery estimands.
 
 \subsection{What changes and what remains fixed}
-The construction asks a simple counterfactual question: how would the same prediction task perform if a fixed training budget were distributed evenly across classes rather than concentrated in a head class? Answering this question requires more than specifying an imbalance ratio. The comparison must first fix the split-unit partition, eligible examples, representation, evaluation cohort, and total controlled training support; only then can class allocation be changed. Figure~\ref{fig:controlled-construction} summarizes this separation between fixed design choices and the intended intervention.
+The design asks a simple counterfactual question: how would the same prediction task perform if a fixed training budget were distributed evenly across classes rather than concentrated in a head class? Within each split, the data source, prediction target, eligible examples, frozen representation, split-unit partition, natural validation and test cohorts, total controlled support, and optimizer-update budget remain fixed. Only class allocation within training support changes. Figure~\ref{fig:controlled-construction} summarizes this separation between fixed choices and the intended intervention.
 
 \begin{figure}[ht]
   \centering
@@ -216,6 +160,33 @@ Severity controls how the shared total $T$ is distributed. Binary tasks have one
 
 Support rank must also be separated from intrinsic class difficulty. Native, difficulty-aligned, and difficulty-reversed \emph{tail assignments} place semantic classes at different points in the same support profile. Aligned assignments compound difficulty with scarcity; reversed assignments compensate difficult classes with greater support. Duplicated assignments are omitted transparently. Appendix~\ref{app:construction} gives contribution caps, pilot quotas, ordering rules, allocation equations, infeasibility handling, and seed families.
 
+\subsection{Prespecified controls}
+Every design and training quantity is fixed before the first definitive fit. Table~\ref{tab:locked} collects these controls with a pointer to the specification that derives each one. Deficit gates and resampling rules are introduced later, together with the endpoints they govern.
+
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}Xl@{}}
+    \toprule
+    Locked quantity & Value & Spec \\
+    \midrule
+    Representation & Frozen Virchow2 features & \ref{app:construction} \\
+    Patch classifier & Two-layer MLP, 512 hidden units & \ref{app:construction} \\
+    Update budget & $U=30\lceil T/B\rceil$ optimizer updates & \ref{app:training} \\
+    Learning-rate envelope & Seven values, \num{1e-5} to \num{1e-2} & \ref{app:controls} \\
+    Support floor per class & $\geq10$ split units and $\geq20$ slides & \ref{app:construction-support} \\
+    Contribution caps & $\leq10\%$ per split unit; $\leq5\%$ per slide & \ref{app:construction-support} \\
+    Severity targets & $\rho_{\mathrm{target}}\in\{1,10,100\}$ & \ref{app:construction} \\
+    Severity tolerance & Achieved $\rho\in[9,11]$ and $[90,110]$ & \ref{app:construction-support} \\
+    Tail assignments & Native, difficulty-aligned, difficulty-reversed & \ref{app:construction} \\
+    Split-unit partitions & Three locked, patient- or case-disjoint & \ref{app:construction} \\
+    Initialization seeds & Two tuning; five disjoint confirmation & \ref{app:training} \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Design and training quantities locked before the first definitive fit, with the section or appendix that specifies each. Only class allocation within the shared training support $T$ varies across controlled conditions.}
+  \label{tab:locked}
+\end{table}
+
 These safeguards define the evidence available to every model. The next section asks how matched models turn that evidence into damage and recovery estimates.
 
 \section{Measuring Damage and Recovery}
@@ -226,11 +197,11 @@ For intuition, suppose balanced CE attains balanced accuracy \num{0.72}, imbalan
 
 \subsection{Methods compared under imbalance}
 \label{sec:methods}
-Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, grouped by the mitigation signal each one reads rather than by intervention family, matching Table~\ref{tab:signal-intervention} of the companion methods report so the two stay comparable at a glance. CE is the size-matched no-mitigation reference. The roster is the patch-applicable subset of that report's broader taxonomy; methods that consume a different input form are not evaluated here. The roster is fitted in the balanced, moderate, and severe conditions, which alone supply the paired contrast a mitigation claim requires; the natural anchor carries the CE reference only. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
+Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, grouped by the mitigation signal each one reads rather than by intervention family. This follows the signal--intervention table in the companion methods report so the two remain comparable at a glance. CE is the size-matched no-mitigation reference. The roster is the patch-applicable subset of that report's broader taxonomy; methods that consume a different input form are not evaluated here. The roster is fitted in the balanced, moderate, and severe conditions, which alone supply the paired contrast a mitigation claim requires; the natural anchor carries the CE reference only. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
 
-\begin{table}[ht]
+\begin{table}[H]
   \centering
-  \footnotesize
+  \scriptsize
   \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.20\linewidth}>{\raggedright\arraybackslash}p{0.30\linewidth}X@{}}
     \toprule
     Signal & Tested methods & Intervention \\
@@ -245,7 +216,7 @@ Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, group
     Prevalence (hybrid) & CE + soft F1; CE + soft MCC; OKO set learning & Sampler and auxiliary loss; set construction and set loss \\
     \bottomrule
   \end{tabularx}
-  \caption{Prespecified patch-regime method roster, grouped by mitigation signal as in Table~\ref{tab:signal-intervention} of the companion methods report, with intervention level retained as a second column so the two axes stay visibly orthogonal.}
+  \caption{Prespecified patch-regime method roster, grouped by mitigation signal following the companion methods report, with intervention level retained as a second column so the two axes stay visibly orthogonal.}
   \label{tab:roster}
 \end{table}
 
