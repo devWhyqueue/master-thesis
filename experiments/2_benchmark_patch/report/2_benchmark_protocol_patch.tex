@@ -536,7 +536,7 @@ Nested pilots compare $10,15,20,30,$ and $50$ units per class, or all available 
 
 The definitive minimum is the larger of this empirical stability floor and a prespecified design floor. Each class must contain at least 10 partitioning units and 20 slides, or 20 slides when partitioning unit and slide coincide, and any class-aware batch or set must contain at least two distinct same-class units. The 10-unit and 20-slide values are not estimated performance thresholds: they are the smallest counts compatible with the 10\% partitioning-unit and 5\% slide contribution caps, respectively. A requested severity is reduced to the largest allocation satisfying both floors; a dataset is excluded if even its balanced condition fails them. Pilot quotas, curves, seeds, and resulting floors are frozen and reported with the definitive training sets.
 
-Within these floors, one shared total $T$ is fixed for the balanced, moderate, and severe conditions of a split. Construction scores every integer total between the independent-support floor and the largest total any locked tail assignment's head class can support at $\rho_{\mathrm{target}}=100$, keeping only totals whose balanced allocation and whose every locked assignment's moderate and severe allocation satisfy the patch or slide contribution caps. Among these cap-feasible totals, the \emph{tolerance-feasible} set is those whose achieved moderate ratio falls in $[9,11]$ and whose achieved severe ratio falls in $[90,110]$ simultaneously, for every locked assignment. The largest tolerance-feasible total is checked against the true fixed-pool construction --- the same sampling procedure the definitive training sets use --- starting from the largest candidate and moving to the next largest until one is confirmed; that confirmed total is $T$. A dataset--regime with no tolerance-feasible total retains its largest independent-support- and cap-feasible total instead, subject to the infeasibility fallback and degeneracy rule below.
+Within these floors, one shared total $T$ is fixed for the balanced, moderate, and severe conditions of a split. Construction scores every integer total between the independent-support floor and the largest total any locked tail assignment's head class can support at $\rho_{\mathrm{target}}=100$, keeping only totals whose balanced allocation and whose every locked assignment's moderate and severe allocation satisfy the patch or slide contribution caps. Among these cap-feasible totals, the \emph{tolerance-feasible} set is those whose achieved moderate ratio falls in $[9,11]$ and whose achieved severe ratio falls in $[90,110]$ simultaneously, for every locked assignment. The largest tolerance-feasible total is checked against the true fixed-pool construction --- the same sampling procedure the definitive training sets use --- starting from the largest candidate and moving to the next largest until one is confirmed; that confirmed total is $T$. The main-text tolerance statement describes this preferred construction and all realized conditions reported in Table~\ref{tab:realized-condition-support}. A dataset--regime with no tolerance-feasible total instead activates the explicitly labelled contingency below.
 
 Before assigning support ranks, the largest balanced pilot level is used to measure class difficulty. Each of the three pilot constructions supplies one hierarchically matched draw in the sense of the companion methods report \citep{queisler2026imbalanceMethods}: every class contributes the same number of partitioning units and every selected unit the same number of patches, so the probe sees equal independent support in every class rather than only equal patch counts. On each draw a class-balanced linear probe makes five-fold out-of-fold predictions with case/patient-disjoint \texttt{StratifiedGroupKFold} partitions. Class difficulty is $d_c=1-\overline{\mathrm{recall}}_c$, where recall is averaged across the three matched draws; five-neighbour kNN recall and the unmatched, patch-balanced-only probe error are retained as sensitivity evidence, the latter because a class ordering that changes between the matched and unmatched scores marks a class whose apparent difficulty is partly scarcity. Pilot hashes, folds, classwise scores, and the easiest-to-hardest ranking are signed. Equal scores retain native class order.
 
@@ -554,7 +554,7 @@ The values $n_i^*$ are real-valued targets, whereas a training set must contain 
 
 Counts determine how many units a class contributes; construction orderings determine which units they are. One master ordering is created per class at each hierarchy level. Every condition selects a deterministic prefix, or a partitioning-unit-round-robin extension of a prefix, from these same orderings: all fixed-pool partitioning units and slides contribute before additional patches are allocated.
 
-If a target ratio is infeasible, the same rule is applied to every dataset and regime: use the largest attainable ratio and report the requested ratio, achieved ratio, limiting class, realized counts, and binding support floor. Validation or test support is never reduced to manufacture feasibility. This general fallback is especially relevant to high-$K$ tasks, where an exponential profile must allocate support to many intermediate classes as well as the tail; it is not a dataset-specific exception. A stable lower-severity condition is preferred to a nominal $\rho=100$ condition supported by only a few independent units.
+If no total satisfies both tolerance bands, the same contingency is applied to every dataset and regime: use the largest jointly attainable moderate and severe ratios, then retain the largest total attaining both maxima. The condition is labelled \emph{off-target}; its requested ratio, achieved ratio, limiting class, realized counts, and binding support floor are reported, and it is interpreted by its achieved rather than nominal severity. Validation or test support is never reduced to manufacture feasibility. This contingency is especially relevant to high-$K$ tasks, where an exponential profile must allocate support to many intermediate classes as well as the tail; it is not a dataset-specific exception. A stable lower-severity condition is preferred to a nominal $\rho=100$ condition supported by only a few independent units.
 
 The fallback has a limit: a moderate or severe condition whose realized allocation is indistinguishable from the balanced condition---achieved ratio within a small tolerance of 1, or realized counts identical to the balanced training set---is not a lower-severity instance of the intended contrast but a null one, since the imbalance intervention did not occur. Such a condition is reported as degenerate rather than fitted and averaged with genuine moderate or severe conditions from other splits or assignments, and it is excluded from the imbalance deficit and recovery estimands in Section~\ref{sec:recovery}. Its requested ratio, achieved ratio, limiting class, and binding support floor are recorded alongside the exclusion, using the same fields every condition already reports.
 
@@ -584,15 +584,17 @@ The random quantities are separated into five seed families so that changing one
 
 \section{Endpoint and Inference Specification}
 \label{app:endpoints}
-This appendix defines secondary endpoints, score semantics, resampling, diagnostics, and confirmatory testing. Gates and recovery retain the main-text definitions in Section~\ref{sec:recovery}.
+This appendix defines secondary endpoints, method-specific score semantics, resampling, diagnostics, and confirmatory testing. Gates and recovery retain the main-text definitions in Section~\ref{sec:recovery}.
 
 \subsection{Probability quality and calibration}
 Let $N$ denote the number of held-out predictions in an aggregation unit, $C$ the number of classes, $y_i\in\{1,\ldots,C\}$ the true label, and $\hat{\mathbf{p}}_i\in[0,1]^C$ the predicted probability vector. Write $Y_i$ for the one-hot encoding of $y_i$.
 
-Table~\ref{tab:score-variants} fixes which score variant enters each endpoint. For ordinary CE,
-post-hoc logit adjustment, and train-time logit adjustment, the target-prior variant is the
+Table~\ref{tab:score-variants} fixes which score variant enters each endpoint. Ordinary CE,
+post-hoc logit adjustment, and train-time logit adjustment have an explicit target-prior
 correction defined in the companion methods report, using the natural-validation prior for the
-corresponding test split. For every other method, the target-prior variant equals its raw logits.
+corresponding test split. No model-free target-prior correction is defined for the other methods;
+their normalized raw scores are therefore retained and labelled as such rather than described as
+target-prior-corrected probabilities.
 
 \begin{table}[ht]
   \centering
@@ -603,17 +605,21 @@ corresponding test split. For every other method, the target-prior variant equal
     \midrule
     Balanced accuracy and all other discrimination endpoints
       & Balanced-decision logits: $z^{\mathrm{CE}}-\tau\log\widehat\pi$ for post-hoc logit adjustment; raw model logits for train-time logit adjustment and every other method. \\
-    Tail-NLL deficit gate and tail-NLL recovery
-      & Target-prior-corrected probabilities before temperature scaling. \\
+    Tail-NLL deficit gate
+      & Target-prior-corrected CE probabilities before temperature scaling. \\
+    Tail-NLL recovery
+      & CE and both logit-adjustment variants: target-prior-corrected probabilities; all other methods: normalized raw scores. \\
     Reported NLL, Brier score, ECE, and reliability diagrams
-      & Target-prior-corrected probabilities before temperature scaling; raw probabilities are retained as a separately labelled diagnostic. \\
+      & The same method-specific variant as tail-NLL recovery; uncorrected outputs are explicitly labelled raw-score results. \\
     Temperature-scaled calibration outputs
-      & Target-prior-corrected logits divided by one positive temperature fitted on natural-validation NLL and applied unchanged to test; these secondary outputs do not enter either recovery gate. \\
+      & The applicable logits or raw scores divided by one positive temperature fitted on natural-validation NLL and applied unchanged to test; these secondary outputs do not enter either recovery gate. \\
     \bottomrule
   \end{tabularx}
   \caption{Canonical mapping from evaluation endpoints to score variants.}
   \label{tab:score-variants}
 \end{table}
+
+\noindent This distinction limits interpretation. NLL and Brier score are proper scoring rules for probability forecasts. For methods without an explicit prior correction, the same equations instead assess the method's normalized raw scores on the natural held-out cohort, without asserting that those scores estimate target-prevalence probabilities. In particular, CFAL's normalized affinities are ranking scores rather than calibrated probabilities, as specified in the companion methods report; its NLL, Brier score, and ECE are therefore diagnostic score summaries and do not support a calibrated-probability claim. The CE-only deficit gate remains target-prior-corrected, while method-specific tail-NLL recovery is reported with the score variant identified in Table~\ref{tab:score-variants}.
 
 \paragraph{Negative log likelihood.}
 Natural-prevalence negative log likelihood (NLL), also called multiclass log loss, is
@@ -714,7 +720,7 @@ The independent per-unit weight draw can still produce a replicate dominated by 
 \paragraph{Intervals after model fitting.}
 The three partitioning-unit-disjoint data splits are fixed design repetitions and are averaged with equal weight; they are not treated as three independent cohorts. Tail assignments remain separate unless an assignment-averaged estimand is explicitly reported. Within each case-bootstrap replicate, the five matched confirmation-seed indices are also resampled as paired blocks and averaged before the splits are combined. This captures algorithmic variation without pretending that five model initializations create five additional case cohorts.
 
-Balanced CE, imbalanced CE, and each mitigation method receive the same partitioning-unit multiplicities and confirmation-seed draws. The complete deficit and recovery fraction, including numerator and denominator, is recomputed in each replicate. The reported 95\% percentile interval spans the 2.5th to 97.5th percentiles of the resulting distribution. Patches are never bootstrapped independently.
+Balanced CE, imbalanced CE, and each mitigation method receive the same partitioning-unit weights and confirmation-seed draws. The complete deficit and recovery fraction, including numerator and denominator, is recomputed in each replicate. The reported 95\% percentile interval spans the 2.5th to 97.5th percentiles of the resulting distribution. Patches are never bootstrapped independently.
 
 \subsection{Paired testing and multiplicity control}
 \label{app:testing}
@@ -724,7 +730,9 @@ The raw two-sided $p$-value comes from a paired partitioning-unit-block permutat
 
 A \emph{test family} is the set of related hypotheses interpreted together. Testing many hypotheses increases the chance that at least one small $p$-value occurs by chance. Holm adjustment controls this family-wise error by ordering the raw $p$-values from smallest to largest, applying the strongest correction to the smallest value, and then proceeding stepwise with less stringent corrections. It provides this control without assuming that the tests are independent.
 
-The confirmatory family holds one method per signal: weighted CE (prevalence), class-balanced CE (nominal support), independent-support weighted CE (independent support), pilot-difficulty weighted CE (difficulty), and semantic-scale weighted CE (diversity). All five share one intervention level, a mean-one class weight on unmodified CE (Section~\ref{sec:five-family}), so a difference among them is attributable to the signal rather than the mechanism. Within one dataset, the family includes every gate-passing combination of primary method, gate, severity, and tail assignment; severities are not split into separate families. Holm adjustment is applied across the testable comparisons, while gated-out comparisons are recorded as not tested. Every other roster member remains exploratory and outside the confirmatory correction.
+The confirmatory family holds one method per signal: weighted CE (prevalence), class-balanced CE (nominal support), independent-support weighted CE (independent support), pilot-difficulty weighted CE (difficulty), and semantic-scale weighted CE (diversity). All five share one intervention level, a mean-one class weight on unmodified CE (Section~\ref{sec:five-family}), so their effect estimates can be compared without changing the intervention mechanism. Within one dataset, the family includes every gate-passing combination of primary method, gate, severity, and tail assignment; severities are not split into separate families. Holm adjustment is applied across the testable method-versus-imbalanced-CE comparisons, while gated-out comparisons are recorded as not tested. Every other roster member remains exploratory and outside the confirmatory correction.
+
+These tests establish whether each primary method improves on imbalanced CE; they do not directly test one primary method against another. The five raw effects and recovery fractions are therefore reported side by side with the pre-outcome signal profile from RQ1. Signal alignment is interpreted descriptively by relating each method's recovery to the corresponding signal component without ranking unlike shortages on a common scale. The signals have no common natural unit and no prespecified rule reduces them to one dominant-shortage label, so no condition is labelled ``matched'' after inspecting recovery. In particular, significance for one method and non-significance for another is not treated as evidence that the methods differ. A confirmatory claim that one signal outperforms another would require a prespecified direct between-method contrast, which this family does not contain.
 
 This family replaces the intervention-based family originally specified here, whose rationale assumed a second prediction regime that the benchmark no longer carries. The change was fixed before any recovery outcome was inspected. The signal-based family is confirmatory only under that timing and must not be revised again after recovery outcomes are read.
 
@@ -774,7 +782,7 @@ Parameters are estimated by maximum a posteriori (MAP) fitting with zero-centere
 This appendix records exact update budgets, validation-search rules, replication, and resource accounting. Main-text interpretation depends only on their matched and test-blind use.
 
 \subsection{Update budgets and checkpoint selection}
-The frozen encoder, classifier family, optimizer family, batch definition, augmentation, and numerical precision are held fixed. Training is budgeted only in optimizer updates; epochs are neither a stopping rule nor a unit of comparison. With $B$ the locked batch size and $T$ the common controlled support, the reference budget is
+Within each method, the frozen encoder, classifier family, optimizer family, batch definition, augmentation, numerical precision, and method-specific optimizer-update budget are held fixed across the balanced and imbalanced allocations. Training is budgeted only in optimizer updates; epochs are neither a stopping rule nor a unit of comparison. With $B$ the locked batch size and $T$ the common controlled support, the single-stage reference budget is
 \begin{equation}
   U=30\left\lceil\frac{T}{B}\right\rceil
   \label{eq:update-budget}
@@ -811,7 +819,7 @@ Hyperparameter comparisons are bounded by a common validation-search budget rath
   \eta\in\{\num{1e-5},\num{3e-5},\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3},\num{1e-2}\}.
   \label{eq:learning-rate-grid}
 \end{equation}
-\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC draw their strength from a seven-value envelope searched through the same adaptive window as the learning rate; every other control is a fixed four-value grid, since its domain is naturally bounded. Both axes follow the search below, in which an edge winner is never accepted as an optimum: a bounded number of window shifts replaces a single fixed grid, at the cost of one new candidate per shift.
+\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC draw their strength from the listed envelope searched through the same adaptive window as the learning rate; every other control is a fixed four-value grid, since its domain is naturally bounded. Both axes follow the search below, in which an edge winner is never accepted as an optimum: a bounded number of window shifts replaces a single fixed grid. Each shift adds one axis value; crossing that value with the unchanged four-value window can require four new fitted configurations, or seven when both axes shift together.
 
 \paragraph{Matched counting-unit diagnostic.}
 Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$, the inverse effective number from the same saturating transform, evaluated at nominal count $n_c$ for the former and independent count $G_c$ for the latter, as defined in the companion methods report \citep{queisler2026imbalanceMethods}. Because $\beta$ sets both a saturation scale and, jointly with the counting unit, the realized weight shape, tuning $\beta$ separately for each method confounds the counting unit with the selected saturation scale. The tuning grid therefore includes a \emph{matched-beta} arm: independent-support weighted CE is confirmed a second time at class-balanced CE's tuned $\beta$, with its own tuned learning rate. Only this matched-$\beta$ comparison attributes a difference to the counting unit alone; it is a diagnostic arm reported alongside, not in place of, the five-family contrast, and is not itself one of the five confirmatory members.
@@ -848,7 +856,7 @@ Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$
       \item Initialize each active window to four adjacent envelope values: $\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}$ for the learning rate, and the start listed in Table~\ref{tab:controls} for an adaptive strength axis.
       \item Fit the active learning-rate window crossed with the method's strength window or fixed grid: at most 16 candidates in any one round. Candidates fitted in an earlier round are reused, never retrained.
       \item If an axis's winning value is interior to its window, record the axis as \emph{resolved} and stop searching it.
-      \item If the winner is an edge value and the envelope extends further in that direction, shift the window one position toward that edge and return to step 2. Only the single newly added candidate is fitted; the three overlapping candidates are reused.
+      \item If the winner is an edge value and the envelope extends further in that direction, shift the window one position toward that edge and return to step 2. The three overlapping axis values are reused. Only configurations introduced by the new row or column are fitted: four when one axis shifts and seven when both shift together.
       \item If the winner is an edge value at the envelope's boundary, retain the boundary value and record the axis as \emph{tuning-limited}.
     \end{enumerate}
     \textbf{Round bounds.} At most three rounds on the learning-rate axis, three on focal loss's $\gamma$ axis, and two on the soft-F1 and soft-MCC strength axis, each bounded by its envelope's length. A resolved or tuning-limited axis is never retrained in a later round.
@@ -897,12 +905,12 @@ Computational cost is separated into validation search and locked-configuration 
   \item[Tail assignment.] The locked mapping from semantic classes to positions in the constructed support profile.
   \item[Comparison unit.] One dataset, imbalance severity, and tail assignment evaluated together.
   \item[Deficit gate.] A prespecified threshold rule that determines whether an observed discrimination or calibration deficit is large and precise enough for recovery analysis.
-  \item[Imbalance deficit.] The paired balanced-CE minus imbalanced-CE difference at common $T$ and on the same held-out cases.
+  \item[Imbalance deficit.] The paired, sign-oriented difference at common $T$ and on the same held-out cases: balanced CE minus imbalanced CE for higher-is-better endpoints, and imbalanced CE minus balanced CE for lower-is-better endpoints. Positive values denote harm from imbalance.
   \item[Recovery.] A method's improvement over imbalanced CE divided by the evidenced imbalance deficit.
   \item[Kish effective partitioning-unit count.] The equally weighted partitioning-unit count with the same weight concentration as one bootstrap replicate.
   \item[Intraclass correlation.] The estimated similarity of class margins from patches belonging to the same partitioning-unit or slide cluster.
   \item[Patch-micro estimate.] A metric computed over eligible patch predictions, with uncertainty clustered by partitioning unit.
-  \item[Case-macro estimate.] An equal-weight aggregation over slides or partitioning units, limiting domination by heavily tiled cases.
+  \item[Case-macro estimate.] An equal-weight aggregation over partitioning units, limiting domination by heavily tiled cases. A slide is the aggregation unit only when it is itself the locked partitioning unit.
   \item[Self-contained search.] The validation-search phase in which every candidate is fitted from scratch, needing no other method's result.
   \item[CE-inherited search.] The validation-search phase for post-hoc logit adjustment and cRT, which reuse a condition's selected CE configuration and tune only what remains open for that method ($\tau$ for post-hoc logit adjustment; the stage-two learning rate for cRT), and so cannot begin until that condition's CE search has resolved.
 \end{description}
