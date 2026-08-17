@@ -40,6 +40,7 @@ EXPECTED_CELLS = {
     "tcga_ut_patch.yaml": ("tcga_ut", "patch", "cancer_type"),
     "tcga_ut_wsi.yaml": ("tcga_ut", "wsi", "cancer_type"),
 }
+NON_DATASET_CONFIGS = {"default.yaml", "rq3_combined.yaml"}
 CONFIG_ROOT = Path(__file__).resolve().parents[3] / "configs"
 PANDA_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
 PANDA_SQUASHFS = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
@@ -182,7 +183,7 @@ def test_calibration_and_permutation():
 
 def test_configs_instantiate_every_report_dataset_regime() -> None:
     config_paths = sorted(
-        path for path in CONFIG_ROOT.glob("*.yaml") if path.name != "default.yaml"
+        path for path in CONFIG_ROOT.glob("*.yaml") if path.name not in NON_DATASET_CONFIGS
     )
 
     assert {path.name for path in config_paths} == set(EXPECTED_CELLS)
@@ -201,7 +202,7 @@ def test_configs_are_freeze_ready_and_output_isolated() -> None:
     configs = [
         _load_config(path)
         for path in CONFIG_ROOT.glob("*.yaml")
-        if path.name != "default.yaml"
+        if path.name not in NON_DATASET_CONFIGS
     ]
 
     for config in configs:

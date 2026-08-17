@@ -12,7 +12,14 @@ from imbalance_benchmark.datasets.data import ImbalanceDataset
 from imbalance_benchmark.modeling.models import MLP
 from imbalance_benchmark.modeling.training.signal_weights import mean_one
 
-__all__ = ["SsbPool", "init_pool", "prepare_ssb_pool", "ssb_loss"]
+__all__ = [
+    "EPS_S",
+    "SsbPool",
+    "init_pool",
+    "prepare_ssb_pool",
+    "semantic_volumes",
+    "ssb_loss",
+]
 
 EPS_S = 1e-3
 
@@ -118,23 +125,35 @@ def _log2_volume(centered: torch.Tensor, d: int) -> float:
     return 0.5 * float(logdet) / math.log(2.0)
 
 
+def semantic_volumes(
+    features: torch.Tensor, class_ids: torch.Tensor, n_classes: int
+) -> dict[int, float]:
+    """Measure classwise semantic volume after pooled isotropic scaling."""
+    scale = _isotropic_scale(features) if len(features) else 1.0
+    d = features.shape[-1]
+    volumes = {}
+    for class_id in range(n_classes):
+        class_features = features[class_ids == class_id]
+        if len(class_features) < 2:
+            continue
+        centered = class_features / scale
+        centered -= centered.mean(dim=0, keepdim=True)
+        volume = _log2_volume(centered, d)
+        if volume != 0.0:
+            volumes[class_id] = volume
+    return volumes
+
+
 def _update_volumes(pool: SsbPool, n_classes: int) -> None:
     """Recompute each class's semantic scale from its currently filled draw."""
     if pool.features is None or pool.filled is None:
         return
     filled = pool.features[pool.filled]
-    scale = _isotropic_scale(filled) if len(filled) else 1.0
-    d = pool.features.shape[-1]
+    class_ids = pool.class_ids[pool.filled]
     for class_id in range(n_classes):
-        mask = pool.filled & (pool.class_ids == class_id)
-        if int(mask.sum()) < 2:
+        if int((class_ids == class_id).sum()) < 2:
             pool.invalid_draws += 1
-            continue
-        class_features = pool.features[mask] / scale
-        centered = class_features - class_features.mean(dim=0, keepdim=True)
-        volume = _log2_volume(centered, d)
-        if volume != 0.0:
-            pool.volumes[class_id] = volume
+    pool.volumes.update(semantic_volumes(filled, class_ids, n_classes))
 
 
 def _ssb_weights(pool: SsbPool, n_classes: int, tau: float) -> torch.Tensor:

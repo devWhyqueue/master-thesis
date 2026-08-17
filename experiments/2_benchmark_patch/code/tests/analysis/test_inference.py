@@ -23,15 +23,6 @@ from imbalance_benchmark.analysis.inference.preflight import (
     require_valid_preflight,
     run_preflight,
 )
-from imbalance_benchmark.analysis.predictors.rq3_features import (
-    _covariates,
-    _has_multiple_slides_per_patient,
-    _reference_block,
-)
-from imbalance_benchmark.analysis.predictors.separability import (
-    effective_support,
-    intraclass_correlation,
-)
 from imbalance_benchmark.datasets.data import slide_level_identity
 
 def _ce_gate_entry(descriptive_only: bool) -> dict[str, object]:
@@ -105,80 +96,6 @@ def test_holm_marks_gated_out_as_not_tested():
         by_method["weighted_ce"]["adjusted_p_value"]
         >= by_method["weighted_ce"]["p_value"]
     )
-
-def test_effective_support_reduces_to_n_when_icc_zero():
-    assert effective_support(n_c=100, mean_cluster_size=4.0, icc=0.0) == pytest.approx(
-        100.0
-    )
-
-def test_effective_support_shrinks_with_high_icc_and_clustering():
-    n_eff = effective_support(n_c=100, mean_cluster_size=4.0, icc=1.0)
-    assert n_eff == pytest.approx(25.0)
-
-def test_wsi_patient_support_sensitivity_requires_multi_slide_patients(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    one_slide_per_patient = {
-        "contribution_stats": {
-            "A": {"n_patients": 10, "n_slides": 10},
-            "B": {"n_patients": 10, "n_slides": 10},
-        }
-    }
-    multiple_slides_per_patient = {
-        "contribution_stats": {
-            "A": {"n_patients": 10, "n_slides": 12},
-            "B": {"n_patients": 10, "n_slides": 10},
-        }
-    }
-
-    assert not _has_multiple_slides_per_patient(one_slide_per_patient)
-    assert _has_multiple_slides_per_patient(multiple_slides_per_patient)
-
-    def feature_frame(*_args: object) -> tuple[np.ndarray, np.ndarray]:
-        return np.array([[0.0, 0.0], [1.0, 1.0]]), np.array([0, 1])
-
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.feature_frame",
-        feature_frame,
-    )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.intrinsic_separability",
-        lambda *_args: {
-            "linear_probe_macro_recall": 0.5,
-            "knn_macro_recall": 0.5,
-            "per_class_nn_error": {},
-        },
-    )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.condition_learnability",
-        lambda *_args: {"linear_probe_macro_recall": 0.5},
-    )
-    paths = {"data": tmp_path}
-    for condition in (one_slide_per_patient, multiple_slides_per_patient):
-        condition["path"] = str(tmp_path)
-
-    reference = _reference_block(paths, True, None)
-    one_slide_covariates = _covariates(paths, True, one_slide_per_patient, reference)
-    multi_slide_covariates = _covariates(
-        paths, True, multiple_slides_per_patient, reference
-    )
-
-    assert "log_min_patient_support" not in one_slide_covariates
-    assert "log_min_patient_support" in multi_slide_covariates
-
-def test_intraclass_correlation_zero_when_no_between_cluster_variance():
-    rng = np.random.default_rng(0)
-    margin = rng.normal(size=40)
-    clusters = np.repeat(np.arange(10), 4)
-    icc = intraclass_correlation(margin, clusters)
-    assert 0.0 <= icc <= 1.0
-
-def test_intraclass_correlation_high_when_clusters_dominate():
-    cluster_means = np.repeat([-5.0, 5.0, -5.0, 5.0, -5.0], 8)
-    margin = cluster_means + np.random.default_rng(0).normal(scale=0.01, size=40)
-    clusters = np.repeat(np.arange(5), 8)
-    icc = intraclass_correlation(margin, clusters)
-    assert icc > 0.9
 
 def test_kish_preflight_is_descriptive_when_the_low_percentile_is_below_five() -> None:
     # Concentration mild enough that neither the dominance nor the contributing

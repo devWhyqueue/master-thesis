@@ -12,6 +12,7 @@ from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
+from imbalance_benchmark.analysis.reporting.tables import rq3_table
 from imbalance_benchmark.modeling.workflows.run_context import (
     RunExposure,
     cost_payload,
@@ -335,60 +336,6 @@ def test_tail_recall_is_grouped_by_assignment(tmp_path: Path) -> None:
     assert merged.loc["a", "tail_recall"] == pytest.approx(0.2)
     assert merged.loc["b", "tail_recall"] == pytest.approx(0.8)
 
-def test_mil_covariates_exclude_patch_effective_support(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Effective support is a patch-only sensitivity covariate."""
-    from imbalance_benchmark.analysis.predictors.rq3_features import (
-        _covariates,
-        _reference_block,
-    )
-
-    manifest = tmp_path / "manifest.csv"
-    balanced = tmp_path / "manifest_balanced.csv"
-    condition = tmp_path / "condition.csv"
-    rows = [
-        {"case_id": "p0", "slide_id": "s0", "cancer_type": "A", "feature_path": "a.pt"},
-        {"case_id": "p0", "slide_id": "s0", "cancer_type": "A", "feature_path": "b.pt"},
-        {"case_id": "p1", "slide_id": "s1", "cancer_type": "B", "feature_path": "c.pt"},
-    ]
-    pd.DataFrame(rows).to_csv(manifest, index=False)
-    pd.DataFrame(rows).to_csv(balanced, index=False)
-    pd.DataFrame(rows).to_csv(condition, index=False)
-
-    features = np.array([[1.0, 0.0], [0.0, 1.0]])
-    labels = np.array([0, 1])
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.feature_frame",
-        lambda *_: (features, labels),
-    )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.intrinsic_separability",
-        lambda *_: {
-            "linear_probe_macro_recall": 0.5,
-            "knn_macro_recall": 0.5,
-            "per_class_nn_error": {},
-        },
-    )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.condition_learnability",
-        lambda *_: {"linear_probe_macro_recall": 0.5},
-    )
-    monkeypatch.setattr(
-        "imbalance_benchmark.analysis.predictors.rq3_features.class_margin_cross_fit",
-        lambda *_: np.array([0.1, 0.2]),
-    )
-
-    reference = _reference_block({"data": tmp_path}, True, None)
-    result = _covariates(
-        {"data": tmp_path},
-        True,
-        {"path": str(condition), "contribution_stats": {}},
-        reference,
-    )
-
-    assert "log_effective_support" not in result
-
 def test_cost_uses_actual_processed_examples_for_partial_batches() -> None:
     cost = cost_payload(
         "ce",
@@ -402,6 +349,23 @@ def test_cost_uses_actual_processed_examples_for_partial_batches() -> None:
 
     assert cost["processed_examples"] == 10
     assert cost["effective_passes_through_unique_examples"] == 1.0
+
+
+def test_rq3_table_reports_two_four_signal_models() -> None:
+    fit = {
+        "intercept": 0.0,
+        "slopes": [1.0, 2.0, 3.0, 4.0],
+        "sigma_u": 0.2,
+        "sigma": 0.1,
+    }
+
+    table = rq3_table({"damage": fit, "recovery": fit})
+
+    assert "damage" in table and "recovery" in table
+    assert "slope\\_independent\\_shortage" in table
+    assert "slope\\_support\\_difficulty\\_alignment" in table
+    assert "slope\\_diversity\\_shortage" in table
+    assert "gate\\_pass" not in table
 
 def test_post_hoc_cost_does_not_inherit_a_previous_gpu_memory_peak(
     monkeypatch: pytest.MonkeyPatch,

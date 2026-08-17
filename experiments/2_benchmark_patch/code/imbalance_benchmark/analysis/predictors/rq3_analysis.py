@@ -13,8 +13,6 @@ from imbalance_benchmark.analysis.predictors.rq3_features import (
 )
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     fit_deficit_model,
-    fit_gate_pass_model,
-    fit_linked_sensitivity_models,
     fit_recovery_model,
     leave_one_group_out,
     support_difficulty_alignment,
@@ -48,16 +46,22 @@ def _cells(
     group: str,
     is_mil: bool,
 ) -> list[dict[str, Any]]:
-    """Turn gate/recovery output into the three linked RQ3 observation sets."""
+    """Turn gate/recovery output into RQ3 damage and recovery cells."""
     gate_map = {(row["assignment"], row["severity"]): False for row in comparisons}
     for row in comparisons:
         if row["method"] == "ce":
             gate_map[(row["assignment"], row["severity"])] |= bool(row["gate_passed"])
     cells = []
     class_names = list(freeze.get("class_names", [])) or None
-    reference = _reference_block(paths, is_mil, class_names)
-    # Covariates depend on (assignment, severity) only: cache per condition
-    # instead of recomputing the same separability/learnability fits per method.
+    balanced = freeze["conditions"]["balanced"]
+    reference = _reference_block(
+        paths,
+        is_mil,
+        class_names,
+        balanced,
+        int(freeze["construction_seed"]),
+    )
+    # Shortages depend on the condition only, so each method reuses one calculation.
     covariate_cache: dict[tuple[str, str], dict[str, Any]] = {}
     for row in comparisons:
         is_deficit_cell = row["method"] == "ce"
@@ -102,24 +106,23 @@ def run_rq3(
     freeze: dict[str, Any],
     comparisons: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Compute frozen-feature RQ3 cells, fits, and descriptive covariate records.
+    """Compute RQ3 signal-shortage cells and the two association fits.
 
     One dataset-regime has only one random-intercept group, so within-split fits
     are degenerate; the cross-dataset combination (:func:`cross_dataset_rq3`) is
     the actual inferential unit -- this only emits each split's contribution.
     """
+    del config
     is_mil = freeze.get("dataset_provenance", {}).get("regime") == "wsi"
     group = _rq3_group(freeze)
     cells = _cells(paths, comparisons, freeze, group, is_mil)
     deficit_cells = [cell for cell in cells if cell["method"] == "ce"]
     recovery_cells = [cell for cell in cells if cell["method"] != "ce"]
-    logger.info("rq3: %d cells ready, fitting gate_pass model", len(cells))
-    gate_pass = fit_gate_pass_model(deficit_cells) if deficit_cells else {}
-    logger.info("rq3: fitting deficit model")
-    deficit = fit_deficit_model(deficit_cells) if deficit_cells else {}
+    logger.info("rq3: %d cells ready, fitting damage model", len(cells))
+    damage = fit_deficit_model(deficit_cells) if deficit_cells else {}
     logger.info("rq3: fitting recovery model")
     recovery = fit_recovery_model(recovery_cells)
-    models = {"gate_pass": gate_pass, "deficit": deficit, "recovery": recovery}
+    models = {"damage": damage, "recovery": recovery}
     return {"cells": cells, "models": models}
 
 
@@ -144,15 +147,9 @@ def cross_dataset_rq3(cells: list[dict[str, Any]]) -> dict[str, Any]:
         "groups": groups,
         "cells": cells,
         "models": {
-            "gate_pass": fit_gate_pass_model(deficit_cells) if deficit_cells else {},
-            "deficit": fit_deficit_model(deficit_cells) if deficit_cells else {},
+            "damage": fit_deficit_model(deficit_cells) if deficit_cells else {},
             "recovery": fit_recovery_model(recovery_cells),
         },
-        "sensitivity": (
-            fit_linked_sensitivity_models(deficit_cells, recovery_cells)
-            if deficit_cells
-            else {}
-        ),
         "leave_one_group_out": leave_one_group_out(deficit_cells)
         if len(groups) > 1
         else {},

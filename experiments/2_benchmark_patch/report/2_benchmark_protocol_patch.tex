@@ -39,7 +39,7 @@ Signal-Matched Interventions in Histopathology Patch Classification}
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
-\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. In computational pathology, raw sample counts hide at least one further shortage --- few labelled patients or slides behind many informative patches --- and say nothing about how separable a class is under the available representation or how much variation it spans. This benchmark uses training allocation as a controlled way to induce such a shortage, and then asks which signal a mitigation method should read to repair it: how would the same prediction task change if one fixed training budget were distributed evenly across classes rather than concentrated in head classes, which signal profile does the resulting condition actually present, and does a method that reads the signal matching that profile recover more of the damage than one that reads a different signal? CAMELYON16, TCGA-UT, BRACS, and PANDA are studied in patch classification using frozen Virchow2 features. Patient- or case-disjoint partitions, natural validation and test cohorts, model family, and optimizer-update budgets remain fixed while only training support is redistributed among size-matched balanced, moderate, and severe conditions. Balanced accuracy and tail-group macro negative log likelihood measure discrimination and probability quality. Mitigation recovery is interpreted only after a prespecified gate establishes a meaningful allocation-induced deficit. A five-member family of methods --- one per signal, all a mean-one class weight on unmodified cross-entropy --- makes the signal contrast interpretable at a fixed intervention level. Exploratory analyses then relate damage and recovery to achieved severity, support--difficulty alignment, and independent support. The benchmark is scoped to patch classification, where each prediction unit carries its own label.
+\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. In computational pathology, raw sample counts hide at least one further shortage --- few labelled patients or slides behind many informative patches --- and say nothing about how separable a class is under the available representation or how much variation it spans. This benchmark uses training allocation as a controlled way to induce such a shortage, and then asks which signal a mitigation method should read to repair it: how would the same prediction task change if one fixed training budget were distributed evenly across classes rather than concentrated in head classes, which signal profile does the resulting condition actually present, and does a method that reads the signal matching that profile recover more of the damage than one that reads a different signal? CAMELYON16, TCGA-UT, BRACS, and PANDA are studied in patch classification using frozen Virchow2 features. Patient- or case-disjoint partitions, natural validation and test cohorts, model family, and optimizer-update budgets remain fixed while only training support is redistributed among size-matched balanced, moderate, and severe conditions. Balanced accuracy and tail-group macro negative log likelihood measure discrimination and probability quality. Mitigation recovery is interpreted only after a prespecified gate establishes a meaningful allocation-induced deficit. A five-member family of methods --- one per signal, all a mean-one class weight on unmodified cross-entropy --- makes the signal contrast interpretable at a fixed intervention level. Exploratory analyses then relate damage and recovery to achieved allocation severity, independent-evidence shortage, support--difficulty alignment, and representational-diversity shortage. The benchmark is scoped to patch classification, where each prediction unit carries its own label.
 \par
 \endgroup
 \end{abstract}
@@ -64,7 +64,7 @@ This design yields three research questions:
 \begin{description}
   \item[RQ1.] \textbf{Which shortage does controlled allocation create, and what does it damage?} Under otherwise fixed conditions, how do controlled changes in training allocation affect tail-class discrimination and calibration, and which signal profile does each condition realize?
   \item[RQ2.] \textbf{Does signal-matched mitigation recover more of the damage?} Which methods recover performance lost specifically to training imbalance, and does recovery improve when a method reads the shortage identified in RQ1?
-  \item[RQ3.] \textbf{What explains variation in damage and mitigation headroom?} Are achieved imbalance severity and support--difficulty alignment associated with whether damage occurs, how large it is, and how much can be recovered? Separability, learnability, and support measures provide sensitivity analyses.
+  \item[RQ3.] \textbf{Which realized signal shortages explain variation in damage and mitigation headroom?} Across controlled conditions, are allocation severity, independent-evidence shortage, support--difficulty alignment, and diversity shortage associated with damage magnitude and subsequent recovery?
 \end{description}
 RQ1 first establishes whether a recoverable deficit exists and which signals characterize it. RQ2 is evaluated only after this deficit passes a prespecified gate. RQ3 then examines why deficit size and recovery headroom vary; it is an exploratory association analysis, not another method ranking.
 
@@ -377,21 +377,20 @@ The preceding subsections establish how models are compared, which endpoints rec
 
 The method roster creates many related method-by-condition comparisons. Treating every result as an independent primary test would increase the chance of a false-positive claim, so the benchmark prespecifies a limited confirmatory family whose tests are adjusted jointly. The confirmatory part of RQ2 asks whether signal choice matters when the intervention mechanism is held fixed. It therefore compares the five weighted-CE methods in Table~\ref{tab:roster}, whose weights use prevalence, nominal support, independent support, difficulty, or diversity while leaving the CE mechanism unchanged. Differences among them can consequently be interpreted as evidence about the signal rather than the intervention. Within each dataset, paired tests support the gate-passing comparisons and Holm adjustment controls their joint family-wise error. Other roster members retain the same effect estimates and confidence intervals but remain exploratory. Appendix~\ref{app:testing} specifies the tests, multiplicity family, and protocol revision; Appendix~\ref{app:controls} gives method-specific diagnostic and tuning details.
 
-Section~\ref{sec:analysis} therefore produces three outputs from each controlled comparison: whether damage occurred, how large it was, and how much of it was recovered when recovery was defined. RQ1 and RQ2 estimate these quantities within a dataset and task. The remaining question is why they vary across datasets, severities, and tail assignments. Section~\ref{sec:rq3} treats the three outputs as outcomes and relates them to prespecified properties of each comparison.
+Section~\ref{sec:analysis} therefore produces three outputs from each controlled comparison: whether damage occurred, how large it was, and how much of it was recovered when recovery was defined. RQ1 and RQ2 estimate these quantities within a dataset and task. The remaining question is why damage magnitude and recovery vary across datasets, severities, and tail assignments. Section~\ref{sec:rq3} models those two continuous outputs and retains damage occurrence only as the gate that determines when recovery is defined.
 
 \section{Explaining Heterogeneity}
 \label{sec:rq3}
-RQ3 follows this handoff by asking which prespecified properties are associated with damage occurrence, damage magnitude, and mitigation headroom. Controlled comparisons, rather than individual patients, are the observations in this exploratory analysis. For damage occurrence and magnitude, one \emph{controlled comparison} is a dataset, severity, and tail assignment cell; recovery comparisons additionally identify the method and gate. The analysis neither predicts patient outcomes nor creates another method ranking.
+RQ3 asks which realized signal shortages are associated with damage and recovery across controlled conditions. The unit of analysis is a controlled comparison, not an individual patient. A damage comparison identifies a dataset, severity, and tail assignment; a recovery comparison additionally identifies the method and gate. Damage occurrence is not modelled because the RQ1 gate already provides that thresholded decision.
 
 \paragraph{Outcomes to explain.}
 \begin{enumerate}
-  \item \textbf{Damage occurrence:} Did the comparison pass either prespecified deficit gate? Every controlled comparison contributes to this binary analysis.
-  \item \textbf{Damage magnitude:} How large was the signed balanced-accuracy deficit? Every comparison contributes, including those with no damage or an apparent improvement under imbalance.
-  \item \textbf{Mitigation headroom:} How much of the demonstrated deficit was recovered? Only gated comparisons contribute because recovery has no stable interpretation when there is no deficit to recover.
+  \item \textbf{Damage magnitude} is the signed balanced-accuracy deficit. Every controlled comparison contributes, including those showing no damage or an apparent improvement under imbalance.
+  \item \textbf{Recovery} is the fraction of the demonstrated deficit repaired by a mitigation method. Only gate-passing comparisons contribute because there is no stable recovery fraction without an established deficit.
 \end{enumerate}
 
 \paragraph{Candidate explanations.}
-Only quantities available without using test outcomes are eligible as predictors. Table~\ref{tab:rq3-predictors} separates the two primary predictors from the variables used only in sensitivity analyses.
+Predictors are constructed without using test outcomes. Together, the four predictors in Table~\ref{tab:rq3-predictors} provide one summary for each distinct dimension of the signal taxonomy.
 
 \begin{table}[ht]
   \centering
@@ -400,33 +399,35 @@ Only quantities available without using test outcomes are eligible as predictors
     \toprule
     Predictor & Question it represents & Model role \\
     \midrule
-    Achieved imbalance ratio & How extreme was the realized head--tail allocation? & Primary, log-transformed \\
-    Support--difficulty alignment $A=\operatorname{corr}(\log N_c,d_c)$ & Does greater allocated support go to more difficult classes ($A>0$), or does scarcity compound difficulty ($A<0$)? & Primary \\
-    Intrinsic separability & How distinguishable are the classes in a common balanced frozen-feature reference, before condition-specific support is considered? & One-predictor sensitivity \\
-    Condition-specific learnability & What remains learnable from the exact controlled training set? & One-predictor sensitivity \\
-    Minimum independent support & How many distinct partitioning units or slides support the scarcest class? & One-predictor sensitivity \\
-    Effective patch support & How much patch support remains after accounting for within-case redundancy? & One-predictor sensitivity \\
+    Achieved allocation severity $\log\rho$ & How unequal was the realized head--tail allocation? & Joint model \\
+    Independent-evidence shortage $S_{\mathrm{ind}}$ & How much patient or slide support did deprived classes lose? & Joint model \\
+    Support--difficulty alignment $A=\operatorname{corr}(\log N_c,d_c)$ & Did greater support go to harder classes ($A>0$), or did scarcity compound difficulty ($A<0$)? & Joint model \\
+    Diversity shortage $S_{\mathrm{div}}$ & How much representational diversity did deprived classes lose? & Joint model \\
     \bottomrule
   \end{tabularx}
-  \caption{RQ3 predictors and their prespecified roles. Sensitivity predictors are fitted one at a time rather than added to the primary model.}
+  \caption{The four RQ3 predictors. Prevalence and nominal support share one allocation-severity predictor because the fixed total $T$ makes them two readings of the same manipulated allocation.}
   \label{tab:rq3-predictors}
 \end{table}
 
-Intrinsic separability asks whether frozen Virchow2 features distinguish classes in a common balanced reference. Condition-specific learnability asks what remains learnable from the exact controlled training set. Both are measured on natural validation data without test outcomes. Minimum independent support and a patch-only redundancy-adjusted effective support are sensitivity predictors rather than replacements for patient or slide counts. Together these predictors measure the difficulty and independent-evidence dimensions of the signal taxonomy defined in the companion methods report \citep{queisler2026imbalanceMethods}, which the prespecified method roster itself covers only sparsely; RQ3 is therefore where those dimensions are examined directly rather than through a mitigation method.
+Both shortage measures compare the imbalanced condition with its size-matched balanced condition and include only classes allocated fewer patches under imbalance. Independent-evidence shortage measures the loss of patient or slide support. Diversity shortage measures the loss of semantic-scale log-volume on fixed Virchow2 embeddings, using a within-condition draw matched across classes in both cases and patches. This fixed, pre-mitigation measure reflects the diversity-aware method's dynamic signal without using fitted models or test outcomes.
 
-One deliberately small model is fitted for each outcome. Every primary model contains only log achieved imbalance ratio and support--difficulty alignment, and each remaining predictor enters a separate one-predictor sensitivity model rather than being added to that primary model. Weak Gaussian priors and leave-one-group-out checks stabilize interpretation without claiming predictive generalization. Appendix~\ref{app:rq3} specifies probes, cross-fitting, ICC, effective support, model forms, MAP fitting, and sensitivity analyses.
+Exactly two models are fitted: one for signed damage and one for recovery among gate-passing comparisons. Both use the same four standardized predictors and a dataset--target random intercept. Neither includes interactions nor method effects. Weak Gaussian priors and bootstrap observation errors stabilize estimation, while a leave-one-group-out check assesses whether the damage associations depend on one dataset--target group. Appendix~\ref{app:rq3} gives the full predictor construction and model form.
 
-RQ3 can therefore suggest which combinations of severity, difficulty, and support deserve follow-up, but it cannot turn the small set of dataset--target groups into general predictive evidence. The final section makes this and the benchmark's other interpretation limits explicit.
+The four predictors are correlated summaries of the realized signal profile. Their coefficients therefore describe conditional associations, not separate causal effects. RQ3 is explanatory and hypothesis-generating; it does not claim predictive generalization.
 
-\section{Interpretation and Limitations}
+RQ3 can therefore identify signal combinations that deserve follow-up, but the small number of dataset--target groups limits broader inference. The final section places this limitation alongside the benchmark's other interpretation boundaries.
+
+\section{Conclusion and Scope}
 \label{sec:limits}
-The design supports deliberately narrow claims. Its strongest claim concerns effects of the training distribution under one frozen Virchow2 representation. It does not establish how end-to-end encoder fine-tuning would respond, whether another foundation representation would produce the same deficits, or whether constructed tails reproduce biological prevalence and referral pathways. The shared total $T$ isolates allocation by discarding some available examples; the full natural condition is therefore retained as a descriptive CE anchor, which places the controlled results on the scale of the complete training partition and of the dataset's own class prevalence. Because no mitigation method is fitted on that anchor, the benchmark reports no method comparison under natural prevalence, and its method claims are confined to the size-matched controlled conditions.
+This benchmark is designed to answer a bounded question: when a fixed training budget is redistributed across classes, which signal shortages appear, what damage follows, and which signal-aware interventions recover that damage? Holding the representation, partitions, model family, and optimization budget fixed makes the allocation contrast interpretable. The resulting claims concern changes in the training distribution under one frozen Virchow2 representation.
 
-Method comparisons also identify methods, not universal mechanisms. Some interventions change sampling, objectives, or architecture together, and equal optimizer updates do not imply equal information exposure: post-hoc logit adjustment performs no gradient optimization, and cRT's second stage retrains only the classifier. Processed examples, unique exposures, accelerator time, memory, and model size are reported rather than treated as equal.
+Several boundaries remain. The design does not establish how end-to-end encoder fine-tuning would respond, whether another foundation representation would produce the same deficits, or whether constructed tails reproduce biological prevalence and referral pathways. The shared total $T$ isolates allocation by withholding some available examples. The full natural condition is therefore retained as a descriptive CE anchor, placing the controlled results alongside the complete training partition and the dataset's natural class prevalence. Because no mitigation method is fitted on that anchor, method comparisons remain confined to the size-matched controlled conditions.
 
-Independent support limits inference more strongly than raw patch count. BRACS patch classification is descriptive because its patch-micro Kish effective support remains below the prespecified threshold under patient-level bootstrap weights. This exclusion exposes an evidence limit rather than hiding an inconvenient result.
+Method comparisons identify methods, not universal mechanisms. Interventions can change sampling, objectives, or architecture together, so equal optimizer updates do not imply equal information exposure. For example, post-hoc logit adjustment performs no gradient optimization, whereas cRT retrains only the classifier in its second stage. Processed examples, unique exposures, accelerator time, memory, and model size are therefore reported rather than assumed to be equivalent.
 
-Finally, calibration is conditional on the natural held-out prevalence and cannot be transported to another deployment population without explicit prior-shift analysis. Within these boundaries, RQ1 estimates damage caused by controlled training allocation, RQ2 estimates recovery only where that damage is established, and RQ3 remains a hypothesis-generating explanation of between-comparison variation.
+Evidence also depends on independent support, not merely patch count. BRACS patch classification remains descriptive because its patch-micro Kish effective support falls below the prespecified threshold under patient-level bootstrap weights. Calibration has a separate boundary: it is conditional on the natural held-out prevalence and cannot be transported to another deployment population without an explicit prior-shift analysis.
+
+Within these boundaries, the three research questions form a deliberate sequence. RQ1 establishes the signal profile and damage created by controlled allocation. RQ2 asks which interventions recover performance only after that damage is established. RQ3 then relates variation in damage and recovery to the realized shortages without treating those associations as causal decomposition. Together, this sequence turns class imbalance from a single prevalence label into a controlled analysis of what evidence is missing, what that shortage changes, and which signal a mitigation method should use.
 
 \clearpage
 \appendix
@@ -729,24 +730,44 @@ This family replaces the intervention-based family originally specified here, wh
 
 \section{RQ3 Model Specification}
 \label{app:rq3}
-This appendix fixes diagnostic feature construction and deliberately small association models used for RQ3. None of these quantities is allowed to use test outcomes as an input predictor.
+This appendix fixes the four signal predictors and two association models used for RQ3. No predictor uses test labels, deficit estimates, recovery estimates, or fitted mitigation-model outputs.
 
-\paragraph{Measuring separability and learnability.}
-The two diagnostics differ only in their reference set: intrinsic separability uses one fixed balanced reference subset per dataset and split, whereas condition-specific learnability uses the exact balanced or imbalanced training set of the condition being explained. Both are evaluated on the unchanged natural-validation cohort. Balanced $k$-nearest-neighbour (kNN) macro recall labels each validation embedding from its closest reference embeddings and gives every class equal weight. A \emph{linear probe} is a class-balanced linear classifier fitted on the frozen reference embeddings; its macro recall is the primary separability or learnability summary. Per-class nearest-neighbour error is reported descriptively to show which classes overlap. None of these diagnostics uses test labels or CE test performance; probes operate directly on patch embeddings.
+\paragraph{Balanced-to-imbalanced shortages.}
+For controlled comparison $j$, let $\mathcal T_j=\{c:N^{(\mathrm{imb})}_{cj}<N^{(\mathrm{bal})}_{c}\}$ contain the semantic classes receiving fewer nominal patches than in the shared balanced condition. The independent-evidence shortage is
+\begin{equation}
+  S_{\mathrm{ind},j}=\frac{1}{|\mathcal T_j|}
+  \sum_{c\in\mathcal T_j}
+  \log\frac{G^{(\mathrm{bal})}_{c}}{G^{(\mathrm{imb})}_{cj}},
+  \label{eq:rq3-independent-shortage}
+\end{equation}
+\noindent where $G_c$ counts contributing patients or slides. Positive values mean that nominally deprived classes also lost independent evidence.
 
-\paragraph{Sensitivity to correlated patches.}
-Unique partitioning-unit and slide counts remain the primary support measures. As a secondary sensitivity analysis, within-case redundancy is discounted through the effective support $N_{\mathrm{eff},c}$ defined in the companion methods report \citep{queisler2026imbalanceMethods}, whose intraclass correlation (ICC) is computed here over partitioning-unit or slide clusters within a class.
+Representational diversity is measured on frozen Virchow2 features using the same within-class semantic volume as semantic-scale weighted CE,
+\begin{equation}
+  S'_c=\tfrac{1}{2}\log_2\det\!\left(I+\frac{d}{M\varepsilon^2}Z_cZ_c^\top\right).
+  \label{eq:rq3-semantic-volume}
+\end{equation}
+\noindent Within each condition, the deterministic draw contains the same number of patients and patches per class, and pooled isotropic scaling fixes $\varepsilon=1$. With the numerical floor $\varepsilon_S=\num{e-3}$, diversity shortage is
+\begin{equation}
+  S_{\mathrm{div},j}=\frac{1}{|\mathcal T_j|}
+  \sum_{c\in\mathcal T_j}
+  \log\frac{\max(S_c^{\prime(\mathrm{bal})},\varepsilon_S)}
+           {\max(S_{cj}^{\prime(\mathrm{imb})},\varepsilon_S)}.
+  \label{eq:rq3-diversity-shortage}
+\end{equation}
+\noindent Positive values indicate lower observed feature volume among nominally deprived classes. If no class is deprived, both shortage contrasts are defined as zero.
 
-Two choices complete that definition for this benchmark. The clustered score is a class margin: the fixed intrinsic linear probe's logit for class $c$ minus its largest competing logit. It is evaluated by \emph{cross-fitting}, so each observation is scored only by a probe trained without it, and the resulting ICC estimate is clipped to $[0,1]$. Effective support is a sensitivity measure and not a replacement for independent-unit counts, with patient count also examined when patients contribute multiple slides.
+\paragraph{Two association models.}
+For either signed balanced-accuracy damage or gated recovery, the linear predictor is
+\begin{equation}
+  \mu_j=\alpha+u_{g[j]}+\beta_\rho\log\rho_j
+  +\beta_{\mathrm{ind}}S_{\mathrm{ind},j}
+  +\beta_A A_j+\beta_{\mathrm{div}}S_{\mathrm{div},j},
+  \label{eq:rq3-model}
+\end{equation}
+\noindent where $u_{g[j]}$ is the random intercept for the dataset--target group and $A_j=\operatorname{corr}(\log N_{cj},d_c)$. Every predictor is standardized before fitting. The damage model includes every controlled comparison and incorporates its bootstrap standard error; the recovery model includes only comparisons passing a prespecified RQ1 deficit gate and incorporates the recovery-ratio bootstrap standard error. No occurrence model, interaction, method effect, alternative predictor model, or diagnostic model is fitted.
 
-\paragraph{Three deliberately small association models.}
-One model is fitted for each of the three RQ3 outcomes. The occurrence model handles the yes/no gate result; the magnitude and recovery models handle continuous outcomes. Every primary model contains exactly two predictors: the log achieved imbalance ratio and support--difficulty alignment $A$. The magnitude model also uses each deficit's bootstrap standard error so that a noisy estimated deficit is not treated as an exact observation.
-
-Comparisons from the same dataset--target group can share a baseline level of difficulty. A \emph{random intercept} allows each group to have its own starting level while estimating common associations with imbalance and alignment. This adjustment is important because the analysis pools several severities and assignments from the same group. The recovery model omits method-specific effects because the small number of gated units cannot support them.
-
-The remaining predictors in Table~\ref{tab:rq3-predictors} are fitted one at a time in separate sensitivity models. They are not combined with one another or with the two primary predictors because only a few independent dataset--target groups are available and the candidate predictors are strongly confounded. No interactions are fitted.
-
-Parameters are estimated by maximum a posteriori (MAP) fitting: ordinary model fit is combined with weak zero-centered Gaussian priors that discourage extreme slopes and variance estimates in this small sample. A leave-one-dataset--target-group-out check then refits the magnitude model while withholding one complete group at a time. This is only a coarse stability check, not evidence of predictive generalization. Model definitions, predictor roles, and priors are frozen before recovery outcomes are inspected, and all RQ3 conclusions remain hypothesis-generating.
+Parameters are estimated by maximum a posteriori (MAP) fitting with zero-centered unit-scale Gaussian penalties on standardized slopes and log-scale parameters. A leave-one-dataset--target-group-out check refits the damage model while withholding one complete group at a time. This is only a coarse stability check, not evidence of predictive generalization. Model definitions, predictor roles, and priors are frozen before recovery outcomes are inspected, and all RQ3 conclusions remain hypothesis-generating.
 
 \section{Training, Tuning, and Execution Specification}
 \label{app:training}
