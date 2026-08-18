@@ -355,6 +355,44 @@ def test_amend_grids_refuses_when_an_existing_grid_would_change(tmp_path: Path) 
     with pytest.raises(RuntimeError, match="refuses to change existing method 'ce'"):
         cmd_amend_grids(Namespace(config=str(config_path), seed=7, split_index=0))
 
+def test_refreeze_preflight_recomputes_preflight_and_chains_the_superseded_hash(
+    tmp_path: Path,
+) -> None:
+    """`refreeze-preflight` must touch only the preflight while chaining supersession.
+
+    Otherwise a preflight-only estimator change (Plan 1) would need a full
+    re-freeze, which drops any prior ``amend-grids`` supersession chain and
+    makes ``analyze`` reject every existing confirm run.
+    """
+    from imbalance_benchmark.commands.freeze import cmd_refreeze_preflight
+    from imbalance_benchmark.common import ensure_dirs
+
+    config_path = _write_amendable_freeze(tmp_path)
+    config = ensure_dirs(load_config(config_path))
+    test_rows = [
+        {
+            "case_id": f"{cls}_{patient}",
+            "slide_id": f"{cls}_{patient}",
+            "cancer_type": cls,
+            "split": "test",
+        }
+        for cls in ("A", "B")
+        for patient in range(15)
+    ]
+    for split_index in range(3):
+        data_dir = split_paths(config, split_index)["data"]
+        pd.DataFrame(test_rows).to_csv(data_dir / "manifest.csv", index=False)
+    freeze_path = split_paths(config, 0)["data"] / "manifest_freeze.json"
+    original = json.loads(freeze_path.read_text())
+
+    cmd_refreeze_preflight(Namespace(config=str(config_path), seed=7, split_index=0))
+
+    refrozen = json.loads(freeze_path.read_text())
+    assert refrozen["supersedes"] == [original["content_sha256"]]
+    assert refrozen["content_sha256"] != original["content_sha256"]
+    for field in ("conditions", "assignment_conditions", "shared_T", "method_grids"):
+        assert refrozen[field] == original[field]
+
 def test_freeze_verifies_pilot_and_prepared_manifest_artifacts(tmp_path: Path) -> None:
     """Held-out manifest or pilot changes invalidate the frozen record."""
     from imbalance_benchmark.common import sign_file, write_json

@@ -11,6 +11,7 @@ from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
 from imbalance_benchmark.commands.freeze import (
     cmd_amend_grids,
     cmd_freeze,
+    cmd_refreeze_preflight,
     cmd_signals,
 )
 from imbalance_benchmark.commands.pilot import cmd_pilot
@@ -43,6 +44,7 @@ __all__ = [
     "cmd_pilot",
     "cmd_freeze",
     "cmd_amend_grids",
+    "cmd_refreeze_preflight",
     "cmd_signals",
     "cmd_materialize_tcga_ut",
     "cmd_materialize_panda",

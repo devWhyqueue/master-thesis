@@ -4,7 +4,10 @@ import argparse
 import json
 import logging
 
-from imbalance_benchmark.commands.freeze_execution import freeze_split
+from imbalance_benchmark.commands.freeze_execution import (
+    _attach_preflight,
+    freeze_split,
+)
 from imbalance_benchmark.manifest.freezing import _build_conditions
 from imbalance_benchmark.analysis.predictors.signals.signal_profile import (
     write_signal_profile,
@@ -25,7 +28,13 @@ from imbalance_benchmark.manifest.freeze import (
 from imbalance_benchmark.manifest.seeds import derive_seed
 from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
 
-__all__ = ["cmd_freeze", "cmd_signals", "cmd_amend_grids", "_build_conditions"]
+__all__ = [
+    "cmd_freeze",
+    "cmd_signals",
+    "cmd_amend_grids",
+    "cmd_refreeze_preflight",
+    "_build_conditions",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +112,41 @@ def cmd_amend_grids(args: argparse.Namespace) -> None:
     sign_file(freeze_path)
     added = len(amended["method_grids"]) - len(meta["method_grids"])
     logger.info("amend-grids: split %s added %d method(s)", args.split_index, added)
+
+
+def _chain_supersession(meta: dict, old_content_hash: str, old_file_hash: str) -> None:
+    """Record a prior freeze's hashes so `accepted_freeze_hashes` still accepts old runs."""
+    meta["supersedes"] = [old_content_hash, *meta.get("supersedes", [])]
+    meta["superseded_freeze_file_hashes"] = [
+        old_file_hash,
+        *meta.get("superseded_freeze_file_hashes", []),
+    ]
+    meta.pop("content_sha256", None)
+
+
+def cmd_refreeze_preflight(args: argparse.Namespace) -> None:
+    """Recompute only the label-only bootstrap preflight against an existing signed freeze.
+
+    Fallback for when the preflight estimator changes but construction did
+    not: a full re-freeze would drop any supersession chain a prior
+    ``amend-grids`` already attached, so ``analyze`` would reject every
+    existing confirm run via :func:`accepted_freeze_hashes`. This chains the
+    prior content hash the same way ``amend-grids`` does instead.
+    """
+    if args.split_index is None:
+        for index in range(3):
+            cmd_refreeze_preflight(
+                argparse.Namespace(**{**vars(args), "split_index": index})
+            )
+        return
+    config = load_config(args.config)
+    paths = split_paths(ensure_dirs(config), args.split_index)
+    freeze_path = paths["data"] / "manifest_freeze.json"
+    meta = json.loads(freeze_path.read_text())
+    verify_manifest_freeze(meta)
+    old_file_hash = compute_sha256(freeze_path)
+    _attach_preflight(meta, paths, config, args.seed)
+    _chain_supersession(meta, meta["content_sha256"], old_file_hash)
+    write_json(freeze_path, lock_manifest_freeze(meta))
+    sign_file(freeze_path)
+    logger.info("refreeze-preflight: split %s done", args.split_index)
