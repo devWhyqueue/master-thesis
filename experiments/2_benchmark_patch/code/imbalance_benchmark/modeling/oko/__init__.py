@@ -97,7 +97,7 @@ def _oko_train_loop(
     )
     k = int(ctx["param_config"]["parameter"])
     b_size = resolve_batch_size(ctx["config"], False)
-    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], False)
+    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], False, budget)
     for step in range(1, budget + 1):
         loss = _oko_step_loss(
             model,

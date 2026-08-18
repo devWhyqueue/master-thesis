@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import Any
 
@@ -12,6 +13,7 @@ from imbalance_benchmark.modeling.context import REFERENCE_PASSES, model_kwargs
 
 __all__ = [
     "CHECKPOINT_INTERVAL",
+    "TARGET_CHECKPOINTS",
     "OPTIMIZER_NAME",
     "WEIGHT_DECAY",
     "resolve_batch_size",
@@ -23,6 +25,9 @@ __all__ = [
 ]
 
 CHECKPOINT_INTERVAL = 50
+# Count the controlled conditions already take (see PLAN_2_natural_tuning_cost.md);
+# natural's cadence is scaled to match instead of running the fixed interval above.
+TARGET_CHECKPOINTS = 170
 # Fixed optimizer family shared by every trainable method and regime.
 OPTIMIZER_NAME = "AdamW"
 WEIGHT_DECAY = 1e-4
@@ -59,10 +64,16 @@ def resolve_batch_size(cfg: dict[str, Any], is_mil: bool) -> int:
     return cfg.get(k, {}).get(sk, 32 if is_mil else 128)
 
 
-def resolve_checkpoint_interval(cfg: dict[str, Any], is_mil: bool) -> int:
-    """Resolve the regime's validation checkpoint interval from config."""
+def resolve_checkpoint_interval(cfg: dict[str, Any], is_mil: bool, budget: int) -> int:
+    """Validation cadence scaled so any budget takes ~TARGET_CHECKPOINTS passes.
+
+    Validation is ~98% of tune cost, so a fixed interval makes cost scale with
+    U. A configured value still wins when it is coarser; this only raises the
+    floor.
+    """
     k = "wsi_training" if is_mil else "patch_training"
-    return cfg.get(k, {}).get("checkpoint_interval", CHECKPOINT_INTERVAL)
+    configured = cfg.get(k, {}).get("checkpoint_interval", CHECKPOINT_INTERVAL)
+    return max(configured, math.ceil(budget / TARGET_CHECKPOINTS))
 
 
 def build_optimizer(
@@ -81,14 +92,18 @@ def resolve_training_config(cfg: dict[str, Any], is_mil: bool) -> dict[str, Any]
 
     Single source of truth for the values the trainer applies but that never
     appear in the supplied YAML (optimizer family, weight decay, checkpoint
-    interval, resolved batch size, budget rule, precision) plus the
+    cadence rule, resolved batch size, budget rule, precision) plus the
     regime-locked architecture. The per-run learning rate and method-specific
     parameter live in the run record's tuning parameters, not here.
+
+    ``target_checkpoints`` records the cadence rule rather than a single
+    resolved interval: each condition derives its own interval from its own
+    update budget, so no single resolved number is representative here.
     """
     return {
         "optimizer": OPTIMIZER_NAME,
         "weight_decay": WEIGHT_DECAY,
-        "checkpoint_interval": resolve_checkpoint_interval(cfg, is_mil),
+        "target_checkpoints": TARGET_CHECKPOINTS,
         "batch_size": resolve_batch_size(cfg, is_mil),
         "update_budget_reference_passes": REFERENCE_PASSES,
         "precision": "float32",

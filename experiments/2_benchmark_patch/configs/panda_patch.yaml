@@ -31,14 +31,6 @@ feature_extraction:
 
 feature_inventory_path: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch/data/features/panda/feature_inventory.json
 
-patch_training:
-  # Validation is ~98% of tune cost (full pass every checkpoint_interval steps).
-  # PANDA's controlled budget U=257790 is ~30x CAMELYON16's U=8490, so the
-  # interval is scaled to match: 50 * round(257790 / 8490) = 1500, giving
-  # PANDA's controlled runs 172 checkpoints against CAMELYON16's 170. The
-  # other three datasets keep the CHECKPOINT_INTERVAL default of 50.
-  checkpoint_interval: 1500
-
 materialize_panda:
   raw_root: /home/space/datasets/panda/raw
   legacy_tiles_dir: /home/space/datasets/panda/native_tiles_20x_256/patches/20x
@@ -70,7 +62,8 @@ slurm:
   # (native only; difficulty_reversed duplicated it and was dropped by
   # freeze), so every condition has exactly 6 observations (1 assignment x 3
   # splits x 2 seeds) and one candidate shard = 6 fits. With
-  # patch_training.checkpoint_interval scaled above, one controlled fit is
+  # patch_training.checkpoint_interval derived from TARGET_CHECKPOINTS (1517,
+  # was hand-set to 1500), one controlled fit is
   # ~8 min measured (job 4698019, CE method, ~8 min startup + 12 fits x ~8 min
   # for shards-per-task=2 = 106 min elapsed on a 120 min wall -- only ~11%
   # margin, and CE is the cheapest method, so slower bundled methods risk

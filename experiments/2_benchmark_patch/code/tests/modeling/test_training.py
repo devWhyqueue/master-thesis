@@ -338,25 +338,29 @@ def test_resolve_training_config_records_source_only_defaults() -> None:
     """The resolved config exposes the defaults the supplied YAML never states.
 
     Finding: "Required run provenance is incomplete" — batch size, optimizer,
-    weight decay, dropout, and checkpoint interval were source-only.
+    weight decay, dropout, and checkpoint cadence were source-only.
     """
-    from imbalance_benchmark.modeling.training.config import resolve_training_config
+    from imbalance_benchmark.modeling.training.config import (
+        TARGET_CHECKPOINTS,
+        resolve_training_config,
+    )
 
     patch = resolve_training_config({}, is_mil=False)
     assert patch["optimizer"] == "AdamW"
     assert patch["weight_decay"] == 1e-4
     assert patch["batch_size"] == 128
-    assert patch["checkpoint_interval"] == 50
+    assert patch["target_checkpoints"] == TARGET_CHECKPOINTS == 170
     assert patch["dropout"] == 0.1
     assert resolve_training_config({}, is_mil=True)["batch_size"] == 32
 
 
-def test_resolve_training_config_honors_configured_checkpoint_interval() -> None:
-    from imbalance_benchmark.modeling.training.config import resolve_training_config
-
-    patch_cfg = {"patch_training": {"checkpoint_interval": 1500}}
-    wsi_cfg = {"wsi_training": {"checkpoint_interval": 200}}
-    assert (
-        resolve_training_config(patch_cfg, is_mil=False)["checkpoint_interval"] == 1500
+def test_resolve_checkpoint_interval_scales_with_budget() -> None:
+    """Cadence targets ~TARGET_CHECKPOINTS passes; a coarser configured value still wins."""
+    from imbalance_benchmark.modeling.training.config import (
+        resolve_checkpoint_interval,
     )
-    assert resolve_training_config(wsi_cfg, is_mil=True)["checkpoint_interval"] == 200
+
+    assert resolve_checkpoint_interval({}, False, budget=8_490) == 50
+    assert resolve_checkpoint_interval({}, False, budget=523_830) == 3_082
+    cfg = {"patch_training": {"checkpoint_interval": 1500}}
+    assert resolve_checkpoint_interval(cfg, False, budget=257_790) == 1517

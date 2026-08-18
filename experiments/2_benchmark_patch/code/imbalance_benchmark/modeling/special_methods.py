@@ -108,7 +108,7 @@ def _mde_train_loop(
 ) -> dict[str, Any]:
     """Run MDE's U joint updates, each consuming one natural and one balanced minibatch."""
     device = ctx["device"]
-    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], True)
+    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], True, budget)
     step = 0
     while step < budget:
         for (bags_u, targets_u), (bags_b, targets_b) in zip(

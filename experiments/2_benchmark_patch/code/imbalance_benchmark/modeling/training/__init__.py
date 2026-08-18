@@ -142,7 +142,7 @@ def _run_training_loop(
 ) -> dict[str, Any]:
     """Execute the update-budgeted training loop, checkpointing on the tie-break rule."""
     step, device, is_mil, n_classes = 0, ctx["device"], ctx["is_mil"], ctx["n_classes"]
-    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], is_mil)
+    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], is_mil, max_steps)
     while step < max_steps:
         for batch in train_loader:
             if step >= max_steps:
