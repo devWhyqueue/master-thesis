@@ -14,6 +14,7 @@ __all__ = [
     "expand_to_rows",
     "resample_seed_indices",
     "kish_effective_count",
+    "case_class_divisor",
     "PatientWeights",
     "weighted_balanced_accuracy",
     "weighted_macro_nll",
@@ -26,12 +27,10 @@ __all__ = [
 class PatientWeights:
     """Bootstrap weights held per patient; rows of a patient always share a weight.
 
-    Every bootstrap statistic here is a weighted sum over rows, and the weight
-    is constant within a patient, so ``sum_rows w(row) * v(row)`` equals
-    ``sum_patients w(patient) * (sum_rows-of-that-patient v(row))``. Aggregating
-    to patients first (``np.bincount``, O(n_rows), once) then matmul-ing against
-    the (n_patients, n_replicates) weight matrix reproduces the row-expanded
-    result at a fraction of the memory and compute.
+    ``sum_rows w(row) * v(row)`` equals ``sum_patients w(patient) *
+    (sum_rows-of-that-patient v(row))``, so aggregating to patients first
+    (``np.bincount``, once) then matmul-ing against the weight matrix
+    reproduces the row-expanded result at a fraction of the cost.
     """
 
     row_patient: np.ndarray  # (n_rows,) index into `patient`
@@ -162,18 +161,33 @@ def kish_effective_count(weights: np.ndarray) -> np.ndarray:
     return out
 
 
+def case_class_divisor(case_ids: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    """Per-row ``1 / (rows of this case within this class)`` - the case-macro weight.
+
+    ponytail: assumes a case's rows are exchangeable within one class; grouped
+    by the ``(case, class)`` pair since a case may span more than one class.
+    """
+    key = pd.DataFrame({"case": case_ids, "label": labels})
+    counts = key.groupby(["case", "label"])["case"].transform("size").to_numpy()
+    return 1.0 / counts.astype(np.float64)
+
+
 def weighted_balanced_accuracy(
-    labels: np.ndarray, preds: np.ndarray, weights: PatientWeights, n_classes: int
+    labels: np.ndarray,
+    preds: np.ndarray,
+    weights: PatientWeights,
+    n_classes: int,
+    case_divisor: np.ndarray,
 ) -> np.ndarray:
-    """Weighted macro recall (balanced accuracy) per replicate column."""
+    """Case-macro balanced accuracy: a case's rows count once per class."""
     out = np.zeros(weights.n_replicates, dtype=np.float64)
     for c in range(n_classes):
         mask = labels == c
         if not mask.any():
             continue
         correct = mask & (preds == c)
-        class_weight = weights.sums(1.0, mask)
-        correct_weight = weights.sums(1.0, correct)
+        class_weight = weights.sums(case_divisor, mask)
+        correct_weight = weights.sums(case_divisor, correct)
         with np.errstate(divide="ignore", invalid="ignore"):
             recall = np.where(
                 class_weight > 0, correct_weight / np.maximum(class_weight, 1e-12), 0.0
@@ -187,12 +201,9 @@ def weighted_macro_nll(
     probabilities: np.ndarray,
     weights: PatientWeights,
     class_subset: list[int],
+    case_divisor: np.ndarray,
 ) -> np.ndarray:
-    """Weighted mean NLL for a subset of classes, averaged unweighted across that subset.
-
-    Used both for natural macro NLL (``class_subset`` = all classes) and the
-    tail-group macro NLL used by the calibration deficit gate.
-    """
+    """Case-macro mean NLL for a class subset (natural macro NLL, or tail-group calibration)."""
     out = np.zeros(weights.n_replicates, dtype=np.float64)
     per_sample_nll = -np.log(
         np.clip(probabilities[np.arange(len(labels)), labels], 1e-12, 1.0)
@@ -202,8 +213,8 @@ def weighted_macro_nll(
         mask = labels == c
         if not mask.any():
             continue
-        class_weight = weights.sums(1.0, mask)
-        weighted_nll = weights.sums(per_sample_nll, mask)
+        class_weight = weights.sums(case_divisor, mask)
+        weighted_nll = weights.sums(case_divisor * per_sample_nll, mask)
         with np.errstate(divide="ignore", invalid="ignore"):
             out += np.where(
                 class_weight > 0, weighted_nll / np.maximum(class_weight, 1e-12), 0.0

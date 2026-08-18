@@ -135,9 +135,7 @@ def test_kish_preflight_is_descriptive_when_the_low_percentile_is_below_five() -
     weights = np.ones((6, 100), dtype=np.float64)
     weights[0, :10] = 3.0
 
-    result = _class_preflight(
-        np.arange(6), np.ones(6, dtype=int), weights, n_replicates=100
-    )
+    result = _class_preflight(np.arange(6), weights, n_replicates=100)
 
     assert result["p2_5_kish_effective_count"] == pytest.approx(64 / 14)
     assert result["frac_replicates_dominant"] == 0.0
@@ -152,9 +150,7 @@ def test_kish_preflight_ignores_a_rare_dominated_replicate() -> None:
     weights = np.ones((6, 100), dtype=np.float64)
     weights[:, 0] = [6.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    result = _class_preflight(
-        np.arange(6), np.ones(6, dtype=int), weights, n_replicates=100
-    )
+    result = _class_preflight(np.arange(6), weights, n_replicates=100)
 
     assert result["p2_5_kish_effective_count"] == pytest.approx(6.0)
     assert result["is_descriptive_only"] is False
@@ -184,9 +180,16 @@ def test_exploratory_methods_are_not_hypothesis_tested() -> None:
     assert row["p_value"] is None
     assert row["adjusted_p_value"] is None
 
-def test_preflight_is_descriptive_when_any_split_class_fails_kish_threshold() -> None:
+def test_preflight_ignores_a_thin_split_cell_when_the_pooled_cell_is_adequate() -> None:
+    """The gate designates from the pooled ``by_class`` cell, not any one split cell.
+
+    Split 0 alone has too few class-A patients to clear Kish on its own, but
+    the shared crossed bootstrap draws one weight per case over the union of
+    split appearances - the same union ``by_class`` pools over - so a thin
+    split cell must not condemn a pooled cell the union comfortably supports.
+    """
     rows = []
-    for split, n_patients in ((0, 2), (1, 10)):
+    for split, n_patients in ((0, 3), (1, 30)):
         for class_name in ("A", "B"):
             rows.extend(
                 {
@@ -197,10 +200,10 @@ def test_preflight_is_descriptive_when_any_split_class_fails_kish_threshold() ->
                 for patient in range(n_patients)
             )
 
-    result = run_preflight(pd.DataFrame(rows), n_replicates=40, seed=4)
+    result = run_preflight(pd.DataFrame(rows), n_replicates=500, seed=4)
 
     assert result["by_split_class"]["0"]["A"]["kish_effective_count"] < 5
-    assert result["is_descriptive_only"]
+    assert not result["is_descriptive_only"]
 
 def test_descriptive_only_cell_never_opens_a_gate_or_permutes() -> None:
     """A preflight descriptive-only cell must skip gates and permutation p-values."""
@@ -302,9 +305,7 @@ def test_unique_resampled_patients_below_five_is_descriptive_even_with_good_kish
     well-balanced weights (i.e. it is not merely a restatement of Kish)."""
     weights = np.ones((4, 100))  # 4 patients, equal weight every replicate: Kish == 4
 
-    result = _class_preflight(
-        np.arange(4), np.ones(4, dtype=int), weights, n_replicates=100
-    )
+    result = _class_preflight(np.arange(4), weights, n_replicates=100)
 
     assert result["kish_effective_count"] == pytest.approx(4.0)
     assert result["unique_resampled_patients"] == pytest.approx(4.0)

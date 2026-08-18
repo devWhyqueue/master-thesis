@@ -10,6 +10,7 @@ import pandas as pd
 from imbalance_benchmark.analysis.inference.bootstrap import (
     PatientWeights,
     build_strata,
+    case_class_divisor,
     gather_seed_resampled,
     resample_patient_weights,
     resample_seed_indices,
@@ -77,6 +78,8 @@ class BootstrapContext:
         )
         self.case_ids = identity["case_id"].astype(str).to_numpy()
         self.slide_ids = identity["slide_id"].astype(str).to_numpy()
+        case_labels = identity["cancer_type"].astype(str).to_numpy()
+        self.case_class_divisor = case_class_divisor(self.case_ids, case_labels)
         position = {c: i for i, c in enumerate(unique_cases)}
         row_patient = np.asarray([position[c] for c in self.case_ids])
         # Replicate 0 is the observed cohort (all unit weights one): every metric
@@ -100,50 +103,46 @@ class BootstrapContext:
             self._seed_indices[n_seeds] = idx
         return self._seed_indices[n_seeds]
 
+    def _paired_seed_metric(self, n_seeds: int, per_seed_fn) -> np.ndarray:
+        """Stack one metric over confirmation seeds, then average a paired seed resample."""
+        per_seed = np.stack([per_seed_fn(i) for i in range(n_seeds)])
+        return gather_seed_resampled(per_seed, self._paired_seed_indices(n_seeds))
+
     def ba_distribution(
         self, labels: np.ndarray, preds_stack: np.ndarray, n_classes: int
     ) -> np.ndarray:
-        """Per-replicate weighted balanced accuracy, averaged over a paired seed resample."""
-        per_seed = np.stack(
-            [
-                weighted_balanced_accuracy(
-                    labels, preds_stack[i], self.weights, n_classes
-                )
-                for i in range(preds_stack.shape[0])
-            ]
-        )
-        return gather_seed_resampled(
-            per_seed, self._paired_seed_indices(preds_stack.shape[0])
+        """Per-replicate case-macro balanced accuracy, averaged over a paired seed resample."""
+        return self._paired_seed_metric(
+            preds_stack.shape[0],
+            lambda i: weighted_balanced_accuracy(
+                labels, preds_stack[i], self.weights, n_classes, self.case_class_divisor
+            ),
         )
 
     def tail_nll_distribution(
         self, labels: np.ndarray, probs_stack: np.ndarray, tail_classes: list[int]
     ) -> np.ndarray | None:
-        """Per-replicate weighted tail-group macro NLL, averaged over a paired seed resample."""
+        """Per-replicate case-macro tail-group NLL, averaged over a paired seed resample."""
         if not tail_classes:
             return None
-        per_seed = np.stack(
-            [
-                weighted_macro_nll(labels, probs_stack[i], self.weights, tail_classes)
-                for i in range(probs_stack.shape[0])
-            ]
-        )
-        return gather_seed_resampled(
-            per_seed, self._paired_seed_indices(probs_stack.shape[0])
+        return self._paired_seed_metric(
+            probs_stack.shape[0],
+            lambda i: weighted_macro_nll(
+                labels,
+                probs_stack[i],
+                self.weights,
+                tail_classes,
+                self.case_class_divisor,
+            ),
         )
 
     def ece_distribution(
         self, labels: np.ndarray, probs_stack: np.ndarray
     ) -> np.ndarray:
         """Per-replicate fixed-bin ECE from the frozen crossed patient bootstrap."""
-        per_seed = np.stack(
-            [
-                weighted_ece(labels, probs_stack[i], self.weights)
-                for i in range(probs_stack.shape[0])
-            ]
-        )
-        return gather_seed_resampled(
-            per_seed, self._paired_seed_indices(probs_stack.shape[0])
+        return self._paired_seed_metric(
+            probs_stack.shape[0],
+            lambda i: weighted_ece(labels, probs_stack[i], self.weights),
         )
 
     def secondary_distributions(

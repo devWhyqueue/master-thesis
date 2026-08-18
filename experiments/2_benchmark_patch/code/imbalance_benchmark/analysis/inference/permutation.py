@@ -5,6 +5,7 @@ from collections.abc import Iterator
 
 import numpy as np
 
+from imbalance_benchmark.analysis.inference.bootstrap import case_class_divisor
 from imbalance_benchmark.analysis.inference.confirmatory.arms import (
     _as_members,
     _ba_observed,
@@ -114,15 +115,19 @@ def _ba_patient_contributions(
     per-row correctness.
     """
     method_members, ce_members = _as_members(method_preds), _as_members(ce_preds)
+    divisor = case_class_divisor(case_ids, labels)
     rows = np.zeros(len(labels), dtype=np.float64)
     for class_index in range(n_classes):
         mask = labels == class_index
         if not mask.any():
             continue
+        n_cases = len(np.unique(case_ids[mask]))
         method_correct = _correctness_mean(method_members, mask, class_index)
         ce_correct = _correctness_mean(ce_members, mask, class_index)
-        rows[mask] = (method_correct - ce_correct).mean(axis=0) / (
-            n_classes * mask.sum()
+        rows[mask] = (
+            (method_correct - ce_correct).mean(axis=0)
+            * divisor[mask]
+            / (n_classes * n_cases)
         )
     return _patient_contributions(case_ids, rows)
 
@@ -155,16 +160,20 @@ def _tail_nll_patient_contributions(
     the paired per-seed difference (see :func:`_ba_patient_contributions`).
     """
     method_members, ce_members = _as_members(method_probs), _as_members(ce_probs)
+    divisor = case_class_divisor(case_ids, labels)
     rows = np.zeros(len(labels), dtype=np.float64)
     present_tails = [
         class_index for class_index in tail_classes if (labels == class_index).any()
     ]
     for class_index in present_tails:
         mask = labels == class_index
+        n_cases = len(np.unique(case_ids[mask]))
         method_nll = _nll_mean(method_members, mask, class_index)
         ce_nll = _nll_mean(ce_members, mask, class_index)
-        rows[mask] = (ce_nll - method_nll).mean(axis=0) / (
-            len(present_tails) * mask.sum()
+        rows[mask] = (
+            (ce_nll - method_nll).mean(axis=0)
+            * divisor[mask]
+            / (len(present_tails) * n_cases)
         )
     return _patient_contributions(case_ids, rows)
 
@@ -192,8 +201,8 @@ def paired_block_permutation_ba(
     _, contributions = _ba_patient_contributions(
         labels, method_stack, ce_stack, case_ids, n_classes
     )
-    observed = _ba_observed(labels, method_stack, n_classes) - _ba_observed(
-        labels, ce_stack, n_classes
+    observed = _ba_observed(labels, method_stack, case_ids, n_classes) - _ba_observed(
+        labels, ce_stack, case_ids, n_classes
     )
     contributions[-1] += observed - contributions.sum()
     return _contribution_p_value(contributions, observed, n_permutations, seed)
@@ -222,8 +231,8 @@ def paired_block_permutation_tail_nll(
     _, contributions = _tail_nll_patient_contributions(
         labels, method_stack, ce_stack, case_ids, tail_classes
     )
-    observed = _tail_nll_observed(labels, ce_stack, tail_classes) - _tail_nll_observed(
-        labels, method_stack, tail_classes
-    )
+    observed = _tail_nll_observed(
+        labels, ce_stack, case_ids, tail_classes
+    ) - _tail_nll_observed(labels, method_stack, case_ids, tail_classes)
     contributions[-1] += observed - contributions.sum()
     return _contribution_p_value(contributions, observed, n_permutations, seed)

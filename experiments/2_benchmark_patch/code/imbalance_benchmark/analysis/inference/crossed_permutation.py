@@ -87,9 +87,9 @@ def crossed_block_permutation_ba(
     observed = float(
         np.mean(
             [
-                _ba_observed(labels, method, n_classes)
-                - _ba_observed(labels, ce, n_classes)
-                for labels, method, ce, _ in prepared
+                _ba_observed(labels, method, case_ids, n_classes)
+                - _ba_observed(labels, ce, case_ids, n_classes)
+                for labels, method, ce, case_ids in prepared
             ]
         )
     )
@@ -103,9 +103,9 @@ def _crossed_tail_observed(
     return float(
         np.mean(
             [
-                _tail_nll_observed(labels, ce, tails)
-                - _tail_nll_observed(labels, method, tails)
-                for (labels, method, ce, _), tails in zip(
+                _tail_nll_observed(labels, ce, case_ids, tails)
+                - _tail_nll_observed(labels, method, case_ids, tails)
+                for (labels, method, ce, case_ids), tails in zip(
                     prepared, split_tails, strict=True
                 )
             ]

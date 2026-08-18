@@ -12,27 +12,25 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
 )
 
 
-def _case_positions(
-    case_of_row: np.ndarray, case_pos: dict[Any, int]
-) -> tuple[np.ndarray, np.ndarray]:
-    """Positions into the shared patient-weight matrix, and each case's row count.
-
-    ``sum_of_k_copies(w) == k * w``, so a patient's weight never needs
-    expanding to every row - only its position and row count do.
-    """
-    cases, multiplicity = np.unique(case_of_row, return_counts=True)
-    positions = np.asarray([case_pos[c] for c in cases], dtype=int)
-    return positions, multiplicity
+def _case_positions(case_of_row: np.ndarray, case_pos: dict[Any, int]) -> np.ndarray:
+    """Positions into the shared patient-weight matrix for one class's contributing cases."""
+    cases = np.unique(case_of_row)
+    return np.asarray([case_pos[c] for c in cases], dtype=int)
 
 
 def _class_preflight(
     positions: np.ndarray,
-    multiplicity: np.ndarray,
     patient_weights: np.ndarray,
     n_replicates: int,
 ) -> dict[str, Any]:
-    """Aggregate one class's per-patient weights and summarize them."""
-    patient_w = multiplicity[:, None] * patient_weights[positions, :]
+    """Aggregate one class's per-patient weights and summarize them.
+
+    A case's cell weight is its Dirichlet weight alone: the shared crossed
+    bootstrap (:class:`BootstrapContext`) draws one weight per case, not one
+    per case-row, so a case contributing many rows (patches/slides) never
+    outweighs a case contributing one.
+    """
+    patient_w = patient_weights[positions, :]
     kish = kish_effective_count(patient_w)
     sum_w, max_w = patient_w.sum(axis=0), patient_w.max(axis=0)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -68,7 +66,7 @@ def _diagnostics_by_class(
     """Calculate aggregate diagnostics for every observed class."""
     return {
         str(label): _class_preflight(
-            *_case_positions(rows["case_id"].to_numpy(), case_pos),
+            _case_positions(rows["case_id"].to_numpy(), case_pos),
             patient_weights,
             n_replicates,
         )
@@ -91,7 +89,7 @@ def _diagnostics_by_split(
         split_mask = _split_mask(identity, split_col, split)
         cell = {
             label: _class_preflight(
-                *_case_positions(
+                _case_positions(
                     identity.loc[split_mask & (labels == label), "case_id"].to_numpy(),
                     case_pos,
                 ),
@@ -149,8 +147,15 @@ def _preflight_result(
     multiplicities_match: bool,
     weights_vary: bool,
 ) -> dict[str, Any]:
-    """Assemble the immutable preflight report from its component diagnostics."""
-    diagnostics = [
+    """Assemble the immutable preflight report from its component diagnostics.
+
+    ``is_descriptive_only`` is designated from ``by_class`` - the pooled cell
+    over every split appearance a case makes - because that is the cell the
+    shared crossed bootstrap (:class:`BootstrapContext`) actually draws
+    against. ``by_split_class`` stays in the report and still gates
+    ``all_split_level_metrics_computable``, a distinct representation check.
+    """
+    split_diagnostics = [
         value for split in by_split_class.values() for value in split.values()
     ]
     return {
@@ -159,12 +164,12 @@ def _preflight_result(
         "by_class": by_class,
         "by_split_class": by_split_class,
         "all_split_level_metrics_computable": all(
-            value["metric_computable"] for value in diagnostics
+            value["metric_computable"] for value in split_diagnostics
         ),
         "identical_multiplicities_across_split_appearances": multiplicities_match,
         "patient_weights_vary": weights_vary,
         "is_descriptive_only": any(
-            value["is_descriptive_only"] for value in diagnostics
+            value["is_descriptive_only"] for value in by_class.values()
         ),
     }
 
@@ -174,14 +179,15 @@ def run_preflight(
     n_replicates: int = 10_000,
     seed: int = 0,
 ) -> dict[str, Any]:
-    """Per split-frame, by-class preflight: unique resampled patients, Kish, max weight.
+    """By-class preflight over the pooled cell: unique resampled patients, Kish, max weight.
 
-    Mean Kish and max-weight fractions are reported across replicates. Per report
-    §"Imbalance deficit, recovery, and inference", inference is descriptive-only
-    when the 2.5th percentile of the Kish count is below five, one patient
-    supplies over 50% of a class's weight in over 5% of replicates, or a
-    split/class cell has fewer than five contributing patients.
-    """
+    ``by_class`` pools every case over the union of its split appearances,
+    matching the one shared weight :class:`BootstrapContext` draws per case -
+    not a per-split cell, which would certify an estimand nobody reports.
+    Per report §"Imbalance deficit, recovery, and inference", inference is
+    descriptive-only when the pooled cell's 2.5th-percentile Kish is below
+    five, one patient supplies over 50% of pooled weight in over 5% of
+    replicates, or fewer than five patients contribute."""
     strata = build_strata(identity)
     rng = np.random.default_rng(seed)
     case_ids, patient_weights = resample_patient_weights(strata, n_replicates, rng)

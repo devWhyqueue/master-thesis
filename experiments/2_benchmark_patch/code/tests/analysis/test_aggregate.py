@@ -20,6 +20,7 @@ from imbalance_benchmark.analysis.db import (
 from imbalance_benchmark.analysis.inference.bootstrap import (
     PatientWeights,
     build_strata,
+    case_class_divisor,
     expand_to_rows,
     gather_seed_resampled,
     kish_effective_count,
@@ -28,10 +29,12 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
     weighted_ece,
     weighted_macro_nll,
 )
+from imbalance_benchmark.analysis.inference.confirmatory.arms import _ba_observed
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import (
     ci_excludes_zero,
 )
+from imbalance_benchmark.analysis.inference.permutation import _as_seed_stack
 from imbalance_benchmark.analysis.inference.preflight import (
     bootstrap_preflight,
     run_preflight,
@@ -45,6 +48,9 @@ from imbalance_benchmark.analysis.query import (
     load_classwise,
     load_eval_details,
     load_test_identity,
+)
+from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
+    _macro_classification,
 )
 from imbalance_benchmark.analysis.reporting.ingestion import (
     _ingest_discovered_run,
@@ -263,21 +269,22 @@ def test_bootstrap_preflight_flags_small_kish():
 def _reference_by_class_via_row_expansion(
     identity: pd.DataFrame, row_weights: np.ndarray, n_replicates: int
 ) -> dict[str, dict[str, float]]:
-    """The pre-Change-4 row-expansion aggregation (``np.add.at`` over expanded rows).
+    """Row-expansion oracle for the case-weighted (not patch-count-weighted) preflight cell.
 
-    Kept only as a test oracle: Change 4 replaces this with the algebraic
-    ``multiplicity * patient_weights`` identity so the (n_rows, n_replicates)
-    matrix is never materialized.
+    Each row is divided by its case's row count within the class before
+    summing back, so the oracle reproduces one Dirichlet weight per case
+    regardless of how many rows (patches/slides) that case contributes -
+    the evidence-gate fix ``_class_preflight`` now encodes directly.
     """
     labels = identity["cancer_type"].to_numpy()
     result = {}
     for label in np.unique(labels):
         mask = labels == label
         case_of_row = identity.loc[mask, "case_id"].to_numpy()
-        weights = row_weights[mask, :]
-        unique_cases = np.unique(case_of_row)
-        pos = {c: i for i, c in enumerate(unique_cases)}
-        idx = np.asarray([pos[c] for c in case_of_row])
+        unique_cases, idx, counts = np.unique(
+            case_of_row, return_inverse=True, return_counts=True
+        )
+        weights = row_weights[mask, :] / counts[idx][:, None]
         patient_w = np.zeros((len(unique_cases), n_replicates), dtype=np.float64)
         np.add.at(patient_w, idx, weights)
         kish = kish_effective_count(patient_w)
@@ -290,8 +297,8 @@ def _reference_by_class_via_row_expansion(
         }
     return result
 
-def test_run_preflight_matches_old_row_expansion_path():
-    """Change 4's patient-level preflight must reproduce the row-expansion path's numbers."""
+def test_run_preflight_matches_case_weighted_row_expansion_path():
+    """The patient-level preflight must reproduce the case-weighted row-expansion oracle."""
     rows = []
     for cls, n_patients in (("A", 8), ("B", 12)):
         for p in range(n_patients):
@@ -319,7 +326,8 @@ def test_weighted_balanced_accuracy_matches_unweighted_when_weights_are_one():
     labels = np.array([0, 0, 1, 1])
     preds = np.array([0, 1, 1, 1])
     weights = PatientWeights(np.arange(4), np.ones((4, 3), dtype=np.float64))
-    ba = weighted_balanced_accuracy(labels, preds, weights, n_classes=2)
+    divisor = case_class_divisor(np.arange(4), labels)
+    ba = weighted_balanced_accuracy(labels, preds, weights, n_classes=2, case_divisor=divisor)
     expected = (0.5 + 1.0) / 2
     assert np.allclose(ba, expected)
 
@@ -342,6 +350,8 @@ def test_patient_weights_kernels_match_naive_row_expansion():
     labels = rng.integers(0, n_classes, size=n_rows)
     preds = rng.integers(0, n_classes, size=n_rows)
     probs = rng.dirichlet(np.ones(n_classes), size=n_rows)
+    divisor = case_class_divisor(row_patient, labels)
+    case_weights = row_weights * divisor[:, None]  # case-macro: rows-in-case-class count once
 
     def naive_balanced_accuracy() -> np.ndarray:
         out = np.zeros(n_replicates)
@@ -350,8 +360,8 @@ def test_patient_weights_kernels_match_naive_row_expansion():
             if not mask.any():
                 continue
             correct = mask & (preds == c)
-            class_weight = row_weights[mask].sum(axis=0)
-            correct_weight = row_weights[correct].sum(axis=0)
+            class_weight = case_weights[mask].sum(axis=0)
+            correct_weight = case_weights[correct].sum(axis=0)
             out += np.where(
                 class_weight > 0, correct_weight / np.maximum(class_weight, 1e-12), 0.0
             )
@@ -365,7 +375,7 @@ def test_patient_weights_kernels_match_naive_row_expansion():
             mask = labels == c
             if not mask.any():
                 continue
-            w = row_weights[mask]
+            w = case_weights[mask]
             class_weight = w.sum(axis=0)
             weighted_nll = (w * per_sample_nll[mask, None]).sum(axis=0)
             out += np.where(
@@ -396,14 +406,40 @@ def test_patient_weights_kernels_match_naive_row_expansion():
         return out
 
     assert np.allclose(
-        weighted_balanced_accuracy(labels, preds, weights, n_classes),
+        weighted_balanced_accuracy(labels, preds, weights, n_classes, divisor),
         naive_balanced_accuracy(),
     )
     assert np.allclose(
-        weighted_macro_nll(labels, probs, weights, list(range(n_classes))),
+        weighted_macro_nll(labels, probs, weights, list(range(n_classes)), divisor),
         naive_macro_nll(list(range(n_classes))),
     )
     assert np.allclose(weighted_ece(labels, probs, weights), naive_ece())
+
+def test_case_macro_ba_matches_clustered_endpoints_and_permutation_observed():
+    """Plan 1's evidence-gate check: at the observed (all-ones-weight) replicate,
+    case-macro BA must equal the unweighted case-macro estimator in
+    ``clustered_endpoints._macro_classification``, and the permutation test's
+    observed statistic (``_ba_observed``) must agree with it too - on a
+    fixture with deliberately unequal rows-per-case, so a divisor bug that
+    only shows up with unbalanced cases cannot hide.
+    """
+    case_ids = np.array(["p0", "p0", "p0", "p1", "p1", "p2"])
+    labels = np.array([0, 0, 0, 1, 1, 1])
+    preds = np.array([0, 1, 0, 1, 0, 1])
+    n_classes = 2
+
+    position = {c: i for i, c in enumerate(np.unique(case_ids))}
+    row_patient = np.asarray([position[c] for c in case_ids])
+    patient = np.ones((len(position), 3), dtype=np.float64)  # replicate 0: every weight 1
+    weights = PatientWeights(row_patient, patient)
+    divisor = case_class_divisor(case_ids, labels)
+
+    ba = weighted_balanced_accuracy(labels, preds, weights, n_classes, divisor)
+    expected_ba, _ = _macro_classification(labels, preds, case_ids)
+    assert ba[0] == pytest.approx(expected_ba)
+
+    observed = _ba_observed(labels, _as_seed_stack(preds, 1), case_ids, n_classes)
+    assert observed == pytest.approx(expected_ba)
 
 def test_seed_resample_gather_averages_correctly():
     per_seed_metric = np.array([[1.0, 2.0], [3.0, 4.0]])  # (n_seeds=2, n_replicates=2)
