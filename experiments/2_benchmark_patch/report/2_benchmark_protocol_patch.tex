@@ -314,7 +314,7 @@ This separation makes confirmation runs comparable without pretending that equal
 Damage and recovery are evaluated on two complementary axes: discrimination measures whether the predicted class is correct, whereas probability quality measures whether the complete predicted distribution is reliable. Both axes preserve the independent patient or case as the unit of evidence.
 
 \paragraph{Discrimination and aggregation.}
-The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Overall accuracy is descriptive. Patch predictions are summarized in two ways: patch-micro estimates treat eligible patches as predictions while uncertainty is clustered by partitioning unit, and case-macro estimates first aggregate the metric contribution within each partitioning unit so that heavily tiled cases do not dominate.
+The primary endpoint is balanced accuracy, equal to macro recall for single-label multiclass prediction. Secondary discrimination outcomes are macro F1; per-class recall and F1; and head, body, and tail recall under the locked assignment. Classes are ranked by allocated training support: the first $\lceil K/3\rceil$ ranks are head, the last $\lceil K/3\rceil$ are tail, and intervening ranks are body; binary tasks have one head and one tail and no body. Ties follow the locked class ordering. Overall accuracy is descriptive. The primary, gate-defining estimator is case-macro: the metric contribution is first aggregated within each partitioning unit, so a unit's contribution to a class counts once regardless of how many patches or slides it supplies, and heavily tiled cases do not dominate. Patch-micro estimates, which instead treat eligible patches directly as predictions while uncertainty remains clustered by partitioning unit, are reported as a secondary view.
 
 \paragraph{Probability quality.}
 Probability-quality metrics ask whether the complete predicted distribution is useful, not only whether its largest entry names the correct class. Tail-group macro negative log likelihood (NLL) is the co-primary calibration endpoint because it gives each tail class equal weight and penalizes confident errors. Because NLL uses the natural logarithm, its values and differences are measured in nats. A nat is the unit of information obtained with logarithms of base $e$, just as a bit is obtained with logarithms of base 2. Natural-prevalence NLL, macro NLL, multiclass Brier score, expected calibration error (ECE), and reliability diagrams provide secondary views. ECE uses 10 fixed equal-width bins and remains secondary because small classwise samples make bin estimates unstable.
@@ -425,7 +425,7 @@ Several boundaries remain. The design does not establish how end-to-end encoder 
 
 Method comparisons identify methods, not universal mechanisms. Interventions can change sampling, objectives, or architecture together, so equal optimizer updates do not imply equal information exposure. For example, post-hoc logit adjustment performs no gradient optimization, whereas cRT retrains only the classifier in its second stage. Processed examples, unique exposures, accelerator time, memory, and model size are therefore reported rather than assumed to be equivalent.
 
-Evidence also depends on independent support, not merely patch count. BRACS patch classification remains descriptive because its patch-micro Kish effective support falls below the prespecified threshold under patient-level bootstrap weights. Calibration has a separate boundary: it is conditional on the natural held-out prevalence and cannot be transported to another deployment population without an explicit prior-shift analysis.
+Evidence also depends on independent support, not merely patch count: the discrimination and calibration gates are evaluated on the case-macro estimator over each class's pooled cell across split appearances (Appendix~\ref{app:endpoints}), and inference is withheld as descriptive wherever that pooled cell's Kish effective support, single-unit dominance, or contributing-unit count fails the prespecified threshold. CAMELYON16 clears that evidence bar but still shows a discrimination deficit well under the \num{0.02} gate threshold even at $\rho_{\mathrm{achieved}}\approx100$; that is an effect-size limit --- the frozen Virchow2 representation leaves little balanced-accuracy damage for a mitigation method to recover --- not an evidence shortage. Calibration has a separate boundary: it is conditional on the natural held-out prevalence and cannot be transported to another deployment population without an explicit prior-shift analysis.
 
 Within these boundaries, the three research questions form a deliberate sequence. RQ1 establishes the signal profile and damage created by controlled allocation. RQ2 asks which interventions recover performance only after that damage is established. RQ3 then relates variation in damage and recovery to the realized shortages without treating those associations as causal decomposition. Together, this sequence turns class imbalance from a single prevalence label into a controlled analysis of what evidence is missing, what that shortage changes, and which signal a mitigation method should use.
 
@@ -456,6 +456,8 @@ This appendix records dataset eligibility, hierarchical sampling, support floors
     Tail assignments & Native, difficulty-aligned, difficulty-reversed & \ref{app:construction} \\
     Data partitions & Three locked, patient- or case-disjoint & \ref{app:construction} \\
     Initialization seeds & Two tuning; five disjoint confirmation & \ref{app:training} \\
+    Gate aggregation unit & Case-macro (patch-micro secondary) & \ref{sec:analysis} \\
+    Evidence cell & Pooled across a case's split appearances & \ref{app:endpoints} \\
     \bottomrule
   \end{tabularx}
   \caption{Design and training quantities locked before the first definitive fit, with the appendix section that specifies each. The allocation of the shared training support $T$ among classes is the only directly manipulated quantity (Section~\ref{sec:design}).}
@@ -697,7 +699,7 @@ The independent per-unit weight draw can still produce a replicate dominated by 
   n_{\mathrm{Kish}}=\frac{\left(\sum_i v_i\right)^2}{\sum_i v_i^2}.
   \label{eq:kish}
 \end{equation}
-\noindent translates unequal case weights into the equivalent number of equally weighted partitioning units. It decreases as weight concentrates. The preflight also records each split/class cell's number of contributing units and its largest unit-weight share. Table~\ref{tab:preflight} lists the three concentration checks; failing any one designates inference for that dataset--regime descriptive before training.
+\noindent translates unequal case weights into the equivalent number of equally weighted partitioning units. It decreases as weight concentrates. The preflight also records, pooled across the union of a class's split appearances, its number of contributing units and its largest unit-weight share --- the cell the shared per-unit weight draw actually resamples against, since one unit's weight applies to every split appearance it makes at once. Table~\ref{tab:preflight} lists the three concentration checks, each evaluated on that pooled cell; failing any one designates inference for that dataset--regime descriptive before training. This is separate from the split-level representation check described above, which still requires every original split--class cell to remain represented.
 
 \begin{table}[ht]
   \centering
@@ -708,10 +710,10 @@ The independent per-unit weight draw can still produce a replicate dominated by 
     \midrule
     Effective partitioning-unit count & 2.5th percentile of $n_{\mathrm{Kish}}$ across replicates below five \\
     Single-unit dominance & One unit supplies more than 50\% of a class's weight in more than 5\% of replicates \\
-    Cell support & A split/class cell has fewer than five contributing units \\
+    Cell support & A class's pooled cell (union of its split appearances) has fewer than five contributing units \\
     \bottomrule
   \end{tabularx}
-  \caption{Label-only preflight concentration checks. All three are evaluated before predictions exist; the designation is recorded rather than used to discard replicates.}
+  \caption{Label-only preflight concentration checks, each evaluated on a class's cell pooled across the union of its split appearances --- the cell the shared per-unit weight draw resamples against. All three are evaluated before predictions exist; the designation is recorded rather than used to discard replicates.}
   \label{tab:preflight}
 \end{table}
 
