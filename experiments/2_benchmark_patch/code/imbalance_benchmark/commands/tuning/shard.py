@@ -60,7 +60,7 @@ def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
     """Run candidate indices sequentially with one loaded frozen MIL context."""
     if args.group is None:
         raise ValueError("--group is required for a round-0 shard")
-    base, _, freeze, fingerprint = _frozen_shard_context(args, False)
+    base, _, freeze, fingerprint, _ = _frozen_shard_context(args, False)
     if any(_is_excluded(paths) for paths in _split_paths(base)):
         return
 
@@ -87,7 +87,7 @@ def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
     """Run round>0 candidate indices: only genuinely new configs are trained."""
     if args.condition is None:
         raise ValueError("--condition is required for a round>0 shard")
-    base, scopes, freeze, fingerprint = _frozen_shard_context(args)
+    base, scopes, freeze, fingerprint, _ = _frozen_shard_context(args)
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
     methods = phase_methods(scopes[0][1].is_mil, args.phase, args.condition)

@@ -31,10 +31,16 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
 
 @dataclass(frozen=True)
 class ReduceRound:
-    """One reduce call's verification fingerprint and adaptive-search round index."""
+    """One reduce call's verification fingerprint and adaptive-search round index.
+
+    ``accepted`` (one hash set per split) additionally admits shards written
+    before a freeze amendment, per ``validate_shard_payload``; unused (round
+    has no meaning) when reused as a terminal-phase fingerprint carrier.
+    """
 
     fingerprint: list[str] = field(default_factory=list)
     index: int = 0
+    accepted: list[set[str]] | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +112,7 @@ def _reduce_method(
             ShardSpec(condition, method, 0, phase),
             reduce_round.fingerprint,
             expected_observations,
+            reduce_round.accepted,
         )
         payloads.append(candidate)
         return candidate["selection"]
@@ -113,7 +120,13 @@ def _reduce_method(
         root, condition, phase, method, grids[method], reduce_round.index
     )
     candidates = [
-        load_candidate(root, spec, reduce_round.fingerprint, expected_observations)
+        load_candidate(
+            root,
+            spec,
+            reduce_round.fingerprint,
+            expected_observations,
+            reduce_round.accepted,
+        )
         for spec in specs
     ]
     payloads.extend(candidates)
@@ -176,26 +189,29 @@ def _reduce_terminal_method(
     location: ReduceLocation,
     method: str,
     terminal_grids: dict[str, list[dict[str, Any]]],
-    fingerprint: list[str],
+    reduce_round: ReduceRound,
     expected_observations: int | None,
     ce_by_lr: dict[float, dict[str, Any]],
     payloads: list[dict[str, Any]],
 ) -> Any:
     """Reduce one method's terminal active window through the cross-round registry."""
     root, condition, phase = location.root, location.condition, location.phase
+    fingerprint, accepted = reduce_round.fingerprint, reduce_round.accepted
     if method == "post_hoc_logit_adjustment":
         candidate = load_candidate(
             root,
             ShardSpec(condition, method, 0, phase),
             fingerprint,
             expected_observations,
+            accepted,
         )
         payloads.append(candidate)
         return candidate["selection"]
     active_grid = terminal_grids[method]
     specs = resolve_terminal_specs(root, condition, phase, method, active_grid)
     candidates = [
-        load_candidate(root, spec, fingerprint, expected_observations) for spec in specs
+        load_candidate(root, spec, fingerprint, expected_observations, accepted)
+        for spec in specs
     ]
     for candidate, config in zip(candidates, active_grid, strict=True):
         if candidate["config"] != config:
@@ -213,7 +229,7 @@ def reduce_terminal_phase(
     phase: str,
     methods: tuple[str, ...],
     terminal_grids: dict[str, list[dict[str, Any]]],
-    fingerprint: list[str],
+    reduce_round: ReduceRound,
     expected_observations: int | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Reduce every method's terminal active window into the signed final selection."""
@@ -226,7 +242,7 @@ def reduce_terminal_phase(
             location,
             method,
             terminal_grids,
-            fingerprint,
+            reduce_round,
             expected_observations,
             ce_by_lr,
             payloads,

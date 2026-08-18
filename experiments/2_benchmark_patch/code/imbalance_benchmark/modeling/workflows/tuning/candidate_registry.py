@@ -31,11 +31,9 @@ def _registry_key(method: str, config: dict[str, Any]) -> str:
 def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
     """Load the map from (method, config) to the round/index it was first trained in.
 
-    Entries written before parameter values were float-normalized (e.g. an
-    int-grid method's ``oko|1|...`` alongside today's ``oko|1.0|...``)
-    collapse onto the same canonical key; keep whichever trained first
-    (lowest round) rather than error, since the earlier one is what any
-    prior decision would have resolved through.
+    Legacy int-formatted keys (e.g. ``oko|1|...`` before parameter values
+    were float-normalized) collapse onto today's canonical key; keep the
+    lowest round, since that is what any prior decision resolved through.
     """
     path = registry_path(root, condition)
     registry = json.loads(path.read_text()) if path.exists() else {}
@@ -104,6 +102,7 @@ def terminal_cost_payloads(
     methods: tuple[str, ...],
     fingerprint: list[str],
     expected_observations: int | None = None,
+    accepted: list[set[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Load every uniquely trained candidate across every round, for realized cost.
 
@@ -124,7 +123,8 @@ def terminal_cost_payloads(
             for entry in registry_candidates_for_method(registry, method)
         )
     return [
-        load_candidate(root, spec, fingerprint, expected_observations) for spec in specs
+        load_candidate(root, spec, fingerprint, expected_observations, accepted)
+        for spec in specs
     ]
 
 

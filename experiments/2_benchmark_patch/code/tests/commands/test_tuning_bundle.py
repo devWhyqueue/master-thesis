@@ -51,6 +51,7 @@ def test_wsi_bundle_reuses_one_context_for_two_exact_shards(monkeypatch) -> None
         [],
         {"runtime_config": {"dataset": {}}, "method_grids": {}},
         ["freeze"],
+        [{"freeze"}],
     )
     monkeypatch.setattr(tuning, "_frozen_shard_context", lambda *_: context)
     monkeypatch.setattr(tuning, "_split_paths", lambda *_: [])

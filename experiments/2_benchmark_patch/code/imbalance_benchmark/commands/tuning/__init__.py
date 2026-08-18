@@ -179,6 +179,7 @@ def _frozen_shard_context(
     list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
     dict[str, Any],
     list[str],
+    list[set[str]],
 ]:
     base = ensure_dirs(load_config(args.config))
     paths = [
@@ -192,12 +193,12 @@ def _frozen_shard_context(
         if load_scopes
         else []
     )
-    return (
-        base,
-        scopes,
-        freezes[0],
-        [compute_sha256(path) for path in paths],
-    )
+    fingerprint = [compute_sha256(path) for path in paths]
+    accepted = [
+        {current, *split_freeze.get("superseded_freeze_file_hashes", [])}
+        for current, split_freeze in zip(fingerprint, freezes)
+    ]
+    return (base, scopes, freezes[0], fingerprint, accepted)
 
 
 def load_shard_scope(
@@ -236,7 +237,7 @@ def load_shard_scope(
 
 def cmd_tune_reduce(args: argparse.Namespace) -> None:
     """Reduce complete shards into the benchmark's signed selection interface."""
-    base, raw_scopes, freeze, fingerprint = _frozen_shard_context(args)
+    base, raw_scopes, freeze, fingerprint, accepted = _frozen_shard_context(args)
     reduce_tuning_shards(
         base,
         raw_scopes,
@@ -244,4 +245,5 @@ def cmd_tune_reduce(args: argparse.Namespace) -> None:
         fingerprint,
         args.phase,
         getattr(args, "condition", None),
+        accepted,
     )

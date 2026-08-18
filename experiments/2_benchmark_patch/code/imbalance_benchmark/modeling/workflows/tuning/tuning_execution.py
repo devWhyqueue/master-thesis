@@ -68,6 +68,7 @@ def write_base_selections(
     fingerprint: list[str],
     is_mil: bool,
     conditions: tuple[str, ...],
+    accepted: list[set[str]] | None = None,
 ) -> None:
     """Reduce and sign every incomplete base-method condition."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
@@ -81,7 +82,7 @@ def write_base_selections(
             "base",
             phase_methods(is_mil, "base", condition),
             freeze["method_grids"],
-            ReduceRound(fingerprint),
+            ReduceRound(fingerprint, accepted=accepted),
             expected_observations(condition, assignments, freeze),
         )
         write_base_selection(base["data"], condition, selected)
@@ -93,6 +94,7 @@ def write_final_selections(
     fingerprint: list[str],
     is_mil: bool,
     conditions: tuple[str, ...],
+    accepted: list[set[str]] | None = None,
 ) -> None:
     """Write the unchanged signed selection interface and parallel search costs."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
@@ -108,6 +110,7 @@ def write_final_selections(
             phase_methods(is_mil, "dependent", condition),
             assignments,
             condition,
+            accepted,
         )
 
 
@@ -119,6 +122,7 @@ def _reduce_condition(
     dependent_methods: tuple[str, ...],
     assignments: tuple[str, ...],
     condition: str,
+    accepted: list[set[str]] | None = None,
 ) -> None:
     """Reduce every required method's signed terminal adaptive state, not round 0.
 
@@ -135,8 +139,9 @@ def _reduce_condition(
     state = load_round_state(root, condition)
     terminal_grids = terminal_active_grids(state, methods, len(freeze["class_names"]))
     expected = expected_observations(condition, assignments, freeze)
+    reduce_round = ReduceRound(fingerprint, accepted=accepted)
     base_selected, _ = reduce_terminal_phase(
-        root, condition, "base", base_methods, terminal_grids, fingerprint, expected
+        root, condition, "base", base_methods, terminal_grids, reduce_round, expected
     )
     dependent_selected, _ = reduce_terminal_phase(
         root,
@@ -144,16 +149,22 @@ def _reduce_condition(
         "dependent",
         dependent_methods,
         terminal_grids,
-        fingerprint,
+        reduce_round,
         expected,
     )
     selected = {**base_selected, **dependent_selected}
     cost_payloads = [
         *terminal_cost_payloads(
-            root, condition, "base", base_methods, fingerprint, expected
+            root, condition, "base", base_methods, fingerprint, expected, accepted
         ),
         *terminal_cost_payloads(
-            root, condition, "dependent", dependent_methods, fingerprint, expected
+            root,
+            condition,
+            "dependent",
+            dependent_methods,
+            fingerprint,
+            expected,
+            accepted,
         ),
     ]
     scoped = ("native",) if condition in {"natural", "balanced"} else assignments
@@ -184,6 +195,7 @@ def reduce_tuning_shards(
     fingerprint: list[str],
     phase: str,
     condition: str | None = None,
+    accepted: list[set[str]] | None = None,
 ) -> None:
     """Reduce complete base or dependent shards into signed selections.
 
@@ -192,7 +204,7 @@ def reduce_tuning_shards(
     """
     is_mil = raw_scopes[0][1].is_mil
     if phase == "base":
-        write_base_selections(base, freeze, fingerprint, is_mil, CONDITIONS)
+        write_base_selections(base, freeze, fingerprint, is_mil, CONDITIONS, accepted)
         return
     write_final_selections(
         base,
@@ -200,6 +212,7 @@ def reduce_tuning_shards(
         fingerprint,
         is_mil,
         (condition,) if condition else CONDITIONS,
+        accepted,
     )
 
 

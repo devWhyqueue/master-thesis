@@ -85,7 +85,9 @@ def test_reduce_this_round_passes_expected_observations_to_reduce_phase(monkeypa
     decide the first time it ran against real bundled shard output."""
     captured = {}
 
-    def fake_reduce_phase(root, condition, phase, methods, grids, reduce_round, expected=None):
+    def fake_reduce_phase(
+        root, condition, phase, methods, grids, reduce_round, expected=None, accepted=None
+    ):
         captured["expected"] = expected
         return {}, []
 
@@ -97,7 +99,7 @@ def test_reduce_this_round_passes_expected_observations_to_reduce_phase(monkeypa
         "tail_assignments": {"native": []},
     }
     decide._reduce_this_round(
-        {"data": Path("root")}, freeze, "moderate", "base", 0, ("ce",), ["fp"]
+        {"data": Path("root")}, freeze, "moderate", "base", 0, ("ce",), ["fp"], [{"fp"}]
     )
 
     assert captured["expected"] == 6  # len(assignments)=1 * 3 splits * 2 seeds
@@ -469,6 +471,7 @@ def test_cmd_tune_decide_handles_a_later_round_with_only_some_methods_active(
                 "class_names": ["a", "b", "c", "d", "e", "f", "g"],
             },
             ["fp"],
+            [{"fp"}],
         ),
     )
     monkeypatch.setattr(decide, "_is_excluded", lambda paths: False)

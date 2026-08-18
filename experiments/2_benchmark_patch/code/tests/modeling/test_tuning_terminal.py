@@ -17,6 +17,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     write_atomic,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
+    ReduceRound,
     reduce_terminal_phase,
     terminal_active_grids,
 )
@@ -188,7 +189,7 @@ def test_reduce_terminal_phase_selects_a_later_round_winner_via_the_registry(
 
     terminal_grids = {"ce": [{"lr": 3e-4}, {"lr": 1e-3}, {"lr": 3e-3}, {"lr": 1e-2}]}
     selections, payloads = reduce_terminal_phase(
-        tmp_path, "moderate", "base", ("ce",), terminal_grids, FINGERPRINT
+        tmp_path, "moderate", "base", ("ce",), terminal_grids, ReduceRound(FINGERPRINT)
     )
 
     assert selections["ce"] == {"lr": 1e-2}
@@ -206,7 +207,12 @@ def test_reduce_terminal_phase_aborts_on_a_stale_shard_that_no_longer_matches_th
 
     with pytest.raises(RuntimeError, match="config mismatch"):
         reduce_terminal_phase(
-            tmp_path, "moderate", "base", ("ce",), {"ce": [{"lr": 1e-4}]}, FINGERPRINT
+            tmp_path,
+            "moderate",
+            "base",
+            ("ce",),
+            {"ce": [{"lr": 1e-4}]},
+            ReduceRound(FINGERPRINT),
         )
 
 

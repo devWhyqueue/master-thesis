@@ -50,7 +50,7 @@ def run_round_wave(
         return
     limited = _limited(job, fresh, config)
     record_attempted(base["data"], scope, list(limited.array_indices))
-    _submit_wave(config, os.path.abspath(args.config), limited, args)
+    submit_wave(config, os.path.abspath(args.config), [limited], args)
 
 
 def run_group_wave(
@@ -59,13 +59,15 @@ def run_group_wave(
     """Submit frozen dependent controlled group through same wave loop."""
     if args.phase != "dependent" or args.round:
         raise ValueError("Only dependent round zero accepts a tuning group")
-    _, _, freeze, fingerprint = _frozen_shard_context(args, False)
+    _, _, freeze, fingerprint, accepted = _frozen_shard_context(args, False)
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     (job,) = dependent_round_zero_jobs(config, is_mil)
     pending = [
         index
         for index in range(job.array_size)
-        if _group_missing(base["data"], freeze, fingerprint, is_mil, job, index)
+        if _group_missing(
+            base["data"], freeze, fingerprint, is_mil, job, index, accepted
+        )
     ]
     if not pending:
         _submit_group_decides(config, os.path.abspath(args.config))
@@ -77,7 +79,7 @@ def run_group_wave(
         return
     limited = _limited(job, fresh, config)
     record_attempted(base["data"], scope, list(limited.array_indices))
-    _submit_wave(config, os.path.abspath(args.config), limited, args)
+    submit_wave(config, os.path.abspath(args.config), [limited], args)
 
 
 def _warn_stalled(scope: str, missing: int) -> None:
@@ -93,7 +95,7 @@ def _warn_stalled(scope: str, missing: int) -> None:
 def _round_plan(
     config: dict[str, Any], args: argparse.Namespace
 ) -> tuple[SlurmJob, list[int]]:
-    base, _, freeze, fingerprint = _frozen_shard_context(args, False)
+    base, _, freeze, fingerprint, accepted = _frozen_shard_context(args, False)
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     methods = phase_methods(is_mil, args.phase, str(args.condition))
     job = _round_job(config, args, methods)
@@ -106,7 +108,14 @@ def _round_plan(
         index
         for index in range(job.array_size)
         if _round_missing(
-            base["data"], args, methods, index, fingerprint, expected, observations
+            base["data"],
+            args,
+            methods,
+            index,
+            fingerprint,
+            expected,
+            observations,
+            accepted,
         )
     ]
     return job, pending
@@ -143,6 +152,7 @@ def _round_missing(
     fingerprint: list[str],
     expected: int,
     observations: int,
+    accepted: list[set[str]],
 ) -> bool:
     candidate, observation = (
         divmod(index, observations) if args.condition == "natural" else (index, None)
@@ -158,6 +168,7 @@ def _round_missing(
             replace(spec, observation_index=observation),
             fingerprint,
             None if observation is not None else expected,
+            accepted,
         )
     except RuntimeError as error:
         if str(error).startswith("Missing tuning"):
@@ -173,6 +184,7 @@ def _group_missing(
     is_mil: bool,
     job: SlurmJob,
     index: int,
+    accepted: list[set[str]],
 ) -> bool:
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     shards = int(job.command.rsplit(" ", 1)[-1])
@@ -188,6 +200,7 @@ def _group_missing(
                 spec,
                 fingerprint,
                 expected_observations(spec.condition, assignments, freeze),
+                accepted,
             )
         except RuntimeError as error:
             if str(error).startswith("Missing tuning"):
@@ -204,15 +217,6 @@ def _limited(job: SlurmJob, pending: list[int], config: dict[str, Any]) -> Slurm
             "No safe tuning wave fits. Resume with: submit --resume-tuning"
         )
     return replace(job, array_indices=tuple(pending[:available]))
-
-
-def _submit_wave(
-    config: dict[str, Any],
-    config_path: str,
-    job: SlurmJob,
-    args: argparse.Namespace,
-) -> None:
-    submit_wave(config, config_path, [job], args)
 
 
 def _submit_decide(

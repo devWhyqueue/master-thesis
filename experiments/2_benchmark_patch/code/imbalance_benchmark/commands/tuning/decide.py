@@ -55,6 +55,7 @@ def _reduce_this_round(
     round_index: int,
     methods: tuple[str, ...],
     fingerprint: list[str],
+    accepted: list[set[str]],
 ) -> dict[str, Any]:
     """Reduce this round's shards and return each method's winning configuration."""
     if round_index == 0:
@@ -73,7 +74,7 @@ def _reduce_this_round(
         phase,
         tuple(grids),
         grids,
-        ReduceRound(fingerprint, index=round_index),
+        ReduceRound(fingerprint, index=round_index, accepted=accepted),
         _expected_observations(condition, assignments, freeze),
     )
     return selections
@@ -87,24 +88,50 @@ def _dependent_phase_started(root: Any, condition: str) -> bool:
     return "crt" in state or "post_hoc_logit_adjustment" in state
 
 
-def cmd_tune_decide(args: argparse.Namespace) -> None:
-    """After one round's shards complete, resolve, shift, lock, or advance the phase."""
-    base, scopes, freeze, fingerprint = _frozen_shard_context(args)
-    if any(_is_excluded(paths) for paths, _, _ in scopes):
-        return
-    is_mil = scopes[0][1].is_mil
+def _resolve_round_states(
+    base: dict[str, Any],
+    freeze: dict[str, Any],
+    fingerprint: list[str],
+    accepted: list[set[str]],
+    args: argparse.Namespace,
+    is_mil: bool,
+) -> tuple[dict[str, Any], dict[str, RoundState], dict[str, Window]]:
+    """Reduce this round's shards and decide each method's next-round state."""
     methods = phase_methods(is_mil, args.phase, args.condition)
     selections = _reduce_this_round(
-        base, freeze, args.condition, args.phase, args.round, methods, fingerprint
+        base,
+        freeze,
+        args.condition,
+        args.phase,
+        args.round,
+        methods,
+        fingerprint,
+        accepted,
     )
-    n_classes = len(freeze["class_names"])
     windows = this_round_windows(
-        base["data"], args.condition, args.phase, args.round, methods, n_classes
+        base["data"],
+        args.condition,
+        args.phase,
+        args.round,
+        methods,
+        len(freeze["class_names"]),
     )
     states = {
         method: decide_next_round(method, selections[method], *windows[method])
         for method in selections
     }
+    return selections, states, windows
+
+
+def cmd_tune_decide(args: argparse.Namespace) -> None:
+    """After one round's shards complete, resolve, shift, lock, or advance the phase."""
+    base, scopes, freeze, fingerprint, accepted = _frozen_shard_context(args)
+    if any(_is_excluded(paths) for paths, _, _ in scopes):
+        return
+    is_mil = scopes[0][1].is_mil
+    selections, states, windows = _resolve_round_states(
+        base, freeze, fingerprint, accepted, args, is_mil
+    )
     merge_round_state(base["data"], args.condition, round_payload(states))
     if args.phase == "base":
         write_base_selection(base["data"], args.condition, selections)
