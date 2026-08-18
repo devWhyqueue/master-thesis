@@ -29,7 +29,14 @@ def _registry_key(method: str, config: dict[str, Any]) -> str:
 
 
 def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
-    """Load the map from (method, config) to the round/index it was first trained in."""
+    """Load the map from (method, config) to the round/index it was first trained in.
+
+    Entries written before parameter values were float-normalized (e.g. an
+    int-grid method's ``oko|1|...`` alongside today's ``oko|1.0|...``)
+    collapse onto the same canonical key; keep whichever trained first
+    (lowest round) rather than error, since the earlier one is what any
+    prior decision would have resolved through.
+    """
     path = registry_path(root, condition)
     registry = json.loads(path.read_text()) if path.exists() else {}
     normalized: dict[str, dict[str, int]] = {}
@@ -39,9 +46,9 @@ def load_registry(root: Path, condition: str) -> dict[str, dict[str, int]]:
         if parameter != "None":
             config["parameter"] = float(parameter)
         canonical = _registry_key(method, config)
-        if canonical in normalized and normalized[canonical] != entry:
-            raise RuntimeError(f"Conflicting candidate registry entries: {canonical}")
-        normalized[canonical] = entry
+        existing = normalized.get(canonical)
+        if existing is None or entry["round"] < existing["round"]:
+            normalized[canonical] = entry
     return normalized
 
 

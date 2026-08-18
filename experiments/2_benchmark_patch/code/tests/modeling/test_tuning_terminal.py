@@ -140,21 +140,22 @@ def test_resolve_terminal_specs_finds_an_int_registered_candidate_via_a_float_qu
     assert [(spec.round, spec.candidate_index) for spec in specs] == [(0, 0)]
 
 
-def test_registry_normalization_rejects_conflicting_candidate_locations(
+def test_registry_normalization_prefers_the_earliest_trained_candidate_location(
     tmp_path: Path,
 ) -> None:
     write_atomic(
         tmp_path / "tuning_shards" / "candidate_registry_moderate.json",
         {
             "oko|1|0.0001": {"round": 0, "candidate_index": 0},
-            "oko|1.0|0.0001": {"round": 1, "candidate_index": 0},
+            "oko|1.0|0.0001": {"round": 1, "candidate_index": 5},
         },
     )
 
-    with pytest.raises(RuntimeError, match="Conflicting candidate registry entries"):
-        resolve_terminal_specs(
-            tmp_path, "moderate", "base", "oko", [{"parameter": 1.0, "lr": 1e-4}]
-        )
+    specs = resolve_terminal_specs(
+        tmp_path, "moderate", "base", "oko", [{"parameter": 1.0, "lr": 1e-4}]
+    )
+
+    assert specs == [ShardSpec("moderate", "oko", 0, "base", round=0)]
 
 
 def test_resolve_terminal_specs_aborts_on_a_config_missing_from_the_registry(
