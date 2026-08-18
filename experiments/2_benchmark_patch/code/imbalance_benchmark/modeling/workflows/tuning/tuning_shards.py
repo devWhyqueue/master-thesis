@@ -21,6 +21,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     validate_shard_payload,
     write_atomic as _write_atomic,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import ReduceRound
 
 
 ScopeStream = tuple[Callable[[], Iterator[TuningScope]], int, list[dict[str, Any]]]
@@ -30,13 +31,13 @@ def run_candidate_shard(
     spec: ShardSpec,
     scopes: list[TuningScope],
     seeds: list[int],
-    fingerprint: list[str],
+    reduce_round: ReduceRound,
     output_root: Path,
     stage_one_config: dict[str, Any] | None = None,
     scope_stream: ScopeStream | None = None,
 ) -> Path:
     """Execute or reuse one candidate shard and persist its ordered observations."""
-    complete = _reusable_path(spec, output_root, fingerprint)
+    complete = _reusable_path(spec, output_root, reduce_round)
     if complete is not None:
         return complete
     target = shard_path(output_root, spec)
@@ -48,34 +49,22 @@ def run_candidate_shard(
         if scope_stream
         else _fit_payload(spec, scopes, seeds, stage_one_config)
     )
-    _add_observation_metadata(payload, spec, scopes, seeds, scope_stream)
-    payload.update(_runtime_payload(spec, fingerprint, started_at, started))
-    validate_shard_payload(payload, fingerprint, spec)
+    descriptors = scope_stream[2] if scope_stream else None
+    payload["seeds"] = seeds
+    payload["scope_count"] = scope_stream[1] if scope_stream else len(scopes)
+    payload["observation_keys"] = _observation_keys(
+        scopes, seeds, descriptors, spec.observation_index
+    )
+    payload.update(
+        _runtime_payload(spec, reduce_round.fingerprint, started_at, started)
+    )
+    validate_shard_payload(payload, reduce_round.fingerprint, spec)
     _write_atomic(target, payload)
     return target
 
 
-def _add_observation_metadata(
-    payload: dict[str, Any],
-    spec: ShardSpec,
-    scopes: list[TuningScope],
-    seeds: list[int],
-    stream: ScopeStream | None,
-) -> None:
-    descriptors = stream[2] if stream else None
-    payload.update(
-        {
-            "seeds": seeds,
-            "scope_count": stream[1] if stream else len(scopes),
-            "observation_keys": _observation_keys(
-                scopes, seeds, descriptors, spec.observation_index
-            ),
-        }
-    )
-
-
 def _reusable_path(
-    spec: ShardSpec, output_root: Path, fingerprint: list[str]
+    spec: ShardSpec, output_root: Path, reduce_round: ReduceRound
 ) -> Path | None:
     candidates = [spec]
     if spec.observation_index is not None:
@@ -83,7 +72,12 @@ def _reusable_path(
     for candidate in candidates:
         path = shard_path(output_root, candidate)
         if path.exists():
-            validate_shard_payload(json.loads(path.read_text()), fingerprint, candidate)
+            validate_shard_payload(
+                json.loads(path.read_text()),
+                reduce_round.fingerprint,
+                candidate,
+                reduce_round.accepted,
+            )
             return path
     return None
 
@@ -105,16 +99,14 @@ def _runtime_payload(
         "peak_accelerator_memory_bytes": int(torch.cuda.max_memory_allocated())
         if torch.cuda.is_available()
         else 0,
-        "hardware": _hardware(),
-    }
-
-
-def _hardware() -> dict[str, Any]:
-    return {
-        "cuda": torch.cuda.is_available(),
-        "device": torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu",
-        "partition": os.environ.get("SLURM_JOB_PARTITION"),
-        "job_id": os.environ.get("SLURM_JOB_ID"),
+        "hardware": {
+            "cuda": torch.cuda.is_available(),
+            "device": torch.cuda.get_device_name()
+            if torch.cuda.is_available()
+            else "cpu",
+            "partition": os.environ.get("SLURM_JOB_PARTITION"),
+            "job_id": os.environ.get("SLURM_JOB_ID"),
+        },
     }
 
 

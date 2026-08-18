@@ -235,8 +235,8 @@ def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
     monkeypatch.setattr(tuning_shard, "combined_scopes", lambda *_a, **_k: base_scopes)
     captured: list[list[TuningScope]] = []
 
-    def fake_run_candidate_shard(spec, scopes, seeds, fingerprint, output_root, stage):
-        del spec, seeds, fingerprint, output_root, stage
+    def fake_run_candidate_shard(spec, scopes, seeds, reduce_round, output_root, stage):
+        del spec, seeds, reduce_round, output_root, stage
         captured.append(scopes)
 
     monkeypatch.setattr(tuning_shard, "run_candidate_shard", fake_run_candidate_shard)
@@ -248,8 +248,8 @@ def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
     built: dict = {}
 
     base = {"data": None}
-    tuning_shard._run_shard(base, [(None, regime, None)], freeze, ["fp"], built, spec)
-    tuning_shard._run_shard(base, [(None, regime, None)], freeze, ["fp"], built, spec)
+    tuning_shard._run_shard(base, [(None, regime, None)], freeze, ["fp"], [], built, spec)
+    tuning_shard._run_shard(base, [(None, regime, None)], freeze, ["fp"], [], built, spec)
 
     first, second = captured
     assert len({id(s.cost_records) for s in first}) == 1
@@ -272,9 +272,9 @@ def test_run_scope_local_shard_threads_selected_ce_for_dependent_phase(
     captured: list[Any] = []
 
     def fake_run_candidate_shard(
-        spec, scopes, seeds, fingerprint, output_root, stage, scope_stream=None
+        spec, scopes, seeds, reduce_round, output_root, stage, scope_stream=None
     ):
-        del spec, scopes, seeds, fingerprint, output_root, scope_stream
+        del spec, scopes, seeds, reduce_round, output_root, scope_stream
         captured.append(stage)
 
     monkeypatch.setattr(tuning_shard, "run_candidate_shard", fake_run_candidate_shard)
@@ -290,6 +290,7 @@ def test_run_scope_local_shard_threads_selected_ce_for_dependent_phase(
         base,
         freeze,
         ["fp"],
+        [],
         tuning_shard.ShardSpec("balanced", "crt", 0, "dependent"),
     )
     tuning_shard._run_scope_local_shard(
@@ -297,6 +298,7 @@ def test_run_scope_local_shard_threads_selected_ce_for_dependent_phase(
         base,
         freeze,
         ["fp"],
+        [],
         tuning_shard.ShardSpec("balanced", "ce", 0, "base"),
     )
 

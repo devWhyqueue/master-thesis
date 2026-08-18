@@ -26,6 +26,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     condition_is_reusable,
     selected_ce,
 )
+from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import ReduceRound
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
     run_candidate_shard,
@@ -46,6 +47,7 @@ def _execute_shards(
     args: argparse.Namespace,
     freeze: dict[str, Any],
     fingerprint: list[str],
+    accepted: list[set[str]],
     indices: list[int],
     spec_for: Callable[[int], ShardSpec | None],
 ) -> None:
@@ -53,14 +55,14 @@ def _execute_shards(
     for index in indices:
         spec = spec_for(index)
         if spec is not None:
-            _run_scope_local_shard(args, base, freeze, fingerprint, spec)
+            _run_scope_local_shard(args, base, freeze, fingerprint, accepted, spec)
 
 
 def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
     """Run candidate indices sequentially with one loaded frozen MIL context."""
     if args.group is None:
         raise ValueError("--group is required for a round-0 shard")
-    base, _, freeze, fingerprint, _ = _frozen_shard_context(args, False)
+    base, _, freeze, fingerprint, accepted = _frozen_shard_context(args, False)
     if any(_is_excluded(paths) for paths in _split_paths(base)):
         return
 
@@ -80,14 +82,14 @@ def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
             observation,
         )
 
-    _execute_shards(base, args, freeze, fingerprint, indices, _spec_for)
+    _execute_shards(base, args, freeze, fingerprint, accepted, indices, _spec_for)
 
 
 def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
     """Run round>0 candidate indices: only genuinely new configs are trained."""
     if args.condition is None:
         raise ValueError("--condition is required for a round>0 shard")
-    base, scopes, freeze, fingerprint, _ = _frozen_shard_context(args)
+    base, scopes, freeze, fingerprint, accepted = _frozen_shard_context(args)
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
     methods = phase_methods(scopes[0][1].is_mil, args.phase, args.condition)
@@ -108,7 +110,7 @@ def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
     for index in indices:
         spec = _spec_for(index)
         if spec is not None:
-            _run_shard(base, overridden, freeze, fingerprint, built, spec)
+            _run_shard(base, overridden, freeze, fingerprint, accepted, built, spec)
 
 
 def _split_paths(base: dict[str, Path]) -> list[dict[str, Path]]:
@@ -121,6 +123,7 @@ def _run_scope_local_shard(
     base: dict[str, Path],
     freeze: dict[str, Any],
     fingerprint: list[str],
+    accepted: list[set[str]],
     spec: ShardSpec,
 ) -> None:
     """Train one base shard with one validation-plus-training feature bank at a time."""
@@ -163,7 +166,7 @@ def _run_scope_local_shard(
         spec,
         [],
         _tuning_seeds(freeze),
-        fingerprint,
+        ReduceRound(fingerprint, accepted=accepted),
         base["data"],
         selected_ce(base["data"], spec.condition)
         if spec.phase == "dependent"
@@ -177,6 +180,7 @@ def _run_shard(
     raw_scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
     freeze: dict[str, Any],
     fingerprint: list[str],
+    accepted: list[set[str]],
     built: dict[tuple[str, tuple[str, ...]], list[TuningScope]],
     spec: ShardSpec,
 ) -> None:
@@ -198,7 +202,7 @@ def _run_shard(
         spec,
         [replace(scope, cost_records=fresh_cost_records) for scope in built[key]],
         _tuning_seeds(freeze),
-        fingerprint,
+        ReduceRound(fingerprint, accepted=accepted),
         base["data"],
         selected_ce(base["data"], spec.condition)
         if spec.phase == "dependent"
