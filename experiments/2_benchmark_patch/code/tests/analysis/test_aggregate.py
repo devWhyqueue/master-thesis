@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -571,6 +572,31 @@ def test_ingestion_does_not_open_eval_array_sidecars(
     ingest_all_runs(conn, {"results": tmp_path / "results"}, {"content_sha256": "freeze"})
 
     assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+
+def test_ingest_all_runs_prunes_a_run_whose_result_dir_was_removed(
+    tmp_path: Path,
+) -> None:
+    """A method retired from a roster (or a directory removed after a rerun)
+    must not leave its old run_id orphaned forever - analyze-combine trusts
+    the DB's key set to mean 'still exists under results/'."""
+    result_dir = tmp_path / "results" / "natural" / "balanced_sampling" / "seed=0"
+    _write_fake_run(
+        result_dir.parents[2], "natural", "balanced_sampling", 0, ["A", "B"], 0
+    )
+    record = read_run_record(result_dir)
+    assert record is not None
+    record["provenance"] = {"freeze_content_sha256": "freeze"}
+    write_run_record(result_dir, record)
+
+    conn = connect_db(tmp_path / "results.sqlite")
+    init_schema(conn)
+    ingest_all_runs(conn, {"results": tmp_path / "results"}, {"content_sha256": "freeze"})
+    assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+
+    shutil.rmtree(result_dir)
+    ingest_all_runs(conn, {"results": tmp_path / "results"}, {"content_sha256": "freeze"})
+
+    assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
 
 def test_ingestion_accepts_a_run_stamped_with_a_superseded_freeze_hash(
     tmp_path: Path,

@@ -31,16 +31,38 @@ logger = logging.getLogger(__name__)
 def ingest_all_runs(
     conn: sqlite3.Connection, paths: dict[str, Path], freeze: dict[str, Any]
 ) -> None:
-    """Ingest every confirmed run under results/, tier-annotated from the freeze manifest."""
+    """Rebuild the run table from results/: ingest what's there, prune what's gone.
+
+    A method retired from a condition's roster (or a directory removed after
+    a rerun) must not leave its old run_id lingering forever - discover_run_dirs
+    only ever upserts what it finds, so anything no longer discovered here is
+    explicitly dropped, keeping analyze-combine's DB-derived key set truthful
+    to the current results/ tree instead of its entire ingestion history.
+    """
+    discovered_ids = set()
     for condition, method, seed_idx, result_dir in discover_result_dirs(
         paths["results"]
     ):
         record = read_run_record(result_dir, array_fields=())
         if record is None:
             continue
-        _ingest_discovered_run(
-            conn, freeze, condition, method, seed_idx, result_dir, record
+        discovered_ids.add(
+            _ingest_discovered_run(
+                conn, freeze, condition, method, seed_idx, result_dir, record
+            )
         )
+    _prune_stale_runs(conn, discovered_ids)
+
+
+def _prune_stale_runs(conn: sqlite3.Connection, discovered_ids: set[str]) -> None:
+    """Delete run rows no longer backed by a discovered result_dir (cascades evals)."""
+    existing = {row[0] for row in conn.execute("SELECT run_id FROM runs")}
+    stale = existing - discovered_ids
+    if stale:
+        conn.executemany(
+            "DELETE FROM runs WHERE run_id = ?", [(run_id,) for run_id in stale]
+        )
+        conn.commit()
 
 
 def _ingest_discovered_run(
@@ -51,7 +73,7 @@ def _ingest_discovered_run(
     seed_idx: int,
     result_dir: Path,
     record: dict[str, Any],
-) -> None:
+) -> str:
     """Add one run with tiers derived from its frozen assignment allocation."""
     provenance = record.get("provenance", {})
     if provenance.get("freeze_content_sha256") not in accepted_freeze_hashes(freeze):
@@ -81,6 +103,7 @@ def _ingest_discovered_run(
         )
     run_id = f"{record.get('benchmark', 'unknown')}:{assignment}:{condition}:{method}:seed={seed_idx}"
     ingest_run(conn, run_id, result_dir, (condition, method, seed_idx), record, tiers)
+    return run_id
 
 
 def write_diagnostics(
