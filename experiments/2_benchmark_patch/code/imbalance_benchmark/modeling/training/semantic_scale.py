@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 
 from imbalance_benchmark.datasets.data import ImbalanceDataset
+from imbalance_benchmark.datasets.features.cache import bank_is_cpu
 from imbalance_benchmark.modeling.models import MLP
 from imbalance_benchmark.modeling.training.signal_weights import mean_one
 
@@ -30,11 +31,13 @@ class SsbPool:
 
     ``features`` rolls forward via :func:`_refresh`, one chunk per optimizer
     update; ``volumes`` retains each class's last valid semantic-scale
-    estimate across updates where its current draw is unusable.
+    estimate across pool passes where its current draw is unusable.
+    ``invalid_draws`` counts pool passes (not steps) in which a class had
+    fewer than two filled rows at the time volumes were recomputed.
     """
 
     class_ids: torch.Tensor
-    raw_features: torch.Tensor
+    indices: np.ndarray
     chunk_size: int
     features: torch.Tensor | None = None
     filled: torch.Tensor | None = None
@@ -66,13 +69,12 @@ def _matched_draw_indices(
 
 
 def init_pool(train_ds: ImbalanceDataset, seed: int, updates_per_pass: int) -> SsbPool:
-    """Build one matched draw and its empty rolling pool, sized for one pass-1 traversal."""
+    """Build one matched draw's row indices and its empty rolling pool, sized for one pass-1 traversal."""
     indices, class_ids = _matched_draw_indices(train_ds, seed)
-    raw_features = train_ds.__getitems__(indices.tolist())["features"]
     chunk_size = max(1, math.ceil(len(indices) / updates_per_pass))
     return SsbPool(
         class_ids=torch.from_numpy(class_ids),
-        raw_features=raw_features,
+        indices=indices,
         chunk_size=chunk_size,
     )
 
@@ -86,22 +88,31 @@ def prepare_ssb_pool(ctx: dict[str, Any], b_size: int) -> None:
     ctx["ssb_pool"] = init_pool(ctx["train_dataset"], ctx["seed"], updates_per_pass)
 
 
-def _refresh(pool: SsbPool, model: MLP, device: torch.device) -> None:
-    """Re-encode the next chunk of the matched draw with the current model."""
-    n = len(pool.raw_features)
+def _refresh(
+    pool: SsbPool, model: MLP, train_ds: ImbalanceDataset, device: torch.device
+) -> bool:
+    """Re-encode the next chunk of the matched draw with the current model.
+
+    Returns True when this call completes a full traversal of the pool
+    (cursor wraps to 0), i.e. every row has been re-encoded at least once.
+    """
+    n = len(pool.indices)
     start = pool.cursor
     stop = min(start + pool.chunk_size, n)
-    idx = torch.arange(start, stop)
+    chunk_indices = pool.indices[start:stop].tolist()
+    raw = train_ds.__getitems__(chunk_indices)["features"]
+    pool_device = device if not bank_is_cpu() else torch.device("cpu")
     with torch.no_grad():
-        encoded = model.encode(pool.raw_features[idx].to(device)).cpu()
+        encoded = model.encode(raw.to(device)).to(pool_device)
     if pool.features is None or pool.filled is None:
-        pool.features = torch.zeros(n, encoded.shape[-1])
+        pool.features = torch.zeros(n, encoded.shape[-1], device=pool_device)
         pool.filled = torch.zeros(n, dtype=torch.bool)
     assert pool.features is not None and pool.filled is not None
     features, filled = pool.features, pool.filled
-    features[idx] = encoded
-    filled[idx] = True
+    features[start:stop] = encoded
+    filled[start:stop] = True
     pool.cursor = 0 if stop >= n else stop
+    return pool.cursor == 0
 
 
 def _isotropic_scale(features: torch.Tensor) -> float:
@@ -117,10 +128,10 @@ def _log2_volume(centered: torch.Tensor, d: int) -> float:
     scale = d / m
     if m <= d:
         gram = centered @ centered.T
-        mat = torch.eye(m) + scale * gram
+        mat = torch.eye(m, device=centered.device) + scale * gram
     else:
         cov = centered.T @ centered
-        mat = torch.eye(d) + scale * cov
+        mat = torch.eye(d, device=centered.device) + scale * cov
     _, logdet = torch.linalg.slogdet(mat.double())
     return 0.5 * float(logdet) / math.log(2.0)
 
@@ -148,8 +159,9 @@ def _update_volumes(pool: SsbPool, n_classes: int) -> None:
     """Recompute each class's semantic scale from its currently filled draw."""
     if pool.features is None or pool.filled is None:
         return
-    filled = pool.features[pool.filled]
-    class_ids = pool.class_ids[pool.filled]
+    mask = pool.filled.to(pool.features.device)
+    filled = pool.features[mask]
+    class_ids = pool.class_ids.to(pool.features.device)[mask]
     for class_id in range(n_classes):
         if int((class_ids == class_id).sum()) < 2:
             pool.invalid_draws += 1
@@ -173,7 +185,7 @@ def ssb_loss(
     """Semantic-scale weighted CE: unit weights through pass 5, SSB weights from pass 6."""
     pool: SsbPool = ctx["ssb_pool"]
     device, n_classes = ctx["device"], ctx["n_classes"]
-    _refresh(pool, model, device)
+    wrapped = _refresh(pool, model, ctx["train_dataset"], device)
     logits = model(inputs)
     reweight_step = 5 * ctx["ssb_updates_per_pass"]
     diagnostics = ctx.setdefault("method_diagnostics", {})
@@ -183,7 +195,8 @@ def ssb_loss(
             _update_volumes(pool, n_classes)
             diagnostics["ssb_invalid_draws"] = pool.invalid_draws
         return F.cross_entropy(logits, targets)
-    _update_volumes(pool, n_classes)
+    if wrapped:
+        _update_volumes(pool, n_classes)
     diagnostics["ssb_invalid_draws"] = pool.invalid_draws
     tau = float(ctx["param"] if ctx["param"] is not None else 0.5)
     weight = _ssb_weights(pool, n_classes, tau).to(device)

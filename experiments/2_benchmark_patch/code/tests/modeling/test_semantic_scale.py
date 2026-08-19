@@ -10,6 +10,7 @@ from imbalance_benchmark.datasets.data import ImbalanceDataset
 from imbalance_benchmark.datasets.features.cache import reset_feature_bank
 from imbalance_benchmark.modeling.models import build_model
 from imbalance_benchmark.modeling.training import _fit_step
+from imbalance_benchmark.modeling.training import semantic_scale
 from imbalance_benchmark.modeling.training.semantic_scale import (
     _log2_volume,
     _matched_draw_indices,
@@ -134,6 +135,37 @@ def test_ssb_uses_unit_weights_for_exactly_five_passes(tmp_path: Path) -> None:
     weighted_loss = _fit_step(batch, ctx, 5 * updates_per_pass, max_steps)
     assert not torch.allclose(weighted_loss, reference)  # SSB weights from here on
     assert ctx["ssb_pool"].volumes  # computed ahead of the first weighted step
+
+
+def test_update_volumes_runs_once_per_pool_pass_not_per_step(
+    tmp_path: Path, monkeypatch
+) -> None:
+    ctx = _ctx(tmp_path, ["a", "b", "c"])
+    b_size = 4
+    prepare_ssb_pool(ctx, b_size)
+    updates_per_pass = ctx["ssb_updates_per_pass"]
+    max_steps = 7 * updates_per_pass  # run past pass 6
+
+    calls = 0
+    original = semantic_scale._update_volumes
+
+    def counting_update_volumes(pool, n_classes):
+        nonlocal calls
+        calls += 1
+        return original(pool, n_classes)
+
+    monkeypatch.setattr(semantic_scale, "_update_volumes", counting_update_volumes)
+
+    batch = {
+        "features": torch.randn(b_size, DIM),
+        "target": torch.randint(0, 3, (b_size,)),
+    }
+    for step in range(max_steps):
+        semantic_scale.ssb_loss(ctx["model"], batch["features"], batch["target"], ctx, step)
+
+    # one seeding call at reweight_step - 1, plus one per completed pool pass
+    # thereafter (passes 6 and 7) -- never one per step.
+    assert calls == 3
 
 
 def test_ssb_pool_class_names_match_dataset_order(tmp_path: Path) -> None:
