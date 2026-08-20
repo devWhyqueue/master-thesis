@@ -190,7 +190,6 @@ def _write_condition_outputs(
 
 def reduce_tuning_shards(
     base: dict[str, Path],
-    raw_scopes: list[tuple[dict[str, Path], Any, Any]],
     freeze: dict[str, Any],
     fingerprint: list[str],
     phase: str,
@@ -201,8 +200,10 @@ def reduce_tuning_shards(
 
     ``condition`` scopes a ``phase="final"`` reduce to one condition, since
     the others may still be mid-search when this condition's converges.
+    Reads only shard artifacts and the freeze record, never raw feature
+    data, so this never needs a loaded scope.
     """
-    is_mil = raw_scopes[0][1].is_mil
+    is_mil = freeze["runtime_config"].get("dataset", {}).get("regime") == "wsi"
     if phase == "base":
         write_base_selections(base, freeze, fingerprint, is_mil, CONDITIONS, accepted)
         return

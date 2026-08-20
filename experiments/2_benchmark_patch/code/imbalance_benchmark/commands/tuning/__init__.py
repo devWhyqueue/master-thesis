@@ -237,10 +237,9 @@ def load_shard_scope(
 
 def cmd_tune_reduce(args: argparse.Namespace) -> None:
     """Reduce complete shards into the benchmark's signed selection interface."""
-    base, raw_scopes, freeze, fingerprint, accepted = _frozen_shard_context(args)
+    base, _, freeze, fingerprint, accepted = _frozen_shard_context(args, False)
     reduce_tuning_shards(
         base,
-        raw_scopes,
         freeze,
         fingerprint,
         args.phase,
