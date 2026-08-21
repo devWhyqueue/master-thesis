@@ -102,12 +102,14 @@ def test_register_candidates_is_idempotent_and_never_overwrites_the_original_rou
     assert registry_lookup(registry, "ce", {"lr": 1e-4}) == (0, 0)
 
 
-def test_register_candidates_honors_a_nonzero_start_index(tmp_path):
-    register_candidates(
-        tmp_path, "moderate", "ce", [{"lr": 3e-4}], round_index=1, start_index=3
-    )
+def test_register_candidates_appends_after_indices_the_same_round_already_claimed(
+    tmp_path,
+):
+    register_candidates(tmp_path, "moderate", "ce", [{"lr": 1e-4}], round_index=1)
+    register_candidates(tmp_path, "moderate", "ce", [{"lr": 3e-4}], round_index=1)
     registry = load_registry(tmp_path, "moderate")
-    assert registry_lookup(registry, "ce", {"lr": 3e-4}) == (1, 3)
+    assert registry_lookup(registry, "ce", {"lr": 1e-4}) == (1, 0)
+    assert registry_lookup(registry, "ce", {"lr": 3e-4}) == (1, 1)
 
 
 def test_registries_are_scoped_per_condition(tmp_path):

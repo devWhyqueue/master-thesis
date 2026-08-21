@@ -134,21 +134,22 @@ def register_candidates(
     method: str,
     configs: list[dict[str, Any]],
     round_index: int,
-    start_index: int = 0,
 ) -> None:
-    """Record where one round's freshly trained candidates now live, idempotently."""
+    """Record new candidates after this (method, round)'s already-claimed indices."""
     registry = load_registry(root, condition)
-    for offset, config in enumerate(configs):
+    prior = registry_candidates_for_method(registry, method)
+    claimed = (e["candidate_index"] for e in prior if e["round"] == round_index)
+    next_index = max(claimed, default=-1) + 1
+    for config in configs:
         key = _registry_key(method, config)
-        registry.setdefault(
-            key, {"round": round_index, "candidate_index": start_index + offset}
-        )
+        if key not in registry:
+            registry[key] = {"round": round_index, "candidate_index": next_index}
+            next_index += 1
     write_atomic(registry_path(root, condition), registry)
 
 
 def _frozen_order_key(payload: dict[str, Any]) -> tuple[float, float]:
-    """Order by (parameter, lr): value-based so ties break the same way regardless
-    of which adaptive-search round a candidate was actually trained in."""
+    """Order by (parameter, lr) so ties break the same regardless of trained round."""
     config = payload["config"]
     return (float(config.get("parameter", float("-inf"))), float(config["lr"]))
 
