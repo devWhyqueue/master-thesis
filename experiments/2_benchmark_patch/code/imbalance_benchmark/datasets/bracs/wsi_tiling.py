@@ -9,13 +9,14 @@ selection, and the coarse tissue-mask prescreen live in ``wsi_foreground``.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import numpy as np
-import openslide
 import pandas as pd
 from scipy.ndimage import convolve
+from tiatoolbox.wsicore.wsireader import WSIReader
 
 from imbalance_benchmark.common import compute_sha256
 from imbalance_benchmark.datasets.bracs import wsi_foreground as fg
@@ -31,26 +32,40 @@ def discover_slides(root: Path) -> dict[str, Path]:
     return {path.stem: path for path in sorted(root.rglob("BRACS_*.svs"))}
 
 
+@contextmanager
+def _open_reader(svs_path: Path) -> Iterator[WSIReader]:
+    # tiatoolbox's WSIReader has no context-manager/close protocol of its own;
+    # close the underlying OpenSlide handle explicitly so batch runs over
+    # hundreds of slides don't accumulate open file descriptors.
+    reader = WSIReader.open(str(svs_path))
+    try:
+        yield reader
+    finally:
+        openslide_wsi = getattr(reader, "openslide_wsi", None)
+        if openslide_wsi is not None:
+            openslide_wsi.close()
+
+
 def tile_slide(svs_path: Path, slide_id: str, tile_root: Path) -> pd.DataFrame:
     """Tile one BRACS WSI at 20x and write the audited, tissue-isolated tiles.
 
     Returns one row per *kept* tile (Otsu foreground fraction, grayscale std,
     Canny edges, and >=2 tissue neighbours), matching ``bracs/audit.py``.
     """
-    with openslide.OpenSlide(str(svs_path)) as slide:
-        level_plan = fg.select_level(slide)
-        n_cols, n_rows = fg.grid_shape(slide, level_plan.downsample)
+    with _open_reader(svs_path) as reader:
+        downsample = fg.select_downsample(reader)
+        n_cols, n_rows = fg.grid_shape(reader, downsample)
         if n_cols == 0 or n_rows == 0:
             raise ValueError(f"{slide_id}: slide too small for a single 20x tile")
-        coarse_mask, coarse_downsample = fg.coarse_tissue_mask(slide)
+        coarse_mask, coarse_downsample = fg.coarse_tissue_mask(reader)
         grid = _cell_grid(
-            slide, n_rows, n_cols, level_plan, coarse_mask, coarse_downsample
+            reader, n_rows, n_cols, downsample, coarse_mask, coarse_downsample
         )
         keep, neighbor_counts = _keep_mask(grid)
         out_dir = tile_root / slide_id
         out_dir.mkdir(parents=True, exist_ok=True)
         rows = _kept_rows(
-            slide, slide_id, out_dir, grid, keep, neighbor_counts, level_plan
+            reader, slide_id, out_dir, grid, keep, neighbor_counts, downsample
         )
     if not rows:
         raise ValueError(f"{slide_id}: no tiles passed the tissue-foreground audit")
@@ -58,19 +73,17 @@ def tile_slide(svs_path: Path, slide_id: str, tile_root: Path) -> pd.DataFrame:
 
 
 def _cell_grid(
-    slide: Any,
+    reader: WSIReader,
     n_rows: int,
     n_cols: int,
-    level_plan: fg.Level,
+    downsample: float,
     coarse_mask: np.ndarray | None,
     coarse_downsample: float,
 ) -> list[list[fg.Cell]]:
     return [
         [
-            fg.cell_stats(slide, row, col, level_plan)
-            if fg.is_candidate(
-                coarse_mask, coarse_downsample, row, col, level_plan.downsample
-            )
+            fg.cell_stats(reader, row, col, downsample)
+            if fg.is_candidate(coarse_mask, coarse_downsample, row, col, downsample)
             else fg.Cell(0.0, 0.0, 0)
             for col in range(n_cols)
         ]
@@ -85,25 +98,25 @@ def _keep_mask(grid: list[list[fg.Cell]]) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _kept_rows(
-    slide: Any,
+    reader: WSIReader,
     slide_id: str,
     out_dir: Path,
     grid: list[list[fg.Cell]],
     keep: np.ndarray,
     neighbor_counts: np.ndarray,
-    level_plan: fg.Level,
+    downsample: float,
 ) -> list[dict[str, Any]]:
     n_rows, n_cols = keep.shape
     return [
         _write_tile(
-            slide,
+            reader,
             slide_id,
             out_dir,
             row,
             col,
             grid[row][col],
             int(neighbor_counts[row, col]),
-            level_plan,
+            downsample,
         )
         for row in range(n_rows)
         for col in range(n_cols)
@@ -112,19 +125,19 @@ def _kept_rows(
 
 
 def _write_tile(
-    slide: Any,
+    reader: WSIReader,
     slide_id: str,
     out_dir: Path,
     row: int,
     col: int,
     cell: fg.Cell,
     tissue_neighbors: int,
-    level_plan: fg.Level,
+    downsample: float,
 ) -> dict[str, Any]:
     x, y = col * fg.TILE_SIZE, row * fg.TILE_SIZE
     tile_path = out_dir / f"{slide_id}_{y:06d}_{x:06d}.png"
     if not tile_path.exists():
-        fg.read_tile_region(slide, row, col, level_plan).save(tile_path)
+        fg.read_tile_region(reader, row, col, downsample).save(tile_path)
     return {
         "slide_id": slide_id,
         "image_path": str(tile_path),

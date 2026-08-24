@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image
 
 from imbalance_benchmark.common import compute_sha256
 from imbalance_benchmark.datasets.bracs import wsi_tiling
@@ -20,41 +19,42 @@ _GRID = {
 }
 
 
-def _cell_image(kind: str, size: tuple[int, int]) -> Image.Image:
+def _cell_pixels(kind: str, size: tuple[int, int]) -> np.ndarray:
     if kind == "tissue":
-        pixels = np.random.default_rng(0).integers(
+        gray = np.random.default_rng(0).integers(
             0, 255, size=(size[1], size[0]), dtype=np.uint8
         )
     else:
-        pixels = np.full((size[1], size[0]), 220, dtype=np.uint8)
-    return Image.fromarray(pixels, mode="L").convert("RGB")
+        gray = np.full((size[1], size[0]), 220, dtype=np.uint8)
+    return np.stack([gray] * 3, axis=-1)
 
 
-class _FakeSlide:
-    properties = {"openslide.objective-power": "20"}
-    level_dimensions = ((3 * TILE_SIZE, 3 * TILE_SIZE),)
+class _FakeInfo:
+    objective_power = 20.0
+    slide_dimensions = (3 * TILE_SIZE, 3 * TILE_SIZE)
     level_downsamples = (1.0,)
+    level_dimensions = ((3 * TILE_SIZE, 3 * TILE_SIZE),)
 
-    def get_best_level_for_downsample(self, _downsample: float) -> int:
-        return 0
 
-    def read_region(
-        self, location: tuple[int, int], _level: int, size: tuple[int, int]
-    ) -> Image.Image:
+class _FakeReader:
+    info = _FakeInfo()
+
+    def read_rect(
+        self,
+        location: tuple[int, int],
+        size: tuple[int, int],
+        resolution: float = 0,
+        units: str = "level",
+    ) -> np.ndarray:
+        assert units == "power"
         col, row = location[0] // TILE_SIZE, location[1] // TILE_SIZE
-        return _cell_image(_GRID[(row, col)], size)
-
-    def __enter__(self) -> "_FakeSlide":
-        return self
-
-    def __exit__(self, *_exc: object) -> None:
-        return None
+        return _cell_pixels(_GRID[(row, col)], size)
 
 
 def test_bracs_wsi_tiling_audits_tiles_and_drops_isolated_tissue(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(wsi_tiling.openslide, "OpenSlide", lambda _path: _FakeSlide())
+    monkeypatch.setattr(wsi_tiling.WSIReader, "open", lambda _path, **_kw: _FakeReader())
 
     frame = wsi_tiling.tile_slide(tmp_path / "BRACS_1.svs", "BRACS_1", tmp_path)
 
@@ -80,15 +80,17 @@ def test_bracs_wsi_tiling_audits_tiles_and_drops_isolated_tissue(
 def test_bracs_wsi_tiling_raises_when_no_tile_passes_the_audit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(
-        wsi_tiling.openslide,
-        "OpenSlide",
-        lambda _path: type(
-            "_BlankSlide",
-            (_FakeSlide,),
-            {"read_region": lambda self, _location, _level, size: _cell_image("background", size)},
-        )(),
-    )
+    class _BlankReader(_FakeReader):
+        def read_rect(
+            self,
+            _location: tuple[int, int],
+            size: tuple[int, int],
+            resolution: float = 0,
+            units: str = "level",
+        ) -> np.ndarray:
+            return _cell_pixels("background", size)
+
+    monkeypatch.setattr(wsi_tiling.WSIReader, "open", lambda _path, **_kw: _BlankReader())
 
     with pytest.raises(ValueError, match="no tiles passed"):
         wsi_tiling.tile_slide(tmp_path / "BRACS_2.svs", "BRACS_2", tmp_path)

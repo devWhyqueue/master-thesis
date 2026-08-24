@@ -13,6 +13,11 @@ this can in principle miss a very small, low-contrast, isolated tissue focus
 that a fully exhaustive scan would have found -- an accepted, documented
 deviation from an exhaustive per-tile scan, not a change to the audit
 thresholds themselves.
+
+Pyramid I/O (level/resolution selection, region reads, and objective-power
+resolution) is delegated to tiatoolbox's ``WSIReader``, which resolves
+20x-power reads and the mpp-based objective-power fallback internally
+instead of re-implementing OpenSlide-level math by hand.
 """
 
 from __future__ import annotations
@@ -20,36 +25,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-import openslide
 from PIL import Image
 from skimage.feature import canny
 from skimage.filters import threshold_otsu
+from tiatoolbox.wsicore.wsireader import WSIReader
 
 __all__ = [
     "TILE_SIZE",
     "Cell",
-    "Level",
     "cell_stats",
     "coarse_tissue_mask",
     "grid_shape",
     "is_candidate",
     "read_tile_region",
-    "select_level",
+    "select_downsample",
 ]
 
 TILE_SIZE = 256
 TARGET_MAGNIFICATION = 20.0
 MIN_OTSU_FOREGROUND = 0.10
 MIN_GRAYSCALE_STD = 8.0
-
-
-@dataclass(frozen=True)
-class Level:
-    """The pyramid level (and its downsample factors) chosen to reach 20x."""
-
-    downsample: float
-    level: int
-    level_downsample: float
 
 
 @dataclass(frozen=True)
@@ -70,46 +65,39 @@ class Cell:
         )
 
 
-def select_level(slide: openslide.OpenSlide) -> Level:
-    """Pick the pyramid level closest to 20x and its downsample factors."""
-    downsample = _base_magnification(slide) / TARGET_MAGNIFICATION
-    level = slide.get_best_level_for_downsample(downsample)
-    return Level(downsample, level, slide.level_downsamples[level])
+def select_downsample(reader: WSIReader) -> float:
+    """Downsample from the slide's base magnification (or mpp fallback) to 20x."""
+    power = reader.info.objective_power
+    if power is None:
+        raise ValueError("Cannot determine BRACS slide base magnification")
+    return float(power) / TARGET_MAGNIFICATION
 
 
-def grid_shape(slide: openslide.OpenSlide, downsample: float) -> tuple[int, int]:
+def grid_shape(reader: WSIReader, downsample: float) -> tuple[int, int]:
     """Return the (n_cols, n_rows) of non-overlapping 256x256 tiles at 20x."""
-    width0, height0 = slide.level_dimensions[0]
+    width0, height0 = reader.info.slide_dimensions
     return int(width0 / downsample) // TILE_SIZE, int(height0 / downsample) // TILE_SIZE
 
 
 def read_tile_region(
-    slide: openslide.OpenSlide, row: int, col: int, level_plan: Level
+    reader: WSIReader, row: int, col: int, downsample: float
 ) -> Image.Image:
-    """Read one 20x grid cell and resize it to exactly 256x256."""
-    level0_x = int(col * TILE_SIZE * level_plan.downsample)
-    level0_y = int(row * TILE_SIZE * level_plan.downsample)
-    level_size = max(
-        1, round(TILE_SIZE * level_plan.downsample / level_plan.level_downsample)
+    """Read one 20x grid cell, resampled to exactly 256x256 by tiatoolbox."""
+    level0_x = int(col * TILE_SIZE * downsample)
+    level0_y = int(row * TILE_SIZE * downsample)
+    region = reader.read_rect(
+        (level0_x, level0_y),
+        (TILE_SIZE, TILE_SIZE),
+        resolution=TARGET_MAGNIFICATION,
+        units="power",
     )
-    region = slide.read_region(
-        (level0_x, level0_y), level_plan.level, (level_size, level_size)
-    ).convert("RGB")
-    if level_size != TILE_SIZE:
-        region = region.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS)
-    # Slide-wide ICC profiles (Aperio scanners: often several MB) ride along in
-    # openslide's per-region info dict; embedding the same profile in every
-    # tile bloats each PNG by orders of magnitude and isn't used downstream.
-    region.info.pop("icc_profile", None)
-    return region
+    return Image.fromarray(region, mode="RGB")
 
 
-def cell_stats(
-    slide: openslide.OpenSlide, row: int, col: int, level_plan: Level
-) -> Cell:
+def cell_stats(reader: WSIReader, row: int, col: int, downsample: float) -> Cell:
     """Compute the Otsu/std/Canny foreground stats for one grid cell."""
     gray = np.asarray(
-        read_tile_region(slide, row, col, level_plan).convert("L"), dtype=np.float64
+        read_tile_region(reader, row, col, downsample).convert("L"), dtype=np.float64
     )
     try:
         foreground_fraction = float((gray < threshold_otsu(gray)).mean())
@@ -119,23 +107,27 @@ def cell_stats(
     return Cell(foreground_fraction, float(gray.std()), edge_count)
 
 
-def coarse_tissue_mask(slide: openslide.OpenSlide) -> tuple[np.ndarray | None, float]:
+def _read_coarse_grayscale(reader: WSIReader, coarse_level: int) -> np.ndarray:
+    width, height = reader.info.level_dimensions[coarse_level]
+    region = reader.read_rect(
+        (0, 0), (int(width), int(height)), resolution=coarse_level, units="level"
+    )
+    return np.asarray(Image.fromarray(region).convert("L"), dtype=np.float64)
+
+
+def coarse_tissue_mask(reader: WSIReader) -> tuple[np.ndarray | None, float]:
     """Cheap low-res Otsu tissue mask used only to skip full-res candidate work.
 
     Returns ``(None, 1.0)`` when the slide has no coarser pyramid level, or
     when the coarse image is perfectly flat (Otsu can't split it) -- both
     mean "treat every cell as a candidate", the false-safe default.
     """
-    if len(slide.level_downsamples) < 2:
+    level_downsamples = reader.info.level_downsamples
+    if len(level_downsamples) < 2:
         return None, 1.0
-    coarse_level = len(slide.level_downsamples) - 1
-    coarse_downsample = slide.level_downsamples[coarse_level]
-    coarse = np.asarray(
-        slide.read_region(
-            (0, 0), coarse_level, slide.level_dimensions[coarse_level]
-        ).convert("L"),
-        dtype=np.float64,
-    )
+    coarse_level = len(level_downsamples) - 1
+    coarse_downsample = level_downsamples[coarse_level]
+    coarse = _read_coarse_grayscale(reader, coarse_level)
     try:
         threshold = threshold_otsu(coarse)
     except ValueError:
@@ -160,16 +152,3 @@ def is_candidate(
         max(x0 + 1, int((col + 1) * TILE_SIZE * scale)),
     )
     return bool(mask[y0:y1, x0:x1].any())
-
-
-def _base_magnification(slide: openslide.OpenSlide) -> float:
-    # ponytail: scanner metadata is not always the ideal on paper; the MPP
-    # fallback is a calibration point if BRACS ever mixes in a scanner whose
-    # base power isn't 20x/40x.
-    power = slide.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER)
-    if power is not None:
-        return float(power)
-    mpp_x = slide.properties.get(openslide.PROPERTY_NAME_MPP_X)
-    if mpp_x is not None:
-        return 40.0 if float(mpp_x) < 0.375 else 20.0
-    raise ValueError("Cannot determine BRACS slide base magnification")
