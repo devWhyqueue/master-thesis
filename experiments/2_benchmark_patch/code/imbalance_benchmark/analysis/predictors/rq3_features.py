@@ -102,8 +102,10 @@ def _fixed_diversity(
     """Semantic volumes from one condition's matched frozen-feature draw."""
     dataset = load_training_dataset(manifest, is_mil, None, class_names=class_names)
     if not is_mil:
-        pool = init_pool(cast(ImbalanceDataset, dataset), seed, updates_per_pass=1)
-        return semantic_volumes(pool.raw_features, pool.class_ids, len(dataset.classes))
+        patches = cast(ImbalanceDataset, dataset)
+        pool = init_pool(patches, seed, updates_per_pass=1)
+        raw_features = patches.__getitems__(pool.indices.tolist())["features"]
+        return semantic_volumes(raw_features, pool.class_ids, len(dataset.classes))
     bags = cast(BagFeatureDataset, dataset)
     features = torch.stack([torch.cat((bag.mean(0), bag.std(0))) for bag, _ in bags])
     targets = torch.from_numpy(dataset.get_int_targets())

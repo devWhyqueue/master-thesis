@@ -64,6 +64,37 @@ def test_patch_feature_frame_gathers_resident_rows_without_sample_loop(
     np.testing.assert_array_equal(targets, [1, 0])
 
 
+def test_fixed_diversity_reads_real_matched_draw_features(tmp_path: Path) -> None:
+    """Real (non-mocked) run: must read the dataset's own raw features, not a
+    model-encoded SsbPool.features that only exists after training refreshes it."""
+    from imbalance_benchmark.datasets.features.cache import reset_feature_bank
+
+    reset_feature_bank()
+    classes = ["a", "b"]
+    rows = []
+    for cls in classes:
+        for case in range(4):
+            for patch in range(2):
+                slide_id = f"{cls}_S{case}_{patch}"
+                feature_path = tmp_path / f"{slide_id}.pt"
+                torch.save(torch.randn(1, 4), feature_path)
+                rows.append(
+                    {
+                        "case_id": f"{cls}_P{case}",
+                        "slide_id": slide_id,
+                        "cancer_type": cls,
+                        "feature_path": str(feature_path),
+                    }
+                )
+    manifest = tmp_path / "manifest.csv"
+    pd.DataFrame(rows).to_csv(manifest, index=False)
+
+    volumes = rq3_features._fixed_diversity(manifest, False, classes, seed=0)
+
+    assert set(volumes) == {0, 1}
+    assert all(np.isfinite(v) for v in volumes.values())
+
+
 from imbalance_benchmark.common import (
     sign_file,
     write_json,

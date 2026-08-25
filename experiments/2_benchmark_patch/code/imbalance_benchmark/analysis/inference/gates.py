@@ -31,9 +31,10 @@ __all__ = [
 ]
 
 # Report §"Imbalance deficit, recovery, and inference": the two co-primary gate
-# thresholds, evaluated from CE runs only, before any mitigation comparison.
-DISCRIMINATION_THRESHOLD = 0.02
-CALIBRATION_THRESHOLD = 0.05
+# thresholds. Derived per PLAN_3 §2 (see derive_deficit_thresholds.py); both
+# noise-floor terms bound, so CALIBRATION_THRESHOLD sits above its 0.05 anchor.
+DISCRIMINATION_THRESHOLD = 0.01443
+CALIBRATION_THRESHOLD = 0.18237
 
 
 def deficit(reference: float, imbalanced: float) -> float:
@@ -56,12 +57,12 @@ def ci_excludes_zero(ci_low: float, ci_high: float) -> bool:
 
 
 def discrimination_gate(ba_deficit: float, ci: tuple[float, float]) -> bool:
-    """Opens when CE's paired BA deficit >= 0.02 and its 95% CI excludes zero."""
+    """Opens when CE's paired BA deficit >= DISCRIMINATION_THRESHOLD and its 95% CI excludes zero."""
     return ba_deficit >= DISCRIMINATION_THRESHOLD and ci_excludes_zero(*ci)
 
 
 def calibration_gate(tail_nll_deficit: float, ci: tuple[float, float]) -> bool:
-    """Opens when CE's tail-group macro-NLL deficit >= 0.05 nats and its 95% CI excludes zero."""
+    """Opens when CE's tail-group macro-NLL deficit >= CALIBRATION_THRESHOLD nats and its 95% CI excludes zero."""
     return tail_nll_deficit >= CALIBRATION_THRESHOLD and ci_excludes_zero(*ci)
 
 

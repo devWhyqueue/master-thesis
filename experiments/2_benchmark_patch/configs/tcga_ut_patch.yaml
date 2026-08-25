@@ -11,12 +11,15 @@ dataset:
   version: tcga-ut-komura-2022
   eligibility_rules:
     source: zenodo_record_5889558_v1_0_authenticated_class_archives
-    labels: 31_of_32_cancer_types_from_source_slide
+    labels: 30_of_32_cancer_types_from_source_slide
     evidence: materialized_project_owned_squashfs_of_source_jpgs
     split_unit: tcga_participant
-    class_exclusions: dlbcl_contribution_cap_infeasible
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
   excluded_classes:
     - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
   root: /mnt/tcga-ut
   materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
   expected_slide_count: 8736
@@ -67,7 +70,10 @@ slurm:
     freeze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 256G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
     tune_natural: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
-    tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    # gpu-2h: ~45% of controlled candidates timed out at 2h (K=30 is the
+    # heaviest patch dataset here); gpu-5h absorbs the slow ones without a
+    # per-task partition workaround.
+    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 256G}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
