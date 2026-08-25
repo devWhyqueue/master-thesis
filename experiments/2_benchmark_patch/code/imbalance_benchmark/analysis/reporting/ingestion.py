@@ -122,8 +122,8 @@ def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:
     if "validation" not in record["splits"] or "test" not in record["splits"]:
         return None
     val, test = record["splits"]["validation"], record["splits"]["test"]
-    val_logits = np.array(val.get("target_prior_logits", val["logits"]))
-    test_logits = np.array(test.get("target_prior_logits", test["logits"]))
+    val_logits = np.array(val["logits"])
+    test_logits = np.array(test["logits"])
     fit = fit_temperature(val_logits, np.array(val["labels"]))
     labels = np.array(test["labels"])
     raw_probs = np.array(test.get("probabilities", []))

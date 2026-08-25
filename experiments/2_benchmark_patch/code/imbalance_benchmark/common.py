@@ -47,11 +47,7 @@ ARRAY_FIELDS = (
     "preds",
     "probabilities",
     "logits",
-    "raw_logits",
     "raw_probabilities",
-    "balanced_decision_logits",
-    "target_prior_logits",
-    "target_prior_probabilities",
 )
 
 
@@ -70,9 +66,7 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
 def output_root(config: dict[str, Any]) -> Path:
     """Resolve the configured output root path."""
     configured = Path(
-        config.get("paths", {}).get(
-            "outputs", "experiments/2_benchmark_patch/outputs"
-        )
+        config.get("paths", {}).get("outputs", "experiments/2_benchmark_patch/outputs")
     )
     return configured if configured.is_absolute() else REPO_ROOT / configured
 

@@ -72,8 +72,8 @@ def test_target_prior_correction_posthoc_formula():
     assert np.allclose(balanced, logits - 0.5 * np.log(pi_train))
 
 def test_calibration_gate_thresholds():
-    assert calibration_gate(0.06, (0.02, 0.10)) is True
-    assert calibration_gate(0.04, (0.01, 0.07)) is False
+    assert calibration_gate(0.19, (0.02, 0.30)) is True
+    assert calibration_gate(0.17, (0.01, 0.28)) is False
 
 def test_calibration_summary_separates_observed_estimate_from_bootstrap() -> None:
     assert _distribution_summary([0.9, 0.1, 0.2], "ECE") == {
@@ -112,7 +112,7 @@ def test_temperature_scaled_probabilities_reconstruct_and_preserve_legacy_order(
 
     assert np.allclose(
         temperature_scaled_probabilities(
-            {"temperature": temperature, "target_prior_logits": logits.tolist()}
+            {"temperature": temperature, "logits": logits.tolist()}
         ),
         scaled,
     )
@@ -120,7 +120,7 @@ def test_temperature_scaled_probabilities_reconstruct_and_preserve_legacy_order(
         temperature_scaled_probabilities(
             {
                 "temperature": temperature,
-                "target_prior_logits": logits.tolist(),
+                "logits": logits.tolist(),
                 "temperature_scaled_probabilities": [[0.4, 0.6], [0.7, 0.3]],
             }
         ),

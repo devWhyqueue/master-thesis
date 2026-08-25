@@ -109,11 +109,7 @@ def _split_payload(
         preds=p_list,
         probabilities=probs,
         logits=tar_l.tolist(),
-        raw_logits=raw_l.tolist(),
         raw_probabilities=res["probs"].tolist(),
-        balanced_decision_logits=dec_l.tolist(),
-        target_prior_logits=tar_l.tolist(),
-        target_prior_probabilities=probs,
         clustered_endpoints=clustered_endpoints(
             res["targets"], preds, probs_arr, identity, is_mil=is_mil
         ),
@@ -210,9 +206,9 @@ def _attach_temperature_scaled_test_outputs(splits: dict[str, dict[str, Any]]) -
     validation, test = splits["validation"], splits["test"]
     test.update(
         temperature_scaled_payload(
-            np.asarray(validation["target_prior_logits"]),
+            np.asarray(validation["logits"]),
             np.asarray(validation["labels"]),
-            np.asarray(test["target_prior_logits"]),
+            np.asarray(test["logits"]),
             np.asarray(test["labels"]),
         )
     )

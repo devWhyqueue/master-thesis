@@ -148,7 +148,7 @@ def temperature_scaled_probabilities(payload: dict[str, object]) -> np.ndarray:
     if "temperature_scaled_probabilities" in payload:
         return np.asarray(payload["temperature_scaled_probabilities"])
     temperature = payload.get("temperature")
-    logits = payload.get("target_prior_logits", payload.get("logits"))
+    logits = payload.get("logits")
     if isinstance(temperature, (int, float)) and logits is not None:
         return apply_temperature(np.asarray(logits), float(temperature))
     return np.asarray(payload["probabilities"])
