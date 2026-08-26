@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "master-thesis-tools"
 version = "0.1.0"
 description = "Utility tooling for the master-thesis repository"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1,<0.29",
     "matplotlib==3.10.9",

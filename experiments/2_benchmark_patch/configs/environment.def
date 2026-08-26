@@ -1,5 +1,7 @@
 Bootstrap: docker
-From: python:3.11-slim
+# 3.12, not 3.11: tiatoolbox 2.1.2 requires sphinx>=9.0.0, which itself
+# requires Python >=3.12, so the pip install below is unresolvable on 3.11.
+From: python:3.12-slim
 
 %files
     requirements-experiment.txt /opt/requirements-experiment.txt
