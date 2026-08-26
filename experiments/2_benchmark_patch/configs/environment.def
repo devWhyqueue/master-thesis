@@ -7,11 +7,16 @@ From: python:3.12-slim
     requirements-experiment.txt /opt/requirements-experiment.txt
 
 %post
+    # libgl1/libglib2.0-0t64: tiatoolbox depends on opencv-python (not the
+    # headless build), whose cv2 extension links libGL.so.1 and
+    # libgthread-2.0.so.0; python:3.12-slim ships neither.
+    #
     # Debian trixie's apt privilege-separated download sandbox (the `_apt`
     # user) cannot mkstemp under /tmp inside an unprivileged Apptainer build;
     # running apt as root (already true here) instead of it avoids that.
     apt-get -o APT::Sandbox::User=root update \
-        && apt-get -o APT::Sandbox::User=root install -y --no-install-recommends squashfs-tools git \
+        && apt-get -o APT::Sandbox::User=root install -y --no-install-recommends \
+            squashfs-tools git libgl1 libglib2.0-0t64 \
         && rm -rf /var/lib/apt/lists/*
     python -m pip install --upgrade pip
     python -m pip install -r /opt/requirements-experiment.txt
