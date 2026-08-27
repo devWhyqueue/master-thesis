@@ -295,8 +295,9 @@ computational-pathology dataset by cropping H\&E tumour patches from pathologist
 tumour regions: \num{1608060} RGB patches of $256\times256$ pixels from \num{8736} diagnostic slides,
 across \num{32} cancer types \citep{komura2022universalEncoding}. These patches are not tiled here but
 supplied by the dataset authors: for each slide at least three uniform tumour regions were delineated
-as polygons by trained pathologists, and $256\times256$ patches were extracted from them across six
-magnifications (\num{0.5}--\num{1.0}~$\mu$m/px) and resized to $256\times256$ \citep{komura2022universalEncoding}.
+as polygons by trained pathologists, and crops spanning six field-of-view sizes, from
+$128\times128$ to $256\times256$~$\mu$m, were taken from them and resized to $256\times256$ pixels,
+which puts their effective resolution at \num{0.5}--\num{1.0}~$\mu$m/px \citep{komura2022universalEncoding}.
 No tissue-foreground filter is applied, the regions already being curated tumour. Every patch carries
 the cancer-type label of the slide it was cropped from, so the patches are themselves labelled samples --- the unit
 of patch-level classification --- while their slide identities also allow grouping into slide-level
