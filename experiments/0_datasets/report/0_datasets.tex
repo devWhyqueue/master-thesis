@@ -234,10 +234,10 @@ question is the most basic in oncology --- \emph{is cancer present?} --- and the
 each slide is either \emph{normal} or contains \emph{tumor} (metastasis). Expert annotations are
 supplied as pixel-level masks marking tumour tissue, rather than as cropped regions, so individual
 tiles can be labelled by intersecting them with the mask. The slides are tiled once into
-non-overlapping $256\times256$ patches at \num{20}x by the group's preprocessing pipeline, which keeps
-a patch only if it clears a tissue-foreground stack --- Otsu thresholding (at least \num{10}\%
-foreground), a standard-deviation filter (at least \num{8} gray levels), Canny edge detection, and an
-isolation filter that discards patches with fewer than two tissue neighbours. Each surviving patch is
+non-overlapping $256\times256$ patches at \num{20}x. A patch is kept only if it clears a
+tissue-foreground stack --- Otsu thresholding (at least \num{10}\% foreground), a
+standard-deviation filter (at least \num{8} gray levels), Canny edge detection, and an isolation
+filter that discards patches with fewer than two tissue neighbours. Each surviving patch is
 then labelled from the WSI mask: it is tumour when at least \num{50}\% of the aligned mask pixels
 have value \num{2}, and normal otherwise.
 
@@ -245,7 +245,7 @@ The benchmark uses \num{398} of the \num{399} published slides (\num{160} tumor,
 after excluding one slide without usable tile evidence; each slide is its own patient, so
 slide-disjoint splits coincide with patient-disjoint splits. Because metastatic tissue occupies only
 a small fraction of a sectioned node, mask-derived tumor tiles are scarce: the patch distribution is
-\num{2340040} normal against \num{59672} tumor tiles (Table~\ref{tab:camelyon16-summary},
+\num{3088478} normal against \num{108855} tumor tiles (Table~\ref{tab:camelyon16-summary},
 Figure~\ref{fig:camelyon16-dist}), even though tumour and normal slides are themselves close to even
 (\num{160} versus \num{238})---tumour tiles are scarce even on slides that do contain a metastasis. The
 \num{20} tumor slides whose annotations are not exhaustive are excluded from the tile-labelling
@@ -269,7 +269,7 @@ slide-level label is used.
       WSIs (tumor / normal) & \num{160} / \num{238}\\
       Patch-labelled WSIs & \num{378}\\
       Patch labels & tumor, normal\\
-      Eligible patches (tumor / normal) & \num{59672} / \num{2340040}\\
+      Eligible patches (tumor / normal) & \num{108855} / \num{3088478}\\
       \bottomrule
     \end{tabular}%
   \end{minipage}
