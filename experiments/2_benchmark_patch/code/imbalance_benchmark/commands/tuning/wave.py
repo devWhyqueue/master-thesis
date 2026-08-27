@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import logging
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import replace
 import os
 from pathlib import Path
+import time
 from typing import Any, Iterator
 
 from imbalance_benchmark.common import ensure_dirs, load_config
@@ -30,6 +31,11 @@ __all__ = ["cmd_tune_wave", "select_wave"]
 
 logger = logging.getLogger(__name__)
 
+LOCK_POLL_SECONDS = 15
+LOCK_WAIT_SECONDS = 900
+# A submission holds the lock for seconds; anything older lost its job.
+LOCK_STALE_SECONDS = 1800
+
 
 def select_wave(plan: ResumePlan, queued: int, limit: int) -> ResumePlan:
     """Select original sparse task IDs, natural first, reserving successor space."""
@@ -44,17 +50,50 @@ def select_wave(plan: ResumePlan, queued: int, limit: int) -> ResumePlan:
     return ResumePlan(natural, controlled)
 
 
+def _reclaim_stale_lock(path: Path) -> bool:
+    """Report whether the lock is free again, clearing one a killed job left."""
+    try:
+        age = time.time() - path.stat().st_mtime
+    except FileNotFoundError:
+        return True
+    if age < LOCK_STALE_SECONDS:
+        return False
+    logger.warning("Reclaiming tuning submission lock held for %.0fs: %s", age, path)
+    try:
+        path.rmdir()
+    except OSError:
+        return False
+    return True
+
+
 @contextmanager
 def _submission_lock(path: Path) -> Iterator[None]:
-    """Serialize shared-output wave submissions on BeeGFS."""
-    try:
-        path.mkdir()
-    except FileExistsError as error:
-        raise RuntimeError(f"Tuning submission lock is busy: {path}") from error
+    """Serialize shared-output wave submissions on BeeGFS.
+
+    Sibling conditions routinely reach their wave submission within the same
+    minute, so a busy lock is expected rather than exceptional. Wait for the
+    holder instead of failing: nothing retries a crashed wave submission, so
+    a lost race silently freezes that condition's round chain forever.
+    """
+    deadline = time.monotonic() + LOCK_WAIT_SECONDS
+    while True:
+        try:
+            path.mkdir()
+            break
+        except FileExistsError as error:
+            if _reclaim_stale_lock(path):
+                continue
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Tuning submission lock still busy after {LOCK_WAIT_SECONDS}s: "
+                    f"{path}. Resume with: submit --resume-tuning"
+                ) from error
+            time.sleep(LOCK_POLL_SECONDS)
     try:
         yield
     finally:
-        path.rmdir()
+        with suppress(FileNotFoundError):
+            path.rmdir()
 
 
 def _wave_jobs(config: dict[str, Any], plan: ResumePlan | SlurmJob) -> list[SlurmJob]:
