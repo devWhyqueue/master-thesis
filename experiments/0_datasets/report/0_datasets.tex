@@ -445,20 +445,28 @@ there, the prediction unit changes but the target does not.
 
 \begin{table}[ht]
   \centering
-  \small
-  \begin{tabular}{ll}
-    \toprule
-    Property & Value\\
-    \midrule
-    WSIs (biopsies) & \num{10616}\\
-    Patch-labelled WSIs & \num{10514}\\
-    Slide labels / patch labels & ISUP 0--5 / benign, cancer\\
-    Eligible patches (benign / cancer) & \num{3702544} / \num{803785}\\
-    \bottomrule
-  \end{tabular}
-  \caption{PANDA dataset properties from full-cohort tiling and mask-based patch labelling. Unlike
-  the other datasets, patch and slide labels define different tasks: binary cancer detection and
-  six-class ISUP grading, respectively.}
+  \begin{minipage}{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{panda_example_patch.jpg}%
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.62\linewidth}
+    \centering
+    \small
+    \begin{tabular}{ll}
+      \toprule
+      Property & Value\\
+      \midrule
+      WSIs (biopsies) & \num{10616}\\
+      Patch-labelled WSIs & \num{10514}\\
+      Slide labels / patch labels & ISUP 0--5 / benign, cancer\\
+      Eligible patches (benign / cancer) & \num{3702544} / \num{803785}\\
+      \bottomrule
+    \end{tabular}%
+  \end{minipage}
+  \caption{PANDA dataset properties, alongside an example $256\times256$ cancer patch (ISUP\,5
+  Radboud biopsy). Unlike the other datasets, patch and slide labels define different tasks: binary
+  cancer detection and six-class ISUP grading, respectively.}
   \label{tab:panda-summary}
 \end{table}
 
