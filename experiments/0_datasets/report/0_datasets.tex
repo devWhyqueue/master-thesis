@@ -424,13 +424,13 @@ Institute --- that differ in staining, scanning, and annotation convention, and 
 ISUP\,0 (\num{2892} biopsies) at the head to ISUP\,5 (\num{1224}) at the tail --- a mild
 ${\approx}\num{2.4}{:}1$ slide-level imbalance.
 
-Unlike the others, PANDA ships raw pyramidal biopsies rather than ready-made patches, so tiles are cut
-here: each biopsy is read at level~0, its native full resolution, divided into $256\times256$ tiles,
-and a luminance foreground filter keeps every tile that is at least \num{35}\% tissue (mean intensity
-below \num{210}), discarding glass and background. No per-slide cap is applied, so the counts reflect
-each biopsy's full available tissue. PANDA's masks additionally support a provider-consistent binary
-cancer/benign tile label --- the only labelling the two institutions share --- formed by collapsing the
-provider-specific mask codes and calling a tile \emph{cancer} when at least half of its mask cell
+Each biopsy is read at level~0, its native full resolution, divided into $256\times256$ tiles,
+and a luminance foreground filter keeps a tile when at least \num{35}\% of its pixels are tissue, a
+pixel counting as tissue when its mean RGB value is below \num{210}, discarding glass and
+background. No per-slide cap is applied, so the counts reflect each biopsy's full available
+tissue. PANDA's masks additionally support a provider-consistent binary cancer/benign tile label
+--- the only labelling the two institutions share --- formed by collapsing the provider-specific
+mask codes and calling a tile \emph{cancer} when at least half of its mask cell
 carries a cancer value. Over the \num{10514} masked biopsies that yield labelled tissue this gives
 \num{3702544} benign against \num{803785} cancer tiles, so the same biopsies furnish both an ordinal
 slide-level grading target and a binary tile-level detection target (Table~\ref{tab:panda-summary},
