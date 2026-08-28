@@ -89,7 +89,7 @@ Table~\ref{tab:datasets} gives the patch target and patient/case grouping used b
     PANDA & Foreground crop; cancer if at least \num{50}\% of its aligned provider-specific mask cell is cancer, benign otherwise & Biopsy (one WSI) \\
     \bottomrule
   \end{tabularx}
-  \caption{Dataset-specific definitions of patch-level examples. TCGA-UT's eligible target set omits one of the 32 annotated cancer types; Appendix~\ref{app:construction} states which class and why.}
+  \caption{Dataset-specific definitions of patch-level examples. TCGA-UT's eligible target set omits two of the 32 annotated cancer types; Appendix~\ref{app:construction} states which classes and why.}
   \label{tab:datasets}
 \end{table}
 
@@ -195,7 +195,7 @@ This ratio records the most extreme head--tail contrast. The complementary norma
     BRACS & \num{103} & \num{262}--\num{273} & \num{193010}--\num{217704} & \num{78}--\num{89} & \num{173}--\num{233} & \num{13982}--\num{27202} \\
     CAMELYON16 & \num{264} & \num{264} & \num{2139913}--\num{2234906} & \num{103}--\num{118} & \num{103}--\num{118} & \num{28810}--\num{36127} \\
     PANDA & \num{7358} & \num{7358} & \num{3141372}--\num{3161828} & \num{6025}--\num{6080} & \num{6025}--\num{6080} & \num{1099847}--\num{1120125} \\
-    TCGA-UT & \num{5005} & \num{6090}--\num{6135} & \num{1120260}--\num{1129060} & \num{750}--\num{914} & \num{784}--\num{1012} & \num{46371}--\num{69317} \\
+    TCGA-UT & \num{4983} & \num{6055}--\num{6100} & \num{1116020}--\num{1121580} & \num{671}--\num{917} & \num{699}--\num{933} & \num{36988}--\num{52204} \\
     \bottomrule
   \end{tabular}
   \vspace{0.8em}
@@ -213,8 +213,8 @@ This ratio records the most extreme head--tail contrast. The complementary norma
     PANDA & $\rho_{\mathrm{achieved}}$ & \num{4.645}--\num{4.735} & \num{1.000} & \num{10.000} & \num{99.996}--\num{100.003} \\
           & $\Hnorm$ & \num{0.326}--\num{0.332} & \num{0.000} & \num{0.561} & \num{0.920} \\
     \addlinespace[2pt]
-    TCGA-UT & $\rho_{\mathrm{achieved}}$ & \num{25.018}--\num{25.629} & \num{1.000}--\num{1.001} & \num{9.989}--\num{10.007} & \num{99.490}--\num{100.848} \\
-          & $\Hnorm$ & \num{0.080}--\num{0.082} & \num{0.000} & \num{0.060} & \num{0.177} \\
+    TCGA-UT & $\rho_{\mathrm{achieved}}$ & \num{17.850}--\num{18.395} & \num{1.001} & \num{9.992}--\num{10.003} & \num{90.107}--\num{100.500} \\
+          & $\Hnorm$ & \num{0.075}--\num{0.076} & \num{0.000} & \num{0.061} & \num{0.174}--\num{0.179} \\
     \bottomrule
   \end{tabular}
   \caption{Overall realized training support (top) and imbalance (bottom). Units are partitioning units. Entries give the minimum and maximum across three frozen splits; moderate and severe imbalance ranges additionally span all retained tail assignments. The controlled support columns summarize balanced, moderate, and severe realizations together: their patch total is shared within a split, while the selected units and slides can vary with allocation. Counts are unique within each realization, even when one unit contributes more than one class. A single value indicates an invariant quantity.}

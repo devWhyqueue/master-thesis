@@ -145,10 +145,10 @@ def matched_contrast(datasets: list[Dataset]) -> str:
 
 
 _BETA_METHODS = {
-    "ce": "Imbalanced CE",
-    "independent_support_ce": "Independent support",
-    "independent_support_ce_matched_beta": r"Independent support at matched $\beta$",
-    "class_balanced_ce": "Nominal support",
+    "ce": "CE",
+    "independent_support_ce": "Independent",
+    "independent_support_ce_matched_beta": r"Independent at matched $\beta$",
+    "class_balanced_ce": "Nominal",
 }
 
 

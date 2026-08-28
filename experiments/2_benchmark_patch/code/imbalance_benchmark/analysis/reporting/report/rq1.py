@@ -214,8 +214,13 @@ def _ce_endpoints(datasets: list[Dataset], table: str) -> pd.DataFrame:
 
 
 def tier_endpoints(datasets: list[Dataset]) -> str:
-    """Head, body, and tail CE endpoints under every controlled condition."""
+    """Head, body, and tail CE endpoints under every controlled condition.
+
+    Tier membership follows the allocation of an imbalanced condition, so the
+    balanced reference and the natural anchor carry no tier and are omitted.
+    """
     frame = _ce_endpoints(datasets, "equal_split_tier_endpoints")
+    frame = cast(pd.DataFrame, frame.dropna(subset=["recall"]))
     frame.columns = pd.Index(
         ["Dataset", "Assignment", "Condition", "Tier", "Recall", "NLL", "Brier"]
     )

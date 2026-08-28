@@ -11,6 +11,8 @@
 \usepackage{tabularx}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
+\usepackage{caption}
+\usepackage{subcaption}
 \usepackage[hidelinks]{hyperref}
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
@@ -18,16 +20,11 @@
 
 \newcommand{\Hnorm}{1-H_{\mathrm{norm}}}
 
-% Placeholder body for a float whose numbers are not yet ingested. Replace the
-% \pending call with \input{assets/<dataset>/<artifact>.tex}; the vendored
-% fragments contain only the tabular body, so caption and label stay here.
-\newcommand{\pending}{%
-  \begin{tabular}{@{}l@{}}
-    \toprule
-    \multicolumn{1}{c}{Pending confirmation runs.} \\
-    \bottomrule
-  \end{tabular}%
-}
+% Vendored fragments carry only the tabular or longtable body, so caption and
+% label stay here: one float spans all four datasets and would otherwise
+% contribute four copies of every label. A longtable cannot sit inside a float,
+% so its caption is attached with \captionof after the body.
+\newcommand{\resultstable}[1]{\input{assets/tables/#1.tex}}
 
 \title{Diagnosing Mitigation Need: Benchmark Results for Controlled\\
 Shortages and Signal-Matched Interventions in Histopathology\\
@@ -52,8 +49,7 @@ Patch Classification}
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
-\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report presents the outcomes of the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol}, which manipulates only the allocation of a fixed training budget among classes and measures what that manipulation damages. CAMELYON16, TCGA-UT, BRACS, and PANDA are evaluated with frozen Virchow2 features under size-matched balanced, moderate, and severe allocations, against natural-prevalence validation and test cohorts held constant across conditions. Three questions are answered in order: which shortage the controlled allocation realizes and what it damages, whether a mitigation method that reads the shortage matching that profile recovers more of the damage than one reading a different signal, and which realized shortages explain variation in damage magnitude and recovery headroom. Mitigation recovery is interpreted only for conditions whose allocation-induced deficit passes the prespecified gate, and the confirmatory family holds the intervention mechanism fixed so that the signal a method reads is the only quantity contrasted. The closing discussion converts these outcomes into design requirements for a mitigation method that reads shortage rather than prevalence alone, which is the purpose the benchmark serves.
-% TODO(results): add two sentences stating the headline damage and recovery outcomes once the confirmation runs are ingested.
+\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report presents the outcomes of the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol}, which manipulates only the allocation of a fixed training budget among classes and measures what that manipulation damages. CAMELYON16, TCGA-UT, BRACS, and PANDA are evaluated with frozen Virchow2 features under size-matched balanced, moderate, and severe allocations, against natural-prevalence validation and test cohorts held constant across conditions. Three questions are answered in order: which shortage the controlled allocation realizes and what it damages, whether a mitigation method that reads the shortage matching that profile recovers more of the damage than one reading a different signal, and which realized shortages explain variation in damage magnitude and recovery headroom. Mitigation recovery is interpreted only for conditions whose allocation-induced deficit passes the prespecified gate, and the confirmatory family holds the intervention mechanism fixed so that the signal a method reads is the only quantity contrasted. Controlled allocation opened the discrimination gate in \num{12} of \num{18} comparison units and the probability-quality gate in \num{6}, all of them on BRACS, with balanced-accuracy deficits spanning \num{0.0007} to \num{0.134}; damage grew with achieved severity and with the number of classes among which the fixed budget was divided. Recovery separated sharply but not along the axis the design was built to test: the prevalence- and nominal-support-weighted members of the confirmatory family returned most of the deficit wherever a gate opened, while the independent-support, difficulty, and diversity members returned essentially none of it and degraded tail probability quality further. The closing discussion converts these outcomes into design requirements for a mitigation method that reads shortage rather than prevalence alone, which is the purpose the benchmark serves.
 \par
 \endgroup
 \end{abstract}
@@ -84,21 +80,25 @@ Two conventions govern how the evidence is labelled throughout. A result is \emp
 \section{Allocation-Induced Damage}
 \label{sec:rq1}
 The controlled conditions must first be shown to have executed as specified, because the inference machinery is conditional on that. Three properties matter before any endpoint is read: whether constrained allocation reached its target severities within the prespecified tolerance bands, whether the label-only bootstrap preflight left any dataset designated descriptive-only, and whether every confirmation seed block and every expected comparison is present across all three partitions. A descriptive-only designation forces both gates closed for that dataset, which removes it from the confirmatory results entirely; an incomplete comparison halts aggregation rather than being averaged over whatever is available. Appendix~\ref{app:realized} carries the full record together with the tuning selections actually used and any deviation from the locked protocol.
-% TODO(results): state here, in two or three sentences, whether construction hit tolerance, which datasets (if any) are descriptive-only, and whether completeness held.
+
+All three properties hold. Every moderate condition realized $\rho_{\mathrm{achieved}}$ within $[9,11]$ and every severe condition within $[90,110]$, the tightest case being the difficulty-aligned severe condition on TCGA-UT at $\rho_{\mathrm{achieved}}=\num{90.11}$ to \num{91.02}; no condition collapsed to the balanced allocation, so none is degenerate. No class on any dataset failed the preflight concentration checks, so no dataset is descriptive-only and both gates remain available everywhere. All four datasets carry three completed partitions, five confirmation seeds in every method block, the full expected set of comparisons on each partition, and an achieved-severity spread across partitions of at most \num{1.0}\% of the smallest realized value. The controlled comparison therefore rests on \num{18} comparison units: six on BRACS and six on TCGA-UT, which retain three tail assignments each, four on CAMELYON16, and two on PANDA, whose binary target admits only the native assignment once duplicated mappings are omitted.
 
 \subsection{Realized signal profiles}
 \label{sec:rq1-profiles}
 Allocation severity is the manipulated variable, but it is not the explanatory one. Each controlled condition is characterized instead by the signal profile it realizes: achieved imbalance ratio $\rho$ and normalized-entropy deficit $\Hnorm$, nominal patch-support shortage, independent patient or slide support shortage, support--difficulty alignment, and representational-diversity shortage. These quantities are measured from the frozen construction rather than inferred from the nominal target, so a condition built to a severe target may still present a mild independent-support shortage, or the reverse.
 
-Table~\ref{tab:signal-profiles} reports the standardized shortage scores per comparison unit together with the dominant shortage each unit presents. The dominant shortage is what makes the matched and unmatched arms of Section~\ref{sec:rq2} interpretable, so units whose two largest scores fall within \num{0.25} standard deviations are designated ambiguous and are reported descriptively only, never as evidence for or against signal matching.
+Table~\ref{tab:signal-profiles} reports the standardized shortage scores per comparison unit together with the dominant shortage each unit presents. The dominant shortage is what makes the matched and unmatched arms of Section~\ref{sec:rq2} interpretable, so units whose two largest scores fall within \num{0.25} standard deviations are designated ambiguous and are reported descriptively only, never as evidence for or against signal matching. Five of the \num{18} units carry that designation: BRACS under the native moderate and difficulty-aligned severe conditions, CAMELYON16 under difficulty-reversed moderate, PANDA under native moderate, and TCGA-UT under native moderate and difficulty-aligned severe.
 
 \begin{table}[ht]
   \centering
-  \footnotesize
-  \pending
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \resultstable{signal_profiles}
   \caption{Realized signal profiles per comparison unit: achieved $\rho$, normalized-entropy deficit, standardized nominal, independent-support and diversity shortages, and support--difficulty alignment, with the dominant shortage and the ambiguous designation applied where the two largest scores fall within \num{0.25} standard deviations.}
   \label{tab:signal-profiles}
 \end{table}
+
+\noindent One column of that table requires comment before any of it is interpreted, because it constrains what the rest of the report can conclude. The standardized independent-support shortage is exactly zero in every one of the \num{18} units. This is a consequence of the design rather than a property of the datasets: the protocol fixes one per-class pool of partitioning units and slides and makes the same pool available to the balanced condition and to every imbalanced condition, so reallocating patches among classes changes how many patches a class draws but not the independent evidence it may draw from. Three consequences follow and are carried through the remainder of the report. Independent-support weighted cross-entropy can never be matched to a shortage that the design actually created. A unit whose four shortage scores are all negative will be labelled with independent support as its dominant shortage purely because zero is then the largest of them, which is what happens in the difficulty-reversed moderate conditions on BRACS and TCGA-UT. And the independent-support coefficient of the RQ3 models in Section~\ref{sec:rq3} is fixed at zero by a predictor with no variance, not estimated from data. The benchmark manipulates allocation within a fixed pool of patients and slides by construction, and the price of that control is that one of the four taxonomy axes is held constant rather than varied.
 
 \subsection{Discrimination deficit and gate status}
 \label{sec:rq1-discrimination}
@@ -109,10 +109,12 @@ Table~\ref{tab:discrimination-deficit} gives the deficit, its interval, and the 
 \begin{table}[ht]
   \centering
   \footnotesize
-  \pending
+  \resultstable{discrimination_deficit}
   \caption{Discrimination deficit $D_{\mathrm{BA}}$ with paired \num{95}\% bootstrap intervals and discrimination-gate outcome, by dataset, severity, and tail assignment. Units failing the \num{0.01443} threshold or the interval condition are shown and marked as not opening the gate.}
   \label{tab:discrimination-deficit}
 \end{table}
+
+\noindent Twelve of the \num{18} units opened the gate. Every deficit is positive except the CAMELYON16 native moderate condition, whose interval covers zero, so redistributing a fixed budget toward head classes never improved case-macro balanced accuracy. Three regularities organize the table. Deficits grow with achieved severity in every dataset and tail assignment: BRACS under the difficulty-reversed assignment moves from \num{0.081} at $\rho=10$ to \num{0.134} at $\rho=100$, and PANDA from \num{0.026} to \num{0.146}. Deficits grow with the difficulty-reversed assignment, which gives the least support to the classes that are easiest to separate and therefore concentrates scarcity where it cannot be compensated: on BRACS the reversed assignment damages roughly three times as much as the difficulty-aligned one at both severities. Finally, the two binary datasets and the two multiclass datasets do not behave alike, but not in the direction class count alone would suggest: PANDA, with two classes, records the largest severe deficit of all (\num{0.146}), while TCGA-UT, with \num{30}, records deficits of at most \num{0.016}. What separates them is how much of the fixed budget the tail retains. A binary severe allocation places \num{99}\% of the budget in one class, whereas a \num{30}-class allocation on a logarithmic support profile leaves the smallest class with a share that is small relative to the head but still absolutely large, which is also visible in the normalized-entropy deficit: \num{0.920} for PANDA severe against \num{0.179} for TCGA-UT severe at the same nominal $\rho=100$.
 
 \subsection{Probability-quality deficit}
 \label{sec:rq1-calibration}
@@ -122,33 +124,61 @@ Table~\ref{tab:calibration-deficit} reports the tail-group deficit and gate outc
 
 \begin{table}[ht]
   \centering
-  \footnotesize
-  \pending
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \resultstable{calibration_deficit}
   \caption{Probability-quality deficit on tail-group macro negative log likelihood in nats, with paired \num{95}\% intervals and calibration-gate outcome. Expected calibration error and its crossed patient-bootstrap interval are secondary descriptors and do not gate.}
   \label{tab:calibration-deficit}
 \end{table}
 
+\noindent The calibration axis behaves very differently from the discrimination axis, and the difference is the sharpest single contrast in the report. All six BRACS units opened the calibration gate, with deficits from \num{0.281} to \num{2.047} nats, and no unit on any other dataset came close: the largest deficit outside BRACS is \num{0.144} nats, below the \num{0.18237} threshold. More striking, five units record a \emph{negative} tail-group deficit, meaning the imbalanced model assigns better-calibrated probabilities to its own tail classes than the size-matched balanced reference does. Four of those five are on TCGA-UT, where the effect reaches $-\num{0.201}$ nats, and one is PANDA at moderate severity. The secondary expected calibration error moves in the same direction as the primary endpoint wherever the gate opened, rising from \num{0.159} to \num{0.317} across the BRACS units as severity and assignment adversity increase, and remains at or below \num{0.026} on CAMELYON16 and PANDA throughout.
+
+The reading these numbers support is that tail-group probability quality is damaged only where the tail classes are genuinely hard under the frozen representation. BRACS is the one dataset whose balanced-condition balanced accuracy sits near \num{0.49} on seven classes, so its tail classes are poorly separated even with even support, and removing support from them collapses the probability mass they receive. On CAMELYON16 and PANDA the tail remains highly separable, and on TCGA-UT the balanced reference already reaches \num{0.755} across \num{30} classes. Where a class is easy, concentrating the budget elsewhere costs accuracy on it without making the model confidently wrong about it, and the tail-group likelihood can even improve because a smaller tail allocation shrinks the model's tendency to over-assign probability to the tail on head-class examples.
+
 \subsection{Where the damage falls}
 \label{sec:rq1-incidence}
-Aggregate deficits do not say which classes absorbed the loss, and a mitigation method has to be told that. Recall, $F_1$, negative log likelihood, and Brier score are therefore also read per class and per support tier, with the head tier the first $\lceil K/3 \rceil$ classes by allocated support and the tail tier the last $\lceil K/3 \rceil$. Table~\ref{tab:tier-endpoints} gives the tier-level endpoints under each condition; the per-class breakdown appears in Appendix~\ref{app:endpoints}.
+Aggregate deficits do not say which classes absorbed the loss, and a mitigation method has to be told that. Recall, $F_1$, negative log likelihood, and Brier score are therefore also read per class and per support tier, with the head tier the first $\lceil K/3 \rceil$ classes by allocated support and the tail tier the last $\lceil K/3 \rceil$. Table~\ref{tab:tier-endpoints} gives the tier-level endpoints under each condition; the per-class breakdown appears in Appendix~\ref{app:endpoints}. The balanced reference and the natural anchor induce no support ordering and therefore carry no tier assignment, so they do not appear there.
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Head, body, and tail recall, negative log likelihood, and Brier score under each controlled condition, averaged with equal weight across the three partitions.}
-  \label{tab:tier-endpoints}
-\end{table}
+\begingroup
+\footnotesize
+\resultstable{tier_endpoints}
+\captionof{table}{Head, body, and tail recall, negative log likelihood, and Brier score for the cross-entropy reference under each controlled condition, averaged with equal weight across the three partitions. Tier membership follows the allocation of the condition and is therefore not constant across conditions.}
+\label{tab:tier-endpoints}
+\endgroup
 
-\noindent Figure~\ref{fig:tail-vs-support} relates per-class recall to allocated training support directly. Its purpose is to separate two readings of the same aggregate deficit: a loss that varies smoothly with support implies that support is the binding constraint, whereas classes falling well below the support trend point to a shortage that allocation alone does not describe.
+\noindent The tier view contradicts the simplest expectation, which is that damage lands on the tail. It does so under the difficulty-aligned assignment, where BRACS tail recall falls to \num{0.205} at moderate and \num{0.120} at severe severity against head recall above \num{0.73}. Under the difficulty-reversed assignment the pattern inverts: BRACS severe tail recall is \num{0.343} while the \emph{body} tier reaches only \num{0.130}, below both the head and the tail. The reversed assignment gives the hardest classes the most support and the easiest classes the least, so the tail keeps a recall floor supplied by separability rather than by support, and the loss concentrates in the middle ranks, which have neither enough support nor enough intrinsic separability. A mitigation method keyed to support rank alone would target the wrong tier in exactly this case.
+
+Figure~\ref{fig:tail-vs-support} relates per-class recall to allocated training support directly. Its purpose is to separate two readings of the same aggregate deficit: a loss that varies smoothly with support implies that support is the binding constraint, whereas classes falling well below the support trend point to a shortage that allocation alone does not describe.
 
 \begin{figure}[ht]
   \centering
-  % TODO(results): replace with assets/<dataset>/tail_vs_support.png once ingested.
-  \fbox{\parbox[c][0.28\linewidth][c]{0.7\linewidth}{\centering Pending confirmation runs.}}
-  \caption{Per-class recall against allocated training patches, coloured by support tier, under the controlled conditions. Classes falling below the support trend indicate a shortage that nominal allocation does not capture.}
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/bracs/tail_vs_support.png}
+    \caption{BRACS}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/camelyon16/tail_vs_support.png}
+    \caption{CAMELYON16}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/panda/tail_vs_support.png}
+    \caption{PANDA}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/tail_vs_support.png}
+    \caption{TCGA-UT}
+  \end{subfigure}
+  \caption{Per-class recall against allocated training patches, coloured by support tier, under the controlled conditions of the first locked partition. Classes falling below the support trend indicate a shortage that nominal allocation does not capture.}
   \label{fig:tail-vs-support}
 \end{figure}
+
+\noindent The scatter shows wide vertical spread at fixed allocated support on the two multiclass datasets, which is the visual form of the same point the tier table makes: at equal support, classes differ by more in recall than the support trend explains, so allocated count is not a sufficient statistic for how well a class is served.
 
 \subsection{Gate routing and the natural anchor}
 \label{sec:rq1-routing}
@@ -156,25 +186,29 @@ The two gates partition the comparison units into four states: discrimination on
 
 \begin{table}[ht]
   \centering
-  \footnotesize
-  \pending
+  \scriptsize
+  \resultstable{gate_routing}
   \caption{Gate routing for every comparison unit: which of the discrimination and probability-quality gates opened, and the reason a closed gate did not open, distinguishing a deficit below threshold, an interval covering zero, and a descriptive-only designation.}
   \label{tab:gate-routing}
 \end{table}
 
-\noindent The natural condition sits outside this partition. It trains on all eligible training patches and is therefore neither size-matched nor part of any estimand, but it is reported because it locates the controlled conditions against the imbalance the datasets present without intervention, which is the regime a deployed method would meet. Table~\ref{tab:natural-anchor} places its endpoints beside the size-matched conditions; differences involving the natural anchor confound allocation with training-set size and support no causal reading.
+\noindent Three of the four states are occupied. Six units, all on BRACS, opened both gates. Six further units opened the discrimination gate alone: both PANDA units, the two CAMELYON16 severe units, and the TCGA-UT severe units under the native and difficulty-reversed assignments. Six units opened neither gate, and every one of them fails on the threshold rather than on the interval, meaning the deficits there are estimated precisely enough to be distinguished from zero but are too small to be material. No unit opened the probability-quality gate alone, and no unit was closed by a descriptive-only designation.
+
+The natural condition sits outside this partition. It trains on all eligible training patches and is therefore neither size-matched nor part of any estimand, but it is reported because it locates the controlled conditions against the imbalance the datasets present without intervention, which is the regime a deployed method would meet. Table~\ref{tab:natural-anchor} places its endpoints beside the size-matched conditions; differences involving the natural anchor confound allocation with training-set size and support no causal reading.
 
 \begin{table}[ht]
   \centering
   \footnotesize
-  \pending
-  \caption{Descriptive comparison of the natural anchor against the size-matched balanced, moderate, and severe conditions. The natural condition is not size-matched, so these differences confound allocation with training-set size and enter no estimand.}
+  \resultstable{natural_anchor}
+  \caption{Descriptive comparison of the natural anchor against the size-matched balanced, moderate, and severe conditions, for the cross-entropy reference. The natural condition is not size-matched, so these differences confound allocation with training-set size and enter no estimand.}
   \label{tab:natural-anchor}
 \end{table}
 
+\noindent The anchor is worth one observation. On three of the four datasets the natural condition, despite training on between four and \num{60} times as many patches at the dataset's own prevalence, matches the size-matched balanced reference to within \num{0.006} balanced accuracy; only TCGA-UT gains appreciably, from \num{0.755} to \num{0.792}. Under frozen Virchow2 features the controlled budget is therefore already close to the point where additional patches stop buying discrimination, which is what the support pilot was designed to establish and which makes the controlled contrast a statement about allocation rather than about scale.
+
 \section{Mitigation Recovery}
 \label{sec:rq2}
-Everything in this section is restricted to the comparison units whose gates opened in Table~\ref{tab:gate-routing}. Recovery is defined as $R_M = [M(\text{method}) - M(\text{imbalanced CE})] / D_M$, the fraction of the established deficit that a method returns, so a unit with no established deficit has no defined recovery and is not reported here at any strength of evidence. Units designated descriptive-only by the bootstrap preflight are excluded on the same grounds.
+Everything in this section is restricted to the comparison units whose gates opened in Table~\ref{tab:gate-routing}. Recovery is defined as $R_M = [M(\text{method}) - M(\text{imbalanced CE})] / D_M$, the fraction of the established deficit that a method returns, so a unit with no established deficit has no defined recovery and is not reported here at any strength of evidence. Units designated descriptive-only by the bootstrap preflight are excluded on the same grounds; no unit was excluded on that ground.
 
 \subsection{The confirmatory five-family}
 \label{sec:rq2-family}
@@ -182,51 +216,82 @@ The confirmatory family contains one method per signal, and all five apply a mea
 
 Table~\ref{tab:confirmatory} reports recovery with its interval, the unadjusted and adjusted $p$-values, and the resulting status for each unit and method.
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Confirmatory recovery $R_M$ for the five-member method family on gate-passing units, with paired \num{95}\% intervals, permutation $p$-values, and Holm-adjusted $p$-values within each dataset.}
-  \label{tab:confirmatory}
-\end{table}
+\begin{landscape}
+\begingroup
+\footnotesize
+\resultstable{confirmatory}
+\captionof{table}{Confirmatory recovery $R_M$ for the five-member method family on discrimination-gate-passing units, with paired \num{95}\% intervals, permutation $p$-values, and Holm-adjusted $p$-values within each dataset. Signal labels name the family member: prevalence is prevalence-weighted cross-entropy, nominal support is class-balanced cross-entropy, and the remaining three are the independent-support, pilot-difficulty, and semantic-scale weighted variants.}
+\label{tab:confirmatory}
+\endgroup
+\end{landscape}
+
+\noindent The family separates into two groups, and the separation is the same in all \num{12} gate-passing units. Prevalence-weighted and class-balanced cross-entropy recover most of the deficit nearly everywhere: on BRACS they return between \num{0.743} and \num{0.997} of it, on CAMELYON16 between \num{0.822} and \num{0.924}, and on TCGA-UT between \num{0.792} and \num{0.828}. The independent-support, difficulty, and diversity members recover essentially nothing on BRACS and TCGA-UT, with point estimates between $-\num{0.099}$ and \num{0.148} and intervals covering zero in almost every case. The one dataset where the non-prevalence signals do move an endpoint is CAMELYON16, where semantic-scale weighting recovers \num{0.655} under the native severe condition and \num{0.509} under the reversed one, and independent-support weighting recovers \num{0.480} under the reversed condition; on a two-class target, however, the diversity and independent-support weights are two-point orderings and cannot be distinguished from a coarse prevalence correction on the mechanism they apply.
+
+PANDA is the informative exception within the working group. There prevalence weighting recovers \num{1.162} at moderate and \num{0.968} at severe severity, while class-balanced cross-entropy, which reads nominal support, recovers only \num{0.014} and \num{0.118}. The two methods differ solely in whether the weight is proportional to inverse frequency or to the effective-number reweighting of nominal counts, and at $\rho=100$ on a two-class problem the effective-number transform saturates and returns nearly uniform weights. The two members of the family that share the prevalence and nominal-support corner of the taxonomy therefore do not behave interchangeably, which matters directly for the matched contrast below.
+
+Holm adjustment within a dataset changes the picture only at its margin. On BRACS, where \num{13} tests enter the family per gate, four of the six prevalence-weighted discrimination tests survive adjustment and two do not, despite recovery point estimates above \num{0.92}, because the moderate conditions have wide recovery intervals. On CAMELYON16, PANDA, and TCGA-UT every prevalence-weighted discrimination test survives at adjusted $p \le \num{0.02}$.
 
 \subsection{Matched against unmatched signals}
 \label{sec:rq2-matched}
 The claim RQ2 actually tests is not that some method recovers damage but that the method reading the shortage a condition presents recovers more of it than a method reading a different shortage. Each gate-passing unit is therefore split into a matched arm, containing the family member whose signal corresponds to the dominant shortage from Table~\ref{tab:signal-profiles}, and an unmatched arm containing the remainder. Ambiguous units, where the two largest shortage scores fall within \num{0.25} standard deviations, contribute descriptively and carry no confirmatory weight.
 
-Table~\ref{tab:matched-contrast} gives the direct matched-versus-unmatched contrast per unit with its interval and adjusted $p$-value. Two further quantities qualify how that contrast should be read. The first is the matched-$\beta$ diagnostic arm, in which independent-support weighted cross-entropy is refitted at the effective weight strength selected for class-balanced cross-entropy; it separates an advantage attributable to the signal from one attributable to a more aggressive tuned intervention. The second is agreement between the dominant shortage and the method that in fact recovered most, which is reported per unit because a systematic mismatch would indicate that the shortage taxonomy, not the methods, is what fails to describe these conditions.
+Table~\ref{tab:matched-contrast} gives the direct matched-versus-unmatched contrast per unit with its interval and adjusted $p$-value, and records which family member in fact recovered most. Two further quantities qualify how that contrast should be read. The first is the matched-$\beta$ diagnostic arm, in which independent-support weighted cross-entropy is refitted at the effective weight strength selected for class-balanced cross-entropy; it separates an advantage attributable to the signal from one attributable to a more aggressive tuned intervention, and appears in Table~\ref{tab:matched-beta}. The second is agreement between the dominant shortage and the method that in fact recovered most, which is reported per unit because a systematic mismatch would indicate that the shortage taxonomy, not the methods, is what fails to describe these conditions.
+
+\begin{landscape}
+\begingroup
+\footnotesize
+\resultstable{matched_contrast}
+\captionof{table}{Direct contrast between the signal-matched arm and the unmatched arm on gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values. Ambiguous units carry no matched arm and are descriptive only. ``Best recoverer'' names the family member with the largest recovery in that unit, and ``Agrees'' records whether it belongs to the matched arm.}
+\label{tab:matched-contrast}
+\endgroup
+\end{landscape}
 
 \begin{table}[ht]
   \centering
-  \footnotesize
-  \pending
-  \caption{Direct contrast between the signal-matched arm and the unmatched arm on gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values, and the matched-$\beta$ diagnostic that refits independent-support weighting at the class-balanced weight strength. Ambiguous units are marked and are descriptive only.}
-  \label{tab:matched-contrast}
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \resultstable{matched_beta}
+  \caption{Matched-$\beta$ diagnostic: case-macro balanced accuracy of independent-support weighted cross-entropy refitted at the effective weight strength selected for class-balanced cross-entropy, beside the imbalanced cross-entropy reference and the two anchors it separates. Descriptive, and not part of the Holm family.}
+  \label{tab:matched-beta}
 \end{table}
+
+\noindent The contrast is signed in opposite directions on different datasets, and the sign is fully predicted by which shortage the unit's profile makes dominant. Where the dominant shortage is nominal support, the matched arm contains prevalence-weighted and class-balanced cross-entropy, and the contrast is positive: \num{0.011} and \num{0.010} on the two CAMELYON16 severe units and \num{0.084} on PANDA severe, all surviving Holm adjustment. Where the dominant shortage is difficulty, diversity, or independent support, the matched arm contains exactly one method from the group that recovers nothing while the unmatched arm retains both methods that work, and the contrast is negative in every such unit: from $-\num{0.013}$ to $-\num{0.057}$ on discrimination and from $-\num{0.430}$ to $-\num{2.695}$ nats on probability quality.
+
+The agreement column makes the same point without the arithmetic of the contrast. In all \num{18} gate-passing rows the family member that recovered most is either prevalence-weighted or class-balanced cross-entropy. The dominant shortage and the best recoverer therefore agree exactly when, and only when, the dominant shortage is nominal support. This is not evidence that signal matching works; it is evidence that on these datasets only one corner of the taxonomy is served by a method that recovers anything, so the matched contrast measures whether the unit happened to land in that corner.
+
+The matched-$\beta$ diagnostic rules out the most obvious alternative explanation. If independent-support weighting failed because its tuned weight strength was too timid rather than because its signal is uninformative, refitting it at the strength selected for class-balanced cross-entropy should close part of the gap. It does not: across all \num{18} units the refit moves balanced accuracy by at most \num{0.005} from the independent-support arm, while the gap to class-balanced cross-entropy remains as large as \num{0.098} on BRACS under the difficulty-reversed severe condition. The failure of the non-prevalence signals is a property of what those weights encode, not of how hard they were applied.
 
 \subsection{Recovery of probability quality}
 \label{sec:rq2-calibration}
 A method may return discrimination while leaving probabilities no better calibrated, or return calibration without moving balanced accuracy, and a mitigation method that must serve both would need to be designed for that trade-off explicitly. Recovery on the tail-group negative log likelihood axis is therefore reported separately in Table~\ref{tab:calibration-recovery}, over the units whose calibration gate opened, which need not be the units whose discrimination gate opened. Where both axes were damaged in the same unit, the two recovery fractions are read together, and any method recovering on one axis while degrading the other is identified explicitly.
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Recovery of tail-group macro negative log likelihood on calibration-gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values, reported alongside the discrimination recovery of the same method and unit where both gates opened.}
-  \label{tab:calibration-recovery}
-\end{table}
+\begin{landscape}
+\begingroup
+\footnotesize
+\resultstable{calibration_recovery}
+\captionof{table}{Recovery of tail-group macro negative log likelihood on the six calibration-gate-passing units, all on BRACS, with paired \num{95}\% intervals and Holm-adjusted $p$-values, reported alongside the discrimination recovery of the same method and unit, since both gates opened in every one of these units.}
+\label{tab:calibration-recovery}
+\endgroup
+\end{landscape}
+
+\noindent All six calibration-gate units are on BRACS, and all six also opened the discrimination gate, so the two axes can be read against each other directly. Prevalence-weighted and class-balanced cross-entropy recover between \num{0.881} and \num{1.261} of the tail-group likelihood deficit, all at adjusted $p \le \num{0.007}$, and recover discrimination in the same cells at between \num{0.743} and \num{0.997}. On these two methods the axes do not trade off: whatever repairs the tail's discrimination also repairs its probability mass.
+
+The other three members do trade off, and in the damaging direction. Independent-support, difficulty, and diversity weighting return recovery fractions between $-\num{1.544}$ and \num{0.260} on the calibration axis, with \num{11} of the \num{18} corresponding estimates negative and \num{10} of them surviving Holm adjustment at $p \le \num{0.007}$. A negative recovery fraction here means the method left tail-group probabilities materially worse than imbalanced cross-entropy had left them, while moving discrimination by an amount indistinguishable from zero. Difficulty weighting under the BRACS difficulty-reversed moderate condition is the clearest instance: tail-group recovery $-\num{1.544}$ against discrimination recovery $-\num{0.099}$. A weight that reads a signal unrelated to the damage does not merely fail to help; it redistributes probability mass across classes and degrades the endpoint that the gate identified as damaged.
 
 \subsection{The wider method roster}
 \label{sec:rq2-roster}
 The remaining roster methods change the training objective, the sampling distribution, the decision threshold, or the classifier head, and so cannot be compared to the five-family at a fixed intervention mechanism. They are reported with intervals but without confirmatory status: balanced sampling, train-time and post-hoc logit adjustment, classifier retraining, focal loss, the prototype-affinity head, the soft-$F_1$ and soft-MCC hybrids, and set learning. Their role in this report is to bound what is achievable on these conditions by any tested means, which is what Section~\ref{sec:discussion} needs in order to distinguish a signal that no method exploits from a deficit that no mechanism repairs.
 
-\begin{table}[ht]
-  \centering
-  \scriptsize
-  \pending
-  \caption{Exploratory recovery estimates for the full method roster on gate-passing units, with paired \num{95}\% intervals. These methods vary the intervention mechanism as well as the signal, carry no confirmatory status, and are not part of the Holm family.}
-  \label{tab:roster-recovery}
-\end{table}
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{roster_recovery}
+\captionof{table}{Exploratory recovery estimates for the full method roster on gate-passing units, with paired \num{95}\% intervals. These methods vary the intervention mechanism as well as the signal, carry no confirmatory status, and are not part of the Holm family.}
+\label{tab:roster-recovery}
+\endgroup
+\end{landscape}
+
+\noindent The roster establishes that no gate-passing unit is beyond repair. In every one of the \num{12} discrimination-gate units at least one roster method recovers more than \num{0.67} of the deficit, and in nine of them at least one recovers more than \num{0.80}. The best exploratory recoverers are balanced sampling and train-time logit adjustment on BRACS, the soft-$F_1$ and soft-MCC hybrids on PANDA and CAMELYON16, and set learning on TCGA-UT, where it reaches \num{1.646} and \num{1.784} and therefore overshoots the size-matched balanced reference. Three of these mechanisms resample or reweight at the level of the batch rather than the loss term, which is the family for which full recovery is mechanically attainable, so overshoot is not anomalous. The practical consequence for Section~\ref{sec:discussion} is that the recovery ceiling on these conditions is set by neither the data nor the representation: where damage exists, some tested mechanism reaches most of it.
 
 \section{Explaining Heterogeneity}
 \label{sec:rq3}
@@ -237,15 +302,27 @@ Damage magnitude and recovery headroom vary across conditions, and RQ3 asks whic
 \end{equation}
 \noindent where $\rho_j$ is achieved severity, $S_{\mathrm{ind},j}$ the independent-support shortage, $A_j$ the support--difficulty alignment, $S_{\mathrm{div},j}$ the diversity shortage, and $u_{g[j]}$ a random intercept over dataset--target groups that absorbs level differences between datasets. Observation errors come from the bootstrap distributions of the corresponding endpoints.
 
-These models are exploratory by construction and by fitting procedure. They are estimated at the posterior mode and return point coefficients with no standard errors and no posterior intervals, so a coefficient reported here indicates direction and relative magnitude but licenses no claim of statistical significance. The only accuracy evidence available for them is the leave-one-group-out check, which refits each model with one dataset--target group held out and reports the held-out root mean squared error; a group whose held-out error is much larger than the rest indicates that the association does not transfer across datasets. Coefficients and that diagnostic appear in Table~\ref{tab:rq3}.
+These models are exploratory by construction and by fitting procedure. They are estimated at the posterior mode and return point coefficients with no standard errors and no posterior intervals, so a coefficient reported here indicates direction and relative magnitude but licenses no claim of statistical significance. The only accuracy evidence available for them is the leave-one-group-out check, which refits each model with one dataset--target group held out and reports the held-out root mean squared error; a group whose held-out error is much larger than the rest indicates that the association does not transfer across datasets. Coefficients and that diagnostic appear in Tables~\ref{tab:rq3} and~\ref{tab:rq3-logo}.
 
 \begin{table}[ht]
   \centering
   \footnotesize
-  \pending
-  \caption{Exploratory association models for signed balanced-accuracy damage and for gated recovery: standardized coefficients from Equation~\eqref{eq:rq3-model}, group and residual scale, and leave-one-group-out held-out error per dataset--target group. Estimated at the posterior mode; no intervals are available.}
+  \resultstable{rq3_models}
+  \caption{Exploratory association models for signed balanced-accuracy damage and for gated recovery: standardized coefficients from Equation~\eqref{eq:rq3-model}, together with the group and residual scale. Estimated at the posterior mode; no intervals are available.}
   \label{tab:rq3}
 \end{table}
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \resultstable{rq3_logo}
+  \caption{Leave-one-group-out check on the damage model: each dataset--target group is held out in turn, the model refitted on the remainder, and the held-out root mean squared error reported alongside the number of cells in the held-out group. Exploratory.}
+  \label{tab:rq3-logo}
+\end{table}
+
+\noindent Three readings follow from the damage model, each qualified by the absence of intervals. Achieved severity is the largest signal predictor, at $\beta_{\log\rho}=\num{0.0471}$ on standardized scale against a residual scale of $\sigma=\num{0.0184}$, which restates in model form the severity ordering already visible in Table~\ref{tab:discrimination-deficit}. Diversity shortage enters with a comparable magnitude and the opposite sign, $\beta_{\mathrm{div}}=-\num{0.0424}$; because severe conditions have both higher $\rho$ and higher measured diversity shortage, the two predictors are strongly collinear across only \num{18} units, and the negative coefficient is better read as the diversity term absorbing part of a severity effect the model has already assigned to $\log\rho$ than as evidence that losing representational diversity reduces damage. Support--difficulty alignment contributes almost nothing, $\beta_{A}=-\num{0.0008}$, which sits awkwardly beside the large assignment effects in Table~\ref{tab:discrimination-deficit}; the alignment predictor is a single correlation summarizing an entire condition, and on the two binary datasets it can take only the values $\pm 1$, so it is a coarse encoding of the assignment contrast rather than a null result about it. The independent-support coefficient is exactly zero, for the reason established in Section~\ref{sec:rq1-profiles}: its predictor has no variance.
+
+The variance components are as informative as the slopes. The dataset--target random-intercept scale, $\sigma_u=\num{0.0484}$, is more than two and a half times the residual scale, so more of the variation in damage lies between datasets than the four signal predictors explain within them. The leave-one-group-out errors are consistent with that: holding out TCGA-UT gives a held-out error of \num{0.0142}, comparable to the residual scale, whereas holding out PANDA gives \num{0.0865}, larger than any deficit that dataset records except its own severe condition. PANDA contributes only two cells and has the largest severe deficit in the benchmark, so the model cannot place it from the other three groups. The association therefore does not transfer across datasets, and no coefficient here should be carried into a method design without a within-dataset check.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -253,45 +330,56 @@ The preceding sections establish what the controlled allocation damaged, how muc
 
 \subsection{What the evidence supports}
 \label{sec:discussion-evidence}
-The findings are summarized here by research question rather than by dataset, since the design intends datasets to be replicates of a mechanism rather than objects of interest in themselves. Three statements structure the summary: where controlled allocation produced a gate-opening deficit and where it did not; whether recovery separated across signals at a fixed intervention mechanism; and which shortages tracked damage magnitude and recovery headroom in the exploratory models. Every statement is bound to the gate status of the units it rests on, so that a claim about recovery is never carried by a unit in which no damage was established.
-% TODO(results): write the three-part summary once the tables in Sections 2 to 4 are populated.
+The findings are summarized here by research question rather than by dataset, since the design intends datasets to be replicates of a mechanism rather than objects of interest in themselves. Three statements structure the summary, and every statement is bound to the gate status of the units it rests on, so that a claim about recovery is never carried by a unit in which no damage was established.
+
+On RQ1, controlled allocation produced a material discrimination deficit in \num{12} of \num{18} comparison units and a material probability-quality deficit in six, all six of the latter on BRACS. Damage grows with achieved severity and with adversity of the tail assignment, and it is largest where the fixed budget is split between few classes, so that the tail retains almost none of it. The six units that opened neither gate all fail on magnitude rather than on precision: at $\rho=10$ on CAMELYON16 and TCGA-UT, and at $\rho=100$ on the difficulty-aligned TCGA-UT condition, redistributing the budget measurably but immaterially changes case-macro balanced accuracy. Damage did not fall where support rank alone predicts: under the difficulty-reversed assignment the body tier absorbs more loss than the tail.
+
+On RQ2, recovery separated widely across the confirmatory family at a fixed intervention mechanism, but along a single split. Prevalence-weighted and class-balanced cross-entropy recover most of both the discrimination and the probability-quality deficit wherever a gate opened; independent-support, difficulty, and diversity weighting recover essentially none of the discrimination deficit and actively degrade tail probability quality in \num{11} of \num{18} calibration cells. The matched-versus-unmatched contrast is positive only in the three units whose dominant shortage is nominal support, and negative in every unit whose dominant shortage is one of the other three, because in those units the matched arm holds exactly the member that does not work. The matched-$\beta$ diagnostic excludes tuned weight strength as the explanation.
+
+On RQ3, achieved severity is the strongest signal-side predictor of damage magnitude, diversity shortage enters with a comparable magnitude but is collinear with severity across only \num{18} units, support--difficulty alignment contributes almost nothing under its single-correlation encoding, and independent-support shortage is fixed at zero by the design. Between-dataset variation exceeds within-dataset residual variation, and the leave-one-group-out check shows the association does not transfer to PANDA. The recovery model is fitted over the gate-passing method cells and is reported alongside the damage model in Table~\ref{tab:rq3}; like the damage model it carries point estimates only.
 
 \subsection{Which shortage a mitigation method must read}
 \label{sec:discussion-signal}
-A method must estimate the shortage that binds, which makes the empirical question whether the dominant shortage was identifiable and whether it mattered. Two outcomes carry different design consequences. If independent-support or diversity shortage tracked damage that prevalence did not, then a prevalence-only method is structurally insufficient on these datasets regardless of how well it is tuned, and the shortage estimate itself becomes part of the method rather than a diagnostic run beforehand. If instead prevalence tracked damage as well as the other signals did, the added estimation machinery buys nothing and the simpler weighting is the correct default.
+A method must estimate the shortage that binds, which makes the empirical question whether the dominant shortage was identifiable and whether it mattered. On these datasets the answer is that the dominant shortage was identifiable in \num{13} of \num{18} units and did not carry the recovery. Neither independent-support nor diversity shortage tracked damage that prevalence failed to track, and the two methods that read prevalence and nominal support recovered most of every deficit that was established. Under the outcome the protocol anticipated for this case, the simpler weighting is the correct default and the added shortage-estimation machinery buys nothing.
 
-The frequency of the ambiguous designation qualifies both readings. A taxonomy whose top two shortage scores are routinely within a quarter of a standard deviation does not partition conditions sharply enough to route a method, and in that case the design implication is a method that combines signals rather than one that selects among them.
+That conclusion has to be stated with the design boundary attached, because the boundary is what produced part of it. Independent-support shortage was not merely uninformative here; it was never created. The shared per-class evidence pool that makes the allocation contrast clean also holds independent support fixed across conditions, so the benchmark tests independent-support weighting on conditions in which the quantity it reads does not vary. The correct inference is that a prevalence-only method is sufficient for allocation-induced shortage under a fixed evidence pool, not that independent support is an unproductive signal in general. Testing that would require cohorts that differ in how many patients back a class, which this design deliberately excludes.
+
+The frequency of the ambiguous designation qualifies the reading further. Five of \num{18} units, including three at moderate severity, have their two largest shortage scores within a quarter of a standard deviation. A taxonomy that cannot separate the top two axes in more than a quarter of its conditions does not partition sharply enough to route a method, and in that case the design implication is a method that combines signals rather than one that selects among them.
 
 \subsection{Signal against mechanism}
 \label{sec:discussion-mechanism}
-Because the five confirmatory methods share one intervention mechanism and differ only in the signal their weights read, the spread of recovery across them isolates how much leverage the choice of signal carries. A wide spread identifies the signal as the lever and makes better shortage estimation the productive direction. A narrow spread has the opposite implication: the signal is not what limits recovery, and a further weighting scheme, however well targeted, is unlikely to help.
+Because the five confirmatory methods share one intervention mechanism and differ only in the signal their weights read, the spread of recovery across them isolates how much leverage the choice of signal carries. That spread is wide, running from below zero to above \num{0.99} within single units, so signal choice does determine whether a weighted-loss method works at all. The spread is not, however, evidence that a better shortage estimate would help, because it is bimodal rather than graded: two members work almost everywhere and three work almost nowhere, with little in between. The productive direction that this pattern indicates is not a finer estimate of difficulty or diversity but an explanation of why weights derived from those signals fail to move the endpoint at all.
 
-The matched-$\beta$ diagnostic is what separates these readings from a third possibility. A method may appear to win on its signal while in fact winning on a more aggressive tuned weight strength; refitting independent-support weighting at the class-balanced weight strength removes that confound. An advantage that survives the refit is attributable to the signal, and one that disappears identifies intervention strength, not signal choice, as the operative variable.
+The comparison between prevalence-weighted and class-balanced cross-entropy on PANDA sharpens that point, since those two occupy adjacent corners of the taxonomy yet differ by a full deficit's worth of recovery, \num{0.968} against \num{0.118} at severe severity. What separates them is not the signal in the taxonomy's sense but the transform applied to it: the effective-number reweighting saturates at high imbalance on a binary target and returns nearly uniform weights. A signal taxonomy that treats these two as neighbours therefore under-describes the design space that actually determines recovery.
+
+The matched-$\beta$ diagnostic separates these readings from a third possibility. A method may appear to win on its signal while in fact winning on a more aggressive tuned weight strength; refitting independent-support weighting at the class-balanced weight strength removes that confound. Here the refit changes balanced accuracy by at most \num{0.005} in any unit while the gap to class-balanced cross-entropy remains up to \num{0.098}, so the advantage that class-balanced weighting holds is attributable to what its weights encode and not to how aggressively they are applied.
 
 \subsection{Where recovery ceilings}
 \label{sec:discussion-ceiling}
-The units that define the unmet need are those in which a gate opened and no method, confirmatory or exploratory, returned a substantial fraction of the deficit. These are the conditions a new method would have to target, and the roster results in Section~\ref{sec:rq2-roster} are what establish that the ceiling belongs to the conditions rather than to the five-family alone. Their realized signal profiles indicate what such conditions have in common and therefore what the method would have to exploit.
+The units that define an unmet need would be those in which a gate opened and no method, confirmatory or exploratory, returned a substantial fraction of the deficit. There are none. In every gate-passing unit at least one tested method recovers more than \num{0.67} of the deficit, and the full roster reaches above \num{0.80} in nine of the \num{12} discrimination-gate units. The ceiling on these conditions therefore belongs to neither the data nor the frozen representation, and a new method cannot be motivated by damage that existing mechanisms leave unrepaired. It has to be motivated instead by what those mechanisms cost, by the endpoints they degrade while repairing another, or by the regimes in which they should not be applied.
 
-The complementary case is equally informative for scoping. Units in which controlled allocation never opened a gate mark regimes where mitigation is not warranted, and a method that intervenes there spends capacity and risks degrading endpoints that were not damaged. Knowing when not to act is part of the specification, not an afterthought.
+The complementary case is equally informative for scoping. Six units opened no gate at all, and all six failed on magnitude rather than precision. A method that intervenes there spends capacity and risks degrading endpoints that were not damaged, and the calibration results in Section~\ref{sec:rq2-calibration} show that this risk is real rather than hypothetical: in cells where the wrong signal was applied, tail-group probability quality fell well below the untreated imbalanced reference. Knowing when not to act is part of the specification, not an afterthought.
 
 \subsection{Design requirements and open questions}
 \label{sec:discussion-requirements}
-The preceding subsections resolve into a small set of requirements for a mitigation method, each traceable to a specific result:
+The preceding subsections resolve into a small set of requirements for a mitigation method, each traceable to a specific result and annotated with the strength of evidence behind it.
 \begin{enumerate}
-  \item Which signal or combination of signals the method must estimate, and whether the shortage estimate must be recomputed per condition or transfers across datasets, as indicated by the leave-one-group-out diagnostic.
-  \item The granularity at which that estimate must be formed, whether per class, per class and partitioning unit, or per class and representational cluster.
-  \item What the method must not require: no access to test prevalence, no labelled data beyond the training partition, and no per-condition tuning that a deployment could not perform.
-  \item Which endpoint the method must not degrade, given the observed trade-off between discrimination and probability quality in Section~\ref{sec:rq2-calibration}.
-  \item The regimes in which the method should decline to intervene, defined by the conditions that opened no gate.
+  \item The method must read prevalence or nominal support, and must not rely on a difficulty or diversity estimate as its primary signal. \emph{Confirmatory}, from the five-family separation in Table~\ref{tab:confirmatory} on all \num{12} discrimination-gate units.
+  \item It must specify the transform applied to that signal, not only the signal itself, because the two prevalence-corner members differ by a full deficit's worth of recovery on PANDA where the effective-number transform saturates. \emph{Confirmatory}, from the same table.
+  \item The estimate must be formed per class and per condition rather than transferred across datasets, since the dataset--target intercept scale exceeds the residual scale and the leave-one-group-out error on PANDA is six times that on TCGA-UT. \emph{Exploratory}, from Tables~\ref{tab:rq3} and~\ref{tab:rq3-logo}.
+  \item It must not degrade tail-group probability quality while repairing discrimination. \emph{Confirmatory}, from the \num{11} negative calibration-recovery cells in Table~\ref{tab:calibration-recovery}, \num{10} of which survive Holm adjustment.
+  \item It must decline to intervene where allocation produced no material deficit, which on these datasets is every moderate condition on CAMELYON16 and TCGA-UT and the difficulty-aligned severe condition on TCGA-UT. \emph{Confirmatory}, from the gate routing in Table~\ref{tab:gate-routing}.
+  \item It must not require access to test prevalence, labelled data beyond the training partition, or per-condition tuning that a deployment could not perform. \emph{Design constraint}, carried from the protocol rather than established by a result here.
 \end{enumerate}
-\noindent Each requirement is annotated with the strength of evidence behind it, distinguishing confirmatory results, exploratory results, and descriptive observations. The exploratory models of Section~\ref{sec:rq3} supply point estimates with no intervals and may therefore motivate a design direction but never justify one on their own.
+\noindent The exploratory models of Section~\ref{sec:rq3} supply point estimates with no intervals and may therefore motivate a design direction but never justify one on their own.
 
-Two questions remain outside what this benchmark can decide. It manipulates allocation within a fixed pool of patients and slides, so it says nothing about a shortage of patients as such, which would require cohorts of differing size. It also holds the representation fixed at frozen Virchow2 features, leaving open whether a diversity shortage measured in that space persists under a representation adapted to the task. Both would have to be measured before a method could be claimed to address either shortage.
+Three questions remain outside what this benchmark can decide. It manipulates allocation within a fixed pool of patients and slides, so it says nothing about a shortage of patients as such, which would require cohorts of differing size; the identically zero independent-support shortage in Table~\ref{tab:signal-profiles} is the direct trace of that boundary. It also holds the representation fixed at frozen Virchow2 features, leaving open whether a diversity shortage measured in that space persists under a representation adapted to the task. And because every gate-passing unit admitted a recovery above \num{0.67} by some tested mechanism, the benchmark identifies no regime of unmet need, so the case for a new method rests on cost, on endpoint trade-offs, and on abstention rather than on unrepaired damage. All three would have to be addressed before a method could be claimed to improve on what the roster already achieves.
 
 \section{Conclusion and Scope}
 \label{sec:limits}
 This report answers three questions in the order the protocol fixed: what controlled allocation damaged, how much of that damage signal-matched mitigation returned, and which realized shortages tracked the variation in both. Its contribution is the design evidence assembled in Section~\ref{sec:discussion}, which states what a mitigation method must read, at what granularity, under what constraints, and where it should decline to act.
-% TODO(results): state the concluding position once Sections 2 to 5 are populated.
+
+The concluding position is that, for allocation-induced shortage under a fixed evidence pool and a frozen representation, signal choice is decisive but the decision is already settled: prevalence and nominal support are the signals that carry recovery, the remaining three carry none and can make probability quality worse, and no gate-passing condition resists repair by some tested mechanism. A new method is therefore not warranted by unmet damage on these conditions. It is warranted, if at all, by the parts of the specification the existing roster does not satisfy: a transform that does not saturate at high imbalance on few classes, an estimate that is recomputed per condition rather than transferred, protection of the probability-quality axis while discrimination is repaired, and an explicit abstention rule for regimes in which allocation caused no material deficit.
 
 Four scope conditions bound every claim above. The three partitions are locked design repetitions of one dataset, not independent cohorts, so the intervals quantify variation across partitionings and initializations rather than across populations. The association models of Section~\ref{sec:rq3} are exploratory and carry no causal interpretation, and their coefficients come without intervals. The benchmark covers patch classification only, where each prediction unit carries its own label; at whole-slide level, reallocating labelled slides changes nominal and independent support together, so the two signals could not be separated in the way this design requires. Temperature scaling is reported as a diagnostic throughout and never gates a decision.
 
@@ -306,109 +394,172 @@ This appendix carries the execution record that Section~\ref{sec:rq1} summarizes
 
 \subsection{Realized construction}
 \label{app:realized-construction}
-Table~\ref{tab:realized-support} reports the achieved imbalance ratio and normalized-entropy deficit for each dataset, partition, and controlled condition, together with the realized partitioning-unit, slide, and patch counts. Conditions falling outside the tolerance bands, $\rho \in [9, 11]$ for moderate and $\rho \in [90, 110]$ for severe, are flagged as off-target, and allocations that collapsed to balanced are flagged as degenerate and excluded from all estimands. Any class or condition dropped during construction is listed with the rule that dropped it.
+Table~\ref{tab:realized-support} reports the achieved imbalance ratio and normalized-entropy deficit for each dataset, partition, and controlled condition, together with the realized partitioning-unit, slide, and patch counts. Conditions falling outside the tolerance bands, $\rho \in [9, 11]$ for moderate and $\rho \in [90, 110]$ for severe, are flagged as off-target, and allocations that collapsed to balanced are flagged as degenerate and excluded from all estimands. No condition carries either flag. Partitioning-unit and slide counts are unique within a realization: one unit may supply patches to more than one class, so per-class counts are not summed.
+
+Two classes are absent from the TCGA-UT target set, for independent reasons recorded in the frozen provenance. Diffuse Large B-cell Lymphoma is excluded because no shared total is both tolerance-feasible and compatible with the per-unit and per-slide contribution caps for it. Cholangiocarcinoma is excluded because its held-out participant count cannot support the split-unit-clustered inference the confirmatory analysis requires. The retained target is therefore \num{30} cancer types, and every quantity reported for TCGA-UT in this report refers to that \num{30}-class task.
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{realized_support}
+\captionof{table}{Realized training support per dataset, partition, and controlled condition: unique partitioning units, slides, patches, achieved $\rho$, and normalized-entropy deficit, with tolerance status. The natural anchor and the balanced reference carry no severity tolerance.}
+\label{tab:realized-support}
+\endgroup
+\end{landscape}
+
+\subsection{Resampling validity and completeness}
+\label{app:realized-validity}
+The label-only preflight resamples partitioning units before any model is fitted and checks whether class-level endpoints can be estimated stably at all. Three concentration checks apply per class: whether the \num{2.5}th percentile of the Kish effective count falls below five, whether a single unit carries more than half the weight in more than \num{5}\% of replicates, and whether a pooled cell draws on fewer than five contributing units. A class failing any check designates its dataset descriptive-only, which forces both gates closed. Table~\ref{tab:preflight-outcome} reports these quantities and the resulting designation, taking the most adverse reading across the three partitions for each class.
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{preflight_outcome}
+\captionof{table}{Label-only bootstrap preflight per dataset and class: Kish effective count and its \num{2.5}th percentile, maximum single-unit weight fraction, share of replicates with a dominant unit, and the resulting descriptive-only designation. Values are the most adverse across the three partitions.}
+\label{tab:preflight-outcome}
+\endgroup
+\end{landscape}
+
+\noindent No class on any dataset is designated descriptive-only. The tightest margins are on BRACS, whose ductal carcinoma in situ class reaches a \num{2.5}th-percentile Kish effective count of \num{5.5} against a floor of five, and no class on any dataset records a dominant unit in any replicate.
+
+Completeness is enforced rather than reported after the fact. Every confirmation block must contain all five initialization seeds, every expected combination of tail assignment, severity, method, and gate must appear in all three partitions, and the achieved severity of a condition must not vary by more than half across partitions. Table~\ref{tab:completeness} records the outcome of each guard per dataset, and Section~\ref{app:realized-deviations} states what was done where a guard did not pass.
 
 \begin{table}[ht]
   \centering
   \scriptsize
-  \pending
-  \caption{Realized training support per dataset, partition, and controlled condition: partitioning units, slides, patches, achieved $\rho$, and normalized-entropy deficit, with off-target and degenerate conditions flagged.}
-  \label{tab:realized-support}
-\end{table}
-
-\subsection{Resampling validity and completeness}
-\label{app:realized-validity}
-The label-only preflight resamples partitioning units before any model is fitted and checks whether class-level endpoints can be estimated stably at all. Three concentration checks apply per class: whether the \num{2.5}th percentile of the Kish effective count falls below five, whether a single unit carries more than half the weight in more than \num{5}\% of replicates, and whether a pooled cell draws on fewer than five contributing units. A class failing any check designates its dataset descriptive-only, which forces both gates closed. Table~\ref{tab:preflight-outcome} reports these quantities and the resulting designation.
-
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Label-only bootstrap preflight per dataset and class: Kish effective count and its \num{2.5}th percentile, maximum single-unit weight fraction, share of replicates with a dominant unit, and the resulting descriptive-only designation.}
-  \label{tab:preflight-outcome}
-\end{table}
-
-\noindent Completeness is enforced rather than reported after the fact. Every confirmation block must contain all five initialization seeds, every expected combination of tail assignment, severity, method, and gate must appear in all three partitions, and the achieved severity of a condition must not vary by more than half across partitions. Table~\ref{tab:completeness} records the outcome of each guard per dataset, and Section~\ref{app:realized-deviations} states what was done where a guard did not pass.
-
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Completeness and consistency guards per dataset: confirmation-seed blocks, expected comparison coverage across the three partitions, and achieved-severity spread.}
+  \resultstable{completeness}
+  \caption{Completeness and consistency guards per dataset: confirmation-seed blocks, expected comparison coverage across the three partitions, and achieved-severity spread. These guards halt aggregation rather than degrade it, so a written result implies every guard passed.}
   \label{tab:completeness}
 \end{table}
 
 \subsection{Tuning selections and deviations}
 \label{app:realized-deviations}
-Hyperparameters were selected on natural-prevalence validation data alone, by the adaptive window over the learning-rate envelope and the per-method control grids fixed in the protocol. Table~\ref{tab:tuning-selections} records the selected value and the update budget actually consumed for each dataset, condition, and method, together with any search that terminated at an envelope boundary, since a selection at the boundary indicates the envelope, not the data, determined the choice.
+Hyperparameters were selected on natural-prevalence validation data alone, by the adaptive window over the learning-rate envelope and the per-method control grids fixed in the protocol. One configuration is chosen against the equal-weight three-split objective and written identically to every partition. Table~\ref{tab:tuning-selections} records the selected value and the update budget for each dataset, condition, and method, together with any search that terminated at an envelope boundary, since a selection at the boundary indicates the envelope, not the data, determined the choice.
 
-\begin{table}[ht]
-  \centering
-  \scriptsize
-  \pending
-  \caption{Selected control values and consumed update budgets per dataset, condition, and method, with searches terminating at an envelope boundary flagged.}
-  \label{tab:tuning-selections}
-\end{table}
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{tuning_selections}
+\captionof{table}{Selected control values and update budgets per dataset, condition, and method, with searches terminating at the \num{1e-5} or \num{1e-2} learning-rate envelope boundary flagged. Post-hoc logit adjustment performs no gradient optimization and carries no learning rate.}
+\label{tab:tuning-selections}
+\endgroup
+\end{landscape}
 
-\noindent Deviations from the locked protocol are listed below with the reason for each and the date on which it was made. Where no deviation occurred, that is stated explicitly rather than left to be inferred from an empty list.
-% TODO(results): list protocol deviations with reason and date, or state that there were none. Cross-check PLAN_1_evidence_gate.md, PLAN_2_natural_tuning_cost.md, and PLAN_3_variable_conditions.md at the repository root for amendments not yet folded into the protocol.
+\noindent Four deviations from the locked protocol were made, each before any definitive gate row was read, and each is recorded here with its reason.
+
+The two deficit-gate thresholds were derived rather than assumed. The protocol had fixed $D_{\mathrm{BA}} \ge \num{0.02}$ and $D_{\mathrm{cal}} \ge \num{0.05}$ nats without a stated derivation, and the discrimination value conflicted with the support pilot's own materiality constant of \num{0.01} for the same endpoint under the same kind of manipulation. Both were replaced by quantities the protocol already fixes: the discrimination threshold became $\max(\num{0.01}, 2\sigma_{\mathrm{seed}})=\num{0.01443}$ and the calibration threshold $2\sigma_{\mathrm{seed}}=\num{0.18237}$ nats, where $\sigma_{\mathrm{seed}}$ is the largest across datasets and partitions of the confirmation-seed standard deviation of the corresponding balanced-condition endpoint. The change was applied identically to all four datasets and frozen before any gate row was read.
+
+The gate-defining estimator was changed from patch-micro to case-macro, and the evidence cell from a per-partition cell to a cell pooled across a case's partition appearances. Both are corrections of a mismatch between a diagnostic and the estimator it certifies: the preflight weighted a case by its patch count, so one large annotated region or one macro-metastasis slide could carry more than half of a class's weight, and the per-partition cell certified an estimand that no reported quantity uses, since the bootstrap draws one shared weight per case over the union of the three test frames.
+
+Cholangiocarcinoma was excluded from the TCGA-UT target set, reducing it from \num{31} eligible classes to \num{30}, because its held-out participant count could not support split-unit-clustered inference. The exclusion uses the existing construction-time mechanism and removes the class from training as well as evaluation, which is stronger than the evidence problem requires and was accepted in exchange for a uniform \num{30}-type task definition.
+
+The validation cadence was scaled to the update budget rather than pinned to a constant. Validation dominates the tuning cost, and a fixed checkpoint interval made that cost scale with the update budget, so the natural condition was running between \num{13} and \num{62} times as many full validation passes as the controlled conditions it exists to contextualize. The interval is now derived so that any budget takes approximately the same number of checkpoints. No estimand, endpoint, or selection rule changed.
+
+One execution defect is recorded here rather than as a protocol change. The cross-dataset matching record, which standardizes the four shortage scores across all \num{18} units and assigns each its dominant shortage, is written per dataset root. It was produced for BRACS, CAMELYON16, and PANDA before their confirmatory aggregation ran, but for TCGA-UT it was produced afterwards, so the first aggregation of that dataset emitted no matched-versus-unmatched rows. The record was regenerated for TCGA-UT from the same four roots and the aggregation repeated; the dominant-shortage and ambiguity labels it assigns are identical to those the other three datasets used, and their standardized scores agree to within \num{0.005}. The other three datasets retain their original records, since re-deriving them would change no label.
 
 \section{Per-Class and Tier Endpoints}
 \label{app:endpoints}
-Section~\ref{sec:rq1-incidence} reports damage at tier level; this appendix gives the per-class detail behind it. For each dataset, recall, $F_1$, negative log likelihood, and Brier score are listed per class, condition, and method, averaged within a partition and then with equal weight across the three partitions. The tier assignment of each class is given alongside, since tier membership follows the allocation of the condition and is therefore not constant across conditions.
+Section~\ref{sec:rq1-incidence} reports damage at tier level; this appendix gives the per-class detail behind it. For each dataset, recall, $F_1$, negative log likelihood, and Brier score are listed per class and condition for the cross-entropy reference, averaged within a partition and then with equal weight across the three partitions. The tier assignment of each class is given alongside, since tier membership follows the allocation of the condition and is therefore not constant across conditions. The table is restricted to cross-entropy because that is the reference against which every deficit in Section~\ref{sec:rq1} is defined; per-class endpoints for the remaining methods are available in the analysis outputs but would multiply the table by the size of the roster without informing a claim made here.
 
-\begin{table}[ht]
-  \centering
-  \scriptsize
-  \pending
-  \caption{Equal-weight three-split per-class test endpoints by condition and method, with the tier assignment each condition induces. One block per dataset.}
-  \label{tab:classwise-endpoints}
-\end{table}
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{classwise_endpoints}
+\captionof{table}{Equal-weight three-split per-class test endpoints for the cross-entropy reference by condition, with the tier assignment each condition induces.}
+\label{tab:classwise-endpoints}
+\endgroup
+\end{landscape}
 
 \section{Calibration Detail}
 \label{app:calibration}
-The calibration gate reads tail-group macro negative log likelihood, but the shape of the miscalibration matters for method design and is not visible in a scalar. This appendix reports the raw and temperature-scaled expected calibration error, negative log likelihood, and Brier score per condition and method, and shows the reliability curves from which they are computed. Reliability is shown for the balanced reference and, separately, for the tail classes under the severe condition, which is where the deficit is expected to concentrate.
+The calibration gate reads tail-group macro negative log likelihood, but the shape of the miscalibration matters for method design and is not visible in a scalar. This appendix reports the raw and temperature-scaled expected calibration error, negative log likelihood, and Brier score per condition and method for the cross-entropy reference and the confirmatory family, and shows the reliability curves from which they are computed.
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Raw and temperature-scaled expected calibration error, negative log likelihood, and Brier score per condition and method, with crossed patient-bootstrap intervals on the calibration error.}
-  \label{tab:calibration-detail}
-\end{table}
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{calibration_detail}
+\captionof{table}{Raw and temperature-scaled expected calibration error, negative log likelihood, and Brier score per condition and method, with crossed patient-bootstrap intervals on the calibration error. Temperature is fitted on natural-prevalence validation data and never gates.}
+\label{tab:calibration-detail}
+\endgroup
+\end{landscape}
+
+\noindent Temperature scaling removes a large share of the observed miscalibration on the cross-entropy reference wherever the calibration gate opened: on the BRACS difficulty-aligned moderate condition it takes expected calibration error from \num{0.169} to \num{0.048} and negative log likelihood from \num{1.397} to \num{1.066}. It does not, however, substitute for mitigation, because a single global scalar cannot redistribute probability mass between classes and therefore leaves the tail-group deficit that the gate reads largely intact. This is the reason the protocol treats it as a diagnostic and never lets it gate.
 
 \begin{figure}[ht]
   \centering
-  % TODO(results): replace with assets/<dataset>/reliability_diagram.png and
-  % assets/<dataset>/tail_reliability_<assignment>.png once ingested.
-  \fbox{\parbox[c][0.28\linewidth][c]{0.7\linewidth}{\centering Pending confirmation runs.}}
-  \caption{Reliability curves for the balanced reference and for tail classes under the severe condition, with bin accuracy against mean predicted confidence over ten equal-width bins.}
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/bracs/reliability_diagram.png}
+    \caption{BRACS, balanced}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/camelyon16/reliability_diagram.png}
+    \caption{CAMELYON16, balanced}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/panda/reliability_diagram.png}
+    \caption{PANDA, balanced}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/reliability_diagram.png}
+    \caption{TCGA-UT, balanced}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/bracs/tail_reliability_native.png}
+    \caption{BRACS, severe tail}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/camelyon16/tail_reliability_native.png}
+    \caption{CAMELYON16, severe tail}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/panda/tail_reliability_native.png}
+    \caption{PANDA, severe tail}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/tail_reliability_native.png}
+    \caption{TCGA-UT, severe tail}
+  \end{subfigure}
+  \caption{Reliability curves for the balanced reference and for the tail classes under the severe condition of the native assignment, with bin accuracy against mean predicted confidence over ten equal-width bins, on the first locked partition.}
   \label{fig:reliability}
 \end{figure}
 
 \section{Per-Partition Results}
 \label{app:splits}
-The main text averages the three partitions with equal weight, which is only defensible if no single partition drives a conclusion. This appendix reports the endpoints and deficits separately for each partition, alongside the spread of achieved severity across them. A conclusion that holds in the equal-weight average but in only one partition individually is identified here and is qualified wherever it appears in the main text.
+The main text averages the three partitions with equal weight, which is only defensible if no single partition drives a conclusion. This appendix reports the cross-entropy deficits separately for each partition, alongside the spread of achieved severity across them. A conclusion that holds in the equal-weight average but in only one partition individually is identified here and is qualified wherever it appears in the main text.
 
-\begin{table}[ht]
-  \centering
-  \scriptsize
-  \pending
-  \caption{Test endpoints and deficits by partition, with the achieved-severity spread across partitions, per dataset, condition, and method.}
-  \label{tab:per-split}
-\end{table}
+\begingroup
+\scriptsize
+\resultstable{per_split}
+\captionof{table}{Cross-entropy deficits by partition on both gate axes, with the equal-weight average and the relative achieved-severity spread across partitions, per dataset, condition, and tail assignment.}
+\label{tab:per-split}
+\endgroup
+
+\noindent No gate decision depends on a single partition. On the discrimination axis every unit that opened the gate exceeds the \num{0.01443} threshold in at least two of the three partitions, and \num{10} of the \num{12} exceed it in all three; the two exceptions are the CAMELYON16 native severe and TCGA-UT difficulty-reversed severe conditions, whose smallest partition-level deficits fall just below it. On the calibration axis all six gate-passing BRACS units exceed the \num{0.18237}-nat threshold in all three partitions. Achieved severity varies across partitions by at most \num{1.0}\% of the smallest realized value, well inside the \num{50}\% consistency guard.
 
 \section{Computational Cost}
 \label{app:cost}
-Cost bears on the design question because a method whose recovery requires substantially more computation than the reference is a different proposition from one that matches it. This appendix records processed examples, unique exposures, accelerator time, peak memory, and model size for each method, along with the cost of the tuning search itself, which is charged to the method that required it.
+Cost bears on the design question because a method whose recovery requires substantially more computation than the reference is a different proposition from one that matches it. This appendix records processed examples, unique exposures, accelerator time, peak memory, and model size for each confirmatory-family method, expressed as a matched difference against cross-entropy in the same condition.
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \pending
-  \caption{Matched computational-cost comparisons against cross-entropy in the same condition, with paired \num{95}\% intervals, covering processed examples, unique exposures, accelerator time, peak memory, and model size.}
-  \label{tab:cost}
-\end{table}
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{cost}
+\captionof{table}{Matched computational-cost comparisons against cross-entropy in the same condition, with paired \num{95}\% intervals, covering processed examples, unique exposures, accelerator time, peak memory, and model size, for the five confirmatory-family methods.}
+\label{tab:cost}
+\endgroup
+\end{landscape}
+
+\noindent The five confirmatory methods are cost-neutral against cross-entropy on every accounting axis except peak accelerator memory. They share the update budget, the batch definition, and the classifier, so processed examples, unique exposures, and parameter counts differ by zero, and accelerator time differs by an amount indistinguishable from zero. Peak memory differs by roughly two gigabytes for the weighted variants, which reflects the weight vector and the loss-reduction buffer rather than a larger model. The requirement in Section~\ref{sec:discussion-requirements} that a method's transform be specified therefore carries no computational cost argument against it: within this family the choice of signal is free, and only its effectiveness differs.
 
 \clearpage
 \bibliographystyle{plainnat}
