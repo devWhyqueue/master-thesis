@@ -1,0 +1,417 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{pdflscape}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+\usepackage[authoryear,round]{natbib}
+\usepackage{siunitx}
+\sisetup{group-separator={,},group-minimum-digits=4}
+
+\newcommand{\Hnorm}{1-H_{\mathrm{norm}}}
+
+% Placeholder body for a float whose numbers are not yet ingested. Replace the
+% \pending call with \input{assets/<dataset>/<artifact>.tex}; the vendored
+% fragments contain only the tabular body, so caption and label stay here.
+\newcommand{\pending}{%
+  \begin{tabular}{@{}l@{}}
+    \toprule
+    \multicolumn{1}{c}{Pending confirmation runs.} \\
+    \bottomrule
+  \end{tabular}%
+}
+
+\title{Diagnosing Mitigation Need: Benchmark Results for Controlled\\
+Shortages and Signal-Matched Interventions in Histopathology\\
+Patch Classification}
+\author{Yannik Queisler}
+\date{\today}
+
+\begin{document}
+\raggedbottom
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\centering
+\vspace*{\fill}
+\makeatletter
+{\LARGE\bfseries \@title\par}
+\vspace{1.5em}
+{\large \@author\par}
+\vspace{1.5em}
+{\large \@date\par}
+\makeatother
+
+\begin{abstract}
+\begingroup
+\setlength{\emergencystretch}{2em}
+\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report presents the outcomes of the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol}, which manipulates only the allocation of a fixed training budget among classes and measures what that manipulation damages. CAMELYON16, TCGA-UT, BRACS, and PANDA are evaluated with frozen Virchow2 features under size-matched balanced, moderate, and severe allocations, against natural-prevalence validation and test cohorts held constant across conditions. Three questions are answered in order: which shortage the controlled allocation realizes and what it damages, whether a mitigation method that reads the shortage matching that profile recovers more of the damage than one reading a different signal, and which realized shortages explain variation in damage magnitude and recovery headroom. Mitigation recovery is interpreted only for conditions whose allocation-induced deficit passes the prespecified gate, and the confirmatory family holds the intervention mechanism fixed so that the signal a method reads is the only quantity contrasted. The closing discussion converts these outcomes into design requirements for a mitigation method that reads shortage rather than prevalence alone, which is the purpose the benchmark serves.
+% TODO(results): add two sentences stating the headline damage and recovery outcomes once the confirmation runs are ingested.
+\par
+\endgroup
+\end{abstract}
+\vspace*{\fill}
+\end{titlepage}
+\hypersetup{pageanchor=true}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\clearpage
+
+\section{Introduction}
+\label{sec:intro}
+This report presents the results of the controlled patch-classification benchmark whose design, endpoints, gating rule, and inference procedure are fixed in the companion protocol \citep{queisler2026benchmarkProtocol}. Nothing in the analysis reported here was chosen after seeing an outcome: the estimands, the deficit thresholds, the confirmatory method family, the multiplicity correction, and the exploratory status of the association models were all locked before the first definitive model fit. The reporting order below follows that locked plan rather than the order in which results proved interesting, and any departure from the plan is recorded in Appendix~\ref{app:realized}.
+
+The benchmark exists to inform the design of a new mitigation method, not to rank the existing ones. Its premise is that an underserved class may lack nominal patch support, independent evidence from patients or slides, learnable signal, or representational diversity, and that these shortages are not interchangeable. Existing methods are therefore treated as instruments: each reads one signal, and the contrast among them measures whether reading the right signal matters. The report is consequently read forward into Section~\ref{sec:discussion}, where the outcomes are converted into requirements a method would have to satisfy. Dataset provenance is documented separately \citep{queisler2026datasets}, as is the signal taxonomy that locates each method within it \citep{queisler2026imbalanceMethods}.
+
+The protocol poses three questions, restated here so that the results can be read without the companion document at hand:
+\begin{description}
+  \item[RQ1.] \textbf{Which shortage does controlled allocation create, and what does it damage?} Under otherwise fixed conditions, how do controlled changes in training allocation affect tail-class discrimination and calibration, and which signal profile does each condition realize?
+  \item[RQ2.] \textbf{Does signal-matched mitigation recover more of the damage?} Which methods recover performance lost specifically to training imbalance, and does recovery improve when a method reads the shortage identified in RQ1?
+  \item[RQ3.] \textbf{Which realized signal shortages explain variation in damage and mitigation headroom?} Across controlled conditions, are allocation severity, independent-evidence shortage, support--difficulty alignment, and diversity shortage associated with damage magnitude and subsequent recovery?
+\end{description}
+\noindent The three sections that follow answer them in that order. Section~\ref{sec:rq1} establishes whether a recoverable deficit exists and which signals characterize the conditions that produced it; the deficit gate defined there determines which conditions Section~\ref{sec:rq2} is permitted to interpret. Section~\ref{sec:rq3} then examines why deficit size and recovery headroom vary, as an exploratory association analysis rather than a second method ranking.
+
+Two conventions govern how the evidence is labelled throughout. A result is \emph{confirmatory} only if it belongs to the five-member method family, arises from a condition that passed the relevant gate, and survives the Holm adjustment applied jointly within its dataset. Every other quantity is \emph{exploratory} or \emph{descriptive}, and is marked as such in the text and in the table caption rather than only in the surrounding prose.
+
+\section{Allocation-Induced Damage}
+\label{sec:rq1}
+The controlled conditions must first be shown to have executed as specified, because the inference machinery is conditional on that. Three properties matter before any endpoint is read: whether constrained allocation reached its target severities within the prespecified tolerance bands, whether the label-only bootstrap preflight left any dataset designated descriptive-only, and whether every confirmation seed block and every expected comparison is present across all three partitions. A descriptive-only designation forces both gates closed for that dataset, which removes it from the confirmatory results entirely; an incomplete comparison halts aggregation rather than being averaged over whatever is available. Appendix~\ref{app:realized} carries the full record together with the tuning selections actually used and any deviation from the locked protocol.
+% TODO(results): state here, in two or three sentences, whether construction hit tolerance, which datasets (if any) are descriptive-only, and whether completeness held.
+
+\subsection{Realized signal profiles}
+\label{sec:rq1-profiles}
+Allocation severity is the manipulated variable, but it is not the explanatory one. Each controlled condition is characterized instead by the signal profile it realizes: achieved imbalance ratio $\rho$ and normalized-entropy deficit $\Hnorm$, nominal patch-support shortage, independent patient or slide support shortage, support--difficulty alignment, and representational-diversity shortage. These quantities are measured from the frozen construction rather than inferred from the nominal target, so a condition built to a severe target may still present a mild independent-support shortage, or the reverse.
+
+Table~\ref{tab:signal-profiles} reports the standardized shortage scores per comparison unit together with the dominant shortage each unit presents. The dominant shortage is what makes the matched and unmatched arms of Section~\ref{sec:rq2} interpretable, so units whose two largest scores fall within \num{0.25} standard deviations are designated ambiguous and are reported descriptively only, never as evidence for or against signal matching.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Realized signal profiles per comparison unit: achieved $\rho$, normalized-entropy deficit, standardized nominal, independent-support and diversity shortages, and support--difficulty alignment, with the dominant shortage and the ambiguous designation applied where the two largest scores fall within \num{0.25} standard deviations.}
+  \label{tab:signal-profiles}
+\end{table}
+
+\subsection{Discrimination deficit and gate status}
+\label{sec:rq1-discrimination}
+The discrimination deficit $D_{\mathrm{BA}}$ is the case-macro balanced accuracy of the size-matched balanced cross-entropy reference minus that of the imbalanced cross-entropy model in the same condition, estimated with the patient-clustered Bayesian bootstrap and averaged with equal weight across the three partitions. The discrimination gate opens for a comparison unit only when $D_{\mathrm{BA}}$ reaches at least \num{0.01443} and its paired \num{95}\% interval excludes zero, a threshold fixed at twice the observed seed-level standard deviation so that a deficit indistinguishable from initialization noise cannot open it.
+
+Table~\ref{tab:discrimination-deficit} gives the deficit, its interval, and the gate outcome for every combination of dataset, severity, and tail assignment. Deficits are reported for all units, including those that fail the threshold, the interval condition, or both, because a condition that produced no measurable damage is itself a finding about when mitigation is warranted.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Discrimination deficit $D_{\mathrm{BA}}$ with paired \num{95}\% bootstrap intervals and discrimination-gate outcome, by dataset, severity, and tail assignment. Units failing the \num{0.01443} threshold or the interval condition are shown and marked as not opening the gate.}
+  \label{tab:discrimination-deficit}
+\end{table}
+
+\subsection{Probability-quality deficit}
+\label{sec:rq1-calibration}
+Discrimination and probability quality can be damaged independently, so the calibration axis carries its own deficit and its own gate. The co-primary endpoint is tail-group macro negative log likelihood in nats, computed over the classes that the condition places in the tail tier; its gate opens at a deficit of at least \num{0.18237} nats with a paired interval excluding zero. Expected calibration error, multiclass Brier score, and the temperature-scaled variant of each are secondary and never gate.
+
+Table~\ref{tab:calibration-deficit} reports the tail-group deficit and gate outcome per unit alongside crossed patient-bootstrap intervals on expected calibration error. Temperature scaling is fitted on natural-prevalence validation data and reported only as a diagnostic of how much of the observed miscalibration a single global scalar removes; Appendix~\ref{app:calibration} carries the raw and scaled comparison in full.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Probability-quality deficit on tail-group macro negative log likelihood in nats, with paired \num{95}\% intervals and calibration-gate outcome. Expected calibration error and its crossed patient-bootstrap interval are secondary descriptors and do not gate.}
+  \label{tab:calibration-deficit}
+\end{table}
+
+\subsection{Where the damage falls}
+\label{sec:rq1-incidence}
+Aggregate deficits do not say which classes absorbed the loss, and a mitigation method has to be told that. Recall, $F_1$, negative log likelihood, and Brier score are therefore also read per class and per support tier, with the head tier the first $\lceil K/3 \rceil$ classes by allocated support and the tail tier the last $\lceil K/3 \rceil$. Table~\ref{tab:tier-endpoints} gives the tier-level endpoints under each condition; the per-class breakdown appears in Appendix~\ref{app:endpoints}.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Head, body, and tail recall, negative log likelihood, and Brier score under each controlled condition, averaged with equal weight across the three partitions.}
+  \label{tab:tier-endpoints}
+\end{table}
+
+\noindent Figure~\ref{fig:tail-vs-support} relates per-class recall to allocated training support directly. Its purpose is to separate two readings of the same aggregate deficit: a loss that varies smoothly with support implies that support is the binding constraint, whereas classes falling well below the support trend point to a shortage that allocation alone does not describe.
+
+\begin{figure}[ht]
+  \centering
+  % TODO(results): replace with assets/<dataset>/tail_vs_support.png once ingested.
+  \fbox{\parbox[c][0.28\linewidth][c]{0.7\linewidth}{\centering Pending confirmation runs.}}
+  \caption{Per-class recall against allocated training patches, coloured by support tier, under the controlled conditions. Classes falling below the support trend indicate a shortage that nominal allocation does not capture.}
+  \label{fig:tail-vs-support}
+\end{figure}
+
+\subsection{Gate routing and the natural anchor}
+\label{sec:rq1-routing}
+The two gates partition the comparison units into four states: discrimination only, probability quality only, both, and neither. This partition is the single result that fixes the scope of Section~\ref{sec:rq2}, because recovery is expressed as a fraction of a deficit and is undefined where no deficit was established. Table~\ref{tab:gate-routing} states the routing compactly for all units and is the table to consult before reading any recovery estimate.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Gate routing for every comparison unit: which of the discrimination and probability-quality gates opened, and the reason a closed gate did not open, distinguishing a deficit below threshold, an interval covering zero, and a descriptive-only designation.}
+  \label{tab:gate-routing}
+\end{table}
+
+\noindent The natural condition sits outside this partition. It trains on all eligible training patches and is therefore neither size-matched nor part of any estimand, but it is reported because it locates the controlled conditions against the imbalance the datasets present without intervention, which is the regime a deployed method would meet. Table~\ref{tab:natural-anchor} places its endpoints beside the size-matched conditions; differences involving the natural anchor confound allocation with training-set size and support no causal reading.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Descriptive comparison of the natural anchor against the size-matched balanced, moderate, and severe conditions. The natural condition is not size-matched, so these differences confound allocation with training-set size and enter no estimand.}
+  \label{tab:natural-anchor}
+\end{table}
+
+\section{Mitigation Recovery}
+\label{sec:rq2}
+Everything in this section is restricted to the comparison units whose gates opened in Table~\ref{tab:gate-routing}. Recovery is defined as $R_M = [M(\text{method}) - M(\text{imbalanced CE})] / D_M$, the fraction of the established deficit that a method returns, so a unit with no established deficit has no defined recovery and is not reported here at any strength of evidence. Units designated descriptive-only by the bootstrap preflight are excluded on the same grounds.
+
+\subsection{The confirmatory five-family}
+\label{sec:rq2-family}
+The confirmatory family contains one method per signal, and all five apply a mean-one class weight to unmodified cross-entropy: prevalence-weighted cross-entropy, class-balanced cross-entropy, independent-support weighted cross-entropy, pilot-difficulty weighted cross-entropy, and semantic-scale weighted cross-entropy. Holding the intervention mechanism fixed in this way is what makes the comparison a contrast between signals rather than between loss surgeries of differing aggressiveness. Each method is tested against imbalanced cross-entropy by a paired partitioning-unit-block permutation test, and the Holm adjustment is applied jointly within a dataset over the five method tests plus the matched contrast for each gate-passing unit.
+
+Table~\ref{tab:confirmatory} reports recovery with its interval, the unadjusted and adjusted $p$-values, and the resulting status for each unit and method.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Confirmatory recovery $R_M$ for the five-member method family on gate-passing units, with paired \num{95}\% intervals, permutation $p$-values, and Holm-adjusted $p$-values within each dataset.}
+  \label{tab:confirmatory}
+\end{table}
+
+\subsection{Matched against unmatched signals}
+\label{sec:rq2-matched}
+The claim RQ2 actually tests is not that some method recovers damage but that the method reading the shortage a condition presents recovers more of it than a method reading a different shortage. Each gate-passing unit is therefore split into a matched arm, containing the family member whose signal corresponds to the dominant shortage from Table~\ref{tab:signal-profiles}, and an unmatched arm containing the remainder. Ambiguous units, where the two largest shortage scores fall within \num{0.25} standard deviations, contribute descriptively and carry no confirmatory weight.
+
+Table~\ref{tab:matched-contrast} gives the direct matched-versus-unmatched contrast per unit with its interval and adjusted $p$-value. Two further quantities qualify how that contrast should be read. The first is the matched-$\beta$ diagnostic arm, in which independent-support weighted cross-entropy is refitted at the effective weight strength selected for class-balanced cross-entropy; it separates an advantage attributable to the signal from one attributable to a more aggressive tuned intervention. The second is agreement between the dominant shortage and the method that in fact recovered most, which is reported per unit because a systematic mismatch would indicate that the shortage taxonomy, not the methods, is what fails to describe these conditions.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Direct contrast between the signal-matched arm and the unmatched arm on gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values, and the matched-$\beta$ diagnostic that refits independent-support weighting at the class-balanced weight strength. Ambiguous units are marked and are descriptive only.}
+  \label{tab:matched-contrast}
+\end{table}
+
+\subsection{Recovery of probability quality}
+\label{sec:rq2-calibration}
+A method may return discrimination while leaving probabilities no better calibrated, or return calibration without moving balanced accuracy, and a mitigation method that must serve both would need to be designed for that trade-off explicitly. Recovery on the tail-group negative log likelihood axis is therefore reported separately in Table~\ref{tab:calibration-recovery}, over the units whose calibration gate opened, which need not be the units whose discrimination gate opened. Where both axes were damaged in the same unit, the two recovery fractions are read together, and any method recovering on one axis while degrading the other is identified explicitly.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Recovery of tail-group macro negative log likelihood on calibration-gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values, reported alongside the discrimination recovery of the same method and unit where both gates opened.}
+  \label{tab:calibration-recovery}
+\end{table}
+
+\subsection{The wider method roster}
+\label{sec:rq2-roster}
+The remaining roster methods change the training objective, the sampling distribution, the decision threshold, or the classifier head, and so cannot be compared to the five-family at a fixed intervention mechanism. They are reported with intervals but without confirmatory status: balanced sampling, train-time and post-hoc logit adjustment, classifier retraining, focal loss, the prototype-affinity head, the soft-$F_1$ and soft-MCC hybrids, and set learning. Their role in this report is to bound what is achievable on these conditions by any tested means, which is what Section~\ref{sec:discussion} needs in order to distinguish a signal that no method exploits from a deficit that no mechanism repairs.
+
+\begin{table}[ht]
+  \centering
+  \scriptsize
+  \pending
+  \caption{Exploratory recovery estimates for the full method roster on gate-passing units, with paired \num{95}\% intervals. These methods vary the intervention mechanism as well as the signal, carry no confirmatory status, and are not part of the Holm family.}
+  \label{tab:roster-recovery}
+\end{table}
+
+\section{Explaining Heterogeneity}
+\label{sec:rq3}
+Damage magnitude and recovery headroom vary across conditions, and RQ3 asks which realized shortages track that variation. Two association models are fitted, one for signed balanced-accuracy damage over the cross-entropy cells and one for recovery over the gate-passing method cells. Both use the same linear predictor over standardized quantities,
+\begin{equation}
+  \mu_j = \alpha + u_{g[j]} + \beta_{\rho}\log \rho_j + \beta_{\mathrm{ind}} S_{\mathrm{ind},j} + \beta_{A} A_j + \beta_{\mathrm{div}} S_{\mathrm{div},j},
+  \label{eq:rq3-model}
+\end{equation}
+\noindent where $\rho_j$ is achieved severity, $S_{\mathrm{ind},j}$ the independent-support shortage, $A_j$ the support--difficulty alignment, $S_{\mathrm{div},j}$ the diversity shortage, and $u_{g[j]}$ a random intercept over dataset--target groups that absorbs level differences between datasets. Observation errors come from the bootstrap distributions of the corresponding endpoints.
+
+These models are exploratory by construction and by fitting procedure. They are estimated at the posterior mode and return point coefficients with no standard errors and no posterior intervals, so a coefficient reported here indicates direction and relative magnitude but licenses no claim of statistical significance. The only accuracy evidence available for them is the leave-one-group-out check, which refits each model with one dataset--target group held out and reports the held-out root mean squared error; a group whose held-out error is much larger than the rest indicates that the association does not transfer across datasets. Coefficients and that diagnostic appear in Table~\ref{tab:rq3}.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Exploratory association models for signed balanced-accuracy damage and for gated recovery: standardized coefficients from Equation~\eqref{eq:rq3-model}, group and residual scale, and leave-one-group-out held-out error per dataset--target group. Estimated at the posterior mode; no intervals are available.}
+  \label{tab:rq3}
+\end{table}
+
+\section{Discussion}
+\label{sec:discussion}
+The preceding sections establish what the controlled allocation damaged, how much of that damage the tested methods returned, and which realized shortages tracked the variation. This section reads those outcomes as design evidence. The question it answers is not which existing method won, but what a mitigation method would have to read, and to do, in order to address the shortages these datasets actually present.
+
+\subsection{What the evidence supports}
+\label{sec:discussion-evidence}
+The findings are summarized here by research question rather than by dataset, since the design intends datasets to be replicates of a mechanism rather than objects of interest in themselves. Three statements structure the summary: where controlled allocation produced a gate-opening deficit and where it did not; whether recovery separated across signals at a fixed intervention mechanism; and which shortages tracked damage magnitude and recovery headroom in the exploratory models. Every statement is bound to the gate status of the units it rests on, so that a claim about recovery is never carried by a unit in which no damage was established.
+% TODO(results): write the three-part summary once the tables in Sections 2 to 4 are populated.
+
+\subsection{Which shortage a mitigation method must read}
+\label{sec:discussion-signal}
+A method must estimate the shortage that binds, which makes the empirical question whether the dominant shortage was identifiable and whether it mattered. Two outcomes carry different design consequences. If independent-support or diversity shortage tracked damage that prevalence did not, then a prevalence-only method is structurally insufficient on these datasets regardless of how well it is tuned, and the shortage estimate itself becomes part of the method rather than a diagnostic run beforehand. If instead prevalence tracked damage as well as the other signals did, the added estimation machinery buys nothing and the simpler weighting is the correct default.
+
+The frequency of the ambiguous designation qualifies both readings. A taxonomy whose top two shortage scores are routinely within a quarter of a standard deviation does not partition conditions sharply enough to route a method, and in that case the design implication is a method that combines signals rather than one that selects among them.
+
+\subsection{Signal against mechanism}
+\label{sec:discussion-mechanism}
+Because the five confirmatory methods share one intervention mechanism and differ only in the signal their weights read, the spread of recovery across them isolates how much leverage the choice of signal carries. A wide spread identifies the signal as the lever and makes better shortage estimation the productive direction. A narrow spread has the opposite implication: the signal is not what limits recovery, and a further weighting scheme, however well targeted, is unlikely to help.
+
+The matched-$\beta$ diagnostic is what separates these readings from a third possibility. A method may appear to win on its signal while in fact winning on a more aggressive tuned weight strength; refitting independent-support weighting at the class-balanced weight strength removes that confound. An advantage that survives the refit is attributable to the signal, and one that disappears identifies intervention strength, not signal choice, as the operative variable.
+
+\subsection{Where recovery ceilings}
+\label{sec:discussion-ceiling}
+The units that define the unmet need are those in which a gate opened and no method, confirmatory or exploratory, returned a substantial fraction of the deficit. These are the conditions a new method would have to target, and the roster results in Section~\ref{sec:rq2-roster} are what establish that the ceiling belongs to the conditions rather than to the five-family alone. Their realized signal profiles indicate what such conditions have in common and therefore what the method would have to exploit.
+
+The complementary case is equally informative for scoping. Units in which controlled allocation never opened a gate mark regimes where mitigation is not warranted, and a method that intervenes there spends capacity and risks degrading endpoints that were not damaged. Knowing when not to act is part of the specification, not an afterthought.
+
+\subsection{Design requirements and open questions}
+\label{sec:discussion-requirements}
+The preceding subsections resolve into a small set of requirements for a mitigation method, each traceable to a specific result:
+\begin{enumerate}
+  \item Which signal or combination of signals the method must estimate, and whether the shortage estimate must be recomputed per condition or transfers across datasets, as indicated by the leave-one-group-out diagnostic.
+  \item The granularity at which that estimate must be formed, whether per class, per class and partitioning unit, or per class and representational cluster.
+  \item What the method must not require: no access to test prevalence, no labelled data beyond the training partition, and no per-condition tuning that a deployment could not perform.
+  \item Which endpoint the method must not degrade, given the observed trade-off between discrimination and probability quality in Section~\ref{sec:rq2-calibration}.
+  \item The regimes in which the method should decline to intervene, defined by the conditions that opened no gate.
+\end{enumerate}
+\noindent Each requirement is annotated with the strength of evidence behind it, distinguishing confirmatory results, exploratory results, and descriptive observations. The exploratory models of Section~\ref{sec:rq3} supply point estimates with no intervals and may therefore motivate a design direction but never justify one on their own.
+
+Two questions remain outside what this benchmark can decide. It manipulates allocation within a fixed pool of patients and slides, so it says nothing about a shortage of patients as such, which would require cohorts of differing size. It also holds the representation fixed at frozen Virchow2 features, leaving open whether a diversity shortage measured in that space persists under a representation adapted to the task. Both would have to be measured before a method could be claimed to address either shortage.
+
+\section{Conclusion and Scope}
+\label{sec:limits}
+This report answers three questions in the order the protocol fixed: what controlled allocation damaged, how much of that damage signal-matched mitigation returned, and which realized shortages tracked the variation in both. Its contribution is the design evidence assembled in Section~\ref{sec:discussion}, which states what a mitigation method must read, at what granularity, under what constraints, and where it should decline to act.
+% TODO(results): state the concluding position once Sections 2 to 5 are populated.
+
+Four scope conditions bound every claim above. The three partitions are locked design repetitions of one dataset, not independent cohorts, so the intervals quantify variation across partitionings and initializations rather than across populations. The association models of Section~\ref{sec:rq3} are exploratory and carry no causal interpretation, and their coefficients come without intervals. The benchmark covers patch classification only, where each prediction unit carries its own label; at whole-slide level, reallocating labelled slides changes nominal and independent support together, so the two signals could not be separated in the way this design requires. Temperature scaling is reported as a diagnostic throughout and never gates a decision.
+
+\appendix
+\phantomsection
+\addcontentsline{toc}{part}{Appendices}
+\addtocontents{toc}{\protect\setcounter{tocdepth}{1}}
+
+\section{Realized Conditions and Analysis Validity}
+\label{app:realized}
+This appendix carries the execution record that Section~\ref{sec:rq1} summarizes in prose. It documents, per dataset, what the frozen construction realized and whether the conditions required for the confirmatory inference to be valid were met.
+
+\subsection{Realized construction}
+\label{app:realized-construction}
+Table~\ref{tab:realized-support} reports the achieved imbalance ratio and normalized-entropy deficit for each dataset, partition, and controlled condition, together with the realized partitioning-unit, slide, and patch counts. Conditions falling outside the tolerance bands, $\rho \in [9, 11]$ for moderate and $\rho \in [90, 110]$ for severe, are flagged as off-target, and allocations that collapsed to balanced are flagged as degenerate and excluded from all estimands. Any class or condition dropped during construction is listed with the rule that dropped it.
+
+\begin{table}[ht]
+  \centering
+  \scriptsize
+  \pending
+  \caption{Realized training support per dataset, partition, and controlled condition: partitioning units, slides, patches, achieved $\rho$, and normalized-entropy deficit, with off-target and degenerate conditions flagged.}
+  \label{tab:realized-support}
+\end{table}
+
+\subsection{Resampling validity and completeness}
+\label{app:realized-validity}
+The label-only preflight resamples partitioning units before any model is fitted and checks whether class-level endpoints can be estimated stably at all. Three concentration checks apply per class: whether the \num{2.5}th percentile of the Kish effective count falls below five, whether a single unit carries more than half the weight in more than \num{5}\% of replicates, and whether a pooled cell draws on fewer than five contributing units. A class failing any check designates its dataset descriptive-only, which forces both gates closed. Table~\ref{tab:preflight-outcome} reports these quantities and the resulting designation.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Label-only bootstrap preflight per dataset and class: Kish effective count and its \num{2.5}th percentile, maximum single-unit weight fraction, share of replicates with a dominant unit, and the resulting descriptive-only designation.}
+  \label{tab:preflight-outcome}
+\end{table}
+
+\noindent Completeness is enforced rather than reported after the fact. Every confirmation block must contain all five initialization seeds, every expected combination of tail assignment, severity, method, and gate must appear in all three partitions, and the achieved severity of a condition must not vary by more than half across partitions. Table~\ref{tab:completeness} records the outcome of each guard per dataset, and Section~\ref{app:realized-deviations} states what was done where a guard did not pass.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Completeness and consistency guards per dataset: confirmation-seed blocks, expected comparison coverage across the three partitions, and achieved-severity spread.}
+  \label{tab:completeness}
+\end{table}
+
+\subsection{Tuning selections and deviations}
+\label{app:realized-deviations}
+Hyperparameters were selected on natural-prevalence validation data alone, by the adaptive window over the learning-rate envelope and the per-method control grids fixed in the protocol. Table~\ref{tab:tuning-selections} records the selected value and the update budget actually consumed for each dataset, condition, and method, together with any search that terminated at an envelope boundary, since a selection at the boundary indicates the envelope, not the data, determined the choice.
+
+\begin{table}[ht]
+  \centering
+  \scriptsize
+  \pending
+  \caption{Selected control values and consumed update budgets per dataset, condition, and method, with searches terminating at an envelope boundary flagged.}
+  \label{tab:tuning-selections}
+\end{table}
+
+\noindent Deviations from the locked protocol are listed below with the reason for each and the date on which it was made. Where no deviation occurred, that is stated explicitly rather than left to be inferred from an empty list.
+% TODO(results): list protocol deviations with reason and date, or state that there were none. Cross-check PLAN_1_evidence_gate.md, PLAN_2_natural_tuning_cost.md, and PLAN_3_variable_conditions.md at the repository root for amendments not yet folded into the protocol.
+
+\section{Per-Class and Tier Endpoints}
+\label{app:endpoints}
+Section~\ref{sec:rq1-incidence} reports damage at tier level; this appendix gives the per-class detail behind it. For each dataset, recall, $F_1$, negative log likelihood, and Brier score are listed per class, condition, and method, averaged within a partition and then with equal weight across the three partitions. The tier assignment of each class is given alongside, since tier membership follows the allocation of the condition and is therefore not constant across conditions.
+
+\begin{table}[ht]
+  \centering
+  \scriptsize
+  \pending
+  \caption{Equal-weight three-split per-class test endpoints by condition and method, with the tier assignment each condition induces. One block per dataset.}
+  \label{tab:classwise-endpoints}
+\end{table}
+
+\section{Calibration Detail}
+\label{app:calibration}
+The calibration gate reads tail-group macro negative log likelihood, but the shape of the miscalibration matters for method design and is not visible in a scalar. This appendix reports the raw and temperature-scaled expected calibration error, negative log likelihood, and Brier score per condition and method, and shows the reliability curves from which they are computed. Reliability is shown for the balanced reference and, separately, for the tail classes under the severe condition, which is where the deficit is expected to concentrate.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Raw and temperature-scaled expected calibration error, negative log likelihood, and Brier score per condition and method, with crossed patient-bootstrap intervals on the calibration error.}
+  \label{tab:calibration-detail}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  % TODO(results): replace with assets/<dataset>/reliability_diagram.png and
+  % assets/<dataset>/tail_reliability_<assignment>.png once ingested.
+  \fbox{\parbox[c][0.28\linewidth][c]{0.7\linewidth}{\centering Pending confirmation runs.}}
+  \caption{Reliability curves for the balanced reference and for tail classes under the severe condition, with bin accuracy against mean predicted confidence over ten equal-width bins.}
+  \label{fig:reliability}
+\end{figure}
+
+\section{Per-Partition Results}
+\label{app:splits}
+The main text averages the three partitions with equal weight, which is only defensible if no single partition drives a conclusion. This appendix reports the endpoints and deficits separately for each partition, alongside the spread of achieved severity across them. A conclusion that holds in the equal-weight average but in only one partition individually is identified here and is qualified wherever it appears in the main text.
+
+\begin{table}[ht]
+  \centering
+  \scriptsize
+  \pending
+  \caption{Test endpoints and deficits by partition, with the achieved-severity spread across partitions, per dataset, condition, and method.}
+  \label{tab:per-split}
+\end{table}
+
+\section{Computational Cost}
+\label{app:cost}
+Cost bears on the design question because a method whose recovery requires substantially more computation than the reference is a different proposition from one that matches it. This appendix records processed examples, unique exposures, accelerator time, peak memory, and model size for each method, along with the cost of the tuning search itself, which is charged to the method that required it.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \pending
+  \caption{Matched computational-cost comparisons against cross-entropy in the same condition, with paired \num{95}\% intervals, covering processed examples, unique exposures, accelerator time, peak memory, and model size.}
+  \label{tab:cost}
+\end{table}
+
+\clearpage
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

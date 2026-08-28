@@ -125,7 +125,7 @@ drifted manifest invalidates the tuning selections and the no-retraining premise
 recording the prior hash in the `supersedes` / `superseded_freeze_file_hashes` fields the schema
 already carries.
 
-### 5. Protocol — `report/2_benchmark_protocol_patch.tex`
+### 5. Protocol — `report/2_benchmark_patch_protocol.tex`
 
 Needs explicit go-ahead: `code/CLAUDE.md` names the protocol the authority and forbids editing it
 unasked.
