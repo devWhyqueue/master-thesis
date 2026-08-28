@@ -4,7 +4,8 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
 import pandas as pd
 
@@ -68,29 +69,25 @@ SHORTAGE = {
 }
 
 _EMPTY = (
-    "\\begin{tabular}{@{}l@{}}\n"
-    "\\toprule\n"
-    "No rows.\\\\\n"
-    "\\bottomrule\n"
-    "\\end{tabular}\n"
+    "\\begin{tabular}{@{}l@{}}\n\\toprule\nNo rows.\\\\\n\\bottomrule\n\\end{tabular}\n"
 )
 
 
-def num(value: Any, digits: int = 3) -> str:
+def num(value: float | None, digits: int = 3) -> str:
     """Fixed-point cell, or an em dash where the quantity is undefined."""
     if value is None or (isinstance(value, float) and not math.isfinite(value)):
         return "---"
     return f"{float(value):.{digits}f}"
 
 
-def ci(bounds: Any, digits: int = 3) -> str:
+def ci(bounds: Sequence[float] | None, digits: int = 3) -> str:
     """Bracketed interval cell from a two-element bound pair."""
     if not bounds:
         return "---"
     return f"[{num(bounds[0], digits)}, {num(bounds[1], digits)}]"
 
 
-def pval(value: Any) -> str:
+def pval(value: float | None) -> str:
     """A p-value cell; permutation resolution bottoms out below 0.0001."""
     if value is None or (isinstance(value, float) and not math.isfinite(value)):
         return "---"
@@ -110,7 +107,13 @@ def body(frame: pd.DataFrame, longtable: bool = False) -> str:
     """
     if frame.empty:
         return _EMPTY
-    return frame.to_latex(index=False, escape=False, longtable=longtable, na_rep="---")
+    return frame.to_latex(
+        index=False,
+        escape=False,
+        longtable=longtable,
+        na_rep="---",
+        float_format="%.3f",
+    )
 
 
 def _cells(line: str) -> list[str]:
@@ -123,8 +126,8 @@ def _cells(line: str) -> list[str]:
 def _numeric(frame: pd.DataFrame) -> pd.DataFrame:
     """Restore numeric dtypes lost when a frame was rendered to LaTeX."""
     for column in frame.columns:
-        converted = pd.to_numeric(frame[column], errors="coerce")
-        if converted.notna().all():
+        converted = cast(pd.Series, pd.to_numeric(frame[column], errors="coerce"))
+        if bool(converted.notna().all()):
             frame[column] = converted
     return frame
 
@@ -233,5 +236,7 @@ def dataset_roots(config: dict[str, Any]) -> list[Path]:
     """The four dataset roots the report combines into one table per float."""
     roots = config.get("rq3", {}).get("dataset_roots", [])
     if not roots:
-        raise RuntimeError("report-tables needs rq3.dataset_roots listing every dataset")
+        raise RuntimeError(
+            "report-tables needs rq3.dataset_roots listing every dataset"
+        )
     return [Path(root) for root in roots]

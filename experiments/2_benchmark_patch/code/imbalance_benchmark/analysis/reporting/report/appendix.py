@@ -125,8 +125,9 @@ def _selection_row(
     return {
         "Dataset": data.name,
         "Condition": CONDITION[condition],
-        "Assignment": ASSIGNMENT[assignment] if condition not in
-        {"natural", "balanced"} else "---",
+        "Assignment": ASSIGNMENT[assignment]
+        if condition not in {"natural", "balanced"}
+        else "---",
         "Method": METHOD.get(method, method),
         "Learning rate": "---" if learning_rate is None else f"{learning_rate:g}",
         "Control": num(values.get("parameter"), 4)
@@ -194,11 +195,17 @@ def rq3_models(rq3: dict[str, Any]) -> str:
     return body(pd.DataFrame(rows))
 
 
+def _group_label(group: str) -> str:
+    """Report label for a dataset-target random-intercept group."""
+    dataset, target = group.split(":")
+    return f"{dataset.upper().replace('_', '-')} ({target.replace('_', ' ')})"
+
+
 def rq3_logo(rq3: dict[str, Any]) -> str:
     """Leave-one-dataset-target-group-out held-out damage error."""
     rows = [
         {
-            "Held-out group": group.replace("_", " "),
+            "Held-out group": _group_label(group),
             "Cells": entry["n"],
             "Held-out RMSE": num(entry["held_out_rmse"], 4),
         }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -131,10 +131,9 @@ def _deficit_rows(
                     "Dataset": data.name,
                     "Assignment": ASSIGNMENT[unit[0]],
                     "Severity": CONDITION[unit[1]],
-                    "Deficit": num(row and row["effect"], digits),
-                    r"95\% CI": ci(row and row["ci"], digits),
-                    "Gate": "Open" if row and row["gate_passed"] else "Closed",
-                    "Outcome": _gate_reason(row, threshold),
+                    "Deficit": num(row["effect"] if row else None, digits),
+                    r"95\% CI": ci(row["ci"] if row else None, digits),
+                    "Gate": _gate_reason(row, threshold),
                 }
             )
     return rows
@@ -172,30 +171,31 @@ def calibration_deficit(datasets: list[Dataset]) -> str:
     return body(frame)
 
 
+def _routing_row(data: Dataset, unit: tuple[str, str]) -> dict[str, str]:
+    """One unit's routing state, with the reason a closed gate did not open."""
+    gates = {
+        gate: ce_row(data, unit, gate) for gate in ("discrimination", "calibration")
+    }
+    opened = [name for name, row in gates.items() if row and row["gate_passed"]]
+    return {
+        "Dataset": data.name,
+        "Assignment": ASSIGNMENT[unit[0]],
+        "Severity": CONDITION[unit[1]],
+        "Discrimination": _gate_reason(
+            gates["discrimination"], DISCRIMINATION_THRESHOLD
+        ),
+        "Probability quality": _gate_reason(
+            gates["calibration"], CALIBRATION_THRESHOLD
+        ),
+        "Routed to": ", ".join(opened).capitalize() if opened else "Neither",
+    }
+
+
 def gate_routing(datasets: list[Dataset]) -> str:
     """Which of the two gates opened for each unit, and why a closed one did not."""
-    rows = []
-    for data in datasets:
-        for unit in comparison_units(data):
-            gates = {
-                gate: ce_row(data, unit, gate)
-                for gate in ("discrimination", "calibration")
-            }
-            opened = [name for name, row in gates.items() if row and row["gate_passed"]]
-            rows.append(
-                {
-                    "Dataset": data.name,
-                    "Assignment": ASSIGNMENT[unit[0]],
-                    "Severity": CONDITION[unit[1]],
-                    "Discrimination": _gate_reason(
-                        gates["discrimination"], DISCRIMINATION_THRESHOLD
-                    ),
-                    "Probability quality": _gate_reason(
-                        gates["calibration"], CALIBRATION_THRESHOLD
-                    ),
-                    "Routed to": ", ".join(opened).capitalize() if opened else "Neither",
-                }
-            )
+    rows = [
+        _routing_row(data, unit) for data in datasets for unit in comparison_units(data)
+    ]
     return body(pd.DataFrame(rows))
 
 
@@ -208,8 +208,8 @@ def _ce_endpoints(datasets: list[Dataset], table: str) -> pd.DataFrame:
         frame.insert(0, "Dataset", data.name)
         frames.append(frame)
     combined = pd.concat(frames, ignore_index=True)
-    combined["assignment"] = combined["assignment"].map(ASSIGNMENT)
-    combined["condition"] = combined["condition"].map(CONDITION)
+    combined["assignment"] = combined["assignment"].map(ASSIGNMENT.get)
+    combined["condition"] = combined["condition"].map(CONDITION.get)
     return combined.drop(columns=["method"])
 
 
@@ -235,4 +235,5 @@ def natural_anchor(datasets: list[Dataset]) -> str:
         "macro_nll": "Macro NLL",
         "expected_calibration_error": "ECE",
     }
-    return body(frame[list(columns)].rename(columns=columns))
+    selected = cast(pd.DataFrame, frame[list(columns)])
+    return body(selected.rename(columns=columns))

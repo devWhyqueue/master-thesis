@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -54,10 +54,10 @@ def _open_units(
 
 def _recovery_cells(row: dict[str, Any] | None) -> dict[str, str]:
     return {
-        "$R_M$": num(row and row.get("recovery")),
-        r"95\% CI": ci(row and row.get("recovery_ci")),
-        "$p$": pval(row and row.get("p_value")),
-        "Holm $p$": pval(row and row.get("adjusted_p_value")),
+        "$R_M$": num(row.get("recovery") if row else None),
+        r"95\% CI": ci(row.get("recovery_ci") if row else None),
+        "$p$": pval(row.get("p_value") if row else None),
+        "Holm $p$": pval(row.get("adjusted_p_value") if row else None),
         "Status": (row or {}).get("status", "---").capitalize(),
     }
 
@@ -111,30 +111,36 @@ def _best_signal(methods: dict[str, dict[str, Any]]) -> str:
     return SIGNAL[max(scored, key=lambda method: scored[method])]
 
 
+def _contrast_row(data: Dataset, unit: tuple[str, str], gate: str) -> dict[str, str]:
+    """One gate-passing unit's matched-versus-unmatched contrast row."""
+    methods = _rows(data, unit, gate)
+    record = data.units[unit_key(data.group, *unit)]
+    contrast = methods.get("matched_vs_unmatched")
+    best = _best_signal(methods)
+    matched = [
+        SIGNAL[method] for method in record["matched_methods"] if method in SIGNAL
+    ]
+    return {
+        "Dataset": data.name,
+        "Assignment": ASSIGNMENT[unit[0]],
+        "Severity": CONDITION[unit[1]],
+        "Gate": gate.capitalize(),
+        "Dominant": SHORTAGE[record["dominant"]],
+        "Contrast": num(contrast["effect"] if contrast else None, 4),
+        r"95\% CI": ci(contrast["ci"] if contrast else None, 4),
+        "Holm $p$": pval(contrast.get("adjusted_p_value") if contrast else None),
+        "Best recoverer": best,
+        "Agrees": "---" if not matched else ("Yes" if best in matched else "No"),
+    }
+
+
 def matched_contrast(datasets: list[Dataset]) -> str:
     """Direct matched-versus-unmatched contrast per gate-passing unit."""
-    rows = []
-    for gate in ("discrimination", "calibration"):
-        for data, unit in _open_units(datasets, gate):
-            methods = _rows(data, unit, gate)
-            record = data.units[unit_key(data.group, *unit)]
-            contrast = methods.get("matched_vs_unmatched")
-            best = _best_signal(methods)
-            matched = [SIGNAL[m] for m in record["matched_methods"] if m in SIGNAL]
-            rows.append(
-                {
-                    "Dataset": data.name,
-                    "Assignment": ASSIGNMENT[unit[0]],
-                    "Severity": CONDITION[unit[1]],
-                    "Gate": gate.capitalize(),
-                    "Dominant": SHORTAGE[record["dominant"]],
-                    "Contrast": num(contrast and contrast["effect"], 4),
-                    r"95\% CI": ci(contrast and contrast["ci"], 4),
-                    "Holm $p$": pval(contrast and contrast.get("adjusted_p_value")),
-                    "Best recoverer": best,
-                    "Agrees": "Yes" if best in matched else "No",
-                }
-            )
+    rows = [
+        _contrast_row(data, unit, gate)
+        for gate in ("discrimination", "calibration")
+        for data, unit in _open_units(datasets, gate)
+    ]
     return body(pd.DataFrame(rows), longtable=True)
 
 
@@ -152,18 +158,23 @@ def matched_beta(datasets: list[Dataset]) -> str:
     for data in datasets:
         table = data.tables["equal_split_endpoints"]
         for unit in comparison_units(data):
-            cell = table[
-                (table["assignment"] == unit[0]) & (table["condition"] == unit[1])
-            ]
+            cell = cast(
+                pd.DataFrame,
+                table[
+                    (table["assignment"] == unit[0]) & (table["condition"] == unit[1])
+                ],
+            )
             entry = {
                 "Dataset": data.name,
                 "Assignment": ASSIGNMENT[unit[0]],
                 "Severity": CONDITION[unit[1]],
             }
             for method, label in _BETA_METHODS.items():
-                match = cell[cell["method"] == method]
+                match = cast(pd.DataFrame, cell[cell["method"] == method])
                 entry[label] = (
-                    num(match.iloc[0]["balanced_accuracy"]) if not match.empty else "---"
+                    num(match.iloc[0]["balanced_accuracy"])
+                    if not match.empty
+                    else "---"
                 )
             rows.append(entry)
     return body(pd.DataFrame(rows))
