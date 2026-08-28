@@ -55,3 +55,15 @@ slurm:
     analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 32G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
   squashfs: []
+
+# Pooled standardization for the prespecified matching rule (protocol
+# app:testing): the dominant shortage is a z-score across every unit of every
+# dataset, so `match` must see all four roots even when it writes into one of
+# them. Without this block cmd_match falls back to this config's own root and
+# would standardize a single dataset against itself.
+rq3:
+  dataset_roots:
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/camelyon16/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/panda/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -267,6 +268,29 @@ def test_rq3_recovery_model_empty_when_no_gated_cells():
         }
     ]
     assert fit_recovery_model(cells) == {}
+
+
+def test_rq3_recovery_model_ignores_cells_without_a_denominator():
+    """A matched-contrast row has no recovery; it must not poison the fit."""
+    rng = np.random.default_rng(7)
+    cells = [
+        {
+            "group": f"g{i % 2}",
+            "rho": 100.0,
+            "independent_shortage": 0.0,
+            "support_difficulty_alignment": 0.2,
+            "diversity_shortage": float(rng.normal()),
+            "gate_passed": True,
+            "recovery": float(rng.normal(0.5, 0.1)),
+            "recovery_se": 0.05,
+        }
+        for i in range(8)
+    ]
+    contrast = {**cells[0], "recovery": float("nan"), "recovery_se": float("nan")}
+    model = fit_recovery_model([*cells, contrast])
+    assert math.isfinite(model["intercept"])
+    assert all(math.isfinite(slope) for slope in model["slopes"])
+    assert math.isfinite(model["sigma"]) and math.isfinite(model["sigma_u"])
 
 
 def test_rq3_cells_keep_calibration_gate_recovery(tmp_path: Path):

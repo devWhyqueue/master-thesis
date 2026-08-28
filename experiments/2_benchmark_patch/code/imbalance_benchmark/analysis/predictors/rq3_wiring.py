@@ -70,9 +70,21 @@ def fit_deficit_model(cells: list[dict[str, Any]]) -> dict[str, Any]:
     return fit_rq3_model(outcomes, predictors, groups, errors, is_logistic=False)
 
 
+def _has_defined_recovery(cell: dict[str, Any]) -> bool:
+    """Whether this cell's recovery fraction exists as a finite number.
+
+    The matched-versus-unmatched contrast rows carry no deficit denominator, so
+    their recovery is undefined; leaving them in propagates NaN through the fit.
+    """
+    recovery = cell.get("recovery")
+    return recovery is not None and math.isfinite(recovery)
+
+
 def fit_recovery_model(cells: list[dict[str, Any]]) -> dict[str, Any]:
     """Model recovery only where a prespecified damage gate passed."""
-    gated = [cell for cell in cells if cell["gate_passed"]]
+    gated = [
+        cell for cell in cells if cell["gate_passed"] and _has_defined_recovery(cell)
+    ]
     if not gated:
         return {}
     predictors, groups = build_predictors(gated)
