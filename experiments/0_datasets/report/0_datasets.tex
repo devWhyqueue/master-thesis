@@ -129,11 +129,9 @@ GPU memory \citep{song2023aiPathology,abels2019computationalPathology}.
 
 The standard response to the size of a WSI is a divide-and-conquer strategy: the image is
 partitioned into small \emph{patches} (also called \emph{tiles}), $256\times256$ pixels to match the
-input size of the Virchow2 encoder used throughout (Section~\ref{sec:learning}), each processed
+input size of the encoder (Section~\ref{sec:learning}), each processed
 independently and later aggregated into a slide- or patient-level prediction
-\citep{song2023aiPathology}. How each dataset arrives at those tiles differs --- from author-supplied
-patches to on-the-fly tiling of raw slides --- and the magnification at which they are cut varies too;
-each dataset below states its own tiling. Figure~\ref{fig:pipeline} sketches the resulting pipeline, from stained
+\citep{song2023aiPathology}. Figure~\ref{fig:pipeline} sketches the resulting pipeline, from stained
 slide to prediction, that every dataset in this report passes through.
 
 \begin{figure}[ht]
