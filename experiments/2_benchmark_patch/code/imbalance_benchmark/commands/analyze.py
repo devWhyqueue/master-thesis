@@ -55,11 +55,24 @@ from imbalance_benchmark.common import (
     split_paths,
     write_json,
 )
+from imbalance_benchmark.analysis.reporting.report import write_report_tables
 from imbalance_benchmark.manifest.seeds import derive_seed
 
-__all__ = ["cmd_analyze", "cmd_analyze_combine", "cmd_combine_rq3", "cmd_match"]
+__all__ = [
+    "cmd_analyze",
+    "cmd_analyze_combine",
+    "cmd_combine_rq3",
+    "cmd_match",
+    "cmd_report_tables",
+]
 
 logger = logging.getLogger(__name__)
+
+
+def cmd_report_tables(args: argparse.Namespace) -> None:
+    """Emit the results report's LaTeX fragments from frozen artifacts."""
+    config = load_config(args.config)
+    write_report_tables(config, ensure_dirs(config))
 
 
 def cmd_combine_rq3(args: argparse.Namespace) -> None:

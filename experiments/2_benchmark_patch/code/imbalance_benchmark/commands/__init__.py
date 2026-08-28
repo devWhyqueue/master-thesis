@@ -5,6 +5,7 @@ from imbalance_benchmark.commands.analyze import (
     cmd_analyze_combine,
     cmd_combine_rq3,
     cmd_match,
+    cmd_report_tables,
 )
 from imbalance_benchmark.commands.confirm import cmd_confirm
 from imbalance_benchmark.commands.confirm.shard import cmd_confirm_shard
@@ -62,6 +63,7 @@ __all__ = [
     "cmd_analyze",
     "cmd_analyze_combine",
     "cmd_combine_rq3",
+    "cmd_report_tables",
     "cmd_match",
     "cmd_submit",
     "cmd_smoke",
