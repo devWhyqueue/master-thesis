@@ -220,7 +220,10 @@ def tier_endpoints(datasets: list[Dataset]) -> str:
     balanced reference and the natural anchor carry no tier and are omitted.
     """
     frame = _ce_endpoints(datasets, "equal_split_tier_endpoints")
-    frame = cast(pd.DataFrame, frame.dropna(subset=["recall"]))
+    # A column holding one unparsed "NaN" stays a string column, so coerce
+    # before dropping rather than relying on the parsed dtype.
+    recall = cast(pd.Series, pd.to_numeric(frame["recall"], errors="coerce"))
+    frame = cast(pd.DataFrame, frame[recall.notna()])
     frame.columns = pd.Index(
         ["Dataset", "Assignment", "Condition", "Tier", "Recall", "NLL", "Brier"]
     )
