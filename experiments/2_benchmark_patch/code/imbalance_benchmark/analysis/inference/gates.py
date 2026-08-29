@@ -7,15 +7,10 @@ from typing import Any
 import numpy as np
 
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
-from imbalance_benchmark.analysis.inference.confirmatory.holm import PRIMARY_METHODS
-from imbalance_benchmark.analysis.inference.permutation import (
-    paired_block_permutation_ba,
-    paired_block_permutation_tail_nll,
-)
 
 __all__ = [
-    "DISCRIMINATION_THRESHOLD",
-    "CALIBRATION_THRESHOLD",
+    "DISCRIMINATION_THRESHOLDS",
+    "CALIBRATION_THRESHOLDS",
     "deficit",
     "recovery",
     "ci_excludes_zero",
@@ -26,15 +21,25 @@ __all__ = [
     "calibration_gate_comparison",
     "_SeverityInputs",
     "_recovery_comparison",
-    "_method_discrimination_recovery",
-    "_method_calibration_recovery",
 ]
 
 # Report §"Imbalance deficit, recovery, and inference": the two co-primary gate
-# thresholds. Derived per PLAN_3 §2 (see derive_deficit_thresholds.py); both
-# noise-floor terms bound, so CALIBRATION_THRESHOLD sits above its 0.05 anchor.
-DISCRIMINATION_THRESHOLD = 0.01443
-CALIBRATION_THRESHOLD = 0.18237
+# thresholds, one pair per dataset. Derived per PLAN_3 §2 (see
+# derive_deficit_thresholds.py's logged "paste into gates.py" lines) from each
+# dataset's own seed dispersion -- a single global max would calibrate every
+# dataset to the noisiest one (BRACS) and under-gate the stable ones.
+DISCRIMINATION_THRESHOLDS: dict[str, float] = {
+    "bracs": 0.01443,
+    "camelyon16": 0.01443,
+    "panda": 0.01443,
+    "tcga_ut": 0.01443,
+}
+CALIBRATION_THRESHOLDS: dict[str, float] = {
+    "bracs": 0.18237,
+    "camelyon16": 0.18237,
+    "panda": 0.18237,
+    "tcga_ut": 0.18237,
+}
 
 
 def deficit(reference: float, imbalanced: float) -> float:
@@ -56,14 +61,31 @@ def ci_excludes_zero(ci_low: float, ci_high: float) -> bool:
     return ci_low > 0.0 or ci_high < 0.0
 
 
-def discrimination_gate(ba_deficit: float, ci: tuple[float, float]) -> bool:
-    """Opens when CE's paired BA deficit >= DISCRIMINATION_THRESHOLD and its 95% CI excludes zero."""
-    return ba_deficit >= DISCRIMINATION_THRESHOLD and ci_excludes_zero(*ci)
+# Pre-plan-05 pooled value, kept only as the fallback when a caller has no
+# dataset to look up (e.g. a test harness with no config); every real
+# pipeline call site threads its own dataset name and uses the table above.
+_FALLBACK_DISCRIMINATION_THRESHOLD = 0.01443
+_FALLBACK_CALIBRATION_THRESHOLD = 0.18237
 
 
-def calibration_gate(tail_nll_deficit: float, ci: tuple[float, float]) -> bool:
-    """Opens when CE's tail-group macro-NLL deficit >= CALIBRATION_THRESHOLD nats and its 95% CI excludes zero."""
-    return tail_nll_deficit >= CALIBRATION_THRESHOLD and ci_excludes_zero(*ci)
+def discrimination_gate(
+    ba_deficit: float, ci: tuple[float, float], dataset: str | None = None
+) -> bool:
+    """Opens when CE's paired BA deficit >= this dataset's threshold and its 95% CI excludes zero."""
+    threshold = DISCRIMINATION_THRESHOLDS.get(
+        dataset or "", _FALLBACK_DISCRIMINATION_THRESHOLD
+    )
+    return ba_deficit >= threshold and ci_excludes_zero(*ci)
+
+
+def calibration_gate(
+    tail_nll_deficit: float, ci: tuple[float, float], dataset: str | None = None
+) -> bool:
+    """Opens when CE's tail-group macro-NLL deficit >= this dataset's threshold (nats) and its 95% CI excludes zero."""
+    threshold = CALIBRATION_THRESHOLDS.get(
+        dataset or "", _FALLBACK_CALIBRATION_THRESHOLD
+    )
+    return tail_nll_deficit >= threshold and ci_excludes_zero(*ci)
 
 
 def confidence_interval(dist: np.ndarray) -> tuple[float, float]:
@@ -76,14 +98,19 @@ def confidence_interval(dist: np.ndarray) -> tuple[float, float]:
 
 
 def _gate_comparison(
-    severity: str, gate: str, b_dist: np.ndarray, s_dist: np.ndarray, gate_fn: Any
+    severity: str,
+    gate: str,
+    b_dist: np.ndarray,
+    s_dist: np.ndarray,
+    dataset: str | None,
+    gate_fn: Any,
 ) -> tuple[dict[str, Any], bool, np.ndarray]:
     deficit_dist = b_dist - s_dist
     effect = float(deficit_dist[0])  # replicate 0 is the observed cohort
     ci = confidence_interval(deficit_dist)
     # The gate and the reported effect use the observed-data deficit; the
     # bootstrap replicates supply only the confidence interval.
-    passed = gate_fn(effect, ci)
+    passed = gate_fn(effect, ci, dataset)
     comparison = {
         "method": "ce",
         "gate": gate,
@@ -98,11 +125,19 @@ def _gate_comparison(
 
 
 def discrimination_gate_comparison(
-    severity: str, balanced_ba: np.ndarray, severity_ba: np.ndarray
+    severity: str,
+    balanced_ba: np.ndarray,
+    severity_ba: np.ndarray,
+    dataset: str | None = None,
 ) -> tuple[dict[str, Any], bool, np.ndarray]:
     """CE-only discrimination-axis deficit and gate check for one severity."""
     return _gate_comparison(
-        severity, "discrimination", balanced_ba, severity_ba, discrimination_gate
+        severity,
+        "discrimination",
+        balanced_ba,
+        severity_ba,
+        dataset,
+        discrimination_gate,
     )
 
 
@@ -110,12 +145,18 @@ def calibration_gate_comparison(
     severity: str,
     balanced_tail_nll: np.ndarray | None,
     severity_tail_nll: np.ndarray | None,
+    dataset: str | None = None,
 ) -> tuple[dict[str, Any], bool, np.ndarray] | None:
     """CE-only calibration-axis (tail macro NLL) deficit and gate check for one severity."""
     if balanced_tail_nll is None or severity_tail_nll is None:
         return None
     return _gate_comparison(
-        severity, "calibration", severity_tail_nll, balanced_tail_nll, calibration_gate
+        severity,
+        "calibration",
+        severity_tail_nll,
+        balanced_tail_nll,
+        dataset,
+        calibration_gate,
     )
 
 
@@ -131,6 +172,7 @@ class _SeverityInputs:
         n_perm: int,
         seed: int,
         assignment: str,
+        dataset: str = "",
         descriptive_only: bool = False,
     ) -> None:
         self.paths = paths
@@ -142,6 +184,7 @@ class _SeverityInputs:
         self.n_perm = n_perm
         self.seed = seed
         self.assignment = assignment
+        self.dataset = dataset
         self.descriptive_only = descriptive_only
 
 
@@ -175,76 +218,3 @@ def _recovery_comparison(
         "bootstrap_numerator": effect_dist.tolist(),
         "bootstrap_denominator": deficit_dist.tolist(),
     }
-
-
-def _method_discrimination_recovery(
-    inp: _SeverityInputs,
-    ba_deficit_dist: np.ndarray,
-    severity_ba: np.ndarray,
-    method: str,
-    method_rec: dict[str, Any],
-    gate_passed: bool,
-) -> dict[str, Any]:
-    """One method's discrimination-axis recovery ratio and permutation p-value."""
-    method_ba = inp.ctx.ba_distribution(
-        inp.balanced["labels"], method_rec["preds"], inp.n_classes
-    )
-    p_val = (
-        paired_block_permutation_ba(
-            inp.balanced["labels"],
-            method_rec["preds"],
-            inp.severity_ce["preds"],
-            inp.ctx.case_ids,
-            inp.n_classes,
-            inp.n_perm,
-            inp.seed,
-        )
-        if gate_passed and method in PRIMARY_METHODS
-        else None
-    )
-    return _recovery_comparison(
-        inp,
-        method,
-        "discrimination",
-        method_ba - severity_ba,
-        ba_deficit_dist,
-        gate_passed,
-        p_val,
-    )
-
-
-def _method_calibration_recovery(
-    inp: _SeverityInputs,
-    cal_deficit_dist: np.ndarray,
-    severity_tail_nll: np.ndarray,
-    tail_classes: list[int],
-    method: str,
-    method_rec: dict[str, Any],
-    gate_passed: bool,
-) -> dict[str, Any]:
-    """One method's calibration-axis (tail NLL) recovery ratio and permutation p-value."""
-    method_tail_nll = inp.ctx.tail_nll_distribution(
-        inp.balanced["labels"], method_rec["probs"], tail_classes
-    )
-    p_val = (
-        paired_block_permutation_tail_nll(
-            inp.balanced["labels"],
-            method_rec["probs"],
-            inp.severity_ce["probs"],
-            inp.ctx.case_ids,
-            tail_classes,
-            inp.n_perm,
-            inp.seed,
-        )
-        if gate_passed and method in PRIMARY_METHODS
-        else None
-    )
-    return _recovery_comparison(
-        inp,
-        method,
-        "calibration",
-        severity_tail_nll - method_tail_nll,
-        cal_deficit_dist,
-        gate_passed,
-        p_val,
-    )

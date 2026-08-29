@@ -58,15 +58,33 @@ def build_predictors(cells: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarra
     return predictors, groups
 
 
+def _alignment_identifiable(cell: dict[str, Any]) -> bool:
+    """Whether this cell's support-difficulty-alignment predictor is identifiable.
+
+    Pearson correlation over exactly two points (a binary target) is always
+    +/-1, saturating the alignment predictor and confounding its pooled
+    coefficient. Cells missing ``n_classes`` (hand-built cells predating this
+    field, e.g. in tests) are treated as identifiable rather than excluded.
+    """
+    n_classes = cell.get("n_classes")
+    return n_classes is None or n_classes > 2
+
+
 def fit_deficit_model(cells: list[dict[str, Any]]) -> dict[str, Any]:
     """Model signed damage over every cell, including negative deficits.
 
     Each bootstrap standard error enters the observation variance so a noisy
-    deficit estimate is not treated as error-free.
+    deficit estimate is not treated as error-free. Cells from a binary-target
+    dataset are excluded: the shared design matrix has one alignment column,
+    and a saturated predictor for those cells would confound its coefficient
+    for every dataset.
     """
-    predictors, groups = build_predictors(cells)
-    outcomes = np.array([cell["deficit_ba"] for cell in cells])
-    errors = np.array([cell["deficit_se"] for cell in cells])
+    identifiable = [cell for cell in cells if _alignment_identifiable(cell)]
+    if not identifiable:
+        return {}
+    predictors, groups = build_predictors(identifiable)
+    outcomes = np.array([cell["deficit_ba"] for cell in identifiable])
+    errors = np.array([cell["deficit_se"] for cell in identifiable])
     return fit_rq3_model(outcomes, predictors, groups, errors, is_logistic=False)
 
 
@@ -81,9 +99,17 @@ def _has_defined_recovery(cell: dict[str, Any]) -> bool:
 
 
 def fit_recovery_model(cells: list[dict[str, Any]]) -> dict[str, Any]:
-    """Model recovery only where a prespecified damage gate passed."""
+    """Model recovery only where a prespecified damage gate passed.
+
+    Binary-target cells are excluded for the same reason as
+    :func:`fit_deficit_model`: their alignment predictor is saturated.
+    """
     gated = [
-        cell for cell in cells if cell["gate_passed"] and _has_defined_recovery(cell)
+        cell
+        for cell in cells
+        if cell["gate_passed"]
+        and _has_defined_recovery(cell)
+        and _alignment_identifiable(cell)
     ]
     if not gated:
         return {}

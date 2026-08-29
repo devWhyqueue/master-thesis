@@ -13,8 +13,6 @@ from imbalance_benchmark.analysis.inference.context import (
 )
 from imbalance_benchmark.analysis.inference.gates import (
     _SeverityInputs,
-    _method_calibration_recovery,
-    _method_discrimination_recovery,
     calibration_gate_comparison,
     confidence_interval,
     discrimination_gate_comparison,
@@ -22,6 +20,10 @@ from imbalance_benchmark.analysis.inference.gates import (
 from imbalance_benchmark.analysis.inference.confirmatory.matched_contrast import (
     contrast_rows,
     load_matching_units,
+)
+from imbalance_benchmark.analysis.inference.confirmatory.method_recovery import (
+    _method_calibration_recovery,
+    _method_discrimination_recovery,
 )
 from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.modeling.context import roster_for_regime
@@ -108,7 +110,7 @@ def _severity_comparisons(
         inp.severity_ce["labels"], inp.severity_ce["probs"], tail_classes
     )
     disc_comparison, disc_gate, ba_deficit_dist = discrimination_gate_comparison(
-        inp.severity, balanced_ba, severity_ba
+        inp.severity, balanced_ba, severity_ba, inp.dataset
     )
     ece_dist = inp.ctx.ece_distribution(
         inp.severity_ce["labels"], inp.severity_ce["probs"]
@@ -118,7 +120,7 @@ def _severity_comparisons(
     comparisons = [disc_comparison]
     cal_gate, cal_deficit_dist = False, None
     cal_result = calibration_gate_comparison(
-        inp.severity, balanced_tail_nll, severity_tail_nll
+        inp.severity, balanced_tail_nll, severity_tail_nll, inp.dataset
     )
     if cal_result is not None:
         cal_comparison, cal_gate, cal_deficit_dist = cal_result
@@ -151,6 +153,7 @@ def _severity_result(
     severity: str,
     seed: int,
     assignment: str,
+    dataset: str,
     descriptive_only: bool,
     expected_methods: tuple[str, ...],
     matching_units: dict[tuple[str, str], Any],
@@ -177,6 +180,7 @@ def _severity_result(
         baseline.n_perm,
         seed,
         assignment,
+        dataset,
         descriptive_only,
     )
     return _severity_comparisons(
@@ -222,6 +226,7 @@ def gates_and_recovery(
         freeze.get("bootstrap_preflight", {}).get("is_descriptive_only", False)
     )
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
+    dataset = config["dataset"]["name"]
     expected_methods = roster_for_regime(is_mil)
     total = len(freeze.get("tail_assignments", {"native": []})) * 2
     steps = _recovery_steps(paths, config, freeze, n_replicates, seed)
@@ -235,6 +240,7 @@ def gates_and_recovery(
             severity,
             seed,
             assignment,
+            dataset,
             descriptive_only,
             expected_methods,
             matching_units,

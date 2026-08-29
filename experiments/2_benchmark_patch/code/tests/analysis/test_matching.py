@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 from imbalance_benchmark.analysis.inference.confirmatory.holm import PRIMARY_METHODS
 from imbalance_benchmark.analysis.predictors.signals.matching import (
     build_matching_record,
@@ -12,11 +14,16 @@ from imbalance_benchmark.common import sign_file, write_json
 
 
 def _write_split(
-    root: Path, index: int, group: str, comparisons: list[dict[str, object]]
+    root: Path,
+    index: int,
+    group: str,
+    comparisons: list[dict[str, object]],
+    class_names: tuple[str, ...] = ("A", "B", "C"),
 ) -> None:
     freeze = {
         "dataset_provenance": {"name": group.split(":")[0], "target": group.split(":")[1]},
         "content_sha256": "deadbeef",
+        "class_names": list(class_names),
     }
     split_dir = root / f"split={index}" / "data"
     write_json(split_dir / "manifest_freeze.json", freeze)
@@ -28,9 +35,14 @@ def _write_split(
     sign_file(profile_path)
 
 
-def _write_root(root: Path, group: str, comparisons: list[dict[str, object]]) -> None:
+def _write_root(
+    root: Path,
+    group: str,
+    comparisons: list[dict[str, object]],
+    class_names: tuple[str, ...] = ("A", "B", "C"),
+) -> None:
     for index in range(3):
-        _write_split(root, index, group, comparisons)
+        _write_split(root, index, group, comparisons, class_names)
 
 
 def test_dominant_shortage_is_the_largest_standardized_score(tmp_path: Path) -> None:
@@ -202,3 +214,107 @@ def test_structurally_zero_independent_shortage_is_never_dominant(
     p = record["units"][unit_key("ds:target", "native", "severe")]
     assert "independent" in p["degenerate_axes"]
     assert p["dominant"] is None
+
+
+def test_standardization_is_computed_within_a_dataset_root_not_pooled(
+    tmp_path: Path,
+) -> None:
+    """A root's own scale must not be diluted by another root's very different scale.
+
+    Regression for the published bug: TCGA-UT's nominal shortage read -1.00
+    because it was small relative to BRACS's, not because TCGA-UT has none.
+    """
+
+    def unit(assignment: str, severity: str, nominal: float) -> dict[str, object]:
+        return {
+            "assignment": assignment,
+            "severity": severity,
+            "rho": 1.0,
+            "nominal_shortage": nominal,
+            "independent_shortage": 0.0,
+            "diversity_shortage": 0.0,
+            "support_difficulty_alignment": 0.0,
+        }
+
+    root_a = tmp_path / "a"
+    _write_root(
+        root_a, "a:target", [unit("native", "moderate", 1.0), unit("native", "severe", 3.0)]
+    )
+    root_b = tmp_path / "b"
+    _write_root(
+        root_b,
+        "b:target",
+        [unit("native", "moderate", 100.0), unit("native", "severe", 300.0)],
+    )
+
+    record = build_matching_record([root_a, root_b])
+
+    a_low = record["units"][unit_key("a:target", "native", "moderate")]
+    b_low = record["units"][unit_key("b:target", "native", "moderate")]
+    # Pooling both roots' raw values ([1, 3, 100, 300]) before standardizing
+    # would give the low unit in root A a z-score around -0.82, not -1.0.
+    assert a_low["standardized_scores"]["nominal"] == pytest.approx(-1.0)
+    assert b_low["standardized_scores"]["nominal"] == pytest.approx(-1.0)
+
+
+def test_binary_target_alignment_axis_is_degenerate_in_matching(
+    tmp_path: Path,
+) -> None:
+    """Pearson correlation over exactly two points is always +/-1; a two-class
+    dataset's alignment score must never be eligible for the dominant argmax."""
+    unit_severe = {
+        "assignment": "native",
+        "severity": "severe",
+        "rho": 4.0,
+        "nominal_shortage": 0.0,
+        "independent_shortage": 0.0,
+        "diversity_shortage": 0.0,
+        "support_difficulty_alignment": -1.0,
+    }
+    unit_moderate = {
+        "assignment": "native",
+        "severity": "moderate",
+        "rho": 8.0,
+        "nominal_shortage": 0.0,
+        "independent_shortage": 0.0,
+        "diversity_shortage": 0.0,
+        "support_difficulty_alignment": 1.0,
+    }
+    root = tmp_path / "ds"
+    _write_root(root, "ds:target", [unit_severe, unit_moderate], class_names=("A", "B"))
+
+    record = build_matching_record([root])
+
+    severe = record["units"][unit_key("ds:target", "native", "severe")]
+    assert "difficulty" in severe["degenerate_axes"]
+    assert severe["dominant"] is None
+
+
+def test_multiclass_alignment_axis_can_still_be_dominant(tmp_path: Path) -> None:
+    """The same setup on a three-class dataset must remain eligible."""
+    unit_severe = {
+        "assignment": "native",
+        "severity": "severe",
+        "rho": 4.0,
+        "nominal_shortage": 0.0,
+        "independent_shortage": 0.0,
+        "diversity_shortage": 0.0,
+        "support_difficulty_alignment": -1.0,
+    }
+    unit_moderate = {
+        "assignment": "native",
+        "severity": "moderate",
+        "rho": 8.0,
+        "nominal_shortage": 0.0,
+        "independent_shortage": 0.0,
+        "diversity_shortage": 0.0,
+        "support_difficulty_alignment": 1.0,
+    }
+    root = tmp_path / "ds"
+    _write_root(root, "ds:target", [unit_severe, unit_moderate])  # default 3 classes
+
+    record = build_matching_record([root])
+
+    severe = record["units"][unit_key("ds:target", "native", "severe")]
+    assert "difficulty" not in severe["degenerate_axes"]
+    assert severe["dominant"] == "difficulty"

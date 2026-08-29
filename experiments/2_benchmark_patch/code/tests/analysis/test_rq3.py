@@ -257,6 +257,48 @@ def test_rq3_damage_and_recovery_models_run_with_four_predictors():
     assert len(recovery_model["slopes"]) == 4
 
 
+def test_fit_deficit_model_excludes_binary_target_cells_from_the_pooled_fit():
+    """A binary target's alignment predictor is a correlation over two points,
+    always +/-1, saturated. Those cells must be dropped, not mixed into the
+    shared design matrix where they would confound the alignment coefficient.
+    """
+    rng = np.random.default_rng(3)
+    multiclass_cells = [
+        {
+            "group": f"multiclass_{i % 4}",
+            "n_classes": 5,
+            "rho": float(rng.choice([1.0, 10.0])),
+            "independent_shortage": float(rng.normal()),
+            "support_difficulty_alignment": float(rng.normal(scale=0.3)),
+            "diversity_shortage": float(rng.normal()),
+            "gate_passed": True,
+            "deficit_ba": float(rng.normal(0.05, 0.02)),
+            "deficit_se": 0.01,
+        }
+        for i in range(12)
+    ]
+    binary_cells = [
+        {
+            "group": "binary",
+            "n_classes": 2,
+            "rho": 10.0,
+            "independent_shortage": float(rng.normal()),
+            "support_difficulty_alignment": 1.0,
+            "diversity_shortage": float(rng.normal()),
+            "gate_passed": True,
+            "deficit_ba": 5.0,  # extreme outlier the fit must never see
+            "deficit_se": 0.01,
+        }
+        for _ in range(4)
+    ]
+
+    without_binary = fit_deficit_model(multiclass_cells)
+    with_binary = fit_deficit_model([*multiclass_cells, *binary_cells])
+
+    assert with_binary["intercept"] == pytest.approx(without_binary["intercept"])
+    np.testing.assert_allclose(with_binary["slopes"], without_binary["slopes"])
+
+
 def test_rq3_recovery_model_empty_when_no_gated_cells():
     cells = [
         {

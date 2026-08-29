@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
-import pandas as pd
-import torch
 
 from imbalance_benchmark.common import sign_file, write_json
-from imbalance_benchmark.datasets.data import ImbalanceDataset
-from imbalance_benchmark.datasets.features import load_feature_row
 from imbalance_benchmark.analysis.predictors.rq3_features import (
     _covariates,
     _deprived_classes,
@@ -19,124 +15,37 @@ from imbalance_benchmark.analysis.predictors.rq3_features import (
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     support_difficulty_alignment,
 )
-from imbalance_benchmark.analysis.predictors.signals.icc import (
-    descriptive_support,
-    icc_estimate,
+from imbalance_benchmark.analysis.predictors.signals.descriptive_support_profile import (
+    ICC_CASE_CAP,
+    ICC_PATCH_CAP,
+    build_descriptive_support,
 )
-from imbalance_benchmark.modeling.training.semantic_scale import _matched_draw_indices
-
-
-class _RawManifest:
-    """Minimal ``.df``/``.classes`` stand-in avoiding ``ImbalanceDataset``'s eager load."""
-
-    def __init__(self, df: pd.DataFrame, classes: list[str]) -> None:
-        self.df = df
-        self.classes = classes
-
-
-def _load_rows(frame: pd.DataFrame, indices: np.ndarray) -> np.ndarray:
-    """Load exactly the requested rows' raw features, bypassing the resident feature bank.
-
-    The shared bank in ``datasets.features.cache`` never evicts, so building a
-    full ``ImbalanceDataset`` per condition to sample a capped subset would
-    still eagerly load and permanently retain every patch in that condition --
-    exactly the full feature pass the cap exists to avoid.
-    """
-    paths = frame["feature_path"].astype(str).to_numpy()
-    feature_index = (
-        frame["feature_index"].to_numpy() if "feature_index" in frame else None
-    )
-    rows = [
-        load_feature_row(
-            str(paths[i]),
-            int(feature_index[i])
-            if feature_index is not None and pd.notna(feature_index[i])
-            else None,
-        )
-        for i in indices
-    ]
-    return torch.stack(rows).numpy()
-
 
 __all__ = ["build_signal_profile", "write_signal_profile"]
 
 logger = logging.getLogger(__name__)
 
-# Cost guard (report methods §sec:support-signal is descriptive only): a full
-# feature pass over every condition's patches is too expensive, so the ICC
-# estimate is drawn from a bounded sample. m_star/n_c use the exact case
-# distribution, which costs nothing beyond the manifest already on disk.
-ICC_CASE_CAP = 200
-ICC_PATCH_CAP = 200
 
+def _nominal_shortage(
+    balanced: dict[str, Any], imbalanced: dict[str, Any], difficulty: dict[str, float]
+) -> float:
+    """Eq. (nominal-shortage): difficulty-weighted mean log loss on deprived classes.
 
-def _nominal_shortage(balanced: dict[str, Any], imbalanced: dict[str, Any]) -> float:
-    """Eq. (nominal-shortage): mean log loss of nominal allocation on deprived classes."""
+    The allocated-count multiset is identical across tail assignments and
+    only permuted onto different classes, so an unweighted mean cannot see
+    which classes were deprived -- every assignment produces the same score.
+    Weighting each deprived class's log loss by its frozen difficulty makes
+    the score respond to which classes the assignment actually deprives.
+    """
     names = _deprived_classes(balanced, imbalanced)
     if not names:
         return 0.0
     bal, imb = balanced["allocated_counts"], imbalanced["allocated_counts"]
-    return float(np.mean([np.log(bal[name] / imb[name]) for name in names]))
-
-
-def _pca_direction(features: np.ndarray) -> np.ndarray:
-    """Leading principal direction of a jointly-fit, class-balanced reference draw."""
-    centered = features - features.mean(axis=0, keepdims=True)
-    _, _, vt = np.linalg.svd(centered, full_matrices=False)
-    return vt[0]
-
-
-def _reference_direction(
-    balanced_path: Path, class_names: list[str], seed: int
-) -> np.ndarray:
-    frame = pd.read_csv(balanced_path)
-    manifest = cast(ImbalanceDataset, _RawManifest(frame, class_names))
-    indices, _ = _matched_draw_indices(manifest, seed)
-    features = _load_rows(frame, indices)
-    return _pca_direction(features)
-
-
-def _sample_condition_scores(
-    class_frame: pd.DataFrame, direction: np.ndarray, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray]:
-    """Capped, seeded case/patch sample of one class's projected scalar scores."""
-    frame = class_frame.reset_index(drop=True)
-    if frame.empty:
-        return np.array([]), np.array([])
-    case_ids_all = frame["case_id"].to_numpy()
-    unique_cases = np.unique(case_ids_all)
-    chosen_cases = rng.choice(
-        unique_cases, size=min(ICC_CASE_CAP, len(unique_cases)), replace=False
-    )
-    rows, case_ids = [], []
-    for case in chosen_cases:
-        case_rows = np.flatnonzero(case_ids_all == case)
-        take = rng.choice(
-            case_rows, size=min(ICC_PATCH_CAP, len(case_rows)), replace=False
-        )
-        rows.append(take)
-        case_ids.append(np.full(len(take), case))
-    indices = np.concatenate(rows)
-    features = _load_rows(frame, indices)
-    return features @ direction, np.concatenate(case_ids)
-
-
-def _condition_descriptives(
-    condition: dict[str, Any],
-    class_names: list[str],
-    direction: np.ndarray,
-    seed: int,
-) -> dict[str, dict[str, float | None]]:
-    """Per-class descriptive ICC/m*/N_eff for one condition (report §sec:support-signal)."""
-    frame = pd.read_csv(condition["path"])
-    rng = np.random.default_rng(seed)
-    out = {}
-    for class_name in class_names:
-        class_frame = frame.loc[frame["cancer_type"] == class_name]
-        counts = class_frame["case_id"].value_counts().to_numpy()
-        scores, case_ids = _sample_condition_scores(class_frame, direction, rng)
-        out[class_name] = descriptive_support(counts, icc_estimate(scores, case_ids))
-    return out
+    losses = np.array([np.log(bal[name] / imb[name]) for name in names])
+    weights = np.array([difficulty[name] for name in names])
+    if weights.sum() <= 0:
+        return float(np.mean(losses))
+    return float(np.average(losses, weights=weights))
 
 
 def _build_comparisons(
@@ -161,7 +70,11 @@ def _build_comparisons(
                     "assignment": assignment,
                     "severity": severity,
                     "rho": condition["achieved_rho"],
-                    "nominal_shortage": _nominal_shortage(balanced, condition),
+                    "nominal_shortage": _nominal_shortage(
+                        balanced,
+                        condition,
+                        freeze.get("difficulty_evidence", {}).get("difficulty", {}),
+                    ),
                     "independent_shortage": shortages["independent_shortage"],
                     "diversity_shortage": shortages["diversity_shortage"],
                     "support_difficulty_alignment": support_difficulty_alignment(
@@ -170,42 +83,6 @@ def _build_comparisons(
                 }
             )
     return comparisons
-
-
-def _all_conditions(
-    freeze: dict[str, Any], balanced: dict[str, Any], tail_assignments: dict[str, Any]
-) -> dict[str, dict[str, Any]]:
-    """Every condition (balanced plus each assignment's moderate/severe)."""
-    return {
-        "balanced": balanced,
-        **{
-            f"{assignment}_{severity}": freeze["assignment_conditions"][assignment][
-                severity
-            ]
-            for assignment in tail_assignments
-            for severity in ("moderate", "severe")
-        },
-    }
-
-
-def _build_descriptive_support(
-    freeze: dict[str, Any],
-    balanced: dict[str, Any],
-    tail_assignments: dict[str, Any],
-    class_names: list[str] | None,
-    seed: int,
-) -> dict[str, dict[str, dict[str, float | None]]]:
-    """Per-class ICC/m*/N_eff for every condition (balanced plus each assignment)."""
-    names = class_names or list(balanced["allocated_counts"])
-    direction = _reference_direction(
-        Path(balanced["path"]), names, int(freeze["construction_seed"])
-    )
-    return {
-        key: _condition_descriptives(condition, names, direction, seed)
-        for key, condition in _all_conditions(
-            freeze, balanced, tail_assignments
-        ).items()
-    }
 
 
 def build_signal_profile(
@@ -224,7 +101,7 @@ def build_signal_profile(
     comparisons = _build_comparisons(
         paths, freeze, is_mil, class_names, balanced, tail_assignments
     )
-    descriptive_support = _build_descriptive_support(
+    descriptive_support = build_descriptive_support(
         freeze, balanced, tail_assignments, class_names, seed
     )
     return {

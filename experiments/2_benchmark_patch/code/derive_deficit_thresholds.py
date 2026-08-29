@@ -1,14 +1,11 @@
 """PLAN_3 Plan §2 / Verification: the noise-floor term of the deficit thresholds.
 
-One-time computation, run before any gate row is read. For every dataset and
-split (and, for tail NLL, every severity, since the tail group is
-severity-specific), reports the standard deviation across the five
-confirmation seeds of balanced-condition CE case-macro balanced accuracy and
-tail-group macro NLL, then the resulting DISCRIMINATION_THRESHOLD /
-CALIBRATION_THRESHOLD to paste into gates.py and the protocol.
-
-Blind: only reads the balanced condition, never a balanced-minus-severity
-contrast, so it never touches a gate row or a recovery ratio.
+One-time, run before any gate row is read. Per dataset (and, for tail NLL,
+per severity), reports the seed-dispersion sigma of balanced-condition CE
+and the resulting DISCRIMINATION_THRESHOLDS / CALIBRATION_THRESHOLDS to paste
+into gates.py -- grouped by dataset, not pooled, since a global max
+calibrates every dataset to the noisiest one. Blind: only reads the balanced
+condition, so it never touches a gate row or a recovery ratio.
 
     uv run python experiments/2_benchmark_patch/code/derive_deficit_thresholds.py
 """
@@ -56,6 +53,16 @@ class DispersionRow:
     severity: str | None
     endpoint: str
     sigma_seed: float
+
+
+@dataclass
+class DatasetThresholds:
+    dataset: str
+    max_ba_sigma: float
+    max_nll_sigma: float
+    discrimination_threshold: float
+    calibration_threshold: float
+    calibration_raised: bool
 
 
 def _seed_point_values(fn, n_seeds: int) -> np.ndarray:
@@ -145,10 +152,11 @@ def dataset_dispersion(config_path: Path) -> list[DispersionRow]:
     config = load_config(config_path)
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     base_paths = ensure_dirs(config)
+    dataset_name = config["dataset"]["name"]
     rows: list[DispersionRow] = []
     for split_index in range(3):
         paths = split_paths(base_paths, split_index)
-        rows += _split_dispersion(config_path.stem, split_index, paths, is_mil)
+        rows += _split_dispersion(dataset_name, split_index, paths, is_mil)
     return rows
 
 
@@ -160,35 +168,62 @@ def _log_rows(all_rows: list[DispersionRow]) -> None:
         logger.info("%-45s %-9s sigma_seed=%.5f", tag, row.endpoint, row.sigma_seed)
 
 
-def _report_thresholds(all_rows: list[DispersionRow]) -> None:
-    """Apply the PLAN_3 §2 rule to the collected dispersion rows and log the result."""
-    ba_sigmas = [r.sigma_seed for r in all_rows if r.endpoint == "ba"]
-    nll_sigmas = [r.sigma_seed for r in all_rows if r.endpoint == "tail_nll"]
-    max_ba_sigma = max(ba_sigmas, default=0.0)
-    max_nll_sigma = max(nll_sigmas, default=0.0)
-
-    discrimination_threshold = max(STABILITY_FLOOR, 2 * max_ba_sigma)
-    raise_calibration = max_nll_sigma > 0.025
-    calibration_threshold = (
-        2 * max_nll_sigma if raise_calibration else CALIBRATION_ANCHOR
+def _dataset_thresholds(dataset: str, rows: list[DispersionRow]) -> DatasetThresholds:
+    """PLAN_3 §2 rule applied to one dataset's own dispersion rows, not the pooled max."""
+    max_ba = max((r.sigma_seed for r in rows if r.endpoint == "ba"), default=0.0)
+    max_nll = max((r.sigma_seed for r in rows if r.endpoint == "tail_nll"), default=0.0)
+    raised = max_nll > 0.025
+    return DatasetThresholds(
+        dataset,
+        max_ba,
+        max_nll,
+        max(STABILITY_FLOOR, 2 * max_ba),
+        2 * max_nll if raised else CALIBRATION_ANCHOR,
+        raised,
     )
 
+
+def _log_dataset_threshold(t: DatasetThresholds) -> None:
+    note = " (raised: noise floor exceeded 0.025)" if t.calibration_raised else ""
     logger.info(
-        "max sigma_seed (balanced-condition case-macro BA):       %.5f", max_ba_sigma
+        "%-12s max sigma ba=%.5f tail_nll=%.5f -> DISCRIMINATION=%.5f CALIBRATION=%.5f%s",
+        t.dataset,
+        t.max_ba_sigma,
+        t.max_nll_sigma,
+        t.discrimination_threshold,
+        t.calibration_threshold,
+        note,
     )
-    logger.info(
-        "max sigma_seed (balanced-condition case-macro tail NLL): %.5f", max_nll_sigma
-    )
-    logger.info(
-        "DISCRIMINATION_THRESHOLD = max(0.01, 2*sigma) = %.5f", discrimination_threshold
-    )
-    note = " (raised: noise floor exceeded 0.025)" if raise_calibration else ""
-    logger.info("CALIBRATION_THRESHOLD    = %.5f%s", calibration_threshold, note)
-    if max_ba_sigma > 0.005 or max_nll_sigma > 0.005:
+    if t.max_ba_sigma > 0.005 or t.max_nll_sigma > 0.005:
         logger.warning(
-            "sigma_seed exceeds 0.005 somewhere; pipeline is noisier than the "
-            "design assumed (PLAN_3 Verification)."
+            "%s: sigma_seed exceeds 0.005; pipeline is noisier than the "
+            "design assumed (PLAN_3 Verification).",
+            t.dataset,
         )
+
+
+def report_thresholds(all_rows: list[DispersionRow]) -> dict[str, DatasetThresholds]:
+    """Apply the PLAN_3 §2 rule per dataset to the collected dispersion rows and log it."""
+    by_dataset: dict[str, list[DispersionRow]] = {}
+    for row in all_rows:
+        by_dataset.setdefault(row.dataset, []).append(row)
+    thresholds = {
+        dataset: _dataset_thresholds(dataset, rows)
+        for dataset, rows in sorted(by_dataset.items())
+    }
+    for t in thresholds.values():
+        _log_dataset_threshold(t)
+    return thresholds
+
+
+def log_paste_ready(thresholds: dict[str, DatasetThresholds]) -> None:
+    """Log the two dicts ready to paste into gates.py's threshold tables."""
+    disc = {
+        t.dataset: round(t.discrimination_threshold, 5) for t in thresholds.values()
+    }
+    cal = {t.dataset: round(t.calibration_threshold, 5) for t in thresholds.values()}
+    logger.info("DISCRIMINATION_THRESHOLDS = %s", disc)
+    logger.info("CALIBRATION_THRESHOLDS = %s", cal)
 
 
 def main() -> None:
@@ -207,7 +242,7 @@ def main() -> None:
         all_rows += dataset_dispersion(args.config_dir / name)
 
     _log_rows(all_rows)
-    _report_thresholds(all_rows)
+    log_paste_ready(report_thresholds(all_rows))
 
 
 if __name__ == "__main__":

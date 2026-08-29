@@ -113,11 +113,21 @@ def _annotate_exploratory(exploratory: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def apply_holm(comparisons: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Adjust p-values within the confirmatory family; mark gated-out cells "not tested".
+    """Adjust p-values within each (dataset, gate) confirmatory family.
 
     Only gate-passing comparisons carry a testable p-value; Holm adjusts
     across exactly those, and every gated-out primary-method comparison is
-    recorded with ``adjusted_p_value=None`` and ``status="not tested"``.
+    recorded with ``adjusted_p_value=None`` and ``status="not tested"``. The
+    confirmatory family is built separately per gate: discrimination and
+    calibration are co-primary endpoints answering different questions, so a
+    dataset opening a second gate must not shrink the first gate's family
+    (and its statistical power) by adding unrelated tests to it.
     """
     confirmatory, exploratory = confirmatory_family(comparisons)
-    return _annotate_confirmatory(confirmatory) + _annotate_exploratory(exploratory)
+    gates = sorted({c.get("gate") for c in confirmatory}, key=lambda g: (g is None, g))
+    annotated: list[dict[str, Any]] = []
+    for gate in gates:
+        annotated += _annotate_confirmatory(
+            [c for c in confirmatory if c.get("gate") == gate]
+        )
+    return annotated + _annotate_exploratory(exploratory)

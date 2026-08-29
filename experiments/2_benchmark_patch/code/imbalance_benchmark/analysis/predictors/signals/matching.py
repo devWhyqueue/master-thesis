@@ -44,6 +44,7 @@ def _load_root_units(root: Path) -> list[dict[str, Any]]:
     per_unit: dict[tuple[str, str], list[dict[str, float]]] = {}
     group: str | None = None
     freeze_hash: str | None = None
+    n_classes = 0
     for index in range(3):
         split_dir = root / f"split={index}" / "data"
         freeze_path, profile_path = (
@@ -62,6 +63,7 @@ def _load_root_units(root: Path) -> list[dict[str, Any]]:
                 f"{profile_path} is stale relative to its freeze; re-run signals"
             )
         group, freeze_hash = _rq3_group(freeze), freeze.get("content_sha256")
+        n_classes = len(freeze.get("class_names", []))
         for comparison in profile["comparisons"]:
             key = (comparison["assignment"], comparison["severity"])
             per_unit.setdefault(key, []).append(comparison)
@@ -73,6 +75,7 @@ def _load_root_units(root: Path) -> list[dict[str, Any]]:
             "assignment": assignment,
             "severity": severity,
             "freeze_content_sha256": freeze_hash,
+            "n_classes": n_classes,
             "nominal_shortage": float(np.mean([r["nominal_shortage"] for r in rows])),
             "independent_shortage": float(
                 np.mean([r["independent_shortage"] for r in rows])
@@ -101,12 +104,24 @@ def _standardize(values: np.ndarray) -> np.ndarray:
 
 
 def _raw_scores(units: list[dict[str, Any]]) -> dict[str, np.ndarray]:
-    """The four shortage scores per unit, before standardization."""
+    """The four shortage scores per unit, before standardization.
+
+    ``support_difficulty_alignment`` is a Pearson correlation, which is
+    exactly +/-1 over the two points a binary target gives it -- a saturated,
+    non-identifiable score. It is forced to NaN (degenerate, per
+    ``_standardize``) for those units so it can never win the dominant-axis
+    argmax on a binary dataset.
+    """
     return {
         "nominal": np.array([unit["nominal_shortage"] for unit in units]),
         "independent": np.array([unit["independent_shortage"] for unit in units]),
         "difficulty": np.array(
-            [-unit["support_difficulty_alignment"] for unit in units]
+            [
+                -unit["support_difficulty_alignment"]
+                if unit.get("n_classes", 0) > 2
+                else np.nan
+                for unit in units
+            ]
         ),
         "diversity": np.array([unit["diversity_shortage"] for unit in units]),
     }
@@ -159,21 +174,14 @@ def _label_unit(
     }
 
 
-def build_matching_record(roots: list[Path]) -> dict[str, Any]:
-    """Standardize the four shortage scores across every pooled unit and label each.
-
-    Protocol app:testing: the dominant shortage is the largest standardized
-    score among axes that are neither degenerate (never varies across the
-    pool) nor never created in this unit (raw score <= 0); a unit whose two
-    largest remaining scores lie within 0.25 SD, or that has no eligible
-    axis, is ambiguous or dominant-free and carries no matched label.
-    """
-    units = [unit for root in roots for unit in _load_root_units(root)]
+def _root_records(root: Path) -> dict[str, dict[str, Any]]:
+    """Standardize one dataset root's own units and label each of them."""
+    units = _load_root_units(root)
     if not units:
-        return {"units": {}, "roots": [str(root) for root in roots]}
+        return {}
     raw = _raw_scores(units)
     standardized = _standardize_scores(raw)
-    records = {
+    return {
         unit_key(unit["group"], unit["assignment"], unit["severity"]): _label_unit(
             unit,
             {label: float(column[index]) for label, column in standardized.items()},
@@ -181,6 +189,24 @@ def build_matching_record(roots: list[Path]) -> dict[str, Any]:
         )
         for index, unit in enumerate(units)
     }
+
+
+def build_matching_record(roots: list[Path]) -> dict[str, Any]:
+    """Standardize the four shortage scores within each dataset root and label each unit.
+
+    Protocol app:testing: the dominant shortage is the largest standardized
+    score among axes that are neither degenerate (never varies within the
+    dataset root) nor never created in this unit (raw score <= 0); a unit
+    whose two largest remaining scores lie within 0.25 SD, or that has no
+    eligible axis, is ambiguous or dominant-free and carries no matched label.
+
+    Standardization is computed per root, not pooled across every dataset:
+    a unit's dominant shortage must be a property of that unit, not its rank
+    against a differently-scaled dataset (e.g. a naturally noisier one).
+    """
+    records: dict[str, Any] = {}
+    for root in roots:
+        records.update(_root_records(root))
     return {"units": records, "roots": [str(root) for root in roots]}
 
 

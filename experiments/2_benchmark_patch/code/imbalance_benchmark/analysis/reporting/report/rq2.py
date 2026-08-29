@@ -53,10 +53,14 @@ def _open_units(
 
 
 def _recovery_cells(row: dict[str, Any] | None) -> dict[str, str]:
+    # The interval is a paired-patient bootstrap dispersion summary, not the
+    # permutation test's own interval; $p$ and Holm $p$ come from a different
+    # resampling scheme (block permutation), so the two can disagree on
+    # whether zero is covered even in the same row.
     return {
         "$R_M$": num(row.get("recovery") if row else None),
-        r"95\% CI": ci(row.get("recovery_ci") if row else None),
-        "$p$": pval(row.get("p_value") if row else None),
+        r"95\% CI (bootstrap)": ci(row.get("recovery_ci") if row else None),
+        "$p$ (permutation)": pval(row.get("p_value") if row else None),
         "Holm $p$": pval(row.get("adjusted_p_value") if row else None),
         "Status": (row or {}).get("status", "---").capitalize(),
     }
@@ -127,7 +131,9 @@ def _contrast_row(data: Dataset, unit: tuple[str, str], gate: str) -> dict[str, 
         "Gate": gate.capitalize(),
         "Dominant": SHORTAGE[record["dominant"]],
         "Contrast": num(contrast["effect"] if contrast else None, 4),
-        r"95\% CI": ci(contrast["ci"] if contrast else None, 4),
+        # Bootstrap dispersion summary, not the permutation test's own
+        # interval; see _recovery_cells.
+        r"95\% CI (bootstrap)": ci(contrast["ci"] if contrast else None, 4),
         "Holm $p$": pval(contrast.get("adjusted_p_value") if contrast else None),
         "Best recoverer": best,
         "Agrees": "---" if not matched else ("Yes" if best in matched else "No"),
@@ -202,7 +208,7 @@ def roster_recovery(datasets: list[Dataset]) -> str:
                         "Gate": gate.capitalize(),
                         "Method": METHOD.get(method, method),
                         "$R_M$": cells["$R_M$"],
-                        r"95\% CI": cells[r"95\% CI"],
+                        r"95\% CI (bootstrap)": cells[r"95\% CI (bootstrap)"],
                     }
                 )
     return body(pd.DataFrame(rows), longtable=True)

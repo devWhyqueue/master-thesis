@@ -154,6 +154,7 @@ def _apply_gates(
     ],
 ) -> None:
     """Propagate CE gates and add crossed patient-block permutation p-values."""
+    dataset = (config or {}).get("dataset", {}).get("name")
     lookup = {
         (entry["assignment"], entry["severity"], entry["gate"]): entry
         for entry in aggregate
@@ -164,9 +165,9 @@ def _apply_gates(
             False
             if entry.get("descriptive_only")
             else (
-                discrimination_gate(entry["effect"], entry["ci"])
+                discrimination_gate(entry["effect"], entry["ci"], dataset)
                 if entry["gate"] == "discrimination"
-                else calibration_gate(entry["effect"], entry["ci"])
+                else calibration_gate(entry["effect"], entry["ci"], dataset)
             )
         )
     for entry in aggregate:

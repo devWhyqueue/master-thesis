@@ -5,8 +5,8 @@ from typing import Any, cast
 import pandas as pd
 
 from imbalance_benchmark.analysis.inference.gates import (
-    CALIBRATION_THRESHOLD,
-    DISCRIMINATION_THRESHOLD,
+    CALIBRATION_THRESHOLDS,
+    DISCRIMINATION_THRESHOLDS,
     ci_excludes_zero,
 )
 from imbalance_benchmark.analysis.reporting.report.sources import (
@@ -120,10 +120,11 @@ def _gate_reason(row: dict[str, Any] | None, threshold: float) -> str:
 
 
 def _deficit_rows(
-    datasets: list[Dataset], gate: str, threshold: float, digits: int
+    datasets: list[Dataset], gate: str, thresholds: dict[str, float], digits: int
 ) -> list[dict[str, str]]:
     rows = []
     for data in datasets:
+        threshold = thresholds[data.freezes[0]["dataset_provenance"]["name"]]
         for unit in comparison_units(data):
             row = ce_row(data, unit, gate)
             rows.append(
@@ -141,7 +142,7 @@ def _deficit_rows(
 
 def discrimination_deficit(datasets: list[Dataset]) -> str:
     """Case-macro balanced-accuracy deficit and discrimination-gate outcome."""
-    rows = _deficit_rows(datasets, "discrimination", DISCRIMINATION_THRESHOLD, 4)
+    rows = _deficit_rows(datasets, "discrimination", DISCRIMINATION_THRESHOLDS, 4)
     frame = pd.DataFrame(rows).rename(columns={"Deficit": r"$D_{\mathrm{BA}}$"})
     return body(frame)
 
@@ -163,7 +164,7 @@ def _ece(data: Dataset, unit: tuple[str, str]) -> tuple[str, str]:
 
 def calibration_deficit(datasets: list[Dataset]) -> str:
     """Tail-group macro-NLL deficit, its gate, and secondary ECE descriptors."""
-    rows = _deficit_rows(datasets, "calibration", CALIBRATION_THRESHOLD, 3)
+    rows = _deficit_rows(datasets, "calibration", CALIBRATION_THRESHOLDS, 3)
     units = [(data, unit) for data in datasets for unit in comparison_units(data)]
     for row, (data, unit) in zip(rows, units, strict=True):
         row["ECE"], row[r"ECE 95\% CI"] = _ece(data, unit)
@@ -177,15 +178,16 @@ def _routing_row(data: Dataset, unit: tuple[str, str]) -> dict[str, str]:
         gate: ce_row(data, unit, gate) for gate in ("discrimination", "calibration")
     }
     opened = [name for name, row in gates.items() if row and row["gate_passed"]]
+    key = data.freezes[0]["dataset_provenance"]["name"]
     return {
         "Dataset": data.name,
         "Assignment": ASSIGNMENT[unit[0]],
         "Severity": CONDITION[unit[1]],
         "Discrimination": _gate_reason(
-            gates["discrimination"], DISCRIMINATION_THRESHOLD
+            gates["discrimination"], DISCRIMINATION_THRESHOLDS[key]
         ),
         "Probability quality": _gate_reason(
-            gates["calibration"], CALIBRATION_THRESHOLD
+            gates["calibration"], CALIBRATION_THRESHOLDS[key]
         ),
         "Routed to": ", ".join(opened).capitalize() if opened else "Neither",
     }

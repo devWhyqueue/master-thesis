@@ -129,6 +129,36 @@ def test_holm_marks_gated_out_as_not_tested():
         >= by_method["weighted_ce"]["p_value"]
     )
 
+def test_confirmatory_family_is_built_per_gate_not_pooled_across_gates():
+    """Opening a second gate must not shrink the first gate's family/power.
+
+    Regression for the published bug: BRACS pooled both gates into one
+    family of 68 tests, so two prevalence-weighted discrimination tests with
+    recovery above 0.92 failed adjustment purely because BRACS also opened
+    the calibration gate.
+    """
+    discrimination_only = [
+        {"method": "weighted_ce", "gate": "discrimination", "gate_passed": True, "p_value": 0.01},
+        {"method": "class_balanced_ce", "gate": "discrimination", "gate_passed": True, "p_value": 0.02},
+    ]
+    calibration = [
+        {"method": "weighted_ce", "gate": "calibration", "gate_passed": True, "p_value": 0.01},
+        {"method": "class_balanced_ce", "gate": "calibration", "gate_passed": True, "p_value": 0.02},
+        {"method": "independent_support_ce", "gate": "calibration", "gate_passed": True, "p_value": 0.03},
+    ]
+
+    single_gate = {c["method"]: c for c in apply_holm(discrimination_only)}
+    both_gates = {
+        (c["method"], c["gate"]): c
+        for c in apply_holm([*discrimination_only, *calibration])
+    }
+
+    for method in ("weighted_ce", "class_balanced_ce"):
+        assert both_gates[(method, "discrimination")]["adjusted_p_value"] == pytest.approx(
+            single_gate[method]["adjusted_p_value"]
+        )
+
+
 def test_kish_preflight_is_descriptive_when_the_low_percentile_is_below_five() -> None:
     # Concentration mild enough that neither the dominance nor the contributing
     # unit criterion fires, so only the Kish floor can designate the cell.

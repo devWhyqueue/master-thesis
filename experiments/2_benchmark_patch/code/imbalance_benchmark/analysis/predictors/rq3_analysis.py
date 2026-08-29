@@ -92,6 +92,7 @@ def _cells(
                 "assignment": row["assignment"],
                 "severity": row["severity"],
                 "gate": row["gate"],
+                "n_classes": len(freeze.get("class_names", [])),
                 "rho": scores["rho"],
                 "support_difficulty_alignment": scores["support_difficulty_alignment"],
                 "independent_shortage": scores["independent_shortage"],
