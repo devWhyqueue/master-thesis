@@ -30,15 +30,15 @@ __all__ = [
 # dataset to the noisiest one (BRACS) and under-gate the stable ones.
 DISCRIMINATION_THRESHOLDS: dict[str, float] = {
     "bracs": 0.01443,
-    "camelyon16": 0.01443,
-    "panda": 0.01443,
-    "tcga_ut": 0.01443,
+    "camelyon16": 0.01,
+    "panda": 0.01,
+    "tcga_ut": 0.01,
 }
 CALIBRATION_THRESHOLDS: dict[str, float] = {
-    "bracs": 0.18237,
+    "bracs": 0.14782,
     "camelyon16": 0.18237,
-    "panda": 0.18237,
-    "tcga_ut": 0.18237,
+    "panda": 0.07185,
+    "tcga_ut": 0.06095,
 }
 
 
