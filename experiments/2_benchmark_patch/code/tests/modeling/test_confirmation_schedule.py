@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 from imbalance_benchmark.modeling.context import (
+    CONTROLLED_CONDITIONS,
     MATCHED_BETA_METHOD,
     NATURAL_ANCHOR_METHODS,
     roster_for_regime,
@@ -59,20 +60,22 @@ def test_natural_units_cover_one_condition_across_every_split_method_seed() -> N
     assert seen == expected
 
 
-def test_controlled_units_cover_three_conditions_across_every_split_method_seed() -> (
+def test_controlled_units_cover_every_condition_across_every_split_method_seed() -> (
     None
 ):
     units = confirm_units_for_group("controlled", is_mil=True)
     methods = confirm_group_methods(True, "balanced")
 
-    assert len(units) == 3 * 3 * len(methods) * CONFIRMATION_SEED_COUNT
-    assert {u.condition for u in units} == {"balanced", "moderate", "severe"}
+    assert len(units) == 3 * len(CONTROLLED_CONDITIONS) * len(methods) * (
+        CONFIRMATION_SEED_COUNT
+    )
+    assert {u.condition for u in units} == set(CONTROLLED_CONDITIONS)
     seen = {(u.split_index, u.condition, u.method, u.seed_index) for u in units}
     assert len(seen) == len(units)
     expected = {
         (split, condition, method, seed)
         for split in range(3)
-        for condition in ("balanced", "moderate", "severe")
+        for condition in CONTROLLED_CONDITIONS
         for method in methods
         for seed in range(CONFIRMATION_SEED_COUNT)
     }

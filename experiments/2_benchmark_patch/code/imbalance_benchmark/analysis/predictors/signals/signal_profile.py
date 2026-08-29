@@ -62,7 +62,7 @@ def _build_comparisons(
     )
     comparisons = []
     for assignment in tail_assignments:
-        for severity in ("moderate", "severe"):
+        for severity in freeze["assignment_conditions"][assignment]:
             condition = freeze["assignment_conditions"][assignment][severity]
             shortages = _covariates(paths, is_mil, condition, reference, freeze)
             comparisons.append(

@@ -120,15 +120,15 @@ def _condition_descriptives(
 def _all_conditions(
     freeze: dict[str, Any], balanced: dict[str, Any], tail_assignments: dict[str, Any]
 ) -> dict[str, dict[str, Any]]:
-    """Every condition (balanced plus each assignment's moderate/severe)."""
+    """Every condition (balanced plus each assignment's realized conditions)."""
     return {
         "balanced": balanced,
         **{
-            f"{assignment}_{severity}": freeze["assignment_conditions"][assignment][
-                severity
-            ]
+            f"{assignment}_{severity}": condition
             for assignment in tail_assignments
-            for severity in ("moderate", "severe")
+            for severity, condition in freeze["assignment_conditions"][
+                assignment
+            ].items()
         },
     }
 

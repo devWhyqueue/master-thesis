@@ -37,6 +37,8 @@ CONDITION = {
     "balanced": "Balanced",
     "moderate": "Moderate",
     "severe": "Severe",
+    "balanced_narrow": "Balanced (narrow)",
+    "severe_narrow": "Severe (narrow)",
 }
 SIGNAL = {
     "weighted_ce": "Prevalence",
@@ -198,7 +200,7 @@ def _scalar_comparisons(root: Path) -> list[dict[str, Any]]:
 
 
 def _selections(root: Path) -> list[dict[str, dict[str, Any]]]:
-    conditions = ("natural", "balanced", "moderate", "severe")
+    conditions = tuple(CONDITION)  # every condition name this report knows how to label
     records = []
     for index in range(3):
         data = root / f"split={index}" / "data"

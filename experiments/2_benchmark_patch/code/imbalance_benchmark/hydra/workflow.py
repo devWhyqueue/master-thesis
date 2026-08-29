@@ -14,7 +14,7 @@ from imbalance_benchmark.hydra.job_resources import resources_for
 from imbalance_benchmark.hydra.job_resources import stage_jobs
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.resume import ResumePlan
-from imbalance_benchmark.modeling.context import CONDITIONS
+from imbalance_benchmark.modeling.context import CONDITIONS, CONTROLLED_CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     bundled_array_size,
     bundled_observation_array_size,
@@ -79,10 +79,9 @@ def build_workflow(
     """Build the benchmark DAG, or its test-partition synthetic smoke variant.
 
     Tuning's adaptive search rounds submit themselves once a prior round
-    completes (see ``tune-decide``), so their true finish time is unknown at
-    submit time - confirm and analyze can never be statically chained after
-    them. ``confirm_only`` builds just that later stage, submitted
-    separately once every condition's tuning lock is resolved.
+    completes (see ``tune-decide``), so confirm/analyze can never be
+    statically chained after them. ``confirm_only`` builds just that later
+    stage, submitted separately once every condition's tuning lock resolves.
     """
     if smoke:
         return smoke_workflow(config)
@@ -164,7 +163,8 @@ def _tuning_jobs(
                 "tune",
             ),
             array_size=bundled_array_size(
-                3 * candidate_array_size(controlled_methods), controlled_shards
+                len(CONTROLLED_CONDITIONS) * candidate_array_size(controlled_methods),
+                controlled_shards,
             ),
             array_indices=plan.controlled_indices if plan else (),
         )

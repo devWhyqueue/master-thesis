@@ -23,6 +23,7 @@ from imbalance_benchmark.modeling.context import (
     CONDITIONS,
     Regime,
     roster_for_condition,
+    scoped_assignments,
 )
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
@@ -160,7 +161,8 @@ def _combined_selections(
     }
     cost_records: list[dict[str, int]] = []
     for condition in _conditions(args):
-        scoped = ("native",) if condition in {"natural", "balanced"} else assignments
+        if not (scoped := scoped_assignments(condition, freeze, assignments)):
+            continue  # not constructed for this dataset (plans/03,04)
         selected = tune_across_splits(
             roster_for_condition(regime.is_mil, condition),
             combined_scopes(scopes, condition, scoped, cost_records),

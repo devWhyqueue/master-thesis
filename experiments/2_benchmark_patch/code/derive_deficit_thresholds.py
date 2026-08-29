@@ -43,7 +43,6 @@ CONFIGS = (
 # prespecified minimum-material balanced-accuracy change (PLAN_3 §2).
 STABILITY_FLOOR = 0.01
 CALIBRATION_ANCHOR = 0.05  # nats; kept unless the noise floor exceeds half of it
-SEVERITIES = ("moderate", "severe")
 
 
 @dataclass
@@ -129,7 +128,7 @@ def _split_dispersion(
             _ba_sigma(balanced, ctx, n_classes, n_seeds),
         )
     ]
-    for severity in SEVERITIES:
+    for severity in freeze.get("assignment_conditions", {}).get("native", {}):
         tail_classes = _tail_classes(
             freeze, balanced["class_names"], "native", severity
         )

@@ -1,9 +1,7 @@
 from __future__ import annotations
 import argparse
-import json
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 import pandas as pd
@@ -28,33 +26,23 @@ from imbalance_benchmark.manifest.construction_helpers import (
     required_counts_by_class,
     write_natural_condition,
 )
+from imbalance_benchmark.manifest.pilot.constraints import (  # noqa: F401
+    PilotConstraints,
+    _pilot_constraints,
+)
+from imbalance_benchmark.manifest.shared_total.narrowing import (
+    NarrowingContext,
+    add_narrowed_conditions,
+)
 from imbalance_benchmark.manifest.statistics import evidence_pool_hash
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class PilotConstraints:
-    """Allocation and independent-unit floors frozen from the pilot."""
-
-    patch_floor: int
-    independent_floor: int
-
-
-def _pilot_constraints(pilot_report_path: Path) -> PilotConstraints:
-    """Freeze the pilot's independent-unit floor as both the unit and count floor.
-
-    The per-patient quota is the scarcest class's *minimum* per-patient
-    inventory at the largest pilot level, so one patient holding a single
-    patch could move the frozen floor - and every condition's achievable
-    severity - by an order of magnitude, making splits incomparable. Per-class
-    independent support is instead guaranteed directly by ``independent_floor``
-    in pool designation plus the contribution caps.
-    """
-    if not pilot_report_path.exists():
-        return PilotConstraints(10, 10)
-    definitive_floor = json.loads(pilot_report_path.read_text())["definitive_floor"]
-    return PilotConstraints(definitive_floor, definitive_floor)
+def _max_required_counts(
+    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
+) -> dict[str, int]:
+    return {c: max(v) for c, v in required_counts_by_class(allocations).items()}
 
 
 def _build_conditions(
@@ -70,6 +58,8 @@ def _build_conditions(
     independent_floor: int | None = None,
     fixed_pools: dict[str, pd.DataFrame] | None = None,
     max_required_counts: Mapping[str, int] | None = None,
+    narrowed_classes: list[str] | None = None,
+    narrowed_ratio: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Construct cap-compliant controlled manifests from one fixed eligible pool."""
     counts = class_support_counts(train_df, is_mil)
@@ -100,10 +90,7 @@ def _build_conditions(
         if not is_mil
         else {}
     )
-    max_required = max_required_counts or {
-        class_name: max(counts)
-        for class_name, counts in required_counts_by_class(local_allocations).items()
-    }
+    max_required = max_required_counts or _max_required_counts(local_allocations)
     pool_df = (
         pd.concat(fixed_pools.values(), ignore_index=True) if fixed_pools else train_df
     )
@@ -118,7 +105,6 @@ def _build_conditions(
                     cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
                 ),
                 allocated[idx],
-                # Same explicit patient/slide pool per condition; hash records it.
                 seed=class_construction_seed(seed, cls),
             )
             for idx, cls in enumerate(classes)
@@ -136,7 +122,7 @@ def _build_conditions(
                 "name": name,
                 "allocated": dict(zip(classes, allocated)),
                 "rows": rows,
-                "pool": train_df,
+                "pool": pool_df,  # designated pool, narrowed for a narrowed class (plans/04)
                 "is_mil": is_mil,
                 "seed": seed,
                 "data_dir": data_dir,
@@ -144,6 +130,8 @@ def _build_conditions(
                 "pool_hash": pool_hash,
                 "available": available,
                 "minimum": min_support,
+                "narrowed_classes": narrowed_classes,
+                "narrowed_ratio": narrowed_ratio,
             }
         )
         logger.info(
@@ -170,9 +158,7 @@ def _freeze_meta(
     construction_seed = derive_seed(args.seed, "definitive_construction")
     config = load_config(args.config)
     if assignments is None:
-        raise ValueError(
-            "Difficulty-aligned assignments must be supplied from pilot evidence"
-        )
+        raise ValueError("Difficulty-aligned assignments required from pilot evidence")
     full_allocations = assignment_allocations(
         train_df, assignments, shared_t, min_support
     )
@@ -183,14 +169,7 @@ def _freeze_meta(
         if not is_mil
         else None
     )
-    max_required = (
-        {
-            class_name: max(counts)
-            for class_name, counts in required_counts_by_class(full_allocations).items()
-        }
-        if not is_mil
-        else None
-    )
+    max_required = _max_required_counts(full_allocations) if not is_mil else None
     assignment_conditions = {
         assignment: _build_conditions(
             train_df,
@@ -208,6 +187,25 @@ def _freeze_meta(
         )
         for assignment, order in assignments.items()
     }
+    if not is_mil:
+        narrowing_ctx = NarrowingContext(
+            train_df,
+            assignments,
+            full_allocations,
+            shared_t,
+            min_support,
+            construction_seed,
+            paths["data"],
+            independent_floor,
+            shared_pools or {},
+            max_required,
+        )
+        add_narrowed_conditions(
+            _build_conditions,
+            assignment_conditions,
+            narrowing_ctx,
+            config["dataset"]["name"],
+        )
     native_conditions = _build_conditions(
         train_df,
         classes,

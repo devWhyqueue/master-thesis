@@ -102,7 +102,15 @@ def _parser() -> argparse.ArgumentParser:
     materialize_pack.add_argument("--shard-index", type=int, required=True)
     for command in ("tune", "confirm"):
         sub.choices[command].add_argument(
-            "--condition", choices=("natural", "balanced", "moderate", "severe")
+            "--condition",
+            choices=(
+                "natural",
+                "balanced",
+                "moderate",
+                "severe",
+                "balanced_narrow",
+                "severe_narrow",
+            ),
         )
     shard = sub.choices["tune-shard"]
     shard.add_argument("--phase", choices=("base", "dependent"), required=True)
@@ -115,12 +123,28 @@ def _parser() -> argparse.ArgumentParser:
     shard.add_argument("--bundle-by-observation", action="store_true")
     shard.add_argument("--round", type=int, default=0)
     shard.add_argument(
-        "--condition", choices=("natural", "balanced", "moderate", "severe")
+        "--condition",
+        choices=(
+            "natural",
+            "balanced",
+            "moderate",
+            "severe",
+            "balanced_narrow",
+            "severe_narrow",
+        ),
     )
     wave = sub.choices["tune-wave"]
     wave.add_argument("--phase", choices=("base", "dependent"), default="base")
     wave.add_argument(
-        "--condition", choices=("natural", "balanced", "moderate", "severe")
+        "--condition",
+        choices=(
+            "natural",
+            "balanced",
+            "moderate",
+            "severe",
+            "balanced_narrow",
+            "severe_narrow",
+        ),
     )
     wave.add_argument("--group", choices=("controlled",))
     wave.add_argument("--round", type=int, default=0)
@@ -128,13 +152,28 @@ def _parser() -> argparse.ArgumentParser:
     reduce = sub.choices["tune-reduce"]
     reduce.add_argument("--phase", choices=("base", "final"), required=True)
     reduce.add_argument(
-        "--condition", choices=("natural", "balanced", "moderate", "severe")
+        "--condition",
+        choices=(
+            "natural",
+            "balanced",
+            "moderate",
+            "severe",
+            "balanced_narrow",
+            "severe_narrow",
+        ),
     )
     decide = sub.add_parser("tune-decide")
     decide.add_argument("--phase", choices=("base", "dependent"), required=True)
     decide.add_argument(
         "--condition",
-        choices=("natural", "balanced", "moderate", "severe"),
+        choices=(
+            "natural",
+            "balanced",
+            "moderate",
+            "severe",
+            "balanced_narrow",
+            "severe_narrow",
+        ),
         required=True,
     )
     decide.add_argument("--round", type=int, default=0)

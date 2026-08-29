@@ -7,6 +7,7 @@ from typing import Any
 
 from imbalance_benchmark.common import compute_sha256, ensure_dirs, split_paths
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
+from imbalance_benchmark.modeling.context import CONTROLLED_CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     load_candidate,
 )
@@ -84,7 +85,9 @@ def _pending_controlled(
     accepted: list[set[str]],
 ) -> tuple[int, ...]:
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    total = 3 * candidate_array_size(phase_methods(is_mil, "base", "balanced"))
+    total = len(CONTROLLED_CONDITIONS) * candidate_array_size(
+        phase_methods(is_mil, "base", "balanced")
+    )
     return tuple(
         index
         for index in range(bundled_array_size(total, bundle_size))

@@ -70,6 +70,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "tune-decide-base-balanced",
         "tune-decide-base-moderate",
         "tune-decide-base-severe",
+        "tune-decide-base-balanced_narrow",
+        "tune-decide-base-severe_narrow",
     ]
     assert jobs[6].dependencies == ("tune-base-natural", "tune-base-controlled")
     assert jobs[7].dependencies == ("tune-base-reduce",)
@@ -81,8 +83,9 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
     assert "--shards-per-task 2" in jobs[4].command
     assert "--bundle-by-observation" in jobs[4].command
     assert jobs[4].memory == "32G"
-    # Patch roster of 15 methods (report tab:roster) crossed with each method's grid.
-    assert jobs[5].array_size == 294
+    # Patch roster of 15 methods (report tab:roster) crossed with each method's grid,
+    # times 5 controlled conditions (plans/03,04), not the pre-narrow-arm 3.
+    assert jobs[5].array_size == 490
     natural_script = render_sbatch(jobs[4], _config(), "config.yaml")
     assert "#SBATCH --mem=32G" in natural_script
 
@@ -106,7 +109,8 @@ def test_dependent_round_zero_jobs_cover_the_controlled_conditions_only() -> Non
 
     jobs = dependent_round_zero_jobs(_config(), is_mil=False)
     assert [job.name for job in jobs] == ["tune-dependent-controlled"]
-    assert jobs[0].array_size == 8
+    # 5 controlled conditions (plans/03,04), not the pre-narrow-arm 3.
+    assert jobs[0].array_size == 13
 
 
 def test_confirm_only_builds_just_confirm_and_analyze() -> None:
@@ -135,7 +139,8 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     # arm = 15; 3 splits x 5 seeds each, bundled 5 per task. Natural fits ce
     # alone, so it keeps one method.
     assert confirm_natural.array_size == 3 * 1
-    assert confirm_controlled.array_size == 3 * 3 * 15
+    # 5 controlled conditions (plans/03,04), not the pre-narrow-arm 3.
+    assert confirm_controlled.array_size == 3 * 5 * 15
     assert confirm_natural.partition == "gpu-5h"
     assert confirm_controlled.partition == "gpu-2h"
     assert confirm_natural.partition != "gpu-2d"
@@ -144,7 +149,7 @@ def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None
     natural_script = render_sbatch(confirm_natural, _config(), "config.yaml")
     controlled_script = render_sbatch(confirm_controlled, _config(), "config.yaml")
     assert f"#SBATCH --array=0-{3 * 1 - 1}%8" in natural_script
-    assert f"#SBATCH --array=0-{3 * 3 * 15 - 1}%8" in controlled_script
+    assert f"#SBATCH --array=0-{3 * 5 * 15 - 1}%8" in controlled_script
     assert "confirm-shard --group natural" in natural_script
     assert "confirm-shard --group controlled" in controlled_script
     assert '--shard-index "$SLURM_ARRAY_TASK_ID"' in natural_script
@@ -161,7 +166,7 @@ def test_submit_links_actual_job_ids() -> None:
 
     submitted = submit_workflow(_config(), submit=fake_submit)
     assert submitted["prepare"] == "1"
-    assert submitted["tune-decide-base-severe"] == str(len(submitted_scripts))
+    assert submitted["tune-decide-base-severe_narrow"] == str(len(submitted_scripts))
     assert "#SBATCH --dependency=afterok:5:6" in submitted_scripts[6]
     assert "#SBATCH --dependency=afterok:7" in submitted_scripts[7]
 

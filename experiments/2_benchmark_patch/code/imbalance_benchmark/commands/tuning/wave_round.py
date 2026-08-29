@@ -20,6 +20,7 @@ from imbalance_benchmark.hydra.job_resources import build_job
 from imbalance_benchmark.hydra.queue import DEFAULT_QUEUE_CAP, _squeue_count
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.workflow import _submit_script
+from imbalance_benchmark.modeling.context import CONTROLLED_CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     expected_observations,
     load_candidate,
@@ -235,7 +236,7 @@ def _submit_decide(
 
 
 def _submit_group_decides(config: dict[str, Any], config_path: str) -> None:
-    for condition in ("balanced", "moderate", "severe"):
+    for condition in CONTROLLED_CONDITIONS:
         _submit_decide(
             config,
             config_path,

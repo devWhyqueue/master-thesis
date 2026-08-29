@@ -51,11 +51,31 @@ def _deprived_classes(
     ]
 
 
+def _independent_deprived_classes(
+    balanced: dict[str, Any], imbalanced: dict[str, Any], is_mil: bool
+) -> list[str]:
+    """Classes whose realized independent support fell below the balanced reference.
+
+    Deliberately distinct from ``_deprived_classes``: a narrowed condition
+    (plans/04-crossed-condition-family.md) can hold nominal rho at 1 - so its
+    nominal deprivation set is empty - while still losing independent
+    support. Reading the nominal set here would reproduce defect A one level
+    down, inside the very cell built to fix it.
+    """
+    key = "n_slides" if is_mil else "n_patients"
+    balanced_stats = balanced["contribution_stats"]
+    return [
+        name
+        for name, stats in imbalanced["contribution_stats"].items()
+        if stats[key] < balanced_stats[name][key]
+    ]
+
+
 def _independent_shortage(
     balanced: dict[str, Any], imbalanced: dict[str, Any], is_mil: bool
 ) -> float:
-    """Mean log loss of independent support across nominally deprived classes."""
-    names = _deprived_classes(balanced, imbalanced)
+    """Mean log loss of independent support across independently deprived classes."""
+    names = _independent_deprived_classes(balanced, imbalanced, is_mil)
     if not names:
         return 0.0
     key = "n_slides" if is_mil else "n_patients"
@@ -78,9 +98,18 @@ def _diversity_shortage(
     balanced_volumes: dict[int, float],
     imbalanced_volumes: dict[int, float],
     class_names: list[str],
+    is_mil: bool = False,
 ) -> float:
-    """Mean log semantic-volume loss across nominally deprived classes."""
-    names = _deprived_classes(balanced, imbalanced)
+    """Mean log semantic-volume loss across nominally *or* independently deprived classes.
+
+    The union, not just the nominal set (plans/04-crossed-condition-family.md):
+    a narrowed condition deprives diversity through the independent-support
+    axis even where nominal rho stays at 1.
+    """
+    names = sorted(
+        {*_deprived_classes(balanced, imbalanced)}
+        | {*_independent_deprived_classes(balanced, imbalanced, is_mil)}
+    )
     if not names:
         return 0.0
     ratios = [
@@ -156,5 +185,6 @@ def _covariates(
             reference["diversity"],
             condition_diversity,
             names,
+            is_mil,
         ),
     }

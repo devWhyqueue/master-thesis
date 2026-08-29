@@ -210,7 +210,7 @@ def _recovery_steps(
         (a, baseline, s)
         for a, baseline in baselines.items()
         if baseline is not None
-        for s in ("moderate", "severe")
+        for s in freeze.get("assignment_conditions", {}).get(a, {})
     ]
 
 

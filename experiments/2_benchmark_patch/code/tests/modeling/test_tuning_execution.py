@@ -25,6 +25,7 @@ FINGERPRINT = ["fp"]
 FREEZE = {
     "seed_roles": {"tuning_initialization_0": 11},
     "class_names": ["a", "b", "c", "d", "e", "f", "g"],
+    "assignment_conditions": {"native": {"moderate": {}}},
 }
 
 

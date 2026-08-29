@@ -195,14 +195,15 @@ def _tail_classes(
     allocation: with class-specific caps the two allocations can rank classes
     differently and yield different tail groups.
     """
-    allocated = (
-        freeze.get("assignment_conditions", {})
-        .get(assignment, {})
-        .get(severity, {})
-        .get("allocated_counts", {})
+    condition = (
+        freeze.get("assignment_conditions", {}).get(assignment, {}).get(severity, {})
     )
+    allocated = condition.get("allocated_counts", {})
     if not allocated:
         return []
+    if narrowed := condition.get("narrowed_classes"):
+        # Tied nominal allocation defeats assign_tiers; narrowed set is the tail (plans/04).
+        return [i for i, name in enumerate(class_names) if name in narrowed]
     tiers = assign_tiers(
         class_names,
         allocated,

@@ -21,6 +21,7 @@ from imbalance_benchmark.modeling.context import (
     MATCHED_BETA_METHOD,
     matched_beta_config,
     roster_for_condition,
+    scoped_assignments,
 )
 from imbalance_benchmark.modeling.workflows.confirmation import (
     RunContext,
@@ -150,13 +151,10 @@ def _run_confirm_unit(
     unit: ConfirmUnit,
     best_configs: dict[str, Any],
     run_data: dict[str, Any],
-    assignments: tuple[str, ...],
+    scoped: tuple[str, ...],
 ) -> None:
     """Fit one scheduled unit for every tail assignment scoped to its condition."""
-    scoped_assignments = (
-        ("unassigned",) if unit.condition in {"natural", "balanced"} else assignments
-    )
-    for assignment in scoped_assignments:
+    for assignment in scoped:
         selected_assignment = "native" if assignment == "unassigned" else assignment
         selected = best_configs.get(selected_assignment, {}).get(unit.condition, {})
         if _seed_already_done(
@@ -182,6 +180,22 @@ def _group_bundle_by_split(units: list[ConfirmUnit]) -> dict[int, list[ConfirmUn
     return grouped
 
 
+def _run_split_bundle(paths: dict[str, Any], split_units: list[ConfirmUnit]) -> None:
+    """Fit every scheduled unit for one split, skipping conditions this dataset never built."""
+    run_data, freeze = _confirm_run_data(paths)
+    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+    selections: dict[str, dict[str, Any]] = {}
+    for unit in split_units:
+        scoped = scoped_assignments(unit.condition, freeze, assignments, "unassigned")
+        if not scoped:
+            continue  # not constructed for this dataset (plans/03,04)
+        if unit.condition not in selections:
+            selections[unit.condition] = _load_condition_selections(
+                paths, unit.condition
+            )
+        _run_confirm_unit(unit, selections[unit.condition], run_data, scoped)
+
+
 def cmd_confirm_shard(args: argparse.Namespace) -> None:
     """Run one resumable bundle of confirmation units for one partition group.
 
@@ -199,12 +213,4 @@ def cmd_confirm_shard(args: argparse.Namespace) -> None:
         paths = split_paths(base_paths, split_index)
         if _is_excluded(paths):
             continue
-        run_data, freeze = _confirm_run_data(paths)
-        assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-        selections: dict[str, dict[str, Any]] = {}
-        for unit in split_units:
-            if unit.condition not in selections:
-                selections[unit.condition] = _load_condition_selections(
-                    paths, unit.condition
-                )
-            _run_confirm_unit(unit, selections[unit.condition], run_data, assignments)
+        _run_split_bundle(paths, split_units)

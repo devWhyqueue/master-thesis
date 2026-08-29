@@ -31,6 +31,7 @@ from imbalance_benchmark.modeling.context import (
     MATCHED_BETA_METHOD,
     matched_beta_config,
     roster_for_condition,
+    scoped_assignments,
 )
 from imbalance_benchmark.modeling.training import build_evaluation_loader
 
@@ -197,11 +198,11 @@ def _confirm_split(args: argparse.Namespace, paths: dict[str, Any]) -> None:
     conditions = (args.condition,) if getattr(args, "condition", None) else CONDITIONS
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for cond in conditions:
+        scoped = scoped_assignments(cond, freeze, assignments, "unassigned")
+        if not scoped:
+            continue  # not constructed for this dataset (plans/03,04)
         methods = roster_for_condition(run_data["is_mil"], cond)
-        scoped_assignments = (
-            ("unassigned",) if cond in {"natural", "balanced"} else assignments
-        )
-        for assignment in scoped_assignments:
+        for assignment in scoped:
             run = RunContext(**run_data, assignment=assignment)
             selected_assignment = "native" if assignment == "unassigned" else assignment
             selected = best_configs.get(selected_assignment, {}).get(cond, {})

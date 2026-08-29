@@ -8,6 +8,10 @@ import torch
 
 from imbalance_benchmark.datasets.data import TrainDataset
 from imbalance_benchmark.modeling.models import build_model
+from imbalance_benchmark.modeling.workflows.condition_scope import (  # noqa: F401
+    controlled_assignments_for_condition,
+    scoped_assignments,
+)
 
 __all__ = [
     "INPUT_DIM",
@@ -27,6 +31,8 @@ __all__ = [
     "Regime",
     "roster_for_regime",
     "roster_for_condition",
+    "controlled_assignments_for_condition",
+    "scoped_assignments",
     "group_conditions",
     "get_grid_configs",
     "model_kwargs",
@@ -42,8 +48,15 @@ MIL_HIDDEN_DIM = 256
 DROPOUT = 0.1
 # Update budget U = REFERENCE_PASSES * ceil(T / B) (report §"Model training and selection").
 REFERENCE_PASSES = 30
-CONDITIONS = ("natural", "balanced", "moderate", "severe")
-CONTROLLED_CONDITIONS = ("balanced", "moderate", "severe")
+# Crossed-condition-family universe (plans/03,04); absent narrowed = no pending work.
+CONTROLLED_CONDITIONS = (
+    "balanced",
+    "moderate",
+    "severe",
+    "balanced_narrow",
+    "severe_narrow",
+)
+CONDITIONS = ("natural", *CONTROLLED_CONDITIONS)
 
 # The natural anchor is descriptive and never enters the imbalance deficit or
 # recovery estimands (report §"From imbalance deficit to mitigation recovery"),
@@ -65,11 +78,9 @@ GRIDS: dict[str, list[float] | list[int]] = {
     "oko": [1, 2, 4, 8],
     "sc_mil": [0.05, 0.1, 0.5, 1.0],
     "mde": [0.0, 0.1, 0.25, 0.5],
-    # E_c(beta) saturation points 1/(1-beta) in {10, 100, 1000, 10000}, matched to
-    # n_c's typical range (report methods §sec:cb-ce).
+    # E_c(beta) saturation points 1/(1-beta) in {10,100,1000,10000}, matched to n_c (§sec:cb-ce).
     "class_balanced_ce": [0.9, 0.99, 0.999, 0.9999],
-    # Saturation points {5, 20, 100, 1000}, scaled down to G_c's observed range
-    # (~20-5000 across the four patch datasets; report methods §sec:isw-ce).
+    # Saturation points {5,20,100,1000}, scaled to G_c's ~20-5000 range (§sec:isw-ce).
     "independent_support_ce": [0.8, 0.95, 0.99, 0.999],
     # Matches weighted_ce's tau grid so the two are directly comparable.
     "pilot_difficulty_ce": [0.25, 0.5, 0.75, 1.0],
@@ -101,11 +112,9 @@ SHARED_METHODS = (
     "pilot_difficulty_ce",
 )
 
-# Confirm-only diagnostic arm (report §sec:isw-ce matched-beta comparison): reuses
-# independent_support_ce's weighting at class_balanced_ce's tuned beta, isolating the
-# counting-unit effect (G_c vs n_c) from the saturation-scale choice. Not tuned itself
-# and deliberately outside SHARED_METHODS/PATCH_ONLY_METHODS/roster_for_regime, so
-# tuning, completeness, and recovery machinery never expect it as a roster member.
+# Confirm-only diagnostic arm (report §sec:isw-ce): reuses independent_support_ce's
+# weighting at class_balanced_ce's tuned beta, isolating G_c vs n_c from the
+# saturation-scale choice. Not tuned, and deliberately outside every roster.
 MATCHED_BETA_METHOD = "independent_support_ce_matched_beta"
 
 
@@ -125,9 +134,8 @@ def roster_for_regime(is_mil: bool) -> tuple[str, ...]:
 def roster_for_condition(is_mil: bool, condition: str) -> tuple[str, ...]:
     """Return the methods fitted in one training condition.
 
-    Mitigation is compared only against a size-matched balanced reference, so
-    the full roster applies to the controlled conditions alone; the natural
-    anchor fits ``NATURAL_ANCHOR_METHODS``.
+    Mitigation is compared only against a size-matched balanced reference:
+    the full roster applies to controlled conditions; natural fits ``NATURAL_ANCHOR_METHODS``.
     """
     if condition == "natural":
         return NATURAL_ANCHOR_METHODS
@@ -149,10 +157,10 @@ def get_grid_configs(
     lr_window: list[float] | None = None,
     strength_window: list[float] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return the method's candidates for one active search window (default: frozen).
+    """Return the method's candidates for one active window (default: frozen).
 
-    CE/cRT sweep only ``lr_window``; post-hoc adjustment sweeps only its taus;
-    other methods cross ``strength_window`` with ``lr_window``, capping OKO by K-1.
+    CE/cRT sweep only ``lr_window``; post-hoc sweeps only its taus; others
+    cross ``strength_window`` with ``lr_window``, capping OKO by K-1.
     """
     lr_values = lr_window if lr_window is not None else LEARNING_RATE_GRID
     if method in NO_STRENGTH_GRID_METHODS:
@@ -189,8 +197,7 @@ class Regime:
         default_factory=dict, kw_only=True
     )
     update_budgets: dict[str, int] = field(default_factory=dict, kw_only=True)
-    # Frozen pilot difficulty evidence, class-name keyed (manifest_freeze.json
-    # difficulty_evidence.difficulty); consumed by pilot_difficulty_ce.
+    # Frozen difficulty evidence, class-name keyed; consumed by pilot_difficulty_ce.
     difficulty: dict[str, float] = field(default_factory=dict, kw_only=True)
 
 

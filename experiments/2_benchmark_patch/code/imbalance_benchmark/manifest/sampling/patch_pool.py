@@ -15,6 +15,13 @@ from imbalance_benchmark.manifest.sampling.patch import (
 
 logger = logging.getLogger(__name__)
 
+# _contribution_cap (patch.py) caps any single patient at 10% and any slide at
+# 5% of a class's allocated patches, so any allocation already requires at
+# least 10 patients and 20 slides. These floors and those caps are the same
+# constraint written twice - do not weaken either without the other.
+MIN_POOL_PATIENTS = 10
+MIN_POOL_SLIDES = 20
+
 
 def _pool_patch_count(slide_sizes: pd.Series, slides: list[str]) -> int:
     """Patches covered by a slide selection, without rescanning the frame."""
@@ -28,7 +35,7 @@ def _pool_is_ready(
     maximum_patches: int | None,
 ) -> bool:
     """Whether a hierarchy prefix meets fixed-pool diversity and capacity."""
-    if len(patients) < 10 or len(slides) < 20:
+    if len(patients) < MIN_POOL_PATIENTS or len(slides) < MIN_POOL_SLIDES:
         return False
     return maximum_patches is None or (
         _pool_patch_count(slide_sizes, slides) >= maximum_patches
@@ -107,8 +114,15 @@ def _expand_pool(
     required_counts: tuple[int, ...],
     max_pool_units: int | None,
     seed: int,
+    max_independent_units: int | None = None,
 ) -> None:
-    """Expand sel_p/sel_s breadth-first until the pool is ready or resources are exhausted."""
+    """Expand sel_p/sel_s breadth-first until the pool is ready or resources are exhausted.
+
+    ``max_independent_units`` caps only the new-patient branch: breadth-first
+    order already prefers a fresh slide from a retained patient over adding a
+    new one, so capping patients makes the pool grow *within* the retained set
+    until it holds the required patch count, or raise if it cannot.
+    """
     pats, hier = pool_hierarchy
     maximum = max(required_counts, default=None)
     slide_sizes = df["slide_id"].value_counts()
@@ -133,6 +147,8 @@ def _expand_pool(
         if patient is not None:
             sel_s.append(remaining[patient].pop(0))
             continue
+        if max_independent_units is not None and len(sel_p) >= max_independent_units:
+            break
         if patient_index >= len(pats):
             break
         patient = pats[patient_index]
@@ -149,6 +165,36 @@ def _expand_pool(
         )
 
 
+def _validate_independent_units(
+    min_independent_units: int, max_independent_units: int | None
+) -> None:
+    if min_independent_units < MIN_POOL_PATIENTS:
+        raise ValueError("Patch conditions need at least 10 independent patients")
+    if max_independent_units is not None and max_independent_units < max(
+        min_independent_units, MIN_POOL_PATIENTS
+    ):
+        raise ValueError(
+            "max_independent_units cannot narrow below the independent-patient floor"
+        )
+
+
+def _designate_floor(
+    df: pd.DataFrame,
+    seed: int,
+    min_independent_units: int,
+    max_independent_units: int | None,
+) -> tuple[list[str], dict, list[str], list[str], dict]:
+    """Validate, shuffle, and take the first ``min_independent_units`` patients as the floor."""
+    _validate_independent_units(min_independent_units, max_independent_units)
+    pats, hier = _build_patch_hierarchy(df, np.random.default_rng(seed))
+    if len(pats) < min_independent_units:
+        raise ValueError("Eligible patches cannot meet the independent-patient floor")
+    sel_p = pats[:min_independent_units]
+    sel_s = [next(iter(hier[p])) for p in sel_p]
+    remaining = {p: list(hier[p])[1:] for p in sel_p}
+    return pats, hier, sel_p, sel_s, remaining
+
+
 def designate_patch_pool(
     df: pd.DataFrame,
     min_independent_units: int,
@@ -156,20 +202,28 @@ def designate_patch_pool(
     max_p: int | None = None,
     max_pool_units: int | None = None,
     required_counts: tuple[int, ...] | None = None,
+    max_independent_units: int | None = None,
 ) -> pd.DataFrame:
-    """Choose the fixed patient/slide pool used by every patch condition."""
-    if min_independent_units < 10:
-        raise ValueError("Patch conditions need at least 10 independent patients")
-    rng = np.random.default_rng(seed)
-    pats, hier = _build_patch_hierarchy(df, rng)
-    if len(pats) < min_independent_units:
-        raise ValueError("Eligible patches cannot meet the independent-patient floor")
-    sel_p = pats[:min_independent_units]
-    sel_s = [next(iter(hier[p])) for p in sel_p]
-    remaining = {p: list(hier[p])[1:] for p in sel_p}
+    """Choose the fixed patient/slide pool used by every patch condition.
+
+    ``max_independent_units``, when given, caps the pool to a narrowed patient
+    subset (independent-support axis) while it still grows in slides/patches
+    to meet ``required_counts`` - see ``_expand_pool``.
+    """
+    pats, hier, sel_p, sel_s, remaining = _designate_floor(
+        df, seed, min_independent_units, max_independent_units
+    )
     counts = required_counts or (() if max_p is None else (max_p,))
     _expand_pool(
-        (pats, hier), sel_p, sel_s, remaining, df, counts, max_pool_units, seed
+        (pats, hier),
+        sel_p,
+        sel_s,
+        remaining,
+        df,
+        counts,
+        max_pool_units,
+        seed,
+        max_independent_units,
     )
     return cast(
         pd.DataFrame, df[df["case_id"].isin(sel_p) & df["slide_id"].isin(sel_s)]

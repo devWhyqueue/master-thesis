@@ -5,6 +5,7 @@ from typing import Any
 
 from imbalance_benchmark.hydra.job_resources import build_job as _job
 from imbalance_benchmark.hydra.rendering import SlurmJob
+from imbalance_benchmark.modeling.context import CONTROLLED_CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     bundled_array_size,
     candidate_array_size,
@@ -32,7 +33,8 @@ def _controlled_job(
             "tune",
         ),
         array_size=bundled_array_size(
-            3 * candidate_array_size(dependent_methods), shards_per_task
+            len(CONTROLLED_CONDITIONS) * candidate_array_size(dependent_methods),
+            shards_per_task,
         ),
     )
 

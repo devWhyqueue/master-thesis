@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.common import sign_file, split_paths, write_json
-from imbalance_benchmark.modeling.context import CONDITIONS, roster_for_condition
+from imbalance_benchmark.modeling.context import (
+    CONDITIONS,
+    roster_for_condition,
+    scoped_assignments,
+)
 from imbalance_benchmark.modeling.workflows.tuning_aggregate import combined_cost
 from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
     load_round_grids,
@@ -49,12 +53,8 @@ def _bundle_indices(
 def write_base_selection(
     root: Path, condition: str, selections: dict[str, Any]
 ) -> Path:
-    """Merge and persist the signed base-method selection consumed by dependent shards.
-
-    A later round only reduces its own still-unresolved subset, so this
-    must merge rather than replace or a resolved method (e.g. ``ce``)
-    would vanish once another method's round advances past it.
-    """
+    """Merge (never replace) the signed base-method selection: a later round only
+    reduces its own unresolved subset, so replacing would drop a resolved method."""
     path = root / "tuning_shards" / f"base_selections_{condition}.json"
     existing = json.loads(path.read_text()) if path.exists() else {}
     write_json(path, {**existing, **selections})
@@ -73,6 +73,8 @@ def write_base_selections(
     """Reduce and sign every incomplete base-method condition."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for condition in conditions:
+        if not scoped_assignments(condition, freeze, assignments):
+            continue  # not constructed for this dataset (plans/03,04)
         roster = roster_for_condition(is_mil, condition)
         if condition_is_reusable(base, condition, roster, assignments):
             continue
@@ -99,6 +101,8 @@ def write_final_selections(
     """Write the unchanged signed selection interface and parallel search costs."""
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     for condition in conditions:
+        if not scoped_assignments(condition, freeze, assignments):
+            continue  # not constructed for this dataset (plans/03,04)
         roster = roster_for_condition(is_mil, condition)
         if condition_is_reusable(base, condition, roster, assignments):
             continue
@@ -126,11 +130,9 @@ def _reduce_condition(
 ) -> None:
     """Reduce every required method's signed terminal adaptive state, not round 0.
 
-    A method's ``base_selections_*`` entry (if any) may only reflect the
-    round it happened to resolve in, and dependent methods like ``crt``
-    never appear there at all - so the terminal ``tuning_round_state`` is
-    the only source of truth for which round each method's active window
-    ended up in, for both base and dependent methods alike.
+    ``base_selections_*`` may only reflect a method's own resolving round,
+    and dependent methods (e.g. ``crt``) never appear there at all - the
+    terminal ``tuning_round_state`` is the only source of truth for both.
     """
     root = base["data"]
     methods = (*base_methods, *dependent_methods)
@@ -167,7 +169,7 @@ def _reduce_condition(
             accepted,
         ),
     ]
-    scoped = ("native",) if condition in {"natural", "balanced"} else assignments
+    scoped = scoped_assignments(condition, freeze, assignments)
     output = {assignment: {} for assignment in assignments}
     for assignment in scoped:
         output[assignment][condition] = selected
@@ -199,9 +201,8 @@ def reduce_tuning_shards(
     """Reduce complete base or dependent shards into signed selections.
 
     ``condition`` scopes a ``phase="final"`` reduce to one condition, since
-    the others may still be mid-search when this condition's converges.
-    Reads only shard artifacts and the freeze record, never raw feature
-    data, so this never needs a loaded scope.
+    others may still be mid-search when this one converges. Reads only shard
+    artifacts and the freeze record, so this never needs a loaded scope.
     """
     is_mil = freeze["runtime_config"].get("dataset", {}).get("regime") == "wsi"
     if phase == "base":

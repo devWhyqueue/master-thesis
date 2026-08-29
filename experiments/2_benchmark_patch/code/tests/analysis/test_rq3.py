@@ -199,6 +199,33 @@ def test_rq3_shortages_compare_only_classes_deprived_by_allocation() -> None:
     assert diversity == pytest.approx(np.log(2.0))
 
 
+def test_independent_shortage_uses_its_own_deprivation_set_not_the_nominal_one() -> (
+    None
+):
+    """A narrowed condition (plans/04-crossed-condition-family.md) holds
+    nominal rho at 1 - no class is nominally deprived - but still loses
+    independent support. Reading the nominal deprivation set for the
+    independent axis would reproduce defect A one level down, inside the
+    very cell built to fix it."""
+    balanced = {
+        "allocated_counts": {"A": 10, "B": 10},
+        "contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}},
+    }
+    narrowed = {
+        "allocated_counts": {"A": 10, "B": 10},  # rho=1, identical to balanced
+        "contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 11}},
+    }
+
+    assert rq3_features._deprived_classes(balanced, narrowed) == []
+    independent = rq3_features._independent_shortage(balanced, narrowed, False)
+    assert independent == pytest.approx(np.log(20 / 11))
+
+    diversity = rq3_features._diversity_shortage(
+        balanced, narrowed, {0: 4.0, 1: 4.0}, {0: 4.0, 1: 2.0}, ["A", "B"], False
+    )
+    assert diversity == pytest.approx(np.log(2.0))
+
+
 def test_rq3_predictor_matrix_contains_exactly_four_signal_columns() -> None:
     cells = [_rq3_cell("dataset:target", "ce", 10.0, 0.1, True)]
 

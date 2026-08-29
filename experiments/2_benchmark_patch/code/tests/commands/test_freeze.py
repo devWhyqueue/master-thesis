@@ -225,6 +225,181 @@ def test_reject_degenerate_conditions_allows_a_capacity_bound_adversarial_assign
 
     reject_degenerate_conditions(meta)
 
+def test_reject_degenerate_conditions_allows_balanced_narrow_at_rho_one() -> None:
+    """balanced_narrow's nominal rho is pinned to 1.0 by construction (plans/04);
+    only its independent-support axis moves, so achieved_rho==1.0 is not
+    degenerate here the way it would be for moderate/severe."""
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_degenerate_conditions,
+    )
+
+    meta = {
+        "conditions": {"balanced": {"allocated_counts": {"A": 70, "B": 70}}},
+        "assignment_conditions": {
+            "native": {
+                "balanced_narrow": {
+                    "achieved_rho": 1.0,
+                    "requested_rho": 1.0,
+                    "allocated_counts": {"A": 70, "B": 70},
+                    "limiting_class": None,
+                    "binding_independent_support_constraint": None,
+                },
+            }
+        },
+    }
+
+    reject_degenerate_conditions(meta)
+
+def test_reject_degenerate_narrowing_catches_a_near_unchanged_pool() -> None:
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_degenerate_narrowing,
+    )
+
+    meta = {
+        "assignment_conditions": {
+            "native": {
+                "balanced_narrow": {"narrowed_ratio": {"B": 0.95}},
+            }
+        }
+    }
+
+    with pytest.raises(ValueError, match="Degenerate narrowing"):
+        reject_degenerate_narrowing(meta)
+
+def test_reject_degenerate_narrowing_accepts_a_measured_feasible_ratio() -> None:
+    """0.5357-0.5543 is plan 03's measured feasible range; tolerance=0.22 must pass it."""
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_degenerate_narrowing,
+    )
+
+    meta = {
+        "assignment_conditions": {
+            "native": {
+                "balanced_narrow": {"narrowed_ratio": {"B": 0.5543}},
+                "severe_narrow": {"narrowed_ratio": {"B": 0.5357}},
+            },
+            "difficulty_reversed": {
+                "moderate": {"narrowed_ratio": None},
+            },
+        }
+    }
+
+    reject_degenerate_narrowing(meta)
+
+def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_narrowed_cell() -> (
+    None
+):
+    """If a narrowed condition's independent support never differs from
+    balanced's, the narrow arm reproduced defect A one level down (the exact
+    trap plans/04-crossed-condition-family.md calls out)."""
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_constant_signal_axes,
+    )
+
+    balanced = {"contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}}
+    meta = {
+        "conditions": {"balanced": balanced},
+        "assignment_conditions": {
+            "native": {
+                "moderate": {
+                    "achieved_rho": 10.0,
+                    "allocated_counts": {"A": 90, "B": 10},
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 20},
+                    },
+                    "narrowed_ratio": None,
+                },
+                "balanced_narrow": {
+                    "achieved_rho": 1.0,
+                    "allocated_counts": {"A": 50, "B": 50},
+                    # Same n_patients as balanced despite a "narrowed" label -
+                    # the trap: nominal-only deprivation masking a flat axis.
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 20},
+                    },
+                    "narrowed_ratio": {"B": 0.55},
+                },
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="independent_shortage never varies"):
+        reject_constant_signal_axes(meta, is_mil=False)
+
+def test_reject_constant_signal_axes_passes_a_genuinely_varying_narrowed_cell() -> None:
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_constant_signal_axes,
+    )
+
+    balanced = {"contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}}
+    meta = {
+        "conditions": {"balanced": balanced},
+        "assignment_conditions": {
+            "native": {
+                "moderate": {
+                    "achieved_rho": 10.0,
+                    "allocated_counts": {"A": 90, "B": 10},
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 20},
+                    },
+                    "narrowed_ratio": None,
+                },
+                "balanced_narrow": {
+                    "achieved_rho": 1.0,
+                    "allocated_counts": {"A": 50, "B": 50},
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 11},
+                    },
+                    "narrowed_ratio": {"B": 0.55},
+                },
+            }
+        },
+    }
+
+    reject_constant_signal_axes(meta, is_mil=False)
+
+def test_reject_constant_signal_axes_skips_the_independent_check_without_a_narrowed_arm() -> (
+    None
+):
+    """TCGA-UT/PANDA carry the nominal arm only (plan 03's measured decision):
+    zero independent shortage everywhere is expected there, not a defect."""
+    from imbalance_benchmark.manifest.shared_total.degenerate import (
+        reject_constant_signal_axes,
+    )
+
+    balanced = {"contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}}
+    meta = {
+        "conditions": {"balanced": balanced},
+        "assignment_conditions": {
+            "native": {
+                "moderate": {
+                    "achieved_rho": 10.0,
+                    "allocated_counts": {"A": 90, "B": 10},
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 20},
+                    },
+                    "narrowed_ratio": None,
+                },
+                "severe": {
+                    "achieved_rho": 100.0,
+                    "allocated_counts": {"A": 99, "B": 1},
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 20},
+                    },
+                    "narrowed_ratio": None,
+                },
+            }
+        },
+    }
+
+    reject_constant_signal_axes(meta, is_mil=False)
+
 def test_dataset_provenance_requires_a_frozen_target() -> None:
     dataset = {
         "name": "panda",

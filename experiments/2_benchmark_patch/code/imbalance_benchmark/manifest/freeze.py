@@ -217,7 +217,7 @@ def _get_constraints(
         ),
         None,
     )
-    if name == "balanced":
+    if name in {"balanced", "balanced_narrow"}:  # rho=1.0 conditions
         return limited, None
     binding = (
         "independent-support floor"

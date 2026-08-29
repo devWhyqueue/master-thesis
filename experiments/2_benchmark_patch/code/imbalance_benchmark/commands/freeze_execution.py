@@ -25,7 +25,7 @@ from imbalance_benchmark.common import (
 )
 from imbalance_benchmark.manifest.construction_helpers import class_support_counts
 from imbalance_benchmark.manifest.shared_total.degenerate import (
-    reject_degenerate_conditions,
+    reject_degenerate_freeze,
 )
 from imbalance_benchmark.manifest.shared_total.search import cap_feasible_shared_total
 from imbalance_benchmark.manifest.freeze import (
@@ -138,7 +138,7 @@ def freeze_split(args: argparse.Namespace) -> None:
         return
     with _phase("condition and tail-assignment construction"):
         meta = _freeze_metadata(args, *ctx)
-    reject_degenerate_conditions(meta)
+    reject_degenerate_freeze(meta, ctx[2])
     with _phase("bootstrap preflight"):
         _attach_preflight(meta, paths, config, args.seed)
     _attach_provenance(meta, paths, config, feature_provenance)

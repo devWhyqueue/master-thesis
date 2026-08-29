@@ -20,18 +20,23 @@ from imbalance_benchmark.manifest.statistics import (
     support_statistics,
 )
 
-CONDITION_RHOS = {"balanced": 1.0, "moderate": 10.0, "severe": 100.0}
+# balanced_narrow/severe_narrow (plans/04) narrow the independent-support pool,
+# not the nominal allocation, so they share their nominal rho with balanced/severe.
+CONDITION_RHOS = {
+    "balanced": 1.0,
+    "moderate": 10.0,
+    "severe": 100.0,
+    "balanced_narrow": 1.0,
+    "severe_narrow": 100.0,
+}
+
+INDEPENDENT_NARROW_RATIO = 0.55  # plan 03's measured narrowed:wide patient-pool ratio
 
 
 def apply_class_exclusions(
     df: pd.DataFrame, excluded_classes: list[str]
 ) -> pd.DataFrame:
-    """Drop configured target classes from the eligible pool before splitting.
-
-    Applied once, before ``split_cases``, so an excluded class never enters
-    any partition or downstream construction rather than being filtered out
-    piecemeal by later stages.
-    """
+    """Drop configured target classes from the eligible pool before splitting."""
     if not excluded_classes:
         return df
     return cast(
@@ -63,6 +68,8 @@ def condition_metadata(
         "evidence_pool_hash": spec["pool_hash"],
         "limiting_class": constraints[0],
         "binding_independent_support_constraint": constraints[1],
+        "narrowed_classes": spec.get("narrowed_classes"),  # achieved, not requested
+        "narrowed_ratio": spec.get("narrowed_ratio"),
     }
 
 
@@ -155,9 +162,9 @@ def designate_shared_patch_pools(
 ) -> dict[str, pd.DataFrame]:
     """Designate one per-class pool that every locked allocation draws from.
 
-    The pool is sized to the largest count a class is ever assigned; smaller
-    counts (e.g. a tail condition's) draw from it without needing to exhaust
-    it, so ``max_pool_units`` must not be clipped to the smallest count.
+    Sized to the largest count a class is ever assigned; a smaller count
+    draws without exhausting it, so ``max_pool_units`` must not be clipped
+    to the smallest count.
     """
     required = required_counts_by_class(allocations)
     return {
@@ -171,6 +178,59 @@ def designate_shared_patch_pools(
         )
         for class_name, counts in required.items()
     }
+
+
+def _designate_one_narrow_pool(
+    train_df: pd.DataFrame,
+    independent_floor: int,
+    seed: int,
+    class_name: str,
+    counts: set[int],
+    ratio: float,
+    wide_patients: int,
+) -> pd.DataFrame:
+    cap = max(independent_floor, round(ratio * wide_patients))
+    return designate_patch_pool(
+        cast(pd.DataFrame, train_df[train_df["cancer_type"] == class_name]),
+        independent_floor,
+        class_construction_seed(seed, class_name),
+        max(counts),
+        max_pool_units=max(independent_floor, max(counts)),
+        required_counts=tuple(sorted(counts)),
+        max_independent_units=cap,
+    )
+
+
+def designate_narrowed_patch_pools(
+    train_df: pd.DataFrame,
+    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
+    independent_floor: int,
+    seed: int,
+    narrowed_classes: set[str],
+    wide_pools: Mapping[str, pd.DataFrame],
+    ratio: float = INDEPENDENT_NARROW_RATIO,
+) -> tuple[dict[str, pd.DataFrame], dict[str, float]]:
+    """Designate narrow per-class pools for the independent-support axis.
+
+    Same seed as the wide pool, so a smaller cap yields a strict patient
+    subset (plans/03,04). ``ratio`` is measured against the designated wide
+    pool, not the full eligible count, which would be infeasible or narrow nothing.
+    """
+    required = required_counts_by_class(allocations)
+    wide_patients = {
+        cls: int(wide_pools[cls]["case_id"].nunique()) for cls in narrowed_classes
+    }
+    pools = {
+        cls: _designate_one_narrow_pool(
+            train_df, independent_floor, seed, cls, counts, ratio, wide_patients[cls]
+        )
+        for cls, counts in required.items()
+        if cls in narrowed_classes
+    }
+    achieved = {
+        cls: p["case_id"].nunique() / wide_patients[cls] for cls, p in pools.items()
+    }
+    return pools, achieved
 
 
 def _retains_fixed_pool(selected: pd.DataFrame, pool: pd.DataFrame) -> bool:
