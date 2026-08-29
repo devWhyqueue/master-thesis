@@ -25,10 +25,8 @@ def expected_comparison_keys(
     """Return the frozen method-by-gate roster expected from every split.
 
     ``(assignment, severity)`` pairs are read from each split's actual
-    ``assignment_conditions``, not a fixed severity tuple: which assignments
-    carry a narrowed condition is per-dataset (plans/04-crossed-condition-
-    family.md), so a hardcoded ("moderate", "severe") would either miss the
-    narrowed pair or wrongly expect it everywhere.
+    ``assignment_conditions``, not a fixed severity tuple: the spread arm can
+    be cost-scoped per dataset, so hardcoding severities misses frozen cells.
     """
     is_mil = config.get("dataset", {}).get("regime") == "wsi" if config else False
     methods = roster_for_regime(is_mil)

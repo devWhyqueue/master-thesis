@@ -15,6 +15,7 @@ from imbalance_benchmark.analysis.predictors.rq3_features import (
 from imbalance_benchmark.analysis.predictors.rq3_wiring import (
     support_difficulty_alignment,
 )
+from imbalance_benchmark.manifest.construction_helpers import CONDITION_REFERENCE
 from imbalance_benchmark.analysis.predictors.signals.descriptive_support_profile import (
     ICC_CASE_CAP,
     ICC_PATCH_CAP,
@@ -57,13 +58,25 @@ def _build_comparisons(
     tail_assignments: dict[str, list[str]],
 ) -> list[dict[str, Any]]:
     """Per-(assignment, severity) shortage scores (protocol app:rq3 / app:testing)."""
-    reference = _reference_block(
-        paths, is_mil, class_names, balanced, int(freeze["construction_seed"])
-    )
     comparisons = []
     for assignment in tail_assignments:
         for severity in freeze["assignment_conditions"][assignment]:
+            if severity == "balanced_spread":
+                continue
             condition = freeze["assignment_conditions"][assignment][severity]
+            reference_condition = CONDITION_REFERENCE[severity]
+            reference_metadata = (
+                freeze["assignment_conditions"][assignment][reference_condition]
+                if reference_condition == "balanced_spread"
+                else balanced
+            )
+            reference = _reference_block(
+                paths,
+                is_mil,
+                class_names,
+                reference_metadata,
+                int(freeze["construction_seed"]),
+            )
             shortages = _covariates(paths, is_mil, condition, reference, freeze)
             comparisons.append(
                 {
@@ -71,7 +84,7 @@ def _build_comparisons(
                     "severity": severity,
                     "rho": condition["achieved_rho"],
                     "nominal_shortage": _nominal_shortage(
-                        balanced,
+                        reference_metadata,
                         condition,
                         freeze.get("difficulty_evidence", {}).get("difficulty", {}),
                     ),

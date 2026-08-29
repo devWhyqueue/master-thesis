@@ -37,8 +37,8 @@ CONDITION = {
     "balanced": "Balanced",
     "moderate": "Moderate",
     "severe": "Severe",
-    "balanced_narrow": "Balanced (narrow)",
-    "severe_narrow": "Severe (narrow)",
+    "balanced_spread": "Balanced (spread)",
+    "severe_spread": "Severe (spread)",
 }
 SIGNAL = {
     "weighted_ce": "Prevalence",

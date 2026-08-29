@@ -20,17 +20,21 @@ from imbalance_benchmark.manifest.statistics import (
     support_statistics,
 )
 
-# balanced_narrow/severe_narrow (plans/04) narrow the independent-support pool,
-# not the nominal allocation, so they share their nominal rho with balanced/severe.
+# Spread conditions vary independent support without changing nominal allocation.
 CONDITION_RHOS = {
     "balanced": 1.0,
     "moderate": 10.0,
     "severe": 100.0,
-    "balanced_narrow": 1.0,
-    "severe_narrow": 100.0,
+    "balanced_spread": 1.0,
+    "severe_spread": 100.0,
 }
-
-INDEPENDENT_NARROW_RATIO = 0.55  # plan 03's measured narrowed:wide patient-pool ratio
+CONDITION_REFERENCE = {
+    "balanced": "balanced_spread",
+    "balanced_spread": "balanced_spread",
+    "moderate": "balanced",
+    "severe": "balanced",
+    "severe_spread": "balanced_spread",
+}
 
 
 def apply_class_exclusions(
@@ -68,8 +72,9 @@ def condition_metadata(
         "evidence_pool_hash": spec["pool_hash"],
         "limiting_class": constraints[0],
         "binding_independent_support_constraint": constraints[1],
-        "narrowed_classes": spec.get("narrowed_classes"),  # achieved, not requested
-        "narrowed_ratio": spec.get("narrowed_ratio"),
+        "spread_classes": spec.get("spread_classes"),
+        "spread_ratio": spec.get("spread_ratio"),
+        "spread_tail_classes": spec.get("spread_tail_classes"),
     }
 
 
@@ -154,6 +159,16 @@ def required_counts_by_class(
     return required
 
 
+def max_required_counts(
+    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
+) -> dict[str, int]:
+    """Largest fixed-pool allocation required for every class."""
+    return {
+        name: max(counts)
+        for name, counts in required_counts_by_class(allocations).items()
+    }
+
+
 def designate_shared_patch_pools(
     train_df: pd.DataFrame,
     allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
@@ -180,55 +195,29 @@ def designate_shared_patch_pools(
     }
 
 
-def _designate_one_narrow_pool(
-    train_df: pd.DataFrame,
-    independent_floor: int,
-    seed: int,
-    class_name: str,
-    counts: set[int],
-    ratio: float,
-    wide_patients: int,
-) -> pd.DataFrame:
-    cap = max(independent_floor, round(ratio * wide_patients))
-    return designate_patch_pool(
-        cast(pd.DataFrame, train_df[train_df["cancer_type"] == class_name]),
-        independent_floor,
-        class_construction_seed(seed, class_name),
-        max(counts),
-        max_pool_units=max(independent_floor, max(counts)),
-        required_counts=tuple(sorted(counts)),
-        max_independent_units=cap,
-    )
-
-
-def designate_narrowed_patch_pools(
+def designate_spread_patch_pools(
     train_df: pd.DataFrame,
     allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
     independent_floor: int,
     seed: int,
-    narrowed_classes: set[str],
-    wide_pools: Mapping[str, pd.DataFrame],
-    ratio: float = INDEPENDENT_NARROW_RATIO,
+    concentrated_pools: Mapping[str, pd.DataFrame],
 ) -> tuple[dict[str, pd.DataFrame], dict[str, float]]:
-    """Designate narrow per-class pools for the independent-support axis.
-
-    Same seed as the wide pool, so a smaller cap yields a strict patient
-    subset (plans/03,04). ``ratio`` is measured against the designated wide
-    pool, not the full eligible count, which would be infeasible or narrow nothing.
-    """
+    """Designate full-eligible per-class pools for the independent-support arm."""
     required = required_counts_by_class(allocations)
-    wide_patients = {
-        cls: int(wide_pools[cls]["case_id"].nunique()) for cls in narrowed_classes
-    }
     pools = {
-        cls: _designate_one_narrow_pool(
-            train_df, independent_floor, seed, cls, counts, ratio, wide_patients[cls]
+        cls: designate_patch_pool(
+            cast(pd.DataFrame, train_df[train_df["cancer_type"] == cls]),
+            int(train_df.loc[train_df["cancer_type"] == cls, "case_id"].nunique()),
+            class_construction_seed(seed, cls),
+            max(counts),
+            max_pool_units=max(independent_floor, max(counts)),
+            required_counts=tuple(sorted(counts)),
         )
         for cls, counts in required.items()
-        if cls in narrowed_classes
     }
     achieved = {
-        cls: p["case_id"].nunique() / wide_patients[cls] for cls, p in pools.items()
+        cls: p["case_id"].nunique() / concentrated_pools[cls]["case_id"].nunique()
+        for cls, p in pools.items()
     }
     return pools, achieved
 

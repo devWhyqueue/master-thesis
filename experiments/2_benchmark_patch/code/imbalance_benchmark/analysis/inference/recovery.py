@@ -202,15 +202,17 @@ def _recovery_steps(
 ) -> list[tuple[str, Baseline, str]]:
     """Every `(assignment, baseline, severity)` step with a resolvable baseline."""
     tail_assignments = freeze.get("tail_assignments", {"native": []})
-    baselines = {
-        a: balanced_baseline(paths, config, freeze, n_replicates, seed, a)
-        for a in tail_assignments
-    }
     return [
-        (a, baseline, s)
-        for a, baseline in baselines.items()
-        if baseline is not None
-        for s in freeze.get("assignment_conditions", {}).get(a, {})
+        (assignment, baseline, severity)
+        for assignment in tail_assignments
+        for severity in freeze.get("assignment_conditions", {}).get(assignment, {})
+        if severity != "balanced_spread"
+        if (
+            baseline := balanced_baseline(
+                paths, config, freeze, n_replicates, seed, assignment, severity
+            )
+        )
+        is not None
     ]
 
 

@@ -108,8 +108,8 @@ def _parser() -> argparse.ArgumentParser:
                 "balanced",
                 "moderate",
                 "severe",
-                "balanced_narrow",
-                "severe_narrow",
+                "balanced_spread",
+                "severe_spread",
             ),
         )
     shard = sub.choices["tune-shard"]
@@ -129,8 +129,8 @@ def _parser() -> argparse.ArgumentParser:
             "balanced",
             "moderate",
             "severe",
-            "balanced_narrow",
-            "severe_narrow",
+            "balanced_spread",
+            "severe_spread",
         ),
     )
     wave = sub.choices["tune-wave"]
@@ -142,8 +142,8 @@ def _parser() -> argparse.ArgumentParser:
             "balanced",
             "moderate",
             "severe",
-            "balanced_narrow",
-            "severe_narrow",
+            "balanced_spread",
+            "severe_spread",
         ),
     )
     wave.add_argument("--group", choices=("controlled",))
@@ -158,8 +158,8 @@ def _parser() -> argparse.ArgumentParser:
             "balanced",
             "moderate",
             "severe",
-            "balanced_narrow",
-            "severe_narrow",
+            "balanced_spread",
+            "severe_spread",
         ),
     )
     decide = sub.add_parser("tune-decide")
@@ -171,8 +171,8 @@ def _parser() -> argparse.ArgumentParser:
             "balanced",
             "moderate",
             "severe",
-            "balanced_narrow",
-            "severe_narrow",
+            "balanced_spread",
+            "severe_spread",
         ),
         required=True,
     )

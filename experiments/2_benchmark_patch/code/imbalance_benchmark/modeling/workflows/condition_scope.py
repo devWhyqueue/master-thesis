@@ -11,7 +11,7 @@ def controlled_assignments_for_condition(
     """Assignments where this controlled condition was actually constructed.
 
     moderate/severe are universal across every assignment on every dataset,
-    but balanced_narrow/severe_narrow are not (plans/03-independent-support-
+    but balanced_spread/severe_spread are not (plans/03-independent-support-
     feasibility.md, plans/04-crossed-condition-family.md): whether a given
     (assignment, condition) pair exists is a fact of this split's own frozen
     ``assignment_conditions``, not something callers may assume. An empty

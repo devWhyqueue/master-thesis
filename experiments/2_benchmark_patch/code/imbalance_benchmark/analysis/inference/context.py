@@ -26,8 +26,9 @@ from imbalance_benchmark.analysis.reporting.secondary_intervals.probability impo
     _secondary_distributions as probability_secondary_distributions,
 )
 from imbalance_benchmark.analysis.query import load_seed_predictions, load_test_identity
+from imbalance_benchmark.manifest.construction_helpers import CONDITION_REFERENCE
 
-__all__ = ["BootstrapContext", "Baseline", "balanced_baseline"]
+__all__ = ["BootstrapContext", "Baseline", "CONDITION_REFERENCE", "balanced_baseline"]
 
 
 def _seed_distributions(
@@ -190,10 +191,7 @@ def _tail_classes(
 ) -> list[int]:
     """Class indices assigned to the tail tier under one condition's allocated support.
 
-    Head/body/tail tiers are defined per comparison unit from that condition's
-    realized allocation, so a moderate comparison must not read the severe
-    allocation: with class-specific caps the two allocations can rank classes
-    differently and yield different tail groups.
+    Head/body/tail tiers use that condition's realized allocation.
     """
     condition = (
         freeze.get("assignment_conditions", {}).get(assignment, {}).get(severity, {})
@@ -201,9 +199,8 @@ def _tail_classes(
     allocated = condition.get("allocated_counts", {})
     if not allocated:
         return []
-    if narrowed := condition.get("narrowed_classes"):
-        # Tied nominal allocation defeats assign_tiers; narrowed set is the tail (plans/04).
-        return [i for i, name in enumerate(class_names) if name in narrowed]
+    if spread_tail := condition.get("spread_tail_classes"):
+        return [i for i, name in enumerate(class_names) if name in spread_tail]
     tiers = assign_tiers(
         class_names,
         allocated,
@@ -237,10 +234,13 @@ def balanced_baseline(
     n_replicates: int,
     seed: int,
     assignment: str = "native",
+    condition: str = "moderate",
 ) -> Baseline | None:
-    """Load balanced CE's predictions and precompute its bootstrap BA distribution."""
+    """Load a condition's prespecified CE reference and bootstrap BA distribution."""
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    balanced = load_seed_predictions(paths, "balanced", "ce")
+    balanced = load_seed_predictions(
+        paths, CONDITION_REFERENCE[condition], "ce", assignment
+    )
     if not (paths["data"] / "manifest.csv").exists() or balanced is None:
         return None
     ctx = BootstrapContext(paths, is_mil, n_replicates, seed)

@@ -16,10 +16,9 @@ from imbalance_benchmark.analysis.reporting.report.sources import (
 __all__ = ["realized_support", "support_frame"]
 
 _TOLERANCE = {"moderate": (9.0, 11.0), "severe": (90.0, 110.0)}
-# balanced_narrow's nominal rho is pinned to 1.0 by construction (its axis is
-# independent support, not nominal count), so it never gets a rho-tolerance
-# check; severe_narrow shares severe's nominal target.
-_UNCHECKED = {"natural", "balanced", "balanced_narrow"}
+# balanced_spread's nominal rho is pinned to 1.0 by construction; severe_spread
+# shares severe's nominal target.
+_UNCHECKED = {"natural", "balanced", "balanced_spread"}
 _DEGENERATE = 1.05
 
 
@@ -47,7 +46,7 @@ def _status(severity: str, achieved: float) -> str:
         return "---"
     if achieved <= _DEGENERATE:
         return "Degenerate"
-    low, high = _TOLERANCE[severity.removesuffix("_narrow")]
+    low, high = _TOLERANCE[severity.removesuffix("_spread")]
     return "On target" if low <= achieved <= high else "Off target"
 
 

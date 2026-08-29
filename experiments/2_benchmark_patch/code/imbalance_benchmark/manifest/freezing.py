@@ -22,27 +22,22 @@ from imbalance_benchmark.manifest.construction_helpers import (
     assignment_allocations,
     class_construction_seed,
     class_support_counts,
+    max_required_counts as _max_required_counts,
     designate_shared_patch_pools,
-    required_counts_by_class,
     write_natural_condition,
 )
 from imbalance_benchmark.manifest.pilot.constraints import (  # noqa: F401
     PilotConstraints,
     _pilot_constraints,
 )
-from imbalance_benchmark.manifest.shared_total.narrowing import (
-    NarrowingContext,
-    add_narrowed_conditions,
+from imbalance_benchmark.manifest.shared_total.spreading import (
+    SpreadingContext,
+    add_concentrated_conditions,
+    add_spread_conditions,
 )
 from imbalance_benchmark.manifest.statistics import evidence_pool_hash
 
 logger = logging.getLogger(__name__)
-
-
-def _max_required_counts(
-    allocations: Mapping[str, Mapping[str, Mapping[str, int]]],
-) -> dict[str, int]:
-    return {c: max(v) for c, v in required_counts_by_class(allocations).items()}
 
 
 def _build_conditions(
@@ -58,8 +53,9 @@ def _build_conditions(
     independent_floor: int | None = None,
     fixed_pools: dict[str, pd.DataFrame] | None = None,
     max_required_counts: Mapping[str, int] | None = None,
-    narrowed_classes: list[str] | None = None,
-    narrowed_ratio: dict[str, float] | None = None,
+    spread_classes: list[str] | None = None,
+    spread_ratio: dict[str, float] | None = None,
+    spread_tail_classes: list[str] | None = None,
 ) -> dict[str, Any]:
     """Construct cap-compliant controlled manifests from one fixed eligible pool."""
     counts = class_support_counts(train_df, is_mil)
@@ -122,7 +118,7 @@ def _build_conditions(
                 "name": name,
                 "allocated": dict(zip(classes, allocated)),
                 "rows": rows,
-                "pool": pool_df,  # designated pool, narrowed for a narrowed class (plans/04)
+                "pool": pool_df,
                 "is_mil": is_mil,
                 "seed": seed,
                 "data_dir": data_dir,
@@ -130,8 +126,9 @@ def _build_conditions(
                 "pool_hash": pool_hash,
                 "available": available,
                 "minimum": min_support,
-                "narrowed_classes": narrowed_classes,
-                "narrowed_ratio": narrowed_ratio,
+                "spread_classes": spread_classes,
+                "spread_ratio": spread_ratio,
+                "spread_tail_classes": spread_tail_classes,
             }
         )
         logger.info(
@@ -188,7 +185,7 @@ def _freeze_meta(
         for assignment, order in assignments.items()
     }
     if not is_mil:
-        narrowing_ctx = NarrowingContext(
+        spreading_ctx = SpreadingContext(
             train_df,
             assignments,
             full_allocations,
@@ -200,10 +197,10 @@ def _freeze_meta(
             shared_pools or {},
             max_required,
         )
-        add_narrowed_conditions(
+        add_spread_conditions(
             _build_conditions,
             assignment_conditions,
-            narrowing_ctx,
+            spreading_ctx,
             config["dataset"]["name"],
         )
     native_conditions = _build_conditions(
@@ -219,6 +216,7 @@ def _freeze_meta(
         fixed_pools=shared_pools,
         max_required_counts=max_required,
     )
+    add_concentrated_conditions(assignment_conditions, native_conditions["balanced"])
     return {
         "class_names": classes,
         "label_to_index": {name: index for index, name in enumerate(classes)},

@@ -48,13 +48,13 @@ MIL_HIDDEN_DIM = 256
 DROPOUT = 0.1
 # Update budget U = REFERENCE_PASSES * ceil(T / B) (report §"Model training and selection").
 REFERENCE_PASSES = 30
-# Crossed-condition-family universe (plans/03,04); absent narrowed = no pending work.
+# Crossed-condition-family universe (plans/03,04).
 CONTROLLED_CONDITIONS = (
     "balanced",
     "moderate",
     "severe",
-    "balanced_narrow",
-    "severe_narrow",
+    "balanced_spread",
+    "severe_spread",
 )
 CONDITIONS = ("natural", *CONTROLLED_CONDITIONS)
 

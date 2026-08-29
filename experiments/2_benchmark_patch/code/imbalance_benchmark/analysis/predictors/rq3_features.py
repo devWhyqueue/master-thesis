@@ -56,7 +56,7 @@ def _independent_deprived_classes(
 ) -> list[str]:
     """Classes whose realized independent support fell below the balanced reference.
 
-    Deliberately distinct from ``_deprived_classes``: a narrowed condition
+    Deliberately distinct from ``_deprived_classes``: a concentrated condition
     (plans/04-crossed-condition-family.md) can hold nominal rho at 1 - so its
     nominal deprivation set is empty - while still losing independent
     support. Reading the nominal set here would reproduce defect A one level
@@ -103,7 +103,7 @@ def _diversity_shortage(
     """Mean log semantic-volume loss across nominally *or* independently deprived classes.
 
     The union, not just the nominal set (plans/04-crossed-condition-family.md):
-    a narrowed condition deprives diversity through the independent-support
+    a concentrated condition deprives diversity through the independent-support
     axis even where nominal rho stays at 1.
     """
     names = sorted(

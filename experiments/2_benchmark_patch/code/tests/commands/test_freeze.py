@@ -111,7 +111,7 @@ def test_freeze_uses_one_patch_pool_for_balanced_and_every_assignment(
     )
     rows = []
     for class_name in ("A", "B"):
-        for patient in range(10):
+        for patient in range(30):
             n_slides = 3 if patient == 0 else 2
             for slide in range(n_slides):
                 for patch in range(10):
@@ -143,7 +143,7 @@ def test_freeze_uses_one_patch_pool_for_balanced_and_every_assignment(
         for conditions in [meta["conditions"], *meta["assignment_conditions"].values()]
         for info in conditions.values()
     }
-    assert len(pool_hashes) == 1
+    assert len(pool_hashes) == 2
 
 def test_freeze_rejects_missing_dataset_provenance(tmp_path: Path) -> None:
     """Definitive freezes cannot replace required provenance with placeholders."""
@@ -225,8 +225,8 @@ def test_reject_degenerate_conditions_allows_a_capacity_bound_adversarial_assign
 
     reject_degenerate_conditions(meta)
 
-def test_reject_degenerate_conditions_allows_balanced_narrow_at_rho_one() -> None:
-    """balanced_narrow's nominal rho is pinned to 1.0 by construction (plans/04);
+def test_reject_degenerate_conditions_allows_balanced_spread_at_rho_one() -> None:
+    """balanced_spread's nominal rho is pinned to 1.0 by construction (plans/04);
     only its independent-support axis moves, so achieved_rho==1.0 is not
     degenerate here the way it would be for moderate/severe."""
     from imbalance_benchmark.manifest.shared_total.degenerate import (
@@ -237,7 +237,7 @@ def test_reject_degenerate_conditions_allows_balanced_narrow_at_rho_one() -> Non
         "conditions": {"balanced": {"allocated_counts": {"A": 70, "B": 70}}},
         "assignment_conditions": {
             "native": {
-                "balanced_narrow": {
+                "balanced_spread": {
                     "achieved_rho": 1.0,
                     "requested_rho": 1.0,
                     "allocated_counts": {"A": 70, "B": 70},
@@ -250,47 +250,46 @@ def test_reject_degenerate_conditions_allows_balanced_narrow_at_rho_one() -> Non
 
     reject_degenerate_conditions(meta)
 
-def test_reject_degenerate_narrowing_catches_a_near_unchanged_pool() -> None:
+def test_reject_degenerate_spreading_catches_a_small_mean_shortage() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
-        reject_degenerate_narrowing,
+        reject_degenerate_spreading,
     )
 
     meta = {
         "assignment_conditions": {
             "native": {
-                "balanced_narrow": {"narrowed_ratio": {"B": 0.95}},
+                "balanced_spread": {"spread_ratio": {"A": 1.1, "B": 1.2}},
             }
         }
     }
 
-    with pytest.raises(ValueError, match="Degenerate narrowing"):
-        reject_degenerate_narrowing(meta)
+    with pytest.raises(ValueError, match="Degenerate spreading"):
+        reject_degenerate_spreading(meta)
 
-def test_reject_degenerate_narrowing_accepts_a_measured_feasible_ratio() -> None:
-    """0.5357-0.5543 is plan 03's measured feasible range; tolerance=0.22 must pass it."""
+def test_reject_degenerate_spreading_accepts_a_measured_shortage() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
-        reject_degenerate_narrowing,
+        reject_degenerate_spreading,
     )
 
     meta = {
         "assignment_conditions": {
             "native": {
-                "balanced_narrow": {"narrowed_ratio": {"B": 0.5543}},
-                "severe_narrow": {"narrowed_ratio": {"B": 0.5357}},
+                "balanced_spread": {"spread_ratio": {"A": 1.5, "B": 2.0}},
+                "severe_spread": {"spread_ratio": {"A": 1.5, "B": 2.0}},
             },
             "difficulty_reversed": {
-                "moderate": {"narrowed_ratio": None},
+                "moderate": {"spread_ratio": None},
             },
         }
     }
 
-    reject_degenerate_narrowing(meta)
+    reject_degenerate_spreading(meta)
 
-def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_narrowed_cell() -> (
+def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_spread_cell() -> (
     None
 ):
-    """If a narrowed condition's independent support never differs from
-    balanced's, the narrow arm reproduced defect A one level down (the exact
+    """If a spread condition's independent support never differs from its
+    reference, the spread arm reproduced defect A one level down (the exact
     trap plans/04-crossed-condition-family.md calls out)."""
     from imbalance_benchmark.manifest.shared_total.degenerate import (
         reject_constant_signal_axes,
@@ -308,18 +307,18 @@ def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_narrowed_c
                         "A": {"n_patients": 20},
                         "B": {"n_patients": 20},
                     },
-                    "narrowed_ratio": None,
+                    "spread_ratio": None,
                 },
-                "balanced_narrow": {
+                "balanced_spread": {
                     "achieved_rho": 1.0,
                     "allocated_counts": {"A": 50, "B": 50},
-                    # Same n_patients as balanced despite a "narrowed" label -
+                    # Same n_patients as balanced despite a "spread" label -
                     # the trap: nominal-only deprivation masking a flat axis.
                     "contribution_stats": {
                         "A": {"n_patients": 20},
                         "B": {"n_patients": 20},
                     },
-                    "narrowed_ratio": {"B": 0.55},
+                    "spread_ratio": {"B": 2.0},
                 },
             }
         },
@@ -328,7 +327,7 @@ def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_narrowed_c
     with pytest.raises(ValueError, match="independent_shortage never varies"):
         reject_constant_signal_axes(meta, is_mil=False)
 
-def test_reject_constant_signal_axes_passes_a_genuinely_varying_narrowed_cell() -> None:
+def test_reject_constant_signal_axes_passes_a_genuinely_varying_spread_cell() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
         reject_constant_signal_axes,
     )
@@ -345,16 +344,23 @@ def test_reject_constant_signal_axes_passes_a_genuinely_varying_narrowed_cell() 
                         "A": {"n_patients": 20},
                         "B": {"n_patients": 20},
                     },
-                    "narrowed_ratio": None,
+                    "spread_ratio": None,
                 },
-                "balanced_narrow": {
+                "balanced_spread": {
                     "achieved_rho": 1.0,
                     "allocated_counts": {"A": 50, "B": 50},
                     "contribution_stats": {
                         "A": {"n_patients": 20},
                         "B": {"n_patients": 11},
                     },
-                    "narrowed_ratio": {"B": 0.55},
+                    "spread_ratio": {"B": 2.0},
+                },
+                "balanced": {
+                    "achieved_rho": 1.0,
+                    "contribution_stats": {
+                        "A": {"n_patients": 20},
+                        "B": {"n_patients": 10},
+                    },
                 },
             }
         },
@@ -362,10 +368,10 @@ def test_reject_constant_signal_axes_passes_a_genuinely_varying_narrowed_cell() 
 
     reject_constant_signal_axes(meta, is_mil=False)
 
-def test_reject_constant_signal_axes_skips_the_independent_check_without_a_narrowed_arm() -> (
+def test_reject_constant_signal_axes_skips_the_independent_check_without_a_spread_arm() -> (
     None
 ):
-    """TCGA-UT/PANDA carry the nominal arm only (plan 03's measured decision):
+    """A nominal-only arm has no independent contrast to check:
     zero independent shortage everywhere is expected there, not a defect."""
     from imbalance_benchmark.manifest.shared_total.degenerate import (
         reject_constant_signal_axes,
@@ -383,7 +389,7 @@ def test_reject_constant_signal_axes_skips_the_independent_check_without_a_narro
                         "A": {"n_patients": 20},
                         "B": {"n_patients": 20},
                     },
-                    "narrowed_ratio": None,
+                    "spread_ratio": None,
                 },
                 "severe": {
                     "achieved_rho": 100.0,
@@ -392,7 +398,7 @@ def test_reject_constant_signal_axes_skips_the_independent_check_without_a_narro
                         "A": {"n_patients": 20},
                         "B": {"n_patients": 20},
                     },
-                    "narrowed_ratio": None,
+                    "spread_ratio": None,
                 },
             }
         },

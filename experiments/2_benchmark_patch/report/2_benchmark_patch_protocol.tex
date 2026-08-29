@@ -476,7 +476,7 @@ All eligible patches enter the pool before condition-specific subsampling. The c
 
 \subsection{Independent evidence and support floors}
 \label{app:construction-support}
-The independent-support rule of Section~\ref{sec:construction} is realized as a fixed per-class partitioning-unit pool and, within it, a fixed slide pool, made available to the balanced and all imbalanced conditions: every condition draws its patches only from this pool. Table~\ref{tab:support-rules} states the selection order and caps.
+The independent-support rule of Section~\ref{sec:construction} is realized as a fixed per-class partitioning-unit pool and, within it, a fixed slide pool for the concentrated conditions. The paired spread conditions use the same seeded ordering but extend each class pool to its eligible partitioning-unit inventory while preserving the nominal patch allocation. Thus the independent-support contrast is deliberately between pools at fixed nominal allocation; the concentrated pool is a patient-prefix subset of the corresponding spread pool. Table~\ref{tab:support-rules} states the selection order and caps.
 
 \begin{table}[ht]
   \centering
@@ -485,14 +485,14 @@ The independent-support rule of Section~\ref{sec:construction} is realized as a 
     \toprule
     Selection order & Contribution caps & What imbalance changes \\
     \midrule
-    Partitioning units, then slides within units, then patches; deterministic round-robin before any unit is revisited & $\leq10\%$ of a class's patch allocation per partitioning unit; $\leq5\%$ per slide & Patches per class; the available partitioning-unit and slide pools are unchanged \\
+    Partitioning units, then slides within units, then patches; deterministic round-robin before any unit is revisited & $\leq10\%$ of a class's patch allocation per partitioning unit; $\leq5\%$ per slide & Nominal allocation, or independent support through the paired concentrated and spread pools \\
     \bottomrule
   \end{tabularx}
   \caption{Hierarchical selection and contribution caps. Every sample list reports per-class partitioning-unit, slide, and patch counts, maximum contributions, and the fraction of the eligible independent pool retained.}
   \label{tab:support-rules}
 \end{table}
 
-\noindent The condition with the largest patch allocation for a class covers the fixed pool in full, so no unit in it goes unused by every condition together. A smaller condition for the same class, in particular a severe tail count well below that maximum, may leave some pool units untouched; this is the intended shape of an imbalanced allocation, not a violation of the shared pool.
+\noindent Within each pool arm, the condition with the largest patch allocation for a class covers its fixed pool in full, so no unit in that arm goes unused by every condition together. A smaller condition for the same class, in particular a severe tail count well below that maximum, may leave some pool units untouched; this is the intended shape of an imbalanced allocation, not a violation of the fixed-pool construction.
 
 The smallest defensible tail support is estimated before the definitive comparison with a \emph{support pilot}. These balanced CE runs ask when additional independent training units cease to materially improve natural-validation performance; they do not tune a hyperparameter or contribute observations to the definitive analysis. One pilot unit is a partitioning unit, or a slide where partitioning unit and slide coincide. Each selected unit contributes the same fixed quota $q_{\mathrm{patch}}$ of patches, distributed as evenly as possible over its eligible slides. The quota is the largest value the patient and slide contribution caps admit at every candidate level and every construction ordering, held fixed so increasing a pilot level adds independent units rather than patches per unit. A caps-admissible quota is necessary but not sufficient: a unit cannot supply more patches than it holds, so a unit is eligible for a candidate level only if its own inventory meets the candidate quota, and the quota at a given level is set from that level's order statistic of per-unit inventory over the eligible units rather than from the scarcest unit in one seeded ordering. A candidate level that no quota can satisfy is dropped from the curve rather than reusing a looser quota from a larger level.
 

@@ -12,7 +12,7 @@ from imbalance_benchmark.common import (
     split_paths,
     verify_signed_file,
 )
-from imbalance_benchmark.manifest.construction_helpers import condition_metadata
+from imbalance_benchmark.manifest import construction_helpers
 from imbalance_benchmark.manifest.statistics import (
     achieved_rho,
     normalized_entropy,
@@ -217,7 +217,7 @@ def _get_constraints(
         ),
         None,
     )
-    if name in {"balanced", "balanced_narrow"}:  # rho=1.0 conditions
+    if construction_helpers.CONDITION_RHOS.get(name, 1.0) == 1.0:
         return limited, None
     binding = (
         "independent-support floor"
@@ -239,7 +239,7 @@ def write_condition(spec: dict[str, Any]) -> dict[str, Any]:
     )
     statistics = support_statistics(condition)
     primary = statistics["slide" if spec["is_mil"] else "patch"]
-    return condition_metadata(
+    return construction_helpers.condition_metadata(
         path,
         condition,
         statistics,

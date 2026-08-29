@@ -622,11 +622,8 @@ def test_fixed_pool_expansion_adds_one_slide_per_patient_per_round() -> None:
 
     assert pool.groupby("case_id")["slide_id"].nunique().eq(2).all()
 
-def test_narrowed_pool_raises_when_the_cap_cannot_supply_the_required_count() -> None:
-    """max_independent_units caps only the new-patient branch (plans/04-crossed-
-    condition-family.md): if the capped patient set genuinely cannot supply the
-    requested patch count, that must be a clean, loud failure - not a silently
-    smaller manifest."""
+def test_spread_pool_is_a_patient_superset_with_unchanged_nominal_counts() -> None:
+    """Plan 04's spread arm adds patients without changing the allocation."""
     from imbalance_benchmark.manifest.sampling.patch_pool import designate_patch_pool
 
     rows = [
@@ -642,33 +639,11 @@ def test_narrowed_pool_raises_when_the_cap_cannot_supply_the_required_count() ->
         for patch in range(10)
     ]
     df = pd.DataFrame(rows)
-    # 30 patients x 20 patches each; a 12-patient cap tops out at 240 patches,
-    # short of the 300 requested.
-    designate_patch_pool(df, 10, seed=4, max_p=300, max_pool_units=60)  # uncapped: feasible
+    concentrated = designate_patch_pool(df, 10, seed=4, max_p=300, max_pool_units=60)
+    spread = designate_patch_pool(df, 30, seed=4, max_p=300, max_pool_units=60)
 
-    with pytest.raises(ValueError, match="cannot form the required fixed evidence pool"):
-        designate_patch_pool(
-            df, 10, seed=4, max_p=300, max_pool_units=60, max_independent_units=12
-        )
-
-def test_narrowed_pool_rejects_a_cap_below_the_independent_patient_floor() -> None:
-    from imbalance_benchmark.manifest.sampling.patch_pool import designate_patch_pool
-
-    with pytest.raises(ValueError, match="cannot narrow below"):
-        designate_patch_pool(
-            pd.DataFrame(
-                {
-                    "case_id": ["p0"],
-                    "slide_id": ["s0"],
-                    "patch_id": ["c0"],
-                    "cancer_type": ["A"],
-                    "split": ["train"],
-                }
-            ),
-            10,
-            seed=4,
-            max_independent_units=5,
-        )
+    assert set(concentrated["case_id"]).issubset(spread["case_id"])
+    assert concentrated["case_id"].nunique() < spread["case_id"].nunique()
 
 @pytest.mark.parametrize("n_patients,slides_per_patient,patches_per_slide", [
     (40, 2, 400),  # BRACS-scale: few patients, tens of thousands of patches

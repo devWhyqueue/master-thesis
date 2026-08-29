@@ -70,8 +70,8 @@ def test_workflow_has_resumable_sharded_tuning_dag() -> None:
         "tune-decide-base-balanced",
         "tune-decide-base-moderate",
         "tune-decide-base-severe",
-        "tune-decide-base-balanced_narrow",
-        "tune-decide-base-severe_narrow",
+        "tune-decide-base-balanced_spread",
+        "tune-decide-base-severe_spread",
     ]
     assert jobs[6].dependencies == ("tune-base-natural", "tune-base-controlled")
     assert jobs[7].dependencies == ("tune-base-reduce",)
@@ -166,7 +166,7 @@ def test_submit_links_actual_job_ids() -> None:
 
     submitted = submit_workflow(_config(), submit=fake_submit)
     assert submitted["prepare"] == "1"
-    assert submitted["tune-decide-base-severe_narrow"] == str(len(submitted_scripts))
+    assert submitted["tune-decide-base-severe_spread"] == str(len(submitted_scripts))
     assert "#SBATCH --dependency=afterok:5:6" in submitted_scripts[6]
     assert "#SBATCH --dependency=afterok:7" in submitted_scripts[7]
 
