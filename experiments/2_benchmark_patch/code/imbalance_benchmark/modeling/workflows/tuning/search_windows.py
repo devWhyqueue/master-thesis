@@ -22,19 +22,19 @@ LR_ENVELOPE: list[float] = [1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
 # unlike balanced-sampling/weighted-CE/OKO strength 1). Each envelope's
 # active four-point window starts at GRIDS[method] (modeling.context) and
 # may shift upward one position at a time. CE (that method's parameter=0)
-# is a free anchor point below the window, not part of it: gamma=0 and
-# auxiliary weight=0 both degenerate exactly to plain CE, so their metrics
-# are aliased from CE's already-computed candidates rather than trained
-# (see tuning_reduction).
+# is a free anchor point below the window for focal only: gamma=0 degenerates
+# exactly to plain CE, so its metrics are aliased from CE's already-computed
+# candidates rather than trained (see tuning_reduction). ce_soft_f1/mcc train
+# under a forced balanced sampler (loaders.FIXED_BALANCED_SAMPLER_METHODS),
+# so their weight=0 point is balanced-sampling CE, not CE - it is trained for
+# real, not aliased, hence their absence from CE_ANCHORED_METHODS below.
 STRENGTH_ENVELOPES: dict[str, list[float]] = {
     "focal": [0.0, 0.5, 1.0, 1.5, 2.0, 4.0, 8.0],
     "ce_soft_f1": [0.0, 0.25, 1.0, 4.0, 16.0, 64.0],
     "ce_soft_mcc": [0.0, 0.25, 1.0, 4.0, 16.0, 64.0],
 }
 
-CE_ANCHORED_METHODS = frozenset(
-    {"weighted_ce", "balanced_sampling", "focal", "ce_soft_f1", "ce_soft_mcc"}
-)
+CE_ANCHORED_METHODS = frozenset({"weighted_ce", "balanced_sampling", "focal"})
 
 
 def initial_window(regime: str, envelope: list[float]) -> list[float]:

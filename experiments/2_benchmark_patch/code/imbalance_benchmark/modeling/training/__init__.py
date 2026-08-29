@@ -9,6 +9,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from imbalance_benchmark.modeling.context import (
+    GRIDS,
+    NO_STRENGTH_GRID_METHODS,
     REFERENCE_PASSES,
     resolve_update_budget,
     set_training_mode,
@@ -97,14 +99,21 @@ def _init_criterion(
     ctx: dict[str, Any],
 ) -> nn.Module:
     """Instantiate the loss function according to the method config."""
+    if method in GRIDS and method not in NO_STRENGTH_GRID_METHODS and param is None:
+        raise ValueError(
+            f"{method} has a strength dimension but its locked parameter is None"
+        )
     if method == "weighted_ce":
-        w = get_class_weights(train_labels, n_classes, float(param or 1.0))
+        strength = float(param if param is not None else 1.0)
+        w = get_class_weights(train_labels, n_classes, strength)
         return nn.CrossEntropyLoss(weight=w.to(device))
     if method == "focal":
-        return FocalLoss(gamma=float(param or 1.0))
+        return FocalLoss(gamma=float(param if param is not None else 1.0))
     if method in ("ce_soft_f1", "ce_soft_mcc"):
         metric = "f1" if "f1" in method else "mcc"
-        return ScholzCombinedLoss(n_classes, metric=metric, weight=float(param or 1.0))
+        return ScholzCombinedLoss(
+            n_classes, metric=metric, weight=float(param if param is not None else 1.0)
+        )
     signal = signal_criterion(method, param, device, ctx)
     return signal if signal is not None else nn.CrossEntropyLoss()
 

@@ -89,13 +89,20 @@ def _load_root_units(root: Path) -> list[dict[str, Any]]:
 
 
 def _standardize(values: np.ndarray) -> np.ndarray:
+    """Z-score one score column; a never-varying column is NaN, not 0.
+
+    A constant column standardized to 0 is indistinguishable from a column
+    that genuinely averages to the pooled mean, which lets a structurally-zero
+    axis win the dominant-shortage argmax by default. NaN marks it as
+    degenerate instead so callers can exclude it from ranking.
+    """
     std = values.std(ddof=0)
-    return (values - values.mean()) / std if std > 0 else np.zeros_like(values)
+    return (values - values.mean()) / std if std > 0 else np.full_like(values, np.nan)
 
 
-def _standardize_scores(units: list[dict[str, Any]]) -> dict[str, np.ndarray]:
-    """Standardize each of the four shortage scores across every pooled unit."""
-    raw = {
+def _raw_scores(units: list[dict[str, Any]]) -> dict[str, np.ndarray]:
+    """The four shortage scores per unit, before standardization."""
+    return {
         "nominal": np.array([unit["nominal_shortage"] for unit in units]),
         "independent": np.array([unit["independent_shortage"] for unit in units]),
         "difficulty": np.array(
@@ -103,14 +110,39 @@ def _standardize_scores(units: list[dict[str, Any]]) -> dict[str, np.ndarray]:
         ),
         "diversity": np.array([unit["diversity_shortage"] for unit in units]),
     }
+
+
+def _standardize_scores(raw: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    """Standardize each of the four shortage scores across every pooled unit."""
     return {label: _standardize(values) for label, values in raw.items()}
 
 
-def _label_unit(unit: dict[str, Any], scores: dict[str, float]) -> dict[str, Any]:
-    """Dominant/ambiguous label and matched/unmatched method sets for one unit."""
-    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    ambiguous = (ranked[0][1] - ranked[1][1]) < AMBIGUITY_BAND_SD
-    dominant = None if ambiguous else ranked[0][0]
+def _label_unit(
+    unit: dict[str, Any],
+    scores: dict[str, float],
+    raw_scores: dict[str, float],
+) -> dict[str, Any]:
+    """Dominant/ambiguous label and matched/unmatched method sets for one unit.
+
+    A degenerate axis (NaN, never varies across the pool) and an axis that was
+    never created in this unit (raw score <= 0) are both excluded before the
+    argmax and the ambiguity check: a shortage that is structurally zero or
+    was never created here cannot be dominant.
+    """
+    degenerate_axes = sorted(
+        label for label, value in scores.items() if np.isnan(value)
+    )
+    ranked = sorted(
+        (
+            (label, value)
+            for label, value in scores.items()
+            if not np.isnan(value) and raw_scores[label] > 0
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    ambiguous = len(ranked) >= 2 and (ranked[0][1] - ranked[1][1]) < AMBIGUITY_BAND_SD
+    dominant = ranked[0][0] if ranked and not ambiguous else None
     matched = MATCHED_MEMBERS[dominant] if dominant else frozenset()
     unmatched = PRIMARY_METHODS - matched
     return {
@@ -119,6 +151,7 @@ def _label_unit(unit: dict[str, Any], scores: dict[str, float]) -> dict[str, Any
         "severity": unit["severity"],
         "freeze_content_sha256": unit["freeze_content_sha256"],
         "standardized_scores": scores,
+        "degenerate_axes": degenerate_axes,
         "dominant": dominant,
         "ambiguous": ambiguous,
         "matched_methods": sorted(matched),
@@ -130,17 +163,21 @@ def build_matching_record(roots: list[Path]) -> dict[str, Any]:
     """Standardize the four shortage scores across every pooled unit and label each.
 
     Protocol app:testing: the dominant shortage is the largest standardized
-    score; a unit whose two largest scores lie within 0.25 SD is ambiguous
-    and carries no matched label.
+    score among axes that are neither degenerate (never varies across the
+    pool) nor never created in this unit (raw score <= 0); a unit whose two
+    largest remaining scores lie within 0.25 SD, or that has no eligible
+    axis, is ambiguous or dominant-free and carries no matched label.
     """
     units = [unit for root in roots for unit in _load_root_units(root)]
     if not units:
         return {"units": {}, "roots": [str(root) for root in roots]}
-    standardized = _standardize_scores(units)
+    raw = _raw_scores(units)
+    standardized = _standardize_scores(raw)
     records = {
         unit_key(unit["group"], unit["assignment"], unit["severity"]): _label_unit(
             unit,
             {label: float(column[index]) for label, column in standardized.items()},
+            {label: float(column[index]) for label, column in raw.items()},
         )
         for index, unit in enumerate(units)
     }

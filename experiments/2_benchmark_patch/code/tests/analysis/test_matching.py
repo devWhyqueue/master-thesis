@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
-
-import pytest
 
 from imbalance_benchmark.analysis.inference.confirmatory.holm import PRIMARY_METHODS
 from imbalance_benchmark.analysis.predictors.signals.matching import (
@@ -132,11 +131,14 @@ def test_no_deprived_class_zero_scores_standardize_without_crashing(tmp_path: Pa
 
     zero = record["units"][unit_key("ds:target", "native", "severe")]
     assert all(isinstance(v, float) for v in zero["standardized_scores"].values())
-    assert zero["dominant"] in {None, "nominal", "independent", "difficulty", "diversity"}
+    # A shortage that was never created (raw score <= 0) can never be dominant.
+    assert zero["dominant"] is None
 
 
-def test_single_unit_pool_has_zero_variance_and_is_ambiguous(tmp_path: Path) -> None:
-    """A single pooled unit standardizes to all zeros (std undefined -> zero), hence ambiguous."""
+def test_single_unit_pool_has_zero_variance_and_every_axis_is_degenerate(
+    tmp_path: Path,
+) -> None:
+    """A single pooled unit has undefined variance on every axis: all NaN, none dominant."""
     only_unit = {
         "assignment": "native",
         "severity": "severe",
@@ -152,10 +154,51 @@ def test_single_unit_pool_has_zero_variance_and_is_ambiguous(tmp_path: Path) -> 
     record = build_matching_record([root])
 
     unit = record["units"][unit_key("ds:target", "native", "severe")]
-    assert unit["standardized_scores"] == {
-        "nominal": pytest.approx(0.0),
-        "independent": pytest.approx(0.0),
-        "difficulty": pytest.approx(0.0),
-        "diversity": pytest.approx(0.0),
+    assert all(math.isnan(v) for v in unit["standardized_scores"].values())
+    assert set(unit["degenerate_axes"]) == {
+        "nominal",
+        "independent",
+        "difficulty",
+        "diversity",
     }
-    assert unit["ambiguous"] is True
+    assert unit["dominant"] is None
+    assert unit["ambiguous"] is False
+
+
+def test_structurally_zero_independent_shortage_is_never_dominant(
+    tmp_path: Path,
+) -> None:
+    """Regression for the published mislabelling: a constant-zero axis must not win the argmax.
+
+    Independent-support shortage is 0.0 for every unit in the pool (structurally
+    zero, per the report), while the other three scores standardize negative for
+    the unit under test. The old unguarded argmax picked "independent" here
+    because a constant column standardized to exactly 0.0, beating the genuinely
+    negative axes.
+    """
+    unit_p = {
+        "assignment": "native",
+        "severity": "severe",
+        "rho": 4.0,
+        "nominal_shortage": 0.0,
+        "independent_shortage": 0.0,
+        "diversity_shortage": 0.0,
+        "support_difficulty_alignment": 2.0,
+    }
+    unit_q = {
+        "assignment": "native",
+        "severity": "moderate",
+        "rho": 8.0,
+        "nominal_shortage": 3.0,
+        "independent_shortage": 0.0,
+        "diversity_shortage": 3.0,
+        "support_difficulty_alignment": -2.0,
+    }
+    root = tmp_path / "ds"
+    _write_root(root, "ds:target", [unit_p, unit_q])
+
+    record = build_matching_record([root])
+
+    p = record["units"][unit_key("ds:target", "native", "severe")]
+    assert "independent" in p["degenerate_axes"]
+    assert p["dominant"] is None

@@ -62,14 +62,36 @@ def test_target_prior_correction_posthoc_formula():
     pi_train = np.array([0.5, 0.3, 0.2])
     pi_target = np.array([0.2, 0.3, 0.5])
     out = apply_target_prior_correction(
-        logits, "post_hoc_logit_adjustment", 1.0, pi_train, pi_target
+        logits, "post_hoc_logit_adjustment", 0.5, pi_train, pi_target
     )
-    expected = logits - np.log(pi_train) + np.log(pi_target)
+    expected = logits - 0.5 * np.log(pi_train) + np.log(pi_target)
     assert np.allclose(out, expected)
     balanced = balanced_decision_logits(
         logits, "post_hoc_logit_adjustment", 0.5, pi_train
     )
     assert np.allclose(balanced, logits - 0.5 * np.log(pi_train))
+
+
+def test_target_prior_correction_posthoc_varies_with_tau():
+    """Regression: the calibration branch used to discard tau, aliasing CE exactly."""
+    logits = np.array([[1.0, 2.0, 3.0]])
+    pi_train = np.array([0.5, 0.3, 0.2])
+    pi_target = np.array([0.2, 0.3, 0.5])
+    outputs = [
+        apply_target_prior_correction(
+            logits, "post_hoc_logit_adjustment", tau, pi_train, pi_target
+        )
+        for tau in (0.25, 0.5, 2.0)
+    ]
+    assert not np.allclose(outputs[0], outputs[1])
+    assert not np.allclose(outputs[1], outputs[2])
+    assert not np.allclose(outputs[0], outputs[2])
+    # tau = 1.0 is CE's own probabilities; post-hoc LA must differ from it
+    # whenever it selects a different tau, or the two methods are byte-identical.
+    ce_at_one = apply_target_prior_correction(
+        logits, "ce", 1.0, pi_train, pi_target
+    )
+    assert not np.allclose(outputs[1], ce_at_one)
 
 def test_calibration_gate_thresholds():
     assert calibration_gate(0.19, (0.02, 0.30)) is True

@@ -13,6 +13,7 @@ from imbalance_benchmark.datasets.data import (
     bag_collate,
     patch_collate,
 )
+from imbalance_benchmark.modeling.context import GRIDS, NO_STRENGTH_GRID_METHODS
 from imbalance_benchmark.modeling.models import (
     AttentionMil,
     MLP,
@@ -30,7 +31,7 @@ from imbalance_benchmark.modeling.training import (
     run_evaluation,
     update_budget,
 )
-from imbalance_benchmark.modeling.training import _fit_step
+from imbalance_benchmark.modeling.training import _fit_step, _init_criterion
 from imbalance_benchmark.modeling.evaluation import _gather_and_eval
 
 DIM = 16
@@ -319,6 +320,32 @@ def test_wsi_method_one_step_finite_training(tmp_path, method, param):
     assert 0.0 <= acc <= 1.0
     assert state
     assert ctx["processed_instances"] > ctx["processed_examples"]
+
+
+def test_locked_zero_strength_trains_at_zero_not_one() -> None:
+    """Regression: `float(param or 1.0)` silently promoted a locked 0.0 to 1.0.
+
+    Must use ``param=0.0``, not ``None`` - the bug is specifically a falsy
+    zero, and ``None`` already takes the correct default-fill path.
+    """
+    criterion = _init_criterion(
+        "focal", 0.0, 3, np.zeros(1, dtype=int), torch.device("cpu"), {}
+    )
+    assert criterion.gamma == 0.0
+
+    weighted = _init_criterion(
+        "weighted_ce", 0.0, 3, np.array([0, 0, 1, 2]), torch.device("cpu"), {}
+    )
+    assert torch.allclose(weighted.weight, torch.ones(3))
+
+
+@pytest.mark.parametrize("method", sorted(GRIDS.keys() - NO_STRENGTH_GRID_METHODS))
+def test_strength_methods_reject_a_missing_locked_parameter(method: str) -> None:
+    """A method with a strength dimension must never silently default an unset lock."""
+    with pytest.raises(ValueError):
+        _init_criterion(
+            method, None, 3, np.zeros(1, dtype=int), torch.device("cpu"), {}
+        )
 
 
 def test_build_optimizer_is_the_single_locked_optimizer() -> None:

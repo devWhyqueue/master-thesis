@@ -175,6 +175,37 @@ def test_reduce_phase_skips_ce_alias_when_ce_has_not_been_reduced_this_call(
     assert selections["weighted_ce"] == {"parameter": 0.25, "lr": 1e-4}
 
 
+def test_ce_soft_hybrids_train_their_own_zero_strength_candidate_not_ces(
+    tmp_path: Path,
+):
+    """Regression: ce_soft_f1/mcc train under a forced balanced sampler, so their
+    weight=0 point is balanced-sampling CE, not CE - it must never be aliased
+    from CE's metrics even when CE was reduced in the same call.
+    """
+    ce_grid = [{"lr": 1e-4}]
+    _write_candidate(tmp_path, ShardSpec("moderate", "ce", 0, "base"), ce_grid[0], 0.9)
+
+    soft_grid = [{"parameter": 0.0, "lr": 1e-4}, {"parameter": 0.25, "lr": 1e-4}]
+    soft_scores = [0.8, 0.3]
+    for index, (cfg, score) in enumerate(zip(soft_grid, soft_scores)):
+        _write_candidate(
+            tmp_path, ShardSpec("moderate", "ce_soft_f1", index, "base"), cfg, score
+        )
+
+    selections, payloads = reduce_phase(
+        tmp_path,
+        "moderate",
+        "base",
+        ("ce", "ce_soft_f1"),
+        {"ce": ce_grid, "ce_soft_f1": soft_grid},
+        ReduceRound(FINGERPRINT),
+    )
+
+    # 1 CE + 2 ce_soft_f1 candidates, all trained - no free CE-aliased entry added.
+    assert len(payloads) == 3
+    assert selections["ce_soft_f1"] == {"parameter": 0.0, "lr": 1e-4}
+
+
 def test_write_base_selection_merges_instead_of_overwriting(tmp_path: Path):
     write_base_selection(tmp_path, "moderate", {"ce": {"lr": 1e-4}})
     write_base_selection(tmp_path, "moderate", {"weighted_ce": {"parameter": 0.5, "lr": 1e-4}})

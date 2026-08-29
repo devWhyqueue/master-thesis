@@ -192,8 +192,10 @@ def apply_target_prior_correction(
         return logits
     log_train = np.log(np.clip(pi_train, 1e-12, 1.0))
     log_target = np.log(np.clip(pi_target, 1e-12, 1.0))
-    if method in {"ce", "post_hoc_logit_adjustment"}:
+    if method == "ce":
         return logits - log_train + log_target
+    if method == "post_hoc_logit_adjustment":
+        return balanced_decision_logits(logits, method, tau, pi_train) + log_target
     return logits + (tau - 1.0) * log_train + log_target
 
 

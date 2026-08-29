@@ -54,6 +54,8 @@ def _base_sampler(
     ctx: dict[str, Any], train_labels: np.ndarray, param: float | None
 ) -> RandomSampler | WeightedRandomSampler:
     method = ctx["method"]
+    # Falsy check intentional: strength 0 must give RandomSampler (CE's anchor),
+    # not a with-replacement uniform sampler. Do not change to `is not None`.
     if method == "balanced_sampling" and param:
         return get_balanced_sampler(train_labels, param, ctx["seed"])
     if method in FIXED_BALANCED_SAMPLER_METHODS:
