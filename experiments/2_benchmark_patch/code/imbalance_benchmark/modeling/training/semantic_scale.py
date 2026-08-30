@@ -169,8 +169,12 @@ def _update_volumes(pool: SsbPool, n_classes: int) -> None:
 
 
 def _ssb_weights(pool: SsbPool, n_classes: int, tau: float) -> torch.Tensor:
+    """Raw weight is ``volume ** -tau`` for a class with a valid draw, else 1.0 (no reweighting)."""
     raw = np.array(
-        [max(pool.volumes.get(c, EPS_S), EPS_S) ** (-tau) for c in range(n_classes)]
+        [
+            pool.volumes[c] ** (-tau) if c in pool.volumes else 1.0
+            for c in range(n_classes)
+        ]
     )
     return mean_one(raw)
 

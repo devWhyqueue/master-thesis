@@ -12,8 +12,10 @@ from imbalance_benchmark.modeling.models import build_model
 from imbalance_benchmark.modeling.training import _fit_step
 from imbalance_benchmark.modeling.training import semantic_scale
 from imbalance_benchmark.modeling.training.semantic_scale import (
+    SsbPool,
     _log2_volume,
     _matched_draw_indices,
+    _ssb_weights,
     prepare_ssb_pool,
 )
 
@@ -166,6 +168,35 @@ def test_update_volumes_runs_once_per_pool_pass_not_per_step(
     # one seeding call at reweight_step - 1, plus one per completed pool pass
     # thereafter (passes 6 and 7) -- never one per step.
     assert calls == 3
+
+
+def test_ssb_weights_gives_a_degenerate_class_raw_weight_one_not_eps_maximum() -> None:
+    """Plan 06 / D1: a class absent from ``pool.volumes`` (dropped as degenerate by
+    ``semantic_volumes``, or never seen) must not fall back to ``EPS_S ** -tau``,
+    which was up to 1000x before mean-one. It must fall back to raw weight 1.0,
+    i.e. no reweighting for that class.
+    """
+    pool = SsbPool(
+        class_ids=torch.tensor([0, 1, 2]),
+        indices=np.array([0, 1, 2]),
+        chunk_size=1,
+        volumes={0: 4.0, 2: 4.0},  # class 1 missing: its matched draw was degenerate
+    )
+    weights = _ssb_weights(pool, n_classes=3, tau=0.5)
+
+    # raw = [4**-0.5, 1.0, 4**-0.5] = [0.5, 1.0, 0.5]; mean-one scales by 3/sum(raw)=1.5
+    expected = torch.tensor([0.5, 1.0, 0.5]) * 1.5
+    assert torch.allclose(weights, expected, atol=1e-6)
+    # Old fallback (EPS_S=1e-3, tau=0.5) would have given raw[1] = sqrt(1000) ~ 31.6:
+    # nowhere near the missing class's actual weight of 1.5.
+    assert weights[1] < 2.0
+
+
+def test_ssb_weights_no_longer_uses_eps_s() -> None:
+    """Plan 06 / D1: EPS_S is removed from `_ssb_weights`, not merely raised."""
+    import inspect
+
+    assert "EPS_S" not in inspect.getsource(_ssb_weights)
 
 
 def test_ssb_pool_class_names_match_dataset_order(tmp_path: Path) -> None:

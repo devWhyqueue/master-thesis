@@ -12,7 +12,7 @@ from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import confidence_interval
 from imbalance_benchmark.analysis.metrics import assign_tiers
 from imbalance_benchmark.analysis.query import load_seed_predictions
-from imbalance_benchmark.analysis.reporting.calibration_intervals import (
+from imbalance_benchmark.analysis.reporting.secondary_intervals.calibration_intervals import (
     _complete_result_keys,
     write_crossed_calibration_table,
 )

@@ -23,7 +23,12 @@ from imbalance_benchmark.analysis.metrics import (
 from imbalance_benchmark.common import read_run_record, write_json
 from imbalance_benchmark.manifest.freeze import accepted_freeze_hashes
 
-__all__ = ["ingest_all_runs", "calibration_summary", "write_diagnostics"]
+__all__ = [
+    "ingest_all_runs",
+    "calibration_summary",
+    "method_diagnostics_summary",
+    "write_diagnostics",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +114,54 @@ def _ingest_discovered_run(
 def write_diagnostics(
     paths: dict[str, Path], comparisons: list[dict[str, Any]]
 ) -> None:
-    """Persist gate/recovery and calibration diagnostics for one analyzed split."""
+    """Persist gate/recovery, calibration, and method diagnostics for one analyzed split."""
     write_json(
         paths["data"] / "gates_and_recovery.json",
         {"comparisons": apply_holm(comparisons)},
     )
     write_json(paths["data"] / "calibration_summary.json", calibration_summary(paths))
+    write_json(
+        paths["data"] / "method_diagnostics.json",
+        {"rows": method_diagnostics_summary(paths)},
+    )
+
+
+def _accumulate_diagnostics(entry: dict[str, Any], diagnostics: dict[str, Any]) -> None:
+    """Fold one run's ``method_diagnostics`` into its (condition, method) entry.
+
+    Generic over the diagnostic's name: a numeric value is summed across seeds, a
+    list value has its length summed. This is what lets ``ssb_invalid_draws``
+    (semantic-scale) and ``sc_mil_batch_diagnostics`` (SC-MIL) share one reader
+    instead of each needing its own report path.
+    """
+    for name, value in diagnostics.items():
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            entry[name] = entry.get(name, 0) + value
+        elif isinstance(value, list):
+            key = f"{name}_count"
+            entry[key] = entry.get(key, 0) + len(value)
+
+
+def method_diagnostics_summary(paths: dict[str, Path]) -> list[dict[str, Any]]:
+    """Per-(condition, method) rollup of every ``method_diagnostics`` key any run recorded."""
+    rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for condition, method, _seed_idx, result_dir in discover_result_dirs(
+        paths["results"]
+    ):
+        record = read_run_record(result_dir, array_fields=())
+        if record is None:
+            continue
+        diagnostics = record.get("method_diagnostics") or {}
+        if not diagnostics:
+            continue
+        entry = rows.setdefault(
+            (condition, method), {"condition": condition, "method": method, "seeds": 0}
+        )
+        entry["seeds"] += 1
+        _accumulate_diagnostics(entry, diagnostics)
+    return list(rows.values())
 
 
 def _run_calibration(record: dict[str, Any]) -> dict[str, Any] | None:

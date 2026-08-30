@@ -176,6 +176,7 @@ class Dataset:
     preflights: list[dict[str, Any]]
     profiles: list[dict[str, Any]]
     selections: list[dict[str, dict[str, Any]]]
+    method_diagnostics: list[dict[str, Any]]
     tables: dict[str, pd.DataFrame]
 
     @property
@@ -230,6 +231,7 @@ def load_dataset(root: Path) -> Dataset:
         preflights=_split_json(root, "bootstrap_preflight.json"),
         profiles=_split_json(root, "signal_profile.json"),
         selections=_selections(root),
+        method_diagnostics=_split_json(root, "method_diagnostics.json"),
         tables=tables,
     )
 

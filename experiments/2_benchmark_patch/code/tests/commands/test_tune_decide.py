@@ -139,7 +139,7 @@ def test_advance_submits_next_round_when_a_method_is_still_shifting(tmp_path, mo
     assert submitted[0].command == "tune-wave --phase base --condition moderate --round 1"
     grids = load_round_grids(tmp_path, "moderate", "base")
     assert grids["round"] == 1
-    assert grids["windows"]["ce"]["lr_window"] == LR_ENVELOPE[3:7]
+    assert grids["windows"]["ce"]["lr_window"] == LR_ENVELOPE[4:8]
 
 
 def test_natural_round_hands_off_to_an_artifact_driven_wave(tmp_path, monkeypatch):

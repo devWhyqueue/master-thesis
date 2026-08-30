@@ -285,9 +285,9 @@ Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, group
     Prevalence & Balanced sampling; weighted CE; train-time and post-hoc logit adjustment; cRT & Sampling; loss weight; logits and prior correction; classifier retraining \\
     Nominal support & Class-balanced CE & Loss weight \\
     Independent support & Independent-support weighted CE & Loss weight \\
-    Difficulty & Focal loss; pilot-difficulty weighted CE & Loss weight \\
+    Difficulty & Pilot-difficulty weighted CE & Loss weight \\
     Diversity & Semantic-scale weighted CE & Loss weight (dynamic) \\
-    Nominal support and difficulty & CFAL & Prototype head and margin loss \\
+    Nominal support and difficulty & Focal loss; CFAL & Loss weight; prototype head and margin loss \\
     Prevalence (hybrid) & CE + soft F1; CE + soft MCC; OKO set learning & Sampler and auxiliary loss; set construction and set loss \\
     \bottomrule
   \end{tabularx}
@@ -865,6 +865,8 @@ Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$
   \caption{Prespecified method-specific controls, crossed with the active window of the learning-rate envelope in Equation~\eqref{eq:learning-rate-grid}. Focal loss and the two soft-label hybrids search their listed envelope through an adaptive four-value window; every other row is a fixed four-value grid. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately. The class-balanced and independent-support $\beta$ grids are matched saturation points on the effective-number transform, scaled to each method's own counting unit as defined in the companion methods report \citep{queisler2026imbalanceMethods}.}
   \label{tab:controls}
 \end{table}
+
+\noindent Method-specific implementation deviations (CFAL's fixed constants, semantic-scale's warmup and degenerate-draw fallback, focal's alpha-balancing) are documented in the companion methods report \citep{queisler2026imbalanceMethods}. Table~\ref{tab:roster} already reflects focal's resulting family reassignment.
 
 \begin{center}
   \fbox{%

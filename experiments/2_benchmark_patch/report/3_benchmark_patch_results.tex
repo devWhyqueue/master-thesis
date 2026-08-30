@@ -472,6 +472,17 @@ The recovery association model of Section~\ref{sec:rq3} initially returned no es
 
 The final aggregation pass for TCGA-UT exhausted its wall-clock allocation while writing the secondary interval tables, after the crossed comparison file on which every gate and recovery estimate in this report depends had already been written. Those interval tables are computed from the fitted runs and the partition databases alone, neither of which the repeated aggregation changed, so the tables carried over from the preceding complete pass are the same tables the interrupted pass would have written. Nothing reported here is drawn from a partially written artifact.
 
+\subsection{Method diagnostics}
+\label{app:method-diagnostics}
+Semantic-scale weighted CE falls back to a raw weight of \num{1} (no reweighting) for any class whose matched draw is degenerate at reweighting time, rather than to the maximal fallback weight the prior implementation used (Plan~06, Decision~D1). \texttt{ssb\_invalid\_draws} counts how often that fallback fires; Table~\ref{tab:method-diagnostics} reports it per condition and method, along with the analogous SC-MIL batch-diagnostic counter, using one reader generic over the diagnostic's name (Plan~06, Decision~D2). A nonzero count on a dataset where diversity weighting shows a null or erratic recovery reading is grounds to distrust that reading until the corresponding condition is retuned under the fixed fallback.
+
+\begingroup
+\scriptsize
+\resultstable{method_diagnostics}
+\captionof{table}{Per-condition, per-method \texttt{method\_diagnostics} counters: \texttt{ssb\_invalid\_draws} (semantic-scale's degenerate-draw fallback count) and \texttt{sc\_mil\_batch\_diagnostics\_count} (SC-MIL's stranded-batch count), summed across confirmation seeds.}
+\label{tab:method-diagnostics}
+\endgroup
+
 \section{Per-Class and Tier Endpoints}
 \label{app:endpoints}
 Section~\ref{sec:rq1-incidence} reports damage at tier level; this appendix gives the per-class detail behind it. For each dataset, recall, $F_1$, negative log likelihood, and Brier score are listed per class and condition for the cross-entropy reference, averaged within a partition and then with equal weight across the three partitions. The tier assignment of each class is given alongside, since tier membership follows the allocation of the condition and is therefore not constant across conditions. The table is restricted to cross-entropy because that is the reference against which every deficit in Section~\ref{sec:rq1} is defined; per-class endpoints for the remaining methods are available in the analysis outputs but would multiply the table by the size of the roster without informing a claim made here.

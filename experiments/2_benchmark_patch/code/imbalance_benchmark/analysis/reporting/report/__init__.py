@@ -45,6 +45,7 @@ _DATASET_TABLES: dict[str, Callable[[list[Dataset]], str]] = {
     "completeness": appendix.completeness,
     "tuning_selections": appendix.tuning_selections,
     "per_split": appendix.per_split,
+    "method_diagnostics": appendix.method_diagnostics,
 }
 
 _RQ3_TABLES: dict[str, Callable[[dict[str, Any]], str]] = {

@@ -43,7 +43,7 @@ def _cfal_reference(
     proto = F.normalize(model.prototypes, dim=-1, eps=1e-8)
     pw = (proto.unsqueeze(0) - proto.unsqueeze(1)).square().sum(dim=-1)
     reg = pw[torch.triu(torch.ones_like(pw), diagonal=1).bool()].var(unbiased=False)
-    return cls + reg
+    return cls + 0.1 * reg
 
 def test_supervised_contrastive_loss_reports_pairs_and_anchors():
     from imbalance_benchmark.modeling.losses import supervised_contrastive_loss
@@ -108,6 +108,32 @@ def test_cfal_loss_matches_report_margin_and_weights():
     counts = np.array([50, 5, 1])
     assert torch.allclose(
         cfal_loss(model, x, y, counts), _cfal_reference(model, x, y, counts), atol=1e-6
+    )
+
+def test_cfal_prototype_diversity_coefficient_is_point_one():
+    """Plan 06 / D4: code matches the docstring's lambda=0.1, not the prior 1.0."""
+    from imbalance_benchmark.modeling.losses import _prototype_diversity
+
+    torch.manual_seed(3)
+    model = CfalPrototypeClassifier(16, 8, 3, 0.0, 1.0).eval()
+    x = torch.randn(9, 16)
+    y = torch.tensor([0, 1, 2, 0, 1, 2, 0, 1, 2])
+    counts = np.array([50, 5, 1])
+
+    eff = (1.0 - 0.999 ** np.maximum(counts, 1.0)) / (1.0 - 0.999)
+    inv_eff = torch.tensor(1.0 / eff, dtype=torch.float32)
+    aff = model.affinities(x)
+    true_aff = aff[torch.arange(len(y)), y]
+    margins = torch.relu(0.1 + aff - true_aff.unsqueeze(1))
+    margins = margins.masked_fill(F.one_hot(y, aff.shape[1]).bool(), 0.0).sum(dim=1)
+    classification_only = (
+        inv_eff[y] * (1.0 - true_aff).clamp(min=0.0).pow(2.0) * margins
+    ).mean()
+
+    assert torch.allclose(
+        cfal_loss(model, x, y, counts),
+        classification_only + 0.1 * _prototype_diversity(model),
+        atol=1e-6,
     )
 
 def test_soft_f1_is_softmax_normalized_not_independent_sigmoids():

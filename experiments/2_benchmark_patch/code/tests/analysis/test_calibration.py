@@ -22,7 +22,7 @@ from imbalance_benchmark.analysis.inference.gates import (
 from imbalance_benchmark.analysis.metrics import (
     negative_log_likelihood,
 )
-from imbalance_benchmark.analysis.reporting.calibration_intervals import (
+from imbalance_benchmark.analysis.reporting.secondary_intervals.calibration_intervals import (
     _distribution_summary,
 )
 from imbalance_benchmark.analysis.reporting.ingestion import (

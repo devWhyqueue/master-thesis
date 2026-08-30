@@ -136,16 +136,16 @@ def test_round_payload_carries_next_windows_only_while_unresolved():
 
 def test_new_candidates_lr_only_shift_adds_exactly_the_new_column():
     prev = LEARNING_RATE_GRID
-    nxt = LR_ENVELOPE[3:7]
+    nxt = LR_ENVELOPE[4:8]  # LEARNING_RATE_GRID's top-edge winner shifts right by one
     added = new_candidates(prev, nxt)
-    assert added == [{"lr": LR_ENVELOPE[6]}]
+    assert added == [{"lr": LR_ENVELOPE[7]}]
 
 
 def test_new_candidates_lr_shift_crossed_with_a_fixed_strength_grid():
-    prev_lr, next_lr = LEARNING_RATE_GRID, LR_ENVELOPE[3:7]
+    prev_lr, next_lr = LEARNING_RATE_GRID, LR_ENVELOPE[4:8]
     strength = [0.25, 0.5, 0.75, 1.0]
     added = new_candidates(prev_lr, next_lr, strength, strength)
-    assert added == [{"parameter": p, "lr": LR_ENVELOPE[6]} for p in strength]
+    assert added == [{"parameter": p, "lr": LR_ENVELOPE[7]} for p in strength]
 
 
 def test_new_candidates_strength_only_shift_adds_exactly_the_new_row():
@@ -157,7 +157,7 @@ def test_new_candidates_strength_only_shift_adds_exactly_the_new_row():
 
 
 def test_new_candidates_both_axes_shift_includes_the_new_corner():
-    prev_lr, next_lr = LEARNING_RATE_GRID, LR_ENVELOPE[3:7]
+    prev_lr, next_lr = LEARNING_RATE_GRID, LR_ENVELOPE[4:8]
     prev_strength = STRENGTH_ENVELOPES["focal"][1:5]
     next_strength = STRENGTH_ENVELOPES["focal"][2:6]
     added = new_candidates(prev_lr, next_lr, prev_strength, next_strength)

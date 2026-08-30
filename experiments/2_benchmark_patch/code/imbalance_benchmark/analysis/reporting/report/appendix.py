@@ -17,6 +17,7 @@ from imbalance_benchmark.analysis.reporting.report.sources import (
 
 __all__ = [
     "completeness",
+    "method_diagnostics",
     "per_split",
     "preflight_outcome",
     "rq3_logo",
@@ -173,6 +174,35 @@ def per_split(datasets: list[Dataset]) -> str:
                         r"$\rho$ spread": num(_severity_spread(data, unit)),
                     }
                 )
+    return body(pd.DataFrame(rows), longtable=True)
+
+
+def _diagnostics_row(
+    dataset_name: str, split_index: int, row: dict[str, Any]
+) -> dict[str, Any]:
+    extra = {
+        key.replace("_", " ").capitalize(): value
+        for key, value in row.items()
+        if key not in {"condition", "method", "seeds"}
+    }
+    return {
+        "Dataset": dataset_name,
+        "Split": split_index,
+        "Condition": CONDITION.get(row["condition"], row["condition"]),
+        "Method": METHOD.get(row["method"], row["method"]),
+        "Seeds": row["seeds"],
+        **extra,
+    }
+
+
+def method_diagnostics(datasets: list[Dataset]) -> str:
+    """Per-condition, per-method rollup of any ``method_diagnostics`` counter a run recorded."""
+    rows = [
+        _diagnostics_row(data.name, split_index, row)
+        for data in datasets
+        for split_index, payload in enumerate(data.method_diagnostics)
+        for row in payload.get("rows", [])
+    ]
     return body(pd.DataFrame(rows), longtable=True)
 
 

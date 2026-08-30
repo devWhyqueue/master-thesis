@@ -343,6 +343,21 @@ def test_locked_zero_strength_trains_at_zero_not_one() -> None:
     assert torch.allclose(weighted.weight, torch.ones(3))
 
 
+def test_focal_is_alpha_balanced_with_gamma_the_only_tuned_control() -> None:
+    """Plan 06 / D5: focal is fitted alpha-balanced, alpha derived not tuned."""
+    from imbalance_benchmark.modeling.training import get_class_weights
+
+    train_labels = np.array([0, 0, 0, 1, 2])
+    criterion = _init_criterion(
+        "focal", 2.0, 3, train_labels, torch.device("cpu"), {}
+    )
+    assert criterion.gamma == 2.0
+    assert criterion.alpha is not None
+    expected_alpha = get_class_weights(train_labels, 3, 1.0)
+    assert torch.allclose(criterion.alpha, expected_alpha)
+    assert torch.isclose(criterion.alpha.mean(), torch.tensor(1.0))
+
+
 @pytest.mark.parametrize("method", sorted(GRIDS.keys() - NO_STRENGTH_GRID_METHODS))
 def test_strength_methods_reject_a_missing_locked_parameter(method: str) -> None:
     """A method with a strength dimension must never silently default an unset lock."""

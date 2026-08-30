@@ -110,7 +110,8 @@ def _init_criterion(
         w = get_class_weights(train_labels, n_classes, strength)
         return nn.CrossEntropyLoss(weight=w.to(device))
     if method == "focal":
-        return FocalLoss(gamma=float(param if param is not None else 1.0))
+        alpha = get_class_weights(train_labels, n_classes, 1.0)
+        return FocalLoss(gamma=float(param if param is not None else 1.0), alpha=alpha)
     if method in ("ce_soft_f1", "ce_soft_mcc"):
         metric = "f1" if "f1" in method else "mcc"
         return ScholzCombinedLoss(

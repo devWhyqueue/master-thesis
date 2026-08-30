@@ -129,7 +129,7 @@ def cfal_loss(
     beta: float = 0.999,
     margin: float = 0.1,
 ) -> torch.Tensor:
-    """CFAL: per-class weight ``1/E_c`` (raw, not renormalized), fixed ``lambda=0.1``."""
+    """CFAL: per-class weight ``1/E_c`` (raw, not renormalized), prototype-diversity term at ``lambda=0.1``."""
     eff = effective_number(class_counts, beta)
     inv_eff = torch.tensor(1.0 / eff, dtype=torch.float32, device=features.device)
     aff = cast(CfalPrototypeClassifier, model).affinities(features)
@@ -141,7 +141,7 @@ def cfal_loss(
     loss_cfal = (
         inv_eff[targets] * (1.0 - true_aff).clamp(min=0.0).pow(gamma) * margin_term
     ).mean()
-    return loss_cfal + _prototype_diversity(model)
+    return loss_cfal + 0.1 * _prototype_diversity(model)
 
 
 def supervised_contrastive_loss(

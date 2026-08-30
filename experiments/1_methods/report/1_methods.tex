@@ -199,7 +199,7 @@ A signal must enter the sampler, objective, or decision rule to count. An effect
     Logit adjustment & Prevalence ($\widehat{\pi}_c$) & Logits and prior correction \\
     cRT & Prevalence (balanced exposure) & Classifier retraining \\
     Class-balanced CE & Nominal support ($E_c(\beta)$) & Loss weight \\
-    Focal loss & Example difficulty ($p_y$) & Loss weight \\
+    Focal loss & Nominal support ($n_c$) and example difficulty ($p_y$) & Loss weight \\
     Pilot-difficulty weighted CE & Class difficulty ($d_c$) & Loss weight \\
     \regimehead{Patch regime}{only}
     Independent-support weighted CE & Independent support ($G_c$) & Loss weight \\
@@ -307,13 +307,13 @@ Two comparisons with class-balanced CE serve different purposes. The validation-
 ISW-CE is evaluated for patch classification. The redundancy-adjusted support $N_{\mathrm{eff},c}$ from Equation~\eqref{eq:neff} is reported descriptively but does not enter the objective. When every prediction unit belongs to a distinct case, $G_c=n_c$ and ISW-CE reduces to class-balanced CE; this applies to slide-per-case cohorts such as CAMELYON16 \citep{queisler2026datasets}.
 
 \subsubsection{Focal Loss}
-Focal loss reduces the contribution of confidently classified examples and concentrates optimization on examples that remain difficult. With focusing parameter $\gamma$, the multiclass focal objective is
+Focal loss reduces the contribution of confidently classified examples and concentrates optimization on examples that remain difficult. With focusing parameter $\gamma$ and class weight $\alpha_y$, the multiclass focal objective is
 \begin{equation}
   \mathcal{L}_{\mathrm{focal}}(\mathbf{z},y) =
-  -(1-p_y)^{\gamma}\log p_y.
+  -\alpha_y(1-p_y)^{\gamma}\log p_y.
   \label{eq:focal}
 \end{equation}
-The reference default is $\gamma=\num{2.0}$ for both regimes; $\gamma$ is the tuned control selected on validation while the rest of the training protocol is held fixed. The method is relevant to imbalance because many minority-class examples can remain hard under a classifier dominated by head-class gradients, but the focal term does not directly encode the class counts. It is therefore a difficulty-sensitive loss rather than a sampler or explicit prior correction.
+The reference default is $\gamma=\num{2.0}$ for both regimes; $\gamma$ is the tuned control selected on validation while the rest of the training protocol is held fixed. $\alpha$ is fitted alpha-balanced: the derived, not tuned, mean-one inverse-frequency weight of Equation~\eqref{eq:weighted-ce} at $s=1$. The method is relevant to imbalance because many minority-class examples can remain hard under a classifier dominated by head-class gradients; combined with $\alpha$-balancing it addresses both difficulty and class frequency, rather than difficulty alone.
 
 \subsubsection{Pilot-Difficulty Weighted Cross-Entropy}
 \label{sec:pdw-ce}
@@ -356,18 +356,16 @@ For class $c$, let $Z_c\in\mathbb R^{d\times M}$ contain $M$ centred feature vec
 
 The full source method also multiplies $S'_c$ by a term derived from distances between class centres. That term is intentionally omitted because centre separation describes difficulty as well as diversity. The resulting within-class-only configuration is evaluated by \citet{ma2023semanticScale} as DSB-CE-1.
 
-Classes with smaller volume receive larger mean-one weights:
+Classes with smaller volume receive larger mean-one weights. Let $r_c=S_c'^{-\tau}$ for a class with a valid volume estimate, and $r_c=1$ (no reweighting) for a class without one:
 \begin{equation}
-  \widetilde S'_c=\max(S'_c,\varepsilon_S),
-  \qquad
   w_c^{\mathrm{SSB}}(\tau)=
-  \frac{\widetilde S'^{-\tau}_c}
-       {\frac{1}{C}\sum_{j=1}^{C}\widetilde S'^{-\tau}_j},
+  \frac{r_c}
+       {\frac{1}{C}\sum_{j=1}^{C}r_j},
   \qquad
   \mathcal{L}_{\mathrm{SSB}}(\mathbf z,y;\tau)=-w_y^{\mathrm{SSB}}(\tau)\log p_y.
   \label{eq:ssb-weight}
 \end{equation}
-\noindent The floor is fixed at $\varepsilon_S=\num{e-3}$ bits. The exponent $\tau\geq0$ is the only tuned control: $\tau=0$ recovers ordinary CE and $\tau=1$ gives inverse-volume weighting. Because the volumes are refreshed as the representation changes, this remains a dynamic weighting method.
+\noindent The exponent $\tau\geq0$ is the only tuned control: $\tau=0$ recovers ordinary CE and $\tau=1$ gives inverse-volume weighting. Because the volumes are refreshed as the representation changes, this remains a dynamic weighting method.
 
 \paragraph{Thesis variant.}
 The method uses the \num{512}-dimensional hidden representation of the shared MLP head and is reported as \emph{semantic-scale weighted CE (DSB-CE-1-inspired)}. To isolate diversity from support, $R$ rolling feature pools $Q^{(r)}$ are constructed from matched draws in which every class contributes the same number of cases and patches.
@@ -387,7 +385,7 @@ Feature scale is stabilized at each refresh before Equation~\eqref{eq:semantic-v
 \end{equation}
 \noindent where $\Sigma_t$ is the pooled covariance across classes and draws. A single scalar removes global magnitude drift without reweighting feature directions or erasing between-class differences. The precision is fixed, leaving $\tau$ as the only validation-selected control.
 
-A draw with fewer than two usable features for a class is excluded. If no valid draw remains, or the averaged volume is zero, the previous estimate is retained; at the first refresh, all classes instead keep unit weights. Such events are recorded, and the floor in Equation~\eqref{eq:ssb-weight} provides final numerical protection. The method is evaluated only for patch classification because matched WSI-level class sets are too small for stable covariance estimates.
+A draw with fewer than two usable features for a class is excluded. If no valid draw remains, or the averaged volume is zero, the previous estimate is retained; a class with no valid estimate at all -- at the first refresh, or in every refresh since -- keeps unit weight ($r_c=1$ in Equation~\eqref{eq:ssb-weight}) rather than a maximal fallback weight, since a degenerate draw carries no diversity evidence to reweight by. Such events are recorded. The method is evaluated only for patch classification because matched WSI-level class sets are too small for stable covariance estimates.
 
 \subsubsection{Logit Adjustment}
 Logit adjustment explicitly corrects for the empirical training prior \citep{menon2021longTail}. Let
