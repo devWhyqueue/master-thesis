@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 import math
 from pathlib import Path
 from typing import Any
 
 import torch
 
+from imbalance_benchmark.common import split_paths, verify_signed_file
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.modeling.context import group_conditions, roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
@@ -15,7 +17,10 @@ from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import 
 from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import ShardSpec
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
+    ShardSpec,
+    _fingerprint_matches,
+)
 from imbalance_benchmark.modeling.workflows.tuning.search_windows import expand_grid
 from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
     new_configs_for_round,
@@ -100,24 +105,27 @@ def resolve_shard_spec(
     return ShardSpec(conditions[condition_index], method, candidate_index, phase)
 
 
-def resolve_round_shard_spec(
-    root: Path, condition: str, index: int, phase: str, methods: tuple[str, ...]
-) -> ShardSpec | None:
-    """Resolve one round>0 array index from this round's signed active windows.
-
-    Each condition resolves its adaptive search independently, so a later
-    round's array always addresses one condition; only the genuinely new
-    (not-yet-trained) configs are addressed, reusing round 0's exact
-    fixed-slot addressing over that smaller per-method grid.
-    """
-    round_grids = load_round_grids(root, condition, phase)
-    grids = {
+def _new_configs_by_method(
+    root: Path, condition: str, round_grids: dict[str, Any], methods: tuple[str, ...]
+) -> dict[str, list[dict[str, Any]]]:
+    """This round's genuinely new per-method configs, keyed by method."""
+    return {
         method: new_configs_for_round(
             root, condition, method, expand_grid(**round_grids["windows"][method])
         )
         for method in methods
         if method in round_grids["windows"]
     }
+
+
+def resolve_round_shard_spec(
+    root: Path, condition: str, index: int, phase: str, methods: tuple[str, ...]
+) -> ShardSpec | None:
+    """Resolve one round>0 array index from this round's signed active
+    windows: only genuinely new (not-yet-trained) configs are addressed,
+    reusing round 0's exact fixed-slot addressing over the smaller grid."""
+    round_grids = load_round_grids(root, condition, phase)
+    grids = _new_configs_by_method(root, condition, round_grids, methods)
     spec = resolve_shard_spec(index, phase, "natural", tuple(grids), grids)
     if spec is None:
         return None
@@ -147,9 +155,8 @@ def _candidate_slot(methods: tuple[str, ...], index: int) -> tuple[str, int]:
 
 
 def phase_methods(is_mil: bool, phase: str, condition: str) -> tuple[str, ...]:
-    """Split one condition's frozen roster into self-contained methods
-    (``phase="base"``) and methods that inherit CE's tuned config (``phase="dependent"``).
-    """
+    """Split the frozen roster into self-contained (``base``) methods and
+    those that inherit CE's tuned config (``dependent``)."""
     return tuple(
         method
         for method in roster_for_condition(is_mil, condition)
@@ -170,6 +177,56 @@ def requested_shard(
     methods = phase_methods(is_mil, phase, group_conditions(group)[0])
     spec = resolve_shard_spec(index, phase, group, methods, grids)
     return replace(spec, observation_index=observation_index) if spec else None
+
+
+def _load_signed_condition_artifacts(
+    base: dict[str, Path], condition: str
+) -> tuple[list[Any], list[Any]] | None:
+    """Load every split's signed selection and cost file, or None if any is bad."""
+    selections, costs = [], []
+    for index in range(3):
+        data = split_paths(base, index)["data"]
+        selection = data / f"tuning_selections_{condition}.json"
+        cost = data / f"tuning_search_cost_{condition}.json"
+        try:
+            verify_signed_file(selection)
+            selections.append(json.loads(selection.read_text()))
+            costs.append(json.loads(cost.read_text()))
+        except (FileNotFoundError, json.JSONDecodeError, RuntimeError):
+            return None
+    return selections, costs
+
+
+def condition_is_reusable(
+    base: dict[str, Path],
+    condition: str,
+    methods: tuple[str, ...],
+    assignments: tuple[str, ...],
+    fingerprint: list[str],
+    accepted: list[set[str]] | None = None,
+) -> bool:
+    """Accept a completed serial condition only when every split matches and
+    its recorded fingerprint still chains (via ``accepted``) to the current
+    freeze - otherwise a stale pre-amendment selection is reused forever."""
+    loaded = _load_signed_condition_artifacts(base, condition)
+    if loaded is None:
+        return False
+    selections, costs = loaded
+    if selections[1:] != selections[:1] * 2 or costs[1:] != costs[:1] * 2:
+        return False
+    required_cost = {"wall_clock_seconds", "accelerator_hours", "processed_examples"}
+    if not required_cost.issubset(costs[0]):
+        return False
+    if not _fingerprint_matches(costs[0].get("fingerprint"), fingerprint, accepted):
+        return False
+    scoped = ("native",) if condition in {"natural", "balanced"} else assignments
+    return all(
+        all(
+            isinstance(selections[0].get(name, {}).get(condition, {}).get(method), dict)
+            for method in methods
+        )
+        for name in scoped
+    )
 
 
 def array_coordinates(

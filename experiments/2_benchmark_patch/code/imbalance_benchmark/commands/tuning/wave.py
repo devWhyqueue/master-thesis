@@ -26,6 +26,10 @@ from imbalance_benchmark.hydra.rendering import render_sbatch
 from imbalance_benchmark.hydra.rendering import SlurmJob
 from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan
 from imbalance_benchmark.hydra.workflow import _submit_script, _tuning_jobs
+from imbalance_benchmark.modeling.context import CONDITIONS
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
+    round_state_path,
+)
 
 __all__ = ["cmd_tune_wave", "select_wave"]
 
@@ -128,7 +132,7 @@ def _run_base_wave(
         raise ValueError("A condition is required for non-base tuning waves")
     remaining = resume_plan(config)
     if not remaining.natural_indices and not remaining.controlled_indices:
-        _submit_terminal(config, os.path.abspath(args.config))
+        _submit_terminal(config, os.path.abspath(args.config), base)
         return
     fresh = ResumePlan(
         tuple(
@@ -156,9 +160,27 @@ def _run_base_wave(
     submit_wave(config, os.path.abspath(args.config), _wave_jobs(config, wave), args)
 
 
-def _submit_terminal(config: dict[str, Any], config_path: str) -> None:
-    """Submit reducer and decision jobs only after every validated base shard exists."""
-    jobs = _tuning_jobs(config, (), ResumePlan((), ()))
+def _submit_terminal(
+    config: dict[str, Any], config_path: str, base: dict[str, Path]
+) -> None:
+    """Submit reducer and decision jobs only after every validated base shard exists.
+
+    A condition whose round-0 decide already ran has moved into its own
+    self-chained round or dependent-phase wave, so this resume path must
+    never resubmit its ``tune-decide-base-*`` round 0: that would recompute
+    round 0's decision from scratch and clobber the further-along state a
+    later round already locked in, corrupting candidate-registry indexing.
+    """
+    decided = {
+        condition
+        for condition in CONDITIONS
+        if round_state_path(base["data"], condition).exists()
+    }
+    jobs = [
+        job
+        for job in _tuning_jobs(config, (), ResumePlan((), ()))
+        if job.name not in {f"tune-decide-base-{condition}" for condition in decided}
+    ]
     if _squeue_count() + len(jobs) > DEFAULT_QUEUE_CAP:
         raise RuntimeError(
             "No room for tuning terminal jobs. Resume with: submit --resume-tuning"

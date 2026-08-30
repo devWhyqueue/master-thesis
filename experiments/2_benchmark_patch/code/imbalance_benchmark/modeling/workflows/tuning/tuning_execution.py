@@ -21,7 +21,6 @@ from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registr
     tuning_locked,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
-    condition_is_reusable,
     expected_observations,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
@@ -30,11 +29,11 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     reduce_terminal_phase,
     terminal_active_grids,
 )
-from imbalance_benchmark.modeling.workflows.tuning.search_windows import expand_grid
-from imbalance_benchmark.modeling.workflows.tuning.tuning_rounds import (
-    new_configs_for_round,
+from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
+    _new_configs_by_method,
+    condition_is_reusable,
+    phase_methods,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import phase_methods
 
 
 def _bundle_indices(
@@ -76,7 +75,9 @@ def write_base_selections(
         if not scoped_assignments(condition, freeze, assignments):
             continue  # not constructed for this dataset (plans/03,04)
         roster = roster_for_condition(is_mil, condition)
-        if condition_is_reusable(base, condition, roster, assignments):
+        if condition_is_reusable(
+            base, condition, roster, assignments, fingerprint, accepted
+        ):
             continue
         selected, _ = reduce_phase(
             base["data"],
@@ -104,7 +105,9 @@ def write_final_selections(
         if not scoped_assignments(condition, freeze, assignments):
             continue  # not constructed for this dataset (plans/03,04)
         roster = roster_for_condition(is_mil, condition)
-        if condition_is_reusable(base, condition, roster, assignments):
+        if condition_is_reusable(
+            base, condition, roster, assignments, fingerprint, accepted
+        ):
             continue
         _reduce_condition(
             base,
@@ -173,7 +176,8 @@ def _reduce_condition(
     output = {assignment: {} for assignment in assignments}
     for assignment in scoped:
         output[assignment][condition] = selected
-    _write_condition_outputs(base, condition, output, combined_cost(cost_payloads))
+    cost = {**combined_cost(cost_payloads), "fingerprint": fingerprint}
+    _write_condition_outputs(base, condition, output, cost)
 
 
 def _write_condition_outputs(
@@ -233,13 +237,7 @@ def round_overridden_scopes(
     ``resolve_round_shard_spec`` used to address them.
     """
     round_grids = load_round_grids(root, condition, phase)
-    overrides = {
-        method: new_configs_for_round(
-            root, condition, method, expand_grid(**round_grids["windows"][method])
-        )
-        for method in methods
-        if method in round_grids["windows"]
-    }
+    overrides = _new_configs_by_method(root, condition, round_grids, methods)
     return [
         (
             paths,

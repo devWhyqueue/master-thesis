@@ -24,10 +24,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     _bundle_indices,
     round_overridden_scopes,
 )
-from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
-    condition_is_reusable,
-    selected_ce,
-)
+from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import selected_ce
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import ReduceRound
 from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
     ShardSpec,
@@ -36,6 +33,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
     combined_scopes,
+    condition_is_reusable,
     phase_methods,
     requested_shard,
     resolve_round_shard_spec,
@@ -132,7 +130,12 @@ def _run_scope_local_shard(
     is_mil = freeze["runtime_config"].get("dataset", {}).get("regime") == "wsi"
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     if condition_is_reusable(
-        base, spec.condition, roster_for_condition(is_mil, spec.condition), assignments
+        base,
+        spec.condition,
+        roster_for_condition(is_mil, spec.condition),
+        assignments,
+        fingerprint,
+        accepted,
     ):
         return
     scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments
@@ -193,6 +196,8 @@ def _run_shard(
         spec.condition,
         roster_for_condition(raw_scopes[0][1].is_mil, spec.condition),
         assignments,
+        fingerprint,
+        accepted,
     ):
         return
     scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments

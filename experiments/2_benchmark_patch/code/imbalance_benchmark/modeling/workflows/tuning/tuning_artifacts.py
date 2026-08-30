@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from imbalance_benchmark.common import split_paths, verify_signed_file
+from imbalance_benchmark.common import verify_signed_file
 
 
 @dataclass(frozen=True)
@@ -28,29 +28,32 @@ class ShardSpec:
     round: int = 0
 
 
-def validate_shard_payload(
-    payload: dict[str, Any],
-    fingerprint: list[str],
-    spec: ShardSpec | None = None,
-    accepted: list[set[str]] | None = None,
-) -> None:
-    """Reject incomplete, stale, or misaddressed shard output.
-
-    ``accepted`` (one hash set per split, from a freeze's own superseded
-    fingerprints) lets a shard written before a ``method_grids`` amendment
-    keep validating, so amending a freeze does not orphan already-tuned
-    shards for the methods it left untouched.
-    """
-    if not payload.get("complete"):
-        raise RuntimeError("Tuning shard is incomplete")
-    stored = payload.get("fingerprint")
+def _fingerprint_matches(
+    stored: Any, fingerprint: list[str], accepted: list[set[str]] | None
+) -> bool:
+    """True if ``stored`` equals ``fingerprint``, or chains through ``accepted``
+    (one hash set per split, from a freeze's own superseded fingerprints) -
+    so a shard or selection written before a ``method_grids`` amendment
+    keeps validating instead of being orphaned by the amendment."""
     in_chain = (
         accepted is not None
         and isinstance(stored, list)
         and len(stored) == len(accepted)
         and all(value in allowed for value, allowed in zip(stored, accepted))
     )
-    if stored != fingerprint and not in_chain:
+    return stored == fingerprint or in_chain
+
+
+def validate_shard_payload(
+    payload: dict[str, Any],
+    fingerprint: list[str],
+    spec: ShardSpec | None = None,
+    accepted: list[set[str]] | None = None,
+) -> None:
+    """Reject incomplete, stale, or misaddressed shard output."""
+    if not payload.get("complete"):
+        raise RuntimeError("Tuning shard is incomplete")
+    if not _fingerprint_matches(payload.get("fingerprint"), fingerprint, accepted):
         raise RuntimeError("Tuning shard freeze fingerprint does not match")
     if spec is not None and payload.get("spec") != asdict(spec):
         raise RuntimeError("Tuning shard specification does not match its path")
@@ -144,39 +147,6 @@ def load_candidate(
         raise RuntimeError(f"Missing tuning shard: {path}")
     return _merge_observation_shards(
         root, spec, fingerprint, expected_observations, accepted
-    )
-
-
-def condition_is_reusable(
-    base: dict[str, Path],
-    condition: str,
-    methods: tuple[str, ...],
-    assignments: tuple[str, ...],
-) -> bool:
-    """Accept a completed serial condition only when every split is identical."""
-    selections, costs = [], []
-    for index in range(3):
-        data = split_paths(base, index)["data"]
-        selection = data / f"tuning_selections_{condition}.json"
-        cost = data / f"tuning_search_cost_{condition}.json"
-        try:
-            verify_signed_file(selection)
-            selections.append(json.loads(selection.read_text()))
-            costs.append(json.loads(cost.read_text()))
-        except (FileNotFoundError, json.JSONDecodeError, RuntimeError):
-            return False
-    if selections[1:] != selections[:1] * 2 or costs[1:] != costs[:1] * 2:
-        return False
-    required_cost = {"wall_clock_seconds", "accelerator_hours", "processed_examples"}
-    if not required_cost.issubset(costs[0]):
-        return False
-    scoped = ("native",) if condition in {"natural", "balanced"} else assignments
-    return all(
-        all(
-            isinstance(selections[0].get(name, {}).get(condition, {}).get(method), dict)
-            for method in methods
-        )
-        for name in scoped
     )
 
 
