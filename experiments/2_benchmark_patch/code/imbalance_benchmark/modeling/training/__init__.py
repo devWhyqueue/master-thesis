@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import math
 from typing import Any
 import numpy as np
 import torch
@@ -12,11 +11,14 @@ from imbalance_benchmark.modeling.context import (
     GRIDS,
     NO_STRENGTH_GRID_METHODS,
     REFERENCE_PASSES,
-    resolve_update_budget,
     set_training_mode,
 )
+from imbalance_benchmark.modeling.training.budget import (
+    example_budget as _example_budget,
+    resolve_update_budget,
+    updates_for_exposure,
+)
 from imbalance_benchmark.modeling.training.config import (
-    CHECKPOINT_INTERVAL,
     build_evaluation_loader,
     build_optimizer,
     pin_memory_ok,
@@ -52,14 +54,14 @@ from imbalance_benchmark.modeling.training.signal_weights import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "CHECKPOINT_INTERVAL",
     "FIXED_BALANCED_SAMPLER_METHODS",
     "get_class_weights",
     "get_balanced_sampler",
     "ClassAwareBatchSampler",
     "class_priors",
     "run_evaluation",
-    "update_budget",
+    "example_budget",
+    "updates_for_exposure",
     "resolve_batch_size",
     "resolve_checkpoint_interval",
     "build_optimizer",
@@ -85,9 +87,9 @@ def class_priors(
     return torch.tensor(p, dtype=torch.float32).to(device)
 
 
-def update_budget(support: int, batch_size: int) -> int:
-    """U = REFERENCE_PASSES * ceil(T / B): reference passes through controlled support."""
-    return REFERENCE_PASSES * math.ceil(support / batch_size)
+def example_budget(support: int) -> int:
+    """E = REFERENCE_PASSES * T example presentations."""
+    return _example_budget(support, REFERENCE_PASSES)
 
 
 def _init_criterion(
@@ -204,7 +206,13 @@ def fit_model(
     opt = build_optimizer(model.parameters(), lr)
     _prepare_training_context(ctx, param, device)
     prepare_ssb_pool(ctx, b_size)
-    budget = max_steps if max_steps is not None else resolve_update_budget(ctx, b_size)
+    budget = (
+        max_steps
+        if max_steps is not None
+        else resolve_update_budget(
+            ctx, ctx["method"], param_config, b_size, REFERENCE_PASSES
+        )
+    )
     best = _run_training_loop(opt, loader, ctx["val_loader"], ctx, budget, best)
     model.load_state_dict({k: v.to(device) for k, v in best["state"].items()})
     ctx["selected_checkpoint_step"] = best["step"]

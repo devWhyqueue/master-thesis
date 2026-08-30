@@ -295,7 +295,7 @@ Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, group
   \label{tab:roster}
 \end{table}
 
-All methods in a controlled comparison retain the frozen encoder, model family, optimizer family, batch definition, augmentation, numerical precision, and their own optimizer-update policy (Table~\ref{tab:locked}). That policy is held fixed across allocation conditions rather than being identical across methods: cRT adds a classifier-only second stage, post-hoc logit adjustment performs no gradient optimization at all, and the natural anchor budgets updates at its own support (Appendix~\ref{app:training}). Hyperparameters and checkpoints are selected only on natural validation data, and are locked before confirmation fitting and the one-time test evaluation. Balanced CE, imbalanced CE, and mitigation runs share split, tail assignment, confirmation-seed index, and held-out cases. Appendix~\ref{app:training} gives update formulas, adaptive grids, tie-breakers, exposure accounting, failure rules, and cost reporting.
+All controlled fits retain the frozen encoder, model family, optimizer family, batch definition, augmentation, and numerical precision. They share an example-presentation budget; method- and configuration-specific update counts are derived from it (Appendix~\ref{app:training}). cRT adds a classifier-only second stage and post-hoc logit adjustment reuses CE. Hyperparameters and checkpoints use natural validation only and are locked before confirmation and test evaluation.
 
 Figure~\ref{fig:benchmark-overview} places these steps in execution order. It also separates the validation search that is self-contained from the phase that cannot start until a condition's CE search has resolved, which is what fixes the order in which runs may be launched.
 
@@ -308,7 +308,7 @@ Figure~\ref{fig:benchmark-overview} places these steps in execution order. It al
 \end{figure}
 \end{landscape}
 
-This separation makes confirmation runs comparable without pretending that equal optimizer updates imply equal data exposure. With models fixed, evaluation can ask which endpoint was damaged and how much of that damage was recovered.
+This separation matches fitted methods by data exposure rather than update count. With models fixed, evaluation can ask which endpoint was damaged and how much recovered.
 
 \subsection{Evaluation endpoints}
 Damage and recovery are evaluated on two complementary axes: discrimination measures whether the predicted class is correct, whereas probability quality measures whether the complete predicted distribution is reliable. Both axes preserve the independent patient or case as the unit of evidence.
@@ -425,7 +425,7 @@ This benchmark is designed to answer a bounded question: when a fixed training b
 
 Several boundaries remain. The design does not establish how end-to-end encoder fine-tuning would respond, whether another foundation representation would produce the same deficits, or whether constructed tails reproduce biological prevalence and referral pathways. The shared total $T$ isolates allocation by withholding some available examples. The full natural condition is therefore retained as a descriptive CE anchor, placing the controlled results alongside the complete training partition and the dataset's natural class prevalence. Because no mitigation method is fitted on that anchor, method comparisons remain confined to the size-matched controlled conditions.
 
-Method comparisons identify methods, not universal mechanisms. Interventions can change sampling, objectives, or architecture together, so equal optimizer updates do not imply equal information exposure. For example, post-hoc logit adjustment performs no gradient optimization, whereas cRT retrains only the classifier in its second stage. Processed examples, unique exposures, accelerator time, memory, and model size are therefore reported rather than assumed to be equivalent.
+Method comparisons identify methods, not universal mechanisms. The soft-$F_1$, soft-MCC, and cRT-stage-two arms are sampling-plus-loss hybrids, not independent sampling evidence. Exposure, time, memory, and model size are reported for the whole roster.
 
 Evidence also depends on independent support, not merely patch count: the discrimination and calibration gates are evaluated on the case-macro estimator over each class's pooled cell across split appearances (Appendix~\ref{app:endpoints}), and inference is withheld as descriptive wherever that pooled cell's Kish effective support, single-unit dominance, or contributing-unit count fails the prespecified threshold. Calibration has a separate boundary: it is conditional on the natural held-out prevalence and cannot be transported to another deployment population without an explicit prior-shift analysis.
 
@@ -449,8 +449,8 @@ This appendix records dataset eligibility, hierarchical sampling, support floors
     \midrule
     Representation & Frozen Virchow2 features & \ref{app:construction} \\
     Patch classifier & Two-layer MLP, 512 hidden units & \ref{app:construction} \\
-    Update budget & $U=30\lceil T/B\rceil$ optimizer updates & \ref{app:training} \\
-    Learning-rate envelope & Seven values, \num{1e-5} to \num{1e-2} & \ref{app:controls} \\
+    Example budget & $E=30T$ example presentations & \ref{app:training} \\
+    Learning-rate envelope & Nine values, \num{3e-6} to \num{3e-2} & \ref{app:controls} \\
     Support floor per class & $\geq10$ partitioning units and $\geq20$ slides & \ref{app:construction-support} \\
     Contribution caps & $\leq10\%$ per partitioning unit; $\leq5\%$ per slide & \ref{app:construction-support} \\
     Severity targets & $\rho_{\mathrm{target}}\in\{1,10,100\}$ & \ref{app:construction} \\
@@ -796,35 +796,37 @@ Parameters are estimated by maximum a posteriori (MAP) fitting with zero-centere
 
 \section{Training, Tuning, and Execution Specification}
 \label{app:training}
-This appendix records exact update budgets, validation-search rules, replication, and resource accounting. Main-text interpretation depends only on their matched and test-blind use.
+This appendix records exposure budgets, validation search, replication, and resource accounting.
 
-\subsection{Update budgets and checkpoint selection}
-Within each method, the frozen encoder, classifier family, optimizer family, batch definition, augmentation, numerical precision, and method-specific optimizer-update budget are held fixed across the balanced and imbalanced allocations. Training is budgeted only in optimizer updates; epochs are neither a stopping rule nor a unit of comparison. With $B$ the locked batch size and $T$ the common controlled support, the single-stage reference budget is
+\subsection{Exposure budgets and checkpoint selection}
+With $B$ the locked batch size and $T$ the common controlled support, every fitted method receives the frozen example-presentation budget
 \begin{equation}
-  U=30\left\lceil\frac{T}{B}\right\rceil
-  \label{eq:update-budget}
+  E=30T.
+  \label{eq:example-budget}
 \end{equation}
-\noindent updates, corresponding to 30 reference passes through $T$ examples under ordinary sampling. Table~\ref{tab:budgets} allocates that budget to the methods that do not consume it in a single stage.
+\noindent Its update count is $U_m=\lceil E/e_m\rceil$, where $e_m$ is that method's examples per update. Epochs are neither a stopping rule nor a comparison unit.
 
 \begin{table}[ht]
   \centering
   \footnotesize
   \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.26\linewidth}X@{}}
     \toprule
-    Method & Optimizer updates \\
+    Method & Examples per update $e_m$ \\
     \midrule
-    Single-stage default & $U$; every method not listed below \\
-    cRT & $U$ stage one, then $\lceil0.2U\rceil$ stage two on the classifier only \\
-    Natural anchor (CE only) & Equation~\eqref{eq:update-budget} at its own support; descriptive, enters no matched contrast \\
+    Single-stage default & $B$ \\
+    OKO & $B(k+2)$ \\
+    MDE & $2B$ \\
+    cRT & $1.2B$ across both stages \\
+    Natural anchor (CE only) & $E=30T_{\mathrm{natural}}$; descriptive \\
     \bottomrule
   \end{tabularx}
-  \caption{Allocation of the reference update budget $U$. Balanced sampling and replacement do not change $U$. Processed examples, unique-example exposures, and updates are all reported.}
+  \caption{Exposure accounting. The frozen $E$ is common; $U_m$ is derived per method and selected configuration. Post-hoc logit adjustment performs no gradient update and reuses CE.}
   \label{tab:budgets}
 \end{table}
 
 \noindent Within a run, the reported checkpoint is fixed by three rules:
 \begin{enumerate}
-  \item Validation metrics are stored at fixed update intervals. The interval is scaled per dataset so the number of stored validation checkpoints is comparable across the widely differing controlled supports $T$, and the resolved value is recorded with every run.
+  \item Validation is stored every $\max(1,\operatorname{round}(U_m/170))$ updates, giving about 170 checkpoints per fit.
   \item The selected checkpoint maximizes natural-validation balanced accuracy; macro F1 and then lower NLL are deterministic tie-breakers.
   \item Test predictions are produced once from that locked checkpoint.
 \end{enumerate}
@@ -833,10 +835,10 @@ Within each method, the frozen encoder, classifier family, optimizer family, bat
 \label{app:controls}
 Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity, and the search adapts within a prespecified envelope rather than committing to a single fixed grid. Every trainable method draws its learning rate from the common envelope
 \begin{equation}
-  \eta\in\{\num{1e-5},\num{3e-5},\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3},\num{1e-2}\}.
+  \eta\in\{\num{3e-6},\num{1e-5},\num{3e-5},\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3},\num{1e-2},\num{3e-2}\}.
   \label{eq:learning-rate-grid}
 \end{equation}
-\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC draw their strength from the listed envelope searched through the same adaptive window as the learning rate; every other control is a fixed four-value grid, since its domain is naturally bounded. Both axes follow the search below, in which an edge winner is never accepted as an optimum: a bounded number of window shifts replaces a single fixed grid. Each shift adds one axis value; crossing that value with the unchanged four-value window can require four new fitted configurations, or seven when both axes shift together.
+\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC use the same adaptive window as the learning rate; the other controls are bounded four-value grids. The prior outer learning-rate winners, \num{1e-5} and \num{1e-2}, are interior to this rerun's envelope.
 
 \paragraph{Matched counting-unit diagnostic.}
 Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$, the inverse effective number from the same saturating transform, evaluated at nominal count $n_c$ for the former and independent count $G_c$ for the latter, as defined in the companion methods report \citep{queisler2026imbalanceMethods}. Because $\beta$ sets both a saturation scale and, jointly with the counting unit, the realized weight shape, tuning $\beta$ separately for each method confounds the counting unit with the selected saturation scale. The tuning grid therefore includes a \emph{matched-beta} arm: independent-support weighted CE is confirmed a second time at class-balanced CE's tuned $\beta$, with its own tuned learning rate. Only this matched-$\beta$ comparison attributes a difference to the counting unit alone; it is a diagnostic arm reported alongside, not in place of, the five-family contrast, and is not itself one of the five confirmatory members.
@@ -871,7 +873,7 @@ Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$
     \textbf{Adaptive window search}, run once per method, dataset, and imbalance severity.
     \begin{enumerate}\setlength{\itemsep}{1pt}
       \item Initialize each active window to four adjacent envelope values: $\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}$ for the learning rate, and the start listed in Table~\ref{tab:controls} for an adaptive strength axis.
-      \item Fit the active learning-rate window crossed with the method's strength window or fixed grid: at most 16 candidates in any one round. Candidates fitted in an earlier round are reused, never retrained.
+      \item Fit the active learning-rate window crossed with the method's strength window or fixed grid: at most 16 candidates per round (four for CE/cRT; one for post-hoc adjustment). Earlier candidates are reused.
       \item If an axis's winning value is interior to its window, record the axis as \emph{resolved} and stop searching it.
       \item If the winner is an edge value and the envelope extends further in that direction, shift the window one position toward that edge and return to step 2. The three overlapping axis values are reused. Only configurations introduced by the new row or column are fitted: four when one axis shifts and seven when both shift together.
       \item If the winner is an edge value at the envelope's boundary, retain the boundary value and record the axis as \emph{tuning-limited}.
@@ -888,14 +890,14 @@ Four method families deviate from the search above. CE and methods without a mea
 Selection and replication follow prespecified units rather than per-run judgement:
 \begin{itemize}\setlength{\itemsep}{1pt}
   \item \textbf{Tuning seeds.} Every candidate is fitted with the same two tuning initialization seeds for each prespecified data split and tail assignment.
-  \item \textbf{Selection unit.} One method, dataset, and imbalance severity. Within it, natural-validation balanced accuracy is averaged across both tuning seeds, all tuning splits, and all tail assignments; the highest aggregate is selected, with macro F1 and then lower NLL as deterministic tie-breakers.
+  \item \textbf{Selection unit.} One method, dataset, and imbalance severity. Natural-validation balanced accuracy is averaged across seeds, splits, and tail assignments; macro F1 then lower NLL break ties. NLL is not separately optimized, and pooling assignments can dilute assignment-specific optima.
   \item \textbf{Locking.} The chosen configuration is locked before any of the five disjoint confirmation initialization seeds is fitted and before test evaluation. Tuning runs never enter confirmation effect estimates.
   \item \textbf{Confirmation.} Each locked data split and tail assignment is repeated with the five confirmation seeds. Exactly three partitioning-unit-disjoint split seeds are used; a dataset--regime unable to produce all three valid splits under the independent-support floors is excluded from the corresponding confirmatory analysis.
   \item \textbf{Matching.} The two runs of a controlled contrast (Appendix~\ref{app:terms}) share data split, tail assignment, confirmation-seed index, and held-out cases, so the contrast does not mix the intended change with a different cohort or replication.
   \item \textbf{Failures.} The unit of replication and all missing or failed runs are reported. A failed run is never silently replaced using a test-informed seed.
 \end{itemize}
 
-Split counts, support floors, condition training sets, tuning and confirmation seeds, method grids, and update budgets are frozen in the signed analysis plan before the first definitive fit. Every candidate fitted, every window shift, and the resolved-or-tuning-limited outcome of each axis are recorded there before the corresponding method enters confirmation. No test data and no confirmation-stage result ever informs a shift, and no grid is changed once confirmation training begins.
+Split counts, support floors, condition training sets, seeds, method grids, and exposure budgets are frozen in the signed analysis plan before the first definitive fit. Every candidate, window shift, and resolved-or-tuning-limited outcome is recorded before confirmation. No test or confirmation result informs a shift.
 
 For every realized condition, the experiment record contains
 \begin{itemize}\setlength{\itemsep}{1pt}

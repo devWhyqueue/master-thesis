@@ -9,8 +9,10 @@ from imbalance_benchmark.commands import tuning
 from imbalance_benchmark.commands.tuning import shard as tuning_shard
 from imbalance_benchmark.commands.confirm import require_tuning_configs
 from imbalance_benchmark.modeling.context import Regime
-from imbalance_benchmark.modeling.workflows import tuning_aggregate
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation import (
+    aggregate as tuning_aggregate,
+)
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
     TuningScope,
     _select_post_hoc,
     _select_trainable,
@@ -51,7 +53,7 @@ def test_tuning_uses_the_frozen_candidate_grid(
         return {}, {"balanced_accuracy": 0.5, "macro_f1": 0.5, "nll": 0.5}
 
     monkeypatch.setattr(
-        "imbalance_benchmark.modeling.workflows.tuning_aggregate._evaluate", evaluate
+        "imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate._evaluate", evaluate
     )
 
     _select_trainable("ce", [scope], [7])
@@ -195,7 +197,7 @@ def test_missing_tuning_selection_stops_confirmation(tmp_path: Path) -> None:
         )
 
 def test_unresolved_tuning_lock_stops_confirmation(tmp_path: Path) -> None:
-    from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
         merge_round_state,
     )
 
@@ -206,7 +208,7 @@ def test_unresolved_tuning_lock_stops_confirmation(tmp_path: Path) -> None:
         require_tuning_configs(tmp_path, "severe", {"ce": {"lr": 1e-3}}, ("ce",))
 
 def test_resolved_tuning_lock_admits_confirmation(tmp_path: Path) -> None:
-    from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
         merge_round_state,
     )
 

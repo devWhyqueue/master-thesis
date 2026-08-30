@@ -11,7 +11,7 @@ from imbalance_benchmark.commands.tuning.round_windows import (
     this_round_windows,
 )
 from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
     load_round_state,
     merge_round_state,
@@ -66,7 +66,7 @@ def test_round_zero_windows_cap_oko_k_by_n_classes():
 
 
 def test_this_round_windows_later_round_reads_signed_grids(tmp_path):
-    from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+    from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
         write_round_grids,
     )
 

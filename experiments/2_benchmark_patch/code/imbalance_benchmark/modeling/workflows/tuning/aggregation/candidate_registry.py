@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.common import sign_file, verify_signed_file, write_json
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import _selection_key
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
+    _selection_key,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     ShardSpec,
     load_candidate,
@@ -20,7 +22,6 @@ def registry_path(root: Path, condition: str) -> Path:
 
 
 def _numeric(value: Any) -> float | None:
-    """Normalize to float so ``1`` (oko's int grid) and ``1.0`` key identically."""
     return float(value) if value is not None else None
 
 
@@ -149,7 +150,6 @@ def register_candidates(
 
 
 def _frozen_order_key(payload: dict[str, Any]) -> tuple[float, float]:
-    """Order by (parameter, lr) so ties break the same regardless of trained round."""
     config = payload["config"]
     return (float(config.get("parameter", float("-inf"))), float(config["lr"]))
 

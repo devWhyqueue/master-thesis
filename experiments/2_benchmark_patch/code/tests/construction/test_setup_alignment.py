@@ -19,6 +19,7 @@ from imbalance_benchmark.common import sign_file
 from imbalance_benchmark.construction import allocate_counts, max_shared_total
 from imbalance_benchmark.construction import locked_class_names
 from imbalance_benchmark.manifest.shared_total import search as shared_total_search
+from imbalance_benchmark.manifest.shared_total.spreading import SPREAD_ASSIGNMENTS_BY_DATASET
 from imbalance_benchmark.datasets.data import BagFeatureDataset
 from imbalance_benchmark.manifest.construction_helpers import _retains_fixed_pool
 from imbalance_benchmark.manifest.shared_total.search import cap_feasible_shared_total
@@ -351,7 +352,11 @@ def test_prepare_excludes_configured_classes_before_splitting(tmp_path: Path) ->
     assert "class_A" not in set(manifest["cancer_type"])
     assert {"class_B", "class_C", "class_D"}.issubset(set(manifest["cancer_type"]))
 
-def test_freeze_uses_the_resampling_seed_family(tmp_path: Path) -> None:
+def test_freeze_uses_the_resampling_seed_family(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Resampling seed provenance does not require the unrelated spread arm."""
+    monkeypatch.setitem(SPREAD_ASSIGNMENTS_BY_DATASET, "synthetic", ())
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(

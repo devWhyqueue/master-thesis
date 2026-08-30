@@ -17,7 +17,9 @@ from imbalance_benchmark.commands.tuning import (
 )
 from imbalance_benchmark.datasets.features.cache import reset_feature_bank
 from imbalance_benchmark.modeling.context import Regime, roster_for_condition
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import TuningScope
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
+    TuningScope,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     _bundle_indices,
     round_overridden_scopes,

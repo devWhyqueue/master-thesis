@@ -7,7 +7,7 @@ from imbalance_benchmark.modeling.context import (
     LEARNING_RATE_GRID,
     NO_STRENGTH_GRID_METHODS,
 )
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
 )
 

@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from imbalance_benchmark.modeling.context import GRIDS, LEARNING_RATE_GRID
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     register_candidates,
     resolve_terminal_specs,
     terminal_cost_payloads,

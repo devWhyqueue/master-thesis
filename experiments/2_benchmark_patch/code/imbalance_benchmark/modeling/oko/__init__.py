@@ -8,7 +8,8 @@ import torch
 import torch.nn.functional as F
 
 from imbalance_benchmark.modeling.evaluation import checkpoint_step, initial_checkpoint
-from imbalance_benchmark.modeling.context import resolve_update_budget
+from imbalance_benchmark.modeling.context import REFERENCE_PASSES
+from imbalance_benchmark.modeling.training.budget import resolve_update_budget
 from imbalance_benchmark.modeling.models import OkoClassifier
 from imbalance_benchmark.modeling.oko.sampling import (
     OkoPools,
@@ -128,7 +129,9 @@ def fit_oko(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     model, dataset, n_classes = ctx["model"], ctx["train_dataset"], ctx["n_classes"]
     k, lr = int(ctx["param_config"]["parameter"]), ctx["param_config"]["lr"]
     b_size = resolve_batch_size(ctx["config"], False)
-    budget = resolve_update_budget(ctx, b_size)
+    budget = resolve_update_budget(
+        ctx, "oko", ctx["param_config"], b_size, REFERENCE_PASSES
+    )
     opt = build_optimizer(model.parameters(), lr)
     class_index = build_class_index(ctx["train_labels"])
     pools = _build_oko_pools(class_index, _independent_units(dataset))

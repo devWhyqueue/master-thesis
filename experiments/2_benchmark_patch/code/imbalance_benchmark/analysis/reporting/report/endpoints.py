@@ -17,7 +17,6 @@ from imbalance_benchmark.analysis.reporting.report.sources import (
 
 __all__ = ["calibration_detail", "classwise_endpoints", "cost"]
 
-_FAMILY = sorted(PRIMARY_METHODS)
 _WITH_REFERENCE = sorted(PRIMARY_METHODS | {"ce"})
 _PROBABILITY = {
     "negative_log_likelihood": "NLL",
@@ -119,14 +118,14 @@ def _cost_frame(datasets: list[Dataset]) -> pd.DataFrame:
         table = data.tables["cost_comparison_intervals"]
         selected = cast(
             pd.DataFrame,
-            table[table["method"].isin(_FAMILY) & table["endpoint"].isin(list(_COST))],
+            table[(table["method"] != "ce") & table["endpoint"].isin(list(_COST))],
         )
         frames.append(_labelled(selected, data.name))
     return pd.concat(frames, ignore_index=True)
 
 
 def cost(datasets: list[Dataset]) -> str:
-    """Matched cost effects against CE in the same condition, five-family only."""
+    """Matched cost effects against CE in the same condition, whole roster."""
     combined = _cost_frame(datasets)
     rendered = pd.DataFrame(
         {

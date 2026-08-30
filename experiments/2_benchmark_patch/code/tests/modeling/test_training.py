@@ -24,12 +24,12 @@ from imbalance_benchmark.modeling.special_methods import (
 )
 from imbalance_benchmark.modeling.training import (
     ClassAwareBatchSampler,
-    CHECKPOINT_INTERVAL,
     build_evaluation_loader,
     fit_model,
     initial_checkpoint,
     run_evaluation,
-    update_budget,
+    example_budget,
+    updates_for_exposure,
 )
 from imbalance_benchmark.modeling.training import _fit_step, _init_criterion
 from imbalance_benchmark.modeling.evaluation import _gather_and_eval
@@ -177,9 +177,13 @@ def test_sc_mil_logs_all_required_batch_diagnostics() -> None:
     ]
 
 
-def test_update_budget_formula():
-    assert update_budget(support=100, batch_size=32) == 30 * 4
-    assert update_budget(support=96, batch_size=32) == 30 * 3
+def test_example_budget_and_method_specific_updates() -> None:
+    budget = example_budget(support=100)
+    assert budget == 30 * 100
+    assert updates_for_exposure(budget, "ce", 32, {}) == 94
+    assert updates_for_exposure(budget, "oko", 32, {"parameter": 8}) == 10
+    assert updates_for_exposure(budget, "mde", 32, {}) == 47
+    assert updates_for_exposure(budget, "crt", 32, {}) == 79
 
 
 def test_sc_mil_batch_sampler_provides_same_class_positive_pairs():
@@ -195,15 +199,15 @@ def test_training_restores_train_mode_after_validation_checkpoint(tmp_path):
     ctx = _patch_ctx("ce", tmp_path, n_classes=2)
     ctx["model"] = MLP(DIM, 8, 2, dropout=0.5)
 
-    fit_model(ctx, max_steps=CHECKPOINT_INTERVAL + 1)
+    fit_model(ctx, max_steps=2)
 
     assert ctx["model"].training
 
 
-def test_training_uses_the_frozen_update_budget(tmp_path):
-    """A frozen budget controls fitting even if the runtime formula changes."""
+def test_training_uses_the_frozen_example_budget(tmp_path):
+    """A frozen exposure budget controls fitting even if runtime details change."""
     ctx = _patch_ctx("ce", tmp_path, n_classes=2)
-    ctx["update_budget"] = 2
+    ctx["example_budget"] = 16
 
     fit_model(ctx)
 
@@ -270,7 +274,7 @@ def test_evaluation_transfers_concatenated_logits_once(
 
 def test_oko_reports_checkpoint_progress(tmp_path: Path, caplog) -> None:
     ctx = _patch_ctx("oko", tmp_path, param=1)
-    ctx["update_budget"] = 1
+    ctx["example_budget"] = 24
 
     with caplog.at_level("INFO"):
         fit_method(ctx)
@@ -379,15 +383,53 @@ def test_resolve_training_config_records_source_only_defaults() -> None:
     assert patch["target_checkpoints"] == TARGET_CHECKPOINTS == 170
     assert patch["dropout"] == 0.1
     assert resolve_training_config({}, is_mil=True)["batch_size"] == 32
+    assert patch["budget_unit"] == "example_presentations"
+    assert patch["example_budget_reference_passes"] == 30
 
 
 def test_resolve_checkpoint_interval_scales_with_budget() -> None:
-    """Cadence targets ~TARGET_CHECKPOINTS passes; a coarser configured value still wins."""
+    """Cadence targets ~TARGET_CHECKPOINTS passes without a fixed floor."""
     from imbalance_benchmark.modeling.training.config import (
         resolve_checkpoint_interval,
     )
 
+    assert resolve_checkpoint_interval({}, False, budget=1) == 1
     assert resolve_checkpoint_interval({}, False, budget=8_490) == 50
-    assert resolve_checkpoint_interval({}, False, budget=523_830) == 3_082
+    assert resolve_checkpoint_interval({}, False, budget=523_830) == 3_081
     cfg = {"patch_training": {"checkpoint_interval": 1500}}
-    assert resolve_checkpoint_interval(cfg, False, budget=257_790) == 1517
+    assert resolve_checkpoint_interval(cfg, False, budget=257_790) == 1516
+
+
+@pytest.mark.parametrize(
+    ("method", "cfg"),
+    [
+        ("ce", {"lr": 1e-3}),
+        ("oko", {"lr": 1e-3, "parameter": 8}),
+        ("mde", {"lr": 1e-3, "parameter": 0.25}),
+        ("crt", {"lr": 1e-3}),
+    ],
+)
+def test_every_method_sees_the_same_example_exposure(
+    tmp_path: Path, method: str, cfg: dict[str, float | int]
+) -> None:
+    """Frozen E equalizes actual presentations across distinct training loops."""
+    ctx = (
+        _bag_ctx(method, tmp_path, cfg.get("parameter"))
+        if method in {"mde", "crt"}
+        else _patch_ctx(
+            method,
+            tmp_path,
+            cfg.get("parameter"),
+            n_classes=9 if method == "oko" else 3,
+        )
+    )
+    ctx["param_config"] = cfg
+    ctx["example_budget"] = 480
+    if method in {"mde", "crt"}:
+        ctx["config"] = {"wsi_training": {"bag_batch_size": 6}}
+    if method == "crt":
+        ctx["stage_one_config"] = {"lr": 1e-3}
+
+    fit_method(ctx)
+
+    assert ctx["processed_examples"] == pytest.approx(480, rel=0.05)

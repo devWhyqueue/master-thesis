@@ -20,7 +20,7 @@ from imbalance_benchmark.common import (
     split_paths,
     verify_signed_file,
 )
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     tuning_locked,
 )
 from imbalance_benchmark.datasets.data import TrainDataset
@@ -118,7 +118,7 @@ def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
         "test_loader": test_ldr,
         "paths": paths,
         "seeds": seeds,
-        "update_budgets": freeze["update_budgets"],
+        "exposure_budgets": freeze["exposure_budgets"],
         "feature_provenance": freeze.get("feature_provenance"),
         "difficulty": freeze.get("difficulty_evidence", {}).get("difficulty", {}),
     }

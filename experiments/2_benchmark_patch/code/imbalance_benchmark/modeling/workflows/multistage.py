@@ -7,7 +7,8 @@ from typing import Any, cast
 import torch.nn as nn
 
 from imbalance_benchmark.modeling.models import AttentionMil, MLP
-from imbalance_benchmark.modeling.context import resolve_update_budget
+from imbalance_benchmark.modeling.context import REFERENCE_PASSES
+from imbalance_benchmark.modeling.training.budget import resolve_update_budget
 from imbalance_benchmark.modeling.training import (
     fit_model,
     resolve_batch_size,
@@ -68,7 +69,9 @@ def _load_state(model: nn.Module, state: dict[str, Any], device: Any) -> None:
 def fit_crt(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """Train cRT's seeded CE stage, then its balanced frozen-representation stage."""
     batch_size = resolve_batch_size(ctx["config"], ctx["is_mil"])
-    budget = resolve_update_budget(ctx, batch_size)
+    budget = resolve_update_budget(
+        ctx, "crt", ctx["param_config"], batch_size, REFERENCE_PASSES
+    )
     stage_one_context = {
         **ctx,
         "model": ctx["model"],

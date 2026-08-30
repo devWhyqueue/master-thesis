@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
 import torch
 
-from imbalance_benchmark.datasets.data import TrainDataset
-from imbalance_benchmark.modeling.models import build_model
 from imbalance_benchmark.modeling.workflows.condition_scope import (  # noqa: F401
     controlled_assignments_for_condition,
     scoped_assignments,
@@ -36,8 +33,6 @@ __all__ = [
     "group_conditions",
     "get_grid_configs",
     "model_kwargs",
-    "build_training_ctx",
-    "resolve_update_budget",
     "set_training_mode",
     "matched_beta_config",
 ]
@@ -46,7 +41,7 @@ INPUT_DIM = 2560
 PATCH_HIDDEN_DIM = 512
 MIL_HIDDEN_DIM = 256
 DROPOUT = 0.1
-# Update budget U = REFERENCE_PASSES * ceil(T / B) (report §"Model training and selection").
+# Example budget E = REFERENCE_PASSES * T.
 REFERENCE_PASSES = 30
 # Crossed-condition-family universe (plans/03,04).
 CONTROLLED_CONDITIONS = (
@@ -63,7 +58,7 @@ CONDITIONS = ("natural", *CONTROLLED_CONDITIONS)
 # so only the CE reference is fitted there.
 NATURAL_ANCHOR_METHODS = ("ce",)
 
-# Current-centered window into workflows.tuning.search_windows.LR_ENVELOPE[2:6].
+# Current-centered window into workflows.tuning.search_windows.LR_ENVELOPE.
 LEARNING_RATE_GRID: list[float] = [1e-4, 3e-4, 1e-3, 3e-3]
 
 GRIDS: dict[str, list[float] | list[int]] = {
@@ -196,51 +191,9 @@ class Regime:
     method_grids: dict[str, list[dict[str, Any]]] = field(
         default_factory=dict, kw_only=True
     )
-    update_budgets: dict[str, int] = field(default_factory=dict, kw_only=True)
+    exposure_budgets: dict[str, int] = field(default_factory=dict, kw_only=True)
     # Frozen difficulty evidence, class-name keyed; consumed by pilot_difficulty_ce.
     difficulty: dict[str, float] = field(default_factory=dict, kw_only=True)
-
-
-def build_training_ctx(
-    method: str,
-    train_ds: TrainDataset,
-    regime: Regime,
-    seed: int,
-    cfg: dict[str, Any],
-    val_loader: torch.utils.data.DataLoader | None = None,
-    update_budget: int | None = None,
-) -> dict[str, Any]:
-    """Build the shared training context for one method/config/seed trial."""
-    torch.manual_seed(seed)
-    kwargs, param = model_kwargs(regime.is_mil), cfg.get("parameter")
-    _factory = lambda: build_model(
-        method, regime.is_mil, n_classes=regime.n_classes, param=param, **kwargs
-    ).to(regime.device)
-    return {
-        "method": method,
-        "model": _factory(),
-        "model_factory": _factory,
-        "train_dataset": train_ds,
-        "val_loader": val_loader,
-        "device": regime.device,
-        "config": regime.config,
-        "param_config": cfg,
-        "seed": seed,
-        "is_mil": regime.is_mil,
-        "n_classes": regime.n_classes,
-        "train_labels": train_ds.get_int_targets(),
-        "difficulty": regime.difficulty,
-        "exposed_indices": set(),
-        "method_diagnostics": {},
-        "processed_examples": 0,
-        **({"update_budget": int(update_budget)} if update_budget is not None else {}),
-    }
-
-
-def resolve_update_budget(ctx: dict[str, Any], batch_size: int) -> int:
-    """Use the signed update budget when present, otherwise retain pilot fallback."""
-    fallback = REFERENCE_PASSES * math.ceil(len(ctx["train_dataset"]) / batch_size)
-    return int(ctx.get("update_budget", fallback))
 
 
 def set_training_mode(ctx: dict[str, Any]) -> None:

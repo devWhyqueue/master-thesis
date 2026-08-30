@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_registry,
     load_round_grids,
     load_round_state,

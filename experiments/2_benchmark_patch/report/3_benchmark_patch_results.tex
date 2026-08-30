@@ -49,6 +49,7 @@ Patch Classification}
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
+\noindent\textbf{Status.} This is a legacy update-matched execution; its recovery and cost conclusions are descriptive pending the exposure-matched rerun.\par
 \noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report presents the outcomes of the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol}, which manipulates only the allocation of a fixed training budget among classes and measures what that manipulation damages. CAMELYON16, TCGA-UT, BRACS, and PANDA are evaluated with frozen Virchow2 features under size-matched balanced, moderate, and severe allocations, against natural-prevalence validation and test cohorts held constant across conditions. Three questions are answered in order: which shortage the controlled allocation realizes and what it damages, whether a mitigation method that reads the shortage matching that profile recovers more of the damage than one reading a different signal, and which realized shortages explain variation in damage magnitude and recovery headroom. Mitigation recovery is interpreted only for conditions whose allocation-induced deficit passes the prespecified gate, and the confirmatory family holds the intervention mechanism fixed so that the signal a method reads is the only quantity contrasted. Controlled allocation opened the discrimination gate in \num{12} of \num{18} comparison units and the probability-quality gate in \num{6}, all of them on BRACS, with balanced-accuracy deficits spanning \num{0.0007} to \num{0.134}; damage grew with achieved severity and with the number of classes among which the fixed budget was divided. Recovery separated sharply but not along the axis the design was built to test: the prevalence- and nominal-support-weighted members of the confirmatory family returned most of the deficit wherever a gate opened, while the independent-support, difficulty, and diversity members returned essentially none of it and degraded tail probability quality further. The closing discussion converts these outcomes into design requirements for a mitigation method that reads shortage rather than prevalence alone, which is the purpose the benchmark serves.
 \par
 \endgroup
@@ -59,10 +60,14 @@ Patch Classification}
 
 \setcounter{tocdepth}{2}
 \tableofcontents
+\noindent These legacy differences do not support a roster-wide cost conclusion; that comparison is deferred to the exposure-matched rerun.
+
 \clearpage
 
 \section{Introduction}
 \label{sec:intro}
+\noindent\textbf{Status.} These are legacy update-matched results. Because methods consumed unequal examples per update, recovery and cost conclusions are descriptive only until the exposure-matched rerun.
+
 This report presents the results of the controlled patch-classification benchmark whose design, endpoints, gating rule, and inference procedure are fixed in the companion protocol \citep{queisler2026benchmarkProtocol}. Nothing in the analysis reported here was chosen after seeing an outcome: the estimands, the deficit thresholds, the confirmatory method family, the multiplicity correction, and the exploratory status of the association models were all locked before the first definitive model fit. The reporting order below follows that locked plan rather than the order in which results proved interesting, and any departure from the plan is recorded in Appendix~\ref{app:realized}.
 
 The benchmark exists to inform the design of a new mitigation method, not to rank the existing ones. Its premise is that an underserved class may lack nominal patch support, independent evidence from patients or slides, learnable signal, or representational diversity, and that these shortages are not interchangeable. Existing methods are therefore treated as instruments: each reads one signal, and the contrast among them measures whether reading the right signal matters. The report is consequently read forward into Section~\ref{sec:discussion}, where the outcomes are converted into requirements a method would have to satisfy. Dataset provenance is documented separately \citep{queisler2026datasets}, as is the signal taxonomy that locates each method within it \citep{queisler2026imbalanceMethods}.
@@ -375,13 +380,13 @@ The preceding subsections resolve into a small set of requirements for a mitigat
 \end{enumerate}
 \noindent The exploratory models of Section~\ref{sec:rq3} supply point estimates with no intervals and may therefore motivate a design direction but never justify one on their own.
 
-Three questions remain outside what this benchmark can decide. It manipulates allocation within a fixed pool of patients and slides, so it says nothing about a shortage of patients as such, which would require cohorts of differing size; the identically zero independent-support shortage in Table~\ref{tab:signal-profiles} is the direct trace of that boundary. It also holds the representation fixed at frozen Virchow2 features, leaving open whether a diversity shortage measured in that space persists under a representation adapted to the task. And because every gate-passing unit admitted a recovery above \num{0.67} by some tested mechanism, the benchmark identifies no regime of unmet need, so the case for a new method rests on cost, on endpoint trade-offs, and on abstention rather than on unrepaired damage. All three would have to be addressed before a method could be claimed to improve on what the roster already achieves.
+Three questions remain outside this benchmark. It manipulates allocation within a fixed pool, so it says nothing about patient shortage as such. It also fixes Virchow2 features. Whether any gate-passing regime has unmet need is deferred to the exposure-matched rerun.
 
 \section{Conclusion and Scope}
 \label{sec:limits}
 This report answers three questions in the order the protocol fixed: what controlled allocation damaged, how much of that damage signal-matched mitigation returned, and which realized shortages tracked the variation in both. Its contribution is the design evidence assembled in Section~\ref{sec:discussion}, which states what a mitigation method must read, at what granularity, under what constraints, and where it should decline to act.
 
-The concluding position is that, for allocation-induced shortage under a fixed evidence pool and a frozen representation, signal choice is decisive but the decision is already settled: prevalence and nominal support are the signals that carry recovery, the remaining three carry none and can make probability quality worse, and no gate-passing condition resists repair by some tested mechanism. A new method is therefore not warranted by unmet damage on these conditions. It is warranted, if at all, by the parts of the specification the existing roster does not satisfy: a transform that does not saturate at high imbalance on few classes, an estimate that is recomputed per condition rather than transferred, protection of the probability-quality axis while discrimination is repaired, and an explicit abstention rule for regimes in which allocation caused no material deficit.
+The legacy run cannot settle which signal recovers damage or whether a gate-passing condition resists repair. Those conclusions await the exposure-matched rerun.
 
 Four scope conditions bound every claim above. The three partitions are locked design repetitions of one dataset, not independent cohorts, so the intervals quantify variation across partitionings and initializations rather than across populations. The association models of Section~\ref{sec:rq3} are exploratory and carry no causal interpretation, and their coefficients come without intervals. The benchmark covers patch classification only, where each prediction unit carries its own label; at whole-slide level, reallocating labelled slides changes nominal and independent support together, so the two signals could not be separated in the way this design requires. Temperature scaling is reported as a diagnostic throughout and never gates a decision.
 
@@ -436,13 +441,15 @@ Completeness is enforced rather than reported after the fact. Every confirmation
 
 \subsection{Tuning selections and deviations}
 \label{app:realized-deviations}
-Hyperparameters were selected on natural-prevalence validation data alone, by the adaptive window over the learning-rate envelope and the per-method control grids fixed in the protocol. One configuration is chosen against the equal-weight three-split objective and written identically to every partition. Table~\ref{tab:tuning-selections} records the selected value and the update budget for each dataset, condition, and method, together with any search that terminated at an envelope boundary, since a selection at the boundary indicates the envelope, not the data, determined the choice.
+\noindent The legacy selections optimize balanced accuracy, pooled across tail assignments, with macro F1 and NLL tie-breakers. The rerun reports frozen exposure budgets, derived updates, and the expanded learning-rate envelope.
+
+Table~\ref{tab:tuning-selections} records the legacy selected controls, update budgets, and boundary hits.
 
 \begin{landscape}
 \begingroup
 \scriptsize
 \resultstable{tuning_selections}
-\captionof{table}{Selected control values and update budgets per dataset, condition, and method, with searches terminating at the \num{1e-5} or \num{1e-2} learning-rate envelope boundary flagged. Post-hoc logit adjustment performs no gradient optimization and carries no learning rate.}
+\captionof{table}{Legacy selected controls, update budgets, and learning-rate boundary hits. The rerun uses the expanded envelope.}
 \label{tab:tuning-selections}
 \endgroup
 \end{landscape}
@@ -455,7 +462,7 @@ The gate-defining estimator was changed from patch-micro to case-macro, and the 
 
 Cholangiocarcinoma was excluded from the TCGA-UT target set, reducing it from \num{31} eligible classes to \num{30}, because its held-out participant count could not support split-unit-clustered inference. The exclusion uses the existing construction-time mechanism and removes the class from training as well as evaluation, which is stronger than the evidence problem requires and was accepted in exchange for a uniform \num{30}-type task definition.
 
-The validation cadence was scaled to the update budget rather than pinned to a constant. Validation dominates the tuning cost, and a fixed checkpoint interval made that cost scale with the update budget, so the natural condition was running between \num{13} and \num{62} times as many full validation passes as the controlled conditions it exists to contextualize. The interval is now derived so that any budget takes approximately the same number of checkpoints. No estimand, endpoint, or selection rule changed.
+The legacy validation cadence was tied to update count. The rerun uses about 170 checkpoints per method-specific derived update count.
 
 Three execution defects are recorded here rather than as protocol changes, because none of them altered an estimand, a threshold, or a selection rule.
 
@@ -556,18 +563,20 @@ The main text averages the three partitions with equal weight, which is only def
 
 \section{Computational Cost}
 \label{app:cost}
+\noindent The legacy table covers five methods only. The exposure-matched rerun reports the whole roster with exposure, time, memory, and model size; this table supports no roster-wide cost claim.
+
 Cost bears on the design question because a method whose recovery requires substantially more computation than the reference is a different proposition from one that matches it. This appendix records processed examples, unique exposures, accelerator time, peak memory, and model size for each confirmatory-family method, expressed as a matched difference against cross-entropy in the same condition.
 
 \begin{landscape}
 \begingroup
 \scriptsize
 \resultstable{cost}
-\captionof{table}{Matched computational-cost comparisons against cross-entropy in the same condition, with paired \num{95}\% intervals, covering processed examples, unique exposures, accelerator time, peak memory, and model size, for the five confirmatory-family methods.}
+\captionof{table}{Legacy matched computational-cost comparisons for five methods. The exposure-matched rerun covers the whole roster.}
 \label{tab:cost}
 \endgroup
 \end{landscape}
 
-\noindent The five confirmatory methods are cost-neutral against cross-entropy on every accounting axis except peak accelerator memory. They share the update budget, the batch definition, and the classifier, so processed examples, unique exposures, and parameter counts differ by exactly zero in all \num{110} matched comparisons, and accelerator time differs by between $-\num{0.022}$ and \num{0.052} hours, that is by at most a few minutes on a run measured in tens of hours. Peak memory is within one gigabyte of the reference in \num{68} of the \num{110} comparisons and has a median difference of \num{0.01} gigabytes; the exceptions are all on PANDA, whose comparisons range from $-\num{12.5}$ to $\num{25.1}$ gigabytes. Since the five methods differ only in a per-class weight vector, that spread reflects allocator behaviour on the one dataset large enough to fill an accelerator rather than a property of the methods. The requirement in Section~\ref{sec:discussion-requirements} that a method's transform be specified therefore carries no computational cost argument against it: within this family the choice of signal is free, and only its effectiveness differs.
+\noindent This legacy five-method subset cannot support a roster-wide cost conclusion. The exposure-matched rerun supplies that comparison.
 
 \clearpage
 \bibliographystyle{plainnat}

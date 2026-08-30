@@ -10,7 +10,7 @@ from typing import Any
 
 import torch
 
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
     TuningScope,
     _evaluate,
     _select_post_hoc,

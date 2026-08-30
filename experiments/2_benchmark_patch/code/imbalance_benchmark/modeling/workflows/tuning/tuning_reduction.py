@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from imbalance_benchmark.modeling.context import get_grid_configs
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     resolve_terminal_specs,
     select_candidate_payload,
 )

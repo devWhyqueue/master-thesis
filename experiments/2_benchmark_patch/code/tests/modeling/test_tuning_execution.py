@@ -8,7 +8,7 @@ import pytest
 
 from imbalance_benchmark.commands.confirm import require_tuning_configs
 from imbalance_benchmark.common import verify_signed_file, split_paths
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     merge_round_state,
     register_candidates,
 )

@@ -10,7 +10,7 @@ from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
     shift_window,
     winner_is_interior,
 )
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_registry,
     register_candidates,
     registry_lookup,

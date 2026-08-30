@@ -8,7 +8,8 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.datasets.data import TrainDataset
-from imbalance_benchmark.modeling.context import Regime, build_training_ctx
+from imbalance_benchmark.modeling.context import Regime
+from imbalance_benchmark.modeling.training.context import build_training_ctx
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
 from imbalance_benchmark.modeling.workflows.run_context import param_counts
 from imbalance_benchmark.modeling.training import class_priors, run_evaluation
@@ -16,13 +17,11 @@ from imbalance_benchmark.modeling.training import class_priors, run_evaluation
 
 @dataclass
 class TuningScope:
-    """One patient split's controlled train manifest and natural validation loader."""
-
     regime: Regime
     val_loader: torch.utils.data.DataLoader
     train_ds: TrainDataset
     cost_records: list[dict[str, int]] = field(default_factory=list)
-    update_budget: int | None = None
+    example_budget: int | None = None
     assignment: str = "native"
     split_index: int = 0
     scope_index: int = 0
@@ -85,7 +84,7 @@ def _evaluate(
         seed,
         cfg,
         scope.val_loader,
-        scope.update_budget,
+        scope.example_budget,
     )
     ctx["record_exposure"] = False
     if stage_one_config is not None:

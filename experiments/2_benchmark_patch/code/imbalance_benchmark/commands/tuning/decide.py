@@ -13,7 +13,7 @@ from imbalance_benchmark.hydra.dependent_jobs import final_reduce_job
 from imbalance_benchmark.hydra.workflow import _submit_script
 from imbalance_benchmark.commands.tuning.round_windows import Window, this_round_windows
 from imbalance_benchmark.modeling.context import roster_for_condition
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
     load_round_state,
     merge_round_state,

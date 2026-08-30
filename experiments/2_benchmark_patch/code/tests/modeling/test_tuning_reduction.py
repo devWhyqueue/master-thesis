@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_registry,
     registry_lookup,
 )

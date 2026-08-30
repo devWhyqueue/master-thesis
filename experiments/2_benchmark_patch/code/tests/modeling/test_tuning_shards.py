@@ -5,11 +5,11 @@ from typing import Any
 
 import pytest
 
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import combined_cost
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import combined_cost
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     select_candidate_payload,
 )
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     register_candidates,
     write_round_grids,
 )

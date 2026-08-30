@@ -15,7 +15,8 @@ from imbalance_benchmark.modeling.evaluation import (
     _RecordingBatchSampler,
 )
 from imbalance_benchmark.modeling.models import DualExpertMil
-from imbalance_benchmark.modeling.context import resolve_update_budget
+from imbalance_benchmark.modeling.context import REFERENCE_PASSES
+from imbalance_benchmark.modeling.training.budget import resolve_update_budget
 from imbalance_benchmark.modeling.oko import fit_oko
 from imbalance_benchmark.modeling.training import (
     build_optimizer,
@@ -141,12 +142,19 @@ def _mde_train_loop(
     return best
 
 
+def _mde_budget(ctx: dict[str, Any], batch_size: int) -> int:
+    """Resolve MDE's method-specific update count."""
+    return resolve_update_budget(
+        ctx, "mde", ctx["param_config"], batch_size, REFERENCE_PASSES
+    )
+
+
 def fit_mde(ctx: dict[str, Any]) -> tuple[dict[str, Any], float]:
     """MDE-inspired: U joint updates, each consuming one natural and one class-balanced minibatch."""
     device = ctx["device"]
     model = cast(DualExpertMil, ctx["model"])
     b_size = resolve_batch_size(ctx["config"], True)
-    budget = resolve_update_budget(ctx, b_size)
+    budget = _mde_budget(ctx, b_size)
     lr = ctx["param_config"]["lr"]
     lambda_con = float(ctx["param_config"].get("parameter", 0.0))
     loader_u, loader_b = _build_mde_loaders(

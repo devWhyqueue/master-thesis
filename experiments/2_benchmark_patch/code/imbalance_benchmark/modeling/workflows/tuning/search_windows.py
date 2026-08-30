@@ -13,10 +13,9 @@ __all__ = [
     "new_candidates",
 ]
 
-# Frozen envelope audited to bound the adaptive learning-rate search (report
-# Appendix, Experimental Controls). The active four-point window starts
-# current-centered here and may shift outward one position at a time.
-LR_ENVELOPE: list[float] = [1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+# The prior run selected both outer values, so both are interior to this
+# rerun's envelope. The active four-point window may still shift outward.
+LR_ENVELOPE: list[float] = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2]
 
 # Audit found these two controls unbounded above (no natural domain ceiling,
 # unlike balanced-sampling/weighted-CE/OKO strength 1). Each envelope's
@@ -44,7 +43,7 @@ def initial_window(regime: str, envelope: list[float]) -> list[float]:
     envelope's first value, current-centered reproduces today's frozen
     default window, and high-centered ends at the envelope's last value.
     """
-    starts = {"low": 0, "current": 2, "high": len(envelope) - 4}
+    starts = {"low": 0, "current": len(envelope) // 2 - 1, "high": len(envelope) - 4}
     if regime not in starts:
         raise ValueError(f"Unknown window regime: {regime}")
     start = starts[regime]

@@ -10,7 +10,7 @@ from imbalance_benchmark.commands import confirm
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     combined_scopes,
 )
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     merge_round_state,
 )
 from imbalance_benchmark.commands.confirm import shard as confirm_shard
@@ -362,7 +362,13 @@ def test_get_grid_configs_honors_an_explicit_lr_window():
 def test_initial_window_positions_by_regime():
     assert initial_window("low", LR_ENVELOPE) == LR_ENVELOPE[0:4]
     assert initial_window("current", LR_ENVELOPE) == LEARNING_RATE_GRID
-    assert initial_window("high", LR_ENVELOPE) == LR_ENVELOPE[3:7]
+    assert initial_window("high", LR_ENVELOPE) == LR_ENVELOPE[-4:]
+
+
+def test_previous_learning_rate_boundaries_are_interior_to_the_rerun_envelope():
+    """The rerun must not repeat the observed 1e-5/1e-2 terminal bounds."""
+    assert LR_ENVELOPE.index(1e-5) not in {0, len(LR_ENVELOPE) - 1}
+    assert LR_ENVELOPE.index(1e-2) not in {0, len(LR_ENVELOPE) - 1}
 
 
 def test_initial_window_rejects_unknown_regime():
@@ -381,14 +387,14 @@ def test_winner_is_interior_true_only_off_the_edges():
 def test_shift_window_reuses_three_overlapping_values_outward():
     window = LEARNING_RATE_GRID  # LR_ENVELOPE[2:6]
     shifted = shift_window(window, window[-1], LR_ENVELOPE)
-    assert shifted == LR_ENVELOPE[3:7]
+    assert shifted == LR_ENVELOPE[4:8]
     assert set(window) & set(shifted) == set(window[1:])
 
 
 def test_shift_window_reuses_three_overlapping_values_inward_direction():
     window = LEARNING_RATE_GRID
     shifted = shift_window(window, window[0], LR_ENVELOPE)
-    assert shifted == LR_ENVELOPE[1:5]
+    assert shifted == LR_ENVELOPE[2:6]
     assert set(window) & set(shifted) == set(window[:-1])
 
 

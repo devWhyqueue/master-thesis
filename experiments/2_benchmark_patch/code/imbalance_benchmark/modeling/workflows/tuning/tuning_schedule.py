@@ -9,8 +9,10 @@ import torch
 
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.modeling.context import group_conditions, roster_for_condition
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import TuningScope
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
+    TuningScope,
+)
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import ShardSpec
@@ -42,7 +44,7 @@ def combined_scopes(
                 class_names=regime.locked_class_names,
             ),
             records,
-            regime.update_budgets.get(
+            regime.exposure_budgets.get(
                 "natural" if condition == "natural" else "controlled"
             ),
             assignment,

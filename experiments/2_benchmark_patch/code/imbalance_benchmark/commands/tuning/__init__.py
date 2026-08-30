@@ -26,14 +26,14 @@ from imbalance_benchmark.modeling.context import (
     scoped_assignments,
 )
 from imbalance_benchmark.modeling.training import build_evaluation_loader
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
+    TuningScope,
     summarize_tuning_cost,
     tune_across_splits,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     reduce_tuning_shards,
 )
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import TuningScope
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     _manifest_name,
     combined_scopes,
@@ -97,7 +97,7 @@ def _tuning_inputs(
             is_mil,
             locked_class_names=list(freeze["class_names"]),
             method_grids=freeze.get("method_grids", {}),
-            update_budgets=freeze.get("update_budgets", {}),
+            exposure_budgets=freeze.get("exposure_budgets", {}),
             difficulty=freeze.get("difficulty_evidence", {}).get("difficulty", {}),
         ),
         build_evaluation_loader(val_ds, is_mil),
@@ -228,7 +228,7 @@ def load_shard_scope(
             capacity_hint=capacity,
         ),
         cost_records,
-        regime.update_budgets.get(
+        regime.exposure_budgets.get(
             "natural" if condition == "natural" else "controlled"
         ),
         assignment,

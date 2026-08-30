@@ -24,7 +24,7 @@ __all__ = [
     "tuning_selections",
 ]
 
-_ENVELOPE = (1e-5, 1e-2)
+_ENVELOPE = (3e-6, 3e-2)
 _SLOPES = (
     r"$\beta_{\log\rho}$",
     r"$\beta_{\mathrm{ind}}$",
@@ -121,7 +121,7 @@ def _selection_row(
     values: dict[str, Any],
 ) -> dict[str, Any]:
     learning_rate = values.get("lr")
-    budgets = data.freezes[0]["update_budgets"]
+    budgets = data.freezes[0]["exposure_budgets"]
     return {
         "Dataset": data.name,
         "Condition": CONDITION[condition],
@@ -134,12 +134,14 @@ def _selection_row(
         if values.get("parameter") is not None
         else "---",
         "At envelope bound": "Yes" if learning_rate in _ENVELOPE else "No",
-        "Updates": budgets["natural" if condition == "natural" else "controlled"],
+        "Example presentations": budgets[
+            "natural" if condition == "natural" else "controlled"
+        ],
     }
 
 
 def tuning_selections(datasets: list[Dataset]) -> str:
-    """Selected control values and consumed update budgets, with boundary flags.
+    """Selected controls and frozen exposure budgets, with boundary flags.
 
     One configuration is chosen against the equal-weight three-split objective
     and written identically to every split, so split 0 carries the selection.

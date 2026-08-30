@@ -11,8 +11,10 @@ from imbalance_benchmark.modeling.context import (
     roster_for_condition,
     scoped_assignments,
 )
-from imbalance_benchmark.modeling.workflows.tuning_aggregate import combined_cost
-from imbalance_benchmark.modeling.workflows.tuning.candidate_registry import (
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
+    combined_cost,
+)
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
     load_round_state,
     terminal_cost_payloads,
@@ -38,7 +40,6 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import phase_
 def _bundle_indices(
     bundle_index: int, size: int, observation_count: int, by_observation: bool
 ) -> list[int]:
-    """Map one bundled SLURM task index to its flat candidate/observation indices."""
     if not by_observation:
         first = bundle_index * size
         return list(range(first, first + size))
@@ -53,8 +54,7 @@ def _bundle_indices(
 def write_base_selection(
     root: Path, condition: str, selections: dict[str, Any]
 ) -> Path:
-    """Merge (never replace) the signed base-method selection: a later round only
-    reduces its own unresolved subset, so replacing would drop a resolved method."""
+    """Merge signed base selections without dropping resolved methods."""
     path = root / "tuning_shards" / f"base_selections_{condition}.json"
     existing = json.loads(path.read_text()) if path.exists() else {}
     write_json(path, {**existing, **selections})

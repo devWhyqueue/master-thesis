@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable
 from typing import Any
 
@@ -12,7 +11,6 @@ from imbalance_benchmark.datasets.features.cache import bank_is_cpu
 from imbalance_benchmark.modeling.context import REFERENCE_PASSES, model_kwargs
 
 __all__ = [
-    "CHECKPOINT_INTERVAL",
     "TARGET_CHECKPOINTS",
     "OPTIMIZER_NAME",
     "WEIGHT_DECAY",
@@ -24,9 +22,6 @@ __all__ = [
     "resolve_training_config",
 ]
 
-CHECKPOINT_INTERVAL = 50
-# Count the controlled conditions already take (see PLAN_2_natural_tuning_cost.md);
-# natural's cadence is scaled to match instead of running the fixed interval above.
 TARGET_CHECKPOINTS = 170
 # Fixed optimizer family shared by every trainable method and regime.
 OPTIMIZER_NAME = "AdamW"
@@ -65,15 +60,9 @@ def resolve_batch_size(cfg: dict[str, Any], is_mil: bool) -> int:
 
 
 def resolve_checkpoint_interval(cfg: dict[str, Any], is_mil: bool, budget: int) -> int:
-    """Validation cadence scaled so any budget takes ~TARGET_CHECKPOINTS passes.
-
-    Validation is ~98% of tune cost, so a fixed interval makes cost scale with
-    U. A configured value still wins when it is coarser; this only raises the
-    floor.
-    """
-    k = "wsi_training" if is_mil else "patch_training"
-    configured = cfg.get(k, {}).get("checkpoint_interval", CHECKPOINT_INTERVAL)
-    return max(configured, math.ceil(budget / TARGET_CHECKPOINTS))
+    """Validation cadence gives every method about TARGET_CHECKPOINTS passes."""
+    del cfg, is_mil
+    return max(1, round(budget / TARGET_CHECKPOINTS))
 
 
 def build_optimizer(
@@ -105,7 +94,8 @@ def resolve_training_config(cfg: dict[str, Any], is_mil: bool) -> dict[str, Any]
         "weight_decay": WEIGHT_DECAY,
         "target_checkpoints": TARGET_CHECKPOINTS,
         "batch_size": resolve_batch_size(cfg, is_mil),
-        "update_budget_reference_passes": REFERENCE_PASSES,
+        "budget_unit": "example_presentations",
+        "example_budget_reference_passes": REFERENCE_PASSES,
         "precision": "float32",
         **model_kwargs(is_mil),
     }

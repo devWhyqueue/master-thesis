@@ -15,7 +15,7 @@ from imbalance_benchmark.construction import (
 from imbalance_benchmark.manifest.freeze import write_condition
 from imbalance_benchmark.manifest.seeds import SEED_ROLES, derive_seed
 from imbalance_benchmark.modeling.context import get_grid_configs, roster_for_regime
-from imbalance_benchmark.modeling.training import resolve_batch_size, update_budget
+from imbalance_benchmark.modeling.training import example_budget
 from imbalance_benchmark.manifest.construction_helpers import (
     CONDITION_RHOS,
     _retains_fixed_pool,
@@ -231,11 +231,10 @@ def _freeze_meta(
             method: get_grid_configs(method, len(classes))
             for method in roster_for_regime(is_mil)
         },
-        "update_budgets": {
-            "controlled": update_budget(shared_t, resolve_batch_size(config, is_mil)),
-            "natural": update_budget(
-                sum(class_support_counts(train_df, is_mil).values()),
-                resolve_batch_size(config, is_mil),
+        "exposure_budgets": {
+            "controlled": example_budget(shared_t),
+            "natural": example_budget(
+                sum(class_support_counts(train_df, is_mil).values())
             ),
         },
         "runtime_config": config,

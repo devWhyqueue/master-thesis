@@ -20,7 +20,8 @@ from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     clustered_endpoints,
 )
 from imbalance_benchmark.common import REPO_ROOT, compute_sha256, write_run_record
-from imbalance_benchmark.modeling.context import resolve_update_budget
+from imbalance_benchmark.modeling.context import REFERENCE_PASSES
+from imbalance_benchmark.modeling.training.budget import resolve_update_budget
 from imbalance_benchmark.modeling.training import (
     class_priors,
     resolve_batch_size,
@@ -158,7 +159,9 @@ def _run_and_record(
         )
     _attach_temperature_scaled_test_outputs(splits)
     b_size = resolve_batch_size(run.config, run.is_mil)
-    budget = resolve_update_budget(ctx, b_size)
+    budget = resolve_update_budget(
+        ctx, ctx["method"], ctx["param_config"], b_size, REFERENCE_PASSES
+    )
     write_run_record(
         run.paths["results"]
         / f"assignment={run.assignment}"

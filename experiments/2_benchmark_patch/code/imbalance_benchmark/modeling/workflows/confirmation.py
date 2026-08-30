@@ -6,7 +6,7 @@ from typing import Any
 import torch
 
 from imbalance_benchmark.datasets.data import TrainDataset
-from imbalance_benchmark.modeling.context import build_training_ctx
+from imbalance_benchmark.modeling.training.context import build_training_ctx
 from imbalance_benchmark.modeling.special_methods import fit_crt, fit_method
 from imbalance_benchmark.modeling.training import class_priors
 from imbalance_benchmark.modeling.workflows.confirmation_helpers import (
@@ -37,9 +37,9 @@ def _training_context(
     seed: int,
     cfg: dict[str, Any],
 ) -> dict[str, Any]:
-    """Build a confirmation context with the signed condition-level update budget."""
+    """Build a confirmation context with the signed condition-level exposure budget."""
     budget_kind = "natural" if condition == "natural" else "controlled"
-    budget = run.update_budgets.get(budget_kind)
+    budget = run.exposure_budgets.get(budget_kind)
     args = (method, train_ds, run, seed, cfg, run.val_loader)
     return (
         build_training_ctx(*args)
