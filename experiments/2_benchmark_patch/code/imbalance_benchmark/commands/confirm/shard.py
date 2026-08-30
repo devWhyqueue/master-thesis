@@ -16,6 +16,7 @@ from imbalance_benchmark.common import (
     read_run_record,
     split_paths,
 )
+from imbalance_benchmark.manifest.freeze import accepted_freeze_hashes
 from imbalance_benchmark.datasets.data import TrainDataset, load_training_dataset
 from imbalance_benchmark.modeling.context import (
     MATCHED_BETA_METHOD,
@@ -121,11 +122,16 @@ def _seed_already_done(
     seed_idx: int,
     configs: dict[str, Any],
     is_mil: bool,
+    accepted: set[str | None],
 ) -> bool:
     """Return whether complete records match the current effective configurations.
 
     A crash mid-write can leave a truncated ``run.json``; treat any read failure
     as not-done so a resumed task refits rather than trusting a corrupt record.
+    A record stamped with a freeze hash outside ``accepted`` predates the
+    current (or an amendment's superseded) freeze and must be refit too -
+    otherwise a pre-refreeze run lingers forever, as ``ingest_all_runs``
+    would refuse it at analyze time regardless.
     """
     for name in _fitted_methods(cond, method, is_mil):
         result_dir = _result_dir(paths, assignment, cond, name, seed_idx)
@@ -134,6 +140,8 @@ def _seed_already_done(
         except (OSError, ValueError):
             return False
         if record is None or "test" not in record.get("splits", {}):
+            return False
+        if record.get("provenance", {}).get("freeze_content_sha256") not in accepted:
             return False
         selected = configs.get(name)
         if name == "post_hoc_logit_adjustment" and isinstance(selected, dict):
@@ -152,6 +160,7 @@ def _run_confirm_unit(
     best_configs: dict[str, Any],
     run_data: dict[str, Any],
     scoped: tuple[str, ...],
+    accepted: set[str | None],
 ) -> None:
     """Fit one scheduled unit for every tail assignment scoped to its condition."""
     for assignment in scoped:
@@ -165,6 +174,7 @@ def _run_confirm_unit(
             unit.seed_index,
             selected,
             run_data["is_mil"],
+            accepted,
         ):
             continue
         run = RunContext(**run_data, assignment=assignment)
@@ -184,6 +194,7 @@ def _run_split_bundle(paths: dict[str, Any], split_units: list[ConfirmUnit]) -> 
     """Fit every scheduled unit for one split, skipping conditions this dataset never built."""
     run_data, freeze = _confirm_run_data(paths)
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
+    accepted = accepted_freeze_hashes(freeze)
     selections: dict[str, dict[str, Any]] = {}
     for unit in split_units:
         scoped = scoped_assignments(unit.condition, freeze, assignments, "unassigned")
@@ -193,7 +204,7 @@ def _run_split_bundle(paths: dict[str, Any], split_units: list[ConfirmUnit]) -> 
             selections[unit.condition] = _load_condition_selections(
                 paths, unit.condition
             )
-        _run_confirm_unit(unit, selections[unit.condition], run_data, scoped)
+        _run_confirm_unit(unit, selections[unit.condition], run_data, scoped, accepted)
 
 
 def cmd_confirm_shard(args: argparse.Namespace) -> None:

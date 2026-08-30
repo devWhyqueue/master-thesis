@@ -9,6 +9,8 @@ from imbalance_benchmark.modeling.context import roster_for_regime
 
 
 def _split_assignment_severities(path: Path) -> set[tuple[str, str]]:
+    """Severities gated for recovery comparisons: everything but the ``balanced_spread``
+    reference arm, which ``recovery._recovery_steps`` never gates against itself."""
     if not path.exists():
         return set()
     conditions = json.loads(path.read_text()).get("assignment_conditions", {})
@@ -16,6 +18,7 @@ def _split_assignment_severities(path: Path) -> set[tuple[str, str]]:
         (assignment, severity)
         for assignment, severities in conditions.items()
         for severity in severities
+        if severity != "balanced_spread"
     }
 
 

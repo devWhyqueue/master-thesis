@@ -827,6 +827,33 @@ def test_crossed_bootstrap_reuses_one_patient_weight_across_split_appearances(
         second.weights.patient[second_patient_of_row0],
     )
 
+def test_expected_comparison_keys_excludes_balanced_spread_reference_arm(
+    tmp_path: Path,
+) -> None:
+    """balanced_spread is a reference arm recovery.py never gates against itself
+    (see ``_recovery_steps``); the expected set must not demand comparisons
+    gates_and_recovery will never produce, or analyze-combine always fails."""
+    from imbalance_benchmark.analysis.reporting.completeness import (
+        expected_comparison_keys,
+    )
+
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    for index in range(3):
+        write_json(
+            split_paths(paths, index)["data"] / "manifest_freeze.json",
+            {
+                "assignment_conditions": {
+                    "native": {"severe": {}, "balanced_spread": {}}
+                }
+            },
+        )
+
+    expected = expected_comparison_keys(paths, {"dataset": {"regime": "patch"}})
+
+    assert all(key[1] != "balanced_spread" for key in expected)
+    assert any(key[1] == "severe" for key in expected)
+
+
 def test_cross_split_completeness_rejects_a_roster_method_missing_everywhere() -> None:
     rows = [
         {

@@ -36,10 +36,14 @@ from imbalance_benchmark.modeling.workflows.confirmation import (
 )
 
 
+FREEZE_HASH = "test-freeze-hash"
+
+
 def _write_seed_record(
     method_dir: Path,
     seed_idx: int,
     tuning_params: dict[str, object] | None = None,
+    freeze_hash: str = FREEZE_HASH,
 ) -> None:
     write_run_record(
         method_dir / f"seed={seed_idx}",
@@ -47,6 +51,7 @@ def _write_seed_record(
             "benchmark": "patch",
             "class_names": ["A", "B"],
             "tuning_params": tuning_params or {},
+            "provenance": {"freeze_content_sha256": freeze_hash},
             "splits": {
                 "test": {
                     "labels": [0, 1],
@@ -168,7 +173,8 @@ def test_unfitted_seed_is_not_done(tmp_path: Path) -> None:
     paths = {"results": tmp_path}
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}, False
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}, False,
+        {FREEZE_HASH},
     )
 
 
@@ -179,7 +185,8 @@ def test_ordinary_method_is_done_once_its_test_record_exists(tmp_path: Path) -> 
     _write_seed_record(method_dir, 0, config)
 
     assert confirm_shard._seed_already_done(
-        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": config}, False
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": config}, False,
+        {FREEZE_HASH},
     )
 
 
@@ -196,6 +203,24 @@ def test_changed_tuning_config_invalidates_an_existing_seed(tmp_path: Path) -> N
         0,
         {"weighted_ce": {"lr": 3e-5, "parameter": 1.0}},
         False,
+        {FREEZE_HASH},
+    )
+
+
+def test_stale_freeze_hash_invalidates_an_otherwise_matching_seed(
+    tmp_path: Path,
+) -> None:
+    """A run stamped under a freeze this split no longer accepts (pre-refreeze
+    leftover) must be refit, even if its tuning params still match - otherwise
+    it lingers until analyze's ingestion refuses it outright."""
+    paths = {"results": tmp_path}
+    method_dir = tmp_path / "assignment=native" / "severe" / "weighted_ce"
+    config = {"lr": 3e-5, "parameter": 1.0}
+    _write_seed_record(method_dir, 0, config, freeze_hash="stale-hash")
+
+    assert not confirm_shard._seed_already_done(
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": config}, False,
+        {FREEZE_HASH},
     )
 
 
@@ -214,7 +239,7 @@ def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
     )
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "severe", "ce", 0, configs, False
+        paths, "native", "severe", "ce", 0, configs, False, {FREEZE_HASH}
     )
 
     _write_seed_record(
@@ -224,7 +249,7 @@ def test_ce_unit_is_not_done_until_its_folded_post_hoc_record_also_exists(
     )
 
     assert confirm_shard._seed_already_done(
-        paths, "native", "severe", "ce", 0, configs, False
+        paths, "native", "severe", "ce", 0, configs, False, {FREEZE_HASH}
     )
 
 
@@ -235,13 +260,13 @@ def test_crt_requires_its_selected_stage_one_ce_config(tmp_path: Path) -> None:
     _write_seed_record(method_dir, 0, configs["crt"])
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "balanced", "crt", 0, configs, False
+        paths, "native", "balanced", "crt", 0, configs, False, {FREEZE_HASH}
     )
 
     _write_seed_record(method_dir, 0, {**configs["crt"], "stage_one": configs["ce"]})
 
     assert confirm_shard._seed_already_done(
-        paths, "native", "balanced", "crt", 0, configs, False
+        paths, "native", "balanced", "crt", 0, configs, False, {FREEZE_HASH}
     )
 
 
@@ -254,7 +279,8 @@ def test_a_truncated_run_record_is_treated_as_not_done(tmp_path: Path) -> None:
     (result_dir / "run.json").write_text("{not valid json")
 
     assert not confirm_shard._seed_already_done(
-        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}, False
+        paths, "native", "severe", "weighted_ce", 0, {"weighted_ce": {}}, False,
+        {FREEZE_HASH},
     )
 
 
