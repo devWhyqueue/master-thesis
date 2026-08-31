@@ -406,7 +406,7 @@ def test_integer_rounding_produces_fractional_achieved_ratios() -> None:
 
 def test_tolerance_feasible_total_lands_within_both_bands() -> None:
     """With generous supports, the selected total realizes both requested severities."""
-    counts = {"A": 5000, "B": 5000}
+    counts = {"A": 1000, "B": 1000}
     train_df = _flat_frame(counts, is_mil=True)
     min_support = 10
 
@@ -428,7 +428,7 @@ def test_tolerance_feasible_total_lands_within_both_bands() -> None:
 
 def test_largest_tolerance_feasible_total_is_selected() -> None:
     """Among several totals inside both bands, the largest one wins."""
-    counts = {"A": 5000, "B": 5000}
+    counts = {"A": 1000, "B": 1000}
     train_df = _flat_frame(counts, is_mil=True)
     min_support = 10
     ctx, floor, ceiling = _build_search_context(
@@ -447,7 +447,7 @@ def test_tolerance_probe_failure_falls_through_within_the_tolerance_tier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A blocked largest in-band total excludes only itself, not the whole tier."""
-    counts = {"A": 5000, "B": 5000}
+    counts = {"A": 1000, "B": 1000}
     train_df = _flat_frame(counts, is_mil=True)
     min_support = 10
     ctx, floor, ceiling = _build_search_context(
