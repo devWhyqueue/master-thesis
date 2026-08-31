@@ -20,6 +20,7 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import (
     ReduceRound,
+    combine_selection,
     reduce_phase,
 )
 
@@ -216,4 +217,37 @@ def test_write_base_selection_merges_instead_of_overwriting(tmp_path: Path):
     assert saved == {
         "ce": {"lr": 1e-4},
         "weighted_ce": {"parameter": 0.5, "lr": 1e-4},
+    }
+
+
+def _payload(config: dict[str, Any], balanced_accuracy: float) -> dict[str, Any]:
+    return {
+        "config": config,
+        "metrics": [
+            {
+                "scope_index": 0,
+                "seed_index": 0,
+                "seed": 11,
+                "balanced_accuracy": balanced_accuracy,
+                "macro_f1": 0.5,
+                "nll": 0.5,
+            }
+        ],
+    }
+
+
+def test_focal_zero_gamma_is_not_aliased_from_cross_entropy():
+    """focal's alpha applies at gamma=0, so its zero point is not plain CE."""
+    grid = [{"lr": 1e-4, "parameter": 0.5}]
+    candidates = [_payload({"lr": 1e-4, "parameter": 0.5}, 0.5)]
+    ce_by_lr = {1e-4: _payload({"lr": 1e-4}, 0.9)}
+
+    assert combine_selection("focal", grid, candidates, dict(ce_by_lr)) == {
+        "lr": 1e-4,
+        "parameter": 0.5,
+    }
+    # weighted_ce stays anchored: its parameter=0 really is plain CE.
+    assert combine_selection("weighted_ce", grid, candidates, dict(ce_by_lr)) == {
+        "lr": 1e-4,
+        "parameter": 0.0,
     }

@@ -20,20 +20,20 @@ LR_ENVELOPE: list[float] = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2
 # Audit found these two controls unbounded above (no natural domain ceiling,
 # unlike balanced-sampling/weighted-CE/OKO strength 1). Each envelope's
 # active four-point window starts at GRIDS[method] (modeling.context) and
-# may shift upward one position at a time. CE (that method's parameter=0)
-# is a free anchor point below the window for focal only: gamma=0 degenerates
-# exactly to plain CE, so its metrics are aliased from CE's already-computed
-# candidates rather than trained (see tuning_reduction). ce_soft_f1/mcc train
-# under a forced balanced sampler (loaders.FIXED_BALANCED_SAMPLER_METHODS),
-# so their weight=0 point is balanced-sampling CE, not CE - it is trained for
-# real, not aliased, hence their absence from CE_ANCHORED_METHODS below.
+# may shift upward one position at a time. No method here reaches plain CE at
+# its zero-strength point, so none is CE-anchored: ce_soft_f1/mcc train under
+# a forced balanced sampler (loaders.FIXED_BALANCED_SAMPLER_METHODS), making
+# their weight=0 point balanced-sampling CE, and focal applies its class-aware
+# alpha at unit strength independently of gamma (training._init_criterion),
+# making its gamma=0 point class-weighted CE. Both are trained for real rather
+# than aliased from CE's candidates (see tuning_reduction).
 STRENGTH_ENVELOPES: dict[str, list[float]] = {
     "focal": [0.0, 0.5, 1.0, 1.5, 2.0, 4.0, 8.0],
     "ce_soft_f1": [0.0, 0.25, 1.0, 4.0, 16.0, 64.0],
     "ce_soft_mcc": [0.0, 0.25, 1.0, 4.0, 16.0, 64.0],
 }
 
-CE_ANCHORED_METHODS = frozenset({"weighted_ce", "balanced_sampling", "focal"})
+CE_ANCHORED_METHODS = frozenset({"weighted_ce", "balanced_sampling"})
 
 
 def initial_window(regime: str, envelope: list[float]) -> list[float]:

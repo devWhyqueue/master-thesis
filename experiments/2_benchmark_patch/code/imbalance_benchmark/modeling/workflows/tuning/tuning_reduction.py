@@ -1,9 +1,9 @@
 """Reduce tuning shards into signed selections.
 
 ``CE_ANCHORED_METHODS`` each degenerate exactly to plain CE at
-``parameter=0`` (zero reweighting, zero focal gamma, zero auxiliary
-weight), so ``reduce_phase`` aliases CE's own same-lr metrics as that
-free candidate instead of training a redundant strength-0 model.
+``parameter=0`` (zero reweighting, uniform sampling), so ``reduce_phase``
+aliases CE's own same-lr metrics as that free candidate instead of training
+a redundant strength-0 model; any other zero point is trained for real.
 """
 
 from __future__ import annotations
