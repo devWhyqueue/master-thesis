@@ -5,7 +5,7 @@ from typing import Any, cast
 import pandas as pd
 
 from imbalance_benchmark.analysis.inference.confirmatory.holm import PRIMARY_METHODS
-from imbalance_benchmark.analysis.reporting.report.rq1 import ce_row, comparison_units
+from imbalance_benchmark.analysis.reporting.report.rq1 import ce_row
 from imbalance_benchmark.analysis.reporting.report.sources import (
     ASSIGNMENT,
     CONDITION,
@@ -18,6 +18,10 @@ from imbalance_benchmark.analysis.reporting.report.sources import (
     num,
     pval,
     unit_key,
+)
+from imbalance_benchmark.analysis.reporting.report.units import (
+    comparison_units,
+    endpoint_cell,
 )
 
 __all__ = [
@@ -164,12 +168,7 @@ def matched_beta(datasets: list[Dataset]) -> str:
     for data in datasets:
         table = data.tables["equal_split_endpoints"]
         for unit in comparison_units(data):
-            cell = cast(
-                pd.DataFrame,
-                table[
-                    (table["assignment"] == unit[0]) & (table["condition"] == unit[1])
-                ],
-            )
+            cell = endpoint_cell(table, unit)
             entry = {
                 "Dataset": data.name,
                 "Assignment": ASSIGNMENT[unit[0]],

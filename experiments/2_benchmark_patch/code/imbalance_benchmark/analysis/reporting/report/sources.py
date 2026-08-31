@@ -104,8 +104,8 @@ def unit_key(group: str, assignment: str, severity: str) -> str:
 def body(frame: pd.DataFrame, longtable: bool = False) -> str:
     """Bare tabular body.
 
-    The report owns the float, caption, and label because a single float spans
-    all four datasets; emitting them here would duplicate every label.
+    The report owns the float, caption, and label, so emitting them here would
+    duplicate every label wherever one float spans several datasets.
     """
     if frame.empty:
         return _EMPTY

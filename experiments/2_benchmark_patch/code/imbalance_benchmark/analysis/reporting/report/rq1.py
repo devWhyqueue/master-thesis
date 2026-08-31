@@ -19,30 +19,20 @@ from imbalance_benchmark.analysis.reporting.report.sources import (
     num,
     unit_key,
 )
+from imbalance_benchmark.analysis.reporting.report.units import (
+    comparison_units,
+    endpoint_cell,
+)
 
 __all__ = [
     "calibration_deficit",
     "ce_row",
-    "comparison_units",
     "discrimination_deficit",
     "gate_routing",
     "natural_anchor",
     "signal_profiles",
     "tier_endpoints",
 ]
-
-_SEVERITY_ORDER = {"moderate": 0, "severe": 1}
-_ASSIGNMENT_ORDER = {"native": 0, "difficulty_aligned": 1, "difficulty_reversed": 2}
-
-
-def comparison_units(data: Dataset) -> list[tuple[str, str]]:
-    """Every (tail assignment, severity) comparison unit this dataset realized."""
-    units = {
-        (row["assignment"], row["severity"])
-        for row in data.comparisons
-        if row["method"] == "ce"
-    }
-    return sorted(units, key=lambda u: (_SEVERITY_ORDER[u[1]], _ASSIGNMENT_ORDER[u[0]]))
 
 
 def ce_row(data: Dataset, unit: tuple[str, str], gate: str) -> dict[str, Any] | None:
@@ -152,11 +142,8 @@ def _ece(data: Dataset, unit: tuple[str, str]) -> tuple[str, str]:
     table = data.tables.get("calibration_table")
     if table is None or table.empty:
         return "---", "---"
-    match = table[
-        (table["assignment"] == unit[0])
-        & (table["condition"] == unit[1])
-        & (table["method"] == "ce")
-    ]
+    cell = endpoint_cell(table, unit)
+    match = cell[cell["method"] == "ce"]
     if match.empty:
         return "---", "---"
     return num(match.iloc[0]["ECE"]), str(match.iloc[0]["ECE 95% CI"])

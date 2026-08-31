@@ -5,7 +5,8 @@ from typing import Any
 import pandas as pd
 
 from imbalance_benchmark.analysis.query import EXPECTED_CONFIRMATION_SEEDS
-from imbalance_benchmark.analysis.reporting.report.rq1 import ce_row, comparison_units
+from imbalance_benchmark.analysis.reporting.report.rq1 import ce_row
+from imbalance_benchmark.analysis.reporting.report.units import comparison_units
 from imbalance_benchmark.analysis.reporting.report.sources import (
     ASSIGNMENT,
     CONDITION,
