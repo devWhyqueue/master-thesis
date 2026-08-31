@@ -105,6 +105,22 @@ def test_single_shard_runs_without_bundle_indices(monkeypatch) -> None:
     assert calls == [[0]]
 
 
+def test_scale_thread_env_divides_task_cpus_across_workers(monkeypatch) -> None:
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "16")
+
+    shard_workers._scale_thread_env(4)
+
+    assert shard_workers.os.environ["OMP_NUM_THREADS"] == "4"
+
+
+def test_scale_thread_env_never_rounds_below_one(monkeypatch) -> None:
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "3")
+
+    shard_workers._scale_thread_env(4)
+
+    assert shard_workers.os.environ["OMP_NUM_THREADS"] == "1"
+
+
 def test_chunk_splits_round_robin_and_drops_empty_workers() -> None:
     assert shard_workers._chunk([0, 1, 2, 3, 4], 2) == [[0, 2, 4], [1, 3]]
     assert shard_workers._chunk([0], 4) == [[0]]

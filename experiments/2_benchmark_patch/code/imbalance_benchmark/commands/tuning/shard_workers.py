@@ -48,6 +48,20 @@ _PARALLEL_FIT_ENV = {"IMB_FEATURE_BANK_DEVICE": "cuda"}
 _CHILD_STAGGER_SECONDS = 3.0
 
 
+def _scale_thread_env(workers: int) -> None:
+    """Divide the task's OpenMP budget across packed children before they spawn.
+
+    ``spawn`` starts each child from this process's environment at
+    ``Process.start()``, and torch reads ``OMP_NUM_THREADS`` at import --
+    before ``_run_chunk`` runs in the child. Left at the whole task's
+    ``SLURM_CPUS_PER_TASK`` (sized for ``cpus: 4 * parallel_fits``), every
+    packed child would size its own thread pool for the *whole* task, so
+    ``workers`` copies compete for the same cores.
+    """
+    total = int(os.environ.get("SLURM_CPUS_PER_TASK", os.cpu_count() or workers))
+    os.environ["OMP_NUM_THREADS"] = str(max(1, total // workers))
+
+
 def _chunk(specs: list[ShardSpec], workers: int) -> list[list[ShardSpec]]:
     """Split specs round-robin across up to ``workers`` non-empty chunks."""
     chunks: list[list[ShardSpec]] = [[] for _ in range(workers)]
@@ -92,6 +106,7 @@ def _run_packed(
         for spec in specs:
             run_one(spec)
         return
+    _scale_thread_env(workers)
     context = multiprocessing.get_context("spawn")
     processes = [
         context.Process(target=_run_chunk, args=(run_one, batch))
