@@ -1,10 +1,10 @@
 \begin{longtable}{lllllllr}
 \toprule
-Dataset & Condition & Assignment & Method & Learning rate & Control & At envelope bound & Legacy updates \\
+Dataset & Condition & Assignment & Method & Learning rate & Control & At envelope bound & Example presentations \\
 \midrule
 \endfirsthead
 \toprule
-Dataset & Condition & Assignment & Method & Learning rate & Control & At envelope bound & Legacy updates \\
+Dataset & Condition & Assignment & Method & Learning rate & Control & At envelope bound & Example presentations \\
 \midrule
 \endhead
 \midrule
@@ -13,348 +13,200 @@ Dataset & Condition & Assignment & Method & Learning rate & Control & At envelop
 \endfoot
 \bottomrule
 \endlastfoot
-BRACS & Balanced & --- & Balanced sampling & 1e-05 & 0.2500 & Yes & 3960 \\
-BRACS & Balanced & --- & CE & 3e-05 & --- & No & 3960 \\
-BRACS & Balanced & --- & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 3960 \\
-BRACS & Balanced & --- & CE + soft MCC & 3e-05 & 64.0000 & No & 3960 \\
-BRACS & Balanced & --- & CFAL & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Balanced & --- & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Balanced & --- & cRT & 0.001 & --- & No & 3960 \\
-BRACS & Balanced & --- & Focal loss & 3e-05 & 0.0000 & No & 3960 \\
-BRACS & Balanced & --- & Independent support & 3e-05 & 0.8000 & No & 3960 \\
-BRACS & Balanced & --- & Logit adjustment (train) & 3e-05 & 2.0000 & No & 3960 \\
-BRACS & Balanced & --- & OKO & 0.003 & 2.0000 & No & 3960 \\
-BRACS & Balanced & --- & Difficulty & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Balanced & --- & Logit adjustment (post-hoc) & --- & 1.0000 & No & 3960 \\
-BRACS & Balanced & --- & Diversity & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Balanced & --- & Prevalence & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Aligned & Balanced sampling & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Aligned & CE & 0.003 & --- & No & 3960 \\
-BRACS & Moderate & Aligned & CE + soft $F_1$ & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Aligned & CE + soft MCC & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Aligned & CFAL & 0.01 & 1.0000 & Yes & 3960 \\
-BRACS & Moderate & Aligned & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Moderate & Aligned & cRT & 0.003 & --- & No & 3960 \\
-BRACS & Moderate & Aligned & Focal loss & 0.001 & 1.5000 & No & 3960 \\
-BRACS & Moderate & Aligned & Independent support & 0.001 & 0.9900 & No & 3960 \\
-BRACS & Moderate & Aligned & Logit adjustment (train) & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Aligned & OKO & 0.001 & 4.0000 & No & 3960 \\
-BRACS & Moderate & Aligned & Difficulty & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Aligned & Logit adjustment (post-hoc) & --- & 0.5000 & No & 3960 \\
-BRACS & Moderate & Aligned & Diversity & 0.0003 & 0.7500 & No & 3960 \\
-BRACS & Moderate & Aligned & Prevalence & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Reversed & Balanced sampling & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Reversed & CE & 0.003 & --- & No & 3960 \\
-BRACS & Moderate & Reversed & CE + soft $F_1$ & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Reversed & CE + soft MCC & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Reversed & CFAL & 0.01 & 1.0000 & Yes & 3960 \\
-BRACS & Moderate & Reversed & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Moderate & Reversed & cRT & 0.003 & --- & No & 3960 \\
-BRACS & Moderate & Reversed & Focal loss & 0.001 & 1.5000 & No & 3960 \\
-BRACS & Moderate & Reversed & Independent support & 0.001 & 0.9900 & No & 3960 \\
-BRACS & Moderate & Reversed & Logit adjustment (train) & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Reversed & OKO & 0.001 & 4.0000 & No & 3960 \\
-BRACS & Moderate & Reversed & Difficulty & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 3960 \\
-BRACS & Moderate & Reversed & Diversity & 0.0003 & 0.7500 & No & 3960 \\
-BRACS & Moderate & Reversed & Prevalence & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Native & Balanced sampling & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Native & CE & 0.003 & --- & No & 3960 \\
-BRACS & Moderate & Native & CE + soft $F_1$ & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Native & CE + soft MCC & 3e-05 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Native & CFAL & 0.01 & 1.0000 & Yes & 3960 \\
-BRACS & Moderate & Native & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Moderate & Native & cRT & 0.003 & --- & No & 3960 \\
-BRACS & Moderate & Native & Focal loss & 0.001 & 1.5000 & No & 3960 \\
-BRACS & Moderate & Native & Independent support & 0.001 & 0.9900 & No & 3960 \\
-BRACS & Moderate & Native & Logit adjustment (train) & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Moderate & Native & OKO & 0.001 & 4.0000 & No & 3960 \\
-BRACS & Moderate & Native & Difficulty & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Moderate & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 3960 \\
-BRACS & Moderate & Native & Diversity & 0.0003 & 0.7500 & No & 3960 \\
-BRACS & Moderate & Native & Prevalence & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Natural & --- & Balanced sampling & 0.0001 & 0.5000 & No & 50970 \\
-BRACS & Natural & --- & CE & 0.0001 & --- & No & 50970 \\
-BRACS & Natural & --- & CE + soft $F_1$ & 0.0003 & 0.2500 & No & 50970 \\
-BRACS & Natural & --- & CE + soft MCC & 0.0003 & 0.2500 & No & 50970 \\
-BRACS & Natural & --- & CFAL & 0.01 & 2.0000 & Yes & 50970 \\
-BRACS & Natural & --- & cRT & 0.003 & --- & No & 50970 \\
-BRACS & Natural & --- & Focal loss & 0.0001 & 4.0000 & No & 50970 \\
-BRACS & Natural & --- & Logit adjustment (train) & 0.0001 & 0.5000 & No & 50970 \\
-BRACS & Natural & --- & OKO & 0.0003 & 1.0000 & No & 50970 \\
-BRACS & Natural & --- & Logit adjustment (post-hoc) & --- & 0.5000 & No & 50970 \\
-BRACS & Natural & --- & Prevalence & 0.0001 & 1.0000 & No & 50970 \\
-BRACS & Severe & Aligned & Balanced sampling & 1e-05 & 1.0000 & Yes & 3960 \\
-BRACS & Severe & Aligned & CE & 0.001 & --- & No & 3960 \\
-BRACS & Severe & Aligned & CE + soft $F_1$ & 1e-05 & 0.2500 & Yes & 3960 \\
-BRACS & Severe & Aligned & CE + soft MCC & 3e-05 & 64.0000 & No & 3960 \\
-BRACS & Severe & Aligned & CFAL & 0.001 & 1.0000 & No & 3960 \\
-BRACS & Severe & Aligned & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Severe & Aligned & cRT & 0.001 & --- & No & 3960 \\
-BRACS & Severe & Aligned & Focal loss & 0.001 & 2.0000 & No & 3960 \\
-BRACS & Severe & Aligned & Independent support & 0.001 & 0.9990 & No & 3960 \\
-BRACS & Severe & Aligned & Logit adjustment (train) & 0.0003 & 1.0000 & No & 3960 \\
-BRACS & Severe & Aligned & OKO & 0.0001 & 1.0000 & No & 3960 \\
-BRACS & Severe & Aligned & Difficulty & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Severe & Aligned & Logit adjustment (post-hoc) & --- & 0.5000 & No & 3960 \\
-BRACS & Severe & Aligned & Diversity & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Severe & Aligned & Prevalence & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Severe & Reversed & Balanced sampling & 1e-05 & 1.0000 & Yes & 3960 \\
-BRACS & Severe & Reversed & CE & 0.001 & --- & No & 3960 \\
-BRACS & Severe & Reversed & CE + soft $F_1$ & 1e-05 & 0.2500 & Yes & 3960 \\
-BRACS & Severe & Reversed & CE + soft MCC & 3e-05 & 64.0000 & No & 3960 \\
-BRACS & Severe & Reversed & CFAL & 0.001 & 1.0000 & No & 3960 \\
-BRACS & Severe & Reversed & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Severe & Reversed & cRT & 0.001 & --- & No & 3960 \\
-BRACS & Severe & Reversed & Focal loss & 0.001 & 2.0000 & No & 3960 \\
-BRACS & Severe & Reversed & Independent support & 0.001 & 0.9990 & No & 3960 \\
-BRACS & Severe & Reversed & Logit adjustment (train) & 0.0003 & 1.0000 & No & 3960 \\
-BRACS & Severe & Reversed & OKO & 0.0001 & 1.0000 & No & 3960 \\
-BRACS & Severe & Reversed & Difficulty & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Severe & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 3960 \\
-BRACS & Severe & Reversed & Diversity & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Severe & Reversed & Prevalence & 3e-05 & 1.0000 & No & 3960 \\
-BRACS & Severe & Native & Balanced sampling & 1e-05 & 1.0000 & Yes & 3960 \\
-BRACS & Severe & Native & CE & 0.001 & --- & No & 3960 \\
-BRACS & Severe & Native & CE + soft $F_1$ & 1e-05 & 0.2500 & Yes & 3960 \\
-BRACS & Severe & Native & CE + soft MCC & 3e-05 & 64.0000 & No & 3960 \\
-BRACS & Severe & Native & CFAL & 0.001 & 1.0000 & No & 3960 \\
-BRACS & Severe & Native & Nominal support & 3e-05 & 0.9999 & No & 3960 \\
-BRACS & Severe & Native & cRT & 0.001 & --- & No & 3960 \\
-BRACS & Severe & Native & Focal loss & 0.001 & 2.0000 & No & 3960 \\
-BRACS & Severe & Native & Independent support & 0.001 & 0.9990 & No & 3960 \\
-BRACS & Severe & Native & Logit adjustment (train) & 0.0003 & 1.0000 & No & 3960 \\
-BRACS & Severe & Native & OKO & 0.0001 & 1.0000 & No & 3960 \\
-BRACS & Severe & Native & Difficulty & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Severe & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 3960 \\
-BRACS & Severe & Native & Diversity & 0.001 & 0.2500 & No & 3960 \\
-BRACS & Severe & Native & Prevalence & 3e-05 & 1.0000 & No & 3960 \\
-CAMELYON16 & Balanced & --- & Balanced sampling & 0.001 & 0.5000 & No & 8490 \\
-CAMELYON16 & Balanced & --- & CE & 0.001 & --- & No & 8490 \\
-CAMELYON16 & Balanced & --- & CE + soft $F_1$ & 0.01 & 64.0000 & Yes & 8490 \\
-CAMELYON16 & Balanced & --- & CE + soft MCC & 0.003 & 64.0000 & No & 8490 \\
-CAMELYON16 & Balanced & --- & CFAL & 0.001 & 0.2500 & No & 8490 \\
-CAMELYON16 & Balanced & --- & Nominal support & 0.001 & 0.9000 & No & 8490 \\
-CAMELYON16 & Balanced & --- & cRT & 0.01 & --- & Yes & 8490 \\
-CAMELYON16 & Balanced & --- & Focal loss & 0.001 & 0.5000 & No & 8490 \\
-CAMELYON16 & Balanced & --- & Independent support & 0.01 & 0.9900 & Yes & 8490 \\
-CAMELYON16 & Balanced & --- & Logit adjustment (train) & 0.001 & 0.2500 & No & 8490 \\
-CAMELYON16 & Balanced & --- & OKO & 0.003 & 1.0000 & No & 8490 \\
-CAMELYON16 & Balanced & --- & Difficulty & 0.01 & 0.7500 & Yes & 8490 \\
-CAMELYON16 & Balanced & --- & Logit adjustment (post-hoc) & --- & 0.2500 & No & 8490 \\
-CAMELYON16 & Balanced & --- & Diversity & 0.001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Balanced & --- & Prevalence & 0.001 & 0.5000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & Balanced sampling & 0.003 & 0.7500 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & CE & 0.01 & --- & Yes & 8490 \\
-CAMELYON16 & Moderate & Reversed & CE + soft $F_1$ & 0.001 & 64.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & CE + soft MCC & 0.003 & 64.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & CFAL & 0.001 & 0.2500 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & Nominal support & 0.001 & 0.9999 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & cRT & 0.01 & --- & Yes & 8490 \\
-CAMELYON16 & Moderate & Reversed & Focal loss & 0.01 & 0.0000 & Yes & 8490 \\
-CAMELYON16 & Moderate & Reversed & Independent support & 0.01 & 0.8000 & Yes & 8490 \\
-CAMELYON16 & Moderate & Reversed & Logit adjustment (train) & 0.001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & OKO & 0.003 & 1.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & Difficulty & 0.003 & 0.5000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 8490 \\
-CAMELYON16 & Moderate & Reversed & Diversity & 0.01 & 0.5000 & Yes & 8490 \\
-CAMELYON16 & Moderate & Reversed & Prevalence & 0.003 & 1.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & Balanced sampling & 0.003 & 0.7500 & No & 8490 \\
-CAMELYON16 & Moderate & Native & CE & 0.01 & --- & Yes & 8490 \\
-CAMELYON16 & Moderate & Native & CE + soft $F_1$ & 0.001 & 64.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & CE + soft MCC & 0.003 & 64.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & CFAL & 0.001 & 0.2500 & No & 8490 \\
-CAMELYON16 & Moderate & Native & Nominal support & 0.001 & 0.9999 & No & 8490 \\
-CAMELYON16 & Moderate & Native & cRT & 0.01 & --- & Yes & 8490 \\
-CAMELYON16 & Moderate & Native & Focal loss & 0.01 & 0.0000 & Yes & 8490 \\
-CAMELYON16 & Moderate & Native & Independent support & 0.01 & 0.8000 & Yes & 8490 \\
-CAMELYON16 & Moderate & Native & Logit adjustment (train) & 0.001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & OKO & 0.003 & 1.0000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & Difficulty & 0.003 & 0.5000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 8490 \\
-CAMELYON16 & Moderate & Native & Diversity & 0.01 & 0.5000 & Yes & 8490 \\
-CAMELYON16 & Moderate & Native & Prevalence & 0.003 & 1.0000 & No & 8490 \\
-CAMELYON16 & Natural & --- & CE & 0.01 & --- & Yes & 523830 \\
-CAMELYON16 & Severe & Reversed & Balanced sampling & 1e-05 & 1.0000 & Yes & 8490 \\
-CAMELYON16 & Severe & Reversed & CE & 0.001 & --- & No & 8490 \\
-CAMELYON16 & Severe & Reversed & CE + soft $F_1$ & 3e-05 & 64.0000 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & CE + soft MCC & 0.01 & 64.0000 & Yes & 8490 \\
-CAMELYON16 & Severe & Reversed & CFAL & 0.01 & 0.2500 & Yes & 8490 \\
-CAMELYON16 & Severe & Reversed & Nominal support & 0.003 & 0.9999 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & cRT & 0.001 & --- & No & 8490 \\
-CAMELYON16 & Severe & Reversed & Focal loss & 0.01 & 1.5000 & Yes & 8490 \\
-CAMELYON16 & Severe & Reversed & Independent support & 0.001 & 0.9990 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & Logit adjustment (train) & 0.0001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & OKO & 0.001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & Difficulty & 0.003 & 0.2500 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & Logit adjustment (post-hoc) & --- & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Reversed & Diversity & 0.01 & 1.0000 & Yes & 8490 \\
-CAMELYON16 & Severe & Reversed & Prevalence & 0.0003 & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Native & Balanced sampling & 1e-05 & 1.0000 & Yes & 8490 \\
-CAMELYON16 & Severe & Native & CE & 0.001 & --- & No & 8490 \\
-CAMELYON16 & Severe & Native & CE + soft $F_1$ & 3e-05 & 64.0000 & No & 8490 \\
-CAMELYON16 & Severe & Native & CE + soft MCC & 0.01 & 64.0000 & Yes & 8490 \\
-CAMELYON16 & Severe & Native & CFAL & 0.01 & 0.2500 & Yes & 8490 \\
-CAMELYON16 & Severe & Native & Nominal support & 0.003 & 0.9999 & No & 8490 \\
-CAMELYON16 & Severe & Native & cRT & 0.001 & --- & No & 8490 \\
-CAMELYON16 & Severe & Native & Focal loss & 0.01 & 1.5000 & Yes & 8490 \\
-CAMELYON16 & Severe & Native & Independent support & 0.001 & 0.9990 & No & 8490 \\
-CAMELYON16 & Severe & Native & Logit adjustment (train) & 0.0001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Native & OKO & 0.001 & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Native & Difficulty & 0.003 & 0.2500 & No & 8490 \\
-CAMELYON16 & Severe & Native & Logit adjustment (post-hoc) & --- & 1.0000 & No & 8490 \\
-CAMELYON16 & Severe & Native & Diversity & 0.01 & 1.0000 & Yes & 8490 \\
-CAMELYON16 & Severe & Native & Prevalence & 0.0003 & 1.0000 & No & 8490 \\
-PANDA & Balanced & --- & Balanced sampling & 1e-05 & 0.0000 & Yes & 257790 \\
-PANDA & Balanced & --- & CE & 1e-05 & --- & Yes & 257790 \\
-PANDA & Balanced & --- & CE + soft $F_1$ & 1e-05 & 16.0000 & Yes & 257790 \\
-PANDA & Balanced & --- & CE + soft MCC & 0.003 & 4.0000 & No & 257790 \\
-PANDA & Balanced & --- & CFAL & 0.0001 & 0.2500 & No & 257790 \\
-PANDA & Balanced & --- & Nominal support & 1e-05 & 0.9000 & Yes & 257790 \\
-PANDA & Balanced & --- & cRT & 1e-05 & --- & Yes & 257790 \\
-PANDA & Balanced & --- & Focal loss & 1e-05 & 0.0000 & Yes & 257790 \\
-PANDA & Balanced & --- & Independent support & 1e-05 & 0.9990 & Yes & 257790 \\
-PANDA & Balanced & --- & Logit adjustment (train) & 1e-05 & 1.0000 & Yes & 257790 \\
-PANDA & Balanced & --- & OKO & 0.001 & 1.0000 & No & 257790 \\
-PANDA & Balanced & --- & Difficulty & 1e-05 & 0.2500 & Yes & 257790 \\
-PANDA & Balanced & --- & Logit adjustment (post-hoc) & --- & 0.2500 & No & 257790 \\
-PANDA & Balanced & --- & Diversity & 1e-05 & 0.7500 & Yes & 257790 \\
-PANDA & Balanced & --- & Prevalence & 1e-05 & 0.7500 & Yes & 257790 \\
-PANDA & Moderate & Native & Balanced sampling & 0.003 & 1.0000 & No & 257790 \\
-PANDA & Moderate & Native & CE & 3e-05 & --- & No & 257790 \\
-PANDA & Moderate & Native & CE + soft $F_1$ & 1e-05 & 16.0000 & Yes & 257790 \\
-PANDA & Moderate & Native & CE + soft MCC & 1e-05 & 16.0000 & Yes & 257790 \\
-PANDA & Moderate & Native & CFAL & 0.001 & 2.0000 & No & 257790 \\
-PANDA & Moderate & Native & Nominal support & 3e-05 & 0.9999 & No & 257790 \\
-PANDA & Moderate & Native & cRT & 1e-05 & --- & Yes & 257790 \\
-PANDA & Moderate & Native & Focal loss & 0.01 & 1.5000 & Yes & 257790 \\
-PANDA & Moderate & Native & Independent support & 3e-05 & 0.8000 & No & 257790 \\
-PANDA & Moderate & Native & Logit adjustment (train) & 1e-05 & 1.0000 & Yes & 257790 \\
-PANDA & Moderate & Native & OKO & 0.001 & 1.0000 & No & 257790 \\
-PANDA & Moderate & Native & Difficulty & 3e-05 & 0.2500 & No & 257790 \\
-PANDA & Moderate & Native & Logit adjustment (post-hoc) & --- & 1.0000 & No & 257790 \\
-PANDA & Moderate & Native & Diversity & 0.01 & 1.0000 & Yes & 257790 \\
-PANDA & Moderate & Native & Prevalence & 1e-05 & 1.0000 & Yes & 257790 \\
-PANDA & Natural & --- & CE & 0.001 & --- & No & 739110 \\
-PANDA & Severe & Native & Balanced sampling & 1e-05 & 1.0000 & Yes & 257790 \\
-PANDA & Severe & Native & CE & 3e-05 & --- & No & 257790 \\
-PANDA & Severe & Native & CE + soft $F_1$ & 1e-05 & 4.0000 & Yes & 257790 \\
-PANDA & Severe & Native & CE + soft MCC & 1e-05 & 4.0000 & Yes & 257790 \\
-PANDA & Severe & Native & CFAL & 0.003 & 4.0000 & No & 257790 \\
-PANDA & Severe & Native & Nominal support & 3e-05 & 0.9999 & No & 257790 \\
-PANDA & Severe & Native & cRT & 1e-05 & --- & Yes & 257790 \\
-PANDA & Severe & Native & Focal loss & 3e-05 & 1.0000 & No & 257790 \\
-PANDA & Severe & Native & Independent support & 3e-05 & 0.8000 & No & 257790 \\
-PANDA & Severe & Native & Logit adjustment (train) & 3e-05 & 1.0000 & No & 257790 \\
-PANDA & Severe & Native & OKO & 0.003 & 1.0000 & No & 257790 \\
-PANDA & Severe & Native & Difficulty & 3e-05 & 0.2500 & No & 257790 \\
-PANDA & Severe & Native & Logit adjustment (post-hoc) & --- & 1.0000 & No & 257790 \\
-PANDA & Severe & Native & Diversity & 3e-05 & 0.5000 & No & 257790 \\
-PANDA & Severe & Native & Prevalence & 1e-05 & 1.0000 & Yes & 257790 \\
-TCGA-UT & Balanced & --- & Balanced sampling & 3e-05 & 1.0000 & No & 10500 \\
-TCGA-UT & Balanced & --- & CE & 1e-05 & --- & Yes & 10500 \\
-TCGA-UT & Balanced & --- & CE + soft $F_1$ & 3e-05 & 16.0000 & No & 10500 \\
-TCGA-UT & Balanced & --- & CE + soft MCC & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & CFAL & 0.0001 & 0.2500 & No & 10500 \\
-TCGA-UT & Balanced & --- & Nominal support & 1e-05 & 0.9990 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & cRT & 0.0003 & --- & No & 10500 \\
-TCGA-UT & Balanced & --- & Focal loss & 1e-05 & 0.0000 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & Independent support & 1e-05 & 0.9500 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & Logit adjustment (train) & 1e-05 & 0.2500 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Balanced & --- & Difficulty & 1e-05 & 0.2500 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & Logit adjustment (post-hoc) & --- & 2.0000 & No & 10500 \\
-TCGA-UT & Balanced & --- & Diversity & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Balanced & --- & Prevalence & 1e-05 & 0.2500 & Yes & 10500 \\
-TCGA-UT & Moderate & Aligned & Balanced sampling & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Aligned & CE & 3e-05 & --- & No & 10500 \\
-TCGA-UT & Moderate & Aligned & CE + soft $F_1$ & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Aligned & CE + soft MCC & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Aligned & CFAL & 3e-05 & 0.2500 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Nominal support & 1e-05 & 0.9999 & Yes & 10500 \\
-TCGA-UT & Moderate & Aligned & cRT & 0.0003 & --- & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Focal loss & 3e-05 & 0.0000 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Independent support & 3e-05 & 0.9900 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Logit adjustment (train) & 3e-05 & 0.5000 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Difficulty & 3e-05 & 0.2500 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Logit adjustment (post-hoc) & --- & 0.5000 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Diversity & 3e-05 & 1.0000 & No & 10500 \\
-TCGA-UT & Moderate & Aligned & Prevalence & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Reversed & Balanced sampling & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Reversed & CE & 3e-05 & --- & No & 10500 \\
-TCGA-UT & Moderate & Reversed & CE + soft $F_1$ & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Reversed & CE + soft MCC & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Reversed & CFAL & 3e-05 & 0.2500 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Nominal support & 1e-05 & 0.9999 & Yes & 10500 \\
-TCGA-UT & Moderate & Reversed & cRT & 0.0003 & --- & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Focal loss & 3e-05 & 0.0000 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Independent support & 3e-05 & 0.9900 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Logit adjustment (train) & 3e-05 & 0.5000 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Difficulty & 3e-05 & 0.2500 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Diversity & 3e-05 & 1.0000 & No & 10500 \\
-TCGA-UT & Moderate & Reversed & Prevalence & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Native & Balanced sampling & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Native & CE & 3e-05 & --- & No & 10500 \\
-TCGA-UT & Moderate & Native & CE + soft $F_1$ & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Native & CE + soft MCC & 1e-05 & 16.0000 & Yes & 10500 \\
-TCGA-UT & Moderate & Native & CFAL & 3e-05 & 0.2500 & No & 10500 \\
-TCGA-UT & Moderate & Native & Nominal support & 1e-05 & 0.9999 & Yes & 10500 \\
-TCGA-UT & Moderate & Native & cRT & 0.0003 & --- & No & 10500 \\
-TCGA-UT & Moderate & Native & Focal loss & 3e-05 & 0.0000 & No & 10500 \\
-TCGA-UT & Moderate & Native & Independent support & 3e-05 & 0.9900 & No & 10500 \\
-TCGA-UT & Moderate & Native & Logit adjustment (train) & 3e-05 & 0.5000 & No & 10500 \\
-TCGA-UT & Moderate & Native & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Moderate & Native & Difficulty & 3e-05 & 0.2500 & No & 10500 \\
-TCGA-UT & Moderate & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 10500 \\
-TCGA-UT & Moderate & Native & Diversity & 3e-05 & 1.0000 & No & 10500 \\
-TCGA-UT & Moderate & Native & Prevalence & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Natural & --- & CE & 3e-05 & --- & No & 261570 \\
-TCGA-UT & Severe & Aligned & Balanced sampling & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Aligned & CE & 0.0001 & --- & No & 10500 \\
-TCGA-UT & Severe & Aligned & CE + soft $F_1$ & 1e-05 & 4.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Aligned & CE + soft MCC & 1e-05 & 4.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Aligned & CFAL & 0.0003 & 4.0000 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Nominal support & 1e-05 & 0.9999 & Yes & 10500 \\
-TCGA-UT & Severe & Aligned & cRT & 0.001 & --- & No & 10500 \\
-TCGA-UT & Severe & Aligned & Focal loss & 0.0001 & 0.0000 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Independent support & 0.0001 & 0.9500 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Logit adjustment (train) & 3e-05 & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Aligned & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Difficulty & 0.0001 & 0.2500 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Logit adjustment (post-hoc) & --- & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Diversity & 0.0001 & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Aligned & Prevalence & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Reversed & Balanced sampling & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Reversed & CE & 0.0001 & --- & No & 10500 \\
-TCGA-UT & Severe & Reversed & CE + soft $F_1$ & 1e-05 & 4.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Reversed & CE + soft MCC & 1e-05 & 4.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Reversed & CFAL & 0.0003 & 4.0000 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Nominal support & 1e-05 & 0.9999 & Yes & 10500 \\
-TCGA-UT & Severe & Reversed & cRT & 0.001 & --- & No & 10500 \\
-TCGA-UT & Severe & Reversed & Focal loss & 0.0001 & 0.0000 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Independent support & 0.0001 & 0.9500 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Logit adjustment (train) & 3e-05 & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Reversed & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Difficulty & 0.0001 & 0.2500 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Diversity & 0.0001 & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Reversed & Prevalence & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Native & Balanced sampling & 1e-05 & 1.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Native & CE & 0.0001 & --- & No & 10500 \\
-TCGA-UT & Severe & Native & CE + soft $F_1$ & 1e-05 & 4.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Native & CE + soft MCC & 1e-05 & 4.0000 & Yes & 10500 \\
-TCGA-UT & Severe & Native & CFAL & 0.0003 & 4.0000 & No & 10500 \\
-TCGA-UT & Severe & Native & Nominal support & 1e-05 & 0.9999 & Yes & 10500 \\
-TCGA-UT & Severe & Native & cRT & 0.001 & --- & No & 10500 \\
-TCGA-UT & Severe & Native & Focal loss & 0.0001 & 0.0000 & No & 10500 \\
-TCGA-UT & Severe & Native & Independent support & 0.0001 & 0.9500 & No & 10500 \\
-TCGA-UT & Severe & Native & Logit adjustment (train) & 3e-05 & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Native & OKO & 3e-05 & 4.0000 & No & 10500 \\
-TCGA-UT & Severe & Native & Difficulty & 0.0001 & 0.2500 & No & 10500 \\
-TCGA-UT & Severe & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Native & Diversity & 0.0001 & 0.5000 & No & 10500 \\
-TCGA-UT & Severe & Native & Prevalence & 1e-05 & 1.0000 & Yes & 10500 \\
+BRACS & Balanced & --- & Balanced sampling & 0.0001 & 0.7500 & No & 503880 \\
+BRACS & Balanced & --- & CE & 3e-05 & --- & No & 503880 \\
+BRACS & Balanced & --- & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced & --- & CE + soft MCC & 0.0003 & 16.0000 & No & 503880 \\
+BRACS & Balanced & --- & CFAL & 0.0001 & 0.2500 & No & 503880 \\
+BRACS & Balanced & --- & Nominal support & 3e-05 & 0.9999 & No & 503880 \\
+BRACS & Balanced & --- & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Balanced & --- & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced & --- & Independent support & 3e-05 & 0.8000 & No & 503880 \\
+BRACS & Balanced & --- & Logit adjustment (train) & 3e-05 & 2.0000 & No & 503880 \\
+BRACS & Balanced & --- & OKO & 0.003 & 2.0000 & No & 503880 \\
+BRACS & Balanced & --- & Difficulty & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced & --- & Logit adjustment (post-hoc) & --- & 1.0000 & No & 503880 \\
+BRACS & Balanced & --- & Diversity & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced & --- & Prevalence & 3e-05 & 0.7500 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Balanced sampling & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & CE & 3e-05 & --- & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & CE + soft MCC & 0.0001 & 16.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & CFAL & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Nominal support & 3e-05 & 0.9990 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & cRT & 0.003 & --- & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Independent support & 3e-05 & 0.8000 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Logit adjustment (train) & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & OKO & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Difficulty & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Logit adjustment (post-hoc) & --- & 2.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Diversity & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Aligned & Prevalence & 3e-05 & 0.7500 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Balanced sampling & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & CE & 3e-05 & --- & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & CE + soft MCC & 0.0001 & 16.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & CFAL & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Nominal support & 3e-05 & 0.9990 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & cRT & 0.003 & --- & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Independent support & 3e-05 & 0.8000 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Logit adjustment (train) & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & OKO & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Difficulty & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Logit adjustment (post-hoc) & --- & 2.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Diversity & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Reversed & Prevalence & 3e-05 & 0.7500 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Balanced sampling & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Native & CE & 3e-05 & --- & No & 503880 \\
+BRACS & Balanced (spread) & Native & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Native & CE + soft MCC & 0.0001 & 16.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Native & CFAL & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Nominal support & 3e-05 & 0.9990 & No & 503880 \\
+BRACS & Balanced (spread) & Native & cRT & 0.003 & --- & No & 503880 \\
+BRACS & Balanced (spread) & Native & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Independent support & 3e-05 & 0.8000 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Logit adjustment (train) & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Native & OKO & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Difficulty & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Logit adjustment (post-hoc) & --- & 2.0000 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Diversity & 3e-05 & 0.2500 & No & 503880 \\
+BRACS & Balanced (spread) & Native & Prevalence & 3e-05 & 0.7500 & No & 503880 \\
+BRACS & Moderate & Aligned & Balanced sampling & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Aligned & CE & 0.003 & --- & No & 503880 \\
+BRACS & Moderate & Aligned & CE + soft $F_1$ & 0.0001 & 0.0000 & No & 503880 \\
+BRACS & Moderate & Aligned & CE + soft MCC & 0.0001 & 0.0000 & No & 503880 \\
+BRACS & Moderate & Aligned & CFAL & 0.003 & 0.2500 & No & 503880 \\
+BRACS & Moderate & Aligned & Nominal support & 0.0001 & 0.9999 & No & 503880 \\
+BRACS & Moderate & Aligned & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Moderate & Aligned & Focal loss & 0.0001 & 0.5000 & No & 503880 \\
+BRACS & Moderate & Aligned & Independent support & 0.001 & 0.9900 & No & 503880 \\
+BRACS & Moderate & Aligned & Logit adjustment (train) & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Aligned & OKO & 0.001 & 4.0000 & No & 503880 \\
+BRACS & Moderate & Aligned & Difficulty & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Moderate & Aligned & Logit adjustment (post-hoc) & --- & 0.5000 & No & 503880 \\
+BRACS & Moderate & Aligned & Diversity & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Aligned & Prevalence & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & Balanced sampling & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & CE & 0.003 & --- & No & 503880 \\
+BRACS & Moderate & Reversed & CE + soft $F_1$ & 0.0001 & 0.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & CE + soft MCC & 0.0001 & 0.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & CFAL & 0.003 & 0.2500 & No & 503880 \\
+BRACS & Moderate & Reversed & Nominal support & 0.0001 & 0.9999 & No & 503880 \\
+BRACS & Moderate & Reversed & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Moderate & Reversed & Focal loss & 0.0001 & 0.5000 & No & 503880 \\
+BRACS & Moderate & Reversed & Independent support & 0.001 & 0.9900 & No & 503880 \\
+BRACS & Moderate & Reversed & Logit adjustment (train) & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & OKO & 0.001 & 4.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & Difficulty & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Moderate & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 503880 \\
+BRACS & Moderate & Reversed & Diversity & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Reversed & Prevalence & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Native & Balanced sampling & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Native & CE & 0.003 & --- & No & 503880 \\
+BRACS & Moderate & Native & CE + soft $F_1$ & 0.0001 & 0.0000 & No & 503880 \\
+BRACS & Moderate & Native & CE + soft MCC & 0.0001 & 0.0000 & No & 503880 \\
+BRACS & Moderate & Native & CFAL & 0.003 & 0.2500 & No & 503880 \\
+BRACS & Moderate & Native & Nominal support & 0.0001 & 0.9999 & No & 503880 \\
+BRACS & Moderate & Native & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Moderate & Native & Focal loss & 0.0001 & 0.5000 & No & 503880 \\
+BRACS & Moderate & Native & Independent support & 0.001 & 0.9900 & No & 503880 \\
+BRACS & Moderate & Native & Logit adjustment (train) & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Native & OKO & 0.001 & 4.0000 & No & 503880 \\
+BRACS & Moderate & Native & Difficulty & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Moderate & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 503880 \\
+BRACS & Moderate & Native & Diversity & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Moderate & Native & Prevalence & 0.0001 & 1.0000 & No & 503880 \\
+BRACS & Natural & --- & CE & 3e-05 & --- & No & 6521970 \\
+BRACS & Severe & Aligned & Balanced sampling & 1e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe & Aligned & CE & 0.001 & --- & No & 503880 \\
+BRACS & Severe & Aligned & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Aligned & CE + soft MCC & 1e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Aligned & CFAL & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Severe & Aligned & Nominal support & 0.0003 & 0.9999 & No & 503880 \\
+BRACS & Severe & Aligned & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Severe & Aligned & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Aligned & Independent support & 0.001 & 0.9990 & No & 503880 \\
+BRACS & Severe & Aligned & Logit adjustment (train) & 0.0003 & 1.0000 & No & 503880 \\
+BRACS & Severe & Aligned & OKO & 0.001 & 4.0000 & No & 503880 \\
+BRACS & Severe & Aligned & Difficulty & 0.001 & 0.5000 & No & 503880 \\
+BRACS & Severe & Aligned & Logit adjustment (post-hoc) & --- & 0.5000 & No & 503880 \\
+BRACS & Severe & Aligned & Diversity & 0.003 & 0.5000 & No & 503880 \\
+BRACS & Severe & Aligned & Prevalence & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe & Reversed & Balanced sampling & 1e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe & Reversed & CE & 0.001 & --- & No & 503880 \\
+BRACS & Severe & Reversed & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Reversed & CE + soft MCC & 1e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Reversed & CFAL & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Severe & Reversed & Nominal support & 0.0003 & 0.9999 & No & 503880 \\
+BRACS & Severe & Reversed & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Severe & Reversed & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Reversed & Independent support & 0.001 & 0.9990 & No & 503880 \\
+BRACS & Severe & Reversed & Logit adjustment (train) & 0.0003 & 1.0000 & No & 503880 \\
+BRACS & Severe & Reversed & OKO & 0.001 & 4.0000 & No & 503880 \\
+BRACS & Severe & Reversed & Difficulty & 0.001 & 0.5000 & No & 503880 \\
+BRACS & Severe & Reversed & Logit adjustment (post-hoc) & --- & 0.5000 & No & 503880 \\
+BRACS & Severe & Reversed & Diversity & 0.003 & 0.5000 & No & 503880 \\
+BRACS & Severe & Reversed & Prevalence & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe & Native & Balanced sampling & 1e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe & Native & CE & 0.001 & --- & No & 503880 \\
+BRACS & Severe & Native & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Native & CE + soft MCC & 1e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Native & CFAL & 0.003 & 1.0000 & No & 503880 \\
+BRACS & Severe & Native & Nominal support & 0.0003 & 0.9999 & No & 503880 \\
+BRACS & Severe & Native & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Severe & Native & Focal loss & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe & Native & Independent support & 0.001 & 0.9990 & No & 503880 \\
+BRACS & Severe & Native & Logit adjustment (train) & 0.0003 & 1.0000 & No & 503880 \\
+BRACS & Severe & Native & OKO & 0.001 & 4.0000 & No & 503880 \\
+BRACS & Severe & Native & Difficulty & 0.001 & 0.5000 & No & 503880 \\
+BRACS & Severe & Native & Logit adjustment (post-hoc) & --- & 0.5000 & No & 503880 \\
+BRACS & Severe & Native & Diversity & 0.003 & 0.5000 & No & 503880 \\
+BRACS & Severe & Native & Prevalence & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Balanced sampling & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & CE & 0.001 & --- & No & 503880 \\
+BRACS & Severe (spread) & Aligned & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & CE + soft MCC & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & CFAL & 0.001 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Nominal support & 0.0001 & 0.9999 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Focal loss & 3e-05 & 0.5000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Independent support & 0.001 & 0.9900 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Logit adjustment (train) & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & OKO & 0.0003 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Difficulty & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Logit adjustment (post-hoc) & --- & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Diversity & 0.001 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Aligned & Prevalence & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Balanced sampling & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & CE & 0.001 & --- & No & 503880 \\
+BRACS & Severe (spread) & Reversed & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & CE + soft MCC & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & CFAL & 0.001 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Nominal support & 0.0001 & 0.9999 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Focal loss & 3e-05 & 0.5000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Independent support & 0.001 & 0.9900 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Logit adjustment (train) & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & OKO & 0.0003 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Difficulty & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Logit adjustment (post-hoc) & --- & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Diversity & 0.001 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Reversed & Prevalence & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & Balanced sampling & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & CE & 0.001 & --- & No & 503880 \\
+BRACS & Severe (spread) & Native & CE + soft $F_1$ & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & CE + soft MCC & 3e-05 & 0.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & CFAL & 0.001 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & Nominal support & 0.0001 & 0.9999 & No & 503880 \\
+BRACS & Severe (spread) & Native & cRT & 0.01 & --- & No & 503880 \\
+BRACS & Severe (spread) & Native & Focal loss & 3e-05 & 0.5000 & No & 503880 \\
+BRACS & Severe (spread) & Native & Independent support & 0.001 & 0.9900 & No & 503880 \\
+BRACS & Severe (spread) & Native & Logit adjustment (train) & 3e-05 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & OKO & 0.0003 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & Difficulty & 0.001 & 0.2500 & No & 503880 \\
+BRACS & Severe (spread) & Native & Logit adjustment (post-hoc) & --- & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & Diversity & 0.001 & 1.0000 & No & 503880 \\
+BRACS & Severe (spread) & Native & Prevalence & 3e-05 & 1.0000 & No & 503880 \\
 \end{longtable}

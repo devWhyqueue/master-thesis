@@ -1,10 +1,10 @@
 \begin{longtable}{llllllllll}
 \toprule
-Dataset & Assignment & Severity & Gate & Dominant & Contrast & 95\% CI & Holm $p$ & Best recoverer & Agrees \\
+Dataset & Assignment & Severity & Gate & Dominant & Contrast & 95\% CI (bootstrap) & Holm $p$ & Best recoverer & Agrees \\
 \midrule
 \endfirsthead
 \toprule
-Dataset & Assignment & Severity & Gate & Dominant & Contrast & 95\% CI & Holm $p$ & Best recoverer & Agrees \\
+Dataset & Assignment & Severity & Gate & Dominant & Contrast & 95\% CI (bootstrap) & Holm $p$ & Best recoverer & Agrees \\
 \midrule
 \endhead
 \midrule
@@ -13,22 +13,23 @@ Dataset & Assignment & Severity & Gate & Dominant & Contrast & 95\% CI & Holm $p
 \endfoot
 \bottomrule
 \endlastfoot
-BRACS & Native & Moderate & Discrimination & Ambiguous & --- & --- & --- & Prevalence & --- \\
-BRACS & Aligned & Moderate & Discrimination & Difficulty & -0.0128 & [-0.0251, -0.0024] & 0.2597 & Nominal support & No \\
-BRACS & Reversed & Moderate & Discrimination & Independent support & -0.0363 & [-0.0532, -0.0221] & 0.0007 & Prevalence & No \\
-BRACS & Native & Severe & Discrimination & Diversity & -0.0187 & [-0.0315, -0.0073] & 0.0342 & Nominal support & No \\
-BRACS & Aligned & Severe & Discrimination & Ambiguous & --- & --- & --- & Nominal support & --- \\
-BRACS & Reversed & Severe & Discrimination & Diversity & -0.0572 & [-0.0711, -0.0436] & 0.0007 & Prevalence & No \\
-CAMELYON16 & Native & Severe & Discrimination & Nominal support & 0.0108 & [0.0043, 0.0180] & 0.0130 & Prevalence & Yes \\
-CAMELYON16 & Reversed & Severe & Discrimination & Nominal support & 0.0097 & [0.0067, 0.0124] & 0.0001 & Prevalence & Yes \\
-PANDA & Native & Moderate & Discrimination & Ambiguous & --- & --- & --- & Prevalence & --- \\
-PANDA & Native & Severe & Discrimination & Nominal support & 0.0835 & [0.0809, 0.0862] & 0.0001 & Prevalence & Yes \\
-TCGA-UT & Native & Severe & Discrimination & Diversity & -0.0069 & [-0.0093, -0.0046] & 0.0001 & Prevalence & No \\
-TCGA-UT & Reversed & Severe & Discrimination & Diversity & -0.0061 & [-0.0087, -0.0034] & 0.0001 & Prevalence & No \\
-BRACS & Native & Moderate & Calibration & Ambiguous & --- & --- & --- & Prevalence & --- \\
-BRACS & Aligned & Moderate & Calibration & Difficulty & -0.4299 & [-0.5656, -0.3362] & 0.0007 & Prevalence & No \\
-BRACS & Reversed & Moderate & Calibration & Independent support & -0.8625 & [-1.5058, -0.2598] & 0.0007 & Prevalence & No \\
-BRACS & Native & Severe & Calibration & Diversity & -0.7399 & [-1.1265, -0.4189] & 0.0007 & Prevalence & No \\
-BRACS & Aligned & Severe & Calibration & Ambiguous & --- & --- & --- & Prevalence & --- \\
-BRACS & Reversed & Severe & Calibration & Diversity & -2.6952 & [-3.2275, -2.1190] & 0.0007 & Prevalence & No \\
+BRACS & Native & Balanced & Discrimination & Independent support & 0.0006 & [-0.0013, 0.0022] & 1.0000 & Diversity & No \\
+BRACS & Aligned & Balanced & Discrimination & Independent support & 0.0006 & [-0.0013, 0.0022] & 1.0000 & Diversity & No \\
+BRACS & Reversed & Balanced & Discrimination & Independent support & 0.0006 & [-0.0013, 0.0022] & 1.0000 & Diversity & No \\
+BRACS & Native & Moderate & Discrimination & Nominal support & 0.0234 & [0.0096, 0.0375] & 0.0367 & Nominal support & Yes \\
+BRACS & Reversed & Moderate & Discrimination & Nominal support & 0.0708 & [0.0525, 0.0915] & 0.0006 & Prevalence & Yes \\
+BRACS & Native & Severe & Discrimination & Ambiguous & --- & --- & --- & Prevalence & --- \\
+BRACS & Aligned & Severe & Discrimination & Difficulty & -0.0042 & [-0.0163, 0.0086] & 1.0000 & Prevalence & No \\
+BRACS & Reversed & Severe & Discrimination & Ambiguous & --- & --- & --- & Prevalence & --- \\
+BRACS & Native & Severe (spread) & Discrimination & Ambiguous & --- & --- & --- & Prevalence & --- \\
+BRACS & Aligned & Severe (spread) & Discrimination & Difficulty & -0.0127 & [-0.0242, 0.0005] & 0.4554 & Prevalence & No \\
+BRACS & Reversed & Severe (spread) & Discrimination & Diversity & -0.0529 & [-0.0648, -0.0418] & 0.0006 & Prevalence & No \\
+BRACS & Aligned & Moderate & Calibration & Difficulty & -0.5566 & [-1.4624, 0.0712] & 0.0004 & Nominal support & No \\
+BRACS & Reversed & Moderate & Calibration & Nominal support & 1.3341 & [1.0771, 1.5953] & 0.0004 & Prevalence & Yes \\
+BRACS & Native & Severe & Calibration & Ambiguous & --- & --- & --- & Prevalence & --- \\
+BRACS & Aligned & Severe & Calibration & Difficulty & -0.4862 & [-0.8830, -0.1232] & 0.0004 & Prevalence & No \\
+BRACS & Reversed & Severe & Calibration & Ambiguous & --- & --- & --- & Prevalence & --- \\
+BRACS & Native & Severe (spread) & Calibration & Ambiguous & --- & --- & --- & Prevalence & --- \\
+BRACS & Aligned & Severe (spread) & Calibration & Difficulty & -0.3229 & [-0.5781, -0.1043] & 0.0004 & Nominal support & No \\
+BRACS & Reversed & Severe (spread) & Calibration & Diversity & -0.7637 & [-1.0321, -0.5357] & 0.0004 & Prevalence & No \\
 \end{longtable}

@@ -1,10 +1,10 @@
 \begin{longtable}{lllllllll}
 \toprule
-Dataset & Assignment & Severity & Signal & $R_M$ & 95\% CI & $p$ & Holm $p$ & Status \\
+Dataset & Assignment & Severity & Signal & $R_M$ & 95\% CI (bootstrap) & $p$ (permutation) & Holm $p$ & Status \\
 \midrule
 \endfirsthead
 \toprule
-Dataset & Assignment & Severity & Signal & $R_M$ & 95\% CI & $p$ & Holm $p$ & Status \\
+Dataset & Assignment & Severity & Signal & $R_M$ & 95\% CI (bootstrap) & $p$ (permutation) & Holm $p$ & Status \\
 \midrule
 \endhead
 \midrule
@@ -13,64 +13,59 @@ Dataset & Assignment & Severity & Signal & $R_M$ & 95\% CI & $p$ & Holm $p$ & St
 \endfoot
 \bottomrule
 \endlastfoot
-BRACS & Native & Moderate & Prevalence & 0.937 & [0.612, 1.244] & 0.0042 & 0.1232 & Tested \\
-BRACS & Native & Moderate & Nominal support & 0.920 & [0.623, 1.191] & 0.0034 & 0.1026 & Tested \\
-BRACS & Native & Moderate & Independent support & 0.139 & [-0.612, 0.573] & 0.5853 & 1.0000 & Tested \\
-BRACS & Native & Moderate & Difficulty & -0.083 & [-0.818, 0.281] & 0.5242 & 1.0000 & Tested \\
-BRACS & Native & Moderate & Diversity & 0.093 & [-0.539, 0.485] & 0.6671 & 1.0000 & Tested \\
-BRACS & Aligned & Moderate & Prevalence & 0.921 & [0.461, 1.453] & 0.0063 & 0.1698 & Tested \\
-BRACS & Aligned & Moderate & Nominal support & 0.997 & [0.627, 1.659] & 0.0019 & 0.0583 & Tested \\
-BRACS & Aligned & Moderate & Independent support & -0.029 & [-0.973, 0.463] & 0.9217 & 1.0000 & Tested \\
-BRACS & Aligned & Moderate & Difficulty & 0.080 & [-0.505, 0.483] & 0.5825 & 1.0000 & Tested \\
-BRACS & Aligned & Moderate & Diversity & 0.370 & [-0.501, 1.038] & 0.1540 & 1.0000 & Tested \\
-BRACS & Reversed & Moderate & Prevalence & 0.878 & [0.750, 0.998] & 0.0001 & 0.0050 & Tested \\
-BRACS & Reversed & Moderate & Nominal support & 0.842 & [0.726, 0.953] & $<$0.0001 & 0.0033 & Tested \\
-BRACS & Reversed & Moderate & Independent support & -0.030 & [-0.237, 0.161] & 0.7092 & 1.0000 & Tested \\
-BRACS & Reversed & Moderate & Difficulty & -0.099 & [-0.334, 0.084] & 0.1235 & 1.0000 & Tested \\
-BRACS & Reversed & Moderate & Diversity & 0.052 & [-0.148, 0.243] & 0.5209 & 1.0000 & Tested \\
-BRACS & Native & Severe & Prevalence & 0.819 & [0.542, 1.051] & 0.0004 & 0.0148 & Tested \\
-BRACS & Native & Severe & Nominal support & 0.859 & [0.622, 1.081] & $<$0.0001 & 0.0031 & Tested \\
-BRACS & Native & Severe & Independent support & 0.147 & [-0.105, 0.385] & 0.0516 & 1.0000 & Tested \\
-BRACS & Native & Severe & Difficulty & 0.006 & [-0.199, 0.201] & 0.9617 & 1.0000 & Tested \\
-BRACS & Native & Severe & Diversity & 0.148 & [-0.044, 0.332] & 0.0399 & 0.9578 & Tested \\
-BRACS & Aligned & Severe & Prevalence & 0.768 & [0.505, 1.153] & 0.0003 & 0.0092 & Tested \\
-BRACS & Aligned & Severe & Nominal support & 0.881 & [0.605, 1.378] & $<$0.0001 & 0.0008 & Tested \\
-BRACS & Aligned & Severe & Independent support & 0.006 & [-0.239, 0.214] & 0.9444 & 1.0000 & Tested \\
-BRACS & Aligned & Severe & Difficulty & -0.065 & [-0.262, 0.075] & 0.2933 & 1.0000 & Tested \\
-BRACS & Aligned & Severe & Diversity & 0.090 & [-0.158, 0.385] & 0.3458 & 1.0000 & Tested \\
-BRACS & Reversed & Severe & Prevalence & 0.785 & [0.686, 0.882] & $<$0.0001 & 0.0007 & Tested \\
-BRACS & Reversed & Severe & Nominal support & 0.743 & [0.634, 0.850] & $<$0.0001 & 0.0007 & Tested \\
-BRACS & Reversed & Severe & Independent support & 0.084 & [-0.001, 0.168] & 0.0894 & 1.0000 & Tested \\
-BRACS & Reversed & Severe & Difficulty & 0.012 & [-0.095, 0.112] & 0.6817 & 1.0000 & Tested \\
-BRACS & Reversed & Severe & Diversity & -0.022 & [-0.100, 0.048] & 0.3862 & 1.0000 & Tested \\
-CAMELYON16 & Native & Severe & Prevalence & 0.893 & [0.544, 1.093] & 0.0003 & 0.0020 & Tested \\
-CAMELYON16 & Native & Severe & Nominal support & 0.838 & [0.444, 1.037] & 0.0050 & 0.0200 & Tested \\
-CAMELYON16 & Native & Severe & Independent support & -0.157 & [-1.030, 0.352] & 0.1560 & 0.3120 & Tested \\
-CAMELYON16 & Native & Severe & Difficulty & 0.185 & [-0.326, 0.515] & 0.0252 & 0.0757 & Tested \\
-CAMELYON16 & Native & Severe & Diversity & 0.655 & [0.222, 0.935] & 0.0001 & 0.0008 & Tested \\
-CAMELYON16 & Reversed & Severe & Prevalence & 0.924 & [0.819, 1.036] & $<$0.0001 & 0.0001 & Tested \\
-CAMELYON16 & Reversed & Severe & Nominal support & 0.822 & [0.538, 0.964] & $<$0.0001 & 0.0001 & Tested \\
-CAMELYON16 & Reversed & Severe & Independent support & 0.480 & [0.385, 0.581] & $<$0.0001 & 0.0001 & Tested \\
-CAMELYON16 & Reversed & Severe & Difficulty & 0.037 & [-0.222, 0.232] & 0.4238 & 0.4238 & Tested \\
-CAMELYON16 & Reversed & Severe & Diversity & 0.509 & [0.375, 0.618] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Moderate & Prevalence & 1.162 & [1.089, 1.253] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Moderate & Nominal support & 0.014 & [-0.057, 0.077] & 0.2574 & 0.3515 & Tested \\
-PANDA & Native & Moderate & Independent support & 0.025 & [-0.061, 0.093] & 0.0325 & 0.0975 & Tested \\
-PANDA & Native & Moderate & Difficulty & -0.143 & [-0.230, -0.068] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Moderate & Diversity & 0.758 & [0.692, 0.823] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Severe & Prevalence & 0.968 & [0.953, 0.984] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Severe & Nominal support & 0.118 & [0.081, 0.151] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Severe & Independent support & -0.018 & [-0.050, 0.005] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Severe & Difficulty & -0.069 & [-0.129, -0.031] & $<$0.0001 & 0.0001 & Tested \\
-PANDA & Native & Severe & Diversity & -0.004 & [-0.057, 0.028] & 0.1757 & 0.3515 & Tested \\
-TCGA-UT & Native & Severe & Prevalence & 0.812 & [0.659, 0.968] & $<$0.0001 & 0.0001 & Tested \\
-TCGA-UT & Native & Severe & Nominal support & 0.792 & [0.639, 0.947] & $<$0.0001 & 0.0001 & Tested \\
-TCGA-UT & Native & Severe & Independent support & -0.003 & [-0.063, 0.062] & 0.9048 & 1.0000 & Tested \\
-TCGA-UT & Native & Severe & Difficulty & -0.047 & [-0.130, 0.037] & 0.1382 & 0.6911 & Tested \\
-TCGA-UT & Native & Severe & Diversity & -0.041 & [-0.148, 0.058] & 0.3448 & 1.0000 & Tested \\
-TCGA-UT & Reversed & Severe & Prevalence & 0.828 & [0.689, 0.939] & $<$0.0001 & 0.0001 & Tested \\
-TCGA-UT & Reversed & Severe & Nominal support & 0.807 & [0.653, 0.935] & $<$0.0001 & 0.0001 & Tested \\
-TCGA-UT & Reversed & Severe & Independent support & 0.010 & [-0.059, 0.070] & 0.7143 & 1.0000 & Tested \\
-TCGA-UT & Reversed & Severe & Difficulty & -0.073 & [-0.161, -0.005] & 0.0076 & 0.0454 & Tested \\
-TCGA-UT & Reversed & Severe & Diversity & -0.025 & [-0.162, 0.091] & 0.4829 & 1.0000 & Tested \\
+BRACS & Native & Balanced & Prevalence & 0.003 & [-0.014, 0.029] & 0.5728 & 1.0000 & Tested \\
+BRACS & Native & Balanced & Nominal support & 0.005 & [-0.013, 0.031] & 0.3891 & 1.0000 & Tested \\
+BRACS & Native & Balanced & Independent support & 0.013 & [-0.008, 0.054] & 0.1222 & 1.0000 & Tested \\
+BRACS & Native & Balanced & Difficulty & -0.057 & [-0.258, 0.064] & 0.3557 & 1.0000 & Tested \\
+BRACS & Native & Balanced & Diversity & 0.021 & [-0.226, 0.282] & 0.7508 & 1.0000 & Tested \\
+BRACS & Aligned & Balanced & Prevalence & 0.003 & [-0.014, 0.031] & 0.5728 & 1.0000 & Tested \\
+BRACS & Aligned & Balanced & Nominal support & 0.005 & [-0.012, 0.035] & 0.3891 & 1.0000 & Tested \\
+BRACS & Aligned & Balanced & Independent support & 0.013 & [-0.009, 0.055] & 0.1222 & 1.0000 & Tested \\
+BRACS & Aligned & Balanced & Difficulty & -0.058 & [-0.267, 0.067] & 0.3557 & 1.0000 & Tested \\
+BRACS & Aligned & Balanced & Diversity & 0.021 & [-0.248, 0.286] & 0.7508 & 1.0000 & Tested \\
+BRACS & Reversed & Balanced & Prevalence & 0.003 & [-0.020, 0.040] & 0.5728 & 1.0000 & Tested \\
+BRACS & Reversed & Balanced & Nominal support & 0.005 & [-0.018, 0.041] & 0.3891 & 1.0000 & Tested \\
+BRACS & Reversed & Balanced & Independent support & 0.015 & [-0.010, 0.079] & 0.1222 & 1.0000 & Tested \\
+BRACS & Reversed & Balanced & Difficulty & -0.064 & [-0.366, 0.080] & 0.3557 & 1.0000 & Tested \\
+BRACS & Reversed & Balanced & Diversity & 0.024 & [-0.326, 0.340] & 0.7508 & 1.0000 & Tested \\
+BRACS & Native & Moderate & Prevalence & 0.815 & [0.419, 1.237] & 0.0002 & 0.0130 & Tested \\
+BRACS & Native & Moderate & Nominal support & 0.892 & [0.549, 1.307] & $<$0.0001 & 0.0022 & Tested \\
+BRACS & Native & Moderate & Independent support & 0.197 & [-0.190, 0.557] & 0.1928 & 1.0000 & Tested \\
+BRACS & Native & Moderate & Difficulty & 0.121 & [-0.263, 0.453] & 0.4373 & 1.0000 & Tested \\
+BRACS & Native & Moderate & Diversity & 0.142 & [-0.415, 0.622] & 0.2702 & 1.0000 & Tested \\
+BRACS & Reversed & Moderate & Prevalence & 0.840 & [0.720, 0.962] & $<$0.0001 & 0.0026 & Tested \\
+BRACS & Reversed & Moderate & Nominal support & 0.833 & [0.696, 0.969] & $<$0.0001 & 0.0011 & Tested \\
+BRACS & Reversed & Moderate & Independent support & 0.051 & [-0.144, 0.202] & 0.5917 & 1.0000 & Tested \\
+BRACS & Reversed & Moderate & Difficulty & -0.078 & [-0.244, 0.059] & 0.2205 & 1.0000 & Tested \\
+BRACS & Reversed & Moderate & Diversity & -0.064 & [-0.279, 0.126] & 0.2047 & 1.0000 & Tested \\
+BRACS & Native & Severe & Prevalence & 0.768 & [0.441, 1.030] & 0.0025 & 0.1214 & Tested \\
+BRACS & Native & Severe & Nominal support & 0.637 & [0.353, 0.880] & 0.0028 & 0.1297 & Tested \\
+BRACS & Native & Severe & Independent support & 0.106 & [-0.149, 0.323] & 0.2974 & 1.0000 & Tested \\
+BRACS & Native & Severe & Difficulty & -0.273 & [-0.637, -0.070] & 0.0012 & 0.0603 & Tested \\
+BRACS & Native & Severe & Diversity & -0.165 & [-0.548, 0.049] & 0.0280 & 1.0000 & Tested \\
+BRACS & Aligned & Severe & Prevalence & 0.654 & [0.330, 1.061] & 0.0073 & 0.3344 & Tested \\
+BRACS & Aligned & Severe & Nominal support & 0.426 & [0.002, 0.767] & 0.0614 & 1.0000 & Tested \\
+BRACS & Aligned & Severe & Independent support & 0.024 & [-0.193, 0.214] & 0.7576 & 1.0000 & Tested \\
+BRACS & Aligned & Severe & Difficulty & 0.164 & [-0.071, 0.437] & 0.0361 & 1.0000 & Tested \\
+BRACS & Aligned & Severe & Diversity & -0.059 & [-0.524, 0.237] & 0.5979 & 1.0000 & Tested \\
+BRACS & Reversed & Severe & Prevalence & 0.794 & [0.691, 0.889] & $<$0.0001 & 0.0006 & Tested \\
+BRACS & Reversed & Severe & Nominal support & 0.736 & [0.619, 0.856] & $<$0.0001 & 0.0006 & Tested \\
+BRACS & Reversed & Severe & Independent support & 0.111 & [0.046, 0.184] & 0.0010 & 0.0505 & Tested \\
+BRACS & Reversed & Severe & Difficulty & -0.059 & [-0.120, 0.002] & 0.0185 & 0.8122 & Tested \\
+BRACS & Reversed & Severe & Diversity & -0.010 & [-0.092, 0.064] & 0.7536 & 1.0000 & Tested \\
+BRACS & Native & Severe (spread) & Prevalence & 0.867 & [0.706, 1.050] & $<$0.0001 & 0.0016 & Tested \\
+BRACS & Native & Severe (spread) & Nominal support & 0.827 & [0.673, 1.007] & $<$0.0001 & 0.0006 & Tested \\
+BRACS & Native & Severe (spread) & Independent support & 0.111 & [-0.033, 0.226] & 0.0411 & 1.0000 & Tested \\
+BRACS & Native & Severe (spread) & Difficulty & 0.021 & [-0.171, 0.190] & 0.9236 & 1.0000 & Tested \\
+BRACS & Native & Severe (spread) & Diversity & -0.026 & [-0.151, 0.074] & 0.5866 & 1.0000 & Tested \\
+BRACS & Aligned & Severe (spread) & Prevalence & 0.478 & [0.005, 0.864] & 0.0517 & 1.0000 & Tested \\
+BRACS & Aligned & Severe (spread) & Nominal support & 0.467 & [0.089, 0.785] & 0.0297 & 1.0000 & Tested \\
+BRACS & Aligned & Severe (spread) & Independent support & -0.139 & [-0.480, 0.060] & 0.0738 & 1.0000 & Tested \\
+BRACS & Aligned & Severe (spread) & Difficulty & -0.149 & [-0.853, 0.210] & 0.1362 & 1.0000 & Tested \\
+BRACS & Aligned & Severe (spread) & Diversity & -0.149 & [-0.638, 0.114] & 0.0831 & 1.0000 & Tested \\
+BRACS & Reversed & Severe (spread) & Prevalence & 0.823 & [0.713, 0.939] & $<$0.0001 & 0.0006 & Tested \\
+BRACS & Reversed & Severe (spread) & Nominal support & 0.790 & [0.685, 0.903] & $<$0.0001 & 0.0006 & Tested \\
+BRACS & Reversed & Severe (spread) & Independent support & 0.051 & [-0.006, 0.113] & 0.0204 & 0.8772 & Tested \\
+BRACS & Reversed & Severe (spread) & Difficulty & -0.008 & [-0.091, 0.059] & 0.6915 & 1.0000 & Tested \\
+BRACS & Reversed & Severe (spread) & Diversity & 0.030 & [-0.037, 0.091] & 0.1580 & 1.0000 & Tested \\
 \end{longtable}

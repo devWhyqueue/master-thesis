@@ -13,290 +13,120 @@ Dataset & Assignment & Condition & Class & Tier & Recall & $F_1$ & NLL & Brier \
 \endfoot
 \bottomrule
 \endlastfoot
-BRACS & Aligned & Moderate & ADH & body & 0.206 & 0.109 & 3.125 & 1.179 \\
-BRACS & Aligned & Moderate & ADH & tail & 0.075 & 0.093 & 3.459 & 1.290 \\
-BRACS & Aligned & Moderate & DCIS & body & 0.549 & 0.507 & 1.087 & 0.457 \\
-BRACS & Aligned & Moderate & DCIS & head & 0.533 & 0.381 & 1.704 & 0.614 \\
-BRACS & Aligned & Moderate & DCIS & tail & 0.350 & 0.451 & 1.085 & 0.521 \\
-BRACS & Aligned & Moderate & FEA & body & 0.468 & 0.239 & 4.311 & 1.335 \\
-BRACS & Aligned & Moderate & FEA & head & 0.516 & 0.272 & 2.456 & 0.910 \\
-BRACS & Aligned & Moderate & IC & head & 0.877 & 0.888 & 0.728 & 0.242 \\
-BRACS & Aligned & Moderate & N & head & 0.793 & 0.428 & 1.226 & 0.613 \\
-BRACS & Aligned & Moderate & PB & tail & 0.207 & 0.318 & 1.887 & 0.786 \\
-BRACS & Aligned & Moderate & UDH & tail & 0.242 & 0.263 & 2.293 & 0.939 \\
-BRACS & Aligned & Severe & ADH & body & 0.242 & 0.130 & 4.371 & 1.281 \\
-BRACS & Aligned & Severe & ADH & tail & 0.018 & 0.031 & 5.300 & 1.476 \\
-BRACS & Aligned & Severe & DCIS & body & 0.519 & 0.474 & 1.827 & 0.600 \\
-BRACS & Aligned & Severe & DCIS & head & 0.555 & 0.389 & 1.622 & 0.585 \\
-BRACS & Aligned & Severe & DCIS & tail & 0.256 & 0.384 & 1.365 & 0.591 \\
-BRACS & Aligned & Severe & FEA & body & 0.418 & 0.177 & 4.908 & 1.359 \\
-BRACS & Aligned & Severe & FEA & head & 0.523 & 0.252 & 3.350 & 0.980 \\
-BRACS & Aligned & Severe & IC & head & 0.880 & 0.882 & 1.099 & 0.280 \\
-BRACS & Aligned & Severe & N & head & 0.846 & 0.405 & 1.299 & 0.567 \\
-BRACS & Aligned & Severe & PB & tail & 0.127 & 0.212 & 2.540 & 0.954 \\
-BRACS & Aligned & Severe & UDH & tail & 0.135 & 0.168 & 2.978 & 1.055 \\
-BRACS & Reversed & Moderate & ADH & body & 0.058 & 0.063 & 2.861 & 1.098 \\
-BRACS & Reversed & Moderate & ADH & head & 0.440 & 0.181 & 3.838 & 1.300 \\
-BRACS & Reversed & Moderate & DCIS & body & 0.360 & 0.415 & 1.534 & 0.532 \\
-BRACS & Reversed & Moderate & DCIS & head & 0.821 & 0.438 & 1.161 & 0.553 \\
-BRACS & Reversed & Moderate & DCIS & tail & 0.402 & 0.365 & 2.237 & 0.705 \\
-BRACS & Reversed & Moderate & FEA & body & 0.167 & 0.141 & 8.027 & 1.510 \\
-BRACS & Reversed & Moderate & FEA & tail & 0.253 & 0.251 & 2.753 & 0.948 \\
-BRACS & Reversed & Moderate & IC & tail & 0.712 & 0.804 & 0.872 & 0.266 \\
-BRACS & Reversed & Moderate & N & tail & 0.352 & 0.353 & 1.505 & 0.657 \\
-BRACS & Reversed & Moderate & PB & head & 0.349 & 0.452 & 2.607 & 0.940 \\
-BRACS & Reversed & Moderate & UDH & head & 0.449 & 0.284 & 2.730 & 1.013 \\
-BRACS & Reversed & Severe & ADH & body & 0.097 & 0.102 & 7.323 & 1.352 \\
-BRACS & Reversed & Severe & ADH & head & 0.589 & 0.172 & 3.720 & 1.233 \\
-BRACS & Reversed & Severe & DCIS & body & 0.183 & 0.251 & 2.986 & 0.847 \\
-BRACS & Reversed & Severe & DCIS & head & 0.829 & 0.319 & 1.634 & 0.490 \\
-BRACS & Reversed & Severe & DCIS & tail & 0.280 & 0.305 & 3.116 & 0.891 \\
-BRACS & Reversed & Severe & FEA & body & 0.110 & 0.102 & 7.957 & 1.600 \\
-BRACS & Reversed & Severe & FEA & tail & 0.177 & 0.204 & 4.829 & 1.138 \\
-BRACS & Reversed & Severe & IC & tail & 0.590 & 0.727 & 1.240 & 0.355 \\
-BRACS & Reversed & Severe & N & tail & 0.228 & 0.285 & 2.715 & 0.867 \\
-BRACS & Reversed & Severe & PB & head & 0.375 & 0.477 & 3.609 & 1.012 \\
-BRACS & Reversed & Severe & UDH & head & 0.448 & 0.280 & 3.531 & 1.066 \\
-BRACS & Native & Moderate & ADH & tail & 0.126 & 0.119 & 3.087 & 1.241 \\
-BRACS & Native & Moderate & DCIS & tail & 0.432 & 0.463 & 1.151 & 0.550 \\
-BRACS & Native & Moderate & FEA & body & 0.380 & 0.309 & 3.135 & 1.083 \\
-BRACS & Native & Moderate & IC & tail & 0.837 & 0.878 & 0.490 & 0.179 \\
-BRACS & Native & Moderate & N & head & 0.738 & 0.419 & 1.121 & 0.576 \\
-BRACS & Native & Moderate & PB & head & 0.289 & 0.404 & 1.891 & 0.838 \\
-BRACS & Native & Moderate & UDH & head & 0.448 & 0.320 & 2.004 & 0.881 \\
-BRACS & Native & Severe & ADH & tail & 0.104 & 0.111 & 3.762 & 1.294 \\
-BRACS & Native & Severe & DCIS & tail & 0.353 & 0.411 & 1.735 & 0.704 \\
-BRACS & Native & Severe & FEA & body & 0.407 & 0.297 & 3.362 & 1.098 \\
-BRACS & Native & Severe & IC & tail & 0.762 & 0.833 & 0.649 & 0.221 \\
-BRACS & Native & Severe & N & head & 0.747 & 0.408 & 1.421 & 0.616 \\
-BRACS & Native & Severe & PB & head & 0.292 & 0.391 & 2.948 & 1.002 \\
-BRACS & Native & Severe & UDH & head & 0.413 & 0.296 & 2.607 & 0.955 \\
-CAMELYON16 & Reversed & Moderate & normal & tail & 0.981 & 0.990 & 0.054 & 0.010 \\
-CAMELYON16 & Reversed & Moderate & tumor & head & 0.988 & 0.686 & 0.241 & 0.065 \\
-CAMELYON16 & Reversed & Severe & normal & tail & 0.946 & 0.972 & 0.084 & 0.018 \\
-CAMELYON16 & Reversed & Severe & tumor & head & 0.991 & 0.501 & 0.224 & 0.059 \\
-CAMELYON16 & Native & Moderate & normal & head & 0.993 & 0.996 & 0.035 & 0.008 \\
-CAMELYON16 & Native & Moderate & tumor & tail & 0.973 & 0.841 & 0.335 & 0.067 \\
-CAMELYON16 & Native & Severe & normal & head & 0.998 & 0.997 & 0.014 & 0.005 \\
-CAMELYON16 & Native & Severe & tumor & tail & 0.932 & 0.875 & 0.526 & 0.104 \\
-PANDA & Native & Moderate & benign & head & 0.976 & 0.957 & 0.133 & 0.068 \\
-PANDA & Native & Moderate & cancer & tail & 0.721 & 0.790 & 0.580 & 0.348 \\
-PANDA & Native & Severe & benign & head & 0.994 & 0.941 & 0.115 & 0.059 \\
-PANDA & Native & Severe & cancer & tail & 0.474 & 0.633 & 0.865 & 0.456 \\
-TCGA-UT & Aligned & Moderate & Adrenocortical carcinoma & head & 0.763 & 0.768 & 1.711 & 0.445 \\
-TCGA-UT & Aligned & Moderate & Bladder Urothelial Carcinoma & tail & 0.452 & 0.502 & 1.711 & 0.696 \\
-TCGA-UT & Aligned & Moderate & Brain Lower Grade Glioma & body & 0.887 & 0.894 & 0.439 & 0.195 \\
-TCGA-UT & Aligned & Moderate & Brain Lower Grade Glioma & head & 0.835 & 0.831 & 0.578 & 0.292 \\
-TCGA-UT & Aligned & Moderate & Breast invasive carcinoma & body & 0.759 & 0.820 & 0.662 & 0.260 \\
-TCGA-UT & Aligned & Moderate & Cervical squamous cell carcinoma and endocervical adenocarcinoma & tail & 0.500 & 0.490 & 1.465 & 0.676 \\
-TCGA-UT & Aligned & Moderate & Colon adenocarcinoma & tail & 0.527 & 0.630 & 0.766 & 0.380 \\
-TCGA-UT & Aligned & Moderate & Esophageal carcinoma & tail & 0.309 & 0.267 & 2.372 & 1.042 \\
-TCGA-UT & Aligned & Moderate & Glioblastoma multiforme & body & 0.819 & 0.829 & 0.409 & 0.219 \\
-TCGA-UT & Aligned & Moderate & Head and Neck squamous cell carcinoma & body & 0.736 & 0.668 & 0.919 & 0.380 \\
-TCGA-UT & Aligned & Moderate & Head and Neck squamous cell carcinoma & tail & 0.745 & 0.703 & 0.884 & 0.387 \\
-TCGA-UT & Aligned & Moderate & Kidney Chromophobe & head & 0.929 & 0.825 & 0.391 & 0.192 \\
-TCGA-UT & Aligned & Moderate & Kidney renal clear cell carcinoma & body & 0.783 & 0.858 & 1.164 & 0.331 \\
-TCGA-UT & Aligned & Moderate & Kidney renal clear cell carcinoma & head & 0.867 & 0.906 & 0.733 & 0.211 \\
-TCGA-UT & Aligned & Moderate & Kidney renal papillary cell carcinoma & body & 0.898 & 0.833 & 0.385 & 0.160 \\
-TCGA-UT & Aligned & Moderate & Kidney renal papillary cell carcinoma & head & 0.818 & 0.796 & 0.781 & 0.291 \\
-TCGA-UT & Aligned & Moderate & Liver hepatocellular carcinoma & body & 0.864 & 0.861 & 0.552 & 0.189 \\
-TCGA-UT & Aligned & Moderate & Liver hepatocellular carcinoma & head & 0.921 & 0.806 & 0.354 & 0.137 \\
-TCGA-UT & Aligned & Moderate & Lung adenocarcinoma & body & 0.729 & 0.771 & 0.806 & 0.346 \\
-TCGA-UT & Aligned & Moderate & Lung squamous cell carcinoma & tail & 0.543 & 0.596 & 1.008 & 0.483 \\
-TCGA-UT & Aligned & Moderate & Mesothelioma & body & 0.864 & 0.508 & 0.864 & 0.363 \\
-TCGA-UT & Aligned & Moderate & Mesothelioma & tail & 0.645 & 0.568 & 1.870 & 0.618 \\
-TCGA-UT & Aligned & Moderate & Ovarian serous cystadenocarcinoma & body & 0.842 & 0.527 & 1.184 & 0.474 \\
-TCGA-UT & Aligned & Moderate & Pancreatic adenocarcinoma & body & 0.752 & 0.618 & 1.603 & 0.525 \\
-TCGA-UT & Aligned & Moderate & Pheochromocytoma and Paraganglioma & head & 0.958 & 0.834 & 0.389 & 0.126 \\
-TCGA-UT & Aligned & Moderate & Prostate adenocarcinoma & head & 0.977 & 0.969 & 0.171 & 0.054 \\
-TCGA-UT & Aligned & Moderate & Rectum adenocarcinoma & tail & 0.751 & 0.368 & 1.338 & 0.722 \\
-TCGA-UT & Aligned & Moderate & Sarcoma & body & 0.850 & 0.860 & 0.390 & 0.153 \\
-TCGA-UT & Aligned & Moderate & Skin Cutaneous Melanoma & body & 0.626 & 0.680 & 0.939 & 0.398 \\
-TCGA-UT & Aligned & Moderate & Skin Cutaneous Melanoma & tail & 0.693 & 0.740 & 0.661 & 0.302 \\
-TCGA-UT & Aligned & Moderate & Stomach adenocarcinoma & tail & 0.478 & 0.536 & 1.356 & 0.586 \\
-TCGA-UT & Aligned & Moderate & Testicular Germ Cell Tumors & head & 0.917 & 0.897 & 0.454 & 0.148 \\
-TCGA-UT & Aligned & Moderate & Thymoma & body & 0.977 & 0.864 & 0.151 & 0.070 \\
-TCGA-UT & Aligned & Moderate & Thymoma & head & 0.940 & 0.837 & 0.422 & 0.158 \\
-TCGA-UT & Aligned & Moderate & Thyroid carcinoma & head & 0.960 & 0.968 & 0.227 & 0.067 \\
-TCGA-UT & Aligned & Moderate & Uterine Carcinosarcoma & body & 0.623 & 0.280 & 2.192 & 0.757 \\
-TCGA-UT & Aligned & Moderate & Uterine Carcinosarcoma & tail & 0.711 & 0.443 & 1.603 & 0.604 \\
-TCGA-UT & Aligned & Moderate & Uterine Corpus Endometrial Carcinoma & tail & 0.611 & 0.661 & 0.996 & 0.387 \\
-TCGA-UT & Aligned & Moderate & Uveal Melanoma & head & 0.959 & 0.678 & 0.572 & 0.286 \\
-TCGA-UT & Aligned & Severe & Adrenocortical carcinoma & head & 0.774 & 0.769 & 2.200 & 0.460 \\
-TCGA-UT & Aligned & Severe & Bladder Urothelial Carcinoma & tail & 0.368 & 0.446 & 1.981 & 0.765 \\
-TCGA-UT & Aligned & Severe & Brain Lower Grade Glioma & body & 0.873 & 0.885 & 0.681 & 0.230 \\
-TCGA-UT & Aligned & Severe & Brain Lower Grade Glioma & head & 0.842 & 0.832 & 0.737 & 0.312 \\
-TCGA-UT & Aligned & Severe & Breast invasive carcinoma & body & 0.749 & 0.810 & 0.828 & 0.302 \\
-TCGA-UT & Aligned & Severe & Cervical squamous cell carcinoma and endocervical adenocarcinoma & tail & 0.447 & 0.449 & 1.519 & 0.689 \\
-TCGA-UT & Aligned & Severe & Colon adenocarcinoma & tail & 0.522 & 0.622 & 0.985 & 0.489 \\
-TCGA-UT & Aligned & Severe & Esophageal carcinoma & tail & 0.248 & 0.225 & 2.604 & 1.066 \\
-TCGA-UT & Aligned & Severe & Glioblastoma multiforme & body & 0.816 & 0.825 & 0.520 & 0.239 \\
-TCGA-UT & Aligned & Severe & Head and Neck squamous cell carcinoma & body & 0.757 & 0.662 & 1.115 & 0.431 \\
-TCGA-UT & Aligned & Severe & Head and Neck squamous cell carcinoma & tail & 0.739 & 0.687 & 1.099 & 0.451 \\
-TCGA-UT & Aligned & Severe & Kidney Chromophobe & head & 0.933 & 0.818 & 0.426 & 0.185 \\
-TCGA-UT & Aligned & Severe & Kidney renal clear cell carcinoma & body & 0.781 & 0.855 & 1.459 & 0.351 \\
-TCGA-UT & Aligned & Severe & Kidney renal clear cell carcinoma & head & 0.868 & 0.905 & 0.965 & 0.228 \\
-TCGA-UT & Aligned & Severe & Kidney renal papillary cell carcinoma & body & 0.885 & 0.807 & 0.437 & 0.174 \\
-TCGA-UT & Aligned & Severe & Kidney renal papillary cell carcinoma & head & 0.806 & 0.785 & 1.059 & 0.331 \\
-TCGA-UT & Aligned & Severe & Liver hepatocellular carcinoma & body & 0.864 & 0.847 & 0.721 & 0.215 \\
-TCGA-UT & Aligned & Severe & Liver hepatocellular carcinoma & head & 0.917 & 0.793 & 0.462 & 0.159 \\
-TCGA-UT & Aligned & Severe & Lung adenocarcinoma & body & 0.709 & 0.757 & 1.058 & 0.409 \\
-TCGA-UT & Aligned & Severe & Lung squamous cell carcinoma & tail & 0.536 & 0.582 & 1.195 & 0.522 \\
-TCGA-UT & Aligned & Severe & Mesothelioma & body & 0.862 & 0.490 & 0.799 & 0.338 \\
-TCGA-UT & Aligned & Severe & Mesothelioma & tail & 0.649 & 0.540 & 1.826 & 0.598 \\
-TCGA-UT & Aligned & Severe & Ovarian serous cystadenocarcinoma & body & 0.860 & 0.507 & 1.206 & 0.460 \\
-TCGA-UT & Aligned & Severe & Pancreatic adenocarcinoma & body & 0.769 & 0.596 & 1.809 & 0.527 \\
-TCGA-UT & Aligned & Severe & Pheochromocytoma and Paraganglioma & head & 0.955 & 0.813 & 0.472 & 0.133 \\
-TCGA-UT & Aligned & Severe & Prostate adenocarcinoma & head & 0.981 & 0.963 & 0.197 & 0.056 \\
-TCGA-UT & Aligned & Severe & Rectum adenocarcinoma & tail & 0.682 & 0.354 & 1.334 & 0.680 \\
-TCGA-UT & Aligned & Severe & Sarcoma & body & 0.836 & 0.851 & 0.475 & 0.186 \\
-TCGA-UT & Aligned & Severe & Skin Cutaneous Melanoma & body & 0.616 & 0.669 & 1.076 & 0.443 \\
-TCGA-UT & Aligned & Severe & Skin Cutaneous Melanoma & tail & 0.644 & 0.710 & 0.823 & 0.359 \\
-TCGA-UT & Aligned & Severe & Stomach adenocarcinoma & tail & 0.455 & 0.519 & 1.514 & 0.631 \\
-TCGA-UT & Aligned & Severe & Testicular Germ Cell Tumors & head & 0.929 & 0.888 & 0.554 & 0.156 \\
-TCGA-UT & Aligned & Severe & Thymoma & body & 0.981 & 0.844 & 0.182 & 0.079 \\
-TCGA-UT & Aligned & Severe & Thymoma & head & 0.956 & 0.803 & 0.419 & 0.143 \\
-TCGA-UT & Aligned & Severe & Thyroid carcinoma & head & 0.958 & 0.960 & 0.316 & 0.082 \\
-TCGA-UT & Aligned & Severe & Uterine Carcinosarcoma & body & 0.641 & 0.277 & 2.396 & 0.748 \\
-TCGA-UT & Aligned & Severe & Uterine Carcinosarcoma & tail & 0.711 & 0.483 & 1.662 & 0.565 \\
-TCGA-UT & Aligned & Severe & Uterine Corpus Endometrial Carcinoma & tail & 0.585 & 0.649 & 1.141 & 0.427 \\
-TCGA-UT & Aligned & Severe & Uveal Melanoma & head & 0.971 & 0.662 & 0.503 & 0.235 \\
-TCGA-UT & Reversed & Moderate & Adrenocortical carcinoma & tail & 0.723 & 0.755 & 1.259 & 0.401 \\
-TCGA-UT & Reversed & Moderate & Bladder Urothelial Carcinoma & head & 0.482 & 0.498 & 2.516 & 0.808 \\
-TCGA-UT & Reversed & Moderate & Brain Lower Grade Glioma & body & 0.871 & 0.893 & 0.439 & 0.206 \\
-TCGA-UT & Reversed & Moderate & Brain Lower Grade Glioma & tail & 0.814 & 0.824 & 0.442 & 0.242 \\
-TCGA-UT & Reversed & Moderate & Breast invasive carcinoma & body & 0.743 & 0.816 & 0.664 & 0.258 \\
-TCGA-UT & Reversed & Moderate & Cervical squamous cell carcinoma and endocervical adenocarcinoma & head & 0.573 & 0.498 & 1.859 & 0.748 \\
-TCGA-UT & Reversed & Moderate & Colon adenocarcinoma & head & 0.536 & 0.605 & 0.837 & 0.396 \\
-TCGA-UT & Reversed & Moderate & Esophageal carcinoma & head & 0.487 & 0.273 & 2.942 & 1.046 \\
-TCGA-UT & Reversed & Moderate & Glioblastoma multiforme & body & 0.824 & 0.829 & 0.430 & 0.240 \\
-TCGA-UT & Reversed & Moderate & Head and Neck squamous cell carcinoma & body & 0.628 & 0.652 & 0.832 & 0.343 \\
-TCGA-UT & Reversed & Moderate & Head and Neck squamous cell carcinoma & head & 0.667 & 0.681 & 0.903 & 0.392 \\
-TCGA-UT & Reversed & Moderate & Kidney Chromophobe & tail & 0.914 & 0.838 & 0.364 & 0.198 \\
-TCGA-UT & Reversed & Moderate & Kidney renal clear cell carcinoma & body & 0.787 & 0.865 & 1.016 & 0.324 \\
-TCGA-UT & Reversed & Moderate & Kidney renal clear cell carcinoma & tail & 0.866 & 0.906 & 0.539 & 0.186 \\
-TCGA-UT & Reversed & Moderate & Kidney renal papillary cell carcinoma & body & 0.887 & 0.843 & 0.391 & 0.178 \\
-TCGA-UT & Reversed & Moderate & Kidney renal papillary cell carcinoma & tail & 0.801 & 0.804 & 0.703 & 0.298 \\
-TCGA-UT & Reversed & Moderate & Liver hepatocellular carcinoma & body & 0.854 & 0.879 & 0.484 & 0.188 \\
-TCGA-UT & Reversed & Moderate & Liver hepatocellular carcinoma & tail & 0.906 & 0.829 & 0.254 & 0.113 \\
-TCGA-UT & Reversed & Moderate & Lung adenocarcinoma & body & 0.719 & 0.769 & 0.778 & 0.332 \\
-TCGA-UT & Reversed & Moderate & Lung squamous cell carcinoma & head & 0.580 & 0.604 & 1.137 & 0.513 \\
-TCGA-UT & Reversed & Moderate & Mesothelioma & body & 0.849 & 0.514 & 0.925 & 0.391 \\
-TCGA-UT & Reversed & Moderate & Mesothelioma & head & 0.653 & 0.535 & 2.177 & 0.623 \\
-TCGA-UT & Reversed & Moderate & Ovarian serous cystadenocarcinoma & body & 0.796 & 0.575 & 0.902 & 0.367 \\
-TCGA-UT & Reversed & Moderate & Pancreatic adenocarcinoma & body & 0.707 & 0.665 & 1.337 & 0.432 \\
-TCGA-UT & Reversed & Moderate & Pheochromocytoma and Paraganglioma & tail & 0.942 & 0.885 & 0.345 & 0.129 \\
-TCGA-UT & Reversed & Moderate & Prostate adenocarcinoma & tail & 0.963 & 0.973 & 0.099 & 0.036 \\
-TCGA-UT & Reversed & Moderate & Rectum adenocarcinoma & head & 0.730 & 0.343 & 1.564 & 0.804 \\
-TCGA-UT & Reversed & Moderate & Sarcoma & body & 0.845 & 0.861 & 0.372 & 0.150 \\
-TCGA-UT & Reversed & Moderate & Skin Cutaneous Melanoma & body & 0.658 & 0.713 & 0.996 & 0.433 \\
-TCGA-UT & Reversed & Moderate & Skin Cutaneous Melanoma & head & 0.745 & 0.766 & 0.860 & 0.372 \\
-TCGA-UT & Reversed & Moderate & Stomach adenocarcinoma & head & 0.489 & 0.536 & 1.856 & 0.691 \\
-TCGA-UT & Reversed & Moderate & Testicular Germ Cell Tumors & tail & 0.863 & 0.899 & 0.335 & 0.130 \\
-TCGA-UT & Reversed & Moderate & Thymoma & body & 0.969 & 0.902 & 0.091 & 0.040 \\
-TCGA-UT & Reversed & Moderate & Thymoma & tail & 0.915 & 0.881 & 0.263 & 0.115 \\
-TCGA-UT & Reversed & Moderate & Thyroid carcinoma & tail & 0.952 & 0.968 & 0.146 & 0.050 \\
-TCGA-UT & Reversed & Moderate & Uterine Carcinosarcoma & body & 0.599 & 0.302 & 2.131 & 0.723 \\
-TCGA-UT & Reversed & Moderate & Uterine Carcinosarcoma & head & 0.719 & 0.432 & 1.581 & 0.605 \\
-TCGA-UT & Reversed & Moderate & Uterine Corpus Endometrial Carcinoma & head & 0.621 & 0.667 & 1.189 & 0.445 \\
-TCGA-UT & Reversed & Moderate & Uveal Melanoma & tail & 0.904 & 0.739 & 0.384 & 0.197 \\
-TCGA-UT & Reversed & Severe & Adrenocortical carcinoma & tail & 0.703 & 0.744 & 1.394 & 0.410 \\
-TCGA-UT & Reversed & Severe & Bladder Urothelial Carcinoma & head & 0.477 & 0.483 & 3.897 & 0.912 \\
-TCGA-UT & Reversed & Severe & Brain Lower Grade Glioma & body & 0.860 & 0.877 & 0.635 & 0.224 \\
-TCGA-UT & Reversed & Severe & Brain Lower Grade Glioma & tail & 0.821 & 0.824 & 0.516 & 0.238 \\
-TCGA-UT & Reversed & Severe & Breast invasive carcinoma & body & 0.739 & 0.809 & 0.983 & 0.314 \\
-TCGA-UT & Reversed & Severe & Cervical squamous cell carcinoma and endocervical adenocarcinoma & head & 0.560 & 0.485 & 2.806 & 0.845 \\
-TCGA-UT & Reversed & Severe & Colon adenocarcinoma & head & 0.538 & 0.596 & 1.631 & 0.570 \\
-TCGA-UT & Reversed & Severe & Esophageal carcinoma & head & 0.456 & 0.276 & 4.538 & 1.128 \\
-TCGA-UT & Reversed & Severe & Glioblastoma multiforme & body & 0.804 & 0.817 & 0.680 & 0.308 \\
-TCGA-UT & Reversed & Severe & Head and Neck squamous cell carcinoma & body & 0.659 & 0.658 & 1.001 & 0.345 \\
-TCGA-UT & Reversed & Severe & Head and Neck squamous cell carcinoma & head & 0.662 & 0.674 & 1.318 & 0.445 \\
-TCGA-UT & Reversed & Severe & Kidney Chromophobe & tail & 0.895 & 0.831 & 0.432 & 0.198 \\
-TCGA-UT & Reversed & Severe & Kidney renal clear cell carcinoma & body & 0.787 & 0.864 & 1.249 & 0.337 \\
-TCGA-UT & Reversed & Severe & Kidney renal clear cell carcinoma & tail & 0.856 & 0.900 & 0.728 & 0.209 \\
-TCGA-UT & Reversed & Severe & Kidney renal papillary cell carcinoma & body & 0.857 & 0.821 & 0.532 & 0.227 \\
-TCGA-UT & Reversed & Severe & Kidney renal papillary cell carcinoma & tail & 0.787 & 0.790 & 0.890 & 0.319 \\
-TCGA-UT & Reversed & Severe & Liver hepatocellular carcinoma & body & 0.841 & 0.878 & 0.610 & 0.215 \\
-TCGA-UT & Reversed & Severe & Liver hepatocellular carcinoma & tail & 0.894 & 0.830 & 0.310 & 0.125 \\
-TCGA-UT & Reversed & Severe & Lung adenocarcinoma & body & 0.712 & 0.755 & 1.129 & 0.387 \\
-TCGA-UT & Reversed & Severe & Lung squamous cell carcinoma & head & 0.587 & 0.601 & 1.728 & 0.609 \\
-TCGA-UT & Reversed & Severe & Mesothelioma & body & 0.844 & 0.488 & 0.928 & 0.368 \\
-TCGA-UT & Reversed & Severe & Mesothelioma & head & 0.655 & 0.515 & 2.727 & 0.648 \\
-TCGA-UT & Reversed & Severe & Ovarian serous cystadenocarcinoma & body & 0.800 & 0.577 & 0.767 & 0.298 \\
-TCGA-UT & Reversed & Severe & Pancreatic adenocarcinoma & body & 0.691 & 0.651 & 1.598 & 0.431 \\
-TCGA-UT & Reversed & Severe & Pheochromocytoma and Paraganglioma & tail & 0.928 & 0.883 & 0.307 & 0.118 \\
-TCGA-UT & Reversed & Severe & Prostate adenocarcinoma & tail & 0.943 & 0.965 & 0.105 & 0.040 \\
-TCGA-UT & Reversed & Severe & Rectum adenocarcinoma & head & 0.699 & 0.316 & 1.932 & 0.775 \\
-TCGA-UT & Reversed & Severe & Sarcoma & body & 0.834 & 0.852 & 0.454 & 0.172 \\
-TCGA-UT & Reversed & Severe & Skin Cutaneous Melanoma & body & 0.657 & 0.712 & 1.256 & 0.507 \\
-TCGA-UT & Reversed & Severe & Skin Cutaneous Melanoma & head & 0.736 & 0.754 & 1.324 & 0.466 \\
-TCGA-UT & Reversed & Severe & Stomach adenocarcinoma & head & 0.481 & 0.536 & 2.985 & 0.825 \\
-TCGA-UT & Reversed & Severe & Testicular Germ Cell Tumors & tail & 0.843 & 0.889 & 0.416 & 0.138 \\
-TCGA-UT & Reversed & Severe & Thymoma & body & 0.944 & 0.911 & 0.104 & 0.051 \\
-TCGA-UT & Reversed & Severe & Thymoma & tail & 0.909 & 0.868 & 0.280 & 0.109 \\
-TCGA-UT & Reversed & Severe & Thyroid carcinoma & tail & 0.938 & 0.962 & 0.175 & 0.055 \\
-TCGA-UT & Reversed & Severe & Uterine Carcinosarcoma & body & 0.624 & 0.299 & 2.472 & 0.688 \\
-TCGA-UT & Reversed & Severe & Uterine Carcinosarcoma & head & 0.707 & 0.434 & 1.743 & 0.600 \\
-TCGA-UT & Reversed & Severe & Uterine Corpus Endometrial Carcinoma & head & 0.606 & 0.656 & 1.920 & 0.569 \\
-TCGA-UT & Reversed & Severe & Uveal Melanoma & tail & 0.907 & 0.760 & 0.214 & 0.114 \\
-TCGA-UT & Native & Moderate & Adrenocortical carcinoma & body & 0.721 & 0.760 & 1.438 & 0.411 \\
-TCGA-UT & Native & Moderate & Bladder Urothelial Carcinoma & body & 0.476 & 0.502 & 2.270 & 0.746 \\
-TCGA-UT & Native & Moderate & Brain Lower Grade Glioma & head & 0.843 & 0.851 & 0.645 & 0.268 \\
-TCGA-UT & Native & Moderate & Breast invasive carcinoma & head & 0.781 & 0.826 & 0.861 & 0.301 \\
-TCGA-UT & Native & Moderate & Cervical squamous cell carcinoma and endocervical adenocarcinoma & body & 0.505 & 0.499 & 1.493 & 0.661 \\
-TCGA-UT & Native & Moderate & Colon adenocarcinoma & body & 0.621 & 0.677 & 0.812 & 0.416 \\
-TCGA-UT & Native & Moderate & Esophageal carcinoma & tail & 0.368 & 0.285 & 2.279 & 0.939 \\
-TCGA-UT & Native & Moderate & Glioblastoma multiforme & head & 0.834 & 0.831 & 0.486 & 0.234 \\
-TCGA-UT & Native & Moderate & Head and Neck squamous cell carcinoma & head & 0.715 & 0.681 & 1.008 & 0.414 \\
-TCGA-UT & Native & Moderate & Kidney Chromophobe & tail & 0.910 & 0.835 & 0.288 & 0.158 \\
-TCGA-UT & Native & Moderate & Kidney renal clear cell carcinoma & head & 0.843 & 0.891 & 0.904 & 0.256 \\
-TCGA-UT & Native & Moderate & Kidney renal papillary cell carcinoma & body & 0.833 & 0.816 & 0.597 & 0.237 \\
-TCGA-UT & Native & Moderate & Liver hepatocellular carcinoma & body & 0.881 & 0.857 & 0.434 & 0.163 \\
-TCGA-UT & Native & Moderate & Lung adenocarcinoma & head & 0.741 & 0.772 & 0.961 & 0.373 \\
-TCGA-UT & Native & Moderate & Lung squamous cell carcinoma & head & 0.610 & 0.615 & 1.293 & 0.551 \\
-TCGA-UT & Native & Moderate & Mesothelioma & tail & 0.743 & 0.587 & 1.043 & 0.410 \\
-TCGA-UT & Native & Moderate & Ovarian serous cystadenocarcinoma & tail & 0.797 & 0.593 & 0.772 & 0.318 \\
-TCGA-UT & Native & Moderate & Pancreatic adenocarcinoma & tail & 0.711 & 0.663 & 1.319 & 0.431 \\
-TCGA-UT & Native & Moderate & Pheochromocytoma and Paraganglioma & tail & 0.933 & 0.876 & 0.332 & 0.121 \\
-TCGA-UT & Native & Moderate & Prostate adenocarcinoma & body & 0.972 & 0.973 & 0.119 & 0.039 \\
-TCGA-UT & Native & Moderate & Rectum adenocarcinoma & tail & 0.629 & 0.370 & 1.163 & 0.657 \\
-TCGA-UT & Native & Moderate & Sarcoma & head & 0.869 & 0.870 & 0.463 & 0.178 \\
-TCGA-UT & Native & Moderate & Skin Cutaneous Melanoma & body & 0.720 & 0.751 & 0.876 & 0.379 \\
-TCGA-UT & Native & Moderate & Stomach adenocarcinoma & body & 0.494 & 0.548 & 1.768 & 0.681 \\
-TCGA-UT & Native & Moderate & Testicular Germ Cell Tumors & body & 0.899 & 0.909 & 0.351 & 0.131 \\
-TCGA-UT & Native & Moderate & Thymoma & tail & 0.936 & 0.883 & 0.235 & 0.102 \\
-TCGA-UT & Native & Moderate & Thyroid carcinoma & head & 0.958 & 0.969 & 0.197 & 0.062 \\
-TCGA-UT & Native & Moderate & Uterine Carcinosarcoma & tail & 0.594 & 0.393 & 1.632 & 0.617 \\
-TCGA-UT & Native & Moderate & Uterine Corpus Endometrial Carcinoma & head & 0.657 & 0.681 & 1.317 & 0.482 \\
-TCGA-UT & Native & Moderate & Uveal Melanoma & tail & 0.904 & 0.750 & 0.326 & 0.177 \\
-TCGA-UT & Native & Severe & Adrenocortical carcinoma & body & 0.719 & 0.759 & 1.569 & 0.403 \\
-TCGA-UT & Native & Severe & Bladder Urothelial Carcinoma & body & 0.466 & 0.489 & 3.151 & 0.818 \\
-TCGA-UT & Native & Severe & Brain Lower Grade Glioma & head & 0.855 & 0.849 & 0.890 & 0.266 \\
-TCGA-UT & Native & Severe & Breast invasive carcinoma & head & 0.791 & 0.821 & 1.319 & 0.362 \\
-TCGA-UT & Native & Severe & Cervical squamous cell carcinoma and endocervical adenocarcinoma & body & 0.458 & 0.470 & 1.967 & 0.728 \\
-TCGA-UT & Native & Severe & Colon adenocarcinoma & body & 0.619 & 0.680 & 1.343 & 0.609 \\
-TCGA-UT & Native & Severe & Esophageal carcinoma & tail & 0.340 & 0.268 & 2.484 & 0.921 \\
-TCGA-UT & Native & Severe & Glioblastoma multiforme & head & 0.819 & 0.824 & 0.816 & 0.291 \\
-TCGA-UT & Native & Severe & Head and Neck squamous cell carcinoma & head & 0.722 & 0.675 & 1.423 & 0.479 \\
-TCGA-UT & Native & Severe & Kidney Chromophobe & tail & 0.882 & 0.820 & 0.293 & 0.150 \\
-TCGA-UT & Native & Severe & Kidney renal clear cell carcinoma & head & 0.847 & 0.887 & 1.211 & 0.276 \\
-TCGA-UT & Native & Severe & Kidney renal papillary cell carcinoma & body & 0.820 & 0.811 & 0.720 & 0.259 \\
-TCGA-UT & Native & Severe & Liver hepatocellular carcinoma & body & 0.872 & 0.857 & 0.567 & 0.189 \\
-TCGA-UT & Native & Severe & Lung adenocarcinoma & head & 0.739 & 0.761 & 1.478 & 0.445 \\
-TCGA-UT & Native & Severe & Lung squamous cell carcinoma & head & 0.625 & 0.615 & 1.888 & 0.637 \\
-TCGA-UT & Native & Severe & Mesothelioma & tail & 0.691 & 0.599 & 1.068 & 0.407 \\
-TCGA-UT & Native & Severe & Ovarian serous cystadenocarcinoma & tail & 0.764 & 0.594 & 0.714 & 0.272 \\
-TCGA-UT & Native & Severe & Pancreatic adenocarcinoma & tail & 0.697 & 0.667 & 1.444 & 0.423 \\
-TCGA-UT & Native & Severe & Pheochromocytoma and Paraganglioma & tail & 0.914 & 0.884 & 0.371 & 0.121 \\
-TCGA-UT & Native & Severe & Prostate adenocarcinoma & body & 0.971 & 0.972 & 0.132 & 0.041 \\
-TCGA-UT & Native & Severe & Rectum adenocarcinoma & tail & 0.580 & 0.353 & 0.967 & 0.511 \\
-TCGA-UT & Native & Severe & Sarcoma & head & 0.875 & 0.870 & 0.672 & 0.230 \\
-TCGA-UT & Native & Severe & Skin Cutaneous Melanoma & body & 0.716 & 0.747 & 1.208 & 0.460 \\
-TCGA-UT & Native & Severe & Stomach adenocarcinoma & body & 0.488 & 0.543 & 2.556 & 0.798 \\
-TCGA-UT & Native & Severe & Testicular Germ Cell Tumors & body & 0.895 & 0.907 & 0.421 & 0.146 \\
-TCGA-UT & Native & Severe & Thymoma & tail & 0.921 & 0.877 & 0.281 & 0.109 \\
-TCGA-UT & Native & Severe & Thyroid carcinoma & head & 0.956 & 0.965 & 0.253 & 0.072 \\
-TCGA-UT & Native & Severe & Uterine Carcinosarcoma & tail & 0.556 & 0.431 & 1.637 & 0.601 \\
-TCGA-UT & Native & Severe & Uterine Corpus Endometrial Carcinoma & head & 0.665 & 0.686 & 2.003 & 0.594 \\
-TCGA-UT & Native & Severe & Uveal Melanoma & tail & 0.878 & 0.751 & 0.216 & 0.118 \\
+BRACS & Aligned & Balanced (spread) & ADH & body & 0.046 & 0.052 & 2.487 & 1.091 \\
+BRACS & Aligned & Balanced (spread) & ADH & tail & 0.211 & 0.216 & 2.825 & 1.217 \\
+BRACS & Aligned & Balanced (spread) & DCIS & body & 0.480 & 0.504 & 0.804 & 0.365 \\
+BRACS & Aligned & Balanced (spread) & DCIS & head & 0.476 & 0.368 & 1.038 & 0.541 \\
+BRACS & Aligned & Balanced (spread) & DCIS & tail & 0.633 & 0.653 & 1.199 & 0.628 \\
+BRACS & Aligned & Balanced (spread) & FEA & body & 0.439 & 0.307 & 3.524 & 1.346 \\
+BRACS & Aligned & Balanced (spread) & FEA & head & 0.442 & 0.374 & 1.900 & 0.850 \\
+BRACS & Aligned & Balanced (spread) & IC & head & 0.880 & 0.904 & 0.397 & 0.168 \\
+BRACS & Aligned & Balanced (spread) & N & head & 0.669 & 0.472 & 1.069 & 0.574 \\
+BRACS & Aligned & Balanced (spread) & PB & tail & 0.453 & 0.575 & 0.881 & 0.483 \\
+BRACS & Aligned & Balanced (spread) & UDH & tail & 0.419 & 0.340 & 1.909 & 0.929 \\
+BRACS & Aligned & Moderate & ADH & body & 0.186 & 0.121 & 3.311 & 1.200 \\
+BRACS & Aligned & Moderate & ADH & tail & 0.037 & 0.053 & 3.249 & 1.313 \\
+BRACS & Aligned & Moderate & DCIS & body & 0.557 & 0.490 & 0.907 & 0.385 \\
+BRACS & Aligned & Moderate & DCIS & head & 0.614 & 0.411 & 1.242 & 0.490 \\
+BRACS & Aligned & Moderate & DCIS & tail & 0.403 & 0.523 & 1.137 & 0.519 \\
+BRACS & Aligned & Moderate & FEA & body & 0.385 & 0.195 & 4.278 & 1.429 \\
+BRACS & Aligned & Moderate & FEA & head & 0.545 & 0.268 & 2.371 & 0.898 \\
+BRACS & Aligned & Moderate & IC & head & 0.883 & 0.892 & 0.646 & 0.234 \\
+BRACS & Aligned & Moderate & N & head & 0.840 & 0.431 & 1.111 & 0.576 \\
+BRACS & Aligned & Moderate & PB & tail & 0.186 & 0.293 & 1.496 & 0.732 \\
+BRACS & Aligned & Moderate & UDH & tail & 0.206 & 0.242 & 2.063 & 0.951 \\
+BRACS & Aligned & Severe & ADH & body & 0.246 & 0.136 & 5.255 & 1.306 \\
+BRACS & Aligned & Severe & ADH & tail & 0.020 & 0.034 & 3.521 & 1.316 \\
+BRACS & Aligned & Severe & DCIS & body & 0.514 & 0.472 & 1.534 & 0.571 \\
+BRACS & Aligned & Severe & DCIS & head & 0.568 & 0.410 & 1.192 & 0.504 \\
+BRACS & Aligned & Severe & DCIS & tail & 0.241 & 0.356 & 1.743 & 0.702 \\
+BRACS & Aligned & Severe & FEA & body & 0.469 & 0.180 & 3.554 & 1.289 \\
+BRACS & Aligned & Severe & FEA & head & 0.497 & 0.235 & 3.545 & 1.030 \\
+BRACS & Aligned & Severe & IC & head & 0.889 & 0.882 & 0.919 & 0.266 \\
+BRACS & Aligned & Severe & N & head & 0.832 & 0.406 & 1.485 & 0.684 \\
+BRACS & Aligned & Severe & PB & tail & 0.133 & 0.222 & 1.913 & 0.844 \\
+BRACS & Aligned & Severe & UDH & tail & 0.129 & 0.154 & 2.407 & 0.995 \\
+BRACS & Aligned & Severe (spread) & ADH & body & 0.308 & 0.196 & 3.679 & 1.228 \\
+BRACS & Aligned & Severe (spread) & ADH & tail & 0.021 & 0.038 & 5.225 & 1.440 \\
+BRACS & Aligned & Severe (spread) & DCIS & body & 0.511 & 0.464 & 1.448 & 0.529 \\
+BRACS & Aligned & Severe (spread) & DCIS & head & 0.390 & 0.258 & 2.465 & 0.806 \\
+BRACS & Aligned & Severe (spread) & DCIS & tail & 0.197 & 0.310 & 1.493 & 0.640 \\
+BRACS & Aligned & Severe (spread) & FEA & body & 0.406 & 0.195 & 5.132 & 1.317 \\
+BRACS & Aligned & Severe (spread) & FEA & head & 0.478 & 0.249 & 3.601 & 1.036 \\
+BRACS & Aligned & Severe (spread) & IC & head & 0.904 & 0.886 & 0.824 & 0.234 \\
+BRACS & Aligned & Severe (spread) & N & head & 0.862 & 0.435 & 1.273 & 0.571 \\
+BRACS & Aligned & Severe (spread) & PB & tail & 0.184 & 0.287 & 1.688 & 0.759 \\
+BRACS & Aligned & Severe (spread) & UDH & tail & 0.133 & 0.167 & 2.884 & 1.101 \\
+BRACS & Reversed & Balanced (spread) & ADH & body & 0.061 & 0.063 & 2.401 & 1.071 \\
+BRACS & Reversed & Balanced (spread) & ADH & head & 0.230 & 0.220 & 2.768 & 1.195 \\
+BRACS & Reversed & Balanced (spread) & DCIS & body & 0.449 & 0.485 & 0.819 & 0.375 \\
+BRACS & Reversed & Balanced (spread) & DCIS & head & 0.616 & 0.642 & 1.216 & 0.636 \\
+BRACS & Reversed & Balanced (spread) & DCIS & tail & 0.504 & 0.382 & 0.990 & 0.512 \\
+BRACS & Reversed & Balanced (spread) & FEA & body & 0.419 & 0.299 & 3.561 & 1.333 \\
+BRACS & Reversed & Balanced (spread) & FEA & tail & 0.436 & 0.371 & 1.904 & 0.852 \\
+BRACS & Reversed & Balanced (spread) & IC & tail & 0.876 & 0.903 & 0.419 & 0.174 \\
+BRACS & Reversed & Balanced (spread) & N & tail & 0.673 & 0.466 & 1.075 & 0.575 \\
+BRACS & Reversed & Balanced (spread) & PB & head & 0.447 & 0.571 & 0.882 & 0.483 \\
+BRACS & Reversed & Balanced (spread) & UDH & head & 0.415 & 0.338 & 1.900 & 0.923 \\
+BRACS & Reversed & Moderate & ADH & body & 0.063 & 0.063 & 2.708 & 1.080 \\
+BRACS & Reversed & Moderate & ADH & head & 0.441 & 0.180 & 3.601 & 1.308 \\
+BRACS & Reversed & Moderate & DCIS & body & 0.329 & 0.401 & 1.816 & 0.606 \\
+BRACS & Reversed & Moderate & DCIS & head & 0.832 & 0.457 & 1.255 & 0.628 \\
+BRACS & Reversed & Moderate & DCIS & tail & 0.364 & 0.347 & 1.871 & 0.686 \\
+BRACS & Reversed & Moderate & FEA & body & 0.198 & 0.169 & 6.328 & 1.495 \\
+BRACS & Reversed & Moderate & FEA & tail & 0.305 & 0.278 & 3.072 & 0.904 \\
+BRACS & Reversed & Moderate & IC & tail & 0.743 & 0.825 & 0.835 & 0.229 \\
+BRACS & Reversed & Moderate & N & tail & 0.311 & 0.329 & 1.583 & 0.683 \\
+BRACS & Reversed & Moderate & PB & head & 0.348 & 0.449 & 2.411 & 0.902 \\
+BRACS & Reversed & Moderate & UDH & head & 0.464 & 0.296 & 2.643 & 0.995 \\
+BRACS & Reversed & Severe & ADH & body & 0.094 & 0.090 & 5.539 & 1.247 \\
+BRACS & Reversed & Severe & ADH & head & 0.553 & 0.173 & 4.036 & 1.281 \\
+BRACS & Reversed & Severe & DCIS & body & 0.240 & 0.300 & 2.604 & 0.740 \\
+BRACS & Reversed & Severe & DCIS & head & 0.826 & 0.337 & 1.675 & 0.564 \\
+BRACS & Reversed & Severe & DCIS & tail & 0.313 & 0.334 & 2.878 & 0.856 \\
+BRACS & Reversed & Severe & FEA & body & 0.126 & 0.103 & 8.673 & 1.575 \\
+BRACS & Reversed & Severe & FEA & tail & 0.201 & 0.214 & 4.261 & 1.076 \\
+BRACS & Reversed & Severe & IC & tail & 0.605 & 0.732 & 1.182 & 0.348 \\
+BRACS & Reversed & Severe & N & tail & 0.222 & 0.270 & 2.518 & 0.865 \\
+BRACS & Reversed & Severe & PB & head & 0.364 & 0.463 & 3.632 & 1.022 \\
+BRACS & Reversed & Severe & UDH & head & 0.447 & 0.273 & 3.589 & 1.095 \\
+BRACS & Reversed & Severe (spread) & ADH & body & 0.051 & 0.053 & 4.132 & 1.247 \\
+BRACS & Reversed & Severe (spread) & ADH & head & 0.583 & 0.178 & 3.659 & 1.191 \\
+BRACS & Reversed & Severe (spread) & DCIS & body & 0.145 & 0.195 & 1.704 & 0.645 \\
+BRACS & Reversed & Severe (spread) & DCIS & head & 0.823 & 0.342 & 1.540 & 0.591 \\
+BRACS & Reversed & Severe (spread) & DCIS & tail & 0.195 & 0.192 & 3.120 & 0.952 \\
+BRACS & Reversed & Severe (spread) & FEA & body & 0.204 & 0.164 & 6.270 & 1.461 \\
+BRACS & Reversed & Severe (spread) & FEA & tail & 0.192 & 0.204 & 3.394 & 1.048 \\
+BRACS & Reversed & Severe (spread) & IC & tail & 0.562 & 0.706 & 0.984 & 0.345 \\
+BRACS & Reversed & Severe (spread) & N & tail & 0.202 & 0.266 & 1.836 & 0.742 \\
+BRACS & Reversed & Severe (spread) & PB & head & 0.465 & 0.538 & 2.277 & 0.855 \\
+BRACS & Reversed & Severe (spread) & UDH & head & 0.409 & 0.263 & 3.562 & 1.143 \\
+BRACS & Native & Balanced (spread) & ADH & tail & 0.174 & 0.173 & 2.662 & 1.157 \\
+BRACS & Native & Balanced (spread) & DCIS & tail & 0.533 & 0.507 & 1.005 & 0.507 \\
+BRACS & Native & Balanced (spread) & FEA & body & 0.447 & 0.349 & 2.422 & 1.005 \\
+BRACS & Native & Balanced (spread) & IC & tail & 0.873 & 0.902 & 0.426 & 0.176 \\
+BRACS & Native & Balanced (spread) & N & head & 0.680 & 0.467 & 1.043 & 0.555 \\
+BRACS & Native & Balanced (spread) & PB & head & 0.451 & 0.573 & 0.893 & 0.492 \\
+BRACS & Native & Balanced (spread) & UDH & head & 0.403 & 0.341 & 1.933 & 0.936 \\
+BRACS & Native & Moderate & ADH & tail & 0.082 & 0.089 & 2.972 & 1.246 \\
+BRACS & Native & Moderate & DCIS & tail & 0.443 & 0.461 & 1.098 & 0.550 \\
+BRACS & Native & Moderate & FEA & body & 0.443 & 0.310 & 2.739 & 1.031 \\
+BRACS & Native & Moderate & IC & tail & 0.826 & 0.871 & 0.524 & 0.199 \\
+BRACS & Native & Moderate & N & head & 0.731 & 0.428 & 1.248 & 0.644 \\
+BRACS & Native & Moderate & PB & head & 0.319 & 0.430 & 1.706 & 0.768 \\
+BRACS & Native & Moderate & UDH & head & 0.426 & 0.326 & 2.054 & 0.914 \\
+BRACS & Native & Severe & ADH & tail & 0.095 & 0.104 & 3.842 & 1.315 \\
+BRACS & Native & Severe & DCIS & tail & 0.395 & 0.442 & 1.424 & 0.591 \\
+BRACS & Native & Severe & FEA & body & 0.417 & 0.316 & 3.337 & 1.104 \\
+BRACS & Native & Severe & IC & tail & 0.742 & 0.824 & 0.663 & 0.234 \\
+BRACS & Native & Severe & N & head & 0.764 & 0.409 & 1.341 & 0.589 \\
+BRACS & Native & Severe & PB & head & 0.293 & 0.390 & 2.779 & 0.967 \\
+BRACS & Native & Severe & UDH & head & 0.421 & 0.306 & 2.470 & 0.928 \\
+BRACS & Native & Severe (spread) & ADH & tail & 0.118 & 0.119 & 3.014 & 1.201 \\
+BRACS & Native & Severe (spread) & DCIS & tail & 0.259 & 0.309 & 1.281 & 0.636 \\
+BRACS & Native & Severe (spread) & FEA & body & 0.376 & 0.331 & 3.003 & 1.110 \\
+BRACS & Native & Severe (spread) & IC & tail & 0.719 & 0.817 & 0.402 & 0.184 \\
+BRACS & Native & Severe (spread) & N & head & 0.748 & 0.421 & 1.369 & 0.617 \\
+BRACS & Native & Severe (spread) & PB & head & 0.401 & 0.469 & 1.425 & 0.719 \\
+BRACS & Native & Severe (spread) & UDH & head & 0.403 & 0.298 & 2.369 & 0.990 \\
 \end{longtable}

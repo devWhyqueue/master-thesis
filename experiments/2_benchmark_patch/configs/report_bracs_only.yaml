@@ -1,0 +1,15 @@
+# BRACS-only report fragments (wave 1, plan 07). Emits into
+# outputs/report_bracs_only/tables/report/. The cross-dataset RQ3 fragments are
+# deliberately not produced here: they need a second dataset-target group.
+
+paths:
+  outputs: experiments/2_benchmark_patch/outputs/report_bracs_only
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+
+rq3:
+  dataset_roots:
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch

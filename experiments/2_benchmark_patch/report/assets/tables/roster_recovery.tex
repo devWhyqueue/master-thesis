@@ -1,10 +1,10 @@
 \begin{longtable}{lllllll}
 \toprule
-Dataset & Assignment & Severity & Gate & Method & $R_M$ & 95\% CI \\
+Dataset & Assignment & Severity & Gate & Method & $R_M$ & 95\% CI (bootstrap) \\
 \midrule
 \endfirsthead
 \toprule
-Dataset & Assignment & Severity & Gate & Method & $R_M$ & 95\% CI \\
+Dataset & Assignment & Severity & Gate & Method & $R_M$ & 95\% CI (bootstrap) \\
 \midrule
 \endhead
 \midrule
@@ -13,166 +13,175 @@ Dataset & Assignment & Severity & Gate & Method & $R_M$ & 95\% CI \\
 \endfoot
 \bottomrule
 \endlastfoot
-BRACS & Native & Moderate & Discrimination & Balanced sampling & 0.872 & [0.448, 1.135] \\
-BRACS & Native & Moderate & Discrimination & CE + soft $F_1$ & 0.782 & [0.386, 1.067] \\
-BRACS & Native & Moderate & Discrimination & CE + soft MCC & 0.775 & [0.366, 1.057] \\
-BRACS & Native & Moderate & Discrimination & CFAL & 0.268 & [-0.544, 0.712] \\
-BRACS & Native & Moderate & Discrimination & cRT & 0.125 & [-0.431, 0.398] \\
-BRACS & Native & Moderate & Discrimination & Focal loss & -0.037 & [-0.708, 0.333] \\
-BRACS & Native & Moderate & Discrimination & Logit adjustment (train) & 0.895 & [0.558, 1.214] \\
-BRACS & Native & Moderate & Discrimination & OKO & 0.357 & [-0.417, 0.816] \\
-BRACS & Native & Moderate & Discrimination & Logit adjustment (post-hoc) & 0.193 & [0.062, 0.362] \\
-BRACS & Aligned & Moderate & Discrimination & Balanced sampling & 0.676 & [-0.120, 1.171] \\
-BRACS & Aligned & Moderate & Discrimination & CE + soft $F_1$ & 0.626 & [-0.198, 1.117] \\
-BRACS & Aligned & Moderate & Discrimination & CE + soft MCC & 0.613 & [-0.212, 1.097] \\
-BRACS & Aligned & Moderate & Discrimination & CFAL & 0.506 & [-0.282, 1.275] \\
-BRACS & Aligned & Moderate & Discrimination & cRT & -0.359 & [-1.911, 0.100] \\
-BRACS & Aligned & Moderate & Discrimination & Focal loss & 0.091 & [-0.595, 0.611] \\
-BRACS & Aligned & Moderate & Discrimination & Logit adjustment (train) & 0.552 & [-0.515, 1.168] \\
-BRACS & Aligned & Moderate & Discrimination & OKO & 0.415 & [-0.522, 1.115] \\
-BRACS & Aligned & Moderate & Discrimination & Logit adjustment (post-hoc) & -0.149 & [-0.885, 0.117] \\
-BRACS & Reversed & Moderate & Discrimination & Balanced sampling & 0.841 & [0.714, 0.953] \\
-BRACS & Reversed & Moderate & Discrimination & CE + soft $F_1$ & 0.844 & [0.718, 0.955] \\
-BRACS & Reversed & Moderate & Discrimination & CE + soft MCC & 0.836 & [0.706, 0.955] \\
-BRACS & Reversed & Moderate & Discrimination & CFAL & 0.319 & [0.085, 0.529] \\
-BRACS & Reversed & Moderate & Discrimination & cRT & 0.215 & [0.058, 0.355] \\
-BRACS & Reversed & Moderate & Discrimination & Focal loss & -0.014 & [-0.200, 0.157] \\
-BRACS & Reversed & Moderate & Discrimination & Logit adjustment (train) & 0.849 & [0.722, 0.958] \\
-BRACS & Reversed & Moderate & Discrimination & OKO & 0.632 & [0.439, 0.796] \\
-BRACS & Reversed & Moderate & Discrimination & Logit adjustment (post-hoc) & 0.215 & [0.134, 0.317] \\
-BRACS & Native & Severe & Discrimination & Balanced sampling & 0.801 & [0.565, 0.998] \\
-BRACS & Native & Severe & Discrimination & CE + soft $F_1$ & 0.790 & [0.530, 1.027] \\
-BRACS & Native & Severe & Discrimination & CE + soft MCC & 0.775 & [0.481, 1.081] \\
-BRACS & Native & Severe & Discrimination & CFAL & 0.513 & [0.277, 0.761] \\
-BRACS & Native & Severe & Discrimination & cRT & 0.402 & [0.142, 0.595] \\
-BRACS & Native & Severe & Discrimination & Focal loss & -0.031 & [-0.259, 0.172] \\
-BRACS & Native & Severe & Discrimination & Logit adjustment (train) & 0.687 & [0.425, 0.894] \\
-BRACS & Native & Severe & Discrimination & OKO & 0.587 & [0.311, 0.810] \\
-BRACS & Native & Severe & Discrimination & Logit adjustment (post-hoc) & 0.365 & [0.223, 0.546] \\
-BRACS & Aligned & Severe & Discrimination & Balanced sampling & 0.747 & [0.447, 1.092] \\
-BRACS & Aligned & Severe & Discrimination & CE + soft $F_1$ & 0.736 & [0.414, 1.082] \\
-BRACS & Aligned & Severe & Discrimination & CE + soft MCC & 0.718 & [0.440, 1.086] \\
-BRACS & Aligned & Severe & Discrimination & CFAL & 0.484 & [0.106, 0.926] \\
-BRACS & Aligned & Severe & Discrimination & cRT & 0.091 & [-0.311, 0.348] \\
-BRACS & Aligned & Severe & Discrimination & Focal loss & 0.044 & [-0.230, 0.283] \\
-BRACS & Aligned & Severe & Discrimination & Logit adjustment (train) & 0.168 & [-0.293, 0.485] \\
-BRACS & Aligned & Severe & Discrimination & OKO & 0.560 & [0.256, 0.902] \\
-BRACS & Aligned & Severe & Discrimination & Logit adjustment (post-hoc) & 0.058 & [-0.182, 0.241] \\
-BRACS & Reversed & Severe & Discrimination & Balanced sampling & 0.787 & [0.685, 0.878] \\
-BRACS & Reversed & Severe & Discrimination & CE + soft $F_1$ & 0.787 & [0.683, 0.879] \\
-BRACS & Reversed & Severe & Discrimination & CE + soft MCC & 0.871 & [0.729, 1.021] \\
-BRACS & Reversed & Severe & Discrimination & CFAL & 0.436 & [0.328, 0.546] \\
-BRACS & Reversed & Severe & Discrimination & cRT & 0.296 & [0.219, 0.385] \\
-BRACS & Reversed & Severe & Discrimination & Focal loss & 0.044 & [-0.056, 0.138] \\
-BRACS & Reversed & Severe & Discrimination & Logit adjustment (train) & 0.712 & [0.613, 0.830] \\
-BRACS & Reversed & Severe & Discrimination & OKO & 0.811 & [0.712, 0.907] \\
-BRACS & Reversed & Severe & Discrimination & Logit adjustment (post-hoc) & 0.193 & [0.125, 0.282] \\
-CAMELYON16 & Native & Severe & Discrimination & Balanced sampling & 0.865 & [0.586, 1.108] \\
-CAMELYON16 & Native & Severe & Discrimination & CE + soft $F_1$ & 0.953 & [0.699, 1.169] \\
-CAMELYON16 & Native & Severe & Discrimination & CE + soft MCC & 0.897 & [0.639, 1.058] \\
-CAMELYON16 & Native & Severe & Discrimination & CFAL & 0.609 & [0.172, 0.895] \\
-CAMELYON16 & Native & Severe & Discrimination & cRT & 0.490 & [0.125, 0.805] \\
-CAMELYON16 & Native & Severe & Discrimination & Focal loss & -0.161 & [-1.330, 0.308] \\
-CAMELYON16 & Native & Severe & Discrimination & Logit adjustment (train) & 0.918 & [0.756, 1.043] \\
-CAMELYON16 & Native & Severe & Discrimination & OKO & 1.003 & [0.788, 1.216] \\
-CAMELYON16 & Native & Severe & Discrimination & Logit adjustment (post-hoc) & 0.502 & [0.148, 0.751] \\
-CAMELYON16 & Reversed & Severe & Discrimination & Balanced sampling & 0.956 & [0.862, 1.074] \\
-CAMELYON16 & Reversed & Severe & Discrimination & CE + soft $F_1$ & 0.997 & [0.921, 1.111] \\
-CAMELYON16 & Reversed & Severe & Discrimination & CE + soft MCC & 0.846 & [0.724, 0.937] \\
-CAMELYON16 & Reversed & Severe & Discrimination & CFAL & 0.615 & [0.462, 0.727] \\
-CAMELYON16 & Reversed & Severe & Discrimination & cRT & 0.422 & [0.223, 0.619] \\
-CAMELYON16 & Reversed & Severe & Discrimination & Focal loss & 0.111 & [-0.067, 0.291] \\
-CAMELYON16 & Reversed & Severe & Discrimination & Logit adjustment (train) & 0.932 & [0.857, 1.042] \\
-CAMELYON16 & Reversed & Severe & Discrimination & OKO & 0.946 & [0.862, 1.063] \\
-CAMELYON16 & Reversed & Severe & Discrimination & Logit adjustment (post-hoc) & 0.772 & [0.653, 0.909] \\
-PANDA & Native & Moderate & Discrimination & Balanced sampling & 1.091 & [1.031, 1.168] \\
-PANDA & Native & Moderate & Discrimination & CE + soft $F_1$ & 1.211 & [1.142, 1.297] \\
-PANDA & Native & Moderate & Discrimination & CE + soft MCC & 1.211 & [1.142, 1.297] \\
-PANDA & Native & Moderate & Discrimination & CFAL & -0.683 & [-0.833, -0.562] \\
-PANDA & Native & Moderate & Discrimination & cRT & 1.118 & [1.048, 1.205] \\
-PANDA & Native & Moderate & Discrimination & Focal loss & -0.041 & [-0.241, 0.133] \\
-PANDA & Native & Moderate & Discrimination & Logit adjustment (train) & 1.162 & [1.093, 1.246] \\
-PANDA & Native & Moderate & Discrimination & OKO & 1.153 & [1.078, 1.243] \\
-PANDA & Native & Moderate & Discrimination & Logit adjustment (post-hoc) & 0.925 & [0.846, 1.017] \\
-PANDA & Native & Severe & Discrimination & Balanced sampling & 0.975 & [0.963, 0.989] \\
-PANDA & Native & Severe & Discrimination & CE + soft $F_1$ & 0.979 & [0.967, 0.993] \\
-PANDA & Native & Severe & Discrimination & CE + soft MCC & 0.983 & [0.970, 0.998] \\
-PANDA & Native & Severe & Discrimination & CFAL & -0.463 & [-0.541, -0.402] \\
-PANDA & Native & Severe & Discrimination & cRT & 0.925 & [0.911, 0.940] \\
-PANDA & Native & Severe & Discrimination & Focal loss & -0.011 & [-0.032, 0.007] \\
-PANDA & Native & Severe & Discrimination & Logit adjustment (train) & 0.972 & [0.960, 0.986] \\
-PANDA & Native & Severe & Discrimination & OKO & 0.965 & [0.952, 0.980] \\
-PANDA & Native & Severe & Discrimination & Logit adjustment (post-hoc) & 0.910 & [0.893, 0.926] \\
-TCGA-UT & Native & Severe & Discrimination & Balanced sampling & 0.821 & [0.687, 0.963] \\
-TCGA-UT & Native & Severe & Discrimination & CE + soft $F_1$ & 0.847 & [0.697, 1.012] \\
-TCGA-UT & Native & Severe & Discrimination & CE + soft MCC & 0.883 & [0.730, 1.058] \\
-TCGA-UT & Native & Severe & Discrimination & CFAL & 0.973 & [0.707, 1.301] \\
-TCGA-UT & Native & Severe & Discrimination & cRT & 0.270 & [0.112, 0.442] \\
-TCGA-UT & Native & Severe & Discrimination & Focal loss & -0.094 & [-0.254, 0.050] \\
-TCGA-UT & Native & Severe & Discrimination & Logit adjustment (train) & 0.584 & [0.420, 0.783] \\
-TCGA-UT & Native & Severe & Discrimination & OKO & 1.646 & [1.326, 2.142] \\
-TCGA-UT & Native & Severe & Discrimination & Logit adjustment (post-hoc) & 0.407 & [0.276, 0.583] \\
-TCGA-UT & Reversed & Severe & Discrimination & Balanced sampling & 0.846 & [0.703, 0.962] \\
-TCGA-UT & Reversed & Severe & Discrimination & CE + soft $F_1$ & 0.919 & [0.776, 1.060] \\
-TCGA-UT & Reversed & Severe & Discrimination & CE + soft MCC & 0.958 & [0.806, 1.120] \\
-TCGA-UT & Reversed & Severe & Discrimination & CFAL & 1.064 & [0.785, 1.538] \\
-TCGA-UT & Reversed & Severe & Discrimination & cRT & 0.167 & [0.031, 0.309] \\
-TCGA-UT & Reversed & Severe & Discrimination & Focal loss & -0.125 & [-0.287, -0.020] \\
-TCGA-UT & Reversed & Severe & Discrimination & Logit adjustment (train) & 0.500 & [0.346, 0.670] \\
-TCGA-UT & Reversed & Severe & Discrimination & OKO & 1.784 & [1.423, 2.447] \\
-TCGA-UT & Reversed & Severe & Discrimination & Logit adjustment (post-hoc) & 0.344 & [0.227, 0.535] \\
-BRACS & Native & Moderate & Calibration & Balanced sampling & 1.022 & [0.718, 1.408] \\
-BRACS & Native & Moderate & Calibration & CE + soft $F_1$ & 0.939 & [0.640, 1.333] \\
-BRACS & Native & Moderate & Calibration & CE + soft MCC & 0.896 & [0.594, 1.248] \\
-BRACS & Native & Moderate & Calibration & CFAL & -0.222 & [-1.893, 0.376] \\
-BRACS & Native & Moderate & Calibration & cRT & -0.712 & [-1.880, -0.212] \\
-BRACS & Native & Moderate & Calibration & Focal loss & -0.406 & [-2.148, 0.162] \\
-BRACS & Native & Moderate & Calibration & Logit adjustment (train) & 1.296 & [1.117, 1.756] \\
-BRACS & Native & Moderate & Calibration & OKO & 0.724 & [0.097, 1.135] \\
-BRACS & Native & Moderate & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
-BRACS & Aligned & Moderate & Calibration & Balanced sampling & 1.184 & [1.046, 2.023] \\
-BRACS & Aligned & Moderate & Calibration & CE + soft $F_1$ & 1.159 & [1.018, 1.955] \\
-BRACS & Aligned & Moderate & Calibration & CE + soft MCC & 1.150 & [1.012, 1.885] \\
-BRACS & Aligned & Moderate & Calibration & CFAL & 0.999 & [0.774, 1.270] \\
-BRACS & Aligned & Moderate & Calibration & cRT & -0.088 & [-1.827, 0.194] \\
-BRACS & Aligned & Moderate & Calibration & Focal loss & 0.530 & [-0.616, 0.768] \\
-BRACS & Aligned & Moderate & Calibration & Logit adjustment (train) & 0.934 & [0.381, 1.026] \\
-BRACS & Aligned & Moderate & Calibration & OKO & 1.077 & [0.950, 1.579] \\
-BRACS & Aligned & Moderate & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
-BRACS & Reversed & Moderate & Calibration & Balanced sampling & 0.895 & [0.711, 0.976] \\
-BRACS & Reversed & Moderate & Calibration & CE + soft $F_1$ & 0.888 & [0.700, 0.971] \\
-BRACS & Reversed & Moderate & Calibration & CE + soft MCC & 0.872 & [0.649, 0.968] \\
-BRACS & Reversed & Moderate & Calibration & CFAL & 0.251 & [-0.594, 0.581] \\
-BRACS & Reversed & Moderate & Calibration & cRT & 0.007 & [-0.464, 0.217] \\
-BRACS & Reversed & Moderate & Calibration & Focal loss & -0.135 & [-1.339, 0.315] \\
-BRACS & Reversed & Moderate & Calibration & Logit adjustment (train) & 1.060 & [1.012, 1.151] \\
-BRACS & Reversed & Moderate & Calibration & OKO & 0.721 & [0.415, 0.861] \\
-BRACS & Reversed & Moderate & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
-BRACS & Native & Severe & Calibration & Balanced sampling & 0.902 & [0.684, 0.992] \\
-BRACS & Native & Severe & Calibration & CE + soft $F_1$ & 0.886 & [0.715, 0.983] \\
-BRACS & Native & Severe & Calibration & CE + soft MCC & 0.026 & [-1.822, 0.495] \\
-BRACS & Native & Severe & Calibration & CFAL & 0.529 & [-0.375, 0.777] \\
-BRACS & Native & Severe & Calibration & cRT & 0.062 & [-0.551, 0.358] \\
-BRACS & Native & Severe & Calibration & Focal loss & -0.753 & [-2.948, -0.204] \\
-BRACS & Native & Severe & Calibration & Logit adjustment (train) & 0.979 & [0.782, 1.068] \\
-BRACS & Native & Severe & Calibration & OKO & 0.785 & [0.332, 0.921] \\
-BRACS & Native & Severe & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
-BRACS & Aligned & Severe & Calibration & Balanced sampling & 1.058 & [0.989, 1.139] \\
-BRACS & Aligned & Severe & Calibration & CE + soft $F_1$ & 1.054 & [0.976, 1.139] \\
-BRACS & Aligned & Severe & Calibration & CE + soft MCC & 0.313 & [0.055, 0.515] \\
-BRACS & Aligned & Severe & Calibration & CFAL & 0.970 & [0.904, 1.034] \\
-BRACS & Aligned & Severe & Calibration & cRT & 0.206 & [0.096, 0.295] \\
-BRACS & Aligned & Severe & Calibration & Focal loss & 0.427 & [0.138, 0.607] \\
-BRACS & Aligned & Severe & Calibration & Logit adjustment (train) & 0.802 & [0.723, 0.860] \\
-BRACS & Aligned & Severe & Calibration & OKO & 0.864 & [0.709, 0.965] \\
-BRACS & Aligned & Severe & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
-BRACS & Reversed & Severe & Calibration & Balanced sampling & 0.928 & [0.883, 0.958] \\
-BRACS & Reversed & Severe & Calibration & CE + soft $F_1$ & 0.926 & [0.881, 0.956] \\
-BRACS & Reversed & Severe & Calibration & CE + soft MCC & 0.890 & [0.746, 1.001] \\
-BRACS & Reversed & Severe & Calibration & CFAL & 0.711 & [0.597, 0.790] \\
-BRACS & Reversed & Severe & Calibration & cRT & 0.488 & [0.409, 0.566] \\
-BRACS & Reversed & Severe & Calibration & Focal loss & -0.026 & [-0.384, 0.194] \\
-BRACS & Reversed & Severe & Calibration & Logit adjustment (train) & 1.021 & [0.989, 1.059] \\
-BRACS & Reversed & Severe & Calibration & OKO & 0.934 & [0.898, 0.967] \\
-BRACS & Reversed & Severe & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
+BRACS & Native & Balanced & Discrimination & Balanced sampling & -0.208 & [-0.894, 0.072] \\
+BRACS & Native & Balanced & Discrimination & CE + soft $F_1$ & -0.034 & [-0.489, 0.215] \\
+BRACS & Native & Balanced & Discrimination & CE + soft MCC & -0.497 & [-1.996, 0.055] \\
+BRACS & Native & Balanced & Discrimination & CFAL & -0.412 & [-1.901, 0.166] \\
+BRACS & Native & Balanced & Discrimination & cRT & -0.734 & [-2.240, -0.303] \\
+BRACS & Native & Balanced & Discrimination & Focal loss & 0.000 & [-0.017, 0.012] \\
+BRACS & Native & Balanced & Discrimination & Logit adjustment (train) & -0.005 & [-0.034, 0.018] \\
+BRACS & Native & Balanced & Discrimination & OKO & -0.941 & [-3.335, -0.206] \\
+BRACS & Native & Balanced & Discrimination & Logit adjustment (post-hoc) & -0.002 & [-0.018, -0.000] \\
+BRACS & Aligned & Balanced & Discrimination & Balanced sampling & -0.209 & [-1.011, 0.073] \\
+BRACS & Aligned & Balanced & Discrimination & CE + soft $F_1$ & -0.034 & [-0.534, 0.207] \\
+BRACS & Aligned & Balanced & Discrimination & CE + soft MCC & -0.500 & [-2.264, 0.053] \\
+BRACS & Aligned & Balanced & Discrimination & CFAL & -0.415 & [-2.055, 0.164] \\
+BRACS & Aligned & Balanced & Discrimination & cRT & -0.740 & [-2.489, -0.303] \\
+BRACS & Aligned & Balanced & Discrimination & Focal loss & 0.000 & [-0.018, 0.012] \\
+BRACS & Aligned & Balanced & Discrimination & Logit adjustment (train) & -0.005 & [-0.034, 0.019] \\
+BRACS & Aligned & Balanced & Discrimination & OKO & -0.948 & [-3.753, -0.197] \\
+BRACS & Aligned & Balanced & Discrimination & Logit adjustment (post-hoc) & -0.002 & [-0.017, -0.000] \\
+BRACS & Reversed & Balanced & Discrimination & Balanced sampling & -0.232 & [-1.320, 0.089] \\
+BRACS & Reversed & Balanced & Discrimination & CE + soft $F_1$ & -0.038 & [-0.643, 0.277] \\
+BRACS & Reversed & Balanced & Discrimination & CE + soft MCC & -0.555 & [-2.959, 0.079] \\
+BRACS & Reversed & Balanced & Discrimination & CFAL & -0.460 & [-2.630, 0.222] \\
+BRACS & Reversed & Balanced & Discrimination & cRT & -0.821 & [-3.518, -0.311] \\
+BRACS & Reversed & Balanced & Discrimination & Focal loss & 0.000 & [-0.025, 0.014] \\
+BRACS & Reversed & Balanced & Discrimination & Logit adjustment (train) & -0.006 & [-0.051, 0.023] \\
+BRACS & Reversed & Balanced & Discrimination & OKO & -1.051 & [-5.187, -0.202] \\
+BRACS & Reversed & Balanced & Discrimination & Logit adjustment (post-hoc) & -0.003 & [-0.027, -0.000] \\
+BRACS & Native & Moderate & Discrimination & Balanced sampling & 0.715 & [0.305, 1.033] \\
+BRACS & Native & Moderate & Discrimination & CE + soft $F_1$ & 0.714 & [0.303, 1.038] \\
+BRACS & Native & Moderate & Discrimination & CE + soft MCC & 0.714 & [0.303, 1.038] \\
+BRACS & Native & Moderate & Discrimination & CFAL & 0.501 & [0.150, 0.847] \\
+BRACS & Native & Moderate & Discrimination & cRT & 0.381 & [-0.132, 0.766] \\
+BRACS & Native & Moderate & Discrimination & Focal loss & 0.770 & [0.412, 1.078] \\
+BRACS & Native & Moderate & Discrimination & Logit adjustment (train) & 0.866 & [0.553, 1.237] \\
+BRACS & Native & Moderate & Discrimination & OKO & 0.462 & [-0.190, 0.988] \\
+BRACS & Native & Moderate & Discrimination & Logit adjustment (post-hoc) & 0.234 & [0.040, 0.435] \\
+BRACS & Reversed & Moderate & Discrimination & Balanced sampling & 0.796 & [0.661, 0.930] \\
+BRACS & Reversed & Moderate & Discrimination & CE + soft $F_1$ & 0.795 & [0.660, 0.930] \\
+BRACS & Reversed & Moderate & Discrimination & CE + soft MCC & 0.795 & [0.660, 0.930] \\
+BRACS & Reversed & Moderate & Discrimination & CFAL & 0.311 & [0.112, 0.517] \\
+BRACS & Reversed & Moderate & Discrimination & cRT & 0.192 & [0.010, 0.354] \\
+BRACS & Reversed & Moderate & Discrimination & Focal loss & 0.828 & [0.705, 0.957] \\
+BRACS & Reversed & Moderate & Discrimination & Logit adjustment (train) & 0.800 & [0.658, 0.932] \\
+BRACS & Reversed & Moderate & Discrimination & OKO & 0.742 & [0.511, 0.940] \\
+BRACS & Reversed & Moderate & Discrimination & Logit adjustment (post-hoc) & 0.233 & [0.145, 0.337] \\
+BRACS & Native & Severe & Discrimination & Balanced sampling & 0.797 & [0.467, 1.067] \\
+BRACS & Native & Severe & Discrimination & CE + soft $F_1$ & 0.669 & [0.370, 0.901] \\
+BRACS & Native & Severe & Discrimination & CE + soft MCC & 0.798 & [0.467, 1.069] \\
+BRACS & Native & Severe & Discrimination & CFAL & 0.587 & [0.357, 0.839] \\
+BRACS & Native & Severe & Discrimination & cRT & 0.230 & [-0.082, 0.465] \\
+BRACS & Native & Severe & Discrimination & Focal loss & 0.725 & [0.352, 0.986] \\
+BRACS & Native & Severe & Discrimination & Logit adjustment (train) & 0.689 & [0.383, 0.948] \\
+BRACS & Native & Severe & Discrimination & OKO & 0.518 & [0.178, 0.801] \\
+BRACS & Native & Severe & Discrimination & Logit adjustment (post-hoc) & 0.385 & [0.252, 0.546] \\
+BRACS & Aligned & Severe & Discrimination & Balanced sampling & 0.731 & [0.408, 1.135] \\
+BRACS & Aligned & Severe & Discrimination & CE + soft $F_1$ & 0.674 & [0.347, 1.081] \\
+BRACS & Aligned & Severe & Discrimination & CE + soft MCC & 0.731 & [0.409, 1.135] \\
+BRACS & Aligned & Severe & Discrimination & CFAL & 0.383 & [0.008, 0.771] \\
+BRACS & Aligned & Severe & Discrimination & cRT & 0.052 & [-0.351, 0.337] \\
+BRACS & Aligned & Severe & Discrimination & Focal loss & 0.598 & [0.225, 0.956] \\
+BRACS & Aligned & Severe & Discrimination & Logit adjustment (train) & 0.217 & [-0.305, 0.554] \\
+BRACS & Aligned & Severe & Discrimination & OKO & 0.792 & [0.465, 1.274] \\
+BRACS & Aligned & Severe & Discrimination & Logit adjustment (post-hoc) & 0.007 & [-0.328, 0.216] \\
+BRACS & Reversed & Severe & Discrimination & Balanced sampling & 0.777 & [0.664, 0.874] \\
+BRACS & Reversed & Severe & Discrimination & CE + soft $F_1$ & 0.790 & [0.680, 0.894] \\
+BRACS & Reversed & Severe & Discrimination & CE + soft MCC & 0.776 & [0.662, 0.873] \\
+BRACS & Reversed & Severe & Discrimination & CFAL & 0.494 & [0.354, 0.628] \\
+BRACS & Reversed & Severe & Discrimination & cRT & 0.438 & [0.330, 0.565] \\
+BRACS & Reversed & Severe & Discrimination & Focal loss & 0.807 & [0.699, 0.905] \\
+BRACS & Reversed & Severe & Discrimination & Logit adjustment (train) & 0.717 & [0.616, 0.827] \\
+BRACS & Reversed & Severe & Discrimination & OKO & 0.785 & [0.646, 0.929] \\
+BRACS & Reversed & Severe & Discrimination & Logit adjustment (post-hoc) & 0.179 & [0.124, 0.244] \\
+BRACS & Native & Severe (spread) & Discrimination & Balanced sampling & 0.904 & [0.763, 1.081] \\
+BRACS & Native & Severe (spread) & Discrimination & CE + soft $F_1$ & 0.904 & [0.763, 1.081] \\
+BRACS & Native & Severe (spread) & Discrimination & CE + soft MCC & 0.904 & [0.763, 1.081] \\
+BRACS & Native & Severe (spread) & Discrimination & CFAL & 0.485 & [0.320, 0.668] \\
+BRACS & Native & Severe (spread) & Discrimination & cRT & 0.384 & [0.212, 0.544] \\
+BRACS & Native & Severe (spread) & Discrimination & Focal loss & 0.859 & [0.665, 1.071] \\
+BRACS & Native & Severe (spread) & Discrimination & Logit adjustment (train) & 0.720 & [0.517, 0.913] \\
+BRACS & Native & Severe (spread) & Discrimination & OKO & 0.717 & [0.530, 0.916] \\
+BRACS & Native & Severe (spread) & Discrimination & Logit adjustment (post-hoc) & 0.612 & [0.408, 0.814] \\
+BRACS & Aligned & Severe (spread) & Discrimination & Balanced sampling & 0.447 & [-0.009, 0.767] \\
+BRACS & Aligned & Severe (spread) & Discrimination & CE + soft $F_1$ & 0.447 & [-0.009, 0.767] \\
+BRACS & Aligned & Severe (spread) & Discrimination & CE + soft MCC & 0.447 & [-0.009, 0.767] \\
+BRACS & Aligned & Severe (spread) & Discrimination & CFAL & 0.173 & [-0.184, 0.515] \\
+BRACS & Aligned & Severe (spread) & Discrimination & cRT & -0.267 & [-1.073, 0.068] \\
+BRACS & Aligned & Severe (spread) & Discrimination & Focal loss & 0.387 & [-0.192, 0.775] \\
+BRACS & Aligned & Severe (spread) & Discrimination & Logit adjustment (train) & 0.128 & [-0.598, 0.531] \\
+BRACS & Aligned & Severe (spread) & Discrimination & OKO & 0.568 & [0.239, 0.967] \\
+BRACS & Aligned & Severe (spread) & Discrimination & Logit adjustment (post-hoc) & -0.403 & [-1.478, 0.046] \\
+BRACS & Reversed & Severe (spread) & Discrimination & Balanced sampling & 0.853 & [0.753, 0.953] \\
+BRACS & Reversed & Severe (spread) & Discrimination & CE + soft $F_1$ & 0.853 & [0.753, 0.953] \\
+BRACS & Reversed & Severe (spread) & Discrimination & CE + soft MCC & 0.853 & [0.753, 0.953] \\
+BRACS & Reversed & Severe (spread) & Discrimination & CFAL & 0.455 & [0.345, 0.577] \\
+BRACS & Reversed & Severe (spread) & Discrimination & cRT & 0.427 & [0.339, 0.519] \\
+BRACS & Reversed & Severe (spread) & Discrimination & Focal loss & 0.829 & [0.725, 0.941] \\
+BRACS & Reversed & Severe (spread) & Discrimination & Logit adjustment (train) & 0.833 & [0.724, 0.953] \\
+BRACS & Reversed & Severe (spread) & Discrimination & OKO & 0.832 & [0.713, 0.940] \\
+BRACS & Reversed & Severe (spread) & Discrimination & Logit adjustment (post-hoc) & 0.462 & [0.375, 0.556] \\
+BRACS & Aligned & Moderate & Calibration & Balanced sampling & 1.355 & [1.096, 2.128] \\
+BRACS & Aligned & Moderate & Calibration & CE + soft $F_1$ & 1.355 & [1.097, 2.129] \\
+BRACS & Aligned & Moderate & Calibration & CE + soft MCC & 1.355 & [1.097, 2.129] \\
+BRACS & Aligned & Moderate & Calibration & CFAL & 0.529 & [-0.212, 0.900] \\
+BRACS & Aligned & Moderate & Calibration & cRT & -1.278 & [-4.556, -0.299] \\
+BRACS & Aligned & Moderate & Calibration & Focal loss & 1.356 & [1.165, 1.900] \\
+BRACS & Aligned & Moderate & Calibration & Logit adjustment (train) & 0.745 & [0.516, 0.952] \\
+BRACS & Aligned & Moderate & Calibration & OKO & 1.165 & [0.948, 1.644] \\
+BRACS & Aligned & Moderate & Calibration & Logit adjustment (post-hoc) & -0.874 & [-2.066, -0.485] \\
+BRACS & Reversed & Moderate & Calibration & Balanced sampling & 0.899 & [0.581, 0.981] \\
+BRACS & Reversed & Moderate & Calibration & CE + soft $F_1$ & 0.898 & [0.582, 0.981] \\
+BRACS & Reversed & Moderate & Calibration & CE + soft MCC & 0.898 & [0.582, 0.981] \\
+BRACS & Reversed & Moderate & Calibration & CFAL & 0.305 & [-2.220, 0.735] \\
+BRACS & Reversed & Moderate & Calibration & cRT & -0.461 & [-4.132, 0.325] \\
+BRACS & Reversed & Moderate & Calibration & Focal loss & 0.898 & [0.544, 0.999] \\
+BRACS & Reversed & Moderate & Calibration & Logit adjustment (train) & 1.040 & [0.944, 1.383] \\
+BRACS & Reversed & Moderate & Calibration & OKO & 0.692 & [-0.294, 0.878] \\
+BRACS & Reversed & Moderate & Calibration & Logit adjustment (post-hoc) & -0.315 & [-1.241, -0.144] \\
+BRACS & Native & Severe & Calibration & Balanced sampling & 0.942 & [0.805, 1.043] \\
+BRACS & Native & Severe & Calibration & CE + soft $F_1$ & 0.838 & [0.649, 0.954] \\
+BRACS & Native & Severe & Calibration & CE + soft MCC & 0.942 & [0.805, 1.043] \\
+BRACS & Native & Severe & Calibration & CFAL & 0.474 & [-0.201, 0.726] \\
+BRACS & Native & Severe & Calibration & cRT & -0.425 & [-1.435, 0.063] \\
+BRACS & Native & Severe & Calibration & Focal loss & 0.895 & [0.740, 1.001] \\
+BRACS & Native & Severe & Calibration & Logit adjustment (train) & 0.980 & [0.742, 1.092] \\
+BRACS & Native & Severe & Calibration & OKO & 0.813 & [0.494, 0.975] \\
+BRACS & Native & Severe & Calibration & Logit adjustment (post-hoc) & -0.541 & [-1.094, -0.340] \\
+BRACS & Aligned & Severe & Calibration & Balanced sampling & 1.198 & [1.093, 1.360] \\
+BRACS & Aligned & Severe & Calibration & CE + soft $F_1$ & 1.152 & [1.025, 1.283] \\
+BRACS & Aligned & Severe & Calibration & CE + soft MCC & 1.198 & [1.093, 1.360] \\
+BRACS & Aligned & Severe & Calibration & CFAL & 0.949 & [0.763, 1.089] \\
+BRACS & Aligned & Severe & Calibration & cRT & -1.790 & [-3.839, -0.771] \\
+BRACS & Aligned & Severe & Calibration & Focal loss & 1.213 & [1.118, 1.358] \\
+BRACS & Aligned & Severe & Calibration & Logit adjustment (train) & 0.620 & [0.329, 0.781] \\
+BRACS & Aligned & Severe & Calibration & OKO & 1.065 & [0.952, 1.190] \\
+BRACS & Aligned & Severe & Calibration & Logit adjustment (post-hoc) & -0.917 & [-1.382, -0.637] \\
+BRACS & Reversed & Severe & Calibration & Balanced sampling & 0.922 & [0.862, 0.959] \\
+BRACS & Reversed & Severe & Calibration & CE + soft $F_1$ & 0.931 & [0.878, 0.970] \\
+BRACS & Reversed & Severe & Calibration & CE + soft MCC & 0.920 & [0.861, 0.958] \\
+BRACS & Reversed & Severe & Calibration & CFAL & 0.646 & [0.448, 0.752] \\
+BRACS & Reversed & Severe & Calibration & cRT & 0.177 & [-0.218, 0.445] \\
+BRACS & Reversed & Severe & Calibration & Focal loss & 0.961 & [0.905, 1.003] \\
+BRACS & Reversed & Severe & Calibration & Logit adjustment (train) & 0.998 & [0.949, 1.041] \\
+BRACS & Reversed & Severe & Calibration & OKO & 0.861 & [0.766, 0.918] \\
+BRACS & Reversed & Severe & Calibration & Logit adjustment (post-hoc) & -0.357 & [-0.484, -0.287] \\
+BRACS & Native & Severe (spread) & Calibration & Balanced sampling & -0.415 & [-2.182, 0.225] \\
+BRACS & Native & Severe (spread) & Calibration & CE + soft $F_1$ & -0.415 & [-2.182, 0.225] \\
+BRACS & Native & Severe (spread) & Calibration & CE + soft MCC & -0.415 & [-2.182, 0.225] \\
+BRACS & Native & Severe (spread) & Calibration & CFAL & -2.417 & [-6.493, -0.916] \\
+BRACS & Native & Severe (spread) & Calibration & cRT & -3.759 & [-8.219, -2.023] \\
+BRACS & Native & Severe (spread) & Calibration & Focal loss & -0.377 & [-2.175, 0.274] \\
+BRACS & Native & Severe (spread) & Calibration & Logit adjustment (train) & 0.839 & [0.595, 1.169] \\
+BRACS & Native & Severe (spread) & Calibration & OKO & -0.687 & [-2.718, 0.077] \\
+BRACS & Native & Severe (spread) & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
+BRACS & Aligned & Severe (spread) & Calibration & Balanced sampling & 0.716 & [0.522, 0.824] \\
+BRACS & Aligned & Severe (spread) & Calibration & CE + soft $F_1$ & 0.716 & [0.522, 0.824] \\
+BRACS & Aligned & Severe (spread) & Calibration & CE + soft MCC & 0.716 & [0.522, 0.824] \\
+BRACS & Aligned & Severe (spread) & Calibration & CFAL & 0.262 & [-0.235, 0.518] \\
+BRACS & Aligned & Severe (spread) & Calibration & cRT & -0.644 & [-1.404, -0.243] \\
+BRACS & Aligned & Severe (spread) & Calibration & Focal loss & 0.734 & [0.560, 0.833] \\
+BRACS & Aligned & Severe (spread) & Calibration & Logit adjustment (train) & 0.919 & [0.855, 0.976] \\
+BRACS & Aligned & Severe (spread) & Calibration & OKO & 0.728 & [0.571, 0.818] \\
+BRACS & Aligned & Severe (spread) & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
+BRACS & Reversed & Severe (spread) & Calibration & Balanced sampling & 0.716 & [0.598, 0.796] \\
+BRACS & Reversed & Severe (spread) & Calibration & CE + soft $F_1$ & 0.716 & [0.598, 0.796] \\
+BRACS & Reversed & Severe (spread) & Calibration & CE + soft MCC & 0.716 & [0.598, 0.796] \\
+BRACS & Reversed & Severe (spread) & Calibration & CFAL & 0.343 & [0.051, 0.536] \\
+BRACS & Reversed & Severe (spread) & Calibration & cRT & -0.448 & [-0.902, -0.190] \\
+BRACS & Reversed & Severe (spread) & Calibration & Focal loss & 0.732 & [0.614, 0.817] \\
+BRACS & Reversed & Severe (spread) & Calibration & Logit adjustment (train) & 0.990 & [0.948, 1.030] \\
+BRACS & Reversed & Severe (spread) & Calibration & OKO & 0.709 & [0.567, 0.805] \\
+BRACS & Reversed & Severe (spread) & Calibration & Logit adjustment (post-hoc) & 0.000 & [0.000, 0.000] \\
 \end{longtable}
