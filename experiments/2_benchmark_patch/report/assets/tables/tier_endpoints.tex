@@ -1,52 +1,12 @@
-\begin{longtable}{lllllll}
+\begin{tabular}{lrrrrrr}
 \toprule
-Dataset & Assignment & Condition & Tier & Recall & NLL & Brier \\
+& \multicolumn{3}{c}{Aligned recall (\%)} & \multicolumn{3}{c}{Reversed recall (\%)} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Condition & Head & Body & Tail & Head & Body & Tail \\
 \midrule
-\endfirsthead
-\toprule
-Dataset & Assignment & Condition & Tier & Recall & NLL & Brier \\
-\midrule
-\endhead
-\midrule
-\multicolumn{7}{r}{Continued on next page} \\
-\midrule
-\endfoot
+Balanced spread & 66.8 & 32.2 & 40.8 & 40.7 & 31.0 & 66.9 \\
+Moderate & 76.4 & 37.6 & 18.3 & 46.1 & 19.7 & 45.9 \\
+Severe & 74.7 & 41.0 & 11.8 & 48.5 & 15.3 & 35.5 \\
+Severe spread & 73.8 & 40.8 & 13.2 & 51.2 & 13.3 & 31.9 \\
 \bottomrule
-\endlastfoot
-BRACS & Aligned & Balanced (spread) & body & 0.322 & 2.272 & 0.934 \\
-BRACS & Aligned & Balanced (spread) & head & 0.668 & 1.026 & 0.496 \\
-BRACS & Aligned & Balanced (spread) & tail & 0.408 & 1.691 & 0.811 \\
-BRACS & Aligned & Moderate & body & 0.376 & 2.832 & 1.004 \\
-BRACS & Aligned & Moderate & head & 0.764 & 1.251 & 0.524 \\
-BRACS & Aligned & Moderate & tail & 0.183 & 2.035 & 0.911 \\
-BRACS & Aligned & Severe & body & 0.410 & 3.448 & 1.055 \\
-BRACS & Aligned & Severe & head & 0.747 & 1.722 & 0.602 \\
-BRACS & Aligned & Severe & tail & 0.118 & 2.416 & 0.983 \\
-BRACS & Aligned & Severe (spread) & body & 0.408 & 3.420 & 1.025 \\
-BRACS & Aligned & Severe (spread) & head & 0.738 & 1.773 & 0.588 \\
-BRACS & Aligned & Severe (spread) & tail & 0.132 & 2.851 & 1.011 \\
-BRACS & Reversed & Balanced (spread) & body & 0.310 & 2.260 & 0.926 \\
-BRACS & Reversed & Balanced (spread) & head & 0.407 & 1.678 & 0.805 \\
-BRACS & Reversed & Balanced (spread) & tail & 0.669 & 1.031 & 0.496 \\
-BRACS & Reversed & Moderate & body & 0.197 & 3.617 & 1.060 \\
-BRACS & Reversed & Moderate & head & 0.461 & 2.624 & 0.993 \\
-BRACS & Reversed & Moderate & tail & 0.459 & 1.696 & 0.581 \\
-BRACS & Reversed & Severe & body & 0.153 & 5.605 & 1.187 \\
-BRACS & Reversed & Severe & head & 0.485 & 3.490 & 1.053 \\
-BRACS & Reversed & Severe & tail & 0.355 & 2.500 & 0.739 \\
-BRACS & Reversed & Severe (spread) & body & 0.133 & 4.035 & 1.117 \\
-BRACS & Reversed & Severe (spread) & head & 0.512 & 2.930 & 0.996 \\
-BRACS & Reversed & Severe (spread) & tail & 0.319 & 2.041 & 0.701 \\
-BRACS & Native & Balanced (spread) & body & 0.447 & 2.422 & 1.005 \\
-BRACS & Native & Balanced (spread) & head & 0.512 & 1.290 & 0.661 \\
-BRACS & Native & Balanced (spread) & tail & 0.526 & 1.365 & 0.613 \\
-BRACS & Native & Moderate & body & 0.443 & 2.739 & 1.031 \\
-BRACS & Native & Moderate & head & 0.492 & 1.669 & 0.775 \\
-BRACS & Native & Moderate & tail & 0.450 & 1.531 & 0.665 \\
-BRACS & Native & Severe & body & 0.417 & 3.337 & 1.104 \\
-BRACS & Native & Severe & head & 0.493 & 2.197 & 0.828 \\
-BRACS & Native & Severe & tail & 0.410 & 1.976 & 0.713 \\
-BRACS & Native & Severe (spread) & body & 0.376 & 3.003 & 1.110 \\
-BRACS & Native & Severe (spread) & head & 0.517 & 1.721 & 0.775 \\
-BRACS & Native & Severe (spread) & tail & 0.365 & 1.566 & 0.674 \\
-\end{longtable}
+\end{tabular}

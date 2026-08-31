@@ -150,94 +150,66 @@ The natural condition trains on all \num{217399} eligible patches at the dataset
 
 \section{Mitigation Recovery}
 \label{sec:rq2}
-Recovery is defined as $R_M = [M(\text{method}) - M(\text{deprived CE})] / D_M$, the fraction of an established deficit that a method returns. Comparisons that do not meet the materiality and precision criteria in Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration} have no stable recovery fraction and are omitted.
+Recovery is defined as $R_M = [M(\text{method}) - M(\text{deprived CE})] / D_M$ and is reported as a percentage of the established deficit. A recovery of \num{0}\% means no improvement over deprived cross-entropy, \num{100}\% reaches the balanced reference, a negative value means further deterioration, and a value above \num{100}\% surpasses the reference. Comparisons that do not meet the materiality and precision criteria in Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration} are omitted because their recovery denominator is not sufficiently stable.
 
-\subsection{The confirmatory five-family}
+\subsection{Which weighting signals recover discrimination}
 \label{sec:rq2-family}
-The confirmatory family contains one method per signal, and all five apply a mean-one class weight to unmodified cross-entropy: prevalence-weighted cross-entropy, class-balanced cross-entropy, independent-support weighted cross-entropy, pilot-difficulty weighted cross-entropy, and semantic-scale weighted cross-entropy. Holding the intervention mechanism fixed in this way is what makes the comparison a contrast between signals rather than between loss surgeries of differing aggressiveness. Each method is tested against deprived cross-entropy by a paired partition-block permutation test. The Holm adjustment is applied jointly over the dataset's confirmatory family, which holds \num{138} members --- five methods in each of the \num{12} units on each of the two axes, plus a matched contrast for each non-ambiguous unit and axis --- of which \num{108} sit on a gate-passing axis and are therefore testable.
-
-\begin{landscape}
-\begingroup
-\footnotesize
-\resultstable{confirmatory}
-\captionof{table}{Confirmatory recovery $R_M$ for the five-member method family on discrimination-gate-passing units, with paired \num{95}\% intervals, permutation $p$-values, and Holm-adjusted $p$-values within the dataset. Signal labels name the family member: prevalence is prevalence-weighted cross-entropy, nominal support is class-balanced cross-entropy, and the remaining three are the independent-support, pilot-difficulty, and semantic-scale weighted variants.}
-\label{tab:confirmatory}
-\endgroup
-\end{landscape}
-
-\noindent The family separates into the same two groups in every unit where anything recovers at all. Prevalence-weighted and class-balanced cross-entropy return between \num{0.426} and \num{0.892} of the discrimination deficit across the eight nominal-axis units, and ten of their sixteen tests survive Holm adjustment. The independent-support, difficulty, and diversity members return between $-\num{0.149}$ and \num{0.197} on those same units, and not one of their \num{24} tests survives. The closest case is independent-support weighting under the reversed severe condition, at \num{0.111} with an interval of $[\num{0.046}, \num{0.184}]$ and an adjusted $p$ of \num{0.0505}; on the prespecified rule it does not survive, and it is the only cell in which that method's interval excludes zero on the discrimination axis.
-
-The independent-support axis is where the family behaves differently, and the difference is this report's central negative result. In all three balanced units every one of the five members recovers essentially nothing: point estimates from $-\num{0.064}$ to \num{0.024}, every interval covering zero, and every adjusted $p$ equal to \num{1}. The largest point estimate belongs to semantic-scale weighting, at \num{0.021} to \num{0.024}; independent-support weighted cross-entropy, the member built to read exactly this shortage, returns \num{0.013} to \num{0.015}. A gate opened on a deficit of roughly three balanced-accuracy points, and the confirmatory family left all of it standing.
-
-Two features of the nominal-axis results qualify the picture there. Holm adjustment bites hardest where recovery intervals are wide: the native severe and difficulty-aligned severe conditions carry prevalence-weighted point estimates of \num{0.768} and \num{0.654} and still fail adjustment, at $p=\num{0.121}$ and $p=\num{0.334}$. And the two prevalence-corner members do not separate here the way they can when an effective-number transform saturates; class-balanced cross-entropy leads in three units and prevalence weighting in five, with differences typically inside their intervals.
-
-\subsection{Matched against unmatched signals}
-\label{sec:rq2-matched}
-The claim RQ2 actually tests is not that some method recovers damage but that the method reading the shortage a condition presents recovers more of it than a method reading a different shortage. Each gate-passing unit is therefore split into a matched arm, containing the family member whose signal corresponds to the dominant shortage from Table~\ref{tab:signal-profiles}, and an unmatched arm containing the remainder. Ambiguous units contribute descriptively and carry no confirmatory weight.
-
-\begin{landscape}
-\begingroup
-\footnotesize
-\resultstable{matched_contrast}
-\captionof{table}{Direct contrast between the signal-matched arm and the unmatched arm on gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values. Ambiguous units carry no matched arm and are descriptive only. ``Best recoverer'' names the family member with the largest recovery in that unit, and ``Agrees'' records whether it belongs to the matched arm.}
-\label{tab:matched-contrast}
-\endgroup
-\end{landscape}
-
-\noindent The independent-support comparison directly tests its matched method on a condition that lacks patient support, and the contrast is flat. All three balanced units differ by \num{0.06} percentage points of balanced accuracy, with an interval of $[-\num{0.13}, \num{0.22}]$ percentage points and an adjusted $p$ of \num{1}. The matching hypothesis is unsupported on this axis: neither arm contains a method that moves the endpoint.
-
-Elsewhere the contrast is signed by which shortage the unit's profile makes dominant, and the sign is predicted entirely by whether that shortage is nominal support. In the two units whose dominant shortage is nominal support the contrast is positive and survives adjustment: \num{0.0234} at native moderate and \num{0.0708} at reversed moderate. In every unit whose dominant shortage is difficulty or diversity the contrast is negative, reaching $-\num{0.0529}$ at reversed severe (spread) with an adjusted $p$ of \num{0.0006}, because the matched arm there holds exactly one member of the group that recovers nothing while the unmatched arm retains both members that work. The agreement column makes the same point without the arithmetic of the contrast: in every unit where any family member recovered a material fraction, that member was prevalence-weighted or class-balanced cross-entropy, so the dominant shortage and the best recoverer agree only where the dominant shortage is nominal support.
-
-The matched-$\beta$ diagnostic in Table~\ref{tab:matched-beta} rules out the most obvious alternative explanation for the independent-support member's failure. If it failed because its tuned weight strength was too timid rather than because its signal is uninformative, refitting it at the strength selected for class-balanced cross-entropy should close part of the gap.
+The confirmatory family contains five weighted cross-entropy methods that differ only in the signal used to set their class weights: prevalence, nominal support, independent support, pilot difficulty, or semantic diversity. Each is compared with deprived cross-entropy using a paired permutation test. A result \emph{survives Holm adjustment} when its adjusted $p$-value remains below \num{0.05} after accounting for all confirmatory comparisons, reducing the chance that a result appears significant only because many methods and conditions were tested.
 
 \begin{table}[ht]
   \centering
-  \scriptsize
-  \setlength{\tabcolsep}{3pt}
-  \resultstable{matched_beta}
-  \caption{Matched-$\beta$ diagnostic: case-macro balanced accuracy of independent-support weighted cross-entropy refitted at the effective weight strength selected for class-balanced cross-entropy, beside the deprived cross-entropy reference and the two anchors it separates. Descriptive, and not part of the Holm family.}
-  \label{tab:matched-beta}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \resultstable{confirmatory_summary}
+  \caption{Balanced-accuracy recovery by shortage and weighting signal. Ranges are percentages of the original deficit; the final column counts results that remain significant after Holm adjustment.}
+  \label{tab:confirmatory}
 \end{table}
 
-\noindent It does not. Across all \num{12} units the refit moves balanced accuracy by at most \num{0.013} from the independent-support arm, and the two largest movements are downward, including on the balanced units, where the refit falls from \num{0.493} to \num{0.484}. The gap to class-balanced cross-entropy meanwhile remains as large as \num{0.112}, under the reversed severe (spread) condition. The failure of the non-prevalence signals is a property of what those weights encode, not of how hard they were applied.
+\noindent Only prevalence-weighted and class-balanced cross-entropy consistently repair nominal-support damage. They recover between \num{42.6}\% and \num{89.2}\% across the eight eligible nominal conditions, and ten of their sixteen comparisons survive Holm adjustment. None of the \num{24} comparisons for independent-support, difficulty, or diversity weighting survives. Under independent-support deprivation, all five methods remain close to no recovery and none survives adjustment. Appendix Table~\ref{tab:confirmatory-detail} provides the condition-level estimates and intervals.
+
+\subsection{Matched against unmatched signals}
+\label{sec:rq2-matched}
+A method is \emph{matched} when its weighting signal corresponds to the dominant shortage identified for that condition in Table~\ref{tab:signal-profiles}; for example, independent-support weighting is matched to a condition that reduces patient breadth. The unmatched arm contains the other weighting signals. Conditions without one clear dominant shortage are excluded from this contrast. A positive matched-minus-unmatched value therefore favours the signal selected by the condition profile.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \resultstable{matched_contrast_summary}
+  \caption{Matched-minus-unmatched contrasts for balanced accuracy. Intervals are paired \num{95}\% bootstrap intervals.}
+  \label{tab:matched-contrast}
+\end{table}
+
+\noindent For the independent-support conditions, matched weighting changes balanced accuracy by only \num{0.06} percentage points, with an interval from $-\num{0.13}$ to \num{0.22} percentage points. This means, for example, a change from \num{49.30}\% to \num{49.36}\%, not a six-percentage-point increase. Matching provides a benefit only in the two nominal-support conditions. When difficulty or diversity is dominant, the matched method is no better and can be worse because the unmatched arm contains the effective prevalence-based methods.
+
+An equal-strength check tests whether independent-support weighting failed only because its tuned weights were too weak. Reusing the strength selected for class-balanced cross-entropy changes balanced accuracy by at most \num{1.3} percentage points across the \num{12} conditions and leaves a gap of up to \num{11.2} percentage points to class-balanced cross-entropy. The weighting strength therefore does not explain the failure. Full matched contrasts and equal-strength results appear in Appendix Tables~\ref{tab:matched-contrast-detail} and~\ref{tab:matched-beta-detail}.
 
 \subsection{Recovery of probability quality}
 \label{sec:rq2-calibration}
-A method may return discrimination while leaving probabilities no better calibrated, and a mitigation method that must serve both would need to be designed for that trade-off explicitly. Recovery on the tail-group negative log likelihood axis is therefore reported separately over the eight units whose calibration gate opened, which are not the same eight as on the discrimination axis.
+A method can restore balanced accuracy while making its probabilities worse. Tail-group negative log likelihood is therefore analysed separately for the eight conditions with a sufficiently large and precise probability-quality deficit.
 
-\begin{landscape}
-\begingroup
-\footnotesize
-\resultstable{calibration_recovery}
-\captionof{table}{Recovery of tail-group macro negative log likelihood on the eight calibration-gate-passing units, with paired \num{95}\% intervals and Holm-adjusted $p$-values, reported alongside the discrimination recovery of the same method and unit where that axis also opened.}
-\label{tab:calibration-recovery}
-\endgroup
-\end{landscape}
+\begin{table}[ht]
+  \centering
+  \small
+  \resultstable{calibration_recovery_summary}
+  \caption{Recovery of tail-group probability quality. Recovery is the percentage of the original negative-log-likelihood deficit.}
+  \label{tab:calibration-recovery}
+\end{table}
 
-\noindent The split within the family is sharper here than on the discrimination axis. Prevalence-weighted and class-balanced cross-entropy recover between \num{0.539} and \num{1.227} of the tail-group likelihood deficit in seven of the eight units, every one at an adjusted $p \le \num{0.007}$. The remaining three members are negative in all \num{24} of their cells, and every one of those \num{24} deteriorations survives Holm adjustment at $p \le \num{0.0098}$, reaching $-\num{4.145}$ for difficulty weighting under the native severe (spread) condition. A negative recovery fraction here means the method left tail-group probabilities materially worse than deprived cross-entropy had left them, while moving discrimination by an amount indistinguishable from zero. A weight that reads a signal unrelated to the damage does not merely fail to help; it redistributes probability mass across classes and degrades the endpoint the gate identified as damaged.
+\noindent Prevalence-weighted and class-balanced cross-entropy improve probability quality in seven of eight conditions, and all \num{14} comparisons survive Holm adjustment. The exception is native severe spread, where neither method improves on deprived cross-entropy despite recovering more than \num{80}\% of its balanced-accuracy deficit. Independent-support, difficulty, and diversity weighting worsen probability quality in every condition, and all \num{24} deteriorations survive adjustment. Exact intervals and adjusted $p$-values appear in Appendix Table~\ref{tab:calibration-recovery-detail}.
 
-The native severe (spread) unit is the exception to the prevalence-corner result, and it is worth stating plainly because it is the unit in which spreading the pool changed the character of the damage. There prevalence-weighted and class-balanced cross-entropy return $-\num{0.416}$ and $-\num{0.451}$ with intervals covering zero, so no confirmatory member repaired probability quality on that unit at all, even though both repaired more than four-fifths of its discrimination deficit.
-
-One inference asymmetry should be read from the table rather than around it. The difficulty-aligned moderate calibration contrast carries a bootstrap interval that covers zero, $[-\num{1.4624}, \num{0.0712}]$, and a permutation-based adjusted $p$ of \num{0.0004}. The two procedures answer different questions --- the interval is a percentile bootstrap over patients, the test a partition-block permutation --- and where they disagree the protocol's decision rule is the test. The disagreement is recorded so that the interval is not read as the test's confidence statement.
-
-\subsection{The wider method roster}
+\subsection{Exploratory methods beyond weighting}
 \label{sec:rq2-roster}
-The remaining roster methods change the training objective, the sampling distribution, the decision threshold, or the classifier head, and so cannot be compared to the five-family at a fixed intervention mechanism. They are reported with intervals but without confirmatory status: balanced sampling, train-time and post-hoc logit adjustment, classifier retraining, focal loss, class-balanced focal loss, the soft-$F_1$ and soft-MCC hybrids, and set learning. Their role is to bound what is achievable on these conditions by any tested means, which is what Section~\ref{sec:discussion} needs in order to distinguish a signal that no method exploits from a deficit that no mechanism repairs.
+The wider roster varies the training objective, sampling distribution, decision rule, or classifier head. Its estimates are exploratory because methods no longer differ by signal alone; several also reduce to the same balanced-sampling mechanism and should not be read as independent confirmations.
 
-Four of these members must be read as one mechanism rather than four. Balanced sampling, the soft-$F_1$ hybrid, the soft-MCC hybrid, and the second stage of classifier retraining all resample the training distribution toward uniformity, the last three at a strength that is fixed rather than tuned. Their agreement below is therefore not four independent confirmations, and the tuning record makes the collapse explicit: the search selects the zero-strength point for the soft hybrids in \num{22} of their \num{26} selections, at which point they are balanced-sampling cross-entropy with no auxiliary term at all.
+\begin{table}[ht]
+  \centering
+  \small
+  \resultstable{roster_recovery_summary}
+  \caption{Most informative recovery results from the exploratory method roster.}
+  \label{tab:roster-recovery}
+\end{table}
 
-\begin{landscape}
-\begingroup
-\scriptsize
-\resultstable{roster_recovery}
-\captionof{table}{Exploratory recovery estimates for the full method roster on gate-passing units, with paired \num{95}\% intervals. These methods vary the intervention mechanism as well as the signal, carry no confirmatory status, and are not part of the Holm family.}
-\label{tab:roster-recovery}
-\endgroup
-\end{landscape}
-
-\noindent On the nominal axis the roster confirms that the deficits are repairable. In seven of the eight nominal-axis discrimination units at least one roster method returns more than \num{0.71} of the deficit, led by balanced sampling, train-time logit adjustment, focal loss, and set learning; the difficulty-aligned severe (spread) unit is the exception, where the best tested mechanism of any kind is set learning at \num{0.57}. On the calibration axis every one of the eight gate-passing units has a method reaching at least \num{0.72}, with train-time logit adjustment the most consistent, and no method overshoots its reference by a margin the intervals cannot absorb.
-
-On the independent-support axis the roster fails as completely as the confirmatory family. In all three balanced units not one of the nine exploratory methods returns a positive recovery whose interval excludes zero, and several are reliably harmful: classifier retraining returns $-\num{0.73}$ to $-\num{0.82}$ and set learning $-\num{0.94}$ to $-\num{1.05}$, both with intervals lying entirely below zero. Taken together with Section~\ref{sec:rq2-family}, this identifies a materially damaged regime in which no tested mechanism, signal-matched or otherwise, repairs the damage. Four of the eleven discrimination-gate units --- the three independent-support units and difficulty-aligned severe (spread) --- have no tested method reaching two-thirds of their deficit.
+\noindent The roster shows that most nominal-support deficits are repairable by several mechanisms. The aligned severe-spread condition is harder, with a best balanced-accuracy recovery of \num{56.8}\%. Independent-support damage is different: none of the nine exploratory methods has positive recovery with an interval excluding zero, while classifier retraining and set learning reliably worsen balanced accuracy. Thus no tested signal or mechanism repairs the loss caused by reduced patient breadth. Full method-level estimates appear in Appendix Table~\ref{tab:roster-recovery-detail}.
 
 \section{Explaining Heterogeneity}
 \label{sec:rq3}
@@ -389,7 +361,7 @@ The tuning budget itself differs by method: \num{16} candidates for most, four f
 
 Three further properties of the selections change what a method label denotes and are recorded for that reason. The search selects the zero-strength point in \num{29} of the \num{196} selections: \num{13} for the soft-$F_1$ hybrid, nine for the soft-MCC hybrid, and seven for focal loss. At zero strength the soft hybrids reduce to balanced-sampling cross-entropy, because their auxiliary term vanishes while their forced balanced sampler does not, and focal loss reduces to class-weighted cross-entropy, because its class-aware $\alpha$ term applies at unit strength independently of $\gamma$. Where those selections were made, the roster row reports the reduced method rather than the named one.
 
-One consequence of that reduction is a defect in the search rather than in the fitted models, and it is recorded rather than repaired because repairing it would change the tuning protocol between this dataset and any replication. The search treats focal loss as anchored to plain cross-entropy, so its $\gamma = 0$ candidate is scored using cross-entropy's already-computed validation metrics instead of being trained. Because $\alpha$ applies unconditionally, that candidate is in fact class-weighted cross-entropy and not plain cross-entropy, so the seven selections that landed on $\gamma = 0$ were made against the wrong metrics. The confirmation runs train the correct objective, and focal loss is an exploratory roster member that enters no confirmatory test, so no gated or Holm-adjusted quantity in this report depends on it; its recovery estimates in Table~\ref{tab:roster-recovery} should nonetheless be read as estimates of a configuration that was not selected on its own evidence.
+One consequence of that reduction is a defect in the search rather than in the fitted models, and it is recorded rather than repaired because repairing it would change the tuning protocol between this dataset and any replication. The search treats focal loss as anchored to plain cross-entropy, so its $\gamma = 0$ candidate is scored using cross-entropy's already-computed validation metrics instead of being trained. Because $\alpha$ applies unconditionally, that candidate is in fact class-weighted cross-entropy and not plain cross-entropy, so the seven selections that landed on $\gamma = 0$ were made against the wrong metrics. The confirmation runs train the correct objective, and focal loss is an exploratory roster member that enters no confirmatory test, so no gated or Holm-adjusted quantity in this report depends on it; its recovery estimates in Appendix Table~\ref{tab:roster-recovery-detail} should nonetheless be read as estimates of a configuration that was not selected on its own evidence.
 
 Two deviations from the locked protocol were made before any definitive gate row was read. The two deficit-gate thresholds were derived rather than assumed: the protocol had fixed discrimination at \num{2} percentage points and calibration at \num{0.05} nats without a stated derivation, while the discrimination value conflicted with the support pilot's \num{1}-percentage-point materiality constant for the same endpoint under the same kind of manipulation. Both were replaced by quantities the protocol already fixes: $\max(\num{1}, 2\sigma_{\mathrm{seed}})=\num{1.443}$ percentage points for discrimination and $2\sigma_{\mathrm{seed}}=\num{0.14782}$ nats for calibration, where $\sigma_{\mathrm{seed}}$ is the confirmation-seed standard deviation of the corresponding balanced-condition endpoint on this dataset. Separately, the gate-defining estimator is case-macro rather than patch-micro, and the evidence cell is pooled across a case's partition appearances rather than taken per partition; both correct a mismatch between a diagnostic and the estimator it certifies, since the bootstrap draws one shared weight per case over the union of the three test frames.
 
@@ -427,6 +399,56 @@ Tables~\ref{tab:discrimination-deficit} and~\ref{tab:calibration-deficit} provid
   \caption{Tail-group negative-log-likelihood deficit with paired \num{95}\% intervals and secondary expected calibration error.}
   \label{tab:calibration-deficit}
 \end{table}
+
+\clearpage
+\section{Detailed Recovery Estimates}
+\label{app:recovery-estimates}
+The main text retains only the comparisons needed to answer RQ2. This appendix provides every condition-level estimate, paired bootstrap interval, and multiplicity-adjusted test result. Recovery is shown as a fraction here, so \num{1} corresponds to \num{100}\% in the main-text summaries. Bootstrap intervals quantify patient-resampling uncertainty, whereas the partition-block permutation tests determine the confirmatory decisions.
+
+\begin{landscape}
+\begingroup
+\footnotesize
+\resultstable{confirmatory}
+\captionof{table}{Confirmatory balanced-accuracy recovery by condition and weighting signal.}
+\label{tab:confirmatory-detail}
+\endgroup
+\end{landscape}
+
+\begin{landscape}
+\begingroup
+\footnotesize
+\resultstable{matched_contrast}
+\captionof{table}{Matched-minus-unmatched contrasts for balanced accuracy and probability quality.}
+\label{tab:matched-contrast-detail}
+\endgroup
+\end{landscape}
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \resultstable{matched_beta}
+  \caption{Equal-strength diagnostic for independent-support weighting, reported as balanced accuracy.}
+  \label{tab:matched-beta-detail}
+\end{table}
+
+\begin{landscape}
+\begingroup
+\footnotesize
+\resultstable{calibration_recovery}
+\captionof{table}{Confirmatory recovery of tail-group negative log likelihood by condition and weighting signal.}
+\label{tab:calibration-recovery-detail}
+\endgroup
+\end{landscape}
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{roster_recovery}
+\captionof{table}{Exploratory recovery estimates for the wider method roster.}
+\label{tab:roster-recovery-detail}
+\endgroup
+\end{landscape}
 
 \section{Per-Class and Tier Endpoints}
 \label{app:endpoints}

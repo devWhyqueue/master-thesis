@@ -1,20 +1,9 @@
-\begin{tabular}{lllrrrrr}
+\begin{tabular}{lrr}
 \toprule
-Dataset & Assignment & Condition & BA & Macro $F_1$ & NLL & Macro NLL & ECE \\
+Condition & Training patches & Balanced accuracy (\%) \\
 \midrule
-BRACS & Aligned & Balanced (spread) & 0.507 & 0.473 & 0.918 & 1.489 & 0.040 \\
-BRACS & Aligned & Moderate & 0.460 & 0.379 & 1.211 & 1.813 & 0.143 \\
-BRACS & Aligned & Severe & 0.429 & 0.337 & 1.551 & 2.266 & 0.219 \\
-BRACS & Aligned & Severe (spread) & 0.431 & 0.349 & 1.564 & 2.470 & 0.209 \\
-BRACS & Reversed & Balanced (spread) & 0.505 & 0.471 & 0.919 & 1.484 & 0.041 \\
-BRACS & Reversed & Moderate & 0.423 & 0.383 & 1.769 & 2.369 & 0.215 \\
-BRACS & Reversed & Severe & 0.382 & 0.341 & 2.582 & 3.368 & 0.313 \\
-BRACS & Reversed & Severe (spread) & 0.375 & 0.335 & 1.915 & 2.707 & 0.259 \\
-BRACS & Native & Balanced (spread) & 0.509 & 0.473 & 0.925 & 1.484 & 0.050 \\
-BRACS & Native & Moderate & 0.467 & 0.416 & 1.274 & 1.763 & 0.148 \\
-BRACS & Native & Severe & 0.447 & 0.399 & 1.793 & 2.265 & 0.220 \\
-BRACS & Native & Severe (spread) & 0.432 & 0.395 & 1.203 & 1.838 & 0.147 \\
-BRACS & --- & Balanced & 0.492 & 0.438 & 0.993 & 1.493 & 0.051 \\
-BRACS & --- & Natural & 0.498 & 0.489 & 0.925 & 1.416 & 0.069 \\
+Natural & \num{217399} & 49.8 \\
+Concentrated balanced & \num{16796} & 49.2 \\
+Balanced spread & \num{16796} & 50.5--50.9 \\
 \bottomrule
 \end{tabular}
