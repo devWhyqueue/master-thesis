@@ -29,6 +29,7 @@ Use this skill to produce scientific writing that is clear, structured, evidence
 
 ## Writing Standards
 
+- Prioritize readability. Prefer plain words and short, direct sentences; define necessary technical terms on first use, and remove jargon that does not add precision.
 - Prefer precise claims over broad declarations. State what is known, what is assumed, and what follows from the cited evidence.
 - Build paragraphs around one main point: topic sentence, supporting evidence or reasoning, and a clear connection to the section's purpose.
 - Use reader-facing scientific terms instead of local project, pipeline, file-structure, hardware, or runtime-log language. Define specialized terms on first use, using `\emph{...}` for the introduced term when writing LaTeX, then continue in plain text.
