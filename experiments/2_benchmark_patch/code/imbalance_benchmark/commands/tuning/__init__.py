@@ -34,6 +34,9 @@ from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import 
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     reduce_tuning_shards,
 )
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.tuning_budget import (
+    tuning_example_budget,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     _manifest_name,
     combined_scopes,
@@ -134,10 +137,8 @@ def _output_name(args: argparse.Namespace) -> str:
 
 def _tune_all_splits(args: argparse.Namespace, started: float) -> None:
     """Tune one configuration against the equal-weight three-split objective."""
-    base_paths = ensure_dirs(load_config(args.config))
-    scopes = [
-        _tuning_inputs(args, split_paths(base_paths, index)) for index in range(3)
-    ]
+    base = ensure_dirs(load_config(args.config))
+    scopes = [_tuning_inputs(args, split_paths(base, index)) for index in range(3)]
     if any(_is_excluded(paths) for paths, _, _ in scopes):
         return
     selections, search_cost = _combined_selections(scopes, args)
@@ -228,9 +229,7 @@ def load_shard_scope(
             capacity_hint=capacity,
         ),
         cost_records,
-        regime.exposure_budgets.get(
-            "natural" if condition == "natural" else "controlled"
-        ),
+        tuning_example_budget(regime, condition),
         assignment,
         split_index,
         scope_index,

@@ -17,6 +17,9 @@ from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import 
 from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,
 )
+from imbalance_benchmark.modeling.workflows.tuning.aggregation.tuning_budget import (
+    tuning_example_budget,
+)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
     ShardSpec,
     _fingerprint_matches,
@@ -49,9 +52,7 @@ def combined_scopes(
                 class_names=regime.locked_class_names,
             ),
             records,
-            regime.exposure_budgets.get(
-                "natural" if condition == "natural" else "controlled"
-            ),
+            tuning_example_budget(regime, condition),
             assignment,
             split_index,
             assignment_index * width + split_index,

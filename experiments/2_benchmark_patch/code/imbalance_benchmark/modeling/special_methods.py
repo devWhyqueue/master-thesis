@@ -24,7 +24,7 @@ from imbalance_benchmark.modeling.training import (
     get_balanced_sampler,
     pin_memory_ok,
     resolve_batch_size,
-    resolve_checkpoint_interval,
+    resolve_checkpoint_schedule,
 )
 from imbalance_benchmark.modeling.workflows.multistage import fit_crt
 
@@ -109,7 +109,7 @@ def _mde_train_loop(
 ) -> dict[str, Any]:
     """Run MDE's U joint updates, each consuming one natural and one balanced minibatch."""
     device = ctx["device"]
-    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], True, budget)
+    checkpoint_schedule = resolve_checkpoint_schedule(budget)
     step = 0
     while step < budget:
         for (bags_u, targets_u), (bags_b, targets_b) in zip(
@@ -135,7 +135,7 @@ def _mde_train_loop(
             loss.backward()
             opt.step()
             step += 1
-            if step % checkpoint_interval == 0 or step == budget:
+            if step in checkpoint_schedule:
                 best = checkpoint_step(
                     model, ctx["val_loader"], device, True, ctx["n_classes"], best, step
                 )

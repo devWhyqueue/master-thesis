@@ -23,10 +23,11 @@ from imbalance_benchmark.modeling.training.config import (
     build_optimizer,
     pin_memory_ok,
     resolve_batch_size,
-    resolve_checkpoint_interval,
+    resolve_checkpoint_schedule,
 )
 from imbalance_benchmark.modeling.evaluation import (
     checkpoint_step,
+    evaluate_metrics,
     initial_checkpoint,
     run_evaluation,
     ClassAwareBatchSampler,
@@ -63,7 +64,7 @@ __all__ = [
     "example_budget",
     "updates_for_exposure",
     "resolve_batch_size",
-    "resolve_checkpoint_interval",
+    "resolve_checkpoint_schedule",
     "build_optimizer",
     "build_evaluation_loader",
     "pin_memory_ok",
@@ -152,9 +153,18 @@ def _run_training_loop(
     max_steps: int,
     best: dict[str, Any],
 ) -> dict[str, Any]:
-    """Execute the update-budgeted training loop, checkpointing on the tie-break rule."""
+    """Execute the update-budgeted training loop, checkpointing on the tie-break rule.
+
+    ``ctx["dense_trace"]``, when set to a list, additionally records every
+    ``ctx["dense_trace_interval"]``-th step's raw validation metrics -- used
+    only by the offline checkpoint-cadence/truncation gate (plan
+    after-a-first-run-linear-wave item 4), never by production tuning or
+    confirmation, which leave it unset and see unchanged behavior.
+    """
     step, device, is_mil, n_classes = 0, ctx["device"], ctx["is_mil"], ctx["n_classes"]
-    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], is_mil, max_steps)
+    checkpoint_schedule = resolve_checkpoint_schedule(max_steps)
+    trace = ctx.get("dense_trace")
+    trace_interval = ctx.get("dense_trace_interval", 1)
     while step < max_steps:
         for batch in train_loader:
             if step >= max_steps:
@@ -164,7 +174,13 @@ def _run_training_loop(
             _fit_step(batch, ctx, step, max_steps).backward()
             optimizer.step()
             step += 1
-            if step % checkpoint_interval == 0 or step == max_steps:
+            if trace is not None and (step % trace_interval == 0 or step == max_steps):
+                metrics = evaluate_metrics(
+                    ctx["model"], val_loader, device, is_mil, n_classes
+                )
+                if metrics is not None:
+                    trace.append({"step": step, **metrics})
+            if step in checkpoint_schedule:
                 best = checkpoint_step(
                     ctx["model"], val_loader, device, is_mil, n_classes, best, step
                 )

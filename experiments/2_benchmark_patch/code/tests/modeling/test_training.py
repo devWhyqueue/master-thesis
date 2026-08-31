@@ -204,6 +204,27 @@ def test_training_restores_train_mode_after_validation_checkpoint(tmp_path):
     assert ctx["model"].training
 
 
+def test_dense_trace_records_every_interval_step(tmp_path):
+    """The item-4 gate's dense trace records raw metrics at every traced step."""
+    ctx = _patch_ctx("ce", tmp_path, n_classes=2)
+    ctx["dense_trace"] = []
+    ctx["dense_trace_interval"] = 1
+
+    fit_model(ctx, max_steps=5)
+
+    assert [entry["step"] for entry in ctx["dense_trace"]] == [1, 2, 3, 4, 5]
+    assert all("balanced_accuracy" in entry for entry in ctx["dense_trace"])
+
+
+def test_dense_trace_is_unset_by_default(tmp_path):
+    """Production tuning/confirmation never set dense_trace; it stays absent."""
+    ctx = _patch_ctx("ce", tmp_path, n_classes=2)
+
+    fit_model(ctx, max_steps=2)
+
+    assert "dense_trace" not in ctx
+
+
 def test_training_uses_the_frozen_example_budget(tmp_path):
     """A frozen exposure budget controls fitting even if runtime details change."""
     ctx = _patch_ctx("ce", tmp_path, n_classes=2)
@@ -402,17 +423,31 @@ def test_resolve_training_config_records_source_only_defaults() -> None:
     assert patch["example_budget_reference_passes"] == 30
 
 
-def test_resolve_checkpoint_interval_scales_with_budget() -> None:
-    """Cadence targets ~TARGET_CHECKPOINTS passes without a fixed floor."""
+def test_resolve_checkpoint_schedule_is_front_loaded_and_bounded() -> None:
+    """Log-spaced cadence: same ~TARGET_CHECKPOINTS budget, dense early, sparse late.
+
+    Item 3 (after-a-first-run-linear-wave): a dense-trace replay on BRACS
+    found the uniform grid disagreed with the true optimum on 41.7% of
+    (condition, method) selections at TARGET_CHECKPOINTS resolution; the
+    log-spaced grid at the same count disagreed on only 4.2%.
+    """
     from imbalance_benchmark.modeling.training.config import (
-        resolve_checkpoint_interval,
+        TARGET_CHECKPOINTS,
+        resolve_checkpoint_schedule,
     )
 
-    assert resolve_checkpoint_interval({}, False, budget=1) == 1
-    assert resolve_checkpoint_interval({}, False, budget=8_490) == 50
-    assert resolve_checkpoint_interval({}, False, budget=523_830) == 3_081
-    cfg = {"patch_training": {"checkpoint_interval": 1500}}
-    assert resolve_checkpoint_interval(cfg, False, budget=257_790) == 1516
+    assert resolve_checkpoint_schedule(1) == {1}
+    # Below TARGET_CHECKPOINTS there is nothing to compress: every step checkpoints.
+    assert resolve_checkpoint_schedule(50) == set(range(1, 51))
+
+    schedule = resolve_checkpoint_schedule(523_830)
+    assert len(schedule) <= TARGET_CHECKPOINTS
+    assert max(schedule) == 523_830  # the final step is always included
+
+    quarter = 523_830 // 4
+    first_quarter = sum(1 for step in schedule if step <= quarter)
+    last_quarter = sum(1 for step in schedule if step > 523_830 - quarter)
+    assert first_quarter > 4 * last_quarter  # dense early, sparse late
 
 
 @pytest.mark.parametrize(

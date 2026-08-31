@@ -21,7 +21,7 @@ from imbalance_benchmark.modeling.oko.sampling import (
 from imbalance_benchmark.modeling.training import (
     build_optimizer,
     resolve_batch_size,
-    resolve_checkpoint_interval,
+    resolve_checkpoint_schedule,
 )
 
 __all__ = [
@@ -98,7 +98,7 @@ def _oko_train_loop(
     )
     k = int(ctx["param_config"]["parameter"])
     b_size = resolve_batch_size(ctx["config"], False)
-    checkpoint_interval = resolve_checkpoint_interval(ctx["config"], False, budget)
+    checkpoint_schedule = resolve_checkpoint_schedule(budget)
     for step in range(1, budget + 1):
         loss = _oko_step_loss(
             model,
@@ -115,7 +115,7 @@ def _oko_train_loop(
         opt.zero_grad()
         loss.backward()
         opt.step()
-        if step % checkpoint_interval == 0 or step == budget:
+        if step in checkpoint_schedule:
             best = checkpoint_step(
                 model, ctx["val_loader"], device, False, n_classes, best, step
             )

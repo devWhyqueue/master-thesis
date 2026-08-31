@@ -102,6 +102,21 @@ def run_evaluation(
     }
 
 
+def evaluate_metrics(
+    model: nn.Module,
+    val_loader: DataLoader | None,
+    device: torch.device,
+    is_mil: bool,
+    n_classes: int,
+) -> dict[str, float] | None:
+    """Compute validation balanced-accuracy/F1/NLL for the current model state."""
+    if val_loader is None:
+        return None
+    logits, targets = _gather_and_eval(model, val_loader, device, is_mil)
+    preds = logits.softmax(dim=-1).argmax(dim=-1)
+    return _compute_metrics(preds, targets, logits, n_classes)
+
+
 def checkpoint_step(
     model: nn.Module,
     val_loader: DataLoader | None,
@@ -112,11 +127,9 @@ def checkpoint_step(
     step: int = 0,
 ) -> dict[str, Any]:
     """Evaluate the current model and keep it if it wins the BA -> F1 -> NLL tie-break."""
-    if val_loader is None:
+    metrics = evaluate_metrics(model, val_loader, device, is_mil, n_classes)
+    if metrics is None:
         return best
-    logits, targets = _gather_and_eval(model, val_loader, device, is_mil)
-    preds = logits.softmax(dim=-1).argmax(dim=-1)
-    metrics = _compute_metrics(preds, targets, logits, n_classes)
     acc, f1, nll = metrics["balanced_accuracy"], metrics["macro_f1"], metrics["nll"]
     if acc > best["acc"] or (
         abs(acc - best["acc"]) < 1e-6
