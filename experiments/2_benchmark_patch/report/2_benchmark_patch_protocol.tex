@@ -13,7 +13,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
-\sisetup{group-separator={,},group-minimum-digits=4}
+\sisetup{group-digits=integer,group-separator={,},group-minimum-digits=4}
 
 \newcommand{\Hnorm}{1-H_{\mathrm{norm}}}
 
@@ -39,7 +39,7 @@ Signal-Matched Interventions in Histopathology Patch Classification}
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
-\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. In computational pathology, raw sample counts hide at least one further shortage --- few labelled patients or slides behind many informative patches --- and say nothing about how separable a class is under the available representation or how much variation it spans. This benchmark uses training allocation as a controlled way to induce such a shortage, and then asks which signal a mitigation method should read to repair it: how would the same prediction task change if one fixed training budget were distributed evenly across classes rather than concentrated in head classes, which signal profile does the resulting condition actually present, and does a method that reads the signal matching that profile recover more of the damage than one that reads a different signal? CAMELYON16, TCGA-UT, BRACS, and PANDA are studied in patch classification using frozen Virchow2 features. Patient- or case-disjoint partitions, natural validation and test cohorts, model family, and each method's optimizer-update policy remain fixed across allocation conditions, while only the allocation of training patches among classes is directly manipulated among size-matched balanced, moderate, and severe conditions. Balanced accuracy and tail-group macro negative log likelihood measure discrimination and probability quality. Mitigation recovery is interpreted only after a prespecified gate establishes a meaningful allocation-induced deficit. A five-member family of methods --- one per signal, all a mean-one class weight on unmodified cross-entropy --- makes the signal contrast interpretable at a fixed intervention level. Exploratory analyses then relate damage and recovery to achieved allocation severity, independent-evidence shortage, support--difficulty alignment, and representational-diversity shortage. The benchmark is scoped to patch classification, where each prediction unit carries its own label.
+\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. In computational pathology, raw sample counts hide at least one further shortage --- few labelled patients or slides behind many informative patches --- and say nothing about how separable a class is under the available representation or how much variation it spans. This benchmark uses training allocation as a controlled way to induce such a shortage, and then asks which signal a mitigation method should read to repair it: how would the same prediction task change if one fixed training budget were distributed evenly across classes rather than concentrated in head classes, which signal profile does the resulting condition actually present, and does a method that reads the signal matching that profile recover more of the damage than one that reads a different signal? CAMELYON16, TCGA-UT, BRACS, and PANDA are studied in patch classification using frozen Virchow2 features. Patient- or case-disjoint partitions, natural validation and test cohorts, model family, and each method's optimizer-update policy remain fixed across conditions. Five size-matched controlled training sets vary either the allocation of patches among classes or the number of patients supplying an identical allocation: balanced, moderate, and severe sets over a concentrated patient pool, plus balanced and severe sets over the full eligible patient pool. Balanced accuracy and tail-group macro negative log likelihood measure discrimination and probability quality. Mitigation recovery is interpreted only after a prespecified gate establishes a meaningful allocation-induced deficit. A five-member family of methods --- one per signal, all a mean-one class weight on unmodified cross-entropy --- makes the signal contrast interpretable at a fixed intervention level. Exploratory analyses then relate damage and recovery to achieved allocation severity, independent-evidence shortage, support--difficulty alignment, and representational-diversity shortage. The benchmark is scoped to patch classification, where each prediction unit carries its own label.
 \par
 \endgroup
 \end{abstract}
@@ -58,7 +58,7 @@ This benchmark asks when such a shortage causes enough damage to warrant mitigat
 
 Allocation is thus a way to create controlled variation in evidence, not the benchmark's main explanatory focus. Each condition is instead characterized by its realized \emph{signal profile}: class prevalence, nominal patch support, independent patient or slide support, class difficulty, and representational diversity. This profile is measured rather than inferred from the nominal imbalance ratio. The companion methods report defines the signal taxonomy and locates each tested method within it \citep{queisler2026imbalanceMethods}; the present benchmark tests whether matching method to signal matters empirically.
 
-The study covers CAMELYON16, TCGA-UT, BRACS, and PANDA using frozen Virchow2 patch features. Patient- or case-disjoint partitions, model family, method-specific update policy, and natural validation and test cohorts remain fixed while the allocation of a common training budget changes. Balanced, moderate, and severe allocations establish the controlled comparisons. To separate signal choice from intervention mechanism, the confirmatory family contains five methods that all apply a mean-one class weight to unmodified CE. Their weights differ only in whether they use prevalence, nominal support, independent support, difficulty, or diversity.
+The study covers CAMELYON16, TCGA-UT, BRACS, and PANDA using frozen Virchow2 patch features. Patient- or case-disjoint partitions, model family, method-specific update policy, and natural validation and test cohorts remain fixed while the allocation of a common training budget or its patient breadth changes. Concentrated balanced, moderate, and severe allocations are paired with balanced and severe allocations over the full eligible patient pool. To separate signal choice from intervention mechanism, the confirmatory family contains five methods that all apply a mean-one class weight to unmodified CE. Their weights differ only in whether they use prevalence, nominal support, independent support, difficulty, or diversity.
 
 This design yields three research questions:
 \begin{description}
@@ -98,7 +98,7 @@ With the prediction examples, targets, and patient/case groupings established, t
 \section{Controlled Experimental Design}
 \label{sec:design}
 \label{sec:construction}
-Figure~\ref{fig:controlled-construction} gives the complete design before its steps are considered separately. Eligible examples are divided into training, validation, and test partitions by partitioning unit; training support is then formed into a natural anchor and three controlled conditions; controlled model comparisons are finally evaluated on unchanged natural validation and test cohorts. Only patch allocation among classes is directly manipulated across the controlled conditions; realized independent-unit and slide support may change as a consequence.
+Figure~\ref{fig:controlled-construction} gives the complete design before its steps are considered separately. Eligible examples are divided into training, validation, and test partitions by partitioning unit; training support is then formed into a natural anchor and five controlled training sets; controlled model comparisons are finally evaluated on unchanged natural validation and test cohorts. Within a comparison, either class allocation changes at fixed patient-pool breadth or patient-pool breadth changes at fixed class allocation.
 
 \begin{figure}[H]
   \centering
@@ -111,9 +111,9 @@ Figure~\ref{fig:controlled-construction} gives the complete design before its st
   ]
     \node[fixed] (eligible) {1. Prepare\\eligible examples\\patch targets\\patient/case IDs\\fixed Virchow2\\features};
     \node[fixed, right=0.35cm of eligible] (split) {2. Create data splits\\patients/cases kept\\in one partition};
-    \node[varied, right=0.35cm of split] (construct) {3. Construct\\training sets\\natural / balanced\\moderate / severe};
+    \node[varied, right=0.35cm of split] (construct) {3. Construct\\training sets\\natural / concentrated\\spread};
     \node[fixed, right=0.35cm of construct] (evaluate) {4. Train and evaluate\\controlled model\\comparisons};
-    \node[note, below=0.55cm of construct] (contrast) {Controlled comparisons share $T$, model family, and update policy;\\only patch allocation is directly manipulated.\\Validation and test data remain unchanged.\\The natural anchor uses all eligible training patches\\and is not size-matched.};
+    \node[note, below=0.55cm of construct] (contrast) {Controlled comparisons share $T$, model family, and update policy;\\one comparison axis changes patch allocation and the other patient breadth.\\Validation and test data remain unchanged.\\The natural anchor uses all eligible training patches\\and is not size-matched.};
     \draw[arrow] (eligible) -- (split);
     \draw[arrow] (split) -- (construct);
     \draw[arrow] (construct) -- (evaluate);
@@ -129,9 +129,18 @@ A patch becomes an \emph{eligible example} only if it has a valid target and pat
 Within each data split, a \emph{partition} is one of three mutually exclusive subsets: training, validation, or test. A \emph{partitioning unit} is the patient or participant where available and the biopsy otherwise. Exactly three partitioning-unit-disjoint data splits are derived from the eligible examples, and every patch from one unit follows the same assignment. Imbalance manipulation is confined to the training partition, so every condition retains the same natural validation and test partitions. No held-out example is deleted, duplicated, or reweighted according to training severity. Validation selects hyperparameters and checkpoints; test evaluation uses every eligible patch at one fixed prevalence.
 
 \subsection{Training-support construction}
-Four training conditions separate two purposes. The \emph{natural anchor} uses all eligible training patches and describes performance at the dataset's observed prevalence. The other three conditions form the controlled experiment: a balanced reference, a moderate imbalance targeting $\rho=10$, and a severe imbalance targeting $\rho=100$. These controlled conditions contain the same total number of training patches $T$ and differ only in its allocation among classes; Appendix~\ref{app:construction-support} gives the fixed pool from which the resulting unit and slide support is drawn. They carry the full method roster and enter the imbalance-deficit and recovery estimands, whereas the natural anchor carries the CE reference only.
+Six training sets separate the descriptive anchor from the controlled experiment. The \emph{natural anchor} uses all eligible training patches and describes performance at the dataset's observed prevalence. Five controlled sets share the same total number of patches $T$. Over the concentrated patient pool, balanced, moderate, and severe allocations target $\rho=1$, $\rho=10$, and $\rho=100$. The paired spread sets place the balanced and severe patch allocations over the full eligible patient pool. Appendix~\ref{app:construction-support} specifies how the concentrated and spread pools are formed.
 
-The controlled comparison asks how the same prediction task changes when a fixed training budget is distributed evenly across classes or concentrated in head classes. Figure~\ref{fig:bracs-realized-allocations} makes this intervention concrete using one BRACS split. The natural allocation shows the source distribution, but it is not size-matched to the three controlled allocations.
+These five controlled sets define four deprived conditions:
+\begin{enumerate}
+  \item concentrated moderate compared with concentrated balanced;
+  \item concentrated severe compared with concentrated balanced;
+  \item concentrated balanced compared with balanced spread; and
+  \item severe spread compared with balanced spread.
+\end{enumerate}
+\par\noindent The first, second, and fourth comparisons change nominal class allocation while holding patient-pool breadth fixed. The third changes patient breadth while preserving each class's patch count. The concentrated balanced set therefore serves as the reference for nominal deprivation and as the deprived set for independent-support deprivation. All five controlled sets carry the full method roster; the natural anchor carries CE only.
+
+Figure~\ref{fig:bracs-realized-allocations} makes the nominal intervention concrete using one BRACS split. The natural allocation shows the source distribution but is not size-matched. Spread variants are not drawn separately because their per-class patch counts are identical to the corresponding balanced and severe bars; only the number of contributing patients differs.
 
 \begin{figure}[ht]
   \centering
@@ -159,11 +168,11 @@ The controlled comparison asks how the same prediction task changes when a fixed
     \allocationpanel{7.2}{-4.65}{Severe}{16796}{100.47}{red!70!black}{N/53.83/9042,PB/24.99/4197,UDH/11.60/1948,FEA/5.38/904,ADH/2.50/420,DCIS/1.16/195,IC/0.54/90}
   \end{tikzpicture}
   \endgroup
-  \caption{Realized BRACS patch allocations. Bars show each class's share of training patches; labels give realized patch counts. Moderate and severe use the native tail assignment. The natural anchor uses all eligible training patches, while balanced, moderate, and severe share $T=\num{16796}$. Class abbreviations are N (normal), PB (pathological benign), UDH (usual ductal hyperplasia), FEA (flat epithelial atypia), ADH (atypical ductal hyperplasia), DCIS (ductal carcinoma in situ), and IC (invasive carcinoma).}
+  \caption{Realized BRACS patch allocations. Bars show each class's share of training patches; labels give realized patch counts. Moderate and severe use the native tail assignment. The natural anchor uses all eligible training patches, while all five controlled sets share $T=\num{16796}$. Balanced spread and severe spread have the same per-class patch counts as the corresponding bars and differ only in contributing-patient breadth. Class abbreviations are N (normal), PB (pathological benign), UDH (usual ductal hyperplasia), FEA (flat epithelial atypia), ADH (atypical ductal hyperplasia), DCIS (ductal carcinoma in situ), and IC (invasive carcinoma).}
   \label{fig:bracs-realized-allocations}
 \end{figure}
 
-\noindent The example shows why the natural anchor and controlled conditions must not be conflated. Natural BRACS is already imbalanced ($\rho_{\mathrm{achieved}}=\num{5.90}$) and contains \num{217399} training patches, almost 13 times the controlled budget. The controlled allocations instead hold $T=\num{16796}$ fixed and redistribute it: their achieved ratios are \num{1.00}, \num{10.01}, and \num{100.47}. Other tail assignments map the same moderate and severe support profiles to different semantic classes; they do not change $T$ or the severity profile itself.
+\noindent The example shows why the natural anchor and controlled conditions must not be conflated. Natural BRACS is already imbalanced ($\rho_{\mathrm{achieved}}=\num{5.90}$) and contains \num{217399} training patches, almost 13 times the controlled budget. The controlled allocations instead hold $T=\num{16796}$ fixed; their achieved ratios are \num{1.00}, \num{10.01}, and \num{100.47}. Other tail assignments map the same moderate and severe support profiles to different semantic classes, while spread variants change patient breadth without changing $T$ or the severity profile.
 
 \noindent The shared $T$ is selected jointly with severity rather than from size alone. Construction retains the largest feasible total for which every tail assignment realizes moderate $\rho_{\mathrm{achieved}}\in[9,11]$ and severe $\rho_{\mathrm{achieved}}\in[90,110]$. Appendix~\ref{app:construction} specifies the search and feasibility rules.
 
@@ -272,7 +281,7 @@ For intuition, suppose balanced CE attains balanced accuracy \num{0.72}, imbalan
 \subsection{Compared methods and shared execution controls}
 \label{sec:methods}
 \label{sec:training}
-Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, grouped by the mitigation signal each one reads. CE is the size-matched no-mitigation reference. The roster is fitted in the balanced, moderate, and severe conditions, which alone supply the paired contrast a mitigation claim requires; the natural anchor carries the CE reference only. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
+Table~\ref{tab:roster} lists only the methods evaluated in this benchmark, grouped by the mitigation signal each one reads. CE is the size-matched no-mitigation reference. The roster is fitted in all five controlled training sets, which supply the paired contrasts required for mitigation claims; the natural anchor carries the CE reference only. Method objectives, tested adaptations, ablations, defaults, and fidelity qualifications are defined exclusively in the companion methods report \citep{queisler2026imbalanceMethods}.
 
 \begin{table}[H]
   \centering

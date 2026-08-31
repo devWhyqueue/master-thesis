@@ -16,7 +16,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage[authoryear,round]{natbib}
 \usepackage{siunitx}
-\sisetup{group-separator={,},group-minimum-digits=4}
+\sisetup{group-digits=integer,group-separator={,},group-minimum-digits=4}
 
 \newcommand{\Hnorm}{1-H_{\mathrm{norm}}}
 
@@ -49,7 +49,7 @@ Patch Classification}
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
-\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report presents the outcomes of the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol} on BRACS, a seven-class breast-lesion task evaluated with frozen Virchow2 features. The design crosses two axes that ordinary imbalance confounds. Along the \emph{nominal} axis a fixed patch budget is redistributed among classes at imbalance ratios of \num{1}, \num{10}, and \num{100}. Along the \emph{independent-support} axis the same nominal allocation is drawn either from the minimal patient pool the contribution caps permit or from the full eligible patient inventory, so patch counts are held exactly equal while the number of patients backing each class changes. Crossing the two yields \num{12} comparison units over three tail assignments. Nominal deprivation damaged both endpoints: the discrimination gate opened in \num{8} of its \num{9} units and the probability-quality gate in \num{8}, with case-macro balanced-accuracy deficits from \num{0.015} to \num{0.138} and tail-group likelihood deficits up to \num{1.744} nats. Independent-support deprivation, dosed at \num{0.41} to \num{0.67} nats of lost patient support at an imbalance ratio pinned to one, damaged discrimination by \num{0.026} to \num{0.030} balanced accuracy and opened the gate in all three of its units. Recovery separated sharply and asymmetrically. Where nominal allocation caused the damage, the prevalence- and nominal-support-weighted members of the confirmatory family returned between \num{0.43} and \num{0.89} of the discrimination deficit and between \num{0.54} and \num{1.23} of the probability-quality deficit. Where independent support caused it, no member of the confirmatory family and no member of the wider roster recovered anything distinguishable from zero, and the direct contrast between the signal-matched and unmatched arms was \num{0.0006} balanced accuracy. The benchmark therefore exhibits, for the first time under this protocol, a gate-passing regime that every tested mechanism fails to repair. The closing discussion converts these outcomes into design requirements and marks the conclusions that a single dataset cannot support.
+\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report evaluates the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol} on BRACS, a seven-class breast-lesion task represented by Virchow2 features. The design separates two axes that ordinary imbalance confounds: nominal patch support and the number of patients contributing those patches. Nominal deprivation produced material balanced-accuracy losses in eight of nine comparisons, with deficits of \num{1.5}--\num{13.8} percentage points; tail-group likelihood also worsened in eight comparisons, by up to \num{1.744} nats (natural-log units of predictive loss). Reducing patient breadth while holding the patch allocation fixed produced balanced-accuracy deficits of \num{2.6}--\num{3.0} percentage points across all three class assignments. Prevalence-weighted and class-balanced cross-entropy were the best methods for nominal damage. The largest probability-quality recovery estimate, \num{1.23} for class-balanced cross-entropy, means that the method surpassed the balanced reference by \num{23}\% of the original deficit after closing it; it does not imply that more than \num{100}\% of the lost probability mass was recovered. By contrast, no tested method repaired the damage caused by reduced patient breadth, and signal-matched weighting differed from unmatched weighting by only \num{0.06} percentage points of balanced accuracy. These results motivate mitigation that responds to dependence among patches from the same patient rather than to per-class counts alone.
 \par
 \endgroup
 \end{abstract}
@@ -64,149 +64,93 @@ Patch Classification}
 
 \section{Introduction}
 \label{sec:intro}
-This report presents the results of the controlled patch-classification benchmark whose design, endpoints, gating rule, and inference procedure are fixed in the companion protocol \citep{queisler2026benchmarkProtocol}. Nothing in the analysis reported here was chosen after seeing an outcome: the estimands, the deficit thresholds, the confirmatory method family, the multiplicity correction, and the exploratory status of the association models were all locked before the first definitive model fit. The reporting order below follows that locked plan rather than the order in which results proved interesting, and any departure from the plan is recorded in Appendix~\ref{app:realized}.
-
+This report presents the results of the controlled patch-classification benchmark whose design, endpoints, materiality criteria, and inference procedure are specified in the companion protocol \citep{queisler2026benchmarkProtocol}.
 The benchmark exists to inform the design of a new mitigation method, not to rank the existing ones. Its premise is that an underserved class may lack nominal patch support, independent evidence from patients or slides, learnable signal, or representational diversity, and that these shortages are not interchangeable. Existing methods are therefore treated as instruments: each reads one signal, and the contrast among them measures whether reading the right signal matters. The report is consequently read forward into Section~\ref{sec:discussion}, where the outcomes are converted into requirements a method would have to satisfy. Dataset provenance is documented separately \citep{queisler2026datasets}, as is the signal taxonomy that locates each method within it \citep{queisler2026imbalanceMethods}.
 
 The protocol poses three questions, restated here so that the results can be read without the companion document at hand:
 \begin{description}
+  \setlength{\itemsep}{0.6em}
   \item[RQ1.] \textbf{Which shortage does controlled allocation create, and what does it damage?} Under otherwise fixed conditions, how do controlled changes in training allocation affect tail-class discrimination and calibration, and which signal profile does each condition realize?
   \item[RQ2.] \textbf{Does signal-matched mitigation recover more of the damage?} Which methods recover performance lost specifically to training imbalance, and does recovery improve when a method reads the shortage identified in RQ1?
   \item[RQ3.] \textbf{Which realized signal shortages explain variation in damage and mitigation headroom?} Across controlled conditions, are allocation severity, independent-evidence shortage, support--difficulty alignment, and diversity shortage associated with damage magnitude and subsequent recovery?
 \end{description}
-\noindent Sections~\ref{sec:rq1} and~\ref{sec:rq2} answer the first two. Section~\ref{sec:rq3} specifies the association models that answer the third and states why they are not fitted here.
-
-\subsection{Scope of this report}
-\label{sec:intro-scope}
-The evidence below comes from one dataset. BRACS is the benchmark's most nominal-sensitive cell and the only one whose probability-quality axis has ever been damaged materially, so it is the dataset on which both gates are simultaneously available and on which a mitigation method has the most to repair. At seven classes it is also a genuine multiclass long-tailed task rather than a binary one, which is the regime the surrounding thesis addresses.
-
-Three consequences follow and are held to throughout. First, RQ3's association models carry a random intercept over dataset--target groups, and a scale parameter over one group is not identified; the models are therefore specified in Section~\ref{sec:rq3} and fitted once a second multiclass dataset is available. Second, no claim here is a claim about generalization across datasets, including the calibration of the two deficit thresholds, which are derived from this dataset's own confirmation-seed dispersion. Third, comparisons that would require a task with few classes --- in particular whether damage grows as a fixed budget is split among fewer classes --- lie outside the scope of the benchmark as it is now planned, because the binary cells are not part of the intended programme. Section~\ref{sec:limits} restates these boundaries as scope conditions.
-
-Two conventions govern how the remaining evidence is labelled. A result is \emph{confirmatory} only if it belongs to the five-member method family, arises from a condition that passed the relevant gate, and survives the Holm adjustment applied jointly within the dataset. Every other quantity is \emph{exploratory} or \emph{descriptive}, and is marked as such in the text and in the table caption rather than only in the surrounding prose.
+\noindent Sections~\ref{sec:rq1} and~\ref{sec:rq2} answer the first two. Section~\ref{sec:rq3} specifies the association models for the third. Statistical tests are restricted to the five weighting methods and to comparisons meeting the prespecified materiality and precision criteria; estimates for the wider method roster remain exploratory.
 
 \section{Allocation-Induced Damage}
 \label{sec:rq1}
-The controlled conditions must first be shown to have executed as specified, because the inference machinery is conditional on that. Four properties matter before any endpoint is read: whether constrained allocation reached its target severities within the prespecified tolerance bands, whether the spread arm realized a measurable independent-support shortage without disturbing the nominal allocation, whether the label-only bootstrap preflight left any class designated descriptive-only, and whether every confirmation seed block and every expected comparison is present across all three partitions. A descriptive-only designation forces both gates closed, which removes the affected evidence from the confirmatory results entirely; an incomplete comparison halts aggregation rather than being averaged over whatever is available. Appendix~\ref{app:realized} carries the full record together with the tuning selections actually used and any deviation from the locked protocol.
+Four prerequisites must hold before the outcome measures are interpreted:
+\begin{enumerate}
+  \item the moderate and severe allocations must reach their target ranges;
+  \item the concentrated and spread allocations must differ in patient breadth while retaining identical patch counts;
+  \item the pooled analysis must contain enough contributing patients for stable interval estimates; and
+  \item every planned method, initialization seed, and data partition must be present.
+\end{enumerate}
+\par\noindent A failed allocation would invalidate the intended comparison, insufficient patient support would limit the corresponding estimates to summaries, and incomplete results would not be aggregated. Appendix~\ref{app:realized} provides the full checks, tuning selections, and protocol deviations. The companion protocol describes the four deprived conditions and their two reference allocations \citep{queisler2026benchmarkProtocol}.
 
-All four properties hold. Every moderate condition realized $\rho_{\mathrm{achieved}}$ within $[9,11]$ and every severe condition within $[90,110]$, at $\rho_{\mathrm{achieved}}=\num{10.00}$ and \num{100.38} respectively, and no condition collapsed to the balanced allocation. The spread arm holds the patch budget at exactly \num{16796} patches and the imbalance ratio at \num{1.000} while raising the contributing patient count from \num{85} to \num{103}, which is the full eligible inventory. No class failed the preflight concentration checks on the pooled evidence cell that every gated quantity uses. All three partitions completed with five confirmation seeds in every method block, the full expected set of \num{378} comparisons, and an achieved-severity spread across partitions of at most \num{0.002} in relative terms against a guard of \num{0.5}. The controlled comparison therefore rests on \num{12} comparison units: three tail assignments crossed with four deprived conditions.
-
-\subsection{The crossed condition family}
-\label{sec:rq1-crossed}
-Ordinary class imbalance moves nominal patch support and independent patient support together, which is why the two cannot be separated observationally. The design separates them by holding one fixed while moving the other, using five controlled conditions and two references:
-\begin{description}
-  \item[Nominal axis.] The \emph{moderate} and \emph{severe} conditions redistribute the fixed patch budget at $\rho=\num{10}$ and $\rho=\num{100}$ and are read against the size-matched \emph{balanced} allocation, which draws from the same concentrated patient pool. Patient breadth is held constant; nominal counts move.
-  \item[Independent-support axis.] The \emph{balanced} allocation is read against \emph{balanced (spread)}, which allocates exactly the same per-class patch counts over the full eligible patient inventory. Nominal counts are identical by construction and $\rho$ stays at one; only the number of patients backing each class moves.
-  \item[Nominal axis over the broad pool.] The \emph{severe (spread)} condition applies the $\rho=\num{100}$ allocation over the spread pool and is read against \emph{balanced (spread)}. It repeats the nominal manipulation at a support breadth where independent evidence is not itself scarce.
-\end{description}
-\noindent The construction pushes against patient inventory rather than against the per-patient contribution caps, and that direction is what makes it feasible. A narrowing arm, which would deprive independent support by shrinking the pool, is not available on this dataset: the concentrated pool is already the smallest patient set that can supply the cross-assignment maximum patch count, so there is no slack to remove. Spreading lowers per-patient contribution instead of raising it, and is therefore feasible wherever the concentrated construction is.
-
-Three freeze-time guards keep the axis from degenerating into a relabelling of the nominal one. A spread arm whose mean achieved log-shortage falls below \num{0.25} is refused; a spread pool that is not a strict superset of the concentrated pool is refused, so the arm adds patients rather than exchanging them; and a freeze in which the independent-support shortage never varies across comparison units is refused outright, which is the guard that detects the axis silently collapsing to a constant. The realized mean log-shortage is \num{0.350} to \num{0.577} across the three partitions, and the pools are nested by construction.
+All four prerequisites were met. Moderate and severe allocations achieved $\rho=\num{10.00}$ and \num{100.38}, respectively, within their target ranges. The spread allocation retained exactly \num{16796} patches at $\rho=\num{1.000}$ while increasing the contributing-patient count from \num{85} to the full eligible inventory of \num{103}. Every class had sufficient patient support in the pooled analysis. All three partitions contained five initialization seeds for every method block and the complete set of \num{378} comparisons. The analysis therefore contains \num{12} comparison units: three class assignments crossed with four deprived conditions.
 
 \subsection{Realized signal profiles}
 \label{sec:rq1-profiles}
-Allocation severity is the manipulated variable, but it is not the explanatory one. Each controlled condition is characterized instead by the signal profile it realizes: achieved imbalance ratio $\rho$ and normalized-entropy deficit $\Hnorm$, nominal patch-support shortage, independent patient-support shortage, support--difficulty alignment, and representational-diversity shortage. These quantities are measured from the frozen construction rather than inferred from the nominal target, and each is computed against the reference that isolates its own axis: the concentrated balanced allocation for the nominal conditions, and the spread balanced allocation for the balanced and severe-spread conditions.
+Allocation severity is the manipulated variable, but it is not the explanatory one. Each controlled condition is characterized instead by the signal profile it realizes: achieved imbalance ratio $\rho$ and normalized-entropy deficit $\Hnorm$, nominal patch-support shortage, independent patient-support shortage, support--difficulty alignment, and representational-diversity shortage. These quantities are measured from the realized training sets rather than inferred from the target ratio. Each condition is compared with the reference that isolates its axis: concentrated balanced for the concentrated moderate and severe conditions, and balanced spread for concentrated balanced and severe spread.
 
 \begin{table}[ht]
   \centering
   \scriptsize
   \setlength{\tabcolsep}{3pt}
   \resultstable{signal_profiles}
-  \caption{Realized signal profiles per comparison unit: achieved $\rho$, normalized-entropy deficit, standardized nominal, independent-support and diversity shortages, and support--difficulty alignment, with the dominant shortage and the ambiguous designation applied where the two largest scores fall within \num{0.25} standard deviations. Scores are standardized across the \num{12} units of this dataset.}
+  \caption{BRACS signal profiles for the four deprived conditions. Each block names the deprived allocation and its reference; rows give the three class assignments. Shortage scores and alignment are standardized across the \num{12} comparison units. A dominant shortage is marked ambiguous when the two largest scores differ by less than \num{0.25} standard deviations.}
   \label{tab:signal-profiles}
 \end{table}
 
-\noindent The independent-support column is the one the crossed design was built to populate, and it varies. Its raw value is a mean log ratio of contributing patients over the classes that lost independent support, and it reaches \num{0.409}, \num{0.630}, and \num{0.673} nats on the three partitions. For scale, the full nominal step from the balanced to the moderate allocation is $\log \num{10} = \num{2.30}$ nats, so the independent axis is dosed at roughly \num{18} to \num{29}\% of the nominal axis's own smallest step. This is a deliberately modest dose, and it is the largest the patient inventory of a \num{103}-patient cohort permits once per-class contribution caps are respected. A null on this axis would consequently be weak evidence; the result reported in Section~\ref{sec:rq2} is not a null.
+\noindent The independent-support comparison holds \num{16796} patches fixed but draws them from fewer patients. Across partitions, the affected classes retain about \num{51}--\num{66}\% of the patient support available in the spread reference, corresponding to a mean log-shortage of \num{0.409}--\num{0.673} nats. This is the largest patient-breadth contrast compatible with the contribution limits.
 
-Two structural features of the table constrain how it should be read. The three balanced units share a single treated allocation and differ only in which assignment's spread arm serves as their reference, so they are three correlated readings of one manipulation rather than three independent replicates; their close agreement is expected and is not confirmation. Separately, units whose two largest standardized scores fall within \num{0.25} standard deviations are designated ambiguous and contribute descriptively only, never as evidence for or against signal matching. Three of the \num{12} units carry that designation, all at severe severity: native severe, reversed severe, and native severe (spread).
+The three concentrated-balanced rows reuse one training allocation and differ only in the class assignment used for comparison; they are correlated views, not independent replications. Three severe comparisons are ambiguous because their two largest shortage scores are nearly tied: native severe, reversed severe, and native severe spread.
 
-\subsection{Discrimination deficit and gate status}
+\clearpage
+\subsection{Discrimination deficit}
 \label{sec:rq1-discrimination}
-The discrimination deficit $D_{\mathrm{BA}}$ is the case-macro balanced accuracy of the reference cross-entropy model minus that of the deprived cross-entropy model in the same unit, estimated with the patient-clustered Bayesian bootstrap and averaged with equal weight across the three partitions. The discrimination gate opens only when $D_{\mathrm{BA}}$ reaches at least \num{0.01443} and its paired \num{95}\% interval excludes zero, a threshold fixed at twice the observed confirmation-seed standard deviation so that a deficit indistinguishable from initialization noise cannot open it.
+The discrimination deficit $D_{\mathrm{BA}}$ is the balanced accuracy lost relative to the appropriate reference, reported in percentage points. The native assignment follows clinical class order; the difficulty-aligned assignment gives the fewest patches to the hardest classes, whereas the reversed assignment gives those classes the most patches. Recovery is analysed when the deficit reaches \num{1.44} percentage points and its paired \num{95}\% interval excludes zero.
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \resultstable{discrimination_deficit}
-  \caption{Discrimination deficit $D_{\mathrm{BA}}$ with paired \num{95}\% bootstrap intervals and discrimination-gate outcome, by tail assignment and condition. Each condition is compared against the reference that isolates its axis. Units failing the \num{0.01443} threshold or the interval condition are shown and marked as not opening the gate.}
-  \label{tab:discrimination-deficit}
-\end{table}
-
-\noindent Eleven of the \num{12} units opened the gate; the exception is the difficulty-aligned moderate condition, whose deficit of \num{0.0150} clears the threshold but whose interval covers zero. Every one of the \num{12} deficits is positive, so neither redistributing the budget toward head classes nor concentrating it on fewer patients ever improved case-macro balanced accuracy.
-
-Three regularities organize the table. Deficits grow with achieved severity under every assignment, most steeply under the difficulty-reversed one, which moves from \num{0.0817} at $\rho=\num{10}$ to \num{0.1323} at $\rho=\num{100}$. Deficits are largest under that same reversed assignment, which gives the least support to the classes that are easiest to separate and therefore concentrates scarcity where separability cannot compensate: at severe severity it damages roughly three times as much as the difficulty-aligned assignment. And the independent-support axis, at a fifth to a quarter of the nominal dose, produces deficits of \num{0.0264} to \num{0.0295} --- larger than the difficulty-aligned moderate condition achieves at ten times the nominal imbalance, and clear of the threshold in all three assignments.
-
-The severe (spread) units allow the nominal manipulation to be read at a support breadth where independent evidence is plentiful. The comparison is not a like-for-like difference, since each unit is measured against its own reference, but the deficits are of the same order as their concentrated counterparts and slightly larger under the native and reversed assignments (\num{0.0847} against \num{0.0545}, and \num{0.1379} against \num{0.1323}) and slightly smaller under the aligned one (\num{0.0404} against \num{0.0430}). Nominal deprivation therefore does not depend on the pool being narrow, and is not a repackaged independent-support effect.
+Moderate imbalance produces deficits of \num{1.50}--\num{8.17} percentage points, concentrated severe imbalance \num{4.30}--\num{13.23}, and severe spread \num{4.04}--\num{13.79}. Concentrating the balanced allocation on fewer patients costs \num{2.64}--\num{2.95} percentage points despite identical patch counts. The only exception is difficulty-aligned moderate: its \num{1.50}-point estimate clears the magnitude threshold, but its interval includes zero. Full estimates and intervals appear in Appendix Table~\ref{tab:discrimination-deficit}.
 
 \subsection{Probability-quality deficit}
 \label{sec:rq1-calibration}
-Discrimination and probability quality can be damaged independently, so the calibration axis carries its own deficit and its own gate. The co-primary endpoint is tail-group macro negative log likelihood in nats, computed over the classes the condition places in its tail tier; its gate opens at a deficit of at least \num{0.14782} nats with a paired interval excluding zero. Expected calibration error, multiclass Brier score, and the temperature-scaled variant of each are secondary and never gate.
+Probability quality is measured by tail-group macro negative log likelihood. One \emph{nat} is one natural-log unit of predictive loss, and lower values are better. Recovery is analysed when deprivation increases this loss by at least \num{0.148} nats and the paired \num{95}\% interval excludes zero.
 
-\begin{table}[ht]
-  \centering
-  \scriptsize
-  \setlength{\tabcolsep}{3pt}
-  \resultstable{calibration_deficit}
-  \caption{Probability-quality deficit on tail-group macro negative log likelihood in nats, with paired \num{95}\% intervals and calibration-gate outcome. Expected calibration error and its crossed patient-bootstrap interval are secondary descriptors and do not gate.}
-  \label{tab:calibration-deficit}
-\end{table}
-
-\noindent Eight of the \num{12} units opened the calibration gate, and the four that did not divide cleanly by axis. The native moderate condition fails on precision, at \num{0.186} nats with an interval covering zero. The three balanced units --- the entire independent-support axis --- fail on magnitude, at \num{0.132} to \num{0.135} nats against the \num{0.14782}-nat threshold. That is a narrow miss, within eleven per cent of the threshold in all three assignments and with intervals that exclude zero, so the defensible reading is that the independent axis degrades tail-group probability quality by an amount this dataset's own seed dispersion cannot certify as material, not that it leaves probability quality untouched.
-
-Among the units that did open the gate, the deficit tracks both severity and assignment adversity, running from \num{0.379} nats at difficulty-aligned moderate to \num{1.744} nats at difficulty-reversed severe. The secondary expected calibration error moves in the same direction, from \num{0.143} to \num{0.313} across those units, against \num{0.051} at the balanced allocation. The one place where the two axes diverge is the native severe (spread) unit, whose discrimination deficit is the second largest in the benchmark (\num{0.0847}) while its calibration deficit is the smallest of the gate-passing set (\num{0.201} nats): spreading the pool leaves the model less confidently wrong about its tail than the concentrated severe allocation does, while costing more accuracy.
+Moderate imbalance increases loss by \num{0.186}--\num{0.754} nats, concentrated severe imbalance by \num{0.688}--\num{1.744}, and severe spread by \num{0.201}--\num{1.127}. Native moderate is the exception because its interval includes zero. The independent-support comparisons increase loss by \num{0.132}--\num{0.135} nats, just below the magnitude threshold, so they do not enter probability-quality recovery analysis. Full estimates, intervals, and secondary calibration measures appear in Appendix Table~\ref{tab:calibration-deficit}.
 
 \subsection{Where the damage falls}
 \label{sec:rq1-incidence}
-Aggregate deficits do not say which classes absorbed the loss, and a mitigation method has to be told that. Recall, negative log likelihood, and Brier score are therefore also read per support tier, with the head tier the first $\lceil K/3 \rceil$ classes in the assignment's ordering and the tail tier the last $\lceil K/3 \rceil$; the per-class breakdown appears in Appendix~\ref{app:endpoints}. One reading caution applies to the spread reference: its allocation is uniform, so its tier labels carry the assignment's class ordering rather than any difference in support, and the spread of recall across its tiers measures intrinsic class difficulty rather than deprivation. It is the appropriate baseline for exactly that reason.
-
-\begingroup
-\footnotesize
-\resultstable{tier_endpoints}
-\captionof{table}{Head, body, and tail recall, negative log likelihood, and Brier score for the cross-entropy reference under each controlled condition, averaged with equal weight across the three partitions. Tier membership follows the assignment's class ordering and is therefore comparable across conditions within an assignment.}
-\label{tab:tier-endpoints}
-\endgroup
-
-\noindent Under the difficulty-aligned assignment the damage lands where support rank predicts. Tail recall falls from \num{0.408} under the uniform spread allocation to \num{0.183} at moderate and \num{0.118} at severe severity, while head recall rises from \num{0.668} to \num{0.747}: the budget moves to the head and the head takes it. Under the difficulty-reversed assignment the pattern differs, and it is the body tier rather than the tail that collapses --- to \num{0.153} at severe severity, against a tail of \num{0.355} and a head of \num{0.485}. The uniform reference shows why: the body tier is already the weakest there, at \num{0.310} against a tail of \num{0.669}, because the reversed ordering places the intrinsically hardest classes in the head and the easiest in the tail, leaving the middle ranks with neither support nor separability. The allocation deepens a weakness it did not create, driving body recall to \num{0.133} under severe (spread). A mitigation method keyed to support rank alone would target the wrong tier in exactly this case.
-
-Figure~\ref{fig:tail-vs-support} relates per-class recall to allocated training support directly. Its purpose is to separate two readings of the same aggregate deficit: a loss that varies smoothly with support implies that support is the binding constraint, whereas classes falling well below the support trend point to a shortage that allocation alone does not describe.
-
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=0.72\linewidth]{assets/bracs/tail_vs_support.png}
-  \caption{Per-class recall against allocated training patches, coloured by support tier, under the controlled conditions of the first locked partition. Classes falling below the support trend indicate a shortage that nominal allocation does not capture.}
-  \label{fig:tail-vs-support}
-\end{figure}
-
-\noindent The scatter shows wide vertical spread at fixed allocated support, which is the visual form of the point the tier table makes: at equal patch count, classes differ by more in recall than the support trend explains, so allocated count is not a sufficient statistic for how well a class is served. The independent-support axis is one concrete instance of that spread, since it moves recall while holding allocated count exactly fixed.
-
-\subsection{Gate routing and the natural anchor}
-\label{sec:rq1-routing}
-The two gates partition the comparison units into four states: discrimination only, probability quality only, both, and neither. This partition fixes the scope of Section~\ref{sec:rq2}, because recovery is expressed as a fraction of a deficit and is undefined where no deficit was established. Table~\ref{tab:gate-routing} states the routing compactly and is the table to consult before reading any recovery estimate.
-
-\begin{table}[ht]
-  \centering
-  \scriptsize
-  \resultstable{gate_routing}
-  \caption{Gate routing for every comparison unit: which of the discrimination and probability-quality gates opened, and the reason a closed gate did not open, distinguishing a deficit below threshold from an interval covering zero.}
-  \label{tab:gate-routing}
-\end{table}
-
-\noindent Every unit is routed somewhere, and three of the four states are occupied. Seven units opened both gates: the reversed moderate condition and all six severe and severe-spread conditions. Four opened the discrimination gate alone --- the three balanced units of the independent axis, and the native moderate condition. One, difficulty-aligned moderate, opened the probability-quality gate alone, so the two axes are nested in neither direction on this dataset. No unit failed both gates. The routing itself carries a result: the independent-support axis creates damage that only one of the two endpoints certifies, which is a different signature from any nominal condition.
-
-The natural condition sits outside this partition. It trains on all \num{217399} eligible training patches at the dataset's own prevalence and is therefore neither size-matched nor part of any estimand, but it is reported because it locates the controlled conditions against the imbalance the dataset presents without intervention, which is the regime a deployed method would meet.
+Aggregate deficits do not show which support tier absorbs the loss. Table~\ref{tab:tier-endpoints} therefore retains only recall for the two difficulty-based assignments; full per-class endpoints appear in Appendix~\ref{app:endpoints}. Tier labels in the balanced spread rows reflect class ordering rather than unequal support because that allocation is uniform.
 
 \begin{table}[ht]
   \centering
   \footnotesize
+  \resultstable{tier_endpoints}
+  \caption{Tier recall (\%) under aligned and reversed assignments.}
+  \label{tab:tier-endpoints}
+\end{table}
+
+\noindent Under the aligned assignment, tail recall falls from \num{40.8}\% under balanced spread to \num{18.3}\% at moderate and \num{11.8}\% at severe imbalance, while head recall remains above \num{73}\%. Under the reversed assignment, the body tier is weakest: recall falls from \num{31.0}\% under balanced spread to \num{15.3}\% at severe and \num{13.3}\% at severe spread. Difficulty therefore changes where damage appears; support rank alone does not identify the affected tier.
+
+\clearpage
+\subsection{Natural anchor}
+\label{sec:rq1-routing}
+The natural condition trains on all \num{217399} eligible patches at the dataset's observed prevalence. It is not size-matched and enters no estimand; it only places the controlled results beside the training distribution encountered without intervention.
+
+\begin{table}[H]
+  \centering
+  \footnotesize
   \resultstable{natural_anchor}
-  \caption{Descriptive comparison of the natural anchor against the size-matched conditions, for the cross-entropy reference. The natural condition is not size-matched, so these differences confound allocation with training-set size and enter no estimand.}
+  \caption{Natural and balanced cross-entropy anchors.}
   \label{tab:natural-anchor}
 \end{table}
 
-\noindent The anchor supports one observation. Despite training on nearly thirteen times as many patches at a natural imbalance of $\rho_{\mathrm{achieved}}=\num{5.90}$, the natural condition reaches a balanced accuracy of \num{0.498}, against \num{0.492} for the size-matched balanced reference and \num{0.509} for its spread counterpart. Under frozen Virchow2 features the controlled budget is therefore already close to the point where additional patches stop buying discrimination, which is what the support pilot was designed to establish and which makes the controlled contrast a statement about allocation rather than about scale. The comparison also frames the size of the independent-support effect: redistributing the same \num{16796} patches from \num{85} patients to \num{103} buys more balanced accuracy than adding two hundred thousand patches at the natural prevalence.
+\noindent Despite using nearly thirteen times as many patches, the natural condition reaches \num{49.8}\% balanced accuracy, compared with \num{49.2}\% for concentrated balanced and \num{50.5}--\num{50.9}\% across the balanced spread assignments. Additional patches at natural prevalence therefore buy less discrimination than distributing the controlled budget across more patients.
 
 \section{Mitigation Recovery}
 \label{sec:rq2}
-Everything in this section is restricted to the comparison units whose gates opened in Table~\ref{tab:gate-routing}. Recovery is defined as $R_M = [M(\text{method}) - M(\text{deprived CE})] / D_M$, the fraction of the established deficit that a method returns, so a unit with no established deficit has no defined recovery and is not reported here at any strength of evidence.
+Recovery is defined as $R_M = [M(\text{method}) - M(\text{deprived CE})] / D_M$, the fraction of an established deficit that a method returns. Comparisons that do not meet the materiality and precision criteria in Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration} have no stable recovery fraction and are omitted.
 
 \subsection{The confirmatory five-family}
 \label{sec:rq2-family}
@@ -240,7 +184,7 @@ The claim RQ2 actually tests is not that some method recovers damage but that th
 \endgroup
 \end{landscape}
 
-\noindent For the first time under this protocol the matched arm can be occupied by independent-support weighting on a unit that genuinely lacks independent support, and the contrast there is flat. All three balanced units return \num{0.0006} balanced accuracy with an interval of $[-\num{0.0013}, \num{0.0022}]$ and an adjusted $p$ of \num{1}. The matching hypothesis is not merely unsupported on this axis; the two arms are indistinguishable, because neither contains a method that moves the endpoint.
+\noindent The independent-support comparison directly tests its matched method on a condition that lacks patient support, and the contrast is flat. All three balanced units differ by \num{0.06} percentage points of balanced accuracy, with an interval of $[-\num{0.13}, \num{0.22}]$ percentage points and an adjusted $p$ of \num{1}. The matching hypothesis is unsupported on this axis: neither arm contains a method that moves the endpoint.
 
 Elsewhere the contrast is signed by which shortage the unit's profile makes dominant, and the sign is predicted entirely by whether that shortage is nominal support. In the two units whose dominant shortage is nominal support the contrast is positive and survives adjustment: \num{0.0234} at native moderate and \num{0.0708} at reversed moderate. In every unit whose dominant shortage is difficulty or diversity the contrast is negative, reaching $-\num{0.0529}$ at reversed severe (spread) with an adjusted $p$ of \num{0.0006}, because the matched arm there holds exactly one member of the group that recovers nothing while the unmatched arm retains both members that work. The agreement column makes the same point without the arithmetic of the contrast: in every unit where any family member recovered a material fraction, that member was prevalence-weighted or class-balanced cross-entropy, so the dominant shortage and the best recoverer agree only where the dominant shortage is nominal support.
 
@@ -293,7 +237,7 @@ Four of these members must be read as one mechanism rather than four. Balanced s
 
 \noindent On the nominal axis the roster confirms that the deficits are repairable. In seven of the eight nominal-axis discrimination units at least one roster method returns more than \num{0.71} of the deficit, led by balanced sampling, train-time logit adjustment, focal loss, and set learning; the difficulty-aligned severe (spread) unit is the exception, where the best tested mechanism of any kind is set learning at \num{0.57}. On the calibration axis every one of the eight gate-passing units has a method reaching at least \num{0.72}, with train-time logit adjustment the most consistent, and no method overshoots its reference by a margin the intervals cannot absorb.
 
-On the independent-support axis the roster fails as completely as the confirmatory family. In all three balanced units not one of the nine exploratory methods returns a positive recovery whose interval excludes zero, and several are reliably harmful: classifier retraining returns $-\num{0.73}$ to $-\num{0.82}$ and set learning $-\num{0.94}$ to $-\num{1.05}$, both with intervals lying entirely below zero. Taken together with Section~\ref{sec:rq2-family}, this yields the finding the benchmark had not previously been able to produce: a gate-passing regime in which no tested mechanism, signal-matched or otherwise, repairs the damage. Four of the eleven discrimination-gate units --- the three independent-support units and difficulty-aligned severe (spread) --- have no tested method reaching two-thirds of their deficit.
+On the independent-support axis the roster fails as completely as the confirmatory family. In all three balanced units not one of the nine exploratory methods returns a positive recovery whose interval excludes zero, and several are reliably harmful: classifier retraining returns $-\num{0.73}$ to $-\num{0.82}$ and set learning $-\num{0.94}$ to $-\num{1.05}$, both with intervals lying entirely below zero. Taken together with Section~\ref{sec:rq2-family}, this identifies a materially damaged regime in which no tested mechanism, signal-matched or otherwise, repairs the damage. Four of the eleven discrimination-gate units --- the three independent-support units and difficulty-aligned severe (spread) --- have no tested method reaching two-thirds of their deficit.
 
 \section{Explaining Heterogeneity}
 \label{sec:rq3}
@@ -304,9 +248,9 @@ Damage magnitude and recovery headroom vary across conditions, and RQ3 asks whic
 \end{equation}
 \noindent where $\rho_j$ is achieved severity, $S_{\mathrm{ind},j}$ the independent-support shortage, $A_j$ the support--difficulty alignment, $S_{\mathrm{div},j}$ the diversity shortage, and $u_{g[j]}$ a random intercept over dataset--target groups that absorbs level differences between datasets. Observation errors come from the bootstrap distributions of the corresponding endpoints.
 
-These models are not fitted in this report, and the reason is structural rather than practical. The quantity that makes Equation~\eqref{eq:rq3-model} worth fitting is $\sigma_u$, the scale of the dataset--target intercepts, which answers whether a shortage-to-damage association is a property of the mechanism or of the dataset. A scale parameter over a single group is not identified: the per-partition fits computed here return $\sigma_u=\num{0.368}$ on every one, which is the prior scale rather than an estimate, and the leave-one-group-out diagnostic that the protocol specifies as the models' only accuracy check has nothing to hold out. Reporting coefficients under those conditions would present a prior as a finding.
+The BRACS cells are complete, but the combined models await the planned TCGA-UT benchmark because the between-dataset variance is not identifiable from one dataset--target group. The recorded BRACS cells allow the combined fit to be assembled without repeating its bootstrap. Binary targets remain excluded because support--difficulty alignment over two classes is always $\pm 1$ and would confound the pooled coefficient.
 
-The per-partition cells are computed and frozen so that the combined fit can be assembled without repeating the bootstrap. Two properties of the design bound what that fit will be able to say even once a second multiclass dataset is available. The identifiability guard excludes binary-target cells from both fits, because a support--difficulty alignment computed over two classes is always $\pm 1$ and would confound the pooled coefficient, so only multiclass datasets can contribute groups. And with two groups $\sigma_u$ is estimable but weakly, while leave-one-group-out reduces to two single-group holdouts. Any RQ3 conclusion reached at that point will be a two-group statement, and Section~\ref{sec:discussion-requirements} marks the design requirement that depends on it as open.
+\emph{Placeholder: TCGA-UT estimates and the combined RQ3 fit will be added here after that benchmark is complete.}
 
 What can be said without the models is what Section~\ref{sec:rq1-discrimination} establishes descriptively. Damage rises monotonically with achieved severity under all three assignments; it is roughly three times larger under the difficulty-reversed assignment than under the aligned one at matched severity; and the independent-support axis produces damage at a fifth to a quarter of the nominal dose, which is the single observation in this report that a nominal-only account of shortage cannot absorb.
 
@@ -316,15 +260,15 @@ The preceding sections establish what the controlled allocations damaged and how
 
 \subsection{What the evidence supports}
 \label{sec:discussion-evidence}
-On RQ1, both manipulated axes damage the endpoints, and they damage them differently. Nominal deprivation opened the discrimination gate in eight of its nine units and the probability-quality gate in eight, with damage growing in severity and in assignment adversity, and landing on the body tier rather than the tail wherever the assignment gives the easiest classes the least support. Independent-support deprivation, at a fifth to a quarter of the nominal dose and with patch counts held exactly equal, opened the discrimination gate in all three of its units at deficits of \num{0.026} to \num{0.030}, and fell just under the probability-quality threshold at \num{0.132} to \num{0.135} nats. The two axes are therefore not redundant: a class can be measurably underserved with no shortfall in its patch count at all.
+On RQ1, both manipulated axes damage the endpoints, and they damage them differently. Nominal deprivation opened the discrimination gate in eight of its nine units and the probability-quality gate in eight, with damage growing in severity and in assignment adversity, and landing on the body tier rather than the tail wherever the assignment gives the easiest classes the least support. Independent-support deprivation, at a fifth to a quarter of the nominal dose and with patch counts held exactly equal, opened the discrimination gate in all three of its units at deficits of \num{2.6}--\num{3.0} percentage points, and fell just under the probability-quality threshold at \num{0.132}--\num{0.135} nats. The two axes are therefore not redundant: a class can be measurably underserved with no shortfall in its patch count at all.
 
-On RQ2, recovery separates the confirmatory family into two groups along the same split in every unit where anything recovers, and the split is by signal, not by intervention strength. Prevalence-weighted and class-balanced cross-entropy return most of both deficits on the nominal axis; independent-support, difficulty, and diversity weighting return essentially none of the discrimination deficit and degrade tail-group probability quality in all \num{24} of their calibration cells, every one surviving multiplicity adjustment. The matched-$\beta$ diagnostic excludes tuned weight strength as the explanation. On the independent-support axis nothing recovers: not the matched member, not the prevalence corner, and not one of the nine exploratory mechanisms, and the direct matched-versus-unmatched contrast is \num{0.0006} balanced accuracy with an interval covering zero.
+On RQ2, recovery separates the confirmatory family into two groups along the same split in every unit where anything recovers, and the split is by signal, not by intervention strength. Prevalence-weighted and class-balanced cross-entropy return most of both deficits on the nominal axis; independent-support, difficulty, and diversity weighting return essentially none of the discrimination deficit and degrade tail-group probability quality in all \num{24} of their calibration cells, every one surviving multiplicity adjustment. The matched-$\beta$ diagnostic excludes tuned weight strength as the explanation. On the independent-support axis nothing recovers: not the matched member, not the prevalence corner, and not one of the nine exploratory mechanisms. The direct matched-versus-unmatched contrast is \num{0.06} percentage points of balanced accuracy with an interval covering zero.
 
-On RQ3 the report makes no claim. The models are specified and their cells are frozen; the fit requires a second multiclass dataset--target group before its variance components mean anything.
+RQ3 remains pending until the TCGA-UT results and combined fit are added in Section~\ref{sec:rq3}.
 
 \subsection{Which shortage a mitigation method must read}
 \label{sec:discussion-signal}
-A method must estimate the shortage that binds, so the empirical question is whether the dominant shortage was identifiable and whether reading it helped. On this dataset the dominant shortage was identifiable in nine of \num{12} units, and reading it helped only where it was nominal support. That much repeats a familiar conclusion. What is new is the case in which the dominant shortage is independent support and reading it still does not help.
+A method must estimate the shortage that binds, so the empirical question is whether the dominant shortage was identifiable and whether reading it helped. On this dataset the dominant shortage was identifiable in nine of \num{12} units, and reading it helped only where it was nominal support. The more informative case is the one in which the dominant shortage is independent support and reading it still does not help.
 
 That case is a real measurement rather than a structural artefact. In a design where a single per-class evidence pool serves every condition, independent support cannot vary, and a method built to read it is being tested on conditions in which the quantity it reads is constant --- a null under those circumstances says nothing. The spread arm removes that objection: independent support varies by \num{0.41} to \num{0.67} nats between the two arms, the pools are nested so the manipulation adds patients rather than exchanging them, and the resulting deficit is large enough to open a prespecified gate. Independent-support weighted cross-entropy then recovers \num{0.013} to \num{0.015} of it. The inference the evidence supports is that a mean-one class weight computed from patient counts does not repair damage caused by a shortage of patients, at this dose, on this dataset.
 
@@ -344,7 +288,7 @@ The roster's harmful members sharpen that reading. Classifier retraining and set
 \label{sec:discussion-ceiling}
 The units that define an unmet need are those in which a gate opened and no method, confirmatory or exploratory, returned a substantial fraction of the deficit. On this dataset there are four of them, out of eleven discrimination-gate units. Three are the independent-support units, where nothing recovers at all. The fourth is difficulty-aligned severe (spread), where the best tested mechanism of any kind reaches \num{0.57}. A fifth case sits on the other axis: the native severe (spread) unit, where both prevalence-corner members return negative probability-quality recovery even though both repair most of the same unit's discrimination deficit.
 
-This is the finding that most changes what a new method would be for. The ceiling on the nominal axis is set by neither the data nor the frozen representation --- existing mechanisms reach most of that damage, and a new method cannot be motivated there by damage left unrepaired. The ceiling on the independent-support axis is set by the mechanism the whole roster shares. A method motivated by this benchmark is therefore a method for the second regime, and its claim would be a claim about patient-level evidence rather than about class counts.
+This is the finding that most changes what a new method would be for. The ceiling on the nominal axis is set by neither the data nor the fixed representation --- existing mechanisms reach most of that damage, and a new method cannot be motivated there by damage left unrepaired. The ceiling on the independent-support axis is set by the mechanism the whole roster shares. A method motivated by this benchmark is therefore a method for the second regime, and its claim would be a claim about patient-level evidence rather than about class counts.
 
 The complementary case remains part of the specification. The difficulty-aligned moderate condition damaged probability quality without a certifiable discrimination deficit, and the three independent-support units damaged discrimination without a certifiable probability-quality deficit. A method that intervenes on the wrong axis spends capacity and risks degrading an endpoint that was not damaged, and Section~\ref{sec:rq2-calibration} shows that risk is real: in all \num{24} cells where a non-prevalence signal was applied to a calibration-damaged unit, tail-group probability quality fell below the untreated reference. Knowing when, and on which axis, not to act is part of the specification rather than an afterthought.
 
@@ -354,28 +298,22 @@ The preceding subsections resolve into a set of requirements for a mitigation me
 \begin{enumerate}
   \item Where the shortage is nominal, the method must read prevalence or nominal support, and must not rely on a difficulty or diversity estimate as its primary signal. \emph{Confirmatory}, from the five-family separation in Table~\ref{tab:confirmatory} across the eight nominal-axis discrimination units.
   \item It must not degrade tail-group probability quality while repairing discrimination. \emph{Confirmatory}, from the \num{24} negative calibration-recovery cells in Table~\ref{tab:calibration-recovery}, all of which survive Holm adjustment.
-  \item It must decline to intervene where allocation produced no material deficit on the axis it targets, which on this dataset is the difficulty-aligned moderate condition on discrimination and the three independent-support units on probability quality. \emph{Confirmatory}, from the gate routing in Table~\ref{tab:gate-routing}.
+  \item It must decline to intervene where allocation produced no material deficit on the axis it targets, which on this dataset is the difficulty-aligned moderate condition on discrimination and the three independent-support units on probability quality. \emph{Confirmatory}, from Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration}.
   \item Independent-support shortage requires a mechanism other than per-class loss reweighting. \emph{Confirmatory within this dataset}, from the joint null of the confirmatory family and the exploratory roster on the three balanced units. \emph{Open across datasets}: this cohort carries the weakest independent dose the candidate datasets offer, so a replication at a stronger dose is needed before the null is read as a property of reweighting rather than of this dose.
   \item It must not require access to test prevalence, labelled data beyond the training partition, or per-condition tuning that a deployment could not perform. \emph{Design constraint}, carried from the protocol rather than established by a result here.
-  \item Whether the shortage estimate must be formed per condition rather than transferred across datasets. \emph{Open}: this is the requirement RQ3's variance components were specified to settle, and it needs at least a second multiclass dataset--target group before Equation~\eqref{eq:rq3-model} can be fitted.
+  \item Whether the shortage estimate must be formed per condition rather than transferred across datasets. \emph{Pending TCGA-UT}: this is the requirement RQ3's variance components were specified to settle.
 \end{enumerate}
-\noindent Requirements four and six are the two that a second dataset changes, and they are the two on which a method design should not be committed yet.
+\noindent Requirements four and six will be reassessed after the TCGA-UT analysis.
 
-\subsection{What a single dataset cannot settle}
+\subsection{Pending TCGA-UT analysis}
 \label{sec:discussion-open}
-Four questions are left open deliberately, and are listed here so that they are not inferred from silence.
-
-The first is whether the independent-support null generalizes. The independent dose realized here, \num{0.41} to \num{0.67} nats, is the weakest of the four datasets on which the crossed construction was measured; a multiclass cohort with a larger patient inventory reaches \num{1.46} to \num{1.79} nats, close to the nominal step itself. If reweighting fails there too, the negative result becomes a statement about the mechanism. If it succeeds there, the result becomes a statement about dose, and requirement four above is withdrawn.
-
-The second is RQ3 in full, as set out in Section~\ref{sec:rq3}. The third is the external validity of the two deficit thresholds, which are derived from this dataset's own confirmation-seed dispersion and therefore calibrate materiality to it; whether they are comparable in scale to thresholds derived the same way elsewhere is unverified, and every gate decision in this report inherits that limit.
-
-The fourth is not deferred but excluded. Whether damage grows as a fixed budget is split among fewer classes is a question about binary and low-cardinality targets, and the binary cells lie outside the scope of this programme. It is recorded here as a boundary of the design rather than as pending work.
+\emph{Placeholder: this subsection will report whether the independent-support result replicates on TCGA-UT, compare dataset-specific materiality thresholds, and interpret the combined RQ3 model.} Binary and low-cardinality targets remain outside that model because support--difficulty alignment over two classes is structurally fixed at $\pm 1$.
 
 \section{Conclusion and Scope}
 \label{sec:limits}
-This report answers two of the protocol's three questions on one dataset. Controlled allocation damages tail-class discrimination and probability quality along two axes that ordinary imbalance confounds, and the crossed construction separates them: nominal patch deprivation and independent patient deprivation each open a prespecified gate, at doses that differ by a factor of four to five. Signal-matched mitigation recovers most of the nominal damage through prevalence and nominal-support weighting alone, and recovers none of the independent-support damage through any tested signal or any tested mechanism. The contribution is the design evidence assembled in Section~\ref{sec:discussion}, which states what a mitigation method must read, what it must not degrade, where it must decline to act, and --- for the first time under this protocol --- a regime in which the existing roster leaves the damage standing.
+The current BRACS results answer the first two protocol questions. Controlled allocation damages tail-class discrimination and probability quality along two axes that ordinary imbalance confounds: nominal patch deprivation and independent patient deprivation. Signal-matched mitigation recovers most nominal damage through prevalence and nominal-support weighting, but no tested signal or mechanism recovers the independent-support damage. Section~\ref{sec:discussion} converts this evidence into requirements for what a mitigation method must read, what it must not degrade, and where it must decline to act. RQ3 will be completed with TCGA-UT.
 
-Five scope conditions bound every claim above. The evidence comes from one dataset, so no statement here is a statement about transfer, and Section~\ref{sec:discussion-open} lists the questions a second multiclass dataset is required to close. The three partitions are locked design repetitions of that dataset, not independent cohorts, so the intervals quantify variation across partitionings and initializations rather than across populations. The three independent-support units share a single treated allocation and differ only in their reference arm, so they are correlated readings rather than three replicates. The benchmark covers patch classification only, where each prediction unit carries its own label; at whole-slide level, reallocating labelled slides changes nominal and independent support together, so the two axes could not be separated in the way this design requires. And temperature scaling is reported as a diagnostic throughout and never gates a decision.
+Four conditions bound the current claims. The three partitions are repeated partitions of BRACS, not independent cohorts, so the intervals quantify variation across partitioning and initialization rather than across populations. The three independent-support units share one deprived allocation and differ only in their reference assignment, so they are correlated readings rather than three replications. The benchmark covers patch classification only, where each prediction unit carries its own label; at whole-slide level, reallocating labelled slides changes nominal and independent support together. Temperature scaling is reported as a diagnostic and never determines whether recovery is analysed.
 
 \appendix
 \phantomsection
@@ -384,7 +322,7 @@ Five scope conditions bound every claim above. The evidence comes from one datas
 
 \section{Realized Conditions and Analysis Validity}
 \label{app:realized}
-This appendix carries the execution record that Section~\ref{sec:rq1} summarizes in prose. It documents what the frozen construction realized and whether the conditions required for the confirmatory inference to be valid were met.
+This appendix carries the execution record that Section~\ref{sec:rq1} summarizes in prose. It documents the realized construction and whether the conditions required for confirmatory inference were met.
 
 \subsection{Realized construction}
 \label{app:realized-construction}
@@ -453,7 +391,7 @@ Three further properties of the selections change what a method label denotes an
 
 One consequence of that reduction is a defect in the search rather than in the fitted models, and it is recorded rather than repaired because repairing it would change the tuning protocol between this dataset and any replication. The search treats focal loss as anchored to plain cross-entropy, so its $\gamma = 0$ candidate is scored using cross-entropy's already-computed validation metrics instead of being trained. Because $\alpha$ applies unconditionally, that candidate is in fact class-weighted cross-entropy and not plain cross-entropy, so the seven selections that landed on $\gamma = 0$ were made against the wrong metrics. The confirmation runs train the correct objective, and focal loss is an exploratory roster member that enters no confirmatory test, so no gated or Holm-adjusted quantity in this report depends on it; its recovery estimates in Table~\ref{tab:roster-recovery} should nonetheless be read as estimates of a configuration that was not selected on its own evidence.
 
-Two deviations from the locked protocol were made before any definitive gate row was read. The two deficit-gate thresholds were derived rather than assumed: the protocol had fixed $D_{\mathrm{BA}} \ge \num{0.02}$ and $D_{\mathrm{cal}} \ge \num{0.05}$ nats without a stated derivation, and the discrimination value conflicted with the support pilot's own materiality constant of \num{0.01} for the same endpoint under the same kind of manipulation. Both were replaced by quantities the protocol already fixes, $\max(\num{0.01}, 2\sigma_{\mathrm{seed}})=\num{0.01443}$ for discrimination and $2\sigma_{\mathrm{seed}}=\num{0.14782}$ nats for calibration, where $\sigma_{\mathrm{seed}}$ is the confirmation-seed standard deviation of the corresponding balanced-condition endpoint on this dataset. Separately, the gate-defining estimator is case-macro rather than patch-micro, and the evidence cell is pooled across a case's partition appearances rather than taken per partition; both correct a mismatch between a diagnostic and the estimator it certifies, since the bootstrap draws one shared weight per case over the union of the three test frames.
+Two deviations from the locked protocol were made before any definitive gate row was read. The two deficit-gate thresholds were derived rather than assumed: the protocol had fixed discrimination at \num{2} percentage points and calibration at \num{0.05} nats without a stated derivation, while the discrimination value conflicted with the support pilot's \num{1}-percentage-point materiality constant for the same endpoint under the same kind of manipulation. Both were replaced by quantities the protocol already fixes: $\max(\num{1}, 2\sigma_{\mathrm{seed}})=\num{1.443}$ percentage points for discrimination and $2\sigma_{\mathrm{seed}}=\num{0.14782}$ nats for calibration, where $\sigma_{\mathrm{seed}}$ is the confirmation-seed standard deviation of the corresponding balanced-condition endpoint on this dataset. Separately, the gate-defining estimator is case-macro rather than patch-micro, and the evidence cell is pooled across a case's partition appearances rather than taken per partition; both correct a mismatch between a diagnostic and the estimator it certifies, since the bootstrap draws one shared weight per case over the union of the three test frames.
 
 \subsection{Method diagnostics}
 \label{app:method-diagnostics}
@@ -467,6 +405,28 @@ Semantic-scale weighted cross-entropy falls back to a raw weight of \num{1}, tha
 \endgroup
 
 \noindent The fallback never fired: \num{0} invalid draws against \num{195} reweighting pools across the three partitions. The diversity-weighted results in Section~\ref{sec:rq2} therefore measure the intended weighting rather than a degenerate fallback.
+
+\clearpage
+\section{Aggregate Damage Estimates}
+\label{app:damage-estimates}
+Tables~\ref{tab:discrimination-deficit} and~\ref{tab:calibration-deficit} provide the assignment-level estimates summarized in Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration}.
+
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \resultstable{discrimination_deficit}
+  \caption{Balanced-accuracy deficit with paired \num{95}\% intervals.}
+  \label{tab:discrimination-deficit}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \resultstable{calibration_deficit}
+  \caption{Tail-group negative-log-likelihood deficit with paired \num{95}\% intervals and secondary expected calibration error.}
+  \label{tab:calibration-deficit}
+\end{table}
 
 \section{Per-Class and Tier Endpoints}
 \label{app:endpoints}
@@ -535,7 +495,7 @@ The main text averages the three partitions with equal weight, which is only def
 \label{tab:per-split}
 \endgroup
 
-\noindent No gate decision rests on a single partition, but the independent-support axis is the least uniform across them and this qualifies its reading. Its three units clear the \num{0.01443} discrimination threshold in two of the three partitions and fall to \num{0.0030} to \num{0.0064} on the second, against \num{0.0540} to \num{0.0597} on the third; the equal-weight average that opens the gate is therefore carried by two partitions rather than three. On the nominal axis the pattern is steadier: every gate-passing unit clears the threshold in all three partitions except difficulty-aligned severe, whose smallest partition-level deficit is \num{0.0119}. On the calibration axis the three balanced units are consistent in falling below threshold, and among the eight gate-passing units the reversed moderate condition is the most variable, ranging from \num{0.037} to \num{1.814} nats. Achieved severity itself varies across partitions by at most \num{0.002} in relative terms, well inside the \num{0.5} consistency guard.
+\noindent No gate decision rests on a single partition, but the independent-support axis is the least uniform across them and this qualifies its reading. Its three units clear the \num{1.44}-percentage-point discrimination threshold in two of the three partitions and fall to \num{0.30}--\num{0.64} percentage points on the second, against \num{5.40}--\num{5.97} on the third; the equal-weight average that opens the gate is therefore carried by two partitions rather than three. On the nominal axis the pattern is steadier: every gate-passing unit clears the threshold in all three partitions except difficulty-aligned severe, whose smallest partition-level deficit is \num{1.19} percentage points. On the calibration axis the three balanced units are consistent in falling below threshold, and among the eight gate-passing units the reversed moderate condition is the most variable, ranging from \num{0.037}--\num{1.814} nats. Achieved severity itself varies across partitions by at most \num{0.002} in relative terms, well inside the \num{0.5} consistency guard.
 
 The conclusions of Section~\ref{sec:rq2} are less exposed to this variation than the gate decisions are, because the recovery estimates on the independent-support axis are null in every partition rather than null only on average. The qualification attaches to the size of the independent-support deficit, not to the finding that nothing recovers it.
 
