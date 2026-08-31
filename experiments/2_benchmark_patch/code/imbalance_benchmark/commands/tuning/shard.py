@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
-from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from typing import Any
-
-import torch
 
 from imbalance_benchmark.common import split_paths
 from imbalance_benchmark.commands.tuning import (
@@ -15,14 +13,14 @@ from imbalance_benchmark.commands.tuning import (
     _tuning_seeds,
     load_shard_scope,
 )
-from imbalance_benchmark.datasets.features.cache import reset_feature_bank
-from imbalance_benchmark.modeling.context import Regime, roster_for_condition
-from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
-    TuningScope,
+from imbalance_benchmark.commands.tuning.shard_workers import (
+    _run_packed,
+    run_round_shards,
 )
+from imbalance_benchmark.datasets.features.cache import reset_feature_bank
+from imbalance_benchmark.modeling.context import roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     _bundle_indices,
-    round_overridden_scopes,
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import selected_ce
 from imbalance_benchmark.modeling.workflows.tuning.tuning_reduction import ReduceRound
@@ -32,11 +30,8 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_shards import (
 )
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
     array_coordinates,
-    combined_scopes,
     condition_is_reusable,
-    phase_methods,
     requested_shard,
-    resolve_round_shard_spec,
 )
 
 __all__ = ["cmd_tune_shard"]
@@ -50,16 +45,23 @@ def _execute_shards(
     accepted: list[set[str]],
     indices: list[int],
     spec_for: Callable[[int], ShardSpec | None],
+    parallel_fits: int = 1,
 ) -> None:
-    """Run every resolvable index, reusing built scopes per (condition, scoped) key."""
-    for index in indices:
-        spec = spec_for(index)
-        if spec is not None:
-            _run_scope_local_shard(args, base, freeze, fingerprint, accepted, spec)
+    """Run every resolvable index, packing up to ``parallel_fits`` fits per GPU.
+
+    ``indices`` is resolved to concrete specs here, once, by ``spec_for`` --
+    the sole authority for the index-to-work-item mapping. Any packed
+    children only ever receive already-resolved specs.
+    """
+    specs = [
+        spec for spec in (spec_for(index) for index in indices) if spec is not None
+    ]
+    run_one = partial(_run_scope_local_shard, args, base, freeze, fingerprint, accepted)
+    _run_packed(run_one, specs, parallel_fits)
 
 
 def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
-    """Run candidate indices sequentially with one loaded frozen MIL context."""
+    """Run candidate indices with one loaded frozen MIL context, packed per GPU."""
     if args.group is None:
         raise ValueError("--group is required for a round-0 shard")
     base, _, freeze, fingerprint, accepted = _frozen_shard_context(args, False)
@@ -82,35 +84,16 @@ def _run_shards(args: argparse.Namespace, indices: list[int]) -> None:
             observation,
         )
 
-    _execute_shards(base, args, freeze, fingerprint, accepted, indices, _spec_for)
-
-
-def _run_round_shards(args: argparse.Namespace, indices: list[int]) -> None:
-    """Run round>0 candidate indices: only genuinely new configs are trained."""
-    if args.condition is None:
-        raise ValueError("--condition is required for a round>0 shard")
-    base, scopes, freeze, fingerprint, accepted = _frozen_shard_context(args)
-    if any(_is_excluded(paths) for paths, _, _ in scopes):
-        return
-    methods = phase_methods(scopes[0][1].is_mil, args.phase, args.condition)
-    overridden = round_overridden_scopes(
-        base["data"], args.condition, args.phase, scopes, methods
+    _execute_shards(
+        base,
+        args,
+        freeze,
+        fingerprint,
+        accepted,
+        indices,
+        _spec_for,
+        getattr(args, "parallel_fits", 1),
     )
-
-    def _spec_for(index: int) -> ShardSpec | None:
-        candidate, observation = array_coordinates(
-            index, args.observation_index, args.observations_per_candidate
-        )
-        spec = resolve_round_shard_spec(
-            base["data"], args.condition, candidate, args.phase, methods
-        )
-        return replace(spec, observation_index=observation) if spec else None
-
-    built: dict[tuple[str, tuple[str, ...]], list[TuningScope]] = {}
-    for index in indices:
-        spec = _spec_for(index)
-        if spec is not None:
-            _run_shard(base, overridden, freeze, fingerprint, accepted, built, spec)
 
 
 def _split_paths(base: dict[str, Path]) -> list[dict[str, Path]]:
@@ -180,43 +163,6 @@ def _run_scope_local_shard(
     )
 
 
-def _run_shard(
-    base: dict[str, Path],
-    raw_scopes: list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
-    freeze: dict[str, Any],
-    fingerprint: list[str],
-    accepted: list[set[str]],
-    built: dict[tuple[str, tuple[str, ...]], list[TuningScope]],
-    spec: ShardSpec,
-) -> None:
-    """Run one shard, reusing ``built``'s cached scopes per (condition, scoped) key."""
-    assignments = tuple(freeze.get("tail_assignments", {"native": []}))
-    if condition_is_reusable(
-        base,
-        spec.condition,
-        roster_for_condition(raw_scopes[0][1].is_mil, spec.condition),
-        assignments,
-        fingerprint,
-        accepted,
-    ):
-        return
-    scoped = ("native",) if spec.condition in {"natural", "balanced"} else assignments
-    key = (spec.condition, scoped)
-    if key not in built:
-        built[key] = combined_scopes(raw_scopes, spec.condition, scoped, [])
-    fresh_cost_records: list[dict[str, int]] = []
-    run_candidate_shard(
-        spec,
-        [replace(scope, cost_records=fresh_cost_records) for scope in built[key]],
-        _tuning_seeds(freeze),
-        ReduceRound(fingerprint, accepted=accepted),
-        base["data"],
-        selected_ce(base["data"], spec.condition)
-        if spec.phase == "dependent"
-        else None,
-    )
-
-
 def cmd_tune_shard(args: argparse.Namespace) -> None:
     """Run one resumable frozen-candidate shard."""
     if args.shards_per_task < 1:
@@ -228,6 +174,6 @@ def cmd_tune_shard(args: argparse.Namespace) -> None:
         args.bundle_by_observation,
     )
     if getattr(args, "round", 0):
-        _run_round_shards(args, indices)
+        run_round_shards(args, indices)
     else:
         _run_shards(args, indices)

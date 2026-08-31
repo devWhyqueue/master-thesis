@@ -94,22 +94,22 @@ def _reserve_bank(rows: list[torch.Tensor], capacity: int) -> None:
             "Feature bank capacity hint is smaller than its unique rows."
         )
     if _BANK is None:
-        first = rows[0].float()
+        first = rows[0]
         _BANK_CAPACITY = capacity
         _BANK = torch.empty(
             (capacity, *first.shape),
-            dtype=torch.float32,
+            dtype=first.dtype,
             device=_target_bank_device(
                 os.environ, capacity * first.numel() * first.element_size()
             ),
         )
-    if any(row.shape != _BANK.shape[1:] for row in rows):
+    if any(row.shape != _BANK.shape[1:] or row.dtype != _BANK.dtype for row in rows):
         raise ValueError("Feature bank rows must share dtype and shape.")
     start = len(_ROWS) - len(rows)
     for offset in range(0, len(rows), _BANK_COPY_CHUNK):
         chunk = rows[offset : offset + _BANK_COPY_CHUNK]
         _BANK[start + offset : start + offset + len(chunk)].copy_(
-            torch.stack(chunk).float(), non_blocking=True
+            torch.stack(chunk), non_blocking=True
         )
 
 

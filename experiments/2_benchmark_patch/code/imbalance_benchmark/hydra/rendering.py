@@ -5,7 +5,7 @@ import posixpath
 import shlex
 from typing import Any
 
-from imbalance_benchmark.common import EXPERIMENT_ROOT
+from imbalance_benchmark.common import EXPERIMENT_ROOT, resolve_partitioned_setting
 from imbalance_benchmark.hydra.squashfs import (
     _generated_tile_squashfs,
     _mount_generated_tile_lines,
@@ -129,7 +129,9 @@ def _directives(job: SlurmJob, root: str, config: dict[str, Any]) -> list[str]:
             if job.array_indices
             else f"0-{array_size - 1}"
         )
-        concurrency = config.get("slurm", {}).get("max_array_concurrency")
+        concurrency = resolve_partitioned_setting(
+            config.get("slurm", {}).get("max_array_concurrency"), job.partition
+        )
         throttle = f"%{int(concurrency)}" if concurrency else ""
         lines.append(f"#SBATCH --array={indices}{throttle}")
     if job.dependencies:
@@ -194,27 +196,22 @@ def _execution_lines(
     return lines
 
 
+def _binds_for(slurm: dict[str, Any], stage: str, key: str, mode: str) -> str:
+    paths = [
+        str(item["path"])
+        for item in slurm.get(key, [])
+        if stage in item.get("stages", ())
+    ]
+    return " ".join(f"-B {shlex.quote(f'{path}:{path}:{mode}')}" for path in paths)
+
+
 def _data_binds(config: dict[str, Any], stage: str) -> str:
     """Return stage-scoped data mounts, defaulting to read-only shared storage."""
     slurm = config.get("slurm", {})
-    readonly = [
-        str(item["path"])
-        for item in slurm.get("readonly_paths", [])
-        if stage in item.get("stages", ())
-    ]
-    writable = [
-        str(item["path"])
-        for item in slurm.get("writable_paths", [])
-        if stage in item.get("stages", ())
-    ]
-    readonly_binds = " ".join(
-        f"-B {shlex.quote(f'{path}:{path}:ro')}" for path in readonly
-    )
+    readonly_binds = _binds_for(slurm, stage, "readonly_paths", "ro")
     if not readonly_binds:
         readonly_binds = '-B "/home/space:/home/space:ro"'
-    writable_binds = " ".join(
-        f"-B {shlex.quote(f'{path}:{path}:rw')}" for path in writable
-    )
+    writable_binds = _binds_for(slurm, stage, "writable_paths", "rw")
     return " ".join(part for part in (readonly_binds, writable_binds) if part)
 
 

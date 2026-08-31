@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -8,110 +7,20 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.inference.gates import confidence_interval
-from imbalance_benchmark.analysis.metrics import assign_tiers
-from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.analysis.reporting.secondary_intervals.calibration_intervals import (
-    _complete_result_keys,
     write_crossed_calibration_table,
 )
 from imbalance_benchmark.analysis.reporting.secondary_intervals.costs import (
     write_cost_comparison_table,
 )
-from imbalance_benchmark.common import split_paths
+from imbalance_benchmark.analysis.reporting.secondary_intervals.interval_cache import (
+    distributions_by_key,
+)
 
 __all__ = ["secondary_interval_rows", "write_interval_tables"]
 
 logger = logging.getLogger(__name__)
-
-
-def _locked_tiers(
-    paths: dict[str, Path], assignment: str, condition: str, class_names: list[str]
-) -> dict[str, str]:
-    freeze_path = paths["data"] / "manifest_freeze.json"
-    if not freeze_path.exists():
-        return {}
-    freeze = json.loads(freeze_path.read_text(encoding="utf-8"))
-    allocated = (
-        freeze.get("assignment_conditions", {})
-        .get(assignment, {})
-        .get(condition, {})
-        .get("allocated_counts", {})
-    )
-    if not allocated:
-        return {}
-    order = freeze.get("tail_assignments", {}).get(assignment, class_names)
-    return assign_tiers(class_names, allocated, order)
-
-
-def _split_distributions(
-    base_paths: dict[str, Path],
-    contexts: list[BootstrapContext],
-    is_mil: bool,
-    ordinal: bool,
-    assignment: str,
-    condition: str,
-    method: str,
-) -> list[dict[str, np.ndarray]]:
-    distributions = []
-    for index in range(3):
-        paths = split_paths(base_paths, index)
-        record = load_seed_predictions(paths, condition, method, assignment)
-        if record is None:
-            raise RuntimeError(
-                f"Missing secondary endpoints for {assignment}/{condition}/{method}"
-            )
-        class_names = list(record["class_names"])
-        tiers = _locked_tiers(paths, assignment, condition, class_names)
-        context = contexts[index]
-        current = context.secondary_distributions(
-            np.asarray(record["labels"]),
-            np.asarray(record["preds"]),
-            np.asarray(record["probs"]),
-            class_names,
-            tiers,
-            is_mil=is_mil,
-            ordinal=ordinal,
-        )
-        scaled = context.probability_secondary_distributions(
-            np.asarray(record["labels"]),
-            np.asarray(record["temperature_scaled_probs"]),
-            class_names,
-            tiers,
-        )
-        current.update(
-            {f"temperature_scaled_{name}": values for name, values in scaled.items()}
-        )
-        distributions.append(current)
-    return distributions
-
-
-def _distributions_by_key(
-    base_paths: dict[str, Path],
-    is_mil: bool,
-    ordinal: bool,
-    n_replicates: int,
-    seed: int,
-) -> dict[tuple[str, str, str], dict[str, np.ndarray]]:
-    keys = sorted(_complete_result_keys(base_paths))
-    # Contexts depend only on the split (paths/is_mil/n_replicates/seed), never on
-    # assignment/condition/method -- build the 3 once instead of once per key.
-    contexts = [
-        BootstrapContext(split_paths(base_paths, index), is_mil, n_replicates, seed)
-        for index in range(3)
-    ]
-    distributions = {}
-    for step, key in enumerate(keys, start=1):
-        assignment, condition, method = key
-        logger.info(
-            "interval: %s/%s/%s %d/%d", assignment, condition, method, step, len(keys)
-        )
-        split_values = _split_distributions(
-            base_paths, contexts, is_mil, ordinal, assignment, condition, method
-        )
-        distributions[key] = _average_split_values(split_values)
-    return distributions
 
 
 def secondary_interval_rows(
@@ -221,7 +130,7 @@ def write_interval_tables(
     is_mil = dataset.get("regime", "patch") == "wsi"
     ordinal = is_mil and dataset.get("name") == "panda"
     logger.info("interval: endpoint distributions")
-    distributions = _distributions_by_key(
+    distributions = distributions_by_key(
         base_paths, is_mil, ordinal, n_replicates, seed
     )
     logger.info("interval: calibration table")

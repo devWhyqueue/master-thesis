@@ -25,6 +25,7 @@ __all__ = [
     "compute_data_hash",
     "write_run_record",
     "read_run_record",
+    "resolve_partitioned_setting",
 ]
 
 
@@ -240,3 +241,10 @@ def read_run_record(
     if requested_fields and npz_path.exists():
         _load_requested_arrays(record, npz_path, requested_fields)
     return record
+
+
+def resolve_partitioned_setting(
+    setting: int | dict[str, int] | None, partition: str
+) -> int | None:
+    """Return a flat value as-is, or the value keyed by ``partition`` from a dict."""
+    return setting.get(partition) if isinstance(setting, dict) else setting

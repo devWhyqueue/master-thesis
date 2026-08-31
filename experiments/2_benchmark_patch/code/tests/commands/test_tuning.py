@@ -7,6 +7,7 @@ import torch
 
 from imbalance_benchmark.commands import tuning
 from imbalance_benchmark.commands.tuning import shard as tuning_shard
+from imbalance_benchmark.commands.tuning import shard_workers
 from imbalance_benchmark.commands.confirm import require_tuning_configs
 from imbalance_benchmark.modeling.context import Regime
 from imbalance_benchmark.modeling.workflows.tuning.aggregation import (
@@ -233,15 +234,15 @@ def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
     base_scopes = [
         TuningScope(regime, object(), object(), split_index=i) for i in range(3)
     ]
-    monkeypatch.setattr(tuning_shard, "condition_is_reusable", lambda *_: False)
-    monkeypatch.setattr(tuning_shard, "combined_scopes", lambda *_a, **_k: base_scopes)
+    monkeypatch.setattr(shard_workers, "condition_is_reusable", lambda *_: False)
+    monkeypatch.setattr(shard_workers, "combined_scopes", lambda *_a, **_k: base_scopes)
     captured: list[list[TuningScope]] = []
 
     def fake_run_candidate_shard(spec, scopes, seeds, reduce_round, output_root, stage):
         del spec, seeds, reduce_round, output_root, stage
         captured.append(scopes)
 
-    monkeypatch.setattr(tuning_shard, "run_candidate_shard", fake_run_candidate_shard)
+    monkeypatch.setattr(shard_workers, "run_candidate_shard", fake_run_candidate_shard)
     freeze = {
         "seed_roles": {"tuning_initialization_0": 1, "tuning_initialization_1": 2},
         "tail_assignments": {"native": []},
@@ -250,8 +251,8 @@ def test_run_shard_shares_one_cost_records_list_across_a_bundles_scopes(
     built: dict = {}
 
     base = {"data": None}
-    tuning_shard._run_shard(base, [(None, regime, None)], freeze, ["fp"], [], built, spec)
-    tuning_shard._run_shard(base, [(None, regime, None)], freeze, ["fp"], [], built, spec)
+    shard_workers._run_shard(base, [(None, regime, None)], freeze, ["fp"], [], built, spec)
+    shard_workers._run_shard(base, [(None, regime, None)], freeze, ["fp"], [], built, spec)
 
     first, second = captured
     assert len({id(s.cost_records) for s in first}) == 1

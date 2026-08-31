@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from imbalance_benchmark.analysis.reporting.secondary_intervals.report import (
+from imbalance_benchmark.analysis.reporting.secondary_intervals.interval_cache import (
     _locked_tiers,
 )
 from imbalance_benchmark.common import compute_sha256
@@ -16,6 +16,7 @@ from imbalance_benchmark.common import dataset_provenance
 from imbalance_benchmark.common import load_config
 from imbalance_benchmark.common import sign_file
 from imbalance_benchmark.common import split_paths
+
 
 def _write_freeze_fixture(tmp_path: Path) -> Path:
     """Config + three signed patient-split manifests, ready for cmd_freeze."""
@@ -59,14 +60,13 @@ def _write_freeze_fixture(tmp_path: Path) -> Path:
         sign_file(pilot)
     return config_path
 
+
 def test_locked_tiers_read_the_current_split_freeze(tmp_path: Path) -> None:
     paths = {"root": tmp_path / "split=1", "data": tmp_path / "split=1" / "data"}
     paths["data"].mkdir(parents=True)
     freeze = {
         "assignment_conditions": {
-            "native": {
-                "severe": {"allocated_counts": {"A": 10, "B": 100}}
-            }
+            "native": {"severe": {"allocated_counts": {"A": 10, "B": 100}}}
         },
         "tail_assignments": {"native": ["B", "A"]},
     }
@@ -76,6 +76,7 @@ def test_locked_tiers_read_the_current_split_freeze(tmp_path: Path) -> None:
         "A": "tail",
         "B": "head",
     }
+
 
 def test_freeze_rejects_pilot_edited_after_signing(tmp_path: Path) -> None:
     """A pilot edited after signing must not be baked into the definitive freeze.
@@ -95,6 +96,7 @@ def test_freeze_rejects_pilot_edited_after_signing(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="signed lock"):
         cmd_freeze(Namespace(config=str(config_path), seed=7, split_index=0))
+
 
 def test_freeze_uses_one_patch_pool_for_balanced_and_every_assignment(
     tmp_path: Path,
@@ -145,6 +147,7 @@ def test_freeze_uses_one_patch_pool_for_balanced_and_every_assignment(
     }
     assert len(pool_hashes) == 2
 
+
 def test_freeze_rejects_missing_dataset_provenance(tmp_path: Path) -> None:
     """Definitive freezes cannot replace required provenance with placeholders."""
     from imbalance_benchmark.commands.freeze_execution import _attach_provenance
@@ -160,6 +163,7 @@ def test_freeze_rejects_missing_dataset_provenance(tmp_path: Path) -> None:
             {"data": tmp_path},
             {"dataset": {"name": "synthetic", "regime": "patch"}},
         )
+
 
 def test_reject_degenerate_conditions_catches_achieved_rho_collapse() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
@@ -190,6 +194,7 @@ def test_reject_degenerate_conditions_catches_achieved_rho_collapse() -> None:
 
     with pytest.raises(ValueError, match="Degenerate native/moderate"):
         reject_degenerate_conditions(meta)
+
 
 def test_reject_degenerate_conditions_allows_a_capacity_bound_adversarial_assignment() -> (
     None
@@ -225,6 +230,7 @@ def test_reject_degenerate_conditions_allows_a_capacity_bound_adversarial_assign
 
     reject_degenerate_conditions(meta)
 
+
 def test_reject_degenerate_conditions_allows_balanced_spread_at_rho_one() -> None:
     """balanced_spread's nominal rho is pinned to 1.0 by construction (plans/04);
     only its independent-support axis moves, so achieved_rho==1.0 is not
@@ -250,6 +256,7 @@ def test_reject_degenerate_conditions_allows_balanced_spread_at_rho_one() -> Non
 
     reject_degenerate_conditions(meta)
 
+
 def test_reject_degenerate_spreading_catches_a_small_mean_shortage() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
         reject_degenerate_spreading,
@@ -265,6 +272,7 @@ def test_reject_degenerate_spreading_catches_a_small_mean_shortage() -> None:
 
     with pytest.raises(ValueError, match="Degenerate spreading"):
         reject_degenerate_spreading(meta)
+
 
 def test_reject_degenerate_spreading_accepts_a_measured_shortage() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
@@ -285,6 +293,7 @@ def test_reject_degenerate_spreading_accepts_a_measured_shortage() -> None:
 
     reject_degenerate_spreading(meta)
 
+
 def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_spread_cell() -> (
     None
 ):
@@ -295,7 +304,9 @@ def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_spread_cel
         reject_constant_signal_axes,
     )
 
-    balanced = {"contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}}
+    balanced = {
+        "contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}
+    }
     meta = {
         "conditions": {"balanced": balanced},
         "assignment_conditions": {
@@ -327,12 +338,15 @@ def test_reject_constant_signal_axes_catches_defect_a_reproduced_in_a_spread_cel
     with pytest.raises(ValueError, match="independent_shortage never varies"):
         reject_constant_signal_axes(meta, is_mil=False)
 
+
 def test_reject_constant_signal_axes_passes_a_genuinely_varying_spread_cell() -> None:
     from imbalance_benchmark.manifest.shared_total.degenerate import (
         reject_constant_signal_axes,
     )
 
-    balanced = {"contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}}
+    balanced = {
+        "contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}
+    }
     meta = {
         "conditions": {"balanced": balanced},
         "assignment_conditions": {
@@ -368,6 +382,7 @@ def test_reject_constant_signal_axes_passes_a_genuinely_varying_spread_cell() ->
 
     reject_constant_signal_axes(meta, is_mil=False)
 
+
 def test_reject_constant_signal_axes_skips_the_independent_check_without_a_spread_arm() -> (
     None
 ):
@@ -377,7 +392,9 @@ def test_reject_constant_signal_axes_skips_the_independent_check_without_a_sprea
         reject_constant_signal_axes,
     )
 
-    balanced = {"contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}}
+    balanced = {
+        "contribution_stats": {"A": {"n_patients": 20}, "B": {"n_patients": 20}}
+    }
     meta = {
         "conditions": {"balanced": balanced},
         "assignment_conditions": {
@@ -406,6 +423,7 @@ def test_reject_constant_signal_axes_skips_the_independent_check_without_a_sprea
 
     reject_constant_signal_axes(meta, is_mil=False)
 
+
 def test_dataset_provenance_requires_a_frozen_target() -> None:
     dataset = {
         "name": "panda",
@@ -420,6 +438,7 @@ def test_dataset_provenance_requires_a_frozen_target() -> None:
     provenance = dataset_provenance({**dataset, "target": "isup_grade"})
 
     assert provenance["target"] == "isup_grade"
+
 
 def test_freeze_metadata_is_content_locked(tmp_path: Path) -> None:
     """Changing a frozen design field must be detected even without a CSV edit."""
@@ -437,6 +456,7 @@ def test_freeze_metadata_is_content_locked(tmp_path: Path) -> None:
     freeze["shared_T"] = 200
     with pytest.raises(RuntimeError, match="content"):
         verify_manifest_freeze(freeze)
+
 
 def _write_amendable_freeze(tmp_path: Path, dropped: set[str] = frozenset()) -> Path:
     """A minimal, fully signed frozen manifest that `cmd_amend_grids` can load.
@@ -498,6 +518,7 @@ def _write_amendable_freeze(tmp_path: Path, dropped: set[str] = frozenset()) -> 
     sign_file(freeze_path)
     return config_path
 
+
 def test_amend_grids_adds_missing_methods_and_chains_the_superseded_hash(
     tmp_path: Path,
 ) -> None:
@@ -520,6 +541,7 @@ def test_amend_grids_adds_missing_methods_and_chains_the_superseded_hash(
     for field in ("conditions", "assignment_conditions", "shared_T", "seed_roles"):
         assert amended[field] == truncated[field]
 
+
 def test_amend_grids_refuses_when_an_existing_grid_would_change(tmp_path: Path) -> None:
     from imbalance_benchmark.commands.freeze import cmd_amend_grids
     from imbalance_benchmark.common import sign_file, write_json
@@ -535,6 +557,7 @@ def test_amend_grids_refuses_when_an_existing_grid_would_change(tmp_path: Path) 
 
     with pytest.raises(RuntimeError, match="refuses to change existing method 'ce'"):
         cmd_amend_grids(Namespace(config=str(config_path), seed=7, split_index=0))
+
 
 def test_refreeze_preflight_recomputes_preflight_and_chains_the_superseded_hash(
     tmp_path: Path,
@@ -573,6 +596,7 @@ def test_refreeze_preflight_recomputes_preflight_and_chains_the_superseded_hash(
     assert refrozen["content_sha256"] != original["content_sha256"]
     for field in ("conditions", "assignment_conditions", "shared_T", "method_grids"):
         assert refrozen[field] == original[field]
+
 
 def test_freeze_verifies_pilot_and_prepared_manifest_artifacts(tmp_path: Path) -> None:
     """Held-out manifest or pilot changes invalidate the frozen record."""

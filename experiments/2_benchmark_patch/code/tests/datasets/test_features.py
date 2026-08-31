@@ -26,9 +26,12 @@ from imbalance_benchmark.datasets.features.cache import (
 )
 from imbalance_benchmark.datasets.data.patch import ImbalanceDataset
 
+
 def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
     from imbalance_benchmark.datasets.bracs.audit import validate_tile_manifest
-    from imbalance_benchmark.datasets.features.panda_audit import validate_tile_inventory
+    from imbalance_benchmark.datasets.features.panda_audit import (
+        validate_tile_inventory,
+    )
 
     with pytest.raises(ValueError, match="audit"):
         validate_tile_manifest(
@@ -42,6 +45,7 @@ def test_upstream_wsi_tiles_require_auditable_realization_fields() -> None:
             pd.DataFrame({"slide_id": ["s"]}),
             expected_slides=1,
         )
+
 
 def test_frozen_feature_reuse_verifies_revision_order_rows_and_hash(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -71,6 +75,7 @@ def test_frozen_feature_reuse_verifies_revision_order_rows_and_hash(
     torch.save(torch.ones(1, 2560), tensor_path)
     with pytest.raises(ValueError, match="row count|hash"):
         features.attach_extracted_features(frame, root)
+
 
 def test_load_feature_model_loads_verified_safetensors_explicitly(
     tmp_path, monkeypatch
@@ -102,7 +107,9 @@ def test_load_feature_model_loads_verified_safetensors_explicitly(
     monkeypatch.setattr(
         feature_lib, "load_safetensors", lambda path: {"weights": str(path)}
     )
-    monkeypatch.setattr(feature_lib, "resolve_data_config", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        feature_lib, "resolve_data_config", lambda *_args, **_kwargs: {}
+    )
     transform = object()
     monkeypatch.setattr(feature_lib, "create_transform", lambda **_: transform)
 
@@ -117,9 +124,11 @@ def test_load_feature_model_loads_verified_safetensors_explicitly(
     assert isinstance(model, Model)
     assert returned_transform is transform
 
+
 def test_patch_sort_key_orders_by_region_then_index() -> None:
     items = ["1_2", "0_9", "1_0", "0_0"]
     assert sorted(items, key=patch_sort_key) == ["0_0", "0_9", "1_0", "1_2"]
+
 
 def test_virchow2_pool_concatenates_cls_and_mean_patch_tokens() -> None:
     # (batch=1, tokens=7, dim=4): token 0 is CLS, tokens 1-4 are register tokens
@@ -135,11 +144,13 @@ def test_virchow2_pool_concatenates_cls_and_mean_patch_tokens() -> None:
     assert torch.allclose(pooled[0, :4], torch.tensor([1.0, 2.0, 3.0, 4.0]))
     assert torch.allclose(pooled[0, 4:], torch.tensor([2.0, 2.0, 2.0, 2.0]))
 
+
 def test_load_slide_features_normalizes_single_vector(tmp_path) -> None:
     path = tmp_path / "slide_0.pt"
     torch.save(torch.randn(2560), path)
     tensor = load_slide_features(str(path))
     assert tensor.shape == (1, 2560)
+
 
 def test_load_feature_row_requires_index_for_multirow(tmp_path) -> None:
     path = tmp_path / "slide_0.pt"
@@ -152,6 +163,7 @@ def test_load_feature_row_requires_index_for_multirow(tmp_path) -> None:
         raise AssertionError("Expected multi-row tensor to require an index.")
     vector = load_feature_row(str(path), 1)
     assert vector.shape == (2560,)
+
 
 def test_attach_extracted_features_writes_one_tensor_per_slide(
     tmp_path, monkeypatch
@@ -184,9 +196,11 @@ def test_attach_extracted_features_writes_one_tensor_per_slide(
     feature_lib.attach_extracted_features(frame, tmp_path / "features")
     assert len(calls) == 2
 
+
 def test_feature_extraction_rejects_a_non_virchow2_encoder() -> None:
     with pytest.raises(ValueError, match="Virchow2"):
         features.resolve_feature_provenance({"model_name": "resnet50"})
+
 
 def test_prepare_validates_encoder_for_precomputed_feature_manifests(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -206,6 +220,7 @@ def test_prepare_validates_encoder_for_precomputed_feature_manifests(
             {"data": tmp_path},
         )
 
+
 def test_bank_stays_on_cpu_without_cuda(tmp_path: Path) -> None:
     path = tmp_path / "slide_0.pt"
     torch.save(torch.randn(1, 8), path)
@@ -220,9 +235,9 @@ def test_target_bank_device_env_override_bypasses_auto_sizing() -> None:
     assert feature_cache._target_bank_device({"IMB_FEATURE_BANK_DEVICE": "cpu"}, 1) == (
         torch.device("cpu")
     )
-    assert feature_cache._target_bank_device({"IMB_FEATURE_BANK_DEVICE": "cuda"}, 1) == (
-        torch.device("cuda")
-    )
+    assert feature_cache._target_bank_device(
+        {"IMB_FEATURE_BANK_DEVICE": "cuda"}, 1
+    ) == (torch.device("cuda"))
 
 
 def test_target_bank_device_auto_falls_back_to_cpu_without_cuda() -> None:
@@ -233,9 +248,7 @@ def test_target_bank_device_auto_respects_the_free_memory_fraction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(feature_cache.torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(
-        feature_cache.torch.cuda, "mem_get_info", lambda: (1000, 1000)
-    )
+    monkeypatch.setattr(feature_cache.torch.cuda, "mem_get_info", lambda: (1000, 1000))
 
     assert feature_cache._target_bank_device({}, 850) == torch.device("cuda")
     assert feature_cache._target_bank_device({}, 851) == torch.device("cpu")
@@ -271,7 +284,7 @@ def test_feature_bank_reserves_a_split_manifest_without_concatenation(
     assert training.rows.tolist() == [2, 3]
     assert feature_cache._BANK is not None
     assert feature_cache._BANK.shape == (4, 2)
-    assert feature_cache._BANK.dtype == torch.float32
+    assert feature_cache._BANK.dtype == torch.float16
     assert feature_cache._BANK.device.type == "cpu"
     assert torch.equal(
         bank_index(torch.tensor([3, 0])),
@@ -295,7 +308,10 @@ def test_feature_bank_keeps_its_reservation_for_a_later_smaller_manifest(
         path = tmp_path / f"slide_{index}.pt"
         torch.save(torch.full((1, 2), index, dtype=torch.float16), path)
         paths.append(str(path))
-    columns = {"slide_id": [f"slide_{i}" for i in range(4)], "cancer_type": list("ABAB")}
+    columns = {
+        "slide_id": [f"slide_{i}" for i in range(4)],
+        "cancer_type": list("ABAB"),
+    }
     split = tmp_path / "manifest.csv"
     pd.DataFrame({**columns, "feature_path": paths}).to_csv(split, index=False)
     condition = tmp_path / "manifest_balanced.csv"

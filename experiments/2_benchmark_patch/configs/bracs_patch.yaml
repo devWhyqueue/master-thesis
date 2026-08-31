@@ -37,9 +37,13 @@ slurm:
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
   tune_shards_per_task: 4
+  # Packs this many concurrent fits onto one GPU's tune-shard task (plan
+  # after-a-first-run-linear-wave item 2): BRACS features are 3-4 GiB/bank,
+  # smaller than TCGA-UT, so twice the fits fit alongside each other.
+  tune_parallel_fits: 8
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
-  max_array_concurrency: 20
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 50}
   container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
   resources:
     prepare: {partition: gpu-5h, gpus: 1, cpus: 8}
