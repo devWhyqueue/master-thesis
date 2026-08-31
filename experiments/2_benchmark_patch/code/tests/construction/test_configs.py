@@ -40,7 +40,7 @@ EXPECTED_CELLS = {
     "tcga_ut_patch.yaml": ("tcga_ut", "patch", "cancer_type"),
     "tcga_ut_wsi.yaml": ("tcga_ut", "wsi", "cancer_type"),
 }
-NON_DATASET_CONFIGS = {"default.yaml", "rq3_combined.yaml"}
+NON_DATASET_CONFIGS = {"default.yaml", "rq3_combined.yaml", "report_bracs_only.yaml"}
 CONFIG_ROOT = Path(__file__).resolve().parents[3] / "configs"
 PANDA_MOUNT = "/home/space/datasets/panda/native_tiles_20x_256"
 PANDA_SQUASHFS = "/home/space/datasets-sqfs/panda-native-tiles-20x-256.sqfs"
