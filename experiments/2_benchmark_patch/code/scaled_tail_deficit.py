@@ -59,6 +59,23 @@ METHODS = ("ce", *sorted(PRIMARY_METHODS))
 PROBS = {"raw": "probs", "scaled": "temperature_scaled_probs"}
 
 
+def _predictions(
+    paths: dict[str, Path], condition: str, method: str, assignment: str
+) -> dict[str, Any] | None:
+    """Load one confirmation block, or None when this dataset never realized it.
+
+    A frozen condition without confirmation runs (TCGA-UT has no
+    `balanced_spread`) is a unit the pipeline also skips, not an error here.
+    """
+    try:
+        return load_seed_predictions(paths, condition, method, assignment)
+    except RuntimeError:
+        logger.info(
+            "scaled-tail: skipping absent %s/%s/%s", assignment, condition, method
+        )
+        return None
+
+
 def _split_contrasts(
     paths: dict[str, Path],
     config: dict[str, Any],
@@ -75,8 +92,8 @@ def _split_contrasts(
             reference = CONDITION_REFERENCE.get(severity)
             if reference is None or reference == severity:
                 continue  # a reference condition is not its own deprived arm
-            balanced = load_seed_predictions(paths, reference, "ce", assignment)
-            deprived = load_seed_predictions(paths, severity, "ce", assignment)
+            balanced = _predictions(paths, reference, "ce", assignment)
+            deprived = _predictions(paths, severity, "ce", assignment)
             if balanced is None or deprived is None:
                 continue
             tail = _tail_classes(
@@ -85,7 +102,7 @@ def _split_contrasts(
             if not tail:
                 continue
             methods = {
-                method: load_seed_predictions(paths, severity, method, assignment)
+                method: _predictions(paths, severity, method, assignment)
                 for method in METHODS
                 if method != "ce"
             }
