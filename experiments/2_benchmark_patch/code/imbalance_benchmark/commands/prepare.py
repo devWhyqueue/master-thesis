@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-SYNTHETIC_PATCHES_PER_SLIDE = 30
+SYNTHETIC_PATCHES_PER_SLIDE = 10
 
 
 # Per-class patient counts, deliberately unequal and unequal in train (>=70%
@@ -53,11 +53,22 @@ SYNTHETIC_PATCHES_PER_SLIDE = 30
 # class's *entire* pool with zero slack. A uniform count here left every class
 # at that same floor, so moderate/severe construction had no room to allocate
 # away from balanced and always reported achieved_rho == 1.0 (degenerate).
+#
+# The smallest class's train count must also clear the severe band's upper
+# tolerance (110x, manifest/shared_total/severity.py) against the pilot's
+# frozen per-patient quota: support / quota >= 110 needs patients * 0.7 >= 110
+# (>=158 patients; SYNTHETIC_PATCHES_PER_SLIDE cancels out of that ratio).
+# Below that, freeze's fallback can legitimately find no total attaining both
+# maxima -- cap_feasible_shared_total's ValueError("... simultaneously ...").
+# SYNTHETIC_PATCHES_PER_SLIDE is kept at the smallest value clearing the
+# *unrelated* 20-unit method floor (below it, `min_support = max(quota, 20)`
+# decouples from patient counts): larger only inflates every class's support,
+# which inflates `max_shared_total` and slows freeze's per-total scan.
 _SYNTHETIC_PATIENTS_PER_CLASS = {
-    "class_A": 150,
-    "class_B": 110,
-    "class_C": 90,
-    "class_D": 76,
+    "class_A": 300,
+    "class_B": 220,
+    "class_C": 180,
+    "class_D": 150,
 }
 
 
