@@ -162,7 +162,10 @@ def base_tuning_jobs(
     """Build round-0 base tuning's natural and controlled array jobs, packed per GPU."""
     slurm = config.get("slurm", {})
     parallel_fits = int(slurm.get("tune_parallel_fits", 1))
+    natural_parallel_fits = int(slurm.get("tune_natural_parallel_fits", parallel_fits))
     return (
-        _base_natural_job(config, slurm, freeze_dependency, plan, parallel_fits),
+        _base_natural_job(
+            config, slurm, freeze_dependency, plan, natural_parallel_fits
+        ),
         _base_controlled_job(config, slurm, freeze_dependency, plan, parallel_fits),
     )

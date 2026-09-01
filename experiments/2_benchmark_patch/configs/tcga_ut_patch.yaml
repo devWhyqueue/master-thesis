@@ -53,17 +53,23 @@ slurm:
   partition: gpu-2h
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
-  # Sized for a ~70min average gpu-2h task: startup ~9min (apptainer/import/
-  # bank load, once per task) + 6 sequential candidates/worker (24/4) at
-  # ~10min each, measured post-fix (plan after-a-first-run-linear-wave item
-  # 2's OMP fix). Only 'ce'-family candidates were timed; heavier methods
-  # eat into the ~40% margin below the 2h cap.
+  # 'ce'-family candidates measured ~10min/candidate (plan
+  # after-a-first-run-linear-wave item 2's OMP fix), giving a ~70min/task
+  # estimate at shards-per-task=24, K=4 -- heavier methods (e.g.
+  # logit_adjustment, still mid-candidate past 1:41 in job 4807150) blow
+  # well past that, hence tune_controlled's gpu-5h partition.
   tune_shards_per_task: 24
   tune_natural_shards_per_task: 3
   # Packs this many concurrent fits onto one GPU's tune-shard task (plan
-  # after-a-first-run-linear-wave item 2): sized against the fp16 feature
-  # bank (~16 GiB after item 1) fitting 4x on an 80gb|h100|h200 card.
-  tune_parallel_fits: 4
+  # after-a-first-run-linear-wave item 2). 4x measured ~20 GiB/fit baseline
+  # on an 80gb card (not the ~16 GiB originally assumed) -- a metric-learning
+  # method's full-batch eval (pairwise embed-to-prototype distances) then
+  # OOM'd needing 7.5 GiB more with zero headroom left. 3x leaves margin.
+  tune_parallel_fits: 3
+  # Natural group's bank holds the full unbalanced dataset (no per-condition
+  # subsample), measured at ~13.4 GiB/fit -- 4x OOMs on the constraint's
+  # 40gb cards (3*13.4 > 39.5 GiB free). 2x fits both 40gb and 80gb+ cards.
+  tune_natural_parallel_fits: 2
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
   max_array_concurrency: {gpu-5h: 35, gpu-2h: 50}
@@ -80,13 +86,14 @@ slurm:
     signals: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
     tune_natural: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
-    # gpu-5h's original ~45%-timeout rationale predates fp16 bank (item 1),
-    # packed+OMP-fixed parallel fits (item 2), front-loaded checkpoints
-    # (item 3), and 40%-budget truncation (item 4). A validated full task
-    # (24 candidates, K=4, shard-index 0) completed clean in 19min at the
-    # old shards-per-task=4; gpu-2h's higher SLURM priority is worth it now.
+    # Reverted to gpu-5h 2026-09-01: the gpu-2h move (shards-per-task=4 ->
+    # 24, this comment's 19min validation run) assumed 'ce'-family-only
+    # timing. Live run (job 4807150) hit tasks still mid-candidate
+    # (logit_adjustment, step ~800/4200) past 1:41 of the 2:00 cap --
+    # heavier methods blow the ~70min/task estimate. gpu-5h removes the
+    # timeout risk without shrinking shards-per-task.
     # memory 48G: measured peak 26.8G at K=4 (job 4807044), ~1.8x headroom.
-    tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
+    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 256G}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
