@@ -144,11 +144,11 @@ def test_execute_shards_runs_sequentially_when_parallel_fits_is_one(
 
 
 def test_execute_shards_packs_specs_across_child_processes(monkeypatch) -> None:
-    started: list[list[int]] = []
+    started: list[tuple] = []
 
     class FakeProcess:
         def __init__(self, target, args) -> None:
-            started.append(args[-1])
+            started.append(args)
             self.exitcode = 0
 
         def start(self) -> None:
@@ -170,7 +170,12 @@ def test_execute_shards_packs_specs_across_child_processes(monkeypatch) -> None:
         {}, Namespace(), {}, [], [], [0, 1, 2, 3], lambda index: index, parallel_fits=2
     )
 
-    assert sorted(spec for batch in started for spec in batch) == [0, 1, 2, 3]
+    assert sorted(spec for _run_one, batch, _margin in started for spec in batch) == [
+        0,
+        1,
+        2,
+        3,
+    ]
     assert len(started) == 2
 
 
@@ -201,3 +206,109 @@ def test_execute_shards_worker_failure_reaches_caller(monkeypatch) -> None:
         assert "workers failed" in str(error)
     else:
         raise AssertionError("Expected a worker failure to raise RuntimeError.")
+
+
+_GIB = 1024**3
+
+
+def test_vram_capped_workers_shrinks_ceiling_on_a_40gb_card(monkeypatch) -> None:
+    monkeypatch.setattr(shard_workers.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        shard_workers.torch.cuda, "mem_get_info", lambda: (37 * _GIB, 40 * _GIB)
+    )
+
+    resolved = shard_workers._vram_capped_workers(
+        parallel_fits=3, per_fit_bytes=19 * _GIB
+    )
+
+    assert resolved == 1
+
+
+def test_vram_capped_workers_keeps_ceiling_on_an_80gb_card(monkeypatch) -> None:
+    monkeypatch.setattr(shard_workers.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        shard_workers.torch.cuda, "mem_get_info", lambda: (74 * _GIB, 80 * _GIB)
+    )
+
+    resolved = shard_workers._vram_capped_workers(
+        parallel_fits=3, per_fit_bytes=19 * _GIB
+    )
+
+    assert resolved == 3
+
+
+def test_vram_capped_workers_is_unchanged_without_cuda(monkeypatch) -> None:
+    monkeypatch.setattr(shard_workers.torch.cuda, "is_available", lambda: False)
+
+    assert shard_workers._vram_capped_workers(parallel_fits=3, per_fit_bytes=19 * _GIB) == 3
+
+
+def test_vram_capped_workers_is_unchanged_when_per_fit_bytes_unknown(monkeypatch) -> None:
+    monkeypatch.setattr(shard_workers.torch.cuda, "is_available", lambda: True)
+
+    assert shard_workers._vram_capped_workers(parallel_fits=3, per_fit_bytes=0) == 3
+
+
+def test_run_guarded_stops_cleanly_before_an_overrunning_item(monkeypatch) -> None:
+    monkeypatch.setenv("SLURM_JOB_END_TIME", str(shard_workers.time.time() + 60))
+    calls: list[int] = []
+
+    shard_workers._run_guarded(calls.append, [1, 2, 3], deadline_margin_seconds=3600)
+
+    assert calls == []
+
+
+def test_run_guarded_runs_every_item_when_margin_is_ample(monkeypatch) -> None:
+    monkeypatch.delenv("SLURM_JOB_END_TIME", raising=False)
+    calls: list[int] = []
+
+    shard_workers._run_guarded(calls.append, [1, 2, 3], deadline_margin_seconds=10)
+
+    assert calls == [1, 2, 3]
+
+
+def test_max_bank_bytes_is_zero_for_fake_specs() -> None:
+    assert tuning._max_bank_bytes({}, {}, [0, 1]) == 0
+
+
+def test_max_bank_bytes_takes_the_worst_condition_and_assignment(monkeypatch) -> None:
+    seen: list[tuple[str, str]] = []
+
+    def fake_bank_bytes_for(base, condition, assignment, dtype):
+        seen.append((condition, assignment))
+        return {"balanced": 1, "severe": 2}[condition] * _GIB
+
+    monkeypatch.setattr(tuning, "bank_bytes_for", fake_bank_bytes_for)
+    freeze = {"tail_assignments": {"a": [], "b": []}}
+    specs = [
+        tuning.ShardSpec("balanced", "ce", 0, "base"),
+        tuning.ShardSpec("severe", "ce", 0, "base"),
+    ]
+
+    result = tuning._max_bank_bytes({}, freeze, specs)
+
+    assert result == 2 * _GIB + tuning._MEASURED_TRANSIENT_BYTES
+    assert ("balanced", "native") in seen
+    assert {("severe", "a"), ("severe", "b")}.issubset(set(seen))
+
+
+def test_max_item_seconds_scales_with_expected_observations() -> None:
+    freeze = {
+        "tail_assignments": {"a": [], "b": [], "c": []},
+        "seed_roles": {"tuning_initialization_0": 1, "tuning_initialization_1": 2},
+    }
+    balanced = tuning.ShardSpec("balanced", "ce", 0, "base")
+    severe = tuning.ShardSpec("severe", "ce", 0, "base")
+
+    only_balanced = tuning._max_item_seconds(freeze, [balanced])
+    with_severe = tuning._max_item_seconds(freeze, [balanced, severe])
+
+    assert only_balanced == tuning._MEASURED_PER_FIT_SECONDS * 6
+    assert with_severe == tuning._MEASURED_PER_FIT_SECONDS * 18
+
+
+def test_max_item_seconds_is_one_fit_for_a_bundled_observation() -> None:
+    freeze = {"tail_assignments": {"native": []}}
+    spec = tuning.ShardSpec("natural", "ce", 0, "base", observation_index=2)
+
+    assert tuning._max_item_seconds(freeze, [spec]) == tuning._MEASURED_PER_FIT_SECONDS

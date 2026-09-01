@@ -6,10 +6,11 @@ import pytest
 import torch
 
 from imbalance_benchmark.commands import tuning
+from imbalance_benchmark.commands.tuning import scope as tuning_scope
 from imbalance_benchmark.commands.tuning import shard as tuning_shard
 from imbalance_benchmark.commands.tuning import shard_workers
 from imbalance_benchmark.commands.confirm import require_tuning_configs
-from imbalance_benchmark.modeling.context import Regime
+from imbalance_benchmark.modeling.context import INPUT_DIM, Regime
 from imbalance_benchmark.modeling.workflows.tuning.aggregation import (
     aggregate as tuning_aggregate,
 )
@@ -306,3 +307,63 @@ def test_run_scope_local_shard_threads_selected_ce_for_dependent_phase(
     )
 
     assert captured == [{"lr": 1e-3}, None]
+
+
+def _write_split_manifests(tmp_path: Path, validation_rows: int, condition_rows: int) -> dict:
+    base = {"root": tmp_path, "data": tmp_path / "data"}
+    split_dir = tmp_path / "split=0" / "data"
+    split_dir.mkdir(parents=True)
+    train_rows = "\n".join("train" for _ in range(2))
+    val_rows = "\n".join("validation" for _ in range(validation_rows))
+    (split_dir / "manifest.csv").write_text(f"split\n{train_rows}\n{val_rows}\n")
+    condition_rows_text = "\n".join(str(i) for i in range(condition_rows))
+    (split_dir / "manifest_balanced.csv").write_text(f"x\n{condition_rows_text}\n")
+    return base
+
+
+def test_bank_capacity_for_reads_validation_and_condition_rows(tmp_path: Path) -> None:
+    base = _write_split_manifests(tmp_path, validation_rows=3, condition_rows=5)
+
+    paths, manifest, capacity = tuning_scope._bank_capacity_for(
+        base, "balanced", "native", 0
+    )
+
+    assert manifest == tmp_path / "split=0" / "data" / "manifest_balanced.csv"
+    assert paths["data"] == tmp_path / "split=0" / "data"
+    assert capacity == 3 + 5
+
+
+def test_bank_bytes_for_scales_capacity_by_dim_and_itemsize(tmp_path: Path) -> None:
+    base = _write_split_manifests(tmp_path, validation_rows=1, condition_rows=1)
+
+    result = tuning.bank_bytes_for(base, "balanced", "native", "float16")
+
+    assert result == 2 * INPUT_DIM * 2  # capacity 2, float16 = 2 bytes/element
+
+
+def test_load_shard_scope_reads_the_resolved_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: load_shard_scope referenced an undefined ``manifest`` local
+    after capacity arithmetic was hoisted out into _bank_capacity_for."""
+    base = _write_split_manifests(tmp_path, validation_rows=1, condition_rows=1)
+    fake_regime = type(
+        "R",
+        (),
+        {"is_mil": False, "locked_class_names": ["a", "b"], "exposure_budgets": {}},
+    )()
+    captured: dict[str, Any] = {}
+
+    def fake_tuning_inputs(_args, paths, capacity_hint=None):
+        return paths, fake_regime, object()
+
+    def fake_load_training_dataset(manifest, is_mil, **kwargs):
+        captured["manifest"] = manifest
+        return object()
+
+    monkeypatch.setattr(tuning_scope, "_tuning_inputs", fake_tuning_inputs)
+    monkeypatch.setattr(tuning_scope, "load_training_dataset", fake_load_training_dataset)
+
+    tuning.load_shard_scope(argparse.Namespace(), base, "balanced", "native", 0, 0, [])
+
+    assert captured["manifest"] == tmp_path / "split=0" / "data" / "manifest_balanced.csv"

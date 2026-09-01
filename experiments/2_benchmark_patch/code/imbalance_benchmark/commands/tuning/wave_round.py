@@ -17,7 +17,7 @@ from imbalance_benchmark.commands.tuning.wave_support import (
 )
 from imbalance_benchmark.hydra.dependent_jobs import dependent_round_zero_jobs
 from imbalance_benchmark.hydra.job_resources import build_job
-from imbalance_benchmark.hydra.queue import DEFAULT_QUEUE_CAP, _squeue_count
+from imbalance_benchmark.hydra.guards import DEFAULT_QUEUE_CAP, _squeue_count
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.workflow import _submit_script
 from imbalance_benchmark.modeling.context import CONTROLLED_CONDITIONS

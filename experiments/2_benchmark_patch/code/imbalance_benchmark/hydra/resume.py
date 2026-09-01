@@ -190,7 +190,7 @@ def _controlled_bundle_complete(
                 base["data"],
                 spec,
                 fingerprint,
-                expected_observations("controlled", assignments, freeze),
+                expected_observations(spec.condition, assignments, freeze),
                 accepted,
             )
 

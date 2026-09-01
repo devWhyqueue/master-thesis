@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable
 from dataclasses import replace
+import logging
 import multiprocessing
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ from imbalance_benchmark.commands.tuning import (
     _is_excluded,
     _tuning_seeds,
 )
+from imbalance_benchmark.hydra.guards import DeadlineGuard
 from imbalance_benchmark.modeling.context import Regime, roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
     TuningScope,
@@ -39,6 +41,8 @@ from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
 
 __all__ = ["run_round_shards"]
 
+logger = logging.getLogger(__name__)
+
 # A fresh spawned interpreter per child avoids re-initializing CUDA in a forked
 # process, and gives each fit its own process-local feature bank (cache.py's
 # ``_BANK`` is a module global). Forcing cuda placement below removes the
@@ -46,6 +50,36 @@ __all__ = ["run_round_shards"]
 # staggering their starts additionally spreads out CUDA context init itself.
 _PARALLEL_FIT_ENV = {"IMB_FEATURE_BANK_DEVICE": "cuda"}
 _CHILD_STAGGER_SECONDS = 3.0
+
+# Matches cache._BANK_DEVICE_FRACTION: the same free-VRAM headroom the bank's
+# own placement check already trusts on this hardware pool.
+_VRAM_SAFETY = 0.85
+
+
+def _vram_capped_workers(parallel_fits: int, per_fit_bytes: int) -> int:
+    """Cap configured packing by the card this task actually landed on.
+
+    ``tune_parallel_fits`` is a ceiling sized for the best card the config's
+    GPU constraint admits; a 40gb card in the same pool needs fewer packed
+    fits than an 80gb one does. Reading free VRAM once here, in the parent,
+    before any child spawns, is the exact race ``_PARALLEL_FIT_ENV`` was
+    added to dodge -- doing it here sidesteps the race instead of forcing
+    every child onto one placement regardless of what the card actually fits.
+    """
+    if not torch.cuda.is_available() or per_fit_bytes <= 0:
+        return parallel_fits
+    free_bytes, _ = torch.cuda.mem_get_info()
+    resolved = min(
+        parallel_fits, max(1, int(free_bytes * _VRAM_SAFETY // per_fit_bytes))
+    )
+    logger.info(
+        "tune: resolved K=%d (ceiling=%d) free=%.2fGiB per_fit=%.2fGiB",
+        resolved,
+        parallel_fits,
+        free_bytes / 1024**3,
+        per_fit_bytes / 1024**3,
+    )
+    return resolved
 
 
 def _scale_thread_env(workers: int) -> None:
@@ -82,34 +116,70 @@ def _run_and_join(processes: list[Any]) -> None:
         raise RuntimeError(f"Tuning shard workers failed: {', '.join(failed)}")
 
 
-def _run_chunk(run_one: Callable[[ShardSpec], None], specs: list[ShardSpec]) -> None:
-    os.environ.update(_PARALLEL_FIT_ENV)
+def _run_guarded(
+    run_one: Callable[[ShardSpec], None],
+    specs: list[ShardSpec],
+    deadline_margin_seconds: float,
+) -> None:
+    """Run ``specs`` in order, stopping cleanly before one that would overrun."""
+    guard = DeadlineGuard(deadline_margin_seconds)
     for spec in specs:
+        if guard.should_stop():
+            logger.info("tune: deadline guard stopping before %s", spec)
+            return
+        guard.start_item()
         run_one(spec)
+        guard.finish_item()
+
+
+def _run_chunk(
+    run_one: Callable[[ShardSpec], None],
+    specs: list[ShardSpec],
+    deadline_margin_seconds: float = 0.0,
+) -> None:
+    # A ``spawn``ed child never runs __main__.main(), so the root logger is
+    # still at its default WARNING level here; this worker's ``tune:`` INFO
+    # lines would otherwise be silently discarded.
+    logging.basicConfig(level=logging.INFO)
+    os.environ.update(_PARALLEL_FIT_ENV)
+    _run_guarded(run_one, specs, deadline_margin_seconds)
 
 
 def _run_packed(
-    run_one: Callable[[ShardSpec], None], specs: list[ShardSpec], parallel_fits: int
+    run_one: Callable[[ShardSpec], None],
+    specs: list[ShardSpec],
+    parallel_fits: int,
+    per_fit_bytes: int = 0,
+    deadline_margin_seconds: float = 0.0,
 ) -> None:
     """Run every spec via ``run_one``, packing up to ``parallel_fits`` fits per GPU.
 
-    Below 2 workers this runs sequentially in-process (bit-identical to no
-    packing at all). Above that, each worker is a fresh spawned interpreter
-    holding its own chunk of specs -- CUDA cannot be reinitialized in a
-    forked process, and a fresh process also gives each fit an independent,
-    race-free view of ``cache._target_bank_device``'s VRAM check. ``run_one``
-    is expected to already be bound to its fixed (args, base, freeze,
-    fingerprint, accepted) context, e.g. via ``functools.partial``.
+    ``parallel_fits`` is a ceiling; ``per_fit_bytes`` (0 disables the check,
+    e.g. no measured estimate available) lets ``_vram_capped_workers`` shrink
+    it to whatever the card this task actually landed on can hold.
+    ``deadline_margin_seconds`` seeds each worker's :class:`DeadlineGuard`
+    (0 is a no-op unless ``SLURM_JOB_END_TIME`` is already in the past).
+
+    Below 2 resolved workers this runs sequentially in-process (bit-identical
+    to no packing at all). Above that, each worker is a fresh spawned
+    interpreter holding its own chunk of specs -- CUDA cannot be
+    reinitialized in a forked process, and a fresh process also gives each
+    fit an independent, race-free view of ``cache._target_bank_device``'s
+    VRAM check. ``run_one`` is expected to already be bound to its fixed
+    (args, base, freeze, fingerprint, accepted) context, e.g. via
+    ``functools.partial``.
     """
-    workers = min(max(1, parallel_fits), len(specs))
+    capped = _vram_capped_workers(parallel_fits, per_fit_bytes)
+    workers = min(max(1, capped), len(specs))
     if workers <= 1:
-        for spec in specs:
-            run_one(spec)
+        _run_guarded(run_one, specs, deadline_margin_seconds)
         return
     _scale_thread_env(workers)
     context = multiprocessing.get_context("spawn")
     processes = [
-        context.Process(target=_run_chunk, args=(run_one, batch))
+        context.Process(
+            target=_run_chunk, args=(run_one, batch, deadline_margin_seconds)
+        )
         for batch in _chunk(specs, workers)
     ]
     _run_and_join(processes)

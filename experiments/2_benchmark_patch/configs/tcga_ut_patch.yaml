@@ -53,22 +53,39 @@ slurm:
   partition: gpu-2h
   test_partition: gpu-test
   tune_natural_observations_per_candidate: 6
-  # 'ce'-family candidates measured ~10min/candidate (plan
-  # after-a-first-run-linear-wave item 2's OMP fix), giving a ~70min/task
-  # estimate at shards-per-task=24, K=4 -- heavier methods (e.g.
-  # logit_adjustment, still mid-candidate past 1:41 in job 4807150) blow
-  # well past that, hence tune_controlled's gpu-5h partition.
-  tune_shards_per_task: 24
-  tune_natural_shards_per_task: 3
-  # Packs this many concurrent fits onto one GPU's tune-shard task (plan
-  # after-a-first-run-linear-wave item 2). 4x measured ~20 GiB/fit baseline
-  # on an 80gb card (not the ~16 GiB originally assumed) -- a metric-learning
-  # method's full-batch eval (pairwise embed-to-prototype distances) then
-  # OOM'd needing 7.5 GiB more with zero headroom left. 3x leaves margin.
+  # Controlled candidates are not uniform work: assignment_count is 1 for
+  # 'balanced' (6 observations/candidate = 3 splits x 2 seeds) and 3 for the
+  # other four conditions (18 observations/candidate). CONTROLLED_CONDITIONS
+  # puts 'balanced' first and the array is condition-major, so low array
+  # indices are all the cheap 6-fit condition -- a per-candidate timing
+  # measured only there (this comment used to cite ~10min/candidate,
+  # ~70min/task at shards-per-task=24) is 3x too optimistic past the first
+  # condition. Measured 2026-09-01 (this plan's Step 0): per_fit_seconds p95
+  # ~168.5s for the 18-observation conditions, ~162.6s for 'balanced' -- a
+  # worst-case candidate is up to ~220s * 18 =~ 66min. shards-per-task is
+  # sized for the worst card in the pool (40gb, runtime K=1, see
+  # tune_parallel_fits below) rather than split across partitions by card
+  # tier; imbalance_benchmark.hydra.deadline.DeadlineGuard is the backstop
+  # that turns an underestimate into a clean partial completion instead of a
+  # TIMEOUT.
+  tune_shards_per_task: 2
+  # 4 base learning-rate candidates is the natural roster's actual ceiling
+  # (_candidate_slots('ce') == 4): bundled_observation_array_size(4, 6, spt)
+  # bottoms out at spt=4 (6 tasks); spt 10-15 bought nothing beyond that.
+  tune_natural_shards_per_task: 4
+  # Packs this many concurrent fits onto one GPU's tune-shard task -- now a
+  # ceiling: shard_workers._vram_capped_workers resolves the actual K per
+  # task from the card's free VRAM at runtime, so a 40gb card in the same
+  # "80gb|40gb|h100|h200" pool packs fewer fits than an 80gb one without
+  # needing a dedicated partition. Sized for an 80gb card at the measured
+  # per-fit footprint (Step 0: peaks up to ~19.29 GiB/fit, dominated by a
+  # handful of methods' own extra tensors -- e.g. a metric-learning method's
+  # full-batch pairwise-distance eval -- not by the ~1.46 GiB analytic bank).
   tune_parallel_fits: 3
   # Natural group's bank holds the full unbalanced dataset (no per-condition
-  # subsample), measured at ~13.4 GiB/fit -- 4x OOMs on the constraint's
-  # 40gb cards (3*13.4 > 39.5 GiB free). 2x fits both 40gb and 80gb+ cards.
+  # subsample, ~6.53 GiB analytic bank plus the same measured per-fit
+  # transient) -- also a ceiling now; runtime K clamps a 40gb card down on
+  # its own instead of needing a dedicated partition.
   tune_natural_parallel_fits: 2
   confirm_natural_shards_per_task: 3
   confirm_controlled_shards_per_task: 10
@@ -85,23 +102,26 @@ slurm:
     freeze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 256G}
     signals: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 256G}
     tune: {partition: gpu-2d, gpus: 1, cpus: 8}
-    tune_natural: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
-    # Reverted to gpu-5h 2026-09-01: the gpu-2h move (shards-per-task=4 ->
-    # 24, this comment's 19min validation run) assumed 'ce'-family-only
-    # timing. Live run (job 4807150) hit tasks still mid-candidate
-    # (logit_adjustment, step ~800/4200) past 1:41 of the 2:00 cap --
-    # heavier methods blow the ~70min/task estimate. gpu-5h removes the
-    # timeout risk without shrinking shards-per-task.
     # memory 48G: measured peak 26.8G at K=4 (job 4807044), ~1.8x headroom.
-    # 40gb dropped from the constraint 2026-09-01: job 4807438's bank alone
-    # measured ~20 GiB/fit -- 2 packed fits already sit at ~40 GiB baseline
-    # with zero margin, and one metric-learning method's eval spike (+7.5
-    # GiB) OOM'd a 39.49 GiB card even at K=3. Only 80gb+ cards have the
-    # headroom this dataset's bank size needs at any K>1.
-    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|h100|h200"}
+    tune_natural: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
+    # gpu-2h with the full 80gb|40gb|h100|h200 pool, 2026-09-01: the prior
+    # gpu-5h reversion and the 40gb drop (both same day) were a
+    # misdiagnosis -- three compounding defects (condition-major array
+    # indices making 'balanced' look representative, the checkpoint
+    # schedule's front-loading making a mid-fit progress line read far less
+    # done than it was, and packed children logging nothing at all) produced
+    # an apparent 500min-candidate that Step 0's direct shard-JSON
+    # measurement does not reproduce (p95 per_fit_seconds ~168.5s, worst
+    # candidate ~66min). shard_workers._vram_capped_workers now resolves K
+    # from the task's actual free VRAM instead of a fixed constant sized for
+    # the worst card the constraint admits, and DeadlineGuard converts a
+    # card that still runs long into a clean partial completion instead of a
+    # TIMEOUT -- so 40gb no longer needs its own partition or its own
+    # constraint exclusion.
+    tune_controlled: {partition: gpu-2h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 256G}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
-    confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
+    confirm_natural: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}

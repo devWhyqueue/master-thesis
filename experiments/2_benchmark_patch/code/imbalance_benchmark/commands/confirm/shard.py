@@ -16,6 +16,7 @@ from imbalance_benchmark.common import (
     read_run_record,
     split_paths,
 )
+from imbalance_benchmark.hydra.guards import DeadlineGuard
 from imbalance_benchmark.manifest.freeze import accepted_freeze_hashes
 from imbalance_benchmark.datasets.data import TrainDataset, load_training_dataset
 from imbalance_benchmark.modeling.context import (
@@ -37,6 +38,13 @@ from imbalance_benchmark.modeling.workflows.confirmation_schedule import (
 )
 
 __all__ = ["cmd_confirm_shard"]
+
+# Confirmation was not separately profiled in the 2026-09-01 Step 0 scan;
+# reuse tuning's measured 220s p95 per-fit cost (patch_benchmark's shared
+# example budget T means confirm fits are the same order of magnitude), times
+# the worst case of 3 tail assignments fit per unit. Errs conservative --
+# DeadlineGuard.finish_item narrows this to reality after the first unit.
+_MEASURED_UNIT_SECONDS = 3 * 220.0
 
 
 def _fitted_methods(cond: str, method: str, is_mil: bool) -> tuple[str, ...]:
@@ -191,12 +199,21 @@ def _group_bundle_by_split(units: list[ConfirmUnit]) -> dict[int, list[ConfirmUn
 
 
 def _run_split_bundle(paths: dict[str, Any], split_units: list[ConfirmUnit]) -> None:
-    """Fit every scheduled unit for one split, skipping conditions this dataset never built."""
+    """Fit every scheduled unit for one split, skipping conditions this dataset never built.
+
+    Stops cleanly before a unit that would overrun the SLURM allocation:
+    each unit already writes its own per-(assignment, condition, method,
+    seed) run record, so a clean exit here loses no completed work and
+    resume picks up exactly the untouched units.
+    """
     run_data, freeze = _confirm_run_data(paths)
     assignments = tuple(freeze.get("tail_assignments", {"native": []}))
     accepted = accepted_freeze_hashes(freeze)
     selections: dict[str, dict[str, Any]] = {}
+    guard = DeadlineGuard(_MEASURED_UNIT_SECONDS)
     for unit in split_units:
+        if guard.should_stop():
+            break
         scoped = scoped_assignments(unit.condition, freeze, assignments, "unassigned")
         if not scoped:
             continue  # not constructed for this dataset (plans/03,04)
@@ -204,7 +221,9 @@ def _run_split_bundle(paths: dict[str, Any], split_units: list[ConfirmUnit]) -> 
             selections[unit.condition] = _load_condition_selections(
                 paths, unit.condition
             )
+        guard.start_item()
         _run_confirm_unit(unit, selections[unit.condition], run_data, scoped, accepted)
+        guard.finish_item()
 
 
 def cmd_confirm_shard(args: argparse.Namespace) -> None:

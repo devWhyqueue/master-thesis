@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 import numpy as np
 import torch
@@ -163,6 +164,7 @@ def _run_training_loop(
     """
     step, device, is_mil, n_classes = 0, ctx["device"], ctx["is_mil"], ctx["n_classes"]
     checkpoint_schedule = resolve_checkpoint_schedule(max_steps)
+    ordered_checkpoints = sorted(checkpoint_schedule)
     trace = ctx.get("dense_trace")
     trace_interval = ctx.get("dense_trace_interval", 1)
     while step < max_steps:
@@ -184,10 +186,22 @@ def _run_training_loop(
                 best = checkpoint_step(
                     ctx["model"], val_loader, device, is_mil, n_classes, best, step
                 )
+                # Checkpoints are log-spaced and front-loaded: "step ~800/4200"
+                # reads as 19% done but is really ~62% through this fit's
+                # checkpoints. condition/candidate/observation/pid identify
+                # which packed-per-GPU fit this is once a task shares one
+                # candidate among several -- method/seed alone cannot.
                 logger.info(
-                    "tune: %s seed=%s step %d/%d",
+                    "tune: %s seed=%s condition=%s candidate=%s observation=%s pid=%s "
+                    "checkpoint %d/%d step %d/%d",
                     ctx["method"],
                     ctx.get("seed"),
+                    ctx.get("condition"),
+                    ctx.get("candidate_index"),
+                    ctx.get("observation_index"),
+                    os.getpid(),
+                    ordered_checkpoints.index(step) + 1,
+                    len(ordered_checkpoints),
                     step,
                     max_steps,
                 )

@@ -6,28 +6,30 @@ import time
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 import torch
 
 from imbalance_benchmark.common import (
-    compute_sha256,
-    ensure_dirs,
     load_config,
+    ensure_dirs,
     sign_file,
     split_paths,
     write_json,
 )
-from imbalance_benchmark.datasets.data import load_training_dataset
-from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
+from imbalance_benchmark.commands.tuning.scope import (
+    _frozen_shard_context,
+    _is_excluded,
+    _tuning_inputs,
+    _tuning_seeds,
+    bank_bytes_for,
+    load_shard_scope,
+)
 from imbalance_benchmark.modeling.context import (
     CONDITIONS,
     Regime,
     roster_for_condition,
     scoped_assignments,
 )
-from imbalance_benchmark.modeling.training import build_evaluation_loader
 from imbalance_benchmark.modeling.workflows.tuning.aggregation.aggregate import (
-    TuningScope,
     summarize_tuning_cost,
     tune_across_splits,
 )
@@ -37,19 +39,11 @@ from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registr
 from imbalance_benchmark.modeling.workflows.tuning.tuning_execution import (
     reduce_tuning_shards,
 )
-from imbalance_benchmark.modeling.workflows.tuning.aggregation.tuning_budget import (
-    tuning_example_budget,
-)
 from imbalance_benchmark.modeling.workflows.tuning.tuning_schedule import (
-    _manifest_name,
     combined_scopes,
 )
 
-__all__ = ["cmd_tune", "cmd_tune_reduce"]
-
-
-def _is_excluded(paths: dict[str, Path]) -> bool:
-    return (paths["data"] / "confirmatory_exclusion.json").exists()
+__all__ = ["cmd_tune", "cmd_tune_reduce", "bank_bytes_for"]
 
 
 def write_serial_cost(
@@ -78,38 +72,6 @@ def write_serial_cost(
     )
 
 
-def _tuning_inputs(
-    args: argparse.Namespace, paths: dict[str, Path], capacity_hint: int | None = None
-) -> tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]:
-    """Load config, the natural-validation loader, and the regime for the tuning sweep."""
-    freeze_path = paths["data"] / "manifest_freeze.json"
-    freeze = json.loads(freeze_path.read_text())
-    verify_manifest_freeze(freeze)
-    config = freeze["runtime_config"]
-    is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
-    val_ds = load_training_dataset(
-        paths["data"] / "manifest.csv",
-        is_mil,
-        "validation",
-        class_names=list(freeze["class_names"]),
-        capacity_hint=capacity_hint,
-    )
-    return (
-        paths,
-        Regime(
-            torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-            config,
-            val_ds.get_n_classes(),
-            is_mil,
-            locked_class_names=list(freeze["class_names"]),
-            method_grids=freeze.get("method_grids", {}),
-            exposure_budgets=freeze.get("exposure_budgets", {}),
-            difficulty=freeze.get("difficulty_evidence", {}).get("difficulty", {}),
-        ),
-        build_evaluation_loader(val_ds, is_mil),
-    )
-
-
 def cmd_tune(args: argparse.Namespace) -> None:
     """Run the validation-only hyperparameter search for every roster method and condition."""
     started = time.perf_counter()
@@ -119,11 +81,6 @@ def cmd_tune(args: argparse.Namespace) -> None:
             "do not pass --split-index."
         )
     _tune_all_splits(args, started)
-
-
-def _tuning_seeds(freeze: dict[str, Any]) -> list[int]:
-    roles = freeze.get("seed_roles", {})
-    return [int(roles[f"tuning_initialization_{index}"]) for index in range(2)]
 
 
 def _conditions(args: argparse.Namespace) -> tuple[str, ...]:
@@ -202,68 +159,6 @@ def _combined_selections(
             selections[assignment][condition] = selected
         _lock_condition(root, condition, methods)
     return selections, summarize_tuning_cost(cost_records)
-
-
-def _frozen_shard_context(
-    args: argparse.Namespace,
-    load_scopes: bool = True,
-) -> tuple[
-    dict[str, Path],
-    list[tuple[dict[str, Path], Regime, torch.utils.data.DataLoader]],
-    dict[str, Any],
-    list[str],
-    list[set[str]],
-]:
-    base = ensure_dirs(load_config(args.config))
-    paths = [
-        split_paths(base, index)["data"] / "manifest_freeze.json" for index in range(3)
-    ]
-    freezes = [json.loads(path.read_text()) for path in paths]
-    for freeze in freezes:
-        verify_manifest_freeze(freeze)
-    scopes = (
-        [_tuning_inputs(args, split_paths(base, index)) for index in range(3)]
-        if load_scopes
-        else []
-    )
-    fingerprint = [compute_sha256(path) for path in paths]
-    accepted = [
-        {current, *split_freeze.get("superseded_freeze_file_hashes", [])}
-        for current, split_freeze in zip(fingerprint, freezes)
-    ]
-    return (base, scopes, freezes[0], fingerprint, accepted)
-
-
-def load_shard_scope(
-    args: argparse.Namespace,
-    base: dict[str, Path],
-    condition: str,
-    assignment: str,
-    split_index: int,
-    scope_index: int,
-    cost_records: list[dict[str, int]],
-) -> TuningScope:
-    """Load one tuning observation's validation and training data into one bank."""
-    paths = split_paths(base, split_index)
-    manifest = paths["data"] / _manifest_name(condition, assignment)
-    frame = pd.read_csv(paths["data"] / "manifest.csv")
-    capacity = int((frame["split"] == "validation").sum()) + len(pd.read_csv(manifest))
-    paths, regime, loader = _tuning_inputs(args, paths, capacity)
-    return TuningScope(
-        regime,
-        loader,
-        load_training_dataset(
-            manifest,
-            regime.is_mil,
-            class_names=regime.locked_class_names,
-            capacity_hint=capacity,
-        ),
-        cost_records,
-        tuning_example_budget(regime, condition),
-        assignment,
-        split_index,
-        scope_index,
-    )
 
 
 def cmd_tune_reduce(args: argparse.Namespace) -> None:

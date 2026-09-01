@@ -21,7 +21,7 @@ from imbalance_benchmark.commands.tuning.wave_support import (
     submit_wave,
     unattempted,
 )
-from imbalance_benchmark.hydra.queue import DEFAULT_QUEUE_CAP, _squeue_count
+from imbalance_benchmark.hydra.guards import DEFAULT_QUEUE_CAP, _squeue_count
 from imbalance_benchmark.hydra.rendering import render_sbatch
 from imbalance_benchmark.hydra.rendering import SlurmJob
 from imbalance_benchmark.hydra.resume import ResumePlan, resume_plan

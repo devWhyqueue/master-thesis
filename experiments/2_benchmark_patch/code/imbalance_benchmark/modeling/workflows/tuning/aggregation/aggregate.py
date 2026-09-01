@@ -75,6 +75,7 @@ def _evaluate(
     scope: TuningScope,
     seed: int,
     stage_one_config: dict[str, Any] | None = None,
+    log_context: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Fit one candidate/seed/split and return its checkpoint plus validation metrics."""
     ctx = build_training_ctx(
@@ -87,6 +88,7 @@ def _evaluate(
         scope.example_budget,
     )
     ctx["record_exposure"] = False
+    ctx.update(log_context or {})  # packed-fit progress-log identifiers only
     if stage_one_config is not None:
         ctx["stage_one_config"] = stage_one_config
         state, _ = fit_crt(ctx)
@@ -153,9 +155,8 @@ def _select_post_hoc(
 ) -> dict[str, Any]:
     """Select one post-hoc strength from all selected CE checkpoints.
 
-    Every tau's metrics are persisted, not just the winner's, for signed
-    reproducibility. ``scopes`` may be a live generator, so the tau grid is
-    resolved lazily on the first scope rather than indexing ``scopes[0]``.
+    Every tau's metrics persist for signed reproducibility; the tau grid
+    resolves lazily on the first scope, since ``scopes`` may stream live.
     """
     observations: dict[float, list[tuple[float, float, float]]] | None = None
     taus: list[float] = []

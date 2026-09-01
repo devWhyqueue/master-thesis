@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from imbalance_benchmark.commands.tuning import decide
-from imbalance_benchmark.commands.tuning.round_windows import (
+from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
     round0_windows,
     this_round_windows,
 )

@@ -7,11 +7,14 @@ from typing import Any
 
 from imbalance_benchmark.commands.tuning import _frozen_shard_context, _is_excluded
 from imbalance_benchmark.hydra.job_resources import build_job
-from imbalance_benchmark.hydra.queue import check_queue_cap
+from imbalance_benchmark.hydra.guards import check_queue_cap
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 from imbalance_benchmark.hydra.dependent_jobs import final_reduce_job
 from imbalance_benchmark.hydra.workflow import _submit_script
-from imbalance_benchmark.commands.tuning.round_windows import Window, this_round_windows
+from imbalance_benchmark.modeling.workflows.tuning.search_windows import (
+    Window,
+    this_round_windows,
+)
 from imbalance_benchmark.modeling.context import roster_for_condition
 from imbalance_benchmark.modeling.workflows.tuning.aggregation.candidate_registry import (
     load_round_grids,

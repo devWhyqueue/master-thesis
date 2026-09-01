@@ -162,7 +162,9 @@ def _fit_streamed_payload(
             index = scope.scope_index * len(seeds) + seed_index
             if spec.observation_index is not None and index != spec.observation_index:
                 continue
-            _, result = _evaluate(spec.method, config, scope, seed, stage_one_config)
+            _, result = _evaluate(
+                spec.method, config, scope, seed, stage_one_config, _ctx(spec, index)
+            )
             metrics.append(_observation_metric(scope, seed_index, seed, result))
     if config is None:
         raise RuntimeError("Tuning shard has no scopes")
@@ -174,13 +176,20 @@ def _fit_streamed_payload(
     }
 
 
+def _ctx(spec: ShardSpec, observation_index: int) -> dict[str, Any]:
+    return dict(
+        condition=spec.condition,
+        candidate_index=spec.candidate_index,
+        observation_index=observation_index,
+    )
+
+
 def _post_hoc_payload(
     scope_source: list[TuningScope] | Callable[[], Iterator[TuningScope]],
     seeds: list[int],
     stage_one_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Select one post-hoc strength; a callable source streams scopes live
-    (never materialize) rather than an already bank-resident base-phase list."""
+    """Select one post-hoc strength from a possibly-live (streamed) scope source."""
     if stage_one_config is None:
         raise RuntimeError("Post-hoc tuning requires the selected CE configuration")
     cost_records: list[dict[str, int]] = []
@@ -212,13 +221,12 @@ def _fit_payload(
     metrics = []
     for scope in scopes:
         for seed_index, seed in enumerate(seeds):
-            observation_index = scope.scope_index * len(seeds) + seed_index
-            if (
-                spec.observation_index is not None
-                and observation_index != spec.observation_index
-            ):
+            index = scope.scope_index * len(seeds) + seed_index
+            if spec.observation_index is not None and index != spec.observation_index:
                 continue
-            _, result = _evaluate(spec.method, config, scope, seed, stage_one_config)
+            _, result = _evaluate(
+                spec.method, config, scope, seed, stage_one_config, _ctx(spec, index)
+            )
             metrics.append(_observation_metric(scope, seed_index, seed, result))
     return {
         "candidate_index": spec.candidate_index,
