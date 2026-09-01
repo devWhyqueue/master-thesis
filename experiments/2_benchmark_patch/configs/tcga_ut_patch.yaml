@@ -93,7 +93,12 @@ slurm:
     # heavier methods blow the ~70min/task estimate. gpu-5h removes the
     # timeout risk without shrinking shards-per-task.
     # memory 48G: measured peak 26.8G at K=4 (job 4807044), ~1.8x headroom.
-    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|40gb|h100|h200"}
+    # 40gb dropped from the constraint 2026-09-01: job 4807438's bank alone
+    # measured ~20 GiB/fit -- 2 packed fits already sit at ~40 GiB baseline
+    # with zero margin, and one metric-learning method's eval spike (+7.5
+    # GiB) OOM'd a 39.49 GiB card even at K=3. Only 80gb+ cards have the
+    # headroom this dataset's bank size needs at any K>1.
+    tune_controlled: {partition: gpu-5h, gpus: 1, cpus: 4, memory: 48G, constraint: "80gb|h100|h200"}
     tune_reduce: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 256G}
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
