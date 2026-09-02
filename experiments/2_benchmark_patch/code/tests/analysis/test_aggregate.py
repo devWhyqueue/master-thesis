@@ -1074,3 +1074,70 @@ def test_cross_split_aggregation_requires_every_comparison_in_all_three_splits()
 
     with pytest.raises(RuntimeError, match="incomplete"):
         require_complete_split_comparisons(rows)
+
+
+def test_apply_gates_p_value_cache_resumes_without_recomputing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The crossed p-value cache must skip a key already on disk on a second pass."""
+    from imbalance_benchmark.analysis.aggregation import parallel_cache
+    from imbalance_benchmark.analysis.aggregation.aggregate import _apply_gates
+
+    class _InlineProcess:
+        def __init__(self, target, args) -> None:
+            self._target, self._args = target, args
+            self.exitcode = 0
+
+        def start(self) -> None:
+            self._target(*self._args)
+
+        def join(self) -> None:
+            pass
+
+    class _InlineContext:
+        def Process(self, target, args) -> "_InlineProcess":
+            return _InlineProcess(target, args)
+
+    monkeypatch.setattr(
+        parallel_cache.multiprocessing, "get_context", lambda *_a: _InlineContext()
+    )
+    paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
+    calls: list[tuple[str, str, str, str]] = []
+
+    def counting_p_value(entry, base_paths, config, seed):
+        calls.append((entry["assignment"], entry["severity"], entry["method"], entry["gate"]))
+        return 0.5
+
+    def entries() -> list[dict]:
+        return [
+            {
+                "assignment": "native",
+                "severity": "severe",
+                "method": "ce",
+                "gate": "discrimination",
+                "effect": 0.2,
+                "ci": (0.1, 0.3),
+                "descriptive_only": False,
+            },
+            {
+                "assignment": "native",
+                "severity": "severe",
+                "method": "weighted_ce",
+                "gate": "discrimination",
+                "effect": 0.15,
+                "ci": (0.05, 0.25),
+                "descriptive_only": False,
+            },
+        ]
+
+    first = entries()
+    _apply_gates(first, paths, {"dataset": {}}, 0, counting_p_value)
+    assert len(calls) == 2
+    assert first[0]["p_value"] == 0.5
+    assert first[1]["p_value"] == 0.5
+
+    second = entries()
+    _apply_gates(second, paths, {"dataset": {}}, 0, counting_p_value)
+    assert len(calls) == 2  # second pass found both keys on disk; no recompute
+    assert second[0]["p_value"] == 0.5
+    assert second[1]["p_value"] == 0.5

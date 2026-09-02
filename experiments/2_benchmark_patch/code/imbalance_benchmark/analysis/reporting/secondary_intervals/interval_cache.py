@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
-import multiprocessing
-import os
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
+from imbalance_benchmark.analysis.aggregation.parallel_cache import (
+    read_npz_cache,
+    spawn_workers,
+    write_npz_cache,
+)
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.metrics import assign_tiers
 from imbalance_benchmark.analysis.query import load_seed_predictions
@@ -53,7 +55,13 @@ def _split_distributions(
     distributions = []
     for index in range(3):
         paths = split_paths(base_paths, index)
-        record = load_seed_predictions(paths, condition, method, assignment)
+        record = load_seed_predictions(
+            paths,
+            condition,
+            method,
+            assignment,
+            fields=("preds", "probs", "temperature_scaled_probs"),
+        )
         if record is None:
             raise RuntimeError(
                 f"Missing secondary endpoints for {assignment}/{condition}/{method}"
@@ -94,11 +102,6 @@ def _average_split_values(
     }
 
 
-def _worker_count() -> int:
-    slurm_cpus = os.environ.get("SLURM_CPUS_PER_TASK")
-    return max(1, int(slurm_cpus)) if slurm_cpus else os.cpu_count() or 1
-
-
 def _cache_dir(base_paths: dict[str, Path], n_replicates: int, seed: int) -> Path:
     # Namespaced by (n_replicates, seed) so a differently-configured rerun cannot
     # silently reuse another run's cached distributions.
@@ -110,28 +113,6 @@ def _cache_dir(base_paths: dict[str, Path], n_replicates: int, seed: int) -> Pat
 def _cache_path(cache_dir: Path, key: tuple[str, str, str]) -> Path:
     assignment, condition, method = key
     return cache_dir / f"{assignment}__{condition}__{method}.npz"
-
-
-def _write_key_cache_atomic(path: Path, values: dict[str, np.ndarray]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    with open(temporary, "wb") as handle:
-        np.savez(handle, **values)  # type: ignore
-    os.replace(temporary, path)
-
-
-def _read_key_cache(path: Path) -> dict[str, np.ndarray]:
-    with np.load(path) as data:
-        return {name: data[name] for name in data.files}
-
-
-def _chunk_keys(
-    keys: list[tuple[str, str, str]], workers: int
-) -> list[list[tuple[str, str, str]]]:
-    chunks: list[list[tuple[str, str, str]]] = [[] for _ in range(workers)]
-    for index, key in enumerate(keys):
-        chunks[index % workers].append(key)
-    return [chunk for chunk in chunks if chunk]
 
 
 def _compute_key_caches(
@@ -162,38 +143,7 @@ def _compute_key_caches(
         split_values = _split_distributions(
             base_paths, contexts, is_mil, ordinal, assignment, condition, method
         )
-        _write_key_cache_atomic(path, _average_split_values(split_values))
-
-
-def _run_and_join(processes: list[Any]) -> None:
-    for process in processes:
-        process.start()
-    for process in processes:
-        process.join()
-    failed = [str(index) for index, process in enumerate(processes) if process.exitcode]
-    if failed:
-        raise RuntimeError(f"Secondary interval workers failed: {', '.join(failed)}")
-
-
-def _spawn_cache_workers(
-    pending: list[tuple[str, str, str]],
-    base_paths: dict[str, Path],
-    is_mil: bool,
-    ordinal: bool,
-    n_replicates: int,
-    seed: int,
-    cache_dir: Path,
-) -> None:
-    workers = min(_worker_count(), len(pending))
-    context = multiprocessing.get_context("spawn")
-    processes = [
-        context.Process(
-            target=_compute_key_caches,
-            args=(chunk, base_paths, is_mil, ordinal, n_replicates, seed, cache_dir),
-        )
-        for chunk in _chunk_keys(pending, workers)
-    ]
-    _run_and_join(processes)
+        write_npz_cache(path, _average_split_values(split_values))
 
 
 def distributions_by_key(
@@ -205,7 +155,7 @@ def distributions_by_key(
 ) -> dict[tuple[str, str, str], dict[str, np.ndarray]]:
     """Return every complete result key's endpoint distributions, cached per key.
 
-    Uncached keys are computed by up to ``_worker_count()`` spawned processes
+    Uncached keys are computed by up to ``worker_count()`` spawned processes
     (one fresh CUDA-free interpreter each) and cached to disk immediately, so
     a crash or wall-clock TIMEOUT resumes from whatever is already on disk
     instead of restarting at the first key.
@@ -214,7 +164,9 @@ def distributions_by_key(
     cache_dir = _cache_dir(base_paths, n_replicates, seed)
     pending = [key for key in keys if not _cache_path(cache_dir, key).exists()]
     if pending:
-        _spawn_cache_workers(
-            pending, base_paths, is_mil, ordinal, n_replicates, seed, cache_dir
+        spawn_workers(
+            pending,
+            _compute_key_caches,
+            (base_paths, is_mil, ordinal, n_replicates, seed, cache_dir),
         )
-    return {key: _read_key_cache(_cache_path(cache_dir, key)) for key in keys}
+    return {key: read_npz_cache(_cache_path(cache_dir, key)) for key in keys}

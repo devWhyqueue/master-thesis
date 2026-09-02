@@ -27,10 +27,9 @@ __all__ = [
 class PatientWeights:
     """Bootstrap weights held per patient; rows of a patient always share a weight.
 
-    ``sum_rows w(row) * v(row)`` equals ``sum_patients w(patient) *
-    (sum_rows-of-that-patient v(row))``, so aggregating to patients first
-    (``np.bincount``, once) then matmul-ing against the weight matrix
-    reproduces the row-expanded result at a fraction of the cost.
+    ``sum_rows w(row)*v(row)`` equals ``sum_patients w(patient)*(sum-of-patient
+    v(row))``, so bincounting to patients once then matmul-ing the weight
+    matrix reproduces the row-expanded result at a fraction of the cost.
     """
 
     row_patient: np.ndarray  # (n_rows,) index into `patient`
@@ -45,10 +44,7 @@ class PatientWeights:
         self, values: np.ndarray | float, mask: np.ndarray | None = None
     ) -> np.ndarray:
         """Sum over rows of ``weight(row) * values(row)`` per replicate.
-
-        ``values`` may be a scalar (broadcast as an all-ones row vector, e.g.
-        to get plain row-weight totals) or a per-row array; ``mask`` restricts
-        the sum to the selected rows.
+        ``values`` may be scalar (all-ones) or per-row; ``mask`` restricts the sum.
         """
         row_patient = self.row_patient if mask is None else self.row_patient[mask]
         if np.isscalar(values):
@@ -59,6 +55,24 @@ class PatientWeights:
             row_patient, weights=weights, minlength=len(self.patient)
         )
         return per_patient @ self.patient
+
+    def class_sums(
+        self, values: np.ndarray | float, codes: np.ndarray, n_codes: int
+    ) -> np.ndarray:
+        """Row sums split by ``codes``: returns ``(n_codes, n_replicates)`` via one
+        bincount over a flattened ``(code, patient)`` index plus a single GEMM --
+        reads the weight matrix once, not ``n_codes`` times.
+        """
+        n_patients = len(self.patient)
+        if np.isscalar(values):
+            weights = None if values == 1.0 else np.full(len(codes), values)
+        else:
+            weights = np.asarray(values)
+        flat_index = codes.astype(np.int64) * n_patients + self.row_patient
+        per_cell = np.bincount(
+            flat_index, weights=weights, minlength=n_codes * n_patients
+        )
+        return per_cell.reshape(n_codes, n_patients) @ self.patient
 
 
 def _contribution_vector(
@@ -80,12 +94,8 @@ def _contribution_vector(
 
 def build_strata(identity: pd.DataFrame) -> pd.Series:
     """Map each patient to its complete split-by-class contribution stratum.
-
-    The optional ``patient_split`` column is retained when all three fixed
-    patient-split repetitions are analysed jointly.  Thus a patient occurring
-    in several test repetitions has one resampling multiplicity across those
-    appearances, while resampling within identical contribution vectors keeps
-    every observed split/class represented.
+    ``patient_split``, when present, keeps one resampling multiplicity per
+    patient across all three fixed split repetitions.
     """
     split_col = "patient_split" if "patient_split" in identity else None
 
@@ -100,15 +110,10 @@ def resample_patient_weights(
     strata: pd.Series, n_replicates: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
     """Bayesian bootstrap (Rubin 1981): independent Dirichlet weight per patient.
-
-    Returns ``(case_ids, weights)`` where ``weights`` has shape
-    ``(n_patients, n_replicates)``. Every patient draws an independent,
-    strictly positive, continuous weight each replicate (a Dirichlet draw
-    is almost-surely positive in every coordinate), so a patient whose
-    contribution pattern is unique never collapses to zero simulated
-    variance the way a per-stratum multinomial draw did. ``strata`` is
-    accepted only for its patient index (grouping now feeds diagnostics in
-    :mod:`preflight`, not the draw itself).
+    Returns ``(case_ids, weights)``, shape ``(n_patients, n_replicates)``. Each
+    patient's almost-surely-positive draw keeps variance nonzero for a unique
+    contribution pattern. ``strata`` supplies only the patient index (grouping
+    now feeds :mod:`preflight`, not the draw itself).
     """
     case_ids = strata.index.to_numpy()
     n = len(case_ids)
@@ -129,11 +134,8 @@ def resample_seed_indices(
     n_seeds: int, n_replicates: int, rng: np.random.Generator
 ) -> np.ndarray:
     """Draw, per replicate, a size-``n_seeds`` resample (with replacement) of seed indices.
-
-    Report: "the five matched confirmation initialization indices are
-    resampled as paired algorithmic-noise blocks and averaged before split
-    aggregation" — the same draw is shared by balanced CE, imbalanced CE, and
-    the method being compared, since callers pass this same matrix to each.
+    Shared by balanced CE, imbalanced CE, and the compared method, so the five
+    confirmation seeds resample as one paired block, not independently per arm.
     """
     return rng.integers(0, n_seeds, size=(n_replicates, n_seeds))
 
@@ -142,9 +144,7 @@ def gather_seed_resampled(
     per_seed_metric: np.ndarray, seed_idx: np.ndarray
 ) -> np.ndarray:
     """Average a (n_seeds, n_replicates) metric matrix over each replicate's seed resample.
-
-    ``seed_idx`` has shape ``(n_replicates, n_seeds)`` from
-    :func:`resample_seed_indices`. Returns shape ``(n_replicates,)``.
+    ``seed_idx`` is ``(n_replicates, n_seeds)`` from :func:`resample_seed_indices`.
     """
     n_replicates = per_seed_metric.shape[1]
     col = np.arange(n_replicates)[:, None]
@@ -163,9 +163,7 @@ def kish_effective_count(weights: np.ndarray) -> np.ndarray:
 
 def case_class_divisor(case_ids: np.ndarray, labels: np.ndarray) -> np.ndarray:
     """Per-row ``1 / (rows of this case within this class)`` - the case-macro weight.
-
-    ponytail: assumes a case's rows are exchangeable within one class; grouped
-    by the ``(case, class)`` pair since a case may span more than one class.
+    ponytail: assumes rows exchangeable within one class; grouped by (case, class).
     """
     key = pd.DataFrame({"case": case_ids, "label": labels})
     counts = key.groupby(["case", "label"])["case"].transform("size").to_numpy()

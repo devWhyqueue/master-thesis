@@ -79,14 +79,17 @@ class BootstrapContext:
         )
         self.case_ids = identity["case_id"].astype(str).to_numpy()
         self.slide_ids = identity["slide_id"].astype(str).to_numpy()
+        # Factorized once (not per secondary-endpoint group-mean call) since
+        # this context is reused across every key a worker processes.
+        self.slide_codes, _ = pd.factorize(self.slide_ids, sort=False)
+        self.case_codes, _ = pd.factorize(self.case_ids, sort=False)
         case_labels = identity["cancer_type"].astype(str).to_numpy()
         self.case_class_divisor = case_class_divisor(self.case_ids, case_labels)
         position = {c: i for i, c in enumerate(unique_cases)}
         row_patient = np.asarray([position[c] for c in self.case_ids])
-        # Replicate 0 is the observed cohort (all unit weights one): every metric
-        # distribution therefore carries the observed-data point estimate at
-        # index 0, which the reported effects, recovery ratios, and deficit gates
-        # use, while replicates 1.. are the bootstrap draws for the interval.
+        # Replicate 0 is the observed cohort (all-ones weight): every metric
+        # carries the observed point estimate at index 0 (used by reported
+        # effects/recovery/deficit gates); replicates 1.. give the interval.
         observed = np.ones((patient_weights.shape[0], 1), dtype=patient_weights.dtype)
         patient = np.concatenate([observed, patient_weights], axis=1).astype(np.float64)
         self.weights = PatientWeights(row_patient, patient)
@@ -164,7 +167,7 @@ class BootstrapContext:
                 self.weights,
                 class_names,
                 tiers,
-                (self.slide_ids, self.case_ids),
+                (self.slide_codes, self.case_codes),
                 is_mil=is_mil,
                 ordinal=ordinal,
             )
@@ -189,9 +192,8 @@ class BootstrapContext:
 def _tail_classes(
     freeze: dict[str, Any], class_names: list[str], assignment: str, severity: str
 ) -> list[int]:
-    """Class indices assigned to the tail tier under one condition's allocated support.
-
-    Head/body/tail tiers use that condition's realized allocation.
+    """Class indices assigned to the tail tier under one condition's allocated
+    support -- head/body/tail tiers use that condition's realized allocation.
     """
     condition = (
         freeze.get("assignment_conditions", {}).get(assignment, {}).get(severity, {})
@@ -212,10 +214,8 @@ def _tail_classes(
 @dataclass
 class Baseline:
     """The balanced-CE reference distributions every severity's gates/recovery compare against.
-
-    The tail group is severity-specific, so ``tail_nll`` is computed per
-    severity by the recovery layer from ``freeze``/``assignment`` rather than
-    precomputed here for a single condition.
+    The tail group is severity-specific, so ``tail_nll`` is computed per severity
+    by the recovery layer from ``freeze``/``assignment``, not precomputed here.
     """
 
     balanced: dict[str, Any]

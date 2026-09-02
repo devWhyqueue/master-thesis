@@ -11,6 +11,7 @@ import yaml
 import imbalance_benchmark.analysis.inference.recovery as _recovery
 
 from imbalance_benchmark.analysis import query as _query
+from imbalance_benchmark.analysis.aggregation import aggregate as _aggregate
 from imbalance_benchmark.analysis.inference import crossed_permutation as _crossed
 from imbalance_benchmark.analysis.reporting.secondary_intervals import (
     interval_cache as _interval_cache,
@@ -63,18 +64,22 @@ def _fast_locked_assignments(orig: Any) -> Any:
     return _wrapped
 
 
-def _serial_cache_workers(*args: Any, **kwargs: Any) -> None:
-    """Run secondary-interval cache computation in-process instead of via `spawn`.
+def _serial_spawn_workers(
+    pending: Any, worker_fn: Any, fixed_args: tuple[Any, ...]
+) -> None:
+    """Run cache-worker computation (secondary intervals, crossed p-values) in-process
+    instead of via `spawn`.
 
     ``spawn`` re-imports every module from scratch in each worker, which
     silently drops every monkeypatch this context manager applies (grids,
-    seed counts, checkpoint budgets); a worker that re-reads the real
-    ``EXPECTED_CONFIRMATION_SEEDS`` (5) against smoke's single confirmed
-    seed rejects every block as incomplete. Toy data has only a handful of
-    (assignment, condition, method) keys, so serial execution costs nothing
-    real runs would notice - it never runs outside this smoke context.
+    seed counts, checkpoint budgets, shrunk permutation counts); a worker
+    that re-reads the real ``EXPECTED_CONFIRMATION_SEEDS`` (5) against
+    smoke's single confirmed seed rejects every block as incomplete. Toy
+    data has only a handful of cache keys, so serial execution costs
+    nothing real runs would notice - it never runs outside this smoke
+    context.
     """
-    _interval_cache._compute_key_caches(*args, **kwargs)
+    worker_fn(pending, *fixed_args)
 
 
 def _fast_balanced_baseline(orig: Any) -> Any:
@@ -116,7 +121,8 @@ def _smoke_patches() -> list[Patch]:
             _confirm_pkg.CONFIRMATION_SEED_ROLES[:1],
         ),
         (_query, "EXPECTED_CONFIRMATION_SEEDS", 1),
-        (_interval_cache, "_spawn_cache_workers", _serial_cache_workers),
+        (_interval_cache, "spawn_workers", _serial_spawn_workers),
+        (_aggregate, "spawn_workers", _serial_spawn_workers),
         (
             _tuning_module,
             "_tuning_seeds",

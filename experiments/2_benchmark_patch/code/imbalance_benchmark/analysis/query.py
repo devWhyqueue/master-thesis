@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from functools import cache
+from functools import cache, lru_cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -123,8 +123,20 @@ def load_test_identity(
     )
 
 
+def _array_fields_for(fields: tuple[str, ...]) -> tuple[str, ...]:
+    """Narrow the heavy NPZ sidecar read to only what ``fields`` will build."""
+    array_fields = {"labels"}
+    if "preds" in fields:
+        array_fields.add("preds")
+    if "probs" in fields or "temperature_scaled_probs" in fields:
+        array_fields.add("probabilities")
+    if "temperature_scaled_probs" in fields:
+        array_fields.add("logits")
+    return tuple(sorted(array_fields))
+
+
 def _require_complete_confirmation_block(
-    method_dir: Path, seed_dirs: list[Path]
+    method_dir: Path, seed_dirs: list[Path], array_fields: tuple[str, ...]
 ) -> list[dict[str, Any]]:
     """Refuse to stack a partial confirmation block; report missing/failed seeds.
 
@@ -136,11 +148,7 @@ def _require_complete_confirmation_block(
     present = {int(d.name.split("=")[1]) for d in seed_dirs}
     expected = set(range(EXPECTED_CONFIRMATION_SEEDS))
     records = [
-        read_run_record(
-            directory,
-            splits=("test",),
-            array_fields=("labels", "preds", "probabilities", "logits"),
-        )
+        read_run_record(directory, splits=("test",), array_fields=array_fields)
         for directory in seed_dirs
     ]
     unreadable = {
@@ -161,25 +169,44 @@ def _require_complete_confirmation_block(
 
 
 def load_seed_predictions(
-    paths: dict[str, Path], condition: str, method: str, assignment: str = "native"
+    paths: dict[str, Path],
+    condition: str,
+    method: str,
+    assignment: str = "native",
+    fields: tuple[str, ...] = ("preds", "probs"),
 ) -> dict[str, Any] | None:
-    """Stack one method's confirmed test-split predictions across its confirmation seeds."""
+    """Stack one method's confirmed test-split predictions across its confirmation seeds.
+
+    ``fields`` selects which of ``"preds"``, ``"probs"``, and
+    ``"temperature_scaled_probs"`` to load and stack; narrowing it skips the
+    matching NPZ arrays entirely. The result is memoized per ``(method_dir,
+    fields)`` -- callers must treat every returned array as read-only.
+    """
     method_dir = _confirmation_dir(paths, condition, method, assignment)
     if not method_dir.exists():
         raise RuntimeError(
             f"Required confirmation method '{method}' is missing for "
             f"{assignment}/{condition}: {method_dir}"
         )
+    return _load_confirmation_block(method_dir, fields)
+
+
+@lru_cache(maxsize=4)
+def _load_confirmation_block(
+    method_dir: Path, fields: tuple[str, ...]
+) -> dict[str, Any] | None:
     seed_dirs = sorted(
         method_dir.glob("seed=*"), key=lambda p: int(p.name.split("=")[1])
     )
     if not seed_dirs:
         raise RuntimeError(f"Confirmation block is missing seed runs: {method_dir}")
-    records = _require_complete_confirmation_block(method_dir, seed_dirs)
+    records = _require_complete_confirmation_block(
+        method_dir, seed_dirs, _array_fields_for(fields)
+    )
     if not records:
         return None
     test_splits = [r["splits"]["test"] for r in records]
-    arrays = _stack_prediction_arrays(test_splits)
+    arrays = _stack_prediction_arrays(test_splits, fields)
     return {
         "class_names": records[0].get("class_names", []),
         "labels": np.array(test_splits[0]["labels"]),
@@ -188,17 +215,21 @@ def load_seed_predictions(
 
 
 def _stack_prediction_arrays(
-    test_splits: list[dict[str, Any]],
+    test_splits: list[dict[str, Any]], fields: tuple[str, ...]
 ) -> dict[str, np.ndarray]:
-    """Stack the seed-indexed prediction arrays retained in confirmed test runs."""
-    return {
-        "preds": np.stack([np.array(split["preds"]) for split in test_splits]),
-        "probs": np.stack([np.array(split["probabilities"]) for split in test_splits]),
-        "temperature_scaled_probs": np.stack(
+    """Stack only the requested seed-indexed prediction arrays."""
+    arrays: dict[str, np.ndarray] = {}
+    if "preds" in fields:
+        arrays["preds"] = np.stack([np.array(split["preds"]) for split in test_splits])
+    if "probs" in fields:
+        arrays["probs"] = np.stack(
+            [np.array(split["probabilities"]) for split in test_splits]
+        )
+    if "temperature_scaled_probs" in fields:
+        arrays["temperature_scaled_probs"] = np.stack(
             [temperature_scaled_probabilities(split) for split in test_splits]
-        ),
-        "logits": np.stack([np.array(split["logits"]) for split in test_splits]),
-    }
+        )
+    return arrays
 
 
 def _confirmation_dir(

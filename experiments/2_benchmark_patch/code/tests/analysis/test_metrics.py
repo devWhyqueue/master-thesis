@@ -30,6 +30,8 @@ def _bootstrap_context() -> BootstrapContext:
     context = object.__new__(BootstrapContext)
     context.case_ids = np.array(["c1", "c1", "c2", "c2"])
     context.slide_ids = np.array(["s1", "s1", "s2", "s2"])
+    context.case_codes, _ = pd.factorize(context.case_ids, sort=False)
+    context.slide_codes, _ = pd.factorize(context.slide_ids, sort=False)
     context.weights = _unit_weights(4, 3)
     context.n_replicates = 3
     context._seed = 7
@@ -62,6 +64,8 @@ def test_secondary_bootstrap_includes_cluster_macro_endpoints() -> None:
     context = object.__new__(BootstrapContext)
     context.case_ids = identity["case_id"].to_numpy()
     context.slide_ids = identity["slide_id"].to_numpy()
+    context.case_codes, _ = pd.factorize(context.case_ids, sort=False)
+    context.slide_codes, _ = pd.factorize(context.slide_ids, sort=False)
     context.weights = _unit_weights(4, 3)
     context.n_replicates = 3
     context._seed = 7
@@ -96,6 +100,8 @@ def test_wsi_secondary_outputs_use_only_applicable_endpoint_names() -> None:
     context = object.__new__(BootstrapContext)
     context.case_ids = np.array(["c1", "c2"])
     context.slide_ids = np.array(["s1", "s2"])
+    context.case_codes, _ = pd.factorize(context.case_ids, sort=False)
+    context.slide_codes, _ = pd.factorize(context.slide_ids, sort=False)
     context.weights = _unit_weights(2, 2)
     context.n_replicates = 2
     context._seed = 7
@@ -387,3 +393,163 @@ def test_post_hoc_cost_does_not_inherit_a_previous_gpu_memory_peak(
     )
 
     assert cost["peak_accelerator_memory_bytes"] == 0
+
+
+def test_class_sums_matches_looped_sums_per_code() -> None:
+    rng = np.random.default_rng(0)
+    n_rows, n_patients, n_replicates, n_codes = 40, 12, 5, 4
+    row_patient = rng.integers(0, n_patients, size=n_rows)
+    patient = rng.random((n_patients, n_replicates))
+    weights = PatientWeights(row_patient, patient)
+    codes = rng.integers(0, n_codes, size=n_rows)
+    values = rng.random(n_rows)
+
+    got = weights.class_sums(values, codes, n_codes)
+    expected = np.stack([weights.sums(values, mask=codes == c) for c in range(n_codes)])
+    assert np.allclose(got, expected, atol=1e-12)
+
+    got_ones = weights.class_sums(1.0, codes, n_codes)
+    expected_ones = np.stack([weights.sums(1.0, mask=codes == c) for c in range(n_codes)])
+    assert np.allclose(got_ones, expected_ones, atol=1e-12)
+
+
+def test_class_metrics_matches_naive_per_class_masks() -> None:
+    """Pins `_class_metrics`/`_probability_class_metrics` against the mask-per-class
+    `weighted_mean` loop they replaced (plan "Speed up analyze-combine" §2)."""
+    from imbalance_benchmark.analysis.reporting.secondary_intervals.metrics import (
+        _class_metrics,
+    )
+    from imbalance_benchmark.analysis.reporting.secondary_intervals.probability import (
+        _probability_class_metrics,
+    )
+    from imbalance_benchmark.analysis.reporting.secondary_intervals.weighted import (
+        weighted_mean,
+    )
+
+    rng = np.random.default_rng(5)
+    n_rows, n_patients, n_replicates, n_classes = 30, 10, 4, 3
+    row_patient = rng.integers(0, n_patients, size=n_rows)
+    patient = rng.random((n_patients, n_replicates))
+    weights = PatientWeights(row_patient, patient)
+    labels = rng.integers(0, n_classes, size=n_rows)
+    predictions = rng.integers(0, n_classes, size=n_rows)
+    probabilities = rng.dirichlet(np.ones(n_classes), size=n_rows)
+    class_names = [f"c{i}" for i in range(n_classes)]
+
+    got_prob = _probability_class_metrics(labels, probabilities, weights, class_names)
+    got_class = _class_metrics(labels, predictions, probabilities, weights, class_names)
+
+    true_probability = np.clip(probabilities[np.arange(n_rows), labels], 1e-12, 1.0)
+    nll_values = -np.log(true_probability)
+    one_hot = np.eye(n_classes)[labels]
+    brier_values = np.sum((probabilities - one_hot) ** 2, axis=1)
+    correct = (predictions == labels).astype(float)
+
+    nll_by_class, f1_by_class, recall_by_class = [], [], []
+    for class_index, class_name in enumerate(class_names):
+        true_class = labels == class_index
+        predicted_class = predictions == class_index
+        class_nll = weighted_mean(nll_values, weights, true_class)
+        class_brier = weighted_mean(brier_values, weights, true_class)
+        assert np.allclose(got_prob[f"nll:{class_name}"], class_nll, equal_nan=True)
+        assert np.allclose(got_prob[f"brier:{class_name}"], class_brier, equal_nan=True)
+
+        recall = weighted_mean(correct, weights, true_class)
+        precision = weighted_mean(true_class.astype(float), weights, predicted_class)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            f1 = np.where(
+                precision + recall > 0,
+                2 * precision * recall / (precision + recall),
+                0.0,
+            )
+        assert np.allclose(got_class[f"recall:{class_name}"], recall, equal_nan=True)
+        assert np.allclose(got_class[f"f1:{class_name}"], f1, equal_nan=True)
+        nll_by_class.append(class_nll)
+        f1_by_class.append(f1)
+        recall_by_class.append(recall)
+
+    assert np.allclose(
+        got_prob["macro_nll"], np.nanmean(np.stack(nll_by_class), axis=0), equal_nan=True
+    )
+    assert np.allclose(
+        got_class["macro_f1"], np.nanmean(np.stack(f1_by_class), axis=0), equal_nan=True
+    )
+    assert np.allclose(
+        got_class["balanced_accuracy"],
+        np.nanmean(np.stack(recall_by_class), axis=0),
+        equal_nan=True,
+    )
+
+
+def test_group_balanced_accuracy_matches_naive_per_class_group_mean() -> None:
+    """Pins `_group_balanced_accuracy` against the per-class `pd.factorize` + masked
+    `_group_mean` loop it replaced (plan §2)."""
+    from imbalance_benchmark.analysis.reporting.secondary_intervals.metrics import (
+        _group_balanced_accuracy,
+    )
+
+    rng = np.random.default_rng(6)
+    n_rows, n_patients, n_replicates, n_classes = 24, 8, 3, 3
+    row_patient = rng.integers(0, n_patients, size=n_rows)
+    patient = rng.random((n_patients, n_replicates))
+    weights = PatientWeights(row_patient, patient)
+    labels = rng.integers(0, n_classes, size=n_rows)
+    predictions = rng.integers(0, n_classes, size=n_rows)
+    groups = rng.integers(0, 5, size=n_rows).astype(str)
+    codes, _ = pd.factorize(groups, sort=False)
+    n_groups = int(codes.max()) + 1
+
+    got = _group_balanced_accuracy(
+        labels, predictions, weights, codes, n_groups, n_classes
+    )
+
+    correct = (predictions == labels).astype(float)
+    recalls = []
+    for class_index in np.unique(labels):
+        selected = labels == class_index
+        local_codes, _ = pd.factorize(groups[selected], sort=False)
+        counts = np.bincount(local_codes)
+        scale = np.zeros(n_rows, dtype=np.float64)
+        scale[selected] = 1.0 / counts[local_codes]
+        numerator = weights.sums(correct * scale)
+        denominator = weights.sums(scale)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            recalls.append(np.where(denominator > 0, numerator / denominator, np.nan))
+    expected = np.nanmean(np.stack(recalls), axis=0)
+    assert np.allclose(got, expected, equal_nan=True)
+
+
+def test_group_macro_f1_matches_sklearn_per_group() -> None:
+    """Covers the case a class is absent from a group's truth but present in its
+    predictions -- the corner `_group_macro_f1`'s `2*tp/(support+predicted_count)`
+    identity must still match sklearn's `zero_division=0` fallback on (plan §4)."""
+    from sklearn.metrics import f1_score
+
+    from imbalance_benchmark.analysis.reporting.secondary_intervals.metrics import (
+        _group_macro_f1,
+    )
+
+    n_classes = 3
+    codes = np.array([0, 0, 0, 1, 1, 1, 1])
+    labels = np.array([0, 0, 1, 2, 2, 2, 2])
+    # group 1: class 0 is absent from truth but predicted once; class 1 absent
+    # from both truth and predictions (must be excluded from the average).
+    predictions = np.array([0, 1, 1, 0, 2, 2, 2])
+    weights = PatientWeights(np.arange(len(codes)), np.ones((len(codes), 2)))
+
+    got = _group_macro_f1(
+        labels, predictions, weights, codes, n_groups=2, n_classes=n_classes
+    )
+
+    expected_per_group = [
+        f1_score(
+            labels[codes == group],
+            predictions[codes == group],
+            average="macro",
+            zero_division=0,  # type: ignore
+        )
+        for group in range(2)
+    ]
+    expected = float(np.mean(expected_per_group))
+    assert got[0] == pytest.approx(expected)
+    assert got[1] == pytest.approx(expected)

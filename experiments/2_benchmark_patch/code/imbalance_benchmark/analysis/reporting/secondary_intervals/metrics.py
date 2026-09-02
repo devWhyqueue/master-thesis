@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
-from sklearn.metrics import f1_score
 
 from imbalance_benchmark.analysis.inference.bootstrap import (
     PatientWeights,
@@ -10,6 +8,10 @@ from imbalance_benchmark.analysis.inference.bootstrap import (
 )
 from imbalance_benchmark.analysis.reporting.secondary_intervals.ordinal import (
     ordinal_metrics,
+)
+from imbalance_benchmark.analysis.reporting.secondary_intervals.probability import (
+    _group_mean,
+    _probability_class_metrics,
 )
 from imbalance_benchmark.analysis.reporting.secondary_intervals.weighted import (
     weighted_mean as _weighted_mean,
@@ -25,121 +27,115 @@ def _class_metrics(
     weights: PatientWeights,
     class_names: list[str],
 ) -> dict[str, np.ndarray]:
+    n_classes = len(class_names)
     metrics = _probability_class_metrics(labels, probabilities, weights, class_names)
-    recalls, f1_by_class = [], []
-    for class_index, class_name in enumerate(class_names):
-        true_class = labels == class_index
-        predicted_class = predictions == class_index
-        recall = _weighted_mean(
-            (predictions == labels).astype(float), weights, true_class
-        )
-        precision = _weighted_mean(true_class.astype(float), weights, predicted_class)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            f1 = np.where(
-                precision + recall > 0,
-                2 * precision * recall / (precision + recall),
-                0.0,
-            )
-        metrics[f"recall:{class_name}"] = recall
-        metrics[f"f1:{class_name}"] = f1
-        recalls.append(recall)
-        f1_by_class.append(f1)
-    metrics["balanced_accuracy"] = np.nanmean(np.stack(recalls), axis=0)
-    metrics["macro_f1"] = np.nanmean(np.stack(f1_by_class), axis=0)
-    return metrics
+    correct = (predictions == labels).astype(np.float64)
 
-
-def _probability_class_metrics(
-    labels: np.ndarray,
-    probabilities: np.ndarray,
-    weights: PatientWeights,
-    class_names: list[str],
-) -> dict[str, np.ndarray]:
-    true_probability = np.clip(
-        probabilities[np.arange(len(labels)), labels], 1e-12, 1.0
-    )
-    nll_values = -np.log(true_probability)
-    one_hot = np.eye(probabilities.shape[1], dtype=np.float64)[labels]
-    brier_values = np.sum((probabilities - one_hot) ** 2, axis=1)
-    metrics: dict[str, np.ndarray] = {}
-    nll_by_class = []
-    for class_index, class_name in enumerate(class_names):
-        true_class = labels == class_index
-        class_nll = _weighted_mean(nll_values, weights, true_class)
-        metrics.update(
-            {
-                f"nll:{class_name}": class_nll,
-                f"brier:{class_name}": _weighted_mean(
-                    brier_values, weights, true_class
-                ),
-            }
-        )
-        nll_by_class.append(class_nll)
-    metrics["macro_nll"] = np.nanmean(np.stack(nll_by_class), axis=0)
-    metrics["negative_log_likelihood"] = _weighted_mean(nll_values, weights)
-    metrics["brier_score"] = _weighted_mean(brier_values, weights)
-    return metrics
-
-
-def _group_mean(
-    values: np.ndarray,
-    weights: PatientWeights,
-    groups: np.ndarray,
-    mask: np.ndarray | None = None,
-) -> np.ndarray:
-    """Macro-average ``values`` over ``groups`` (e.g. slides), weighted by each
-    group's (single) patient weight -- not by the group's row count.
-
-    Folds the ``1 / bincount(codes)[codes]`` group-size correction into the
-    values vector so both terms reduce to :meth:`PatientWeights.sums` calls,
-    instead of allocating a full ``(n_rows, n_replicates)`` scaled weight copy.
-    """
-    selected = np.ones(len(values), dtype=bool) if mask is None else mask
-    codes, _ = pd.factorize(groups[selected], sort=False)
-    counts = np.bincount(codes)
-    scale = np.zeros(len(values), dtype=np.float64)
-    scale[selected] = 1.0 / counts[codes]
-    numerator = weights.sums(values * scale)
-    denominator = weights.sums(scale)
+    # recall_c = (true positives of c) / (rows labelled c); precision_c = (true
+    # positives of c) / (rows predicted c) -- both reduce to one class_sums of
+    # `correct` grouped by the respective code, since `correct` is 1 only on
+    # true positives (see plan §2 for the derivation).
+    label_counts = weights.class_sums(1.0, labels, n_classes)
+    prediction_counts = weights.class_sums(1.0, predictions, n_classes)
+    true_positives_by_label = weights.class_sums(correct, labels, n_classes)
+    true_positives_by_prediction = weights.class_sums(correct, predictions, n_classes)
     with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(denominator > 0, numerator / denominator, np.nan)
+        recall_by_class = np.where(
+            label_counts > 0,
+            true_positives_by_label / np.maximum(label_counts, 1e-12),
+            np.nan,
+        )
+        precision_by_class = np.where(
+            prediction_counts > 0,
+            true_positives_by_prediction / np.maximum(prediction_counts, 1e-12),
+            np.nan,
+        )
+        f1_by_class = np.where(
+            precision_by_class + recall_by_class > 0,
+            2
+            * precision_by_class
+            * recall_by_class
+            / (precision_by_class + recall_by_class),
+            0.0,
+        )
+
+    for class_index, class_name in enumerate(class_names):
+        metrics[f"recall:{class_name}"] = recall_by_class[class_index]
+        metrics[f"f1:{class_name}"] = f1_by_class[class_index]
+    metrics["balanced_accuracy"] = np.nanmean(recall_by_class, axis=0)
+    metrics["macro_f1"] = np.nanmean(f1_by_class, axis=0)
+    return metrics
 
 
 def _group_balanced_accuracy(
     labels: np.ndarray,
     predictions: np.ndarray,
     weights: PatientWeights,
-    groups: np.ndarray,
+    codes: np.ndarray,
+    n_groups: int,
+    n_classes: int,
 ) -> np.ndarray:
-    correct = (predictions == labels).astype(float)
-    recalls = []
-    for label in np.unique(labels):
-        selected = labels == label
-        recalls.append(_group_mean(correct, weights, groups, mask=selected))
-    return np.nanmean(np.stack(recalls), axis=0)
+    """Macro recall over classes, each averaged group-first (one vote per group)."""
+    correct = (predictions == labels).astype(np.float64)
+    group_class_counts = np.bincount(
+        codes * n_classes + labels, minlength=n_groups * n_classes
+    ).reshape(n_groups, n_classes)
+    # Each row's group-within-its-own-class size; a divide-by-zero here is
+    # impossible since every row is itself a member counted in its own cell.
+    scale = 1.0 / group_class_counts[codes, labels]
+    numerator = weights.class_sums(correct * scale, labels, n_classes)
+    denominator = weights.class_sums(scale, labels, n_classes)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        recall_by_class = np.where(
+            denominator > 0, numerator / np.maximum(denominator, 1e-12), np.nan
+        )
+    return np.nanmean(recall_by_class, axis=0)
 
 
 def _group_macro_f1(
     labels: np.ndarray,
     predictions: np.ndarray,
     weights: PatientWeights,
-    groups: np.ndarray,
+    codes: np.ndarray,
+    n_groups: int,
+    n_classes: int,
 ) -> np.ndarray:
-    codes, _ = pd.factorize(groups, sort=False)
-    scores = np.asarray(
-        [
-            f1_score(
-                labels[codes == code],
-                predictions[codes == code],
-                average="macro",
-                zero_division=0,  # type: ignore
-            )
-            for code in range(codes.max() + 1)
-        ]
+    """Per-group macro F1 (sklearn ``average="macro", zero_division=0`` semantics),
+    macro-averaged over only the classes present (in truth or prediction) in that
+    group, then weighted-averaged over groups by each group's one representative row.
+
+    ``f1 = 2*tp / (support + predicted_count)`` is the standard identity
+    ``2TP / (2TP + FP + FN)``, algebraically equal to ``2*precision*recall /
+    (precision + recall)`` whenever that ratio is defined, and matching
+    sklearn's ``zero_division=0`` fallback in every corner case (see plan §4
+    and ``test_group_macro_f1_matches_sklearn_per_group``).
+    """
+    correct = (labels == predictions).astype(np.float64)
+    support = np.bincount(
+        codes * n_classes + labels, minlength=n_groups * n_classes
+    ).reshape(n_groups, n_classes)
+    predicted_count = np.bincount(
+        codes * n_classes + predictions, minlength=n_groups * n_classes
+    ).reshape(n_groups, n_classes)
+    true_positive = np.bincount(
+        codes * n_classes + labels, weights=correct, minlength=n_groups * n_classes
+    ).reshape(n_groups, n_classes)
+    label_union_size = support + predicted_count
+    present = label_union_size > 0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        f1_per_class = np.where(
+            present, 2 * true_positive / np.maximum(label_union_size, 1), 0.0
+        )
+    present_count = present.sum(axis=1)
+    macro_f1_by_group = np.where(
+        present_count > 0,
+        f1_per_class.sum(axis=1) / np.maximum(present_count, 1),
+        np.nan,
     )
+
     first_rows = np.unique(codes, return_index=True)[1]
     values = np.zeros(len(labels), dtype=np.float64)
-    values[first_rows] = scores
+    values[first_rows] = macro_f1_by_group[codes[first_rows]]
     mask = np.zeros(len(labels), dtype=bool)
     mask[first_rows] = True
     return _weighted_mean(values, weights, mask)
@@ -150,29 +146,33 @@ def _cluster_metrics(
     predictions: np.ndarray,
     probabilities: np.ndarray,
     weights: PatientWeights,
-    slide_ids: np.ndarray,
-    case_ids: np.ndarray,
+    slide_codes: np.ndarray,
+    case_codes: np.ndarray,
     is_mil: bool,
 ) -> dict[str, np.ndarray]:
+    n_classes = probabilities.shape[1]
     correct = (predictions == labels).astype(float)
     nll = -np.log(np.clip(probabilities[np.arange(len(labels)), labels], 1e-12, 1.0))
-    one_hot = np.eye(probabilities.shape[1], dtype=np.float64)[labels]
+    one_hot = np.eye(n_classes, dtype=np.float64)[labels]
     brier = np.sum((probabilities - one_hot) ** 2, axis=1)
     result = (
         {} if is_mil else {"patch_micro_accuracy": _weighted_mean(correct, weights)}
     )
-    for name, groups in (("slide", slide_ids), ("patient", case_ids)):
+    for name, codes in (("slide", slide_codes), ("patient", case_codes)):
+        n_groups = int(codes.max()) + 1 if codes.size else 0
         result.update(
             {
-                f"{name}_macro_accuracy": _group_mean(correct, weights, groups),
+                f"{name}_macro_accuracy": _group_mean(
+                    correct, weights, codes, n_groups
+                ),
                 f"{name}_macro_balanced_accuracy": _group_balanced_accuracy(
-                    labels, predictions, weights, groups
+                    labels, predictions, weights, codes, n_groups, n_classes
                 ),
                 f"{name}_macro_f1": _group_macro_f1(
-                    labels, predictions, weights, groups
+                    labels, predictions, weights, codes, n_groups, n_classes
                 ),
-                f"{name}_macro_nll": _group_mean(nll, weights, groups),
-                f"{name}_macro_brier": _group_mean(brier, weights, groups),
+                f"{name}_macro_nll": _group_mean(nll, weights, codes, n_groups),
+                f"{name}_macro_brier": _group_mean(brier, weights, codes, n_groups),
             }
         )
     return result
@@ -206,10 +206,12 @@ def secondary_seed_metrics(
     """Compute the full secondary endpoint set for one model seed.
 
     ``sample`` is ``(labels, predictions, probabilities)`` and ``identity`` is
-    ``(slide_ids, case_ids)`` for that seed's rows.
+    ``(slide_codes, case_codes)`` -- integer group codes, factorized once per
+    :class:`~imbalance_benchmark.analysis.inference.context.BootstrapContext`,
+    for that seed's rows.
     """
     labels, predictions, probabilities = sample
-    slide_ids, case_ids = identity
+    slide_codes, case_codes = identity
     metrics = _class_metrics(labels, predictions, probabilities, weights, class_names)
     metrics.update(_tier_metrics(metrics, class_names, tiers))
     metrics.update(
@@ -222,7 +224,7 @@ def secondary_seed_metrics(
         metrics.update(ordinal_metrics(labels, predictions, weights, len(class_names)))
     metrics.update(
         _cluster_metrics(
-            labels, predictions, probabilities, weights, slide_ids, case_ids, is_mil
+            labels, predictions, probabilities, weights, slide_codes, case_codes, is_mil
         )
     )
     return metrics

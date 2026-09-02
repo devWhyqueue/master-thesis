@@ -123,9 +123,15 @@ slurm:
     confirm: {partition: gpu-2d, gpus: 1, cpus: 8}
     confirm_natural: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
     confirm_controlled: {partition: gpu-2h, gpus: 1, cpus: 8, memory: 96G, constraint: "80gb|40gb|h100|h200"}
-    # analyze-combine TIMEOUT'd at 5h with zero checkpointing (write_interval_tables
-    # runs as one monolithic pass) -- cpu-2d gives it room to finish from scratch.
+    # analyze's own recovery/RQ3 phase has its own recorded history of 5h
+    # TIMEOUTs (bracs_patch.yaml commit 8f96820, panda_patch.yaml:105-109),
+    # so it stays on cpu-2d.
     analyze: {partition: cpu-2d, gpus: 0, cpus: 8, memory: 256G}
+    # analyze-combine TIMEOUT'd at 5h (job 4811165) on _apply_gates: ~144
+    # crossed permutation tests ran serially on one core. Now parallel and
+    # checkpointed (analysis/aggregation/aggregate.py), same pattern as the
+    # interval cache -- back on cpu-5h.
+    analyze-combine: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
     smoke: {partition: gpu-test, gpus: 1, cpus: 4}
   squashfs:
     - source: /home/space/datasets-sqfs/tcga-ut/patch.sqfs

@@ -10,6 +10,9 @@ import pandas as pd
 from imbalance_benchmark.analysis.aggregation.consistent_severity import (
     require_consistent_achieved_severity,
 )
+from imbalance_benchmark.analysis.aggregation.crossed_p_value_cache import (
+    fill_crossed_p_values,
+)
 from imbalance_benchmark.analysis.inference.gates import (
     calibration_gate,
     confidence_interval,
@@ -170,12 +173,16 @@ def _apply_gates(
                 else calibration_gate(entry["effect"], entry["ci"], dataset)
             )
         )
+    pending: list[dict[str, Any]] = []
     for entry in aggregate:
         gate = lookup.get((entry["assignment"], entry["severity"], entry["gate"]))
-        if gate is not None:
-            entry["gate_passed"] = entry.get("gate_passed", gate["gate_passed"])
-            entry["p_value"] = (
-                crossed_p_value(entry, base_paths, config, seed)
-                if config and not entry.get("descriptive_only")
-                else None
-            )
+        if gate is None:
+            continue
+        entry["gate_passed"] = entry.get("gate_passed", gate["gate_passed"])
+        if config and not entry.get("descriptive_only"):
+            pending.append(entry)
+        else:
+            entry["p_value"] = None
+    if pending:
+        assert config is not None  # guaranteed by the `if config` check above
+        fill_crossed_p_values(pending, base_paths, config, seed, crossed_p_value)

@@ -5,13 +5,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from imbalance_benchmark.analysis.aggregation import parallel_cache
 from imbalance_benchmark.analysis.reporting.secondary_intervals import interval_cache
 
 
 def test_chunk_keys_splits_round_robin_and_drops_empty_workers() -> None:
     keys = [("a", "natural", "ce"), ("a", "natural", "oko"), ("a", "balanced", "ce")]
 
-    chunks = interval_cache._chunk_keys(keys, 5)
+    chunks = parallel_cache.chunk_keys(keys, 5)
 
     assert chunks == [[keys[0]], [keys[1]], [keys[2]]]
 
@@ -20,8 +21,8 @@ def test_key_cache_round_trips_through_atomic_write(tmp_path: Path) -> None:
     path = tmp_path / "cache" / "a__natural__ce.npz"
     values = {"balanced_accuracy": np.array([0.5, 0.4, 0.6])}
 
-    interval_cache._write_key_cache_atomic(path, values)
-    loaded = interval_cache._read_key_cache(path)
+    parallel_cache.write_npz_cache(path, values)
+    loaded = parallel_cache.read_npz_cache(path)
 
     assert path.exists()
     assert not list(path.parent.glob(".*.tmp"))
@@ -69,7 +70,7 @@ def test_distributions_by_key_spawns_no_workers_when_fully_cached(
     keys = [("a", "natural", "ce")]
     monkeypatch.setattr(interval_cache, "_complete_result_keys", lambda *_a, **_k: keys)
     cache_dir = interval_cache._cache_dir(base_paths, 10, 0)
-    interval_cache._write_key_cache_atomic(
+    parallel_cache.write_npz_cache(
         interval_cache._cache_path(cache_dir, keys[0]), {"endpoint": np.array([0.1])}
     )
 
@@ -78,7 +79,7 @@ def test_distributions_by_key_spawns_no_workers_when_fully_cached(
             raise AssertionError("no worker should spawn when every key is cached")
 
     monkeypatch.setattr(
-        interval_cache.multiprocessing, "get_context", lambda *_a: PoisonedContext()
+        parallel_cache.multiprocessing, "get_context", lambda *_a: PoisonedContext()
     )
 
     distributions = interval_cache.distributions_by_key(base_paths, False, False, 10, 0)
@@ -108,7 +109,7 @@ def test_distributions_by_key_worker_failure_reaches_caller(
             return FailedProcess()
 
     monkeypatch.setattr(
-        interval_cache.multiprocessing, "get_context", lambda *_a: FailedContext()
+        parallel_cache.multiprocessing, "get_context", lambda *_a: FailedContext()
     )
 
     with pytest.raises(RuntimeError, match="workers failed"):

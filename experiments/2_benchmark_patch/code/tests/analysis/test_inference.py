@@ -25,6 +25,31 @@ from imbalance_benchmark.analysis.inference.preflight import (
 )
 from imbalance_benchmark.datasets.data import slide_level_identity
 
+def _constant_p_value(*_: object) -> float:
+    return 0.01
+
+
+class _InlineProcess:
+    """Runs its target in-process instead of really spawning -- keeps the
+    ``_apply_gates`` -> ``spawn_workers`` path under test without paying for
+    (or needing picklable closures across) a real OS process."""
+
+    def __init__(self, target: object, args: tuple[object, ...]) -> None:
+        self._target, self._args = target, args
+        self.exitcode = 0
+
+    def start(self) -> None:
+        self._target(*self._args)  # type: ignore[operator]
+
+    def join(self) -> None:
+        pass
+
+
+class _InlineContext:
+    def Process(self, target: object, args: tuple[object, ...]) -> _InlineProcess:
+        return _InlineProcess(target, args)
+
+
 def _ce_gate_entry(descriptive_only: bool) -> dict[str, object]:
     return {
         "method": "ce",
@@ -235,9 +260,18 @@ def test_preflight_ignores_a_thin_split_cell_when_the_pooled_cell_is_adequate() 
     assert result["by_split_class"]["0"]["A"]["kish_effective_count"] < 5
     assert not result["is_descriptive_only"]
 
-def test_descriptive_only_cell_never_opens_a_gate_or_permutes() -> None:
+def test_descriptive_only_cell_never_opens_a_gate_or_permutes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A preflight descriptive-only cell must skip gates and permutation p-values."""
+    from imbalance_benchmark.analysis.aggregation import parallel_cache
     from imbalance_benchmark.analysis.aggregation.aggregate import _apply_gates
+    from imbalance_benchmark.common import ensure_dirs
+
+    monkeypatch.setattr(
+        parallel_cache.multiprocessing, "get_context", lambda *_a: _InlineContext()
+    )
+    base_paths = ensure_dirs({"paths": {"outputs": str(tmp_path)}})
 
     def fake_p_value(
         entry, base_paths, config, seed
@@ -245,12 +279,12 @@ def test_descriptive_only_cell_never_opens_a_gate_or_permutes() -> None:
         raise AssertionError("descriptive-only cells must not be permutation tested")
 
     descriptive = [_ce_gate_entry(descriptive_only=True)]
-    _apply_gates(descriptive, {}, {"dataset": {}}, 0, fake_p_value)
+    _apply_gates(descriptive, base_paths, {"dataset": {}}, 0, fake_p_value)
     assert descriptive[0]["gate_passed"] is False
     assert descriptive[0]["p_value"] is None
 
     confirmatory = [_ce_gate_entry(descriptive_only=False)]
-    _apply_gates(confirmatory, {}, {"dataset": {}}, 0, lambda *_: 0.01)
+    _apply_gates(confirmatory, base_paths, {"dataset": {}}, 0, _constant_p_value)
     assert confirmatory[0]["gate_passed"] is True
     assert confirmatory[0]["p_value"] == 0.01
 

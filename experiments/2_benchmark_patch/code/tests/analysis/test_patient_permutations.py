@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from imbalance_benchmark.analysis.inference.crossed_permutation import (
@@ -260,6 +261,8 @@ def test_probability_only_secondary_distributions_match_full_outputs() -> None:
     context = object.__new__(BootstrapContext)
     context.case_ids = np.array(["p0", "p0", "p1", "p1"])
     context.slide_ids = np.array(["s0", "s1", "s2", "s3"])
+    context.case_codes, _ = pd.factorize(context.case_ids, sort=False)
+    context.slide_codes, _ = pd.factorize(context.slide_ids, sort=False)
     context.weights = __import__(
         "imbalance_benchmark.analysis.inference.bootstrap", fromlist=["PatientWeights"]
     ).PatientWeights(np.array([0, 0, 1, 1]), np.ones((2, 3)))

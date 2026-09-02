@@ -33,17 +33,24 @@ def _method_gate_blocks(
     """Load each split's paired method/CE prediction block for one gate entry."""
     blocks: list[Block] = []
     method_data: dict[str, Any] | None = None
+    is_disc = entry["gate"] == "discrimination"
+    fields = ("preds",) if is_disc else ("probs",)
     for index in range(3):
         paths = split_paths(base_paths, index)
         method = load_seed_predictions(
-            paths, entry["severity"], entry["method"], entry["assignment"]
+            paths,
+            entry["severity"],
+            entry["method"],
+            entry["assignment"],
+            fields=fields,
         )
-        ce = load_seed_predictions(paths, entry["severity"], "ce", entry["assignment"])
+        ce = load_seed_predictions(
+            paths, entry["severity"], "ce", entry["assignment"], fields=fields
+        )
         if method is None or ce is None:
             return None
         method_data = method
         id_df = load_test_identity(paths["data"] / "manifest.csv", is_mil)
-        is_disc = entry["gate"] == "discrimination"
         blocks.append(
             (
                 method["labels"],
@@ -76,7 +83,11 @@ def _contrast_gate_blocks(
         labels: np.ndarray | None = None
         for method in (*matched, *unmatched):
             rec = load_seed_predictions(
-                paths, entry["severity"], method, entry["assignment"]
+                paths,
+                entry["severity"],
+                method,
+                entry["assignment"],
+                fields=("preds",) if is_disc else ("probs",),
             )
             if rec is None:
                 return None
