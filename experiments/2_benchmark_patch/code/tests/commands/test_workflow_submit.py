@@ -129,6 +129,30 @@ def test_confirm_only_builds_just_confirm_and_analyze() -> None:
     assert jobs[3].dependencies == ("analyze",)
 
 
+def test_analyze_combine_uses_its_own_resource_key_when_set() -> None:
+    """analyze-combine must resolve its own resource key, not silently reuse analyze's.
+
+    Regression: ``_job(config, "analyze-combine", ..., "analyze")`` passed
+    "analyze" as the positional ``resource`` argument instead of ``fallback``,
+    so ``resources_for`` always looked up the "analyze" key and a dedicated
+    "analyze-combine" resource entry was silently ignored.
+    """
+    config = _config()
+    config["slurm"]["resources"]["analyze"] = {"partition": "cpu-2d"}
+    config["slurm"]["resources"]["analyze-combine"] = {"partition": "cpu-5h"}
+    jobs = build_workflow(config, confirm_only=True)
+    assert next(j for j in jobs if j.name == "analyze").partition == "cpu-2d"
+    assert next(j for j in jobs if j.name == "analyze-combine").partition == "cpu-5h"
+
+
+def test_analyze_combine_falls_back_to_analyze_resources_when_unset() -> None:
+    """Datasets without a dedicated analyze-combine key keep the old shared resource."""
+    config = _config()
+    config["slurm"]["resources"]["analyze"] = {"partition": "cpu-2d"}
+    jobs = build_workflow(config, confirm_only=True)
+    assert next(j for j in jobs if j.name == "analyze-combine").partition == "cpu-2d"
+
+
 def test_confirm_shards_naturally_and_controlled_across_two_partitions() -> None:
     """Confirmation no longer shares one two-day array across every condition."""
     jobs = build_workflow(_config(), confirm_only=True)

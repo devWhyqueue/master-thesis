@@ -35,7 +35,12 @@ def confirm_workflow(config: dict[str, Any]) -> list[SlurmJob]:
         array_splits=(0, 1, 2),
     )
     combine = _job(
-        config, "analyze-combine", "analyze-combine", False, (analyze.name,), "analyze"
+        config,
+        "analyze-combine",
+        "analyze-combine",
+        False,
+        (analyze.name,),
+        fallback="analyze",
     )
     return [natural, controlled, analyze, combine]
 
