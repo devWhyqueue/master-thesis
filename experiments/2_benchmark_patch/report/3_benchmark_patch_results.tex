@@ -32,6 +32,7 @@
 
 \begin{document}
 \raggedbottom
+\setlength{\emergencystretch}{2em}
 \hypersetup{pageanchor=false}
 \begin{titlepage}
 \centering
@@ -47,7 +48,7 @@
 \begin{abstract}
 \begingroup
 \setlength{\emergencystretch}{2em}
-\noindent A class can be underserved for several distinct reasons, and the count that marks it as rare does not say which. This report evaluates the controlled patch-classification benchmark specified in the companion protocol \citep{queisler2026benchmarkProtocol} on BRACS, a seven-class breast-lesion task represented by Virchow2 features. The design separates two axes that ordinary imbalance confounds: nominal patch support and the number of patients contributing those patches. Nominal deprivation produced material balanced-accuracy losses in eight of nine comparisons, with deficits of \num{1.5}--\num{13.8} percentage points; tail-group likelihood also worsened in eight comparisons, by up to \num{1.744} nats (natural-log units of predictive loss), although a single validation-fitted temperature removes most of that likelihood deficit and leaves three of the eight above the threshold for a meaningful difference. Reducing patient breadth while holding the patch allocation fixed produced balanced-accuracy deficits of \num{2.6}--\num{3.0} percentage points across all three class assignments. Prevalence-weighted and class-balanced cross-entropy were the best methods for nominal damage. The largest probability-quality recovery estimate, \num{1.23} for class-balanced cross-entropy, means that the method surpassed the balanced reference by \num{23}\% of the original deficit after closing it. By contrast, no tested method repaired the damage caused by reduced patient breadth, and signal-matched weighting differed from unmatched weighting by only \num{0.06} percentage points of balanced accuracy. These results motivate mitigation that responds to dependence among patches from the same patient rather than to per-class counts alone.
+\noindent A class can be underserved for several distinct reasons, and patch count alone does not reveal which one applies. This report evaluates a controlled patch-classification benchmark on BRACS and TCGA-UT using frozen Virchow2 features. Reducing the number of contributing patients while holding patch counts fixed caused balanced-accuracy deficits of \num{2.62}--\num{3.03} percentage points on BRACS and \num{4.76}--\num{4.83} points on TCGA-UT. Moderate nominal deprivation caused material damage on BRACS but remained below TCGA-UT's prespecified one-point threshold; severe deprivation damaged both datasets. Prevalence and nominal-support weighting recovered \num{32.1}--\num{85.3}\% of TCGA-UT's severe discrimination deficits and also led on BRACS, whereas no class-weighting signal repaired the independent-support loss. The wider TCGA-UT roster closed only about \num{13}--\num{17}\% of that loss. Probability-quality effects depended on dataset, assignment, and calibration, so discrimination recovery did not imply reliable probabilities. Exploratory two-group models associated greater severity and independent-support shortage with more damage, and independent-support shortage with less recovery. These non-causal patterns motivate mitigation that accounts for dependence among patches from the same patient and remains inactive when its target deficit is absent.
 \par
 \endgroup
 \end{abstract}
@@ -62,7 +63,7 @@
 
 \section{Introduction}
 \label{sec:intro}
-This report presents the results of the controlled patch-classification benchmark whose design, endpoints, materiality criteria, and inference procedure are specified in the companion protocol \citep{queisler2026benchmarkProtocol}.
+This report presents the results of the controlled patch-classification benchmark whose design, endpoints, materiality criteria, and inference procedure are specified in the companion protocol \citep{queisler2026benchmarkProtocol}. It covers BRACS, a seven-class breast-lesion task, and TCGA-UT, a 30-class cancer-type task; both use frozen Virchow2 patch features. Their different cohort sizes test whether the same shortages behave similarly under two substantially different evidence regimes.
 The benchmark exists to inform the design of a new mitigation method, not to rank the existing ones. Its premise is that an underserved class may lack nominal patch support, independent evidence from patients or slides, learnable signal, or representational diversity, and that these shortages are not interchangeable. Existing methods are therefore treated as instruments: each reads one signal, and the contrast among them measures whether reading the right signal matters. The report is consequently read forward into Section~\ref{sec:discussion}, where the outcomes are converted into requirements a method would have to satisfy. Dataset provenance is documented separately \citep{queisler2026datasets}, as is the signal taxonomy that locates each method within it \citep{queisler2026imbalanceMethods}.
 
 The protocol poses three questions, restated here so that the results can be read without the companion document at hand:
@@ -72,7 +73,7 @@ The protocol poses three questions, restated here so that the results can be rea
   \item[RQ2.] \textbf{Does signal-matched mitigation recover more of the damage?} Which methods recover performance lost specifically to training imbalance, and does recovery improve when a method reads the shortage identified in RQ1?
   \item[RQ3.] \textbf{Which realized signal shortages explain variation in damage and mitigation headroom?} Across controlled conditions, are allocation severity, independent-evidence shortage, support--difficulty alignment, and diversity shortage associated with damage magnitude and subsequent recovery?
 \end{description}
-\noindent Sections~\ref{sec:rq1} and~\ref{sec:rq2} answer the first two. Section~\ref{sec:rq3} specifies the association models for the third. Statistical tests are restricted to the five weighting methods and to comparisons meeting the prespecified materiality and precision criteria; estimates for the wider method roster remain exploratory.
+\noindent Sections~\ref{sec:rq1} and~\ref{sec:rq2} answer the first two. Section~\ref{sec:rq3} reports the association models for the third. Statistical tests are restricted to the five weighting methods and to comparisons meeting each dataset's prespecified materiality and precision criteria; estimates for the wider method roster and the two-group association models remain exploratory.
 
 \section{Allocation-Induced Damage}
 \label{sec:rq1}
@@ -85,7 +86,7 @@ Four prerequisites must hold before the outcome measures are interpreted:
 \end{enumerate}
 \par\noindent A failed allocation would invalidate the intended comparison, insufficient patient support would limit the corresponding estimates to summaries, and incomplete results would not be aggregated. Appendix~\ref{app:realized} provides the full checks, tuning selections, and protocol deviations. The companion protocol describes the four deprived conditions and their two reference allocations \citep{queisler2026benchmarkProtocol}.
 
-All four prerequisites were met. Moderate and severe allocations achieved $\rho=\num{10.00}$ and \num{100.38}, respectively, within their target ranges. The spread allocation retained exactly \num{16796} patches at $\rho=\num{1.000}$ while increasing the contributing-patient count from \num{85} to the full eligible inventory of \num{103}. Every class had sufficient patient support in the pooled analysis. All three partitions contained five initialization seeds for every method block and the complete set of \num{378} comparisons. The analysis therefore contains \num{12} comparison units: three class assignments crossed with four deprived conditions.
+All four prerequisites were met on both datasets. Moderate and severe allocations reached their target ranges, pooled class support passed every resampling check, and each dataset contains three partitions, five initialization seeds per method block, and all \num{378} planned comparisons. The analysis therefore contains \num{24} comparison units: \num{12} per dataset, formed by three class assignments crossed with four deprived conditions. Appendix~\ref{app:realized} reports the dataset-specific construction and completeness checks.
 
 \subsection{Realized signal profiles}
 \label{sec:rq1-profiles}
@@ -96,55 +97,53 @@ Allocation severity is the manipulated variable, but it is not the explanatory o
   \scriptsize
   \setlength{\tabcolsep}{3pt}
   \resultstable{signal_profiles}
-  \caption{BRACS signal profiles for the four deprived conditions. Each block names the deprived allocation and its reference; rows give the three class assignments. Shortage scores and alignment are standardized across the \num{12} comparison units. A dominant shortage is marked ambiguous when the two largest scores differ by less than \num{0.25} standard deviations.}
+  \caption{Signal profiles for the four deprived conditions on both datasets. Each block names the deprived allocation and its reference; rows give the three class assignments. Shortage scores and alignment use the frozen four-group matching base, which also contains two targets outside the RQ3 fit. A dominant shortage is marked ambiguous when the two largest scores differ by less than \num{0.25} standard deviations.}
   \label{tab:signal-profiles}
 \end{table}
 
-\noindent The independent-support comparison holds \num{16796} patches fixed but draws them from fewer patients. Across partitions, the affected classes retain about \num{51}--\num{66}\% of the patient support available in the spread reference, corresponding to a mean log-shortage of \num{0.409}--\num{0.673} nats. This is the largest patient-breadth contrast compatible with the contribution limits.
+\noindent The independent-support comparison holds patch allocation fixed while changing patient breadth. BRACS keeps \num{16796} patches and expands from \num{85} concentrated patients to \num{103} spread patients. TCGA-UT holds \num{36988}--\num{52204} patches fixed by partition while expanding from \num{671}--\num{917} concentrated patients to \num{4983} spread patients. TCGA-UT thus supplies the stronger independent-support contrast: its mean log-shortage is \num{1.462}--\num{1.794} nats, compared with \num{0.409}--\num{0.673} on BRACS.
 
-The three concentrated-balanced rows reuse one training allocation and differ only in the class assignment used for comparison; they are correlated views, not independent replications. Three severe comparisons are ambiguous because their two largest shortage scores are nearly tied: native severe, reversed severe, and native severe spread.
+Within each dataset, the three concentrated-balanced rows reuse one training allocation and differ only in the class assignment used for comparison; they are correlated views, not independent replications. The profile table therefore describes realized conditions rather than multiplying the number of independent experiments.
 
-\clearpage
 \subsection{Discrimination deficit}
 \label{sec:rq1-discrimination}
-The discrimination deficit $D_{\mathrm{BA}}$ is the balanced accuracy lost relative to the appropriate reference, reported in percentage points. The native assignment follows clinical class order; the difficulty-aligned assignment gives the fewest patches to the hardest classes, whereas the reversed assignment gives those classes the most patches. The \num{1.44}-point minimum is $\max(\num{1},2\sigma_{\mathrm{seed}})$: the larger of the one-percentage-point threshold established in the pilot and twice the balanced-condition standard deviation across confirmation seeds. Recovery is analysed when the deficit reaches this minimum and its paired \num{95}\% interval excludes zero.
+The discrimination deficit $D_{\mathrm{BA}}$ is the balanced accuracy lost relative to the appropriate reference, reported in percentage points. The native assignment follows clinical class order; the difficulty-aligned assignment gives the fewest patches to the hardest classes, whereas the reversed assignment gives those classes the most patches. The dataset-specific minimum is $\max(\num{1},2\sigma_{\mathrm{seed}})$: \num{1.443} points on BRACS and \num{1.000} point on TCGA-UT. Recovery is analysed when the deficit reaches this minimum and its paired \num{95}\% interval excludes zero.
 
-Moderate imbalance produces deficits of \num{1.50}--\num{8.17} percentage points, concentrated severe imbalance \num{4.30}--\num{13.23}, and severe spread \num{4.15}--\num{13.77}. Concentrating the balanced allocation on fewer patients costs \num{2.62}--\num{3.03} percentage points despite identical patch counts. The only exception is difficulty-aligned moderate: its \num{1.50}-point estimate clears the magnitude threshold, but its interval includes zero. Full estimates and intervals appear in Appendix Table~\ref{tab:discrimination-deficit}.
+On BRACS, moderate imbalance produces deficits of \num{1.50}--\num{8.17} percentage points, concentrated severe imbalance \num{4.30}--\num{13.23}, and severe spread \num{4.15}--\num{13.77}; only aligned moderate lacks a precise material deficit. On TCGA-UT, moderate deficits are only \num{0.13}--\num{0.45} points and remain below threshold, whereas concentrated severe deficits reach \num{1.33}--\num{1.79} points and severe-spread deficits \num{2.40}--\num{4.96} points. Independent-support deprivation damages every assignment on both datasets, by \num{2.62}--\num{3.03} points on BRACS and \num{4.76}--\num{4.83} on TCGA-UT, despite identical patch counts within each comparison. Full estimates and intervals appear in Appendix Table~\ref{tab:discrimination-deficit}.
 
 \subsection{Probability-quality deficit}
 \label{sec:rq1-calibration}
-Probability quality is measured by tail-group macro negative log likelihood. One \emph{nat} is one natural-log unit of predictive loss, and lower values are better. The \num{0.148}-nat minimum is likewise derived from balanced-condition variation, as twice the confirmation-seed standard deviation. Recovery is analysed when deprivation reaches this minimum and its paired \num{95}\% interval excludes zero.
+Probability quality is measured by tail-group macro negative log likelihood. One \emph{nat} is one natural-log unit of predictive loss, and lower values are better. The minimum derived from balanced-condition variation is \num{0.14782} nats on BRACS and \num{0.06095} on TCGA-UT. Recovery is analysed when deprivation reaches the dataset-specific minimum and its paired \num{95}\% interval excludes zero.
 
-Moderate imbalance increases loss by \num{0.186}--\num{0.754} nats, concentrated severe imbalance by \num{0.688}--\num{1.744}, and severe spread by \num{0.205}--\num{1.129}. Native moderate is the exception because its interval includes zero. The independent-support comparisons increase loss by \num{0.134}--\num{0.140} nats, just below the magnitude threshold, so they do not enter probability-quality recovery analysis. Full estimates, intervals, and secondary calibration measures appear in Appendix Table~\ref{tab:calibration-deficit}.
+On BRACS, moderate imbalance increases loss by \num{0.186}--\num{0.754} nats, concentrated severe imbalance by \num{0.688}--\num{1.744}, and severe spread by \num{0.205}--\num{1.129}; native moderate is imprecise, and independent-support deficits of \num{0.134}--\num{0.140} fall just below threshold. TCGA-UT differs: moderate deficits are negative, all three independent-support comparisons increase loss by \num{0.258}--\num{0.263} nats, only aligned concentrated severe clears threshold, and all three severe-spread comparisons do. The calibration response is therefore dataset- and assignment-dependent rather than a scaled copy of the discrimination response. Full estimates appear in Appendix Table~\ref{tab:calibration-deficit}.
 
 \subsection{Where the damage falls}
 \label{sec:rq1-incidence}
-Aggregate deficits do not show which support tier absorbs the loss. Table~\ref{tab:tier-endpoints} therefore retains only recall for the two difficulty-based assignments; full per-class endpoints appear in Appendix~\ref{app:endpoints}. Tier labels in the balanced spread rows reflect class ordering rather than unequal support because that allocation is uniform.
+Aggregate deficits do not show which support tier absorbs the loss. Table~\ref{tab:tier-endpoints} therefore retains one informative tier for each difficulty-based assignment and dataset; the exhaustive tier and per-class endpoints appear in Appendix~\ref{app:endpoints}. Tier labels in balanced-spread rows reflect class ordering rather than unequal support because that allocation is uniform.
 
 \begin{table}[ht]
   \centering
   \footnotesize
-  \resultstable{tier_endpoints}
-  \caption{Tier recall (\%) under aligned and reversed assignments.}
+  \resultstable{tier_endpoints_summary}
+  \caption{Selected tier recall (\%) under aligned and reversed assignments.}
   \label{tab:tier-endpoints}
 \end{table}
 
-\noindent Under the aligned assignment, tail recall falls from \num{40.8}\% under balanced spread to \num{18.3}\% at moderate and \num{11.8}\% at severe imbalance, while head recall remains above \num{73}\%. Under the reversed assignment, the body tier is weakest: recall falls from \num{31.0}\% under balanced spread to \num{15.3}\% at severe and \num{13.3}\% at severe spread. Difficulty therefore changes where damage appears; support rank alone does not identify the affected tier.
+\noindent BRACS shows substantial tier damage already at moderate severity: aligned tail recall falls from \num{40.9}\% to \num{18.3}\%, while reversed body recall falls from \num{31.2}\% to \num{19.7}\%. TCGA-UT moves less at moderate severity, in line with its sub-threshold aggregate deficit, but severe deprivation lowers aligned tail recall from \num{66.1}\% to \num{51.9}\%. Under the reversed TCGA-UT assignment, severe spread restores head recall to \num{66.4}\%, close to the \num{67.0}\% spread reference. Difficulty and cohort breadth therefore change where damage appears; support rank alone does not identify the affected tier.
 
-\clearpage
 \subsection{Natural anchor}
 \label{sec:rq1-routing}
-The natural condition trains on all \num{217399} eligible patches at the dataset's observed prevalence. It is not size-matched and enters no estimand; it only places the controlled results beside the training distribution encountered without intervention.
+The natural condition trains on every eligible patch at each dataset's observed prevalence. It is not size-matched and enters no estimand; it only places the controlled results beside the training distribution encountered without intervention.
 
 \begin{table}[H]
   \centering
   \footnotesize
-  \resultstable{natural_anchor}
+  \resultstable{natural_anchor_summary}
   \caption{Natural and balanced cross-entropy anchors.}
   \label{tab:natural-anchor}
 \end{table}
 
-\noindent Despite using nearly thirteen times as many patches, the natural condition reaches \num{49.8}\% balanced accuracy, compared with \num{49.2}\% for concentrated balanced and \num{50.4}--\num{50.9}\% across the balanced spread assignments. Additional patches at natural prevalence therefore buy less discrimination than distributing the controlled budget across more patients.
+\noindent On BRACS, the natural condition uses nearly thirteen times the controlled patch total yet reaches \num{49.8}\% balanced accuracy, between the concentrated and spread balanced references. On TCGA-UT, the \num{5580100}-patch natural anchor reaches \num{79.1}\%, well above the concentrated balanced result of \num{75.3}\% and close to the spread references at \num{79.6}--\num{79.7}\%. The natural anchor therefore reinforces the benefit of broad patient coverage on TCGA-UT but does not isolate it from the much larger patch budget.
 
 \section{Mitigation Recovery}
 \label{sec:rq2}
@@ -156,14 +155,14 @@ The confirmatory family contains five weighted cross-entropy methods that differ
 
 \begin{table}[ht]
   \centering
-  \small
+  \scriptsize
   \setlength{\tabcolsep}{4pt}
   \resultstable{confirmatory_summary}
   \caption{Balanced-accuracy recovery by shortage and weighting signal. Ranges are percentages of the original deficit; the final column counts results that remain significant after Holm adjustment.}
   \label{tab:confirmatory}
 \end{table}
 
-\noindent Only prevalence-weighted and class-balanced cross-entropy consistently repair nominal-support damage. They recover between \num{42.6}\% and \num{89.2}\% across the eight eligible nominal conditions, and ten of their sixteen comparisons survive Holm adjustment. None of the \num{24} comparisons for independent-support, difficulty, or diversity weighting survives. Under independent-support deprivation, all five methods remain close to no recovery and none survives adjustment. Appendix Table~\ref{tab:confirmatory-detail} provides the condition-level estimates and intervals.
+\noindent Prevalence and nominal-support weighting are the only signals that repeatedly repair nominal deprivation. On BRACS they recover \num{42.6}--\num{89.2}\% across the eight eligible nominal units, with ten of sixteen comparisons surviving Holm adjustment. TCGA-UT's moderate units do not enter recovery analysis because their deficits are below threshold; across its six severe units, the same two signals recover \num{32.1}--\num{85.3}\% and all six concentrated-severe comparisons survive adjustment. Severe-spread recovery is more mixed: independent-support weighting also recovers \num{8.1}--\num{47.7}\%, and difficulty weighting produces one adjusted deterioration. No weighting repairs independent-support deprivation on either dataset: all estimates lie between $-\num{6.5}$\% and \num{2.5}\% on BRACS and between $-\num{1.9}$\% and \num{0.0}\% on TCGA-UT. Appendix Table~\ref{tab:confirmatory-detail} provides the condition-level estimates and intervals.
 
 \subsection{Matched against unmatched signals}
 \label{sec:rq2-matched}
@@ -177,13 +176,13 @@ A method is \emph{matched} when its weighting signal corresponds to the dominant
   \label{tab:matched-contrast}
 \end{table}
 
-\noindent For the independent-support conditions, matched weighting changes balanced accuracy by only \num{0.06} percentage points, with an interval from $-\num{0.13}$ to \num{0.22} percentage points. For example, this is a change from \num{49.30}\% to \num{49.36}\%. Matching provides a benefit only in the two nominal-support conditions. When difficulty or diversity is dominant, the matched method is no better and can be worse because the unmatched arm contains the effective prevalence-based methods.
+\noindent For independent-support deprivation, matched weighting changes balanced accuracy by only \num{0.06} percentage points on BRACS and \num{0.00} on TCGA-UT; both intervals cover zero. Matching favours the corresponding signal in the two BRACS nominal-support units and the one TCGA-UT nominal-support unit. When difficulty or diversity is dominant, the matched method never outperforms the effective prevalence-based alternatives and is worse in two units.
 
-Both methods use an effective-number formula. Its parameter $\beta$ controls how strongly class weights differ. The \emph{matched-$\beta$ diagnostic} reruns independent-support weighting with the value selected for class-balanced cross-entropy. Holding $\beta$ constant isolates the use of patient counts rather than patch counts from the effect of selecting different values. This changes balanced accuracy by at most \num{1.3} percentage points across the \num{12} conditions and still leaves a gap of up to \num{11.2} percentage points to class-balanced cross-entropy. Weakly tuned independent-support weights therefore do not explain the failure. Full matched contrasts and matched-$\beta$ results appear in Appendix Tables~\ref{tab:matched-contrast-detail} and~\ref{tab:matched-beta-detail}.
+Both independent-support and class-balanced weighting use an effective-number formula whose parameter $\beta$ controls weight strength. The matched-$\beta$ diagnostic gives independent-support weighting the value selected for class-balanced cross-entropy, separating the count source from tuning strength. It does not alter the conclusion on either dataset. Full matched contrasts and matched-$\beta$ results appear in Appendix Tables~\ref{tab:matched-contrast-detail} and~\ref{tab:matched-beta-detail}.
 
 \subsection{Recovery of probability quality}
 \label{sec:rq2-calibration}
-A method can restore balanced accuracy while making its probabilities worse. The prespecified recovery endpoint is tail-group macro negative log likelihood computed from raw test probabilities; temperature scaling never enters the gate or the confirmatory tests. It is analysed for the eight conditions with a sufficiently large and precise raw-score deficit.
+A method can restore balanced accuracy while making its probabilities worse. The prespecified recovery endpoint is tail-group macro negative log likelihood computed from raw test probabilities; temperature scaling never enters the confirmatory decisions. Recovery is analysed only where the dataset-specific raw-score deficit is sufficiently large and precise.
 
 \begin{table}[ht]
   \centering
@@ -193,11 +192,7 @@ A method can restore balanced accuracy while making its probabilities worse. The
   \label{tab:calibration-recovery}
 \end{table}
 
-\noindent Prevalence-weighted and class-balanced cross-entropy improve raw probability quality in seven of eight conditions, and all \num{14} comparisons survive Holm adjustment. The exception is native severe spread, where neither method improves on deprived cross-entropy despite recovering more than \num{80}\% of its balanced-accuracy deficit. Independent-support, difficulty, and diversity weighting worsen raw probability quality in every condition, and all \num{24} deteriorations survive adjustment. Exact intervals and adjusted $p$-values appear in Appendix Table~\ref{tab:calibration-recovery-detail}.
-
-Some of that damage may be easy to undo. \emph{Temperature scaling} divides a model's output scores by one number fitted on validation data before they are turned into probabilities. It cannot change which class is predicted, so discrimination is untouched; it corrects only systematic over- or under-confidence. Fitting one temperature per condition lowers expected calibration error across the eight deprived cross-entropy conditions from \num{0.143}--\num{0.313} to \num{0.048}--\num{0.079}, and overall negative log likelihood from \num{1.203}--\num{2.582} to \num{1.047}--\num{1.271}. Whether the tail group is repaired along with the aggregate is a separate question, answered by re-estimating the tail-group contrast on scaled probabilities as Appendix~\ref{app:calibration} describes. A change counts below only when its paired \num{95}\% interval excludes zero.
-
-Three findings follow, and they do not point the same way. First, most of the allocation-induced deficit is over-confidence rather than lost probability quality. After scaling, the eight deficits span $-\num{0.189}$ to \num{0.280} nats; only difficulty-reversed severe, difficulty-reversed severe spread, and difficulty-aligned severe spread still clear the \num{0.148}-nat minimum, and difficulty-aligned moderate, difficulty-aligned severe, and native severe change sign, meaning deprived cross-entropy ends up better calibrated on the tail than its own balanced reference. Second, the repair credited to prevalence-based weighting largely goes with it: \num{14} of its \num{16} raw improvements qualify, against one after scaling, and four cells turn into deteriorations. Third, the harm done by the other three signals stays. \num{21} of \num{24} raw deteriorations qualify, and \num{21} of \num{24} scaled ones do; scaling compresses them from as much as \num{2.604} nats to at most \num{0.501} without removing them. Post-hoc calibration therefore undoes much of what the allocation did, and much of what prevalence weighting was credited with repairing, but not the damage the remaining signals cause.
+\noindent On BRACS, prevalence and nominal-support weighting improve raw probability quality in seven of eight eligible units, whereas the other three signals deteriorate in all \num{24} comparisons. TCGA-UT does not repeat that simple pattern. All five signals worsen the three independent-support units by \num{51.7}--\num{62.4}\% of the original deficit, while prevalence and nominal-support weighting recover \num{106.5}\% and \num{92.2}\% in aligned concentrated severe. Across severe-spread assignments the result changes from improvement to mixed response to deterioration. Probability-quality recovery is therefore conditional on dataset and assignment even when discrimination recovery is consistent. Exact intervals and adjusted $p$-values appear in Appendix Table~\ref{tab:calibration-recovery-detail}; Appendix~\ref{app:calibration} separately examines whether validation-fitted temperature scaling removes these raw-score effects.
 
 \subsection{Exploratory methods beyond weighting}
 \label{sec:rq2-roster}
@@ -211,7 +206,7 @@ The wider roster varies the training objective, sampling distribution, decision 
   \label{tab:roster-recovery}
 \end{table}
 
-\noindent The roster shows that most nominal-support deficits are repairable by several mechanisms. The aligned severe-spread condition is harder, with a best balanced-accuracy recovery of \num{55.4}\%. Independent-support damage is different: none of the nine exploratory methods has positive recovery with an interval excluding zero, while set learning, focal loss, and classifier retraining reliably worsen balanced accuracy. Thus no tested signal or mechanism repairs the loss caused by reduced patient breadth. Full method-level estimates appear in Appendix Table~\ref{tab:roster-recovery-detail}.
+\noindent The roster confirms that severe nominal-support deficits are broadly repairable: the best estimates are \num{55.4}--\num{90.8}\% on BRACS and \num{90.0}--\num{130.6}\% on TCGA-UT. Independent-support damage remains largely unrecovered. No BRACS method has positive recovery with an interval excluding zero. TCGA-UT's CFAL and OKO estimates are positive but close only \num{12.9}--\num{16.6}\% of the deficit, while classifier retraining deteriorates by about \num{13.5}\%. Thus no tested method closes a substantial share of the independent-support loss. Full method-level estimates appear in Appendix Table~\ref{tab:roster-recovery-detail}.
 
 \section{Explaining Heterogeneity}
 \label{sec:rq3}
@@ -222,71 +217,70 @@ Damage magnitude and recovery headroom vary across conditions, and RQ3 asks whic
 \end{equation}
 \noindent where $\rho_j$ is achieved severity, $S_{\mathrm{ind},j}$ the independent-support shortage, $A_j$ the support--difficulty alignment, $S_{\mathrm{div},j}$ the diversity shortage, and $u_{g[j]}$ a random intercept over dataset--target groups that absorbs level differences between datasets. Observation errors come from the bootstrap distributions of the corresponding endpoints.
 
-The BRACS cells are complete, but the combined models await the planned TCGA-UT benchmark because the between-dataset variance is not identifiable from one dataset--target group. The recorded BRACS cells allow the combined fit to be assembled without repeating its bootstrap. Binary targets remain excluded because support--difficulty alignment over two classes is always $\pm 1$ and would confound the pooled coefficient.
+The fitted sample contains BRACS and TCGA-UT only. The signal variables nevertheless retain the frozen standardization computed over the four dataset--target groups in the matching record, so the scales are not redefined after inspecting these two results. Binary targets remain excluded because support--difficulty alignment over two classes is structurally fixed at $\pm 1$.
 
-\emph{Placeholder: TCGA-UT estimates and the combined RQ3 fit will be added here after that benchmark is complete.}
+\begin{table}[ht]
+  \centering
+  \scriptsize
+  \resultstable{rq3_models}
+  \caption{Maximum a posteriori estimates for the two exploratory association models. Damage is signed balanced-accuracy loss and recovery is the recovered fraction. Predictors use the frozen standardized signal profile.}
+  \label{tab:rq3-models}
+\end{table}
 
-What can be said without the models is what Section~\ref{sec:rq1-discrimination} establishes descriptively. Damage rises monotonically with achieved severity under all three assignments; it is roughly three times larger under the difficulty-reversed assignment than under the aligned one at matched severity; and the independent-support axis produces damage at a fifth to a quarter of the nominal dose, which is the single observation in this report that a nominal-only account of shortage cannot absorb.
+\noindent Conditional on the other profile variables, achieved severity and independent-support shortage have positive damage coefficients, \num{0.0318} and \num{0.0158}. In the recovery model, independent-support shortage has the largest coefficient in magnitude and is negative, $-\num{0.3385}$; severity is also negative, while alignment and diversity are small and positive. These are exploratory associations, not causal effects, and two dataset--target groups cannot establish that the coefficients transport to a new dataset.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \resultstable{rq3_logo}
+  \caption{Leave-one-group-out prediction error for the exploratory RQ3 damage model.}
+  \label{tab:rq3-logo}
+\end{table}
+
+\noindent Leaving out TCGA-UT produces a held-out root-mean-square error of \num{0.1396}, more than twice BRACS's \num{0.0618}. The model therefore summarizes the observed conditional pattern but does not yet provide reliable out-of-group prediction.
 
 \section{Discussion}
 \label{sec:discussion}
-The preceding sections establish what the controlled allocations damaged and how much of that damage the tested methods returned. This section reads those outcomes as design evidence. The question it answers is not which existing method won, but what a mitigation method would have to read, and to do, in order to address the shortages this dataset actually presents.
+The preceding sections establish what the controlled allocations damaged and how much of that damage the tested methods returned. This section reads those outcomes as design evidence. The question is not which existing method won, but what a mitigation method would have to read and do across two distinct evidence regimes.
 
 \subsection{What the evidence supports}
 \label{sec:discussion-evidence}
-On RQ1, nominal patch support and independent patient support are distinct sources of damage. Nominal deprivation reduced balanced accuracy in eight of nine comparisons, with larger losses at greater severity and when scarce support was assigned to harder classes. The affected tier followed the support allocation: when the easiest classes received the fewest patches, the body rather than the nominal tail carried the loss. Reducing patient breadth while keeping every class's patch count unchanged reduced balanced accuracy by \num{2.6}--\num{3.0} percentage points in all three assignments. Its probability-quality deficits of \num{0.132}--\num{0.135} nats were below the \num{0.148}-nat minimum used for recovery analysis. Patch count alone therefore does not characterize whether a class has enough training evidence.
+RQ1 separates nominal patch shortage from independent patient shortage on both datasets. Moderate nominal deprivation is material on BRACS but not TCGA-UT, showing that severity labels do not imply equal damage across datasets. Severe deprivation damages both, with assignment determining which tier is affected. Independent-support deprivation replicates more strongly: holding patches fixed costs \num{2.62}--\num{3.03} balanced-accuracy points on BRACS and \num{4.76}--\num{4.83} on TCGA-UT. Patch count alone therefore does not characterize whether a class has enough independent training evidence.
 
-For RQ2, weighting by prevalence or nominal support recovers most of the damage caused by nominal shortage. Weighting by independent support, difficulty, or diversity recovers essentially none of the discrimination loss and worsens raw tail-group probability quality in all \num{24} eligible comparisons. Every deterioration remains significant after multiplicity adjustment, and \num{21} of the \num{24} remain deteriorations with intervals excluding zero after temperature scaling. The allocation-induced deficit those methods were applied to is the part that scaling mostly removes: three of the eight scaled deficits still clear the materiality minimum, and three reverse sign. Holding $\beta$ constant between independent-support and class-balanced weighting does not close the discrimination gap. More importantly, none of the five confirmatory methods or nine exploratory mechanisms repairs the discrimination loss caused by reduced patient breadth. The direct advantage of matched over unmatched weighting in those conditions is only \num{0.06} percentage points of balanced accuracy, with an interval covering zero. These results support prevalence-based weighting for nominal shortage, but not class weighting as a remedy for limited patient evidence.
+RQ2 also contains a replicated and a dataset-dependent result. Prevalence and nominal-support weighting repair much of the severe discrimination deficit on both datasets. No weighting repairs independent-support discrimination damage, and widening the mechanism roster closes at most about one sixth of TCGA-UT's deficit. Probability quality is less uniform: BRACS mostly rewards prevalence-based weighting on raw scores, whereas TCGA-UT changes direction by assignment and shows consistent deterioration under independent-support deprivation. A method cannot infer probability-quality benefit from discrimination recovery alone. Validation-fitted temperature scaling changes which of these readings stand: it removes most of the nominal-allocation deficit and most of the repair credited to prevalence-based weighting, but leaves the deterioration caused by the other three signals and, on TCGA-UT, the independent-support deficit essentially intact (Appendix~\ref{app:calibration}).
 
-RQ3 remains pending until the TCGA-UT results and combined fit are added in Section~\ref{sec:rq3}.
+RQ3 is consistent with these controlled contrasts: severity and independent shortage are positively associated with damage, and independent shortage is negatively associated with recovery after conditioning on the remaining profile. The fit is deliberately exploratory because only two dataset--target groups contribute. Its poor TCGA-UT leave-one-group-out error cautions against treating the coefficients as transferable laws.
 
 \subsection{Which shortage a mitigation method must read}
 \label{sec:discussion-signal}
-A method must estimate the shortage that binds, so the empirical question is whether the dominant shortage was identifiable and whether reading it helped. On this dataset the dominant shortage was identifiable in nine of \num{12} units, and reading it helped only where it was nominal support. The more informative case is the one in which the dominant shortage is independent support and reading it still does not help.
+A method must estimate the shortage that binds, but reading the correct count is useful only if its intervention can address that shortage. The spread arm makes independent support vary while patch counts remain fixed. This produces a precise deficit at both the weaker BRACS dose and the stronger TCGA-UT dose, yet independent-support weighting remains near zero recovery in both. The result is therefore not explained by an inactive manipulation or a single dataset's dose.
 
-That case is a real measurement rather than a structural artefact. In a design where a single per-class evidence pool serves every condition, independent support cannot vary, and a method built to read it is being tested on conditions in which the quantity it reads is constant --- a null under those circumstances says nothing. The spread arm removes that objection: independent support varies by \num{0.41} to \num{0.67} nats between the two arms, the pools are nested so the manipulation adds patients rather than exchanging them, and the resulting deficit is sufficiently large and precise for recovery analysis. Independent-support weighted cross-entropy then recovers only \num{1.3}--\num{1.5}\% of it. The inference the evidence supports is that a mean-one class weight computed from patient counts does not repair damage caused by a shortage of patients, at this dose, on this dataset.
-
-The mechanism that failure suggests is worth stating because it constrains method design directly. All five confirmatory members apply a per-class scalar to the loss, which can only change how heavily each class's examples are emphasized. When a class lacks patients rather than patches, its patches are correlated: they carry fewer independent observations of the class than their count implies, and no reweighting of that count adds information the sample does not contain. A method that addresses independent-support shortage must therefore do something other than reweight --- draw on evidence outside the class's own examples, or change what is estimated rather than how heavily it is weighted.
-
-The frequency of the ambiguous designation qualifies the routing question separately. Three of \num{12} units, all at severe severity, have their two largest shortage scores within a quarter of a standard deviation. A taxonomy that cannot separate the top two axes in a quarter of its conditions does not partition sharply enough to route a method by selecting among signals, which points toward a method that combines them.
+All five confirmatory members apply a per-class scalar to the loss. Such a scalar can emphasize examples but cannot add independent observations. When many patches come from few patients, stronger emphasis may instead amplify patient-specific regularities. A method aimed at independent shortage therefore needs a different mechanism, such as patient-level aggregation or information sharing, and must be tested while patient breadth varies independently of patch count.
 
 \subsection{Signal against mechanism}
 \label{sec:discussion-mechanism}
-Because the five confirmatory methods share one intervention mechanism and differ only in the signal their weights read, the spread of recovery across them isolates how much leverage the choice of signal carries. That spread is wide on the nominal axis, running from below zero to \num{89.2}\% within single comparisons, so signal choice determines whether a weighted-loss method works at all there. The spread is not, however, evidence that a better shortage estimate would help, because it is bimodal rather than graded: two members work almost everywhere on that axis and three work almost nowhere, with little in between.
-
-The independent-support axis separates signal from mechanism more cleanly than the nominal axis can, because there the mechanism is held fixed across the five members and the wider roster fails alongside them. Nine exploratory methods spanning resampling, logit adjustment, decision-threshold correction, classifier retraining, and set learning were applied to a deficit of roughly three balanced-accuracy points, and none returned a positive fraction of it whose interval excludes zero. When both the signal contrast and the mechanism contrast come back null on the same units, the limitation lies not in the choice among tested designs but in what all of them share.
-
-The roster's harmful members sharpen that reading. Set learning and focal loss damage the independent-support comparisons most, with recovery between $-\num{64}$\% and $-\num{106}$\%, and classifier retraining damages them too, between $-\num{33}$\% and $-\num{38}$\%. All three rebalance the effective training distribution more aggressively than a per-class scalar does, whether by resampling, by re-emphasizing hard examples, or by refitting the classifier on a rebalanced head. Rebalancing toward classes whose examples come from few patients amplifies those patients' idiosyncrasies rather than the class's signal, which is the failure mode a patient-aware method would have to avoid by construction.
+The confirmatory family isolates signal choice because its intervention mechanism is shared. On the nominal axis, prevalence and nominal support outperform the other signals on both datasets, so signal choice determines whether class weighting works. On the independent axis, changing the signal does not help. The exploratory roster then changes mechanisms as well: it finds no meaningful BRACS recovery and only \num{12.9}--\num{16.6}\% recovery from TCGA-UT's best two methods. This small nonzero result rules out the stronger claim that every wider-roster estimate is null, but it does not close a substantial share of the deficit.
 
 \subsection{Where tested methods reach a ceiling}
 \label{sec:discussion-ceiling}
-The clearest unmet needs are the four discrimination comparisons in which no confirmatory or exploratory method returns a substantial fraction of an established deficit. Three are the independent-support comparisons, where nothing recovers at all. The fourth is difficulty-aligned severe (spread), where the best tested mechanism reaches \num{55.4}\% recovery. A related failure appears in native severe (spread): both prevalence-based methods worsen tail-group negative log likelihood even though they repair most of the same condition's discrimination deficit. Post-hoc calibration does not remove it. Their raw deteriorations of $-\num{0.083}$ and $-\num{0.090}$ nats have intervals covering zero, whereas the scaled ones, $-\num{0.218}$ and $-\num{0.217}$ nats, do not.
-
-This is the finding that most changes what a new method would be for. The ceiling on the nominal axis is set by neither the data nor the fixed representation --- existing mechanisms reach most of that damage, and a new method cannot be motivated there by damage left unrepaired. The ceiling on the independent-support axis is set by the mechanism the whole roster shares. A method motivated by this benchmark is therefore a method for the second regime, and its claim would be a claim about patient-level evidence rather than about class counts.
-
-The complementary case remains part of the specification. The difficulty-aligned moderate condition damaged raw probability quality without a certifiable discrimination deficit, and the three independent-support units damaged discrimination without a certifiable raw probability-quality deficit. A method that intervenes on the wrong axis spends capacity and risks degrading an endpoint that was not damaged, and Section~\ref{sec:rq2-calibration} shows that risk: in all \num{24} cells where a non-prevalence signal was applied to a calibration-damaged unit, raw tail-group negative log likelihood rose above the untreated reference, and \num{21} of those \num{24} remain deteriorations with intervals excluding zero after temperature scaling. This harm is therefore a property of the intervention rather than a confidence-scaling artefact, which is what makes declining to intervene a requirement rather than a preference.
+Existing mechanisms recover most severe nominal damage, so a new method is not justified by that regime alone. The unmet need is independent patient support: its discrimination damage replicates, grows under TCGA-UT's stronger contrast, and remains mostly unrecovered. The complementary finding is that intervention should be conditional. TCGA-UT's moderate allocation is nominally imbalanced but produces no material discrimination deficit, and probability-quality effects change direction across datasets and assignments. Applying mitigation whenever a count ratio looks large risks treating damage that is absent or worsening an endpoint that was not the target.
 
 \subsection{Design requirements and open questions}
 \label{sec:discussion-requirements}
-The preceding subsections resolve into a set of requirements for a mitigation method, each traceable to a specific result, annotated with the strength of evidence behind it and, where relevant, with what a second dataset would have to confirm.
+The replicated and dataset-dependent findings resolve into four requirements:
 \begin{enumerate}
-  \item Where the shortage is nominal, the method must read prevalence or nominal support, and must not rely on a difficulty or diversity estimate as its primary signal. \emph{Confirmatory}, from the five-family separation in Table~\ref{tab:confirmatory} across the eight nominal-axis discrimination units.
-  \item It must not leave tail-group probability quality worse after validation-fitted calibration while repairing discrimination. \emph{Confirmatory for raw scores}, from the \num{24} negative recovery cells in Table~\ref{tab:calibration-recovery}, all of which survive Holm adjustment, and \emph{supported after calibration} by the \num{21} of those \num{24} whose scaled intervals still exclude zero. The requirement binds on the harm rather than on the repair: the raw benefit credited to prevalence-based weighting on this endpoint does not survive scaling.
-  \item It must decline to intervene where allocation produced no material deficit on the axis it targets, which on this dataset is the difficulty-aligned moderate condition on discrimination and the three independent-support units on probability quality. \emph{Confirmatory}, from Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration}.
-  \item Independent-support shortage requires a mechanism other than per-class loss reweighting. \emph{Confirmatory within this dataset}, from the joint null of the confirmatory family and the exploratory roster on the three independent-support comparisons. \emph{Open across datasets}: this cohort carries the weakest independent dose the candidate datasets offer, so a replication at a stronger dose is needed before the null is read as a property of reweighting rather than of this dose.
-  \item Whether the shortage estimate must be formed per condition rather than transferred across datasets. \emph{Pending TCGA-UT}: this is the requirement RQ3's variance components were specified to settle.
+  \item Diagnose material damage, not imbalance ratio alone; moderate BRACS and TCGA-UT allocations demonstrate that the same nominal severity can have different consequences.
+  \item Use prevalence or nominal support for class weighting when severe nominal deprivation damages discrimination; difficulty and diversity estimates are not effective primary weighting signals in these tasks.
+  \item Address independent-support shortage with a mechanism beyond per-class weights, and evaluate it at patient level while patch totals remain fixed.
+  \item Judge discrimination and probability quality separately, including after validation-fitted calibration, and remain inactive when the target deficit is absent.
 \end{enumerate}
-\noindent Requirements four and five will be reassessed after the TCGA-UT analysis. If the independent-support result replicates, the fastest route to a new method is a focused mechanism experiment rather than another broad method roster. Such an experiment should hold patch counts fixed while varying patient breadth and within-patient redundancy, then test a patient-aware objective instead of applying another per-class weight. A practical first candidate is a patient-macro objective, which averages patch losses within each patient before giving patients equal weight; hierarchical shrinkage that borrows strength across patients or classes is a more complex second candidate. A diversity-focused arm is justified only if the combined RQ3 analysis links residual damage to representational diversity; the present failure of diversity weighting makes it a weaker starting point. Any candidate should be judged jointly on balanced accuracy and probability quality and should remain inactive where its target deficit is absent.
-
-\subsection{Pending TCGA-UT analysis}
-\label{sec:discussion-open}
-\emph{Placeholder: this subsection will report whether the independent-support result replicates on TCGA-UT, compare dataset-specific materiality thresholds, and interpret the combined RQ3 model.} Binary and low-cardinality targets remain outside that model because support--difficulty alignment over two classes is structurally fixed at $\pm 1$.
+\noindent A focused next experiment should therefore hold patch counts fixed while varying patient breadth and within-patient redundancy, then test a patient-aware objective rather than another per-class weight. A patient-macro objective, which averages patch losses within each patient before weighting patients equally, is the simplest candidate. Hierarchical sharing across patients or classes is a more complex alternative. The RQ3 coefficients can prioritize hypotheses, but their two-group fit is not strong enough to select a mechanism by itself.
 
 \section{Conclusion and Scope}
 \label{sec:limits}
-The current BRACS results answer the first two protocol questions. Controlled allocation damages tail-class discrimination and probability quality along two axes that ordinary imbalance confounds: nominal patch deprivation and independent patient deprivation. Signal-matched mitigation recovers most nominal damage through prevalence and nominal-support weighting, but no tested signal or mechanism recovers the independent-support damage. Section~\ref{sec:discussion} converts this evidence into requirements for what a mitigation method must read, what it must not degrade, and where it must decline to act. RQ3 will be completed with TCGA-UT.
+Across BRACS and TCGA-UT, controlled allocation separates two effects that ordinary imbalance confounds. Severe nominal patch deprivation is largely repairable through prevalence or nominal-support weighting. Independent patient deprivation damages discrimination even when patch allocation is unchanged, and no tested class weighting repairs it; the wider roster closes at most a small share. Calibration effects vary across datasets and assignments, and post-hoc temperature scaling removes most of the nominal-allocation effect but not TCGA-UT's independent-support deficit. The exploratory RQ3 fit agrees with the controlled comparisons but remains hypothesis-generating. Together these results motivate patient-aware mitigation that diagnoses damage before acting and evaluates probability quality separately from discrimination.
 
-Four conditions bound the current claims. The three partitions are repeated partitions of BRACS, not independent cohorts, so the intervals quantify variation across partitioning and initialization rather than across populations. The three independent-support units share one deprived allocation and differ only in their reference assignment, so they are correlated readings rather than three replications. The benchmark covers patch classification only, where each prediction unit carries its own label; at whole-slide level, reallocating labelled slides changes nominal and independent support together. Temperature scaling is reported as a diagnostic and never determines whether recovery is analysed.
+Four conditions bound the claims. Each dataset's three partitions are repeated partitions, not independent cohorts, so intervals do not measure variation across populations. Within a dataset, the three independent-support units share one deprived allocation and differ only in reference assignment, so the two datasets provide the replications, not the three assignments. The benchmark covers patch classification only; at whole-slide level, reallocating labelled slides changes nominal and independent support together. Temperature scaling is a diagnostic and never determines the confirmatory recovery analysis.
 
 \newpage
 \appendix
@@ -311,7 +305,7 @@ Table~\ref{tab:realized-support} reports the achieved imbalance ratio and normal
 \endgroup
 \end{landscape}
 
-\noindent The two rows that define the independent-support axis are the balanced and balanced (spread) entries within each partition. They carry identical patch counts and an identical $\rho$ of \num{1.000}, and differ only in patient count, \num{85} against \num{103}, and correspondingly in slides. That the spread arm reaches the same \num{103} patients the natural condition draws on confirms that it exhausts the eligible inventory, so the dose reported in Section~\ref{sec:rq1-profiles} is the largest this cohort can supply under the contribution caps.
+\noindent The balanced and balanced-spread rows define the independent-support axis. Within every partition they carry identical patch counts and $\rho=\num{1.000}$. BRACS increases patient breadth from \num{85} to \num{103} at \num{16796} patches. TCGA-UT increases it from \num{671}--\num{917} to \num{4983} at partition-specific totals of \num{36988}--\num{52204} patches. In both datasets the spread arm reaches the full eligible patient inventory under the contribution caps.
 
 \subsection{Resampling validity and completeness}
 \label{app:realized-validity}
@@ -326,9 +320,9 @@ The label-only preflight resamples patients before any model is fitted and check
 \endgroup
 \end{landscape}
 
-\noindent No class is designated descriptive-only on the pooled evidence cell that every gated quantity uses. The tightest margin is ductal carcinoma in situ, whose \num{2.5}th-percentile Kish effective count is \num{5.5} against a floor of five, and no class records a dominant patient in any replicate. The margin is narrow because the cohort is small: the seven classes draw on \num{85} to \num{103} patients in total, which is the same scarcity the independent-support axis manipulates.
+\noindent No class is designated descriptive-only on the pooled evidence cell used for every confirmatory quantity. The tightest margins are ductal carcinoma in situ on BRACS, with a \num{2.5}th-percentile Kish effective count of \num{5.5}, and uterine carcinosarcoma on TCGA-UT, with \num{6.6}; both remain above the floor of five. No pooled class records a dominant patient in any replicate.
 
-That scarcity binds one level down. Evaluated per partition and per class rather than pooled, the preflight flags the ADH, DCIS, and FEA cells as descriptive-only on all three partitions, with \num{2.5}th-percentile Kish effective counts between \num{1.8} and \num{2.7} and dominant-patient shares up to \num{0.32}. No gated quantity in this report is computed on those cells, since every gate and every recovery estimate reads the pooled cell, but the per-class, per-partition entries of Appendix~\ref{app:endpoints} rest on them and are descriptive for that reason.
+That support binds one level down. Evaluated per partition and class rather than pooled, BRACS flags ADH, DCIS, and FEA. TCGA-UT flags its nine smallest patient pools: adrenocortical carcinoma, kidney chromophobe, mesothelioma, ovarian serous cystadenocarcinoma, pheochromocytoma and paraganglioma, rectum adenocarcinoma, thymoma, uterine carcinosarcoma, and uveal melanoma. These flags qualify the corresponding per-class entries in Appendix~\ref{app:endpoints}; every confirmatory deficit and recovery estimate uses the valid pooled cell.
 
 Completeness is enforced rather than reported after the fact. Every confirmation block must contain all five initialization seeds, every expected combination of tail assignment, condition, method, and gate must appear in all three partitions, and the achieved severity of a condition must not vary by more than half across partitions.
 
@@ -342,7 +336,7 @@ Completeness is enforced rather than reported after the fact. Every confirmation
 
 \subsection{Budget, tuning selections, and deviations}
 \label{app:realized-deviations}
-Training budget is expressed in example presentations rather than optimizer updates, because methods consume different amounts of data per update and an update budget would confound the method comparison with data exposure. The frozen budget is $E = \num{503880}$ example presentations for every controlled condition and $E = \num{6521970}$ for the natural anchor; each method derives its own update count as $\lceil E / e_m \rceil$, where $e_m$ is its examples per update. The checkpoint interval is rescaled to that derived count so that every method receives approximately \num{170} validation passes regardless of how many updates its budget yields.
+Training budget is expressed in example presentations rather than optimizer updates, because methods consume different amounts of data per update. The frozen controlled and natural budgets are \num{503880} and \num{6521970} examples on BRACS, and \num{1343760} and \num{33480600} on TCGA-UT. Each method derives its update count as $\lceil E/e_m\rceil$, where $e_m$ is its examples per update, and the checkpoint interval is rescaled to preserve approximately the same number of validation passes.
 
 \begin{landscape}
 \begingroup
@@ -353,19 +347,17 @@ Training budget is expressed in example presentations rather than optimizer upda
 \endgroup
 \end{landscape}
 
-\noindent None of the \num{196} selections terminated at a learning-rate envelope boundary, so in no case did the envelope rather than the validation data determine the choice. Three properties of the selection procedure are stated here as limits on the claims that rest on it rather than as defects.
+\noindent None of the \num{392} selections, \num{196} per dataset, terminated at a learning-rate envelope boundary. The validation data rather than the search envelope therefore determined every selected point.
 
 The selection objective is natural-prevalence validation balanced accuracy, tie-broken by macro $F_1$ and then by negative log likelihood. Tail-group negative log likelihood is a co-primary endpoint with its own gate, and no method was ever tuned for it. Every statement in Section~\ref{sec:rq2-calibration} about a method degrading probability quality is therefore a statement about a method optimized for a different endpoint.
 
-Selection also pools across tail assignments: one configuration is chosen per condition and method and applied to all three assignments, which the table records as repeated rows, and all \num{60} condition--method cells that span more than one assignment carry identical selections. Since the assignment determines which classes need help, this pooling systematically dilutes the difficulty- and diversity-reading methods relative to a per-assignment selection, and their null results should be read with that in mind.
+Selection also pools across tail assignments: one configuration is chosen per condition and method and applied to all three assignments. Since the assignment determines which classes need help, this pooling can dilute difficulty- and diversity-reading methods relative to per-assignment tuning, and their null results should be read with that limitation.
 
 The tuning budget itself differs by method: \num{16} candidates for most, four for cross-entropy and classifier retraining, and a single shard for post-hoc logit adjustment, which requires no training of its own.
 
-Three further properties of the selections change what a method label denotes and are recorded for that reason. The search selects the zero-strength point in \num{28} of the \num{196} selections: \num{13} for the soft-$F_1$ hybrid, nine for the soft-MCC hybrid, and six for focal loss. At zero strength the soft hybrids reduce to balanced-sampling cross-entropy, because their auxiliary term vanishes while their forced balanced sampler does not, and focal loss reduces to class-weighted cross-entropy, because its class-aware $\alpha$ term applies at unit strength independently of $\gamma$. Where those selections were made, the roster row reports the reduced method rather than the named one.
+Zero-strength selections retain their method-specific base mechanism. A zero auxiliary weight leaves the soft-$F_1$ and soft-MCC hybrids with balanced-sampling cross-entropy, while focal loss at $\gamma=0$ retains its class-aware $\alpha$ and reduces to class-weighted cross-entropy. The tuning table records these points explicitly; every selected focal $\gamma=0$ candidate was trained rather than borrowed from a plain-cross-entropy anchor.
 
-That reduction previously interacted with a defect in the search. The search treated focal loss as anchored to plain cross-entropy, scoring its $\gamma = 0$ candidate with cross-entropy's already-computed validation metrics instead of training it; because $\alpha$ applies unconditionally, that candidate is class-weighted cross-entropy rather than plain cross-entropy, so the anchor supplied the wrong metrics. The anchor has been removed, and the two conditions whose focal selection had come from it, concentrated balanced and balanced spread, were re-tuned from the first round under the corrected search. Concentrated balanced now selects $\gamma = 1$; balanced spread again selects $\gamma = 0$, this time against a trained candidate, as does concentrated severe, whose window had already reached $\gamma = 0$ under the original search. Every zero-strength focal selection reported here therefore rests on its own fitted evidence. Re-tuning those two conditions also moved four other selections in them, which is why their estimates differ from a search that never trained a $\gamma = 0$ point.
-
-Two deviations from the locked protocol were made before any definitive gate row was read. The two deficit-gate thresholds were derived rather than assumed: the protocol had fixed discrimination at \num{2} percentage points and calibration at \num{0.05} nats without a stated derivation, while the discrimination value conflicted with the support pilot's \num{1}-percentage-point materiality constant for the same endpoint under the same kind of manipulation. Both were replaced by quantities the protocol already fixes: $\max(\num{1}, 2\sigma_{\mathrm{seed}})=\num{1.443}$ percentage points for discrimination and $2\sigma_{\mathrm{seed}}=\num{0.14782}$ nats for calibration, where $\sigma_{\mathrm{seed}}$ is the confirmation-seed standard deviation of the corresponding balanced-condition endpoint on this dataset. Separately, the gate-defining estimator is case-macro rather than patch-micro, and the evidence cell is pooled across a case's partition appearances rather than taken per partition; both correct a mismatch between a diagnostic and the estimator it certifies, since the bootstrap draws one shared weight per case over the union of the three test frames.
+Two deviations from the locked protocol were made before definitive results were read. The fixed thresholds were replaced by quantities the protocol already defines: $\max(\num{1},2\sigma_{\mathrm{seed}})$ for discrimination and $2\sigma_{\mathrm{seed}}$ for calibration. This yields dataset-specific thresholds of \num{1.443} percentage points and \num{0.14782} nats on BRACS, and \num{1.000} point and \num{0.06095} nats on TCGA-UT. Separately, the defining estimator is patient-macro rather than patch-micro and pools a patient's partition appearances, matching the crossed patient bootstrap used for inference.
 
 \subsection{Method diagnostics}
 \label{app:method-diagnostics}
@@ -378,13 +370,24 @@ Semantic-scale weighted cross-entropy falls back to a raw weight of \num{1}, tha
 \label{tab:method-diagnostics}
 \endgroup
 
-\noindent The fallback never fired: \num{0} invalid draws against \num{195} reweighting pools across the three partitions. The diversity-weighted results in Section~\ref{sec:rq2} therefore measure the intended weighting rather than a degenerate fallback.
+\noindent The fallback never fired: each dataset records \num{0} invalid draws across \num{195} reweighting pools. The diversity-weighted results therefore measure the intended weighting rather than a degenerate fallback.
 
 \clearpage
 \section{Aggregate Damage Estimates}
 \label{app:damage-estimates}
-Tables~\ref{tab:discrimination-deficit} and~\ref{tab:calibration-deficit} provide the assignment-level estimates summarized in Sections~\ref{sec:rq1-discrimination} and~\ref{sec:rq1-calibration}.
+Tables~\ref{tab:natural-anchor-detail}--\ref{tab:calibration-deficit} provide the complete anchors and assignment-level estimates summarized in Section~\ref{sec:rq1}.
 
+\begin{landscape}
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \resultstable{natural_anchor}
+  \caption{Complete natural and cross-entropy anchor endpoints.}
+  \label{tab:natural-anchor-detail}
+\end{table}
+\end{landscape}
+
+\begin{landscape}
 \begin{table}[H]
   \centering
   \footnotesize
@@ -392,7 +395,9 @@ Tables~\ref{tab:discrimination-deficit} and~\ref{tab:calibration-deficit} provid
   \caption{Balanced-accuracy deficit with paired \num{95}\% intervals.}
   \label{tab:discrimination-deficit}
 \end{table}
+\end{landscape}
 
+\begin{landscape}
 \begin{table}[H]
   \centering
   \scriptsize
@@ -401,6 +406,7 @@ Tables~\ref{tab:discrimination-deficit} and~\ref{tab:calibration-deficit} provid
   \caption{Tail-group negative-log-likelihood deficit with paired \num{95}\% intervals and secondary expected calibration error.}
   \label{tab:calibration-deficit}
 \end{table}
+\end{landscape}
 
 \clearpage
 \section{Detailed Recovery Estimates}
@@ -454,7 +460,16 @@ The main text retains only the comparisons needed to answer RQ2. This appendix p
 
 \section{Per-Class and Tier Endpoints}
 \label{app:endpoints}
-Section~\ref{sec:rq1-incidence} reports damage at tier level; this appendix gives the per-class detail behind it. Recall, $F_1$, negative log likelihood, and Brier score are listed per class and condition for the cross-entropy reference, averaged within a partition and then with equal weight across the three partitions, with the tier assignment given alongside. The table is restricted to cross-entropy because that is the reference against which every deficit in Section~\ref{sec:rq1} is defined. As recorded in Appendix~\ref{app:realized-validity}, the per-partition cells for the ADH, DCIS, and FEA classes are designated descriptive-only by the preflight, so their entries here carry no inferential weight.
+Section~\ref{sec:rq1-incidence} uses a compact tier summary. This appendix gives every tier endpoint and the per-class detail behind it. Recall, $F_1$, negative log likelihood, and Brier score are listed for the cross-entropy reference, averaged within a partition and then with equal weight across the three partitions. The per-partition support qualifications listed in Appendix~\ref{app:realized-validity} apply to the corresponding class rows.
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\resultstable{tier_endpoints}
+\captionof{table}{Complete tier endpoints by dataset, assignment, and condition.}
+\label{tab:tier-endpoints-detail}
+\endgroup
+\end{landscape}
 
 \begin{landscape}
 \begingroup
@@ -478,9 +493,15 @@ The calibration gate reads tail-group macro negative log likelihood, but the sha
 \endgroup
 \end{landscape}
 
-\noindent Temperature scaling removes most aggregate miscalibration on the cross-entropy reference wherever the raw-score deficit meets the analysis criteria. Under difficulty-reversed severe, for example, it takes expected calibration error from \num{0.313} to \num{0.067} and negative log likelihood from \num{2.582} to \num{1.271}. The balanced references change little: their calibration error is \num{0.040}--\num{0.051} before scaling, and scaling moves it by at most \num{0.006}. This indicates that much of the observed probability-quality damage is a correctable confidence-scaling error induced by the allocation.
+\noindent Temperature scaling reduces aggregate miscalibration on both datasets but by different amounts. For difficulty-reversed severe, BRACS expected calibration error falls from \num{0.313} to \num{0.067} and negative log likelihood from \num{2.582} to \num{1.271}; on TCGA-UT the same quantities fall from \num{0.140} to \num{0.010} and from \num{1.191} to \num{0.881}. This shows that a large aggregate raw-score difference can reflect correctable confidence scaling, but aggregate repair does not establish repair of the tail-group endpoint.
 
-Table~\ref{tab:calibration-detail} reports aggregate metrics, however, and the gated endpoint is the tail group. The contrasts quoted in Section~\ref{sec:rq2-calibration} therefore re-estimate the tail-group macro negative log likelihood itself on scaled probabilities, holding everything else fixed: the same confirmation runs, the same tail classes taken from each deprived condition's own allocation, the same frozen crossed patient bootstrap, and the same equal-weight average over the three partitions. Recomputing the raw contrasts by the same route reproduces the published values in Tables~\ref{tab:calibration-deficit} and~\ref{tab:calibration-recovery-detail} exactly, which is what licenses reading the scaled column beside them. These scaled contrasts carry paired bootstrap intervals only. The partition-block permutation tests and the Holm adjustment were run on the prespecified raw endpoint and are not repeated here, so no scaled result is a confirmatory decision; the materiality minimum and the interval criterion are applied to them descriptively.
+Table~\ref{tab:calibration-detail} reports aggregate metrics, however, and the gated endpoint is the tail group. The contrasts of Section~\ref{sec:rq2-calibration} are therefore re-estimated here on scaled probabilities, holding everything else fixed: the same confirmation runs, the same tail classes taken from each deprived condition's own allocation, the same frozen crossed patient bootstrap, and the same equal-weight average over the three partitions. Recomputing the raw contrasts by the same route reproduces the published values in Tables~\ref{tab:calibration-deficit} and~\ref{tab:calibration-recovery-detail} exactly, which is what licenses reading the scaled column beside them. These scaled contrasts carry paired bootstrap intervals only. The partition-block permutation tests and the Holm adjustment were run on the prespecified raw endpoint and are not repeated here, so no scaled result is a confirmatory decision; the materiality minimum and the interval criterion are applied to them descriptively.
+
+Three findings follow, and they do not point the same way. First, most of the nominal-allocation deficit is over-confidence rather than lost probability quality. Across BRACS's eight eligible deprived conditions the scaled deficits span $-\num{0.189}$ to \num{0.280} nats; only difficulty-reversed severe, difficulty-reversed severe spread, and difficulty-aligned severe spread still clear the \num{0.148}-nat minimum, and difficulty-aligned moderate, difficulty-aligned severe, and native severe change sign, meaning deprived cross-entropy ends up better calibrated on the tail than its own balanced reference. TCGA-UT's four eligible nominal conditions behave the same way on a smaller scale: they span $-\num{0.056}$ to \num{0.106} nats, difficulty-aligned severe changes sign, and only the difficulty-aligned and native severe-spread deficits clear its \num{0.061}-nat minimum.
+
+Second, the independent-support deficit is not over-confidence, and this is where the two datasets separate. TCGA-UT's three independent-support deficits fall only from \num{0.258}--\num{0.263} to \num{0.228}--\num{0.232} nats; all three remain above the minimum with intervals excluding zero, so scaling leaves that damage essentially intact. BRACS's equivalents fall from \num{0.134}--\num{0.140} to \num{0.102}--\num{0.109} nats and stay below its higher minimum both before and after scaling. Holding patch counts fixed while removing patients therefore produces a probability-quality loss that post-hoc calibration does not repair, at the dose where the endpoint is precise enough to read.
+
+Third, the repair credited to prevalence-based weighting does not survive scaling on either dataset, whereas the harm from the other three signals does. On BRACS, \num{14} of the \num{16} raw prevalence-based improvements have intervals excluding zero against one after scaling, and four cells turn into deteriorations. On TCGA-UT the reversal is complete: four raw improvements become none, and all \num{14} scaled cells are deteriorations with intervals excluding zero. The remaining three signals deteriorate throughout: \num{21} of BRACS's \num{24} raw deteriorations qualify and \num{21} of \num{24} scaled ones do, with the largest compressed from \num{2.604} to \num{0.501} nats, while on TCGA-UT \num{18} of \num{21} qualify in both, compressed from \num{0.293} to \num{0.177} nats. Post-hoc calibration therefore undoes much of what the nominal allocation did, and most of what prevalence weighting was credited with repairing, but neither the harm the remaining signals cause nor TCGA-UT's independent-support damage.
 
 \begin{figure}[ht]
   \centering
@@ -506,24 +527,55 @@ Table~\ref{tab:calibration-detail} reports aggregate metrics, however, and the g
     \includegraphics[width=\linewidth]{assets/bracs/tail_reliability_difficulty_reversed.png}
     \caption{Severe, reversed assignment, tail classes}
   \end{subfigure}
-  \caption{Reliability curves for the balanced reference and for the tail classes under the severe condition of each tail assignment, with bin accuracy against mean predicted confidence over ten equal-width bins, on the first locked partition.}
-  \label{fig:reliability}
+  \caption{BRACS reliability curves for the balanced reference and severe-condition tail classes on the first locked partition.}
+  \label{fig:reliability-bracs}
 \end{figure}
 
+\begin{figure}[ht]
+  \centering
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/reliability_diagram.png}
+    \caption{Balanced reference, all classes}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/tail_reliability_native.png}
+    \caption{Severe, native assignment, tail classes}
+  \end{subfigure}
+
+  \vspace{0.8em}
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/tail_reliability_difficulty_aligned.png}
+    \caption{Severe, aligned assignment, tail classes}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/tcga_ut/tail_reliability_difficulty_reversed.png}
+    \caption{Severe, reversed assignment, tail classes}
+  \end{subfigure}
+  \caption{TCGA-UT reliability curves for the balanced reference and severe-condition tail classes on the first locked partition. Both figure sets use ten equal-width confidence bins.}
+  \label{fig:reliability-tcga}
+\end{figure}
+
+\clearpage
+\begin{landscape}
 \section{Per-Partition Results}
 \label{app:splits}
 The main text averages the three partitions with equal weight, which is only defensible if no single partition drives a conclusion. This appendix reports the cross-entropy deficits separately for each partition, alongside the spread of achieved severity across them.
 
 \begingroup
-\scriptsize
-\resultstable{per_split}
-\captionof{table}{Cross-entropy deficits by partition on both gate axes, with the equal-weight average and the relative achieved-severity spread across partitions, per condition and tail assignment.}
+\tiny
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.82}
+\captionof{table}{Cross-entropy deficits by partition on both endpoint axes, with the equal-weight average and relative achieved-severity spread, per dataset, condition, and assignment.}
 \label{tab:per-split}
+\resultstable{per_split}
 \endgroup
+\end{landscape}
 
-\noindent No gate decision rests on a single partition, but the independent-support axis is the least uniform across them and this qualifies its reading. Its three units clear the \num{1.44}-percentage-point discrimination threshold in two of the three partitions and fall to \num{0.30}--\num{0.64} percentage points on the second, against \num{5.40}--\num{5.97} on the third; the equal-weight average that opens the gate is therefore carried by two partitions rather than three. On the nominal axis the pattern is steadier: every gate-passing unit clears the threshold in all three partitions except difficulty-aligned severe, whose smallest partition-level deficit is \num{1.19} percentage points. On the calibration axis the three balanced units are consistent in falling below threshold, and among the eight gate-passing units the reversed moderate condition is the most variable, ranging from \num{0.037}--\num{1.814} nats. Achieved severity itself varies across partitions by at most \num{0.002} in relative terms, well inside the \num{0.5} consistency guard.
-
-The conclusions of Section~\ref{sec:rq2} are less exposed to this variation than the gate decisions are, because the recovery estimates on the independent-support axis are null in every partition rather than null only on average. The qualification attaches to the size of the independent-support deficit, not to the finding that nothing recovers it.
+\noindent Partition-level variation is retained rather than hidden by the equal-weight average. BRACS's independent-support deficit is smallest in the second partition and largest in the third, so two partitions carry most of its pooled magnitude. TCGA-UT nevertheless repeats the pooled deficit under a stronger patient-breadth contrast. Achieved-severity spread remains at most \num{0.002} on BRACS and \num{0.010} on TCGA-UT, well inside the \num{0.5} consistency guard. The appendix table gives the corresponding partition-level qualification for every nominal and calibration comparison.
 
 \section{Computational Cost}
 \label{app:cost}
@@ -538,9 +590,7 @@ Cost bears on the design question because a method whose recovery requires subst
 \endgroup
 \end{landscape}
 
-\noindent The exposure budget is matched to within \num{0.6}\% across the roster, which is the property that makes the recovery comparison a comparison of methods rather than of data volume. Every method processes the same \num{503880} examples as cross-entropy to within rounding, except set learning, which exceeds it by \num{2727} to \num{2983} examples because its per-update example count depends on a tuned set size and the derived update count must be integral, and classifier retraining, which exceeds it by \num{129}. Post-hoc logit adjustment trains nothing of its own and reuses the cross-entropy checkpoint, so its processed-example difference is the full budget with a negative sign; its cost is a single pass to fit one scalar.
-
-That matched exposure is achieved through unequal update counts, which is the intended trade. Set learning takes roughly \num{3800} fewer updates than cross-entropy at \num{641} more examples per update, and classifier retraining splits its budget between two stages in a fixed ratio. Accelerator time, peak memory, and parameter counts differ by amounts their intervals absorb in every case, so no roster method's recovery on this dataset is bought with materially more computation than the reference.
+\noindent Exposure matching makes the recovery comparison a comparison of methods rather than data volume. Small differences remain where an integral update count cannot exactly realize a tuned examples-per-update value; classifier retraining splits its budget between two fixed-ratio stages, and post-hoc logit adjustment reuses the cross-entropy checkpoint. Accelerator time, peak memory, parameters, and all exposure differences are reported without collapsing their dataset-specific intervals into a universal cost claim.
 
 \clearpage
 \bibliographystyle{plainnat}

@@ -1,9 +1,10 @@
-\begin{tabularx}{\textwidth}{@{}l c X@{}}
+\begin{tabularx}{\textwidth}{@{}l l c X@{}}
 \toprule
-Endpoint and shortage & Units & Most informative result \\
+Dataset & Endpoint and shortage & Units & Most informative result \\
 \midrule
-Balanced accuracy, nominal support & 8 & Best method recovers \num{79.2}--\num{90.8}\% in seven units; \num{55.4}\% in aligned severe spread \\
-Probability quality, nominal support & 8 & Best method recovers \num{82.2}--\num{135.6}\% in every unit \\
-Balanced accuracy, independent support & 3 & No positive recovery with an interval excluding zero; OKO, focal loss, and cRT worsen performance \\
+BRACS & Balanced accuracy, nominal support & 8 & Best method recovers \num{79.2}--\num{90.8}\% in seven units; \num{55.4}\% in aligned severe spread. \\
+BRACS & Balanced accuracy, independent support & 3 & No positive recovery with an interval excluding zero; OKO, focal loss, and cRT worsen performance. \\
+TCGA-UT & Balanced accuracy, severe shortage & 6 & Several mechanisms recover most of the deficit; best estimates range from \num{90.0}\% to \num{130.6}\%. \\
+TCGA-UT & Balanced accuracy, independent support & 3 & CFAL and OKO recover only \num{12.9}--\num{16.6}\%; cRT deteriorates by \num{13.4}--\num{13.5}\%. \\
 \bottomrule
 \end{tabularx}

@@ -1,10 +1,11 @@
-\begin{tabular}{@{}l c c c c c@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{1.9cm}cX>{\raggedright\arraybackslash}p{1.9cm}@{}}
 \toprule
-Condition group & Units & Prevalence & Nominal support & Other signals & Survive Holm \\
+Dataset & Shortage & Units & Balanced-accuracy recovery & Holm result \\
 \midrule
-Independent support & 3 & \num{0.3}\% & \num{0.4}--\num{0.5}\% & $-\num{6.5}$--\num{2.5}\% & 0/15 \\
-Nominal, moderate & 2 & \num{81.5}--\num{84.0}\% & \num{83.3}--\num{89.2}\% & $-\num{7.8}$--\num{19.7}\% & 4/10 \\
-Nominal, severe & 3 & \num{65.4}--\num{79.4}\% & \num{42.6}--\num{73.6}\% & $-\num{27.3}$--\num{16.4}\% & 2/15 \\
-Nominal, severe spread & 3 & \num{46.6}--\num{87.1}\% & \num{45.5}--\num{83.1}\% & $-\num{14.5}$--\num{11.1}\% & 4/15 \\
+BRACS & Independent & 3 & All signals: $-\num{6.5}$--\num{2.5}\%. & 0/15 \\
+BRACS & Nominal & 8 & Prevalence/nominal: \num{42.6}--\num{89.2}\%. & 10/16 improve \\
+TCGA-UT & Independent & 3 & All signals: $-\num{1.9}$--\num{0.0}\%. & 0/15 \\
+TCGA-UT & Severe & 3 & Prevalence/nominal: \num{41.9}--\num{85.3}\%. & 6/6 improve \\
+TCGA-UT & Severe spread & 3 & Prevalence/nominal: \num{32.1}--\num{80.7}\%; independent: \num{8.1}--\num{47.7}\%. & 8 improve; 1 deteriorates \\
 \bottomrule
-\end{tabular}
+\end{tabularx}

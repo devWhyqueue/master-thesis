@@ -1,10 +1,11 @@
-\begin{tabularx}{\textwidth}{@{}l c X c@{}}
+\begin{tabularx}{\textwidth}{@{}l l c X l@{}}
 \toprule
-Dominant shortage & Units & Matched minus unmatched balanced accuracy (percentage points) & Holm result \\
+Dataset & Dominant shortage & Units & Matched minus unmatched balanced accuracy (percentage points) & Holm result \\
 \midrule
-Independent support & 3 & \num{0.06} $[-\num{0.13},\ \num{0.22}]$ & No difference \\
-Nominal support & 2 & \num{2.34} $[\num{0.96},\ \num{3.75}]$; \num{7.08} $[\num{5.25},\ \num{9.15}]$ & Both favour matched \\
-Difficulty & 2 & $-\num{0.42}$ $[-\num{1.63},\ \num{0.86}]$; $-\num{1.27}$ $[-\num{2.42},\ \num{0.05}]$ & No difference \\
-Diversity & 1 & $-\num{5.29}$ $[-\num{6.48},\ -\num{4.18}]$ & Favours unmatched \\
+BRACS & Independent support & 3 & \num{0.06} $[-\num{0.13},\ \num{0.22}]$ & No difference \\
+TCGA-UT & Independent support & 3 & \num{0.00} $[-\num{0.11},\ \num{0.12}]$ & No difference \\
+BRACS & Nominal support & 2 & \num{2.34} $[\num{0.96},\ \num{3.75}]$; \num{7.08} $[\num{5.25},\ \num{9.15}]$ & Both favour matched \\
+TCGA-UT & Nominal support & 1 & \num{2.86} $[\num{2.36},\ \num{3.34}]$ & Favours matched \\
+Both & Difficulty or diversity & 6 & Matched weighting never outperforms effective prevalence-based alternatives. & Two favour unmatched \\
 \bottomrule
 \end{tabularx}

@@ -1,0 +1,15 @@
+# BRACS + TCGA-UT report fragments (2-dataset scope, other datasets ignored).
+# Emits into outputs/report_bracs_tcga/tables/report/.
+
+paths:
+  outputs: experiments/2_benchmark_patch/outputs/report_bracs_tcga
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+
+rq3:
+  dataset_roots:
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch
+    - /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch
