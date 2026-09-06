@@ -24,6 +24,7 @@ from imbalance_benchmark.analysis.predictors.rq3_features import (
     _fixed_diversity,
     _independent_shortage,
 )
+from imbalance_benchmark.datasets.features.cache import reset_feature_bank
 
 # ``_nominal_shortage`` lives in the signal-profile module, not rq3_features;
 # reused here (private, intentional -- plan explicitly allows reaching into
@@ -111,8 +112,15 @@ def _semantic_volume_ratio(
     manipulated here, so the mean must run over all K classes (report
     Sec. "Manipulation Check").
     """
+    # The process-global feature bank (imbalance_benchmark.datasets.features.cache)
+    # sizes itself once per manifest load and never grows; reset it between the
+    # narrow and wide loads exactly as commands/tuning/shard.py resets it between
+    # scopes, or the second load overflows the first load's fixed-size bank.
+    reset_feature_bank()
     narrow_volumes = _fixed_diversity(narrow_manifest, False, class_names, seed)
+    reset_feature_bank()
     wide_volumes = _fixed_diversity(wide_manifest, False, class_names, seed)
+    reset_feature_bank()
     ratios = [
         np.log(
             max(wide_volumes.get(index, EPS_S), EPS_S)

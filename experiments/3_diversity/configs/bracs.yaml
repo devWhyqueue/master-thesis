@@ -45,7 +45,7 @@ slurm:
   max_array_concurrency: {gpu-5h: 35, gpu-2h: 50}
   resources:
     build: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
-    check: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 256G}
+    check: {partition: cpu-2h, gpus: 0, cpus: 8, memory: 256G}
     import-anchor: {partition: cpu-5h, gpus: 0, cpus: 4}
     fit: {partition: gpu-5h, gpus: 1, cpus: 8, memory: 64G, constraint: "80gb|40gb|h100|h200"}
     analyze: {partition: cpu-2d, gpus: 0, cpus: 16, memory: 128G}
