@@ -1,0 +1,219 @@
+\section{What Was Held Fixed, and What Was Checked}
+\label{app:realized}
+The supporting analyses address four questions: whether the intended allocations were achieved, whether the estimates have adequate patient support, whether recovery depends on the assignment, and whether calibration or partition variation changes the interpretation. Repeated execution records are summarized as ranges; paired uncertainty intervals are retained for the primary damage and weighting comparisons. Ranges describe observed variation, not confidence intervals.
+
+\subsection{Allocation and patient coverage}
+\label{app:realized-construction}
+Table~\ref{tab:realized-support} separates class imbalance from patient coverage. Within each partition, balanced and balanced-spread training use identical class-specific patch counts. Their patient counts differ substantially, especially on TCGA-UT. Moderate and severe allocations meet their target ratios of 9--11 and 90--110, respectively; none is off-target or collapses to balance. Small departures from a ratio of one in balanced training reflect integer allocation.
+
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\input{assets/readable/support.tex}
+\caption{Allocation ranges across the three partitions and available assignments. Patients are unique contributing patients, not summed class counts. Patch counts refer to one realized training allocation. Spread increases patient coverage at matched patch counts; it does not necessarily reach every eligible patient under severe allocation.}
+\label{tab:realized-support}
+\end{table}
+
+\noindent For BRACS, balanced training uses \num{13982}--\num{27202} patches from \num{78}--\num{89} patients, compared with \num{103} patients under balanced spread. The corresponding TCGA-UT comparison uses \num{36988}--\num{52204} patches from \num{671}--\num{917} versus \num{4983} patients. The patient inventory is therefore exhausted by balanced spread on both datasets, while TCGA-UT severe spread reaches \num{4203}--\num{4983} patients.
+
+\subsection{Patient support and complete comparisons}
+\label{app:realized-validity}
+The \emph{bootstrap patient-support check} evaluates the planned resampling before training, using only patient identifiers, partition membership, and class labels. It checks whether each pooled class has at least five contributing patients, whether the \num{2.5}th percentile of its Kish effective count is at least five, and whether a single patient carries more than half the weight in at most \num{5}\% of replicates. Failure would restrict the dataset to descriptive estimates.
+
+Both datasets pass. The closest effective-count margins are \num{5.5} for ductal carcinoma in situ on BRACS and \num{6.6} for uterine carcinosarcoma on TCGA-UT. No pooled class has a dominant patient in any replicate.
+
+The qualification changes at the individual partition level. BRACS flags atypical ductal hyperplasia, ductal carcinoma in situ, and flat epithelial atypia. TCGA-UT flags adrenocortical carcinoma, kidney chromophobe, mesothelioma, ovarian serous cystadenocarcinoma, pheochromocytoma and paraganglioma, rectum adenocarcinoma, thymoma, uterine carcinosarcoma, and uveal melanoma. Class-specific estimates from those partitions need caution; the confirmatory comparisons use the valid pooled patient support.
+
+All five confirmation seeds and all three partitions are present in every required block, yielding \num{378} planned comparisons per dataset. Relative achieved-severity spread is at most \num{0.002} on BRACS and \num{0.010} on TCGA-UT, below the \num{0.5} limit. Semantic-scale weighting records zero invalid draws across \num{195} reweighting pools per dataset: its fallback to unit weights never occurs.
+
+\subsection{What tuning selected}
+\label{app:realized-deviations}
+Training budgets count example presentations, not optimizer updates: controlled and natural budgets are \num{503880} and \num{6521970} on BRACS, and \num{1343760} and \num{33480600} on TCGA-UT. A method consuming $e_m$ examples per update receives $\lceil E/e_m\rceil$ updates, with checkpoint spacing adjusted to keep approximately the same number of validation passes.
+
+Tables~\ref{tab:tuning-selections} and~\ref{tab:tuning-tcga} show which parameter values were selected and how often the strength was zero. They summarize the \num{392} recorded condition--assignment--method entries, including configurations reused across assignments; these are not \num{392} independent tuning exercises. No entry selects a learning rate at the boundary of the candidate range. This rules out observed boundary selections, but does not establish that a wider range could not improve validation performance.
+
+\begin{table}[H]
+\centering\small
+\input{assets/readable/tuning_BRACS.tex}
+\caption{BRACS tuning summary. Ranges span recorded selections; zero-strength counts use entries with a strength parameter as denominator. Strength has a method-specific meaning and cannot be compared numerically across methods.}
+\label{tab:tuning-selections}
+\end{table}
+\begin{table}[H]
+\centering\small
+\input{assets/readable/tuning_TCGA-UT.tex}
+\caption{TCGA-UT tuning summary, using the same conventions as Table~\ref{tab:tuning-selections}. Post-hoc logit adjustment reuses the cross-entropy checkpoint.}
+\label{tab:tuning-tcga}
+\end{table}
+
+\noindent Zero strength does not always mean ordinary cross-entropy. The soft-$F_1$ and soft-MCC hybrids retain balanced sampling; focal loss at $\gamma=0$ retains class-aware $\alpha$. These selected candidates were trained with those mechanisms intact. Most methods receive \num{16} candidates, cross-entropy and classifier retraining four, and post-hoc logit adjustment one shard without new training.
+
+Selection maximizes natural-prevalence validation balanced accuracy, with macro $F_1$ and negative log likelihood as successive tie-breakers. It pools assignments and does not optimize the tail-group probability-quality endpoint. Consequently, weak recovery can reflect both the signal and the selected operating point; a calibration deterioration describes a method tuned for discrimination.
+
+Two protocol deviations were fixed before definitive results were read. Materiality thresholds use the pilot-defined quantities $\max(1,2\sigma_{\rm seed})$ for discrimination and $2\sigma_{\rm seed}$ for calibration: \num{1.443} percentage points and \num{0.14782} nats on BRACS, versus \num{1.000} point and \num{0.06095} nats on TCGA-UT. The defining estimator is patient-macro rather than patch-micro and pools each patient's partition appearances, matching the crossed patient bootstrap.
+
+\clearpage
+\section{How Large Was the Damage?}
+\label{app:damage-estimates}
+The natural condition provides context but is not the reference for these deficits. Moderate and severe concentrated training are compared with concentrated balanced training; severe spread and patient shortage use balanced spread. Positive values mean worse performance under deprivation. Tables~\ref{tab:discrimination-deficit} and~\ref{tab:calibration-deficit} preserve every assignment and its paired interval, making the distinction between an imprecise deficit and a sub-threshold one explicit.
+
+\begin{table}[H]
+\centering\small\setlength{\tabcolsep}{4pt}
+\input{assets/readable/damage.tex}
+\caption{Balanced-accuracy loss in percentage points, with paired 95\% intervals. Eligibility requires both the dataset's minimum deficit and an interval excluding zero. TCGA-UT moderate has small positive estimates, not an established absence of loss.}
+\label{tab:discrimination-deficit}
+\end{table}
+
+\begin{table}[H]
+\centering\small\setlength{\tabcolsep}{4pt}
+\input{assets/readable/calibration_damage.tex}
+\caption{Tail-group negative-log-likelihood increase in nats, with paired 95\% intervals. Negative values mean improved probability quality. TCGA-UT moderate improves this endpoint under all three assignments, even though balanced accuracy falls slightly.}
+\label{tab:calibration-deficit}
+\end{table}
+
+\noindent This contrast matters for interpretation: moderate deprivation on TCGA-UT is not simply too noisy to detect. Native and reversed balanced-accuracy intervals exclude zero, but their estimates remain below the one-point minimum. All three probability-quality intervals instead favour moderate training. Neither finding makes the much larger natural training set an appropriate causal reference.
+
+\clearpage
+\section{Which Signals Recover the Loss?}
+\label{app:recovery-estimates}
+The main-text recovery map shows the pattern; the following tables retain the uncertainty behind it. Each cell gives recovery as a percentage, its paired bootstrap 95\% interval, and the Holm-adjusted permutation $p$-value. Zero means no repair and 100\% means the balanced reference is reached. Negative recovery means further damage. Only eligible comparisons appear; absent rows must not be interpreted as zero recovery. Nominal and independent denote the corresponding support-weighted cross-entropy methods.
+
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.35}
+\input{assets/readable/recovery_BRACS.tex}
+\caption{BRACS discrimination recovery (\%). Prevalence and nominal-support weighting repair nominal deprivation, while patient shortage remains unrepaired. Each cell retains estimate, interval, and adjusted $p$-value.}
+\label{tab:confirmatory-detail}
+\end{table}
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.35}
+\input{assets/readable/recovery_TCGA-UT.tex}
+\caption{TCGA-UT discrimination recovery (\%). Moderate is omitted because it fails the materiality criterion. Independent-support weighting helps severe spread in some assignments but does not repair patient shortage itself.}
+\label{tab:confirmatory-tcga}
+\end{table}
+
+\noindent A useful distinction is between improving a deprived model and outperforming a different weighting signal. The matched-minus-unmatched contrast tests the latter, and excludes ambiguous shortage profiles. Tables~\ref{tab:matched-contrast-detail} and~\ref{tab:matched-calibration} retain the eligible, unambiguous contrasts; positive values favour the matched signal. Their units are endpoint differences, not recovery percentages.
+
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\input{assets/readable/matched_damage.tex}
+\caption{Matched-minus-unmatched balanced accuracy in percentage points. Intervals are paired bootstrap 95\% intervals; $p$-values use the confirmatory Holm adjustment.}
+\label{tab:matched-contrast-detail}
+\end{table}
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\input{assets/readable/matched_calibration.tex}
+\caption{Matched-minus-unmatched probability quality in nats, oriented so positive favours the matched signal. Ambiguous profiles are excluded.}
+\label{tab:matched-calibration}
+\end{table}
+
+\noindent Equalizing the effective-number parameter $\beta$ tests whether independent-support weighting merely selected an unsuitable strength. Table~\ref{tab:matched-beta-detail} shows that this does not rescue patient shortage: BRACS balanced accuracy falls from 49.2\% under cross-entropy to 48.4\% with matched $\beta$; TCGA-UT remains at 75.3\%. These are descriptive absolute accuracies, not paired damage estimates.
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\input{assets/readable/matched_beta.tex}
+\caption{Balanced accuracy (\%) under cross-entropy, tuned independent-support weighting, independent-support weighting at nominal-support's selected $\beta$, and nominal-support weighting.}
+\label{tab:matched-beta-detail}
+\end{table}
+
+\noindent Probability-quality recovery tells a different story from discrimination. Large negative percentages occur when further NLL deterioration is divided by a comparatively small eligible deficit. They quantify damage relative to that deficit, not negative probabilities. The following two tables retain this scale rather than truncating large deteriorations.
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.35}
+\input{assets/readable/calibration_recovery_BRACS.tex}
+\caption{BRACS raw tail-group NLL recovery (\%), with paired intervals and Holm-adjusted $p$-values. Prevalence-based repair does not extend to the other three signals.}
+\label{tab:calibration-recovery-detail}
+\end{table}
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.35}
+\input{assets/readable/calibration_recovery_TCGA-UT.tex}
+\caption{TCGA-UT raw tail-group NLL recovery (\%), using the same conventions. Patient-shortage rows are eligible here, unlike on BRACS.}
+\label{tab:calibration-recovery-tcga}
+\end{table}
+\clearpage
+
+\subsection{Does changing the mechanism help?}
+The wider roster is exploratory. Tables~\ref{tab:roster-recovery-detail} and~\ref{tab:roster-tcga} summarize every roster method by its range across eligible assignments. These ranges reveal whether a method's apparent success is consistent across assignments; they are not confidence intervals or additional significance tests. The tables focus on discrimination because the confirmatory NLL tables and calibration analysis already establish that discrimination repair cannot be read as probability repair.
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\input{assets/readable/roster_BRACS.tex}
+\caption{Exploratory BRACS discrimination recovery (\%): minimum to maximum across eligible assignments. A single rounded value can represent several similar estimates.}
+\label{tab:roster-recovery-detail}
+\end{table}
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\input{assets/readable/roster_TCGA-UT.tex}
+\caption{Exploratory TCGA-UT discrimination recovery (\%). CFAL and OKO partly repair patient shortage, but remain far from closing the deficit. Dashes indicate no eligible comparison.}
+\label{tab:roster-tcga}
+\end{table}
+
+\clearpage
+\section{Which Class Tiers Lose Recall?}
+\label{app:endpoints}
+Aggregate accuracy can hide compensation between tiers: better performance on well-supported classes may accompany worse performance on the tail. The tables below retain all three assignments and all tiers, with conditions placed side by side. They report absolute recall rather than causal differences; balanced spread is the reference only for severe spread among the nominal conditions shown. In balanced-spread rows, tier names describe class ordering rather than unequal patch counts.
+
+\begin{table}[H]
+\centering\small
+\input{assets/readable/tiers_BRACS.tex}
+\caption{BRACS tier recall (\%). Aligned tail recall falls sharply even at moderate allocation, while head recall rises. The aggregate therefore combines losses and gains.}
+\label{tab:tier-endpoints-detail}
+\end{table}
+\begin{table}[H]
+\centering\small
+\input{assets/readable/tiers_TCGA-UT.tex}
+\caption{TCGA-UT tier recall (\%). Moderate changes are smaller than on BRACS, but severe deprivation still damages the aligned tail.}
+\label{tab:tier-tcga}
+\end{table}
+
+\noindent Under aligned TCGA-UT allocation, tail recall declines from 66.1\% under balanced spread to 51.9\% under severe concentrated training; severe spread raises it to 54.5\%. Under the reversed assignment, the head contains the difficult classes and recovers to 66.4\% under severe spread. Tier identity must therefore be read together with the assignment. Individual class estimates require additional caution where the partition-level patient-support qualifications in Appendix~\ref{app:realized-validity} apply.
+
+\section{Can the Associations Predict Another Dataset?}
+\label{app:rq3-prediction}
+Leave-one-dataset-out prediction tests a stronger claim than describing the observed comparisons. The damage model is fitted to one dataset's twelve comparison units and predicts the other's twelve; centering and scaling use the training dataset, and no unseen-dataset intercept is supplied. Training on BRACS gives a TCGA-UT root-mean-square error of \num{13.96} balanced-accuracy percentage points. The reverse direction gives \num{6.18} points. Both errors are large relative to the observed deficits. The association model therefore describes these data but does not reliably predict damage in another dataset.
+
+\section{What Confidence Scaling Repairs}
+\label{app:calibration}
+Temperature scaling adjusts confidence without changing the predicted class. Table~\ref{tab:calibration-detail} isolates its effect on the cross-entropy anchors: aggregate NLL and expected calibration error (ECE) before and after fitting temperature on natural-prevalence validation data. The confirmatory endpoint is tail-group NLL, so improved aggregate calibration does not itself establish tail repair.
+
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\input{assets/readable/calibration.tex}
+\caption{Cross-entropy aggregate NLL and ECE before and after temperature scaling. These are descriptive point estimates; confirmatory raw tail-group comparisons retain their paired uncertainty in Appendix~\ref{app:recovery-estimates}.}
+\label{tab:calibration-detail}
+\end{table}
+
+\input{assets/readable/calibration_interpretation.tex}
+
+\clearpage
+\section{Do Individual Partitions Change the Conclusion?}
+\label{app:splits}
+Equal-weight pooling is easier to interpret when the individual partitions agree. Tables~\ref{tab:per-split} and~\ref{tab:split-calibration} show every partition-specific deficit on its own endpoint scale; their averages and paired uncertainty are already reported in Appendix~\ref{app:damage-estimates}. The severity checks in Appendix~\ref{app:realized-validity} rule out large allocation-ratio variation as the explanation for these differences.
+
+\begin{table}[H]
+\centering\small\setlength{\tabcolsep}{4pt}
+\input{assets/readable/split_damage.tex}
+\caption{Balanced-accuracy deficit by partition, in percentage points. Positive means damage. Partitions 1--3 correspond to stored partition identifiers 0--2.}
+\label{tab:per-split}
+\end{table}
+\begin{table}[H]
+\centering\small\setlength{\tabcolsep}{4pt}
+\input{assets/readable/split_calibration.tex}
+\caption{Tail-group NLL deficit by partition, in nats. Negative values mean improved probability quality. These partition estimates do not replace pooled patient-bootstrap inference.}
+\label{tab:split-calibration}
+\end{table}
+
+\noindent BRACS balanced-accuracy damage from patient shortage is smallest in partition 2 and largest in partition 3, so two partitions carry most of the pooled magnitude. TCGA-UT repeats the pooled deficit under a stronger patient-coverage contrast. Agreement on the broad mechanism therefore coexists with substantial uncertainty about its magnitude in a particular split.
+
+\section{What Additional Computation Was Required?}
+\label{app:cost}
+The useful comparison is additional cost against cross-entropy in the same condition. Tables~\ref{tab:cost} and~\ref{tab:cost-tcga} summarize each method's minimum and maximum recorded differences across assignments and conditions. Minutes denote accelerator time; MiB denotes peak memory divided by $2^{20}$. Examples are processed presentations, Unique is the recorded unique-exposure count, and Parameters is model size. These ranges describe measured variation, not uncertainty intervals; rounded zeros can hide small differences.
+
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\input{assets/readable/cost_BRACS.tex}
+\caption{BRACS additional cost against matched cross-entropy. Post-hoc adjustment records incremental work after checkpoint reuse; its negative training counts are not end-to-end savings.}
+\label{tab:cost}
+\end{table}
+\begin{table}[H]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\input{assets/readable/cost_TCGA-UT.tex}
+\caption{TCGA-UT additional cost, with the same units and aggregation as Table~\ref{tab:cost}. Exposure differences and memory overhead vary by mechanism.}
+\label{tab:cost-tcga}
+\end{table}
+
+\noindent Exposure matching removes most differences in data volume, while integral update counts leave residual mismatches for methods such as OKO and two-stage classifier retraining. CFAL has substantially higher peak memory than cross-entropy in both datasets. Post-hoc logit adjustment reuses a trained checkpoint, so its incremental training cost cannot be compared with a complete training run without including that checkpoint's cost. These distinctions are more informative than a single universal ranking of computational expense.

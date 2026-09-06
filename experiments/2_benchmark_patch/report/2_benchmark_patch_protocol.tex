@@ -459,7 +459,7 @@ This appendix records dataset eligibility, hierarchical sampling, support floors
     Representation & Frozen Virchow2 features & \ref{app:construction} \\
     Patch classifier & Two-layer MLP, 512 hidden units & \ref{app:construction} \\
     Example budget & $E=30T$ example presentations & \ref{app:training} \\
-    Learning-rate envelope & Nine values, \num{3e-6} to \num{3e-2} & \ref{app:controls} \\
+    Learning-rate candidate range & Nine values, \num{3e-6} to \num{3e-2} & \ref{app:controls} \\
     Support floor per class & $\geq10$ partitioning units and $\geq20$ slides & \ref{app:construction-support} \\
     Contribution caps & $\leq10\%$ per partitioning unit; $\leq5\%$ per slide & \ref{app:construction-support} \\
     Severity targets & $\rho_{\mathrm{target}}\in\{1,10,100\}$ & \ref{app:construction} \\
@@ -674,8 +674,8 @@ Because checkpoints and hyperparameters are selected for natural-validation bala
 \subsection{Uncertainty from resampling partitioning units}
 The resampled partitioning unit is the patient or participant where one is available, and the biopsy/WSI for PANDA and CAMELYON16. Each replicate reweights the observed partitioning units rather than deterministically repeating each one exactly once, and the complete statistic is recomputed from those weights.
 
-\paragraph{Label-only preflight.}
-Before model training, \num{10000} bootstrap replicates are constructed using only partitioning-unit identifiers, split membership, and class labels. \emph{Label-only} means that no predictions, performance values, or method identities are used; these replicates test whether the planned resampling scheme is valid before results can influence it. The count of \num{10000} is a prespecified Monte Carlo budget. It places about 250 replicates in each 2.5\% tail of a percentile interval, reducing simulation noise in the interval endpoints while remaining inexpensive at this label-only stage.
+\paragraph{Bootstrap patient-support check.}
+Before model training, \num{10000} bootstrap replicates are constructed using only partitioning-unit identifiers, split membership, and class labels. No predictions, performance values, or method identities are used; these replicates test whether the planned resampling scheme is valid before results can influence it. The count of \num{10000} is a prespecified Monte Carlo budget. It places about 250 replicates in each 2.5\% tail of a percentile interval, reducing simulation noise in the interval endpoints while remaining inexpensive before model fitting.
 
 Each partitioning unit draws an independent, continuous bootstrap weight in every replicate: a Bayesian bootstrap \citep{rubin1981bayesian} in which the $n$ observed units' weights are $n$ times a draw from a symmetric $\mathrm{Dirichlet}(1,\ldots,1)$ distribution over the $n$-simplex. This draw is almost surely strictly positive in every coordinate, so every unit contributes to every replicate; no split--class cell, including one contributed by a unit whose observed split-by-class pattern is unique among the cohort, can be emptied by an unlucky draw. A unit's observed contribution pattern---how many examples it supplies to each class in each test-split appearance---is still recorded and grouped into strata, but only to report per-stratum diagnostics; it no longer constrains the weight draw itself. A selected unit's weight is applied to all of its slides and patches in every split. Figure~\ref{fig:bootstrap-workflow} summarizes the workflow.
 
@@ -700,18 +700,18 @@ Each partitioning unit draws an independent, continuous bootstrap weight in ever
     \draw[arrow] (weights) -- (interval);
     \draw[sidearrow] (identity) -- (strata);
   \end{tikzpicture}
-  \caption{Bayesian bootstrap workflow clustered by partitioning unit. The label-only preflight executes the identity, weight-draw, and stratum-diagnostic steps before predictions exist. After model fitting, the same paired per-unit weights are applied to every matched run.}
+  \caption{Bayesian bootstrap workflow clustered by partitioning unit. The bootstrap patient-support check executes the identity, weight-draw, and stratum-diagnostic steps before predictions exist. After model fitting, the same paired per-unit weights are applied to every matched run.}
   \label{fig:bootstrap-workflow}
 \end{figure}
 
-\noindent The preflight verifies that every original split--class cell remains represented, every split-level metric is computable, one partitioning unit receives the same weight across all of its split appearances, and every unit's resampled weight actually varies across replicates. Failure of any check stops the analysis rather than causing a replicate to be silently discarded.
+\noindent The patient-support check verifies that every original split--class cell remains represented, every split-level metric is computable, one partitioning unit receives the same weight across all of its split appearances, and every unit's resampled weight actually varies across replicates. Failure of any check stops the analysis rather than causing a replicate to be silently discarded.
 
 The independent per-unit weight draw can still produce a replicate dominated by a few heavily weighted units. If partitioning unit $i$ has class-specific bootstrap weight $v_i$, the \emph{Kish effective partitioning-unit count}
 \begin{equation}
   n_{\mathrm{Kish}}=\frac{\left(\sum_i v_i\right)^2}{\sum_i v_i^2}.
   \label{eq:kish}
 \end{equation}
-\noindent translates unequal case weights into the equivalent number of equally weighted partitioning units. It decreases as weight concentrates. The preflight also records, pooled across the union of a class's split appearances, its number of contributing units and its largest unit-weight share --- the cell the shared per-unit weight draw actually resamples against, since one unit's weight applies to every split appearance it makes at once. Table~\ref{tab:preflight} lists the three concentration checks, each evaluated on that pooled cell; failing any one designates inference for that dataset--regime descriptive before training. This is separate from the split-level representation check described above, which still requires every original split--class cell to remain represented.
+\noindent translates unequal case weights into the equivalent number of equally weighted partitioning units. It decreases as weight concentrates. The patient-support check also records, pooled across the union of a class's split appearances, its number of contributing units and its largest unit-weight share --- the cell the shared per-unit weight draw actually resamples against, since one unit's weight applies to every split appearance it makes at once. Table~\ref{tab:preflight} lists the three concentration checks, each evaluated on that pooled cell; failing any one designates inference for that dataset--regime descriptive before training. This is separate from the split-level representation check described above, which still requires every original split--class cell to remain represented.
 
 \begin{table}[ht]
   \centering
@@ -725,7 +725,7 @@ The independent per-unit weight draw can still produce a replicate dominated by 
     Cell support & A class's pooled cell (union of its split appearances) has fewer than five contributing units \\
     \bottomrule
   \end{tabularx}
-  \caption{Label-only preflight concentration checks, each evaluated on a class's cell pooled across the union of its split appearances --- the cell the shared per-unit weight draw resamples against. All three are evaluated before predictions exist; the designation is recorded rather than used to discard replicates.}
+  \caption{Concentration criteria for the bootstrap patient-support check, each evaluated on a class's cell pooled across the union of its split appearances --- the cell the shared per-unit weight draw resamples against. All three are evaluated before predictions exist; the designation is recorded rather than used to discard replicates.}
   \label{tab:preflight}
 \end{table}
 
@@ -842,12 +842,12 @@ With $B$ the locked batch size and $T$ the common controlled support, every fitt
 
 \subsection{Control grids and adaptive validation search}
 \label{app:controls}
-Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity, and the search adapts within a prespecified envelope rather than committing to a single fixed grid. Every trainable method draws its learning rate from the common envelope
+Hyperparameter comparisons are bounded by a common validation-search budget rather than by restricting every method to one tuned quantity, and the search adapts within a prespecified candidate range rather than committing to a single fixed grid. Every trainable method draws its learning rate from the common candidate range
 \begin{equation}
   \eta\in\{\num{3e-6},\num{1e-5},\num{3e-5},\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3},\num{1e-2},\num{3e-2}\}.
   \label{eq:learning-rate-grid}
 \end{equation}
-\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC use the same adaptive window as the learning rate; the other controls are bounded four-value grids. The prior outer learning-rate winners, \num{1e-5} and \num{1e-2}, are interior to this rerun's envelope.
+\noindent Table~\ref{tab:controls} lists each method's imbalance-specific control. Focal loss, CE + soft F1, and CE + soft MCC use the same adaptive window as the learning rate; the other controls are bounded four-value grids. The prior outer learning-rate winners, \num{1e-5} and \num{1e-2}, are interior to this rerun's candidate range.
 
 \paragraph{Matched counting-unit diagnostic.}
 Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$, the inverse effective number from the same saturating transform, evaluated at nominal count $n_c$ for the former and independent count $G_c$ for the latter, as defined in the companion methods report \citep{queisler2026imbalanceMethods}. Because $\beta$ sets both a saturation scale and, jointly with the counting unit, the realized weight shape, tuning $\beta$ separately for each method confounds the counting unit with the selected saturation scale. The tuning grid therefore includes a \emph{matched-beta} arm: independent-support weighted CE is confirmed a second time at class-balanced CE's tuned $\beta$, with its own tuned learning rate. Only this matched-$\beta$ comparison attributes a difference to the counting unit alone; it is a diagnostic arm reported alongside, not in place of, the five-family contrast, and is not itself one of the five confirmatory members.
@@ -860,9 +860,9 @@ Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$
     Method or family & Candidate method-specific control \\
     \midrule
     Balanced sampling / weighted CE & strength $\in\{0.25,0.5,0.75,1\}$ \\
-    Focal loss & $\gamma\in\{0,0.5,1,1.5,2,4,8\}$ envelope; active window starts at $\{0.5,1,1.5,2\}$ \\
+    Focal loss & $\gamma\in\{0,0.5,1,1.5,2,4,8\}$ candidate range; active window starts at $\{0.5,1,1.5,2\}$ \\
     Logit adjustment & $\tau\in\{0.25,0.5,1,2\}$ \\
-    CE + soft F1 / soft MCC & auxiliary weight $\in\{0,0.25,1,4,16,64\}$ envelope; active window starts at $\{0.25,1,4,16\}$ \\
+    CE + soft F1 / soft MCC & auxiliary weight $\in\{0,0.25,1,4,16,64\}$ candidate range; active window starts at $\{0.25,1,4,16\}$ \\
     CFAL & affinity bandwidth $\sigma\in\{0.25,1,2,4\}$ \\
     OKO & odd-class count $k\in\{1,2,4,8\}$, capped by $K-1$ \\
     Class-balanced CE & $\beta\in\{0.9,0.99,0.999,0.9999\}$; saturation points $1/(1-\beta)\in\{10,100,1000,10000\}$, matched to $n_c$'s range \\
@@ -871,7 +871,7 @@ Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$
     Semantic-scale weighted CE & $\tau\in\{0.25,0.5,0.75,1\}$; reweighting begins at reference pass 6 of 30 \\
     \bottomrule
   \end{tabularx}
-  \caption{Prespecified method-specific controls, crossed with the active window of the learning-rate envelope in Equation~\eqref{eq:learning-rate-grid}. Focal loss and the two soft-label hybrids search their listed envelope through an adaptive four-value window; every other row is a fixed four-value grid. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately. The class-balanced and independent-support $\beta$ grids are matched saturation points on the effective-number transform, scaled to each method's own counting unit as defined in the companion methods report \citep{queisler2026imbalanceMethods}.}
+  \caption{Prespecified method-specific controls, crossed with the active window of the learning-rate candidate range in Equation~\eqref{eq:learning-rate-grid}. Focal loss and the two soft-label hybrids search their listed candidate set through an adaptive four-value window; every other row is a fixed four-value grid. cRT has no imbalance-strength grid; only its stage-two learning rate is selected separately. The class-balanced and independent-support $\beta$ grids are matched saturation points on the effective-number transform, scaled to each method's own counting unit as defined in the companion methods report \citep{queisler2026imbalanceMethods}.}
   \label{tab:controls}
 \end{table}
 
@@ -883,19 +883,19 @@ Class-balanced and independent-support weighted CE both weight by $1/E_c(\beta)$
     \small
     \textbf{Adaptive window search}, run once per method, dataset, and imbalance severity.
     \begin{enumerate}\setlength{\itemsep}{1pt}
-      \item Initialize each active window to four adjacent envelope values: $\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}$ for the learning rate, and the start listed in Table~\ref{tab:controls} for an adaptive strength axis.
+      \item Initialize each active window to four adjacent candidate values: $\{\num{1e-4},\num{3e-4},\num{1e-3},\num{3e-3}\}$ for the learning rate, and the start listed in Table~\ref{tab:controls} for an adaptive strength axis.
       \item Fit the active learning-rate window crossed with the method's strength window or fixed grid: at most 16 candidates per round (four for CE/cRT; one for post-hoc adjustment). Earlier candidates are reused.
       \item If an axis's winning value is interior to its window, record the axis as \emph{resolved} and stop searching it.
-      \item If the winner is an edge value and the envelope extends further in that direction, shift the window one position toward that edge and return to step 2. The three overlapping axis values are reused. Only configurations introduced by the new row or column are fitted: four when one axis shifts and seven when both shift together.
-      \item If the winner is an edge value at the envelope's boundary, retain the boundary value and record the axis as \emph{tuning-limited}.
+      \item If the winner is an edge value and the candidate range extends further in that direction, shift the window one position toward that edge and return to step 2. The three overlapping axis values are reused. Only configurations introduced by the new row or column are fitted: four when one axis shifts and seven when both shift together.
+      \item If the winner is an edge value at the candidate range's boundary, retain the boundary value and record the axis as \emph{tuning-limited}.
     \end{enumerate}
-    \textbf{Round bounds.} At most three rounds on the learning-rate axis, three on focal loss's $\gamma$ axis, and two on the soft-F1 and soft-MCC strength axis, each bounded by its envelope's length. A resolved or tuning-limited axis is never retrained in a later round.
+    \textbf{Round bounds.} At most three rounds on the learning-rate axis, three on focal loss's $\gamma$ axis, and two on the soft-F1 and soft-MCC strength axis, each bounded by the number of available candidates. A resolved or tuning-limited axis is never retrained in a later round.
   \end{minipage}}
 \end{center}
 
 For weighted CE, balanced sampling, focal loss, CE + soft F1, and CE + soft MCC, an imbalance-specific strength of zero is mathematically identical to plain CE at the same learning rate: it applies no class reweighting or sampling adjustment, reduces the focal term to the plain cross-entropy loss, or drops the auxiliary term entirely. That value is therefore excluded from the searched window, and its metrics are copied from CE's already-fitted same-learning-rate run rather than retrained, giving each of these five methods one additional comparison point at no extra training cost.
 
-Four method families deviate from the search above. CE and methods without a meaningful imbalance-specific control search the learning-rate envelope alone. Train-time logit adjustment is tuned jointly over $\tau$ and learning rate, with $\tau$ held to its fixed grid. Post-hoc logit adjustment inherits the selected CE model and tunes only $\tau$, because it performs no gradient optimization. cRT inherits the selected CE configuration for stage one and selects its stage-two classifier learning rate separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
+Four method families deviate from the search above. CE and methods without a meaningful imbalance-specific control search the learning-rate candidate range alone. Train-time logit adjustment is tuned jointly over $\tau$ and learning rate, with $\tau$ held to its fixed grid. Post-hoc logit adjustment inherits the selected CE model and tunes only $\tau$, because it performs no gradient optimization. cRT inherits the selected CE configuration for stage one and selects its stage-two classifier learning rate separately from the common grid. Temperature scaling, when reported, fits one positive scalar on natural-validation NLL after model and checkpoint selection and applies it unchanged to test logits \citep{guo2017calibration}.
 
 \subsection{Replication, locking, and records}
 Selection and replication follow prespecified units rather than per-run judgement:
@@ -916,7 +916,7 @@ For every realized condition, the experiment record contains
   \item partitioning-unit, slide, and patch identifiers by partition;
   \item requested and achieved $T$ and $\rho$, and the class assignment;
   \item all seed families and their tuning, confirmation, pilot, or definitive roles;
-  \item pilot patch quota and bootstrap-preflight diagnostics;
+  \item pilot patch quota and bootstrap patient-support diagnostics;
   \item model and optimizer configuration, candidate grid, and selected checkpoint;
   \item environment identifier and test-prediction hash.
 \end{itemize}
