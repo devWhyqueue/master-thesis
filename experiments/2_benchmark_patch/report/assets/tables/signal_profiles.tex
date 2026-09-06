@@ -1,30 +1,45 @@
-\begin{tabular}{llllllllll}
+\begin{tabular}{llllllll}
 \toprule
-Dataset & Assignment & Severity & $\rho$ & $1-H_{\mathrm{norm}}$ & $S_{\mathrm{nom}}$ & $S_{\mathrm{ind}}$ & $S_{\mathrm{div}}$ & $A$ & Dominant \\
+Assignment & $\rho$ & $1-H_{\mathrm{norm}}$ & $S_{\mathrm{nom}}$ & $S_{\mathrm{ind}}$ & $S_{\mathrm{div}}$ & $A$ & Dominant \\
 \midrule
-BRACS & Native & Balanced & 1.00 & 0.000 & -1.47 & 1.73 & -1.32 & 0.20 & Independent support \\
-BRACS & Aligned & Balanced & 1.00 & 0.000 & -1.47 & 1.73 & -1.32 & 0.20 & Independent support \\
-BRACS & Reversed & Balanced & 1.00 & 0.000 & -1.47 & 1.73 & -1.31 & 0.20 & Independent support \\
-BRACS & Native & Moderate & 10.00 & 0.128 & -0.35 & -0.58 & -0.79 & 0.36 & Nominal support \\
-BRACS & Aligned & Moderate & 10.00 & 0.128 & -0.17 & -0.58 & -0.35 & -0.92 & Difficulty \\
-BRACS & Reversed & Moderate & 10.00 & 0.128 & -0.39 & -0.58 & -0.65 & 0.92 & Nominal support \\
-BRACS & Native & Severe & 100.38 & 0.353 & 0.76 & -0.58 & 0.80 & 0.36 & Ambiguous \\
-BRACS & Aligned & Severe & 100.38 & 0.353 & 1.26 & -0.58 & 1.28 & -0.92 & Difficulty \\
-BRACS & Reversed & Severe & 100.38 & 0.353 & 0.65 & -0.58 & 0.79 & 0.92 & Ambiguous \\
-BRACS & Native & Severe (spread) & 100.38 & 0.353 & 0.76 & -0.58 & 1.00 & 0.36 & Ambiguous \\
-BRACS & Aligned & Severe (spread) & 100.38 & 0.353 & 1.26 & -0.58 & 0.88 & -0.92 & Difficulty \\
-BRACS & Reversed & Severe (spread) & 100.38 & 0.353 & 0.65 & -0.58 & 0.99 & 0.92 & Diversity \\
-TCGA-UT & Native & Balanced & 1.00 & 0.000 & -1.38 & 1.66 & -1.56 & 0.01 & Independent support \\
-TCGA-UT & Aligned & Balanced & 1.00 & 0.000 & -1.38 & 1.66 & -1.56 & 0.01 & Independent support \\
-TCGA-UT & Reversed & Balanced & 1.00 & 0.000 & -1.38 & 1.66 & -1.56 & 0.01 & Independent support \\
-TCGA-UT & Native & Moderate & 10.00 & 0.061 & -0.34 & -0.71 & 0.18 & 0.09 & Diversity \\
-TCGA-UT & Aligned & Moderate & 10.00 & 0.061 & -0.14 & -0.71 & 0.29 & -0.99 & Difficulty \\
-TCGA-UT & Reversed & Moderate & 10.00 & 0.061 & -0.63 & -0.71 & 0.24 & 0.99 & Diversity \\
-TCGA-UT & Native & Severe & 100.17 & 0.179 & 0.87 & -0.71 & 1.14 & 0.09 & Diversity \\
-TCGA-UT & Aligned & Severe & 90.43 & 0.174 & 1.43 & -0.71 & 1.23 & -0.99 & Ambiguous \\
-TCGA-UT & Reversed & Severe & 100.17 & 0.179 & 0.32 & -0.71 & 1.25 & 0.99 & Diversity \\
-TCGA-UT & Native & Severe (spread) & 100.17 & 0.179 & 0.87 & -0.71 & -0.15 & 0.09 & Nominal support \\
-TCGA-UT & Aligned & Severe (spread) & 90.43 & 0.174 & 1.43 & -0.24 & 0.25 & -0.99 & Ambiguous \\
-TCGA-UT & Reversed & Severe (spread) & 100.17 & 0.179 & 0.32 & 0.25 & 0.25 & 0.99 & Ambiguous \\
+\multicolumn{8}{l}{\textbf{BRACS --- Patient shortage: concentrated balanced vs. balanced spread}} \\
+Native & 1.00 & 0.000 & -1.47 & 1.73 & -1.32 & 0.20 & Independent support \\
+Aligned & 1.00 & 0.000 & -1.47 & 1.73 & -1.32 & 0.20 & Independent support \\
+Reversed & 1.00 & 0.000 & -1.47 & 1.73 & -1.31 & 0.20 & Independent support \\
+\midrule
+\multicolumn{8}{l}{\textbf{BRACS --- Moderate patch shortage vs. concentrated balanced}} \\
+Native & 10.00 & 0.128 & -0.35 & -0.58 & -0.79 & 0.36 & Nominal support \\
+Aligned & 10.00 & 0.128 & -0.17 & -0.58 & -0.35 & -0.92 & Difficulty \\
+Reversed & 10.00 & 0.128 & -0.39 & -0.58 & -0.65 & 0.92 & Nominal support \\
+\midrule
+\multicolumn{8}{l}{\textbf{BRACS --- Severe patch shortage vs. concentrated balanced}} \\
+Native & 100.38 & 0.353 & 0.76 & -0.58 & 0.80 & 0.36 & Ambiguous \\
+Aligned & 100.38 & 0.353 & 1.26 & -0.58 & 1.28 & -0.92 & Difficulty \\
+Reversed & 100.38 & 0.353 & 0.65 & -0.58 & 0.79 & 0.92 & Ambiguous \\
+\midrule
+\multicolumn{8}{l}{\textbf{BRACS --- Severe spread vs. balanced spread}} \\
+Native & 100.38 & 0.353 & 0.76 & -0.58 & 1.00 & 0.36 & Ambiguous \\
+Aligned & 100.38 & 0.353 & 1.26 & -0.58 & 0.88 & -0.92 & Difficulty \\
+Reversed & 100.38 & 0.353 & 0.65 & -0.58 & 0.99 & 0.92 & Diversity \\
+\midrule
+\multicolumn{8}{l}{\textbf{TCGA-UT --- Patient shortage: concentrated balanced vs. balanced spread}} \\
+Native & 1.00 & 0.000 & -1.38 & 1.66 & -1.56 & 0.01 & Independent support \\
+Aligned & 1.00 & 0.000 & -1.38 & 1.66 & -1.56 & 0.01 & Independent support \\
+Reversed & 1.00 & 0.000 & -1.38 & 1.66 & -1.56 & 0.01 & Independent support \\
+\midrule
+\multicolumn{8}{l}{\textbf{TCGA-UT --- Moderate patch shortage vs. concentrated balanced}} \\
+Native & 10.00 & 0.061 & -0.34 & -0.71 & 0.18 & 0.09 & Diversity \\
+Aligned & 10.00 & 0.061 & -0.14 & -0.71 & 0.29 & -0.99 & Difficulty \\
+Reversed & 10.00 & 0.061 & -0.63 & -0.71 & 0.24 & 0.99 & Diversity \\
+\midrule
+\multicolumn{8}{l}{\textbf{TCGA-UT --- Severe patch shortage vs. concentrated balanced}} \\
+Native & 100.17 & 0.179 & 0.87 & -0.71 & 1.14 & 0.09 & Diversity \\
+Aligned & 90.43 & 0.174 & 1.43 & -0.71 & 1.23 & -0.99 & Ambiguous \\
+Reversed & 100.17 & 0.179 & 0.32 & -0.71 & 1.25 & 0.99 & Diversity \\
+\midrule
+\multicolumn{8}{l}{\textbf{TCGA-UT --- Severe spread vs. balanced spread}} \\
+Native & 100.17 & 0.179 & 0.87 & -0.71 & -0.15 & 0.09 & Nominal support \\
+Aligned & 90.43 & 0.174 & 1.43 & -0.24 & 0.25 & -0.99 & Ambiguous \\
+Reversed & 100.17 & 0.179 & 0.32 & 0.25 & 0.25 & 0.99 & Ambiguous \\
 \bottomrule
 \end{tabular}
