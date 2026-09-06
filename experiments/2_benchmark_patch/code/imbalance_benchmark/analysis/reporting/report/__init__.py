@@ -1,7 +1,7 @@
 """Report-shaped LaTeX fragments for the patch-benchmark results report.
 
 Reads frozen analysis artifacts only -- no bootstrap, no permutation, no model
-fit -- and emits one fragment per float in ``3_benchmark_patch_results.tex``.
+fit -- and emits one fragment per float in ``2_benchmark_patch_results.tex``.
 Each fragment is a bare tabular or longtable body: a single float in the report
 spans all four datasets, so caption and label stay with the float and are not
 duplicated here.
