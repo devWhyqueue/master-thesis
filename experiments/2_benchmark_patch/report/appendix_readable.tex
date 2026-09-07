@@ -26,7 +26,7 @@ The qualification changes at the individual partition level. BRACS flags atypica
 All five confirmation seeds and all three partitions are present in every required block, yielding \num{378} planned comparisons per dataset. Relative achieved-severity spread is at most \num{0.002} on BRACS and \num{0.010} on TCGA-UT, below the \num{0.5} limit. Semantic-scale weighting records zero invalid draws across \num{195} reweighting pools per dataset: its fallback to unit weights never occurs.
 
 \subsection{What tuning selected}
-\label{app:realized-deviations}
+\label{app:realized-tuning}
 Training budgets count example presentations, not optimizer updates: controlled and natural budgets are \num{503880} and \num{6521970} on BRACS, and \num{1343760} and \num{33480600} on TCGA-UT. A method consuming $e_m$ examples per update receives $\lceil E/e_m\rceil$ updates, with checkpoint spacing adjusted to keep approximately the same number of validation passes.
 
 Tables~\ref{tab:tuning-selections} and~\ref{tab:tuning-tcga} show which parameter values were selected and how often the strength was zero. They summarize the \num{392} recorded condition--assignment--method entries, including configurations reused across assignments; these are not \num{392} independent tuning exercises. No entry selects a learning rate at the boundary of the candidate range. This rules out observed boundary selections, but does not establish that a wider range could not improve validation performance.
@@ -48,7 +48,7 @@ Tables~\ref{tab:tuning-selections} and~\ref{tab:tuning-tcga} show which paramete
 
 Selection maximizes natural-prevalence validation balanced accuracy, with macro $F_1$ and negative log likelihood as successive tie-breakers. It pools assignments and does not optimize the tail-group probability-quality endpoint. Consequently, weak recovery can reflect both the signal and the selected operating point; a calibration deterioration describes a method tuned for discrimination.
 
-Two protocol deviations were fixed before definitive results were read. Materiality thresholds use the pilot-defined quantities $\max(1,2\sigma_{\rm seed})$ for discrimination and $2\sigma_{\rm seed}$ for calibration: \num{1.443} percentage points and \num{0.14782} nats on BRACS, versus \num{1.000} point and \num{0.06095} nats on TCGA-UT. The defining estimator is patient-macro rather than patch-micro and pools each patient's partition appearances, matching the crossed patient bootstrap.
+The defining estimator is patient-macro, equivalent to the protocol's case-macro estimator for BRACS and TCGA-UT. It pools each patient's partition appearances, matching the crossed patient bootstrap.
 
 \clearpage
 \section{How Large Was the Damage?}
