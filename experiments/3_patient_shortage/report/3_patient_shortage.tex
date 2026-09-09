@@ -1,0 +1,177 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{siunitx}
+\sisetup{group-digits=integer,group-separator={,},group-minimum-digits=4}
+\newcommand{\conc}{\mathrm{C}}
+\newcommand{\spr}{\mathrm{S}}
+\title{Class Decodability Under Patient Shortage}
+\author{Yannik Queisler}
+\date{September 9, 2026}
+
+\begin{document}
+\raggedbottom
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Reducing the number of training patients at fixed class patch counts damages histopathology classification with frozen features, and the tested mitigation methods recover little of that loss. This experiment asks whether a different classifier can exploit class information that remains accessible under patient shortage, or whether broader patient coverage benefits several distinct readouts of the same representation. It compares the original multilayer perceptron, regularized multinomial logistic regression, and cosine nearest neighbours on the existing balanced concentrated and balanced spread allocations of BRACS and TCGA-UT. Three existing patient-disjoint splits give 36 evaluation cells, with no new feature extraction or patient selection. Patient-macro balanced accuracy measures classifier gains, coverage benefits, and their interaction. Positive probe gains demonstrate missed predictive structure; failures cannot establish intrinsic inseparability.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:question}
+The preceding benchmark found that independent-support deprivation reduced balanced accuracy by \num{2.62}--\num{3.03} percentage points on BRACS and \num{4.76}--\num{4.83} points on TCGA-UT, despite matched class patch counts. No exploratory method produced a positive BRACS recovery interval excluding zero; the strongest TCGA-UT recoveries closed only about one sixth of the deficit \citep{queisler2026benchmarkResults}. These findings establish damage that the tested interventions largely failed to repair. They do not establish that repair is impossible.
+
+\noindent The motivating question is:
+\begin{quote}
+\itshape Under patient shortage, does the frozen representation lose class separability, or does the classifier fail to exploit the structure that remains?
+\end{quote}
+\noindent A necessary distinction is that removing training patients does not change the encoder or the embeddings of any fixed test patch. What changes is the labelled training sample available to estimate a decision rule. Its coverage of class variation can shrink even when its patch count remains unchanged. This experiment therefore measures \emph{out-of-patient class decodability}: predictive class information that specified readouts can learn from the available patients and use on held-out patients.
+
+The operational question is whether a simple alternative readout improves on the original classifier under shortage, and whether restoring patient breadth benefits each readout. A linear probe tests linearly accessible information \citep{alain2016probes}. A nearest-neighbour readout tests local label structure; frozen-feature nearest-neighbour evaluation also appears in \citet{caron2021emerging}. The proposed cosine metric, uniform voting, and search grid are design choices for this experiment, not a reproduction of that paper's full evaluation recipe.
+
+\section{Controlled comparison}
+\label{sec:design}
+The experiment retains BRACS's seven lesion classes and TCGA-UT's 30 eligible cancer types, including the benchmark's exclusions and label order. Each patch retains its frozen 2560-dimensional Virchow2 feature vector, formed by concatenating the CLS token and mean patch token. All eligibility rules and the three existing train--validation--test splits remain fixed \citep{queisler2026benchmarkProtocol}. A partitioning unit is a BRACS patient or TCGA-UT participant; both are called patients below. Patients are disjoint between training, validation, and test within each split. Repeated splits can contain the same patient in different roles.
+
+Only the balanced allocations are used. Concentrated support (\(\conc\)) draws the available patch budget from fewer patients; spread support (\(\spr\)) uses broader training-patient coverage with the same class-specific patch counts. Preserve the exact existing patch identities in each allocation rather than reconstructing an approximately matched sample. Use the native assignment's spread realization and the shared concentrated-balanced realization. Alternative class assignments are not extra repetitions.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}p{0.22\textwidth}XX@{}}
+\toprule
+Design element & Fixed or varied & Purpose \\
+\midrule
+Datasets and splits & BRACS and TCGA-UT; three existing splits each & Diagnose both tasks without generating cohorts. \\
+Patient support & Balanced concentrated and balanced spread & Change patient breadth at matched class patch counts. \\
+Readouts & Original CE MLP, logistic regression, cosine \(k\)-NN & Compare learned nonlinear, linear, and local decisions. \\
+Evidence & Same frozen features; each allocation's exact patches & Give every readout the same labelled training evidence. \\
+Evaluation & Unchanged natural validation and test patients & Measure generalization to unseen patients within each split. \\
+\bottomrule
+\end{tabularx}
+\caption{Crossed design: \(2\) datasets \(\times\) \(3\) splits \(\times\) \(2\) support conditions \(\times\) \(3\) readouts gives \(36\) evaluation cells. Initialization runs within an MLP cell are not independent cohorts.}
+\label{tab:design}
+\end{table}
+
+\noindent The historical comparison retains \num{13982}--\num{27202} training patches per BRACS split, with \num{78}--\num{89} concentrated patients versus \num{103} spread patients. TCGA-UT retains \num{36988}--\num{52204} patches, with \num{671}--\num{917} concentrated patients versus \num{4983} spread patients \citep{queisler2026benchmarkResults}. Different shortage doses prevent interpreting a larger effect on one dataset as intrinsic dataset susceptibility.
+
+The spread arm supplies additional patient identities only from the original training partition. It is an achievable reference for these features, not an oracle ceiling or a classifier trained with test labels. The contrast changes patient identities and within-patient patch contributions together. It therefore measures the existing coverage intervention, not an isolated effect of patient count independent of patient composition or influence.
+
+\section{Readouts}
+\label{sec:readouts}
+Every readout receives the same training patches within a cell. Validation and test patients never enter an optimization objective or neighbour bank. No feature fine-tuning, learned projection, augmentation, patient weighting, calibration, or additional mitigation method is introduced. The linear probe retains the original feature coordinates; unit normalization belongs only to the explicitly defined cosine readout.
+
+\subsection{Original classifier}
+The reference is the benchmark's CE-trained two-layer MLP: a 512-unit hidden layer, ReLU, dropout, and linear class output. Reuse all five confirmation initializations and their selected configurations where feature provenance, label order, allocation identities, split identities, checkpoint selection, and score semantics match. Compute mean performance across runs, not predictions from a five-model ensemble. If predictions are absent, regenerate them from the matching checkpoints. If a complete matching reference is unavailable, report the blocked comparison; do not silently substitute another allocation or training recipe.
+
+\subsection{Linear probe}
+For logistic regression, let \(z_j\in\mathbb{R}^{2560}\) and \(y_j\) denote the feature vector and class of training patch \(j\), and let \(K\) be the number of classes. Fit weights \(W\in\mathbb{R}^{K\times2560}\) and intercept \(b\in\mathbb{R}^{K}\) by minimizing
+\begin{equation}
+\mathcal{L}_{\lambda}(W,b)
+= -\frac{1}{N}\sum_{j=1}^{N}
+\log\left[\operatorname{softmax}(Wz_j+b)\right]_{y_j}
++\frac{\lambda}{2}\lVert W\rVert_F^2,
+\label{eq:linear}
+\end{equation}
+\noindent where \(N\) is the allocation's patch count. The intercept is unpenalized. Use no standardization or class weighting and select
+\begin{equation}
+\lambda\in\{10^{-6},10^{-5},10^{-4},10^{-3},10^{-2},10^{-1},1\}.
+\label{eq:lambda}
+\end{equation}
+\noindent Defining the penalty relative to mean loss avoids ambiguity from software conventions that scale regularization with sample count. Fit the convex objective with deterministic zero initialization and a full-batch solver to numerical convergence. Record solver, precision, stopping tolerance, iteration count, objective, and convergence status. Numerical retries may increase the iteration limit without changing the objective, candidate grid, or data. An unresolved failure makes that candidate unavailable across all three splits for its selection unit; record the failure and do not interpret the resulting search as complete. If no candidate converges throughout, that readout is unavailable.
+
+The predicted class is the largest fitted logit, with exact ties resolved by fixed class order. The fit is deterministic and needs no initialization replication. Convergence removes an avoidable optimization explanation within this objective; it does not certify an optimal classifier among all possible objectives or function families.
+
+\subsection{Nearest neighbours}
+For cosine \(k\)-NN, normalize each nonzero feature as \(u=z/\lVert z\rVert_2\). Rank training patches by decreasing \(u^{\mathsf T}u_j\) and let \(\mathcal{N}_k(u)\) contain the first \(k\) patches. Predict
+\begin{equation}
+\widehat y(u)=\arg\max_{c\in\{1,\ldots,K\}}
+\sum_{j\in\mathcal{N}_k(u)}\mathbf{1}\{y_j=c\},
+\qquad k\in\{1,5,20,100\}.
+\label{eq:knn}
+\end{equation}
+\noindent Sort equal similarities by patch identifier and resolve equal class votes by fixed class order. Preflight requires finite features, nonzero norms, and at least 100 training patches per allocation. A failed check stops the affected comparison rather than silently dropping patches. Multiple neighbours may come from the same patient: this is a patch-neighbour readout, not an equal-patient intervention. Compute exact neighbours in query and bank batches, retaining the top 100 so all four candidates share one search. Do not materialize the full query-by-training distance matrix or substitute approximate search.
+
+For each probe, select one hyperparameter separately for each dataset and support condition. Maximize validation patient-macro balanced accuracy averaged equally over the three splits. Treat differences no larger than \(10^{-10}\) on the proportion scale as numerical ties; choose larger \(\lambda\) or larger \(k\). A boundary winner remains a boundary winner: no adaptive grid expansion. Retain each split's training-only fit or bank for test prediction; do not merge training and validation after selection. Lock all choices before inspecting any new test predictions.
+
+This gives each probe a small, explicit search. The MLP retains its historical, larger search budget. Readout gains consequently identify an alternative pipeline that extracts useful information, not the causal contribution of architecture alone. Because patients can change roles between repeated splits, pooled validation selection and reused cohorts do not constitute a fresh independent confirmation.
+
+\section{Endpoints}
+\label{sec:analysis}
+The primary endpoint matches the benchmark's patient-macro balanced accuracy. For split \(r\), class \(c\), and patient \(i\), let \(\mathcal{J}_{irc}\) contain that patient's evaluated patches of class \(c\). Define
+\begin{equation}
+q_{irc}=\frac{1}{|\mathcal{J}_{irc}|}
+\sum_{j\in\mathcal{J}_{irc}}\mathbf{1}\{\widehat y_j=c\},
+\qquad
+A_r=\frac{1}{K}\sum_{c=1}^{K}
+\frac{1}{|\mathcal{P}_{rc}|}\sum_{i\in\mathcal{P}_{rc}}q_{irc},
+\label{eq:ba}
+\end{equation}
+\noindent where \(\mathcal{P}_{rc}\) comprises evaluated patients with at least one class-\(c\) patch. A patient may contribute to more than one class, but counts once within each class regardless of patch count. Validation selection uses the same estimator on validation patients. Secondary outcomes are per-class patient-macro recall and patch-micro balanced accuracy, which averages patch-level recall equally across classes. No head--tail grouping is needed for balanced training.
+
+For one dataset, let \(A_{h,s}\) denote the equally weighted mean across three test splits for readout \(h\) and support \(s\in\{\conc,\spr\}\). Average the MLP's five run-level metrics within each split first. Suppressing the dataset index, define the classifier gain under each condition and the coverage benefit by
+\begin{align}
+G_{h,s}&=A_{h,s}-A_{\mathrm{MLP},s},\label{eq:gain}\\
+B_h&=A_{h,\spr}-A_{h,\conc},\label{eq:breadth}\\
+I_h&=G_{h,\conc}-G_{h,\spr}=B_{\mathrm{MLP}}-B_h.
+\label{eq:interaction}
+\end{align}
+\noindent The central classifier contrast is \(G_{h,\conc}\) for each new probe. Positive \(B_h\) indicates a benefit of spread support for that readout. Positive \(I_h\) indicates that the probe's advantage over the MLP is larger under shortage. An interaction alone is insufficient: a probe that performs badly in both conditions can have a small coverage gap and positive \(I_h\). Interpret it jointly with absolute performance and \(G_{h,\conc}\). Report all effects in percentage points, multiplying proportion differences by 100. Do not normalize by a potentially small deficit or select the best probe using test performance.
+
+Use 2,000 paired patient-cluster Bayesian bootstrap replicates, adopting the benchmark's shared-weight principle \citep{queisler2026benchmarkProtocol}. Within each dataset, draw one \(n\,\mathrm{Dirichlet}(1,\ldots,1)\) weight vector over the union of its \(n\) distinct test patients. Reuse each patient's weight for every class and test-split appearance, support condition, and readout. Replace each within-class patient mean in Equation~\eqref{eq:ba} by its normalized weighted mean, then recompute every contrast. Positive weights retain all observed split--class cells.
+
+Within each replicate, also draw five MLP seed indices with replacement from the five confirmation indices. Use that same draw across both support conditions and all splits, and across every contrast involving the MLP. Deterministic probe predictions remain fixed. Average splits equally rather than resampling them as independent cohorts. Fix the bootstrap random seed to 20260909 and report 2.5th and 97.5th percentiles. Check that every statistic is finite; never silently discard failed replicates.
+
+These intervals describe held-out patient and MLP initialization variation conditional on the allocations, selected probe settings, and existing splits. They omit new training-patient draws and hyperparameter-selection uncertainty. Report BRACS and TCGA-UT separately, with individual split estimates alongside pooled estimates. All comparisons are exploratory; intervals are pointwise, not simultaneous, and no confirmatory significance claims or multiplicity-adjusted testing family is introduced.
+
+\section{Interpretation}
+\label{sec:interpretation}
+Prespecify one percentage point as the practical-relevance threshold for the three signed contrasts. This is a design choice for the diagnostic, not the benchmark's dataset-specific recovery gate. A point estimate above one point is practically promising; a lower interval bound above one point supports an improvement exceeding that threshold. A positive estimate with an interval crossing zero remains uncertain. Conversely, an interval containing zero does not establish equivalence or absence of useful information.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{@{}p{0.29\textwidth}X@{}}
+\toprule
+Observed pattern & Supported interpretation and limit \\
+\midrule
+Positive shortage gain \(G_{h,\conc}\) & The alternative readout exploits predictive information that the original MLP pipeline leaves unused under the same shortage allocation. It does not identify whether optimization, regularization, or decision geometry explains the gain. \\
+Positive \(G_{h,\conc}\) and \(I_h\) & The gain is larger under shortage than under spread support. If both exceed the practical threshold with precise intervals, prioritize the readout for a later shortage-focused study. \\
+Positive \(B_h\) across readouts & Broader training coverage benefits all tested approaches. If neither probe improves under shortage, a coverage limitation remains the leading explanation within this diagnostic, not proof of intrinsic inseparability. \\
+Probe gain and residual \(B_h>0\) & Both explanations can contribute: the classifier can improve while broader patient coverage still adds useful evidence. \\
+Weak, conflicting, or imprecise effects & Diagnosis remains unresolved. Show absolute accuracies, intervals, and class recalls rather than forcing a binary conclusion. \\
+\bottomrule
+\end{tabularx}
+\caption{Interpretation requires effect magnitude and uncertainty. None of these outcomes establishes a Bayes-error bound or an oracle ceiling.}
+\label{tab:interpretation}
+\end{table}
+
+\noindent A linear-probe gain shows that a simpler linear decision rule generalizes better under the tested fitting procedure. A nearest-neighbour gain shows usable local structure in the chosen metric. Failure of either probe is weaker evidence: linear rules may miss nonlinear boundaries, while cosine neighbourhoods may reflect patient identity or unsuitable feature scaling. Failure of all three readouts cannot prove that no classifier can separate the classes or that new representations are necessary.
+
+Broad-support success nevertheless supplies a useful positive control: the same frozen representation supports that observed performance when labelled patient coverage is larger. If a shortage-trained probe approaches the spread-trained MLP, report the direct difference and uncertainty without calling the two equivalent. If the spread-trained probe improves further, the remaining coverage benefit must also remain visible. A two-dimensional embedding plot or training-set accuracy would not replace these held-out contrasts and is not part of the minimal design.
+
+\section{Computational budget, reporting, and limits}
+\label{sec:budget}
+There are 12 dataset--split--support combinations. The MLP reference contributes 60 existing confirmation runs, summarized into 12 cells. Logistic regression requires \(12\times7=84\) candidate fits; the 12 selected fits are already among them and need no additional confirmation initialization. Nearest neighbours requires 12 training banks and 12 validation searches, each reused across four values of \(k\), followed by 12 test searches at the locked values. Thus the 36-cell comparison adds 84 convex fits and exact neighbour evaluation, rather than a new neural-training benchmark. Numerical retries, if any, are listed separately from this nominal budget.
+
+Feature extraction and neural training are outside scope. Neighbour computation can still dominate runtime because it compares each query with the training bank. Record wall time, peak memory, hardware, solver iterations, and query/bank batch sizes; do not claim a runtime saving before measuring it. Batching controls peak memory without changing the neighbour definition. Reusing historical predictions requires a provenance audit, not new access to cluster jobs as part of writing this protocol.
+
+Before evaluation, verify train--validation--test patient disjointness within each split, exact allocation identities, class counts, feature dimensions, finite values, valid normalization, label order, and the complete five-run reference. Save selected hyperparameters and candidate validation scores before generating probe test predictions. The eventual result report contains absolute balanced accuracies for all readouts and conditions, the two probes' gains and interactions, all three coverage benefits, paired intervals, split estimates, and per-class recall. Include one accuracy plot with support condition on the horizontal axis and one line per readout, separately for each dataset. Report failures and boundary-selected hyperparameters alongside the numerical results.
+
+The design deliberately reuses fixed allocations and cohorts whose benchmark outcomes already motivated the question. It diagnoses those allocations; it does not estimate variability over which training patients could have been retained. Repeated splits are not independent cohorts, and shared patient bootstrap weights do not remove every dependence caused by overlapping training or validation data. Fresh patient draws or a new held-out cohort would be needed for stronger confirmation. The results also concern patch classification using one frozen encoder, not representation learning or whole-slide prediction.
+
+The intended outcome is a bounded mechanistic decision. A useful shortage-trained probe establishes available predictive structure and motivates a focused classifier study. Persistent spread benefits establish value from broader labelled coverage for the tested readouts. Neither a null probe result nor largely unrecovered benchmark damage justifies describing the representation as intrinsically inseparable or the loss as unrepairable.
+
+\clearpage
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
