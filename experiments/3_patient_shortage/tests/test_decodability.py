@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from decodability import LAMBDAS, SUPPORTS
+from decodability import K_VALUES, LAMBDAS, SUPPORTS
 from decodability.audit import _verify_cell_audit
 from decodability.evidence import CellEvidence
 from decodability.linear import fit_multinomial_logistic
@@ -115,7 +115,7 @@ def test_selection_tie_rule_prefers_larger(tmp_path):
             }
             write_run_record(r_dir, rec)
 
-        for k in (1, 5, 20, 100):
+        for k in K_VALUES:
             r_dir = (
                 tmp_path / f"split={s_idx}" / "results" / "balanced" / "knn" / f"k={k}"
             )
