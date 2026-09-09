@@ -13,7 +13,10 @@ import torch
 from imbalance_benchmark.analysis.query import load_test_identity
 from imbalance_benchmark.common import verify_signed_file
 from imbalance_benchmark.datasets.data import ImbalanceDataset, load_training_dataset
-from imbalance_benchmark.datasets.features.cache import bank_index
+from imbalance_benchmark.datasets.features.cache import (
+    bank_index,
+    reset_feature_bank,
+)
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 
 from decodability import (
@@ -104,16 +107,17 @@ def _load_eval_splits(
 
 def load_cell(config: dict[str, Any], split_index: int, support: str) -> CellEvidence:
     """Load verified train/val/test data for one split and support condition."""
+    reset_feature_bank()
     exp2_p = exp2_split_paths(config, split_index)
     freeze = load_freeze_meta(exp2_p)
     classes = list(freeze["class_names"])
     is_mil = freeze.get("runtime_config", {}).get("dataset", {}).get("regime") == "wsi"
 
-    tr_x, tr_y, tr_pts, tr_cases = _load_train_evidence(
-        allocation_manifest(exp2_p, support), is_mil, classes
-    )
     val_data, test_data = _load_eval_splits(
         exp2_p["data"] / "manifest.csv", is_mil, classes
+    )
+    tr_x, tr_y, tr_pts, tr_cases = _load_train_evidence(
+        allocation_manifest(exp2_p, support), is_mil, classes
     )
     if tr_x.shape[1] != INPUT_DIM:
         raise ValueError(f"Feature dim mismatch: {tr_x.shape[1]} != {INPUT_DIM}")
