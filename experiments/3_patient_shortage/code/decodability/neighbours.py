@@ -35,17 +35,15 @@ def _rank_chunk(
     indices: torch.Tensor,
     top: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Sort candidate top entries by (-similarity, bank_index)."""
+    """Sort candidate top entries by (-similarity, bank_index), per row."""
     sims_cpu, idx_cpu = sims.cpu().numpy(), indices.cpu().numpy()
-    n_queries = sims_cpu.shape[0]
-    out_sims = np.zeros((n_queries, top), dtype=np.float32)
-    out_idx = np.zeros((n_queries, top), dtype=np.int64)
+    n_queries, n_cols = sims_cpu.shape
+    flat_sims, flat_idx = sims_cpu.ravel(), idx_cpu.ravel()
+    row_key = np.repeat(np.arange(n_queries), n_cols)
+    order = np.lexsort((flat_idx, -flat_sims, row_key))
+    top_pos = order.reshape(n_queries, n_cols)[:, :top]
 
-    for q in range(n_queries):
-        order = np.lexsort((idx_cpu[q], -sims_cpu[q]))[:top]
-        out_sims[q], out_idx[q] = sims_cpu[q, order], idx_cpu[q, order]
-
-    return torch.from_numpy(out_sims), torch.from_numpy(out_idx)
+    return torch.from_numpy(flat_sims[top_pos]), torch.from_numpy(flat_idx[top_pos])
 
 
 def _scan_bank_for_query_chunk(
@@ -98,34 +96,40 @@ def _gather_query_chunks(
     return out_i, out_s
 
 
+def _peak_memory_mb(device: torch.device, device_type: str) -> float:
+    """Return CUDA peak allocated memory in MB, or 0.0 off-GPU."""
+    if device_type == "cuda" and torch.cuda.is_available():
+        return torch.cuda.max_memory_allocated(device) / (1024 * 1024)
+    return 0.0
+
+
 def top_neighbours(
     query_features: torch.Tensor,
     bank_features: torch.Tensor,
     top: int = NEIGHBOUR_TOP,
     query_batch_size: int = 1024,
-    bank_batch_size: int = 4096,
+    bank_batch_size: int | None = None,
     window_factor: int = 128,
 ) -> tuple[np.ndarray, np.ndarray, SearchStats]:
-    """Compute exact cosine top-k neighbours via batching without full matrix."""
+    """Compute exact cosine top-k neighbours via batching without full matrix.
+
+    ``bank_batch_size`` defaults to the whole bank (at most ~460 MB for this
+    experiment's train sets), so the scan is one matmul + one topk per query
+    chunk instead of several chunk merges.
+    """
     start = time.perf_counter()
     q_norm, b_norm = _normalize(query_features), _normalize(bank_features)
+    resolved_bank_batch = bank_batch_size or b_norm.shape[0]
     cand_k = min(b_norm.shape[0], max(top, window_factor))
     out_i, out_s = _gather_query_chunks(
-        q_norm, b_norm, top, cand_k, query_batch_size, bank_batch_size
+        q_norm, b_norm, top, cand_k, query_batch_size, resolved_bank_batch
     )
     dev = query_features.device.type
-    mem = (
-        torch.cuda.max_memory_allocated(query_features.device) / (1024 * 1024)
-        if dev == "cuda" and torch.cuda.is_available()
-        else 0.0
+    mem = _peak_memory_mb(query_features.device, dev)
+    stats = SearchStats(
+        time.perf_counter() - start, mem, dev, query_batch_size, resolved_bank_batch
     )
-    return (
-        out_i,
-        out_s,
-        SearchStats(
-            time.perf_counter() - start, mem, dev, query_batch_size, bank_batch_size
-        ),
-    )
+    return out_i, out_s, stats
 
 
 def vote(
@@ -134,13 +138,12 @@ def vote(
     """Plurality vote among first k neighbours with first-max tie resolution."""
     sub = neighbour_labels[:, :k]
     n_samples = sub.shape[0]
-    preds = np.zeros(n_samples, dtype=np.int64)
-    probs = np.zeros((n_samples, n_classes), dtype=np.float64)
-
-    for i in range(n_samples):
-        counts = np.bincount(sub[i], minlength=n_classes)
-        probs[i] = counts / float(k)
-        # np.argmax returns first occurrence of max value -> lowest class index
-        preds[i] = np.argmax(counts)
+    row_offsets = np.arange(n_samples)[:, None] * n_classes
+    counts = np.bincount(
+        (sub + row_offsets).ravel(), minlength=n_samples * n_classes
+    ).reshape(n_samples, n_classes)
+    probs = counts / float(k)
+    # np.argmax returns first occurrence of max value -> lowest class index
+    preds = np.argmax(counts, axis=1).astype(np.int64)
 
     return preds, probs

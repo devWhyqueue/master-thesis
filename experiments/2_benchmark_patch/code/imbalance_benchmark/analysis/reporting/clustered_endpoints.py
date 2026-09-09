@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score
 
 from imbalance_benchmark.analysis.metrics import expected_calibration_error
 
-__all__ = ["clustered_endpoints"]
+__all__ = ["clustered_endpoints", "_cluster_discrimination"]
 
 
 def _macro_accuracy(
@@ -34,6 +36,34 @@ def _macro_mean(contribution: np.ndarray, groups: np.ndarray) -> float:
     return float(pd.Series(contribution).groupby(groups, sort=False).mean().mean())
 
 
+def _macro_f1_scores(
+    labels: np.ndarray, predictions: np.ndarray, groups: np.ndarray
+) -> list[float]:
+    """Per-group macro F1, iterated in ``pd.unique(groups)`` order.
+
+    Builds each group's row indices via one stable argsort instead of a
+    ``groups == group`` boolean scan per group; ``order[start:end]`` preserves
+    the same original-index row order the boolean mask would produce, so
+    every per-group score is bit-identical to the scan-based version.
+    """
+    order = np.argsort(groups, kind="stable")
+    sorted_groups = groups[order]
+    starts = np.flatnonzero(np.r_[True, sorted_groups[1:] != sorted_groups[:-1]])
+    ends = np.r_[starts[1:], len(sorted_groups)]
+    slices: dict[Any, np.ndarray] = {
+        sorted_groups[s]: order[s:e] for s, e in zip(starts, ends)
+    }
+    return [
+        f1_score(
+            labels[np.asarray(slices[group])],
+            predictions[np.asarray(slices[group])],
+            average="macro",
+            zero_division=0,  # type: ignore
+        )
+        for group in pd.unique(groups)
+    ]
+
+
 def _macro_classification(
     labels: np.ndarray, predictions: np.ndarray, groups: np.ndarray
 ) -> tuple[float, float]:
@@ -47,15 +77,7 @@ def _macro_classification(
                 pd.Series(correct).groupby(groups[class_rows], sort=False).mean().mean()
             )
         )
-    scores = [
-        f1_score(
-            labels[groups == group],
-            predictions[groups == group],
-            average="macro",
-            zero_division=0,  # type: ignore
-        )
-        for group in pd.unique(groups)
-    ]
+    scores = _macro_f1_scores(labels, predictions, groups)
     return float(np.mean(recalls)), float(np.mean(scores))
 
 

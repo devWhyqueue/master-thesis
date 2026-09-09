@@ -25,6 +25,7 @@ def _job(
     dependencies: tuple[str, ...] = (),
     array_splits: tuple[int, ...] = (),
     array_conditions: tuple[str, ...] = (),
+    array_size: int = 0,
 ) -> SlurmJob:
     """Build one stage's job with its resolved SLURM resources."""
     res = resources_for(config, stage, False)
@@ -34,8 +35,14 @@ def _job(
         dependencies=dependencies,
         array_splits=array_splits,
         array_conditions=array_conditions,
+        array_size=array_size,
         **res,
     )
+
+
+# probe-val shard index decodes as: split = idx // 16, condition = SUPPORTS[(idx % 16)
+# // 8], unit = idx % 8, where units 0..6 index LAMBDAS and unit 7 is the k-NN search.
+PROBE_VAL_ARRAY_SIZE = 48
 
 
 def build_workflow(config: dict[str, Any]) -> list[SlurmJob]:
@@ -46,8 +53,7 @@ def build_workflow(config: dict[str, Any]) -> list[SlurmJob]:
         "probe-val",
         "probe-val",
         dependencies=(preflight.name,),
-        array_splits=(0, 1, 2),
-        array_conditions=SUPPORTS,
+        array_size=PROBE_VAL_ARRAY_SIZE,
     )
     select = _job(config, "select", "select", dependencies=(probe_val.name,))
     probe_test = _job(

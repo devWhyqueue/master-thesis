@@ -70,17 +70,6 @@ def _fit_once(
     return model, not has_conv_warn
 
 
-def _fit_with_retry(
-    x: np.ndarray, y: np.ndarray, c_val: float, max_iter: int, tol: float
-) -> tuple[LogisticRegression, bool, int]:
-    """Fit once; retry at 4x max_iter if convergence warning occurs."""
-    model, conv = _fit_once(x, y, c_val, max_iter, tol)
-    if not conv:
-        retried_model, retried_conv = _fit_once(x, y, c_val, max_iter * 4, tol)
-        return retried_model, retried_conv, max_iter * 4
-    return model, conv, max_iter
-
-
 def fit_multinomial_logistic(
     features: np.ndarray,
     labels: np.ndarray,
@@ -91,7 +80,7 @@ def fit_multinomial_logistic(
     """Fit multinomial logistic regression with C = 1 / (N * lambda)."""
     feat64, lab_int = np.asarray(features, np.float64), np.asarray(labels, np.int64)
     c_val = 1.0 / (feat64.shape[0] * lambda_val)
-    model, conv, actual_iter = _fit_with_retry(feat64, lab_int, c_val, max_iter, tol)
+    model, conv = _fit_once(feat64, lab_int, c_val, max_iter, tol)
     w = np.asarray(model.coef_, dtype=np.float64)
     b = np.asarray(model.intercept_, dtype=np.float64)
     obj = _compute_objective(feat64, lab_int, w, b, lambda_val)
@@ -104,7 +93,7 @@ def fit_multinomial_logistic(
         "lbfgs",
         "float64",
         tol,
-        actual_iter,
+        max_iter,
         int(model.n_iter_[0]),
         obj,
         conv,

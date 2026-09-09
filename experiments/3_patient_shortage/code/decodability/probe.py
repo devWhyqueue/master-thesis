@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
-    clustered_endpoints,
+    _cluster_discrimination,
 )
 from imbalance_benchmark.common import (
     ensure_dirs,
@@ -19,7 +19,7 @@ from imbalance_benchmark.common import (
     write_run_record,
 )
 
-from decodability import K_VALUES, LAMBDAS, probe_dir
+from decodability import K_VALUES, LAMBDAS, SUPPORTS, probe_dir
 from decodability.evidence import load_cell
 from decodability.linear import (
     LinearFitResult,
@@ -28,7 +28,7 @@ from decodability.linear import (
 )
 from decodability.neighbours import top_neighbours, vote
 
-__all__ = ["run_probe_val", "run_probe_test"]
+__all__ = ["decode_shard_index", "run_probe_val", "run_probe_test"]
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +52,18 @@ def _save_split_record(
     identity: pd.DataFrame,
     extra_fields: dict[str, Any] | None = None,
 ) -> None:
-    safe_probs = np.clip(probs, 1e-12, 1.0)
-    safe_probs = safe_probs / np.sum(safe_probs, axis=1, keepdims=True)
-    endpoints = clustered_endpoints(
-        labels=labels, predictions=preds, probabilities=safe_probs, identity=identity
-    )
-    discrim = {
-        k: v
-        for k, v in endpoints.items()
-        if "nll" not in k and "brier" not in k and "calibration" not in k
-    }
+    case_ids = identity["case_id"].astype(str).to_numpy()
+    slide_ids = identity["slide_id"].astype(str).to_numpy()
+    discrim = _cluster_discrimination(labels, preds, case_ids, slide_ids, is_mil=False)
     record = {
         **meta,
         **(extra_fields or {}),
         "splits": {
             split_name: {
                 "endpoints": discrim,
-                "labels": labels.tolist(),
-                "preds": preds.tolist(),
-                "probabilities": probs.tolist(),
+                "labels": labels,
+                "preds": preds,
+                "probabilities": probs,
             }
         },
     }
@@ -78,45 +71,38 @@ def _save_split_record(
 
 
 def _val_logreg(
-    cell: Any, paths: dict[str, Path], config: dict[str, Any], support: str
+    cell: Any, paths: dict[str, Path], config: dict[str, Any], support: str, lam: float
 ) -> None:
     train_x, val_x = cell.train_x.cpu().numpy(), cell.val_x.cpu().numpy()
-    coefs, intercepts = {}, {}
-    for lam in LAMBDAS:
-        fit_res: LinearFitResult = fit_multinomial_logistic(train_x, cell.train_y, lam)
-        coefs[str(lam)], intercepts[str(lam)] = fit_res.coef, fit_res.intercept
-        val_preds, val_probs = predict_logreg(val_x, fit_res.coef, fit_res.intercept)
-        r_dir = probe_dir(paths, support, "logreg", f"lambda={lam}")
-        extra = {
-            "solver": {
-                "solver": fit_res.solver,
-                "precision": fit_res.precision,
-                "tolerance": fit_res.tolerance,
-                "max_iter": fit_res.max_iter,
-                "n_iter": fit_res.n_iter,
-                "objective": fit_res.objective,
-                "converged": fit_res.converged,
-                "lambda": fit_res.lambda_val,
-                "C": fit_res.c_val,
-            }
+    param_str = f"lambda={lam}"
+    fit_res: LinearFitResult = fit_multinomial_logistic(train_x, cell.train_y, lam)
+    val_preds, val_probs = predict_logreg(val_x, fit_res.coef, fit_res.intercept)
+    extra = {
+        "solver": {
+            "solver": fit_res.solver,
+            "precision": fit_res.precision,
+            "tolerance": fit_res.tolerance,
+            "max_iter": fit_res.max_iter,
+            "n_iter": fit_res.n_iter,
+            "objective": fit_res.objective,
+            "converged": fit_res.converged,
+            "lambda": fit_res.lambda_val,
+            "C": fit_res.c_val,
         }
-        _save_split_record(
-            r_dir,
-            _record_meta(config, "logreg", f"lambda={lam}"),
-            "validation",
-            cell.val_y,
-            val_preds,
-            val_probs,
-            cell.val_identity,
-            extra,
-        )
-    coef_file = paths["data"] / f"logreg_coefficients_{support}.npz"
-    coef_file.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(
-        coef_file,
-        **{f"coef_{k}": v for k, v in coefs.items()},
-        **{f"intercept_{k}": v for k, v in intercepts.items()},
+    }
+    _save_split_record(
+        probe_dir(paths, support, "logreg", param_str),
+        _record_meta(config, "logreg", param_str),
+        "validation",
+        cell.val_y,
+        val_preds,
+        val_probs,
+        cell.val_identity,
+        extra,
     )
+    coef_file = paths["data"] / f"logreg_coefficients_{support}_{param_str}.npz"
+    coef_file.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(coef_file, coef=fit_res.coef, intercept=fit_res.intercept)
 
 
 def _val_knn(
@@ -148,14 +134,34 @@ def _val_knn(
         )
 
 
-def run_probe_val(config: dict[str, Any], split_index: int, support: str) -> None:
-    """Fit validation candidates and evaluate for both probes."""
+def decode_shard_index(shard_index: int) -> tuple[int, str, int]:
+    """Decode a probe-val array index into (split_index, support, unit).
+
+    Layout: ``split = idx // 16``, ``support = SUPPORTS[(idx % 16) // 8]``,
+    ``unit = idx % 8`` where units 0..6 index ``LAMBDAS`` and unit 7 runs the
+    k-NN search. One task per lambda keeps each SLURM task's wall clock
+    bounded by a single L-BFGS fit instead of the whole lambda grid.
+    """
+    split_index = shard_index // 16
+    support = SUPPORTS[(shard_index % 16) // 8]
+    unit = shard_index % 8
+    return split_index, support, unit
+
+
+def run_probe_val(config: dict[str, Any], shard_index: int) -> None:
+    """Fit one validation candidate (one lambda, or the k-NN search) for one shard."""
+    split_index, support, unit = decode_shard_index(shard_index)
     paths = split_paths(ensure_dirs(config), split_index)
     cell = load_cell(config, split_index, support)
-    _val_logreg(cell, paths, config, support)
-    _val_knn(cell, paths, config, support)
+    if unit < len(LAMBDAS):
+        _val_logreg(cell, paths, config, support, LAMBDAS[unit])
+    else:
+        _val_knn(cell, paths, config, support)
     logger.info(
-        "Probe validation complete for split %d, support %s", split_index, support
+        "Probe validation complete for split %d, support %s, unit %d",
+        split_index,
+        support,
+        unit,
     )
 
 
@@ -166,10 +172,10 @@ def _test_logreg(
     support: str,
     selected: dict[str, Any],
 ) -> None:
-    lam_float, param_str = float(selected["selected"]), selected["selected_param_str"]
-    coef_file = paths["data"] / f"logreg_coefficients_{support}.npz"
+    param_str = selected["selected_param_str"]
+    coef_file = paths["data"] / f"logreg_coefficients_{support}_{param_str}.npz"
     with np.load(coef_file) as data:
-        coef, intercept = data[f"coef_{lam_float}"], data[f"intercept_{lam_float}"]
+        coef, intercept = data["coef"], data["intercept"]
     test_preds, test_probs = predict_logreg(cell.test_x.cpu().numpy(), coef, intercept)
     val_r_dir = probe_dir(paths, support, "logreg", param_str)
     _save_split_record(

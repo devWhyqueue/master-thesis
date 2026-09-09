@@ -16,6 +16,7 @@ from decodability import audit as audit_stage
 from decodability import probe as probe_stage
 from decodability import select as select_stage
 from decodability import slurm as slurm_stage
+from decodability.slurm import PROBE_VAL_ARRAY_SIZE
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -30,7 +31,9 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("preflight")
 
     probe_val = sub.add_parser("probe-val")
-    probe_val.add_argument("--condition", choices=SUPPORTS, required=True)
+    probe_val.add_argument(
+        "--shard-index", type=int, choices=range(PROBE_VAL_ARRAY_SIZE), required=True
+    )
 
     sub.add_parser("select")
 
@@ -51,12 +54,8 @@ def cmd_preflight(args: argparse.Namespace) -> None:
 
 
 def cmd_probe_val(args: argparse.Namespace) -> None:
-    """Run validation probe fitting/search for specified split and condition."""
-    if args.split_index is None:
-        raise ValueError("--split-index is required for probe-val")
-    probe_stage.run_probe_val(
-        load_config(args.config), args.split_index, args.condition
-    )
+    """Run one shard of validation probe fitting/search."""
+    probe_stage.run_probe_val(load_config(args.config), args.shard_index)
 
 
 def cmd_select(args: argparse.Namespace) -> None:

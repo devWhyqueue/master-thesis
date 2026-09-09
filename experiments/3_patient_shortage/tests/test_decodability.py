@@ -6,10 +6,12 @@ import numpy as np
 import pytest
 import torch
 
+from decodability import LAMBDAS, SUPPORTS
 from decodability.audit import _verify_cell_audit
 from decodability.evidence import CellEvidence
 from decodability.linear import fit_multinomial_logistic
 from decodability.neighbours import top_neighbours, vote
+from decodability.probe import decode_shard_index
 from decodability.select import _select_knn, _select_logreg
 
 
@@ -151,6 +153,22 @@ def test_interaction_algebraic_identity():
     i_h = g_c - g_s
 
     np.testing.assert_allclose(i_h, b_mlp - b_h, atol=1e-12)
+
+
+def test_decode_shard_index_covers_grid_exactly_once():
+    """All 48 probe-val shard indices cover 3 splits x 2 supports x 8 units once."""
+    seen = set()
+    for shard_index in range(48):
+        split_index, support, unit = decode_shard_index(shard_index)
+        assert split_index in range(3)
+        assert support in SUPPORTS
+        assert unit in range(len(LAMBDAS) + 1)
+        seen.add((split_index, support, unit))
+
+    assert len(seen) == 48
+    assert seen == {
+        (s, c, u) for s in range(3) for c in SUPPORTS for u in range(len(LAMBDAS) + 1)
+    }
 
 
 def test_preflight_detects_patient_overlap():

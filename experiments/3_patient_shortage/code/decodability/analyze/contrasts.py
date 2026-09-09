@@ -60,6 +60,7 @@ def load_readout_predictions(
 
 
 def _split_ba_distribution(
+    context: BootstrapContext,
     config: dict[str, Any],
     split_index: int,
     support: str,
@@ -68,10 +69,6 @@ def _split_ba_distribution(
     n_classes: int,
 ) -> np.ndarray:
     """Build replicate balanced accuracy distribution for one split."""
-    exp2_paths = exp2_split_paths(config, split_index)
-    context = BootstrapContext(
-        exp2_paths, is_mil=False, n_replicates=N_REPLICATES, seed=BOOTSTRAP_SEED
-    )
     labels, preds_stack = load_readout_predictions(
         config, split_index, support, readout, selection
     )
@@ -82,11 +79,24 @@ def _collect_pooled_dists(
     config: dict[str, Any], selection: dict[str, Any], n_classes: int
 ) -> dict[str, dict[str, np.ndarray]]:
     """Collect 3-split pooled distributions for all supports and readouts."""
+    # Each split's BootstrapContext only depends on split_index (patient
+    # resampling), so it is built once here instead of per support/readout.
+    contexts = {
+        i: BootstrapContext(
+            exp2_split_paths(config, i),
+            is_mil=False,
+            n_replicates=N_REPLICATES,
+            seed=BOOTSTRAP_SEED,
+        )
+        for i in range(3)
+    }
     dists: dict[str, dict[str, np.ndarray]] = {s: {} for s in SUPPORTS}
     for s in SUPPORTS:
         for r in _READOUTS:
             splits = [
-                _split_ba_distribution(config, i, s, r, selection, n_classes)
+                _split_ba_distribution(
+                    contexts[i], config, i, s, r, selection, n_classes
+                )
                 for i in range(3)
             ]
             if not all(np.all(np.isfinite(d)) for d in splits):
