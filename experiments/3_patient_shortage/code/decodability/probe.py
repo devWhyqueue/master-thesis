@@ -14,6 +14,7 @@ from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
 )
 from imbalance_benchmark.common import (
     ensure_dirs,
+    read_run_record,
     split_paths,
     verify_signed_file,
     write_run_record,
@@ -55,16 +56,21 @@ def _save_split_record(
     case_ids = identity["case_id"].astype(str).to_numpy()
     slide_ids = identity["slide_id"].astype(str).to_numpy()
     discrim = _cluster_discrimination(labels, preds, case_ids, slide_ids, is_mil=False)
+    # Test evaluation reuses the selected candidate's directory: merge so the
+    # validation record and its solver metadata survive.
+    existing = read_run_record(result_dir) or {}
     record = {
+        **existing,
         **meta,
         **(extra_fields or {}),
         "splits": {
+            **existing.get("splits", {}),
             split_name: {
                 "endpoints": discrim,
                 "labels": labels,
                 "preds": preds,
                 "probabilities": probs,
-            }
+            },
         },
     }
     write_run_record(result_dir, record, keep_arrays=True)
@@ -82,6 +88,7 @@ def _val_logreg(
             "solver": fit_res.solver,
             "precision": fit_res.precision,
             "tolerance": fit_res.tolerance,
+            "solver_tolerance": fit_res.solver_tolerance,
             "max_iter": fit_res.max_iter,
             "n_iter": fit_res.n_iter,
             "objective": fit_res.objective,

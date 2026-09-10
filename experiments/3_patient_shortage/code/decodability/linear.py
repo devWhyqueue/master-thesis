@@ -23,6 +23,7 @@ class LinearFitResult:
     solver: str
     precision: str
     tolerance: float
+    solver_tolerance: float
     max_iter: int
     n_iter: int
     objective: float
@@ -75,16 +76,19 @@ def fit_multinomial_logistic(
     labels: np.ndarray,
     lambda_val: float,
     tol: float = 1e-8,
-    max_iter: int = 2000,
+    max_iter: int = 10000,
 ) -> LinearFitResult:
-    """Fit multinomial logistic regression with C = 1 / (N * lambda)."""
+    """Fit with C = 1 / (N * lambda) and ``tol`` as a gradient tolerance on the mean
+    objective; scikit-learn applies its own ``tol`` to the summed objective, so the
+    solver receives ``tol * N``.
+    """
     feat64, lab_int = np.asarray(features, np.float64), np.asarray(labels, np.int64)
-    c_val = 1.0 / (feat64.shape[0] * lambda_val)
-    model, conv = _fit_once(feat64, lab_int, c_val, max_iter, tol)
+    n_samples = feat64.shape[0]
+    c_val, solver_tol = 1.0 / (n_samples * lambda_val), tol * n_samples
+    model, conv = _fit_once(feat64, lab_int, c_val, max_iter, solver_tol)
     w = np.asarray(model.coef_, dtype=np.float64)
     b = np.asarray(model.intercept_, dtype=np.float64)
     obj = _compute_objective(feat64, lab_int, w, b, lambda_val)
-
     return LinearFitResult(
         w,
         b,
@@ -93,6 +97,7 @@ def fit_multinomial_logistic(
         "lbfgs",
         "float64",
         tol,
+        solver_tol,
         max_iter,
         int(model.n_iter_[0]),
         obj,

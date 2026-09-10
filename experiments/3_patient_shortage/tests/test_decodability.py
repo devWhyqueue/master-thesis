@@ -81,6 +81,17 @@ def test_logistic_c_and_regularization():
     assert weights[0] > weights[1] > weights[2]
 
 
+def test_logistic_tolerance_is_on_mean_objective():
+    """Solver gtol == tol * N, so the criterion does not tighten with sample count."""
+    np.random.seed(7)
+    x = np.random.randn(500, 8)
+    y = np.random.randint(0, 3, size=500)
+
+    res = fit_multinomial_logistic(x, y, lambda_val=1e-6, tol=1e-8, max_iter=300)
+    assert np.isclose(res.solver_tolerance, 1e-8 * 500)
+    assert res.converged
+
+
 def test_selection_tie_rule_prefers_larger(tmp_path):
     """Differences <= 1e-10 resolve toward larger lambda / larger k."""
     from imbalance_benchmark.common import write_run_record
