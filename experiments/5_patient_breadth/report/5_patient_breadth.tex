@@ -150,6 +150,8 @@ The accounts are then read as follows. Support that depends only on the patch bu
 
 Depth saturation is judged separately from the fits. It is supported when $\Delta_m(20)$ has an interval contained in $\pm1$ point, that is when quadrupling the patches taken from each of twenty patients leaves accuracy practically unchanged. This criterion is informative only if the predicted transition falls inside the ladder, so the mean estimated correlation is compared with the depth levels in advance: a mean $\ICC$ below $1/32$ places the transition beyond the deepest cell, and an absence of saturation is then uninformative about the redundancy account rather than evidence against it.
 
+\input{results}
+
 \section{Limitations}
 \label{sec:limitations}
 The grid is bounded by the rarest class in each cohort, so its largest allocation stays well below the benchmark's balanced allocations and the absolute accuracies of this experiment are not comparable with those of the earlier reports. The design also fixes equal depth for every patient, which removes contribution inequality but makes the allocations less similar to naturally collected cohorts, where patients differ widely in how much material they supply. Conclusions about the shape of the support surface therefore transfer to naturally unequal cohorts only through the design-effect model.
@@ -158,7 +160,6 @@ The redundancy adjustment inherits the approximations of the taxonomy. Its corre
 
 Finally, the experiment locates the deficit in the training material but cannot say whether the missing information is absent from the cohort or merely inexpressible in this representation. A residual breadth term is compatible with both, and separating them requires varying the representation rather than the allocation. Probability quality is evaluated without temperature scaling, so the secondary calibration endpoints describe the fitted probabilities rather than the best attainable ones.
 
-% \input{results}   % TODO: add after the cluster run
 
 \bibliographystyle{plainnat}
 \bibliography{references}

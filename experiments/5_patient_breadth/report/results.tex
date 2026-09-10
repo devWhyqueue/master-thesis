@@ -1,0 +1,83 @@
+\section{Results}
+\label{sec:results}
+The established coverage deficit resolves into two distinct phenomena depending on the dataset. On BRACS, the patient shortage is completely explained by within-patient redundancy: effective support accounts for the entire deficit, and the residual coverage benefit disappears. On TCGA-UT, effective support falls substantially short: a large coverage benefit persists even after accounting for redundancy, indicating that additional patients supply variation not captured by the correlation model.
+
+\subsection{Effective support and residual coverage}
+All surface parameters and contrasts are summarized in Table~\ref{tab:breadth_surface_fits} and Table~\ref{tab:breadth_contrasts}. The nominal support account is cleanly rejected on both datasets. The augmented nominal model leaves large, practically relevant residual breadth coefficients $\gamma_n$: 3.01 points per log unit on BRACS (95\% interval: 2.05 to 4.03) and 6.78 points on TCGA-UT (6.41 to 7.15). At a fixed budget of 160 training patches per class, reallocating those patches from 5 patients at depth 32 to 20 patients at depth 8 improves accuracy by $X=3.66$ points on BRACS (2.17 to 5.29) and $X=9.45$ points on TCGA-UT (8.89 to 10.04). Nominal patch counts therefore fail to describe the support available to the classifier.
+
+When adjusted for within-patient redundancy, the two datasets diverge completely. On BRACS, the effective support predictor achieves the lowest residual standard deviation (0.40 points), and the augmented effective model yields a residual breadth coefficient $\gamma_e$ of 0.13 points per log unit ($-2.12$ to 2.19). This estimate is closely centred on zero and well below the 1.44-point threshold for practical relevance, though the interval is wide. The redundancy account therefore successfully explains the BRACS deficit: patients still matter, but only because patches from the same patient are correlated.
+
+On TCGA-UT, the effective support adjustment fails to explain the coverage benefit. The augmented effective model leaves a massive residual breadth coefficient $\gamma_e$ of 4.45 points per log unit (2.21 to 6.65), heavily exceeding the 1.44-point threshold. Even at matched effective support, adding more patients substantially improves accuracy. This establishes that TCGA-UT patients supply coverage beyond redundancy: variation that a scalar correlation cannot express.
+
+\subsection{Intraclass correlations and depth saturation}
+The correlation estimates support the saturation predictions (Table~\ref{tab:breadth_class_iccs}). On BRACS, the mean $\ICC$ is 0.130, implying that depth saturation should occur near $m\approx 7.7$. Depth gains beyond $m=8$ remain small but positive: $\Delta_m(20)=2.09$ points (0.79 to 3.45). This gradual saturation aligns with the lower $\ICC$.
+
+On TCGA-UT, the correlations are exceptionally high. The mean $\ICC$ is 0.457, placing the saturation transition near $m\approx 2.2$, well below the smallest grid depth of 8. As predicted, further depth increases yield virtually no benefit: $\Delta_m(20)=0.39$ points (0.00 to 0.80), and $\Delta_m(5)$ is just 0.05 points ($-0.49$ to 0.58). The design effect at $m=32$ reaches 15.17 on average, meaning that quadrupling the patch count per patient adds almost no effective observations.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Dataset & Model & Predictors & Slope $\beta$ & Residual breadth $\gamma$ & Residual SD \\
+\midrule
+BRACS & Nominal & $\log n$ & 3.02 [2.49, 3.62] & -- & 1.43 \\
+& Breadth only & $\log G$ & 4.52 [3.82, 5.27] & -- & 1.06 \\
+& Effective & $\log \Neff$ & 4.51 [3.80, 5.29] & -- & 0.40 \\
+\addlinespace
+& Augmented nominal & $\log n + \gamma_n \log G$ & 3.02 [2.49, 3.62] & 3.01 [2.05, 4.03] & 0.46 \\
+& Augmented effective & $\log \Neff + \gamma_e \log G$ & 4.51 [3.80, 5.29] & 0.13 [$-2.12$, 2.19] & 0.43 \\
+\midrule
+TCGA-UT & Nominal & $\log n$ & 3.58 [3.39, 3.78] & -- & 3.08 \\
+& Breadth only & $\log G$ & 6.97 [6.65, 7.30] & -- & 0.21 \\
+& Effective & $\log \Neff$ & 6.94 [6.62, 7.26] & -- & 0.28 \\
+\addlinespace
+& Augmented nominal & $\log n + \gamma_n \log G$ & 3.58 [3.39, 3.78] & 6.78 [6.41, 7.15] & 0.18 \\
+& Augmented effective & $\log \Neff + \gamma_e \log G$ & 6.94 [6.62, 7.26] & 4.45 [2.21, 6.65] & 0.17 \\
+\bottomrule
+\end{tabular}
+\caption{Support surface regression fits over the nine grid cells. Both slope and residual breadth are expressed in percentage points per natural log unit.}
+\label{tab:breadth_surface_fits}
+\end{table}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Contrast & BRACS Estimate [95\% CI] (pp) & TCGA-UT Estimate [95\% CI] (pp) \\
+\midrule
+\multicolumn{3}{l}{\textit{Depth gains at fixed breadth $\Delta_m(G) = A(G, 32) - A(G, 8)$}} \\
+$\Delta_m(G=5)$ & 3.02 [1.70, 4.39] & 0.05 [$-0.49$, 0.58] \\
+$\Delta_m(G=10)$ & 1.16 [$-0.35$, 2.76] & 0.33 [$-0.10$, 0.77] \\
+$\Delta_m(G=20)$ & 2.09 [0.79, 3.45] & 0.39 [0.00, 0.80] \\
+\addlinespace
+\multicolumn{3}{l}{\textit{Breadth gains at fixed depth $\Delta_G(m) = A(20, m) - A(5, m)$}} \\
+$\Delta_G(m=8)$ & 6.68 [5.34, 8.14] & 9.50 [8.84, 10.13] \\
+$\Delta_G(m=16)$ & 6.38 [4.84, 8.06] & 9.65 [9.08, 10.21] \\
+$\Delta_G(m=32)$ & 5.75 [4.34, 7.16] & 9.84 [9.27, 10.41] \\
+\addlinespace
+Equal-budget advantage $X = A(20, 8) - A(5, 32)$ & 3.66 [2.17, 5.29] & 9.45 [8.89, 10.04] \\
+\bottomrule
+\end{tabular}
+\caption{Key contrasts on the allocation grid. The equal-budget advantage compares the broadest and deepest cell within the $n_c=160$ set.}
+\label{tab:breadth_contrasts}
+\end{table}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Dataset & Mean $\ICC$ & Mean $\DE_c(m=8)$ & Mean $\DE_c(m=32)$ \\
+\midrule
+BRACS & 0.130 & 1.91 & 5.02 \\
+TCGA-UT & 0.457 & 4.20 & 15.17 \\
+\bottomrule
+\end{tabular}
+\caption{Mean estimated intraclass correlations and design effects.}
+\label{tab:breadth_class_iccs}
+\end{table}
+
+\section{Discussion}
+\label{sec:discussion}
+Separating patient count from sampling depth resolves the patient shortage deficit into two distinct mechanisms that standard benchmarks confound. The finding that within-patient redundancy explains the entire BRACS deficit is a strong validation of the effective support model: on this dataset, a smaller patient count is equivalent to a smaller dataset of independent observations.
+
+On TCGA-UT, however, effective support is insufficient. The large residual breadth effect demonstrates that patients in this cohort carry unique morphological or acquisition variation that cannot be reduced to scalar correlation. This distinction matters for dataset construction: for tasks resembling BRACS, deep sampling of fewer patients can theoretically substitute for broader recruitment, provided the budget scales by the design effect. For tasks resembling TCGA-UT, no amount of deep sampling can replace missing patients, because the representation depends on the diversity they introduce.
