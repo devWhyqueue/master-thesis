@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import hashlib
 from typing import Any, cast
 
@@ -12,8 +11,6 @@ import pandas as pd
 from breadth import (
     BREADTH_LADDER,
     DEPTH_LADDER,
-    FALLBACK_BREADTH_LADDER,
-    FALLBACK_DEPTH_LADDER,
 )
 
 __all__ = [
@@ -57,29 +54,17 @@ def _audit_counts(
     class_names: list[str],
     depth_ladder: tuple[int, ...],
 ) -> dict[str, dict[str, dict[int, int]]]:
-    """Record eligible patient counts for each split, class, and depth."""
+    """Record common maximum-depth pool sizes for every cell depth."""
     return {
         str(s): {
-            c: {d: len(eligible_patients_by_class(df, c, d)) for d in depth_ladder}
+            c: {
+                d: len(eligible_patients_by_class(df, c, max(depth_ladder)))
+                for d in depth_ladder
+            }
             for c in class_names
         }
         for s, df in train_dfs.items()
     }
-
-
-def _resolve_ladders(
-    satisfies: Callable[[tuple[int, ...], tuple[int, ...]], bool],
-    b_lad: tuple[int, ...],
-    d_lad: tuple[int, ...],
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    """Check initial ladders, falling back if infeasible."""
-    if satisfies(b_lad, d_lad):
-        return b_lad, d_lad
-    if satisfies(b_lad, FALLBACK_DEPTH_LADDER):
-        return b_lad, FALLBACK_DEPTH_LADDER
-    if satisfies(FALLBACK_BREADTH_LADDER, FALLBACK_DEPTH_LADDER):
-        return FALLBACK_BREADTH_LADDER, FALLBACK_DEPTH_LADDER
-    raise RuntimeError("Even fallback ladders infeasible.")
 
 
 def check_grid_eligibility(
@@ -88,20 +73,19 @@ def check_grid_eligibility(
     breadth_ladder: tuple[int, ...] = BREADTH_LADDER,
     depth_ladder: tuple[int, ...] = DEPTH_LADDER,
 ) -> tuple[tuple[int, ...], tuple[int, ...], dict[str, Any]]:
-    """Verify eligible patient counts and resolve realized breadth/depth ladders."""
-
-    def _satisfies(b: tuple[int, ...], d: tuple[int, ...]) -> bool:
-        max_g = max(b)
-        return all(
-            len(eligible_patients_by_class(df, c, depth)) >= max_g
-            for df in train_dfs.values()
-            for c in class_names
-            for depth in d
-        )
-
+    """Require a common maximum-depth pool for every class and split."""
     audit = _audit_counts(train_dfs, class_names, depth_ladder)
-    realized_b, realized_d = _resolve_ladders(_satisfies, breadth_ladder, depth_ladder)
-    return realized_b, realized_d, audit
+    if any(
+        count < max(breadth_ladder)
+        for classes in audit.values()
+        for depths in classes.values()
+        for count in depths.values()
+    ):
+        raise RuntimeError(
+            "Common maximum-depth pool infeasible; reduce the entire grid "
+            "in BREADTH_LADDER and DEPTH_LADDER, then rerun preflight."
+        )
+    return breadth_ladder, depth_ladder, audit
 
 
 def _slide_patch_lists(patient_df: pd.DataFrame) -> list[list[int]]:
@@ -149,13 +133,17 @@ def sample_cell_draw(
     draw_index: int,
     base_seed: int = 0,
 ) -> pd.DataFrame:
-    """Sample one (G, m) draw: G patients per class, m patches per patient."""
+    """Pair patients across depths; reveal nested round-robin patch prefixes."""
+    if m not in DEPTH_LADDER:
+        raise ValueError("Depth must belong to the configured grid")
     selected_indices: list[int] = []
     for cls_idx, c_name in enumerate(class_names):
-        eligible = eligible_patients_by_class(train_df, c_name, m)
+        eligible = eligible_patients_by_class(train_df, c_name, max(DEPTH_LADDER))
         if len(eligible) < g:
             raise RuntimeError(f"Class {c_name} has only {len(eligible)} eligible")
-        seed = derive_draw_seed(base_seed, split_index, g, m, draw_index, cls_idx)
+        seed = derive_draw_seed(
+            base_seed, split_index, g, max(DEPTH_LADDER), draw_index, cls_idx
+        )
         chosen = np.random.default_rng(seed).choice(eligible, size=g, replace=False)
         cls_df = train_df[train_df["cancer_type"] == c_name]
         for case in chosen:

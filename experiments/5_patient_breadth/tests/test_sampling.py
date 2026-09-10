@@ -73,51 +73,48 @@ def test_sample_patient_patches_insufficient_raises():
         sample_patient_patches_round_robin(patient_df, m=3)
 
 
-def test_check_grid_eligibility_fallback():
-    """Infeasible ladder triggers depth fallback then breadth fallback."""
-    # Build df where each class has 10 patients with 16 patches, but none with 32
-    rows = []
-    for c in ["c1", "c2"]:
-        for p in range(10):
-            for patch in range(16):
-                rows.append(
-                    {
-                        "cancer_type": c,
-                        "case_id": f"p_{c}_{p}",
-                        "slide_id": f"s_{c}_{p}",
-                        "patch_id": f"pt_{c}_{p}_{patch}",
-                    }
-                )
-    df = pd.DataFrame(rows)
-    train_dfs = {0: df, 1: df, 2: df}
-
-    # Initial ladder (5, 10, 20) x (8, 16, 32): 32 fails and max_g=20 fails
-    # Fallback depth: (4, 8, 16), max_g still 20 (fails)
-    # Fallback breadth: (4, 8, 16) with max_g=16 (fails, only 10 patients)
+def test_check_grid_eligibility_requires_common_pool():
+    """Shallow-only patients cannot rescue an infeasible common pool."""
+    frame = pd.DataFrame(
+        [
+            {"cancer_type": "c", "case_id": f"p{patient}"}
+            for patient in range(25)
+            for _ in range(32 if patient < 16 else 16)
+        ]
+    )
     with pytest.raises(RuntimeError, match="infeasible"):
-        check_grid_eligibility(train_dfs, ["c1", "c2"])
+        check_grid_eligibility({0: frame}, ["c"])
+    breadth, depth, audit = check_grid_eligibility(
+        {0: frame}, ["c"], breadth_ladder=(4, 8, 16)
+    )
+    assert breadth == (4, 8, 16)
+    assert depth == (8, 16, 32)
+    assert set(audit["0"]["c"].values()) == {16}
 
-    # If 25 patients each have 16 patches:
-    rows25 = []
-    for c in ["c1", "c2"]:
-        for p in range(25):
-            for patch in range(16):
-                rows25.append(
-                    {
-                        "cancer_type": c,
-                        "case_id": f"p_{c}_{p}",
-                        "slide_id": f"s_{c}_{p}",
-                        "patch_id": f"pt_{c}_{p}_{patch}",
-                    }
-                )
-    df25 = pd.DataFrame(rows25)
-    train_dfs25 = {0: df25, 1: df25, 2: df25}
 
-    b_lad, d_lad, audit = check_grid_eligibility(train_dfs25, ["c1", "c2"])
-    # 25 >= 20, but depth 32 is missing -> falls back to depth ladder (4, 8, 16)
-    assert b_lad == (5, 10, 20)
-    assert d_lad == (4, 8, 16)
-    assert "0" in audit
+def test_depth_draws_share_patients_and_nested_patches():
+    """All depths use maximum-depth patients and prefixes of their patches."""
+    frame = pd.DataFrame(
+        [
+            {
+                "cancer_type": "c",
+                "case_id": f"p{patient}",
+                "slide_id": f"s{patch % 3}",
+                "patch_id": f"p{patient}_{patch:02d}",
+            }
+            for patient in range(30)
+            for patch in range(32 if patient < 20 else 16)
+        ]
+    )
+    for draw in range(5):
+        cells = [sample_cell_draw(frame, ["c"], 5, m, 0, draw) for m in (8, 16, 32)]
+        assert set(cells[0].case_id) == set(cells[1].case_id) == set(cells[2].case_id)
+        assert set(cells[0].case_id) <= {f"p{i}" for i in range(20)}
+        assert set(cells[0].patch_id) < set(cells[1].patch_id) < set(cells[2].patch_id)
+    with pytest.raises(RuntimeError, match="eligible"):
+        sample_cell_draw(frame, ["c"], 21, 8, 0, 0)
+    with pytest.raises(ValueError, match="Depth"):
+        sample_cell_draw(frame, ["c"], 5, 64, 0, 0)
 
 
 def test_sample_cell_draw_exact_budget():
@@ -126,7 +123,7 @@ def test_sample_cell_draw_exact_budget():
     for c in ["class_0", "class_1"]:
         for p in range(10):
             for s in range(2):
-                for patch in range(10):
+                for patch in range(16):
                     rows.append(
                         {
                             "cancer_type": c,
@@ -151,4 +148,3 @@ def test_sample_cell_draw_exact_budget():
         assert c_df["case_id"].nunique() == g
         counts = c_df["case_id"].value_counts()
         assert all(cnt == m for cnt in counts)
-
