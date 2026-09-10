@@ -10,14 +10,14 @@
 \newcommand{\spr}{\mathrm{S}}
 \title{Patient Shortage in Histopathology:\\Classifier or Coverage Limitation?}
 \author{Yannik Queisler}
-\date{September 9, 2026}
+\date{September 10, 2026}
 
 \begin{document}
 \raggedbottom
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent Reducing the number of training patients at fixed class patch counts damages histopathology classification with frozen features, and the tested mitigation methods recover little of that loss. This experiment asks whether a different classifier can exploit class information that remains accessible under patient shortage, or whether broader patient coverage benefits several distinct readouts of the same representation. It compares the original multilayer perceptron, regularized multinomial logistic regression, and cosine nearest neighbours on the existing balanced concentrated and balanced spread allocations of BRACS and TCGA-UT. The comparison uses three existing patient-disjoint splits and holds the training patches fixed across classifiers within each support condition. Patient-macro balanced accuracy measures classifier gains, coverage benefits, and their interaction. Classifier gains identify predictive structure that the MLP leaves unused, while consistent coverage benefits support the value of broader training-patient diversity.
+\noindent Patient shortage can impair histopathology classification even when class patch counts remain fixed. This experiment tests whether changing the classifier recovers the lost performance or whether broader training-patient coverage remains beneficial. The original multilayer perceptron (MLP), regularized multinomial logistic regression, and cosine nearest neighbours are compared on identical frozen Virchow2 features and matched concentrated and spread allocations across three patient-disjoint splits of BRACS and TCGA-UT. Under concentrated support, logistic regression improves patient-macro balanced accuracy over the MLP by only 0.19 percentage points on BRACS (95\% interval: $-0.59$ to 1.01) and 0.48 points on TCGA-UT (0.28 to 0.70). Broader coverage improves logistic regression by 2.44 and 4.70 points, respectively. Nearest neighbours underperform the MLP in both conditions and datasets. These results favour a coverage limitation within the tested classifiers, with a small additional classifier gain on TCGA-UT that falls below the prespecified one-point practical threshold. They do not establish that other classifiers could not recover more of the shortage deficit.
 \end{abstract}
 
 \tableofcontents
@@ -152,32 +152,21 @@ A \emph{bootstrap} approximates sampling variation by repeatedly resampling or r
 Each patient's weight is shared across classifiers, support conditions, classes, and appearances in different test splits, following the benchmark's paired analysis \citep{queisler2026benchmarkProtocol}. The within-class patient mean in Equation~\eqref{eq:ba} becomes a weighted mean, normalized by the total weight of patients present in that class and split. Class and split averages remain equally weighted. Every contrast is then recalculated using the same patient weights on both sides. This pairing preserves the correlation between predictions for the same patients when estimating uncertainty in their differences.
 
 Each replicate also samples five initialization indices with replacement from the MLP's five confirmation runs. The same draw is shared across support conditions, splits, and contrasts involving the MLP; deterministic probe predictions remain fixed. The 2.5th and 97.5th percentiles of the resulting distributions define the reported 95\% intervals. BRACS and TCGA-UT are evaluated separately, with split-level estimates complementing the pooled estimates.
-\section{Interpretation}
+One percentage point is the prespecified practical-relevance threshold for the three signed contrasts. A point estimate above one point is practically promising; a lower interval bound above one point supports an improvement exceeding that threshold. An interval containing zero does not establish equivalence. All intervals below are individual, exploratory 95\% bootstrap intervals.
+
+\input{results}
+
+\section{Discussion}
 \label{sec:interpretation}
-One percentage point is the prespecified practical-relevance threshold for the three signed contrasts. A point estimate above one point is practically promising; a lower interval bound above one point supports an improvement exceeding that threshold. A positive estimate with an interval crossing zero remains uncertain. Conversely, an interval containing zero does not establish equivalence or absence of useful information.
+The principal finding is that replacing the MLP does not remove the performance cost of concentrated patient support. Logistic regression comes closest to the MLP in both datasets, but its shortage gain is small relative to its own benefit from broader coverage. On TCGA-UT, the linear classifier improves over the MLP under both support conditions, demonstrating a modest classifier limitation alongside a substantially larger coverage effect. The near-zero interaction does not identify this gain as specific to shortage. On BRACS, the linear classifier supplies no clear gain over the MLP, whereas broader coverage improves both learned classifiers.
 
-\begin{table}[htbp]
-\centering
-\small
-\renewcommand{\arraystretch}{1.18}
-\begin{tabularx}{\textwidth}{@{}p{0.29\textwidth}X@{}}
-\toprule
-Observed pattern & Supported interpretation and limit \\
-\midrule
-Positive shortage gain \(G_{h,\conc}\) & The alternative readout exploits predictive information that the original MLP pipeline leaves unused under the same shortage allocation. It does not identify whether optimization, regularization, or decision geometry explains the gain. \\
-Positive \(G_{h,\conc}\) and \(I_h\) & The gain is larger under shortage than under spread support. If both exceed the practical threshold with precise intervals, the readout warrants a later shortage-focused study. \\
-Positive \(B_h\) across readouts & Broader training coverage benefits all tested approaches. If neither probe improves under shortage, a coverage limitation remains the leading explanation within this diagnostic, not proof of intrinsic inseparability. \\
-Probe gain and residual \(B_h>0\) & Both explanations can contribute: the classifier can improve while broader patient coverage still adds useful evidence. \\
-Weak, conflicting, or imprecise effects & Absolute accuracies, intervals, and class recalls describe the uncertainty; neither explanation is clearly favoured. \\
-\bottomrule
-\end{tabularx}
-\caption{Interpretation requires effect magnitude and uncertainty. None of these outcomes establishes a Bayes-error bound or an oracle ceiling.}
-\label{tab:interpretation}
-\end{table}
+The evidence for coverage is strongest on TCGA-UT: all three readouts benefit, with lower interval bounds above one percentage point. BRACS supports a narrower conclusion. Its MLP and linear-probe coverage intervals exclude zero but do not establish benefits greater than one point; the nearest-neighbour interval includes zero and its split-level effects conflict. Thus the results support broader patient coverage across both tasks without claiming equally consistent evidence across all readouts and datasets.
 
-\noindent A linear-probe gain shows that a simpler linear decision rule generalizes better under the tested fitting procedure. A nearest-neighbour gain shows usable local structure in the chosen metric. Failure of either probe is weaker evidence: linear rules may miss nonlinear boundaries, while cosine neighbourhoods may reflect patient identity or unsuitable feature scaling. Failure of all three readouts cannot prove that no classifier can separate the classes or that new representations are necessary.
+Nearest neighbours illustrate why the interaction cannot be interpreted alone. Their positive interaction reflects a smaller spread benefit than the MLP's, while their absolute accuracy is lower under both support conditions. Even the TCGA-UT interaction, whose interval lies above the practical threshold, therefore does not identify a useful shortage remedy. A classifier must first offer a favourable shortage gain before a positive interaction supports its use for this purpose.
 
-Broad-support success supplies a useful positive control: the same frozen representation supports the observed performance when labelled patient coverage is larger. A shortage-trained probe approaching the spread-trained MLP suggests that classifier choice can offset part of the observed deficit. Its direct difference and uncertainty quantify that comparison, while any further improvement of the spread-trained probe identifies a remaining coverage benefit.
+The coverage intervention changes patient identities and their patch contributions together. Its benefit therefore supports the value of the broader labelled allocation, rather than isolating a causal effect of patient count alone. Likewise, logistic regression and the MLP differ in fitting and regularization, so the small TCGA-UT gain cannot be attributed solely to linear versus nonlinear decision geometry. Stronger regularization selected for concentrated BRACS support is consistent with a need to constrain fitting with fewer patients, but this selection pattern does not establish the mechanism of the coverage deficit.
+
+These findings motivate a follow-up experiment asking whether a small but deliberately diverse patient set can retain the benefit of broader coverage. At several training-patient budgets, random patient selection could be compared with selection that spreads the chosen patients across the frozen feature space, using training data only. Class-specific patch totals would remain fixed, with matched patient counts and per-patient contribution limits between selection strategies. Repeated patient draws, evaluated with the MLP and logistic regression on the fixed held-out patients, would measure both accuracy and sensitivity to patient composition. An advantage for diversity-based selection would suggest that which patients are labelled matters beyond their number; a persistent benefit from larger patient sets under both strategies would strengthen the case for acquiring broader labelled coverage.
 
 \section{Limitations}
 \label{sec:budget}

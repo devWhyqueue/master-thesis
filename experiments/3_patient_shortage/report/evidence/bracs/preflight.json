@@ -1,0 +1,156 @@
+{
+  "status": "pass",
+  "input_dim": 2560,
+  "splits": {
+    "0": {
+      "balanced": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/split=0/data/manifest_balanced.csv",
+        "manifest_sha256": "d11fc941a6a6ac96186e03fc9c14f5ed98781e747dd54d00a9ad2dce9e0cc448",
+        "cell_stats": {
+          "n_train": 16796,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 2400,
+            "1": 2400,
+            "2": 2400,
+            "3": 2399,
+            "4": 2399,
+            "5": 2399,
+            "6": 2399
+          },
+          "n_patients_train": 85,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 22133
+        }
+      },
+      "balanced_spread": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/split=0/data/manifest_native_balanced_spread.csv",
+        "manifest_sha256": "3a39fc1c0a93a14f289594048c25d762e04922f4da264d438d28aa500c1f5375",
+        "cell_stats": {
+          "n_train": 16796,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 2400,
+            "1": 2400,
+            "2": 2400,
+            "3": 2399,
+            "4": 2399,
+            "5": 2399,
+            "6": 2399
+          },
+          "n_patients_train": 103,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 22133
+        }
+      }
+    },
+    "1": {
+      "balanced": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/split=1/data/manifest_balanced.csv",
+        "manifest_sha256": "15c7e9e60fea2161dfc33832eec41a19af0bafb16364c74cc857b3937555b62d",
+        "cell_stats": {
+          "n_train": 27202,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 3886,
+            "1": 3886,
+            "2": 3886,
+            "3": 3886,
+            "4": 3886,
+            "5": 3886,
+            "6": 3886
+          },
+          "n_patients_train": 89,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 54552
+        }
+      },
+      "balanced_spread": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/split=1/data/manifest_native_balanced_spread.csv",
+        "manifest_sha256": "41ab0cedac083199640174424a9df14754f1ceea5c0e899df1bc461aaf5a5945",
+        "cell_stats": {
+          "n_train": 27202,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 3886,
+            "1": 3886,
+            "2": 3886,
+            "3": 3886,
+            "4": 3886,
+            "5": 3886,
+            "6": 3886
+          },
+          "n_patients_train": 103,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 54552
+        }
+      }
+    },
+    "2": {
+      "balanced": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/split=2/data/manifest_balanced.csv",
+        "manifest_sha256": "0ffd6bc247fbbfc87e579197a7610c5e6c042cb4fc87348be740651f90d52c0e",
+        "cell_stats": {
+          "n_train": 13982,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 1998,
+            "1": 1998,
+            "2": 1998,
+            "3": 1997,
+            "4": 1997,
+            "5": 1997,
+            "6": 1997
+          },
+          "n_patients_train": 78,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 31390
+        }
+      },
+      "balanced_spread": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/split=2/data/manifest_native_balanced_spread.csv",
+        "manifest_sha256": "dd62553a73e7b720130cba5f569233de627541289385faccc04af76848469bc2",
+        "cell_stats": {
+          "n_train": 13982,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 1998,
+            "1": 1998,
+            "2": 1998,
+            "3": 1997,
+            "4": 1997,
+            "5": 1997,
+            "6": 1997
+          },
+          "n_patients_train": 103,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 31390
+        }
+      }
+    }
+  }
+}

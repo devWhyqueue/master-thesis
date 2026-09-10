@@ -1,0 +1,112 @@
+\section{Results}
+\label{sec:results}
+Changing the classifier provides little improvement under patient shortage, whereas broader coverage retains a substantial benefit for the learned classifiers. Tables~\ref{tab:results-accuracy} and~\ref{tab:results-contrasts} report the pooled patient-macro estimates and paired contrasts. All primary MLP estimates average the five confirmation runs within each split and then the three splits.
+
+\subsection{Realized comparison and selected settings}
+The completed integrity audits passed for both datasets and all six split--support cells per dataset. They verified patient-disjoint partitions, finite nonzero training features, and complete five-run MLP reference blocks. Class-specific patch counts match exactly between concentrated and spread support within every split. Table~\ref{tab:realized-support} gives the realized training allocations. Each BRACS split contains 24 validation and 24 test patients; each TCGA-UT split contains \num{1067} in each partition. These are per-split counts, not counts of distinct patients across the repeated splits.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Dataset & Split & Training patches & Patients C & Patients S \\
+\midrule
+BRACS & 0 & \num{16796} & 85 & 103 \\
+ & 1 & \num{27202} & 89 & 103 \\
+ & 2 & \num{13982} & 78 & 103 \\
+\addlinespace
+TCGA-UT & 0 & \num{44792} & 917 & \num{4983} \\
+ & 1 & \num{52204} & 752 & \num{4983} \\
+ & 2 & \num{36988} & 671 & \num{4983} \\
+\bottomrule
+\end{tabular}
+\caption{Realized training evidence. Patch totals are identical in concentrated (C) and spread (S) support; patient breadth differs. Split identifiers follow the fixed benchmark partitions.}
+\label{tab:realized-support}
+\end{table}
+
+\noindent Every candidate in both hyperparameter grids was available for selection, and none of the eight selected settings lay at a grid boundary. BRACS selected $\lambda=1$ under concentrated support and $\lambda=0.1$ under spread support, with $k=250$ in both conditions. TCGA-UT selected $\lambda=0.01$ and $k=100$ in both conditions. These settings were selected using validation accuracy only.
+
+\subsection{Classifier gains and remaining coverage benefits}
+On BRACS, logistic regression reaches 44.99\% accuracy under concentrated support, close to the MLP's 44.81\%. Its gain of 0.19 points has an interval spanning $-0.59$ to 1.01 points, leaving both its direction and practical relevance uncertain. Under spread support, logistic regression also remains close to the MLP (47.43\% versus 47.72\%). Broader coverage improves the MLP by 2.91 points and logistic regression by 2.44 points; both intervals exclude zero. Neither lower bound exceeds the one-point practical threshold. The linear-probe interaction of 0.47 points is uncertain, so the comparison does not establish a shortage-specific advantage.
+
+\begin{table}[htbp]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Dataset & Readout & Accuracy C (\%) & Accuracy S (\%) & Benefit (points) \\
+\midrule
+BRACS & MLP & 44.81 & 47.72 & 2.91 \\
+ & & [41.67, 48.14] & [43.94, 51.48] & [0.91, 5.22] \\
+ & Logistic & 44.99 & 47.43 & 2.44 \\
+ & & [41.89, 48.13] & [43.55, 51.18] & [0.31, 4.98] \\
+ & $k$-NN & 42.47 & 43.72 & 1.25 \\
+ & & [39.26, 45.83] & [39.89, 47.29] & [$-0.65$, 3.42] \\
+\addlinespace
+TCGA-UT & MLP & 74.66 & 79.43 & 4.76 \\
+ & & [73.28, 75.91] & [78.15, 80.61] & [4.12, 5.40] \\
+ & Logistic & 75.15 & 79.84 & 4.70 \\
+ & & [73.77, 76.39] & [78.50, 81.08] & [4.04, 5.34] \\
+ & $k$-NN & 68.09 & 71.17 & 3.08 \\
+ & & [66.85, 69.35] & [69.89, 72.41] & [2.56, 3.58] \\
+\bottomrule
+\end{tabular}
+\caption{Patient-macro balanced accuracy and paired coverage benefit $B_h=A_{h,\spr}-A_{h,\conc}$. Brackets give 95\% intervals beneath point estimates. Coverage benefits remain positive for the MLP and logistic regression on both datasets; the BRACS nearest-neighbour interval includes zero.}
+\label{tab:results-accuracy}
+\end{table}
+
+\noindent On TCGA-UT, logistic regression improves on the MLP by 0.48 points under concentrated support (95\% interval: 0.28 to 0.70) and 0.42 points under spread support (0.17 to 0.67). Both gains exclude zero, but their upper bounds remain below one point. Broader coverage still adds 4.70 points to logistic regression, close to the MLP's 4.76-point benefit. The interaction is only 0.07 points ($-0.23$ to 0.36), which does not support a practically important shortage-specific gain. The concentrated linear probe also remains 4.28 points below the spread MLP by point estimate; no paired interval for this cross-condition comparison is included in the available results.
+
+\begin{table}[htbp]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Dataset & Probe & Shortage gain & Spread gain & Interaction \\
+\midrule
+BRACS & Logistic & 0.19 & $-0.28$ & 0.47 \\
+ & & [$-0.59$, 1.01] & [$-1.10$, 0.53] & [$-0.68$, 1.69] \\
+ & $k$-NN & $-2.34$ & $-4.00$ & 1.66 \\
+ & & [$-3.99$, $-0.56$] & [$-6.09$, $-1.76$] & [0.24, 3.04] \\
+\addlinespace
+TCGA-UT & Logistic & 0.48 & 0.42 & 0.07 \\
+ & & [0.28, 0.70] & [0.17, 0.67] & [$-0.23$, 0.36] \\
+ & $k$-NN & $-6.57$ & $-8.25$ & 1.68 \\
+ & & [$-7.25$, $-5.84$] & [$-8.99$, $-7.51$] & [1.03, 2.33] \\
+\bottomrule
+\end{tabular}
+\caption{Paired classifier gains over the MLP and their interaction, in percentage points, with 95\% intervals. Positive interactions for $k$-NN occur alongside negative gains: they indicate a smaller coverage benefit, not successful shortage mitigation.}
+\label{tab:results-contrasts}
+\end{table}
+
+\noindent Nearest neighbours perform worse than the MLP under both conditions on both datasets, with all four gain intervals wholly below zero. Their shortage deficits are 2.34 points on BRACS and 6.57 points on TCGA-UT. Spread support increases nearest-neighbour accuracy by 1.25 points on BRACS, with an interval including zero, and by 3.08 points on TCGA-UT, with an interval wholly above one point. The resulting positive interactions therefore reflect reduced responsiveness to coverage rather than an advantage over the reference classifier.
+
+\subsection{Split variation and secondary outcomes}
+The deterministic probes permit a direct check of split variation (Table~\ref{tab:probe-splits}). Logistic regression benefits from spread support in all three splits of each dataset. Its BRACS benefit varies from 0.27 to 4.60 points, compared with 4.31 to 5.10 points on TCGA-UT. BRACS nearest neighbours lose about 0.75 points in splits 0 and 1 and gain 5.25 points in split 2. Their pooled positive estimate thus conceals inconsistent responses. TCGA-UT nearest neighbours benefit in every split, by 2.33 to 4.31 points.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+ & & \multicolumn{2}{c}{Logistic regression} & \multicolumn{2}{c}{$k$-NN} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Dataset & Split & C & S & C & S \\
+\midrule
+BRACS & 0 & 47.37 & 49.82 & 45.41 & 44.67 \\
+ & 1 & 45.80 & 46.08 & 43.87 & 43.11 \\
+ & 2 & 41.80 & 46.40 & 38.13 & 43.38 \\
+\addlinespace
+TCGA-UT & 0 & 75.58 & 79.90 & 68.79 & 71.12 \\
+ & 1 & 74.50 & 79.18 & 67.25 & 71.56 \\
+ & 2 & 75.36 & 80.46 & 68.22 & 70.84 \\
+\bottomrule
+\end{tabular}
+\caption{Split-level patient-macro balanced accuracy (\%) for the selected deterministic probes. These descriptive estimates are correlated across splits and do not constitute independent replications.}
+\label{tab:probe-splits}
+\end{table}
+
+\noindent Patch-micro balanced accuracy changes the BRACS pattern. Averaged over splits, logistic regression scores 50.21\% under concentrated and 50.04\% under spread support, a difference of $-0.17$ points. Nearest neighbours score 44.72\% and 42.98\%, a difference of $-1.74$ points. Thus the positive patient-macro coverage estimates on BRACS do not extend to an endpoint that gives more influence to patients contributing more patches within a class. On TCGA-UT, the endpoints agree in direction: patch-micro accuracy increases from 75.77\% to 80.07\% for logistic regression and from 68.67\% to 71.86\% for nearest neighbours. These secondary estimates have no reported uncertainty intervals.
+
+Across the equally averaged split-level class recalls, spread support improves 5 of 7 BRACS classes for each probe, 25 of 30 TCGA-UT classes for logistic regression, and 26 of 30 for nearest neighbours. These descriptive counts show that coverage benefits are not confined to a single class, while also showing that not every class benefits. They neither measure the size of each class's effect nor establish class-specific improvements with uncertainty control.
+
+The available split-level and secondary MLP summaries represent only the first confirmation run, whereas the primary pooled analysis uses all five. They are therefore excluded from these secondary comparisons to preserve the stated MLP estimand. This restriction does not affect the primary accuracies, classifier gains, coverage benefits, or interactions in Tables~\ref{tab:results-accuracy} and~\ref{tab:results-contrasts}.

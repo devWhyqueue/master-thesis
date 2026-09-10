@@ -1,0 +1,294 @@
+{
+  "status": "pass",
+  "input_dim": 2560,
+  "splits": {
+    "0": {
+      "balanced": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch/split=0/data/manifest_balanced.csv",
+        "manifest_sha256": "a89752a04509914fcbdb15656a40ef188694f727c7cd5db61da468fe3ca6696f",
+        "cell_stats": {
+          "n_train": 44792,
+          "n_classes": 30,
+          "class_counts": {
+            "0": 1494,
+            "1": 1494,
+            "2": 1493,
+            "3": 1493,
+            "4": 1493,
+            "5": 1493,
+            "6": 1493,
+            "7": 1493,
+            "8": 1493,
+            "9": 1493,
+            "10": 1493,
+            "11": 1493,
+            "12": 1493,
+            "13": 1493,
+            "14": 1493,
+            "15": 1493,
+            "16": 1493,
+            "17": 1493,
+            "18": 1493,
+            "19": 1493,
+            "20": 1493,
+            "21": 1493,
+            "22": 1493,
+            "23": 1493,
+            "24": 1493,
+            "25": 1493,
+            "26": 1493,
+            "27": 1493,
+            "28": 1493,
+            "29": 1493
+          },
+          "n_patients_train": 917,
+          "n_patients_val": 1067,
+          "n_patients_test": 1067
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 238530
+        }
+      },
+      "balanced_spread": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch/split=0/data/manifest_native_balanced_spread.csv",
+        "manifest_sha256": "4f18a3abd7e6ee07112247acbda9b5f714916a2a6b9fe8830bd3561cd581f5ae",
+        "cell_stats": {
+          "n_train": 44792,
+          "n_classes": 30,
+          "class_counts": {
+            "0": 1494,
+            "1": 1494,
+            "2": 1493,
+            "3": 1493,
+            "4": 1493,
+            "5": 1493,
+            "6": 1493,
+            "7": 1493,
+            "8": 1493,
+            "9": 1493,
+            "10": 1493,
+            "11": 1493,
+            "12": 1493,
+            "13": 1493,
+            "14": 1493,
+            "15": 1493,
+            "16": 1493,
+            "17": 1493,
+            "18": 1493,
+            "19": 1493,
+            "20": 1493,
+            "21": 1493,
+            "22": 1493,
+            "23": 1493,
+            "24": 1493,
+            "25": 1493,
+            "26": 1493,
+            "27": 1493,
+            "28": 1493,
+            "29": 1493
+          },
+          "n_patients_train": 4983,
+          "n_patients_val": 1067,
+          "n_patients_test": 1067
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 238530
+        }
+      }
+    },
+    "1": {
+      "balanced": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch/split=1/data/manifest_balanced.csv",
+        "manifest_sha256": "8080263ccf044626f6e8bfb02e5c9dc83f12b74b1abec155796f99d8167732bd",
+        "cell_stats": {
+          "n_train": 52204,
+          "n_classes": 30,
+          "class_counts": {
+            "0": 1741,
+            "1": 1741,
+            "2": 1741,
+            "3": 1741,
+            "4": 1740,
+            "5": 1740,
+            "6": 1740,
+            "7": 1740,
+            "8": 1740,
+            "9": 1740,
+            "10": 1740,
+            "11": 1740,
+            "12": 1740,
+            "13": 1740,
+            "14": 1740,
+            "15": 1740,
+            "16": 1740,
+            "17": 1740,
+            "18": 1740,
+            "19": 1740,
+            "20": 1740,
+            "21": 1740,
+            "22": 1740,
+            "23": 1740,
+            "24": 1740,
+            "25": 1740,
+            "26": 1740,
+            "27": 1740,
+            "28": 1740,
+            "29": 1740
+          },
+          "n_patients_train": 752,
+          "n_patients_val": 1067,
+          "n_patients_test": 1067
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 241220
+        }
+      },
+      "balanced_spread": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch/split=1/data/manifest_native_balanced_spread.csv",
+        "manifest_sha256": "2349db5a78de94d7ebe40987649324476cf922605f74511b6f6f5918c4d0accd",
+        "cell_stats": {
+          "n_train": 52204,
+          "n_classes": 30,
+          "class_counts": {
+            "0": 1741,
+            "1": 1741,
+            "2": 1741,
+            "3": 1741,
+            "4": 1740,
+            "5": 1740,
+            "6": 1740,
+            "7": 1740,
+            "8": 1740,
+            "9": 1740,
+            "10": 1740,
+            "11": 1740,
+            "12": 1740,
+            "13": 1740,
+            "14": 1740,
+            "15": 1740,
+            "16": 1740,
+            "17": 1740,
+            "18": 1740,
+            "19": 1740,
+            "20": 1740,
+            "21": 1740,
+            "22": 1740,
+            "23": 1740,
+            "24": 1740,
+            "25": 1740,
+            "26": 1740,
+            "27": 1740,
+            "28": 1740,
+            "29": 1740
+          },
+          "n_patients_train": 4983,
+          "n_patients_val": 1067,
+          "n_patients_test": 1067
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 241220
+        }
+      }
+    },
+    "2": {
+      "balanced": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch/split=2/data/manifest_balanced.csv",
+        "manifest_sha256": "aa1c086a26cc7cc92e0873aafedd958016c945bbd5048e9b7d3e8ce588ac4bec",
+        "cell_stats": {
+          "n_train": 36988,
+          "n_classes": 30,
+          "class_counts": {
+            "0": 1232,
+            "1": 1232,
+            "2": 1233,
+            "3": 1233,
+            "4": 1233,
+            "5": 1233,
+            "6": 1233,
+            "7": 1233,
+            "8": 1233,
+            "9": 1233,
+            "10": 1233,
+            "11": 1233,
+            "12": 1233,
+            "13": 1233,
+            "14": 1233,
+            "15": 1233,
+            "16": 1233,
+            "17": 1233,
+            "18": 1233,
+            "19": 1233,
+            "20": 1233,
+            "21": 1233,
+            "22": 1233,
+            "23": 1233,
+            "24": 1233,
+            "25": 1233,
+            "26": 1233,
+            "27": 1233,
+            "28": 1233,
+            "29": 1233
+          },
+          "n_patients_train": 671,
+          "n_patients_val": 1067,
+          "n_patients_test": 1067
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 239960
+        }
+      },
+      "balanced_spread": {
+        "manifest_path": "/home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch/split=2/data/manifest_native_balanced_spread.csv",
+        "manifest_sha256": "1f34b3e9e3b30297740d556e8c7c8ec07d25fbeb734f070d923299095bf961d9",
+        "cell_stats": {
+          "n_train": 36988,
+          "n_classes": 30,
+          "class_counts": {
+            "0": 1232,
+            "1": 1232,
+            "2": 1233,
+            "3": 1233,
+            "4": 1233,
+            "5": 1233,
+            "6": 1233,
+            "7": 1233,
+            "8": 1233,
+            "9": 1233,
+            "10": 1233,
+            "11": 1233,
+            "12": 1233,
+            "13": 1233,
+            "14": 1233,
+            "15": 1233,
+            "16": 1233,
+            "17": 1233,
+            "18": 1233,
+            "19": 1233,
+            "20": 1233,
+            "21": 1233,
+            "22": 1233,
+            "23": 1233,
+            "24": 1233,
+            "25": 1233,
+            "26": 1233,
+            "27": 1233,
+            "28": 1233,
+            "29": 1233
+          },
+          "n_patients_train": 4983,
+          "n_patients_val": 1067,
+          "n_patients_test": 1067
+        },
+        "mlp_reference": {
+          "seeds": 5,
+          "n_test": 239960
+        }
+      }
+    }
+  }
+}
