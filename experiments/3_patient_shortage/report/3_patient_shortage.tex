@@ -82,7 +82,7 @@ For logistic regression, let \(z_j\in\mathbb{R}^{2560}\) and \(y_j\) denote the 
 \end{equation}
 \noindent where \(N\) is the allocation's patch count. The intercept is unpenalized. Use no standardization or class weighting and select
 \begin{equation}
-\lambda\in\{10^{-6},10^{-5},10^{-4},10^{-3},10^{-2},10^{-1},1\}.
+\lambda\in\{10^{-6},10^{-5},10^{-4},10^{-3},10^{-2},10^{-1},1,10,10^{2}\}.
 \label{eq:lambda}
 \end{equation}
 \noindent Defining the penalty relative to mean loss avoids ambiguity from software conventions that scale regularization with sample count. The stopping tolerance follows the same convention: convergence requires the largest absolute gradient component of Equation~\eqref{eq:linear} to fall below \(10^{-8}\). A solver that minimizes the summed rather than the mean loss therefore receives this tolerance multiplied by \(N\); applying \(10^{-8}\) to the summed objective would instead demand a mean-scale gradient below double-precision resolution and could not be met at any iteration count. Fit the convex objective with deterministic zero initialization and a full-batch solver to numerical convergence. Record solver, precision, stopping tolerance, iteration count, objective, and convergence status. Numerical retries may increase the iteration limit without changing the objective, candidate grid, or data. An unresolved failure makes that candidate unavailable across all three splits for its selection unit; record the failure and do not interpret the resulting search as complete. If no candidate converges throughout, that readout is unavailable.
@@ -94,12 +94,12 @@ For cosine \(k\)-NN, normalize each nonzero feature as \(u=z/\lVert z\rVert_2\).
 \begin{equation}
 \widehat y(u)=\arg\max_{c\in\{1,\ldots,K\}}
 \sum_{j\in\mathcal{N}_k(u)}\mathbf{1}\{y_j=c\},
-\qquad k\in\{1,5,20,100\}.
+\qquad k\in\{1,5,20,100,250,500\}.
 \label{eq:knn}
 \end{equation}
-\noindent Sort equal similarities by patch identifier and resolve equal class votes by fixed class order. Preflight requires finite features, nonzero norms, and at least 100 training patches per allocation. A failed check stops the affected comparison rather than silently dropping patches. Multiple neighbours may come from the same patient: this is a patch-neighbour readout, not an equal-patient intervention. Compute exact neighbours in query and bank batches, retaining the top 100 so all four candidates share one search. Do not materialize the full query-by-training distance matrix or substitute approximate search.
+\noindent Sort equal similarities by patch identifier and resolve equal class votes by fixed class order. Preflight requires finite features, nonzero norms, and at least 100 training patches per allocation. A failed check stops the affected comparison rather than silently dropping patches. Multiple neighbours may come from the same patient: this is a patch-neighbour readout, not an equal-patient intervention. Compute exact neighbours in query and bank batches, retaining the top 500 so all six candidates share one search. Do not materialize the full query-by-training distance matrix or substitute approximate search.
 
-For each probe, select one hyperparameter separately for each dataset and support condition. Maximize validation patient-macro balanced accuracy averaged equally over the three splits. Treat differences no larger than \(10^{-10}\) on the proportion scale as numerical ties; choose larger \(\lambda\) or larger \(k\). A boundary winner remains a boundary winner: no adaptive grid expansion. Retain each split's training-only fit or bank for test prediction; do not merge training and validation after selection. Lock all choices before inspecting any new test predictions.
+For each probe, select one hyperparameter separately for each dataset and support condition. Maximize validation patient-macro balanced accuracy averaged equally over the three splits. Treat differences no larger than \(10^{-10}\) on the proportion scale as numerical ties; choose larger \(\lambda\) or larger \(k\). Retain each split's training-only fit or bank for test prediction; do not merge training and validation after selection. Lock all choices before inspecting any new test predictions.
 
 This gives each probe a small, explicit search. The MLP retains its historical, larger search budget. Readout gains consequently identify an alternative pipeline that extracts useful information, not the causal contribution of architecture alone. Because patients can change roles between repeated splits, pooled validation selection and reused cohorts do not constitute a fresh independent confirmation.
 

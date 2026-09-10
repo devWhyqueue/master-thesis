@@ -144,14 +144,15 @@ def _val_knn(
 def decode_shard_index(shard_index: int) -> tuple[int, str, int]:
     """Decode a probe-val array index into (split_index, support, unit).
 
-    Layout: ``split = idx // 16``, ``support = SUPPORTS[(idx % 16) // 8]``,
-    ``unit = idx % 8`` where units 0..6 index ``LAMBDAS`` and unit 7 runs the
-    k-NN search. One task per lambda keeps each SLURM task's wall clock
-    bounded by a single L-BFGS fit instead of the whole lambda grid.
+    Units run ``len(LAMBDAS)`` lambda fits followed by one k-NN search, and are
+    nested inside support, which is nested inside split. One task per lambda
+    keeps each SLURM task's wall clock bounded by a single L-BFGS fit instead
+    of the whole lambda grid.
     """
-    split_index = shard_index // 16
-    support = SUPPORTS[(shard_index % 16) // 8]
-    unit = shard_index % 8
+    units = len(LAMBDAS) + 1
+    split_index = shard_index // (units * len(SUPPORTS))
+    support = SUPPORTS[(shard_index // units) % len(SUPPORTS)]
+    unit = shard_index % units
     return split_index, support, unit
 
 

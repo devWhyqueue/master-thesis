@@ -102,7 +102,7 @@ def test_selection_tie_rule_prefers_larger(tmp_path):
     }
     for s_idx in range(3):
         # 1e-6 and 1e-5 have identical validation accuracy
-        for lam in (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0):
+        for lam in LAMBDAS:
             r_dir = (
                 tmp_path
                 / f"split={s_idx}"
@@ -167,16 +167,17 @@ def test_interaction_algebraic_identity():
 
 
 def test_decode_shard_index_covers_grid_exactly_once():
-    """All 48 probe-val shard indices cover 3 splits x 2 supports x 8 units once."""
+    """Probe-val shard indices cover 3 splits x 2 supports x every unit once."""
+    n_shards = 3 * len(SUPPORTS) * (len(LAMBDAS) + 1)
     seen = set()
-    for shard_index in range(48):
+    for shard_index in range(n_shards):
         split_index, support, unit = decode_shard_index(shard_index)
         assert split_index in range(3)
         assert support in SUPPORTS
         assert unit in range(len(LAMBDAS) + 1)
         seen.add((split_index, support, unit))
 
-    assert len(seen) == 48
+    assert len(seen) == n_shards
     assert seen == {
         (s, c, u) for s in range(3) for c in SUPPORTS for u in range(len(LAMBDAS) + 1)
     }

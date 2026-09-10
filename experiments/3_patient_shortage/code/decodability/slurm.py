@@ -11,7 +11,7 @@ from imbalance_benchmark.hydra.guards import check_queue_cap
 from imbalance_benchmark.hydra.job_resources import resources_for
 from imbalance_benchmark.hydra.rendering import SlurmJob, render_sbatch
 
-from decodability import SUPPORTS
+from decodability import LAMBDAS, SUPPORTS
 
 __all__ = ["build_workflow", "submit_workflow"]
 
@@ -40,9 +40,9 @@ def _job(
     )
 
 
-# probe-val shard index decodes as: split = idx // 16, condition = SUPPORTS[(idx % 16)
-# // 8], unit = idx % 8, where units 0..6 index LAMBDAS and unit 7 is the k-NN search.
-PROBE_VAL_ARRAY_SIZE = 48
+# probe-val shards run 3 splits x SUPPORTS x (one task per lambda plus one k-NN
+# search); see decode_shard_index for the addressing.
+PROBE_VAL_ARRAY_SIZE = 3 * len(SUPPORTS) * (len(LAMBDAS) + 1)
 
 
 def build_workflow(config: dict[str, Any]) -> list[SlurmJob]:

@@ -31,7 +31,7 @@ MLP_ASSIGNMENT: dict[str, str] = {
     "balanced_spread": "native",
 }
 READOUTS: tuple[str, ...] = ("mlp", "logreg", "knn")
-LAMBDAS: tuple[float, ...] = (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0)
+LAMBDAS: tuple[float, ...] = (1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0)
 K_VALUES: tuple[int, ...] = (1, 5, 20, 100, 250, 500)
 NEIGHBOUR_TOP: int = 500
 TIE_TOLERANCE: float = 1e-10  # proportion scale
