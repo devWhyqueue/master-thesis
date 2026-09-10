@@ -1,0 +1,164 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{siunitx}
+\sisetup{group-digits=integer,group-separator={,},group-minimum-digits=4}
+\newcommand{\conc}{\mathrm{C}}
+\newcommand{\spr}{\mathrm{S}}
+\title{Patient Shortage in Histopathology:\\Unequal Influence or Coverage Limitation?}
+\author{Yannik Queisler}
+\date{September 10, 2026}
+
+\begin{document}
+\raggedbottom
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Reducing the number of training patients can impair classification even when class patch counts remain fixed. The preceding experiments found that several learning methods and alternative classifiers recover little of this damage. This prospective experiment asks whether unequal patient influence contributes to the remaining deficit. Multinomial logistic regression is compared under ordinary patch-average and patient-average training, using identical concentrated and spread patient allocations from BRACS and TCGA-UT. Patient averaging gives each contributing patient equal loss mass within a class while preserving that class's total influence. Frozen features, existing splits, and selected regularization remain fixed. The comparison separates the gain from equalizing patient influence from the benefit of broader coverage that remains afterwards. A residual coverage benefit would identify a limitation of this correction, without establishing which missing variation causes the loss.
+\end{abstract}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+The thesis distinguishes nominal support, the number of labelled examples, from independent support, the number of patients supplying them. Patches from one patient share biological and acquisition characteristics, so their count need not reflect the amount of independent evidence. Within-class diversity is a separate, representation-dependent description of observed variation \citep{queisler2026imbalanceMethods}.
+
+The benchmark reduced patient support while holding class patch counts fixed. Discrimination losses reached 2.62--3.03 percentage points on BRACS and 4.76--4.83 points on TCGA-UT. Tested methods left these losses largely unrecovered \citep{queisler2026benchmarkResults}. Experiment~3 then compared the original multilayer perceptron with logistic regression and cosine nearest neighbours. Under concentrated support, logistic regression improved patient-macro balanced accuracy by only 0.19 points on BRACS and 0.48 points on TCGA-UT. Broader coverage benefited logistic regression by 2.44 points (95\% interval: 0.31 to 4.98) and 4.70 points (4.04 to 5.34), respectively \citep{queisler2026patientShortage}. These findings limit the classifier explanation within the tested procedures; they do not exclude better classifiers.
+
+Two explanations motivate the next controlled comparison. Under \emph{unequal patient influence}, patients supplying more patches disproportionately shape the fitted decision rule. Giving patients equal influence could improve generalization without adding observations. Under a \emph{residual coverage limitation}, broader patient coverage remains beneficial after that correction. Both explanations can hold together. The experiment therefore asks whether equalizing influence improves the shortage-trained classifier, and how much coverage benefit remains.
+
+This intervention tests a specific mechanism rather than treating a general loss of ``effective information'' as an independently measurable cause. Equal weighting neither removes correlations between patches nor supplies unobserved variation. Moreover, the benchmark already samples round-robin across patients and limits contributions. An audit of the remaining inequality is essential to interpreting the comparison.
+
+\section{Controlled comparison}
+\label{sec:design}
+BRACS retains its seven lesion classes and TCGA-UT its 30 eligible cancer types. Both retain the benchmark's eligibility rules, class order, and frozen 2560-dimensional Virchow2 features, formed by concatenating the CLS token and mean patch token. The three existing train--validation--test splits remain fixed. BRACS patients and TCGA-UT participants are called patients below; they are disjoint between partitions within each split \citep{queisler2026benchmarkProtocol}.
+
+Concentrated support (\(\conc\)) and spread support (\(\spr\)) reuse Experiment~3's exact balanced training allocations: the shared concentrated allocation and the spread allocation under native class assignment. Class-specific patch counts match between support conditions within each split. The two objectives receive identical patches within each condition; no patients or patches are resampled. Validation and test cohorts retain their natural distributions.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+Patient support & Patch-average loss & Patient-average loss \\
+\midrule
+Concentrated & Existing logistic baseline & Weighted fit on identical patches \\
+Spread & Existing logistic baseline & Weighted fit on identical patches \\
+\bottomrule
+\end{tabularx}
+\caption{Four cells per dataset and split compare two objectives under two support conditions, isolating the weighting intervention within each condition.}
+\label{tab:design}
+\end{table}
+
+\noindent The inherited allocations contain \num{13982}--\num{27202} patches per BRACS split, with 78--89 concentrated patients and 103 spread patients. TCGA-UT contains \num{36988}--\num{52204} patches, with 671--917 concentrated patients and \num{4983} spread patients \citep{queisler2026patientShortage}. These unequal shortage doses prevent attributing differences in effect size to intrinsic dataset susceptibility. The support contrast also changes patient identities and within-patient patch contributions; it does not isolate patient count alone.
+
+There are \(2\) datasets \(\times\,3\) splits \(\times\,2\) support conditions \(\times\,2\) objectives, or 24 evaluated cells. Twelve patch-average baselines can be reused after verifying feature provenance, patch and patient identities, labels, partitions, regularization, solver settings, convergence, and prediction alignment. The remaining 12 cells require weighted fits. A baseline failing these checks must be reproduced under the specified settings before comparison; it is not replaced by a different allocation or classifier.
+
+\section{Training objective and patient influence}
+\label{sec:objective}
+For one training allocation, let \(N\) be its total patch count, \(n_c\) the count for class \(c\), and \(G_c\) the number of patients contributing to that class. Patient \(i\) contributes \(m_{ic}>0\) such patches, whose indices form \(\mathcal J_{ic}\). Thus \(n_c=\sum_{i=1}^{G_c}m_{ic}\). Logistic regression predicts class probabilities from \(Wz_j+b\), where \(z_j\) is a frozen feature vector, \(W\) the coefficient matrix, and \(b\) an unpenalized intercept. Its cross-entropy for patch \(j\) is \(\ell_j=-\log p(y_j\mid z_j)\).
+
+Ordinary training gives each patch equal weight. Patient-average training instead uses
+\begin{equation}
+ w_j=\frac{n_c}{G_c m_{ic}}\quad(j\in\mathcal J_{ic}),
+ \qquad
+ L_{\mathrm{patient}}=\frac1N\sum_{j=1}^{N}w_j\ell_j
+ +\frac{\lambda}{2}\lVert W\rVert_F^2.
+ \label{eq:objective}
+\end{equation}
+\noindent Each patient then contributes total weight \(n_c/G_c\) within class \(c\). Equivalently, the data term averages patch losses within a patient, averages patients within a class, and combines classes with their unchanged shares \(n_c/N\):
+\begin{equation}
+ \frac1N\sum_jw_j\ell_j
+ =\sum_{c=1}^{K}\frac{n_c}{N}\frac1{G_c}
+ \sum_{i=1}^{G_c}\frac1{m_{ic}}\sum_{j\in\mathcal J_{ic}}\ell_j.
+ \label{eq:patient-average}
+\end{equation}
+\noindent Here \(K\) is the number of classes. Preserving \(n_c/N\) also preserves small integer-rounding differences in the balanced allocations. A patient contributing several classes enters each class separately; the objective does not force equal total influence across such patients irrespective of class.
+
+The weights satisfy \(\sum_{j:y_j=c}w_j=n_c\) and \(\sum_jw_j=N\). Their mean is one, so weighting does not change the loss scale relative to regularization. If all patients contribute equal numbers of patches within each class, every weight equals one and the two objectives coincide.
+
+\subsection{Fixed fitting procedure}
+Both objectives use Experiment~3's deterministic full-batch multinomial logistic regression, float64 fitting, L-BFGS solver, and unchanged feature preprocessing. Table~\ref{tab:regularization} fixes the selected regularization. The mean-objective tolerance remains \(10^{-8}\), with at most \num{10000} iterations. For the inherited solver convention, \(C=1/(N\lambda)\) and the supplied tolerance is \(N\times10^{-8}\); weighting must retain total weight \(N\) so this objective mapping remains valid. Only converged fits enter analysis. Nonconvergence is reported and resolved numerically before interpreting the affected contrast, without silently changing regularization.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Dataset & Concentrated \(\lambda\) & Spread \(\lambda\) \\
+\midrule
+BRACS & 1 & 0.1 \\
+TCGA-UT & 0.01 & 0.01 \\
+\bottomrule
+\end{tabular}
+\caption{Experiment~3's validation-selected settings, frozen for both objectives across all three splits. No further hyperparameter search is performed.}
+\label{tab:regularization}
+\end{table}
+
+\noindent Prediction selects the largest logit, resolving ties by the fixed class order. Validation and test patients never enter fitting or weight calculation. Freezing regularization isolates the weighting change within each support condition. On BRACS, the coverage contrast remains a comparison of procedures with different inherited regularization; it is not a fixed-regularization patient-count effect.
+
+\subsection{Contribution audit}
+Before fitting, report \(n_c\), \(G_c\), the minimum and maximum \(m_{ic}\), and the largest patient share \(\max_i(m_{ic}/n_c)\), for every class, split, and support condition. Quantify departure from equal influence by
+\begin{equation}
+ D_c=\frac12\sum_{i=1}^{G_c}\left|\frac{m_{ic}}{n_c}-\frac1{G_c}\right|.
+ \label{eq:influence}
+\end{equation}
+\noindent This is the fraction of within-class loss mass redistributed by patient averaging; zero means the objectives already coincide for that class. It measures contribution inequality, not feature redundancy or effective sample size. Verify positive weights, preserved class totals, total weight \(N\), and unit weights under equal contributions. Exact patch identities must match across objectives, and class patch counts must match across support conditions. The existing 10\% patient and 5\% slide contribution caps remain properties of the inherited sample allocation, not extra caps on the new loss weights.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The primary endpoint is \emph{patient-macro balanced accuracy}, retaining Experiment~3's equal weighting of patients within each class. For split \(r\), let \(\mathcal P_{rc}\) be test patients with at least one patch of true class \(c\). Their within-patient class recalls are \(q_{irc}\). The split score is
+\begin{equation}
+ A_r=\frac1K\sum_{c=1}^{K}\frac1{|\mathcal P_{rc}|}
+ \sum_{i\in\mathcal P_{rc}}q_{irc},
+ \qquad
+ q_{irc}=\frac1{|\mathcal J^{\mathrm{test}}_{irc}|}
+ \sum_{j\in\mathcal J^{\mathrm{test}}_{irc}}\mathbf1\{\widehat y_j=c\}.
+ \label{eq:accuracy}
+\end{equation}
+\noindent Here \(\mathcal J^{\mathrm{test}}_{irc}\) contains that patient's evaluated patches of class \(c\). The final score averages the three split scores equally, separately for each dataset. Secondary endpoints are class-specific patient-macro recalls and patch-micro balanced accuracy, which pools patches within class before averaging classes. Probability quality and calibration are outside this experiment's scope.
+
+Let \(A_{o,s}\) denote the pooled score for objective \(o\in\{\mathrm{patch},\mathrm{patient}\}\) under support \(s\in\{\conc,\spr\}\). The contrasts are
+\begin{align}
+ W_s&=A_{\mathrm{patient},s}-A_{\mathrm{patch},s}, &&\text{weighting gain},\label{eq:gain}\\
+ B_o&=A_{o,\spr}-A_{o,\conc}, &&\text{coverage benefit},\label{eq:coverage}\\
+ I&=W_{\conc}-W_{\spr}=B_{\mathrm{patch}}-B_{\mathrm{patient}},
+ &&\text{interaction}.\label{eq:interaction}
+\end{align}
+\noindent The primary questions concern \(W_{\conc}\) and \(B_{\mathrm{patient}}\). Report all four accuracies, both weighting gains, both coverage benefits, and the interaction in percentage points. A positive interaction means the coverage gap shrinks, but could arise because spread performance deteriorates. It is therefore interpreted alongside the absolute scores and both gains, not as sufficient evidence of repair.
+
+Uncertainty uses 2,000 paired Bayesian-bootstrap replicates, with the inherited seed \texttt{20260909}. Within each dataset, draw one vector of weights from \(\mathrm{Dirichlet}(1,\ldots,1)\) over distinct test patients. Share each patient's weight across both objectives, both support conditions, all classes, and every test appearance across splits. Replace each within-class patient mean in Equation~\eqref{eq:accuracy} by its weighted mean, normalizing over the patients present in that class and split; then average splits and calculate contrasts. Report the 2.5th and 97.5th percentiles as individual exploratory 95\% intervals, together with split-level point estimates. There is no initialization resampling for deterministic fits and no multiplicity-adjusted confirmatory claim.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+One percentage point is the prespecified practical-relevance threshold, as in Experiment~3. A point estimate above one point is practically promising; a lower interval bound above one point supports a positive effect exceeding that threshold. Intervals crossing zero remain inconclusive about direction. An interval excluding zero but overlapping one point supports direction without establishing a practically meaningful gain. A negligible residual coverage difference requires the entire interval for \(B_{\mathrm{patient}}\) to lie within \([-1,1]\) points.
+
+\begin{table}[htbp]
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Observed pattern & Supported interpretation \\
+\midrule
+Positive \(W_{\conc}\), larger than \(W_{\spr}\) & Equalizing influence helps under shortage, with an additional shortage-specific benefit if the interaction is supported. \\
+Positive \(W_{\conc}\) and residual \(B_{\mathrm{patient}}\) & Unequal influence contributes, but the correction leaves a coverage benefit. \\
+Residual \(B_{\mathrm{patient}}\), little supported \(W_{\conc}\) & The tested correction does not explain away the coverage deficit; a null gain alone does not exclude an influence effect. \\
+Positive \(W_{\conc}\), residual interval within \([-1,1]\) & The coverage gap is practically negligible under patient averaging, conditional on the fixed design. Check spread accuracy for deterioration. \\
+\bottomrule
+\end{tabularx}
+\caption{Prospective interpretations. Effect magnitude and uncertainty qualify every pattern; these are not experimental findings.}
+\label{tab:interpretation}
+\end{table}
+
+\noindent Interpret weighting gains together with the contribution audit. Near-zero \(D_c\) means the intervention changes little in that class, so a null result provides little evidence about strongly unequal patient influence elsewhere. Similar gains in both support conditions indicate a general weighting benefit rather than an explanation specific to patient shortage. Broad or conflicting intervals leave the mechanism unresolved.
+
+\section{Limitations}
+\label{sec:limitations}
+This experiment is conditional on the exact allocations and cohorts that motivated the hypothesis. Its intervals describe held-out patient variation, not variation from new training-patient draws, hyperparameter selection, or another population. Shared bootstrap weights account for repeated test patients but do not remove dependence from overlapping training and validation partitions. Fixed regularization tests this intervention at the inherited settings, not the best attainable patient-average procedure.
+
+A residual coverage benefit cannot distinguish missing morphology, acquisition variation, patient composition, or within-patient sampling. Patient averaging changes influence without removing patch redundancy. Neither a residual deficit nor a null gain establishes an information ceiling, intrinsic inseparability, or classifier impossibility. Feature diversity, patch depth, fresh allocations, additional readouts, and other representations require separate experiments.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
