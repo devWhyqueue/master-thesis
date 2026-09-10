@@ -28,6 +28,7 @@ class LinearFitResult:
     n_iter: int
     objective: float
     converged: bool
+    weighted: bool
 
 
 def _compute_objective(
@@ -36,6 +37,7 @@ def _compute_objective(
     coef: np.ndarray,
     intercept: np.ndarray,
     lambda_val: float,
+    sample_weight: np.ndarray | None = None,
 ) -> float:
     """Compute mean cross-entropy loss + lambda / 2 * ||W||_F^2."""
     logits = features @ coef.T + intercept
@@ -45,13 +47,23 @@ def _compute_objective(
 
     n_samples = len(labels)
     chosen_probs = np.clip(probs[np.arange(n_samples), labels], 1e-15, 1.0)
-    mean_ce = -float(np.mean(np.log(chosen_probs)))
+    log_probs = np.log(chosen_probs)
+    mean_ce = -float(
+        np.mean(log_probs)
+        if sample_weight is None
+        else np.average(log_probs, weights=sample_weight)
+    )
     l2_penalty = (lambda_val / 2.0) * float(np.sum(coef**2))
     return mean_ce + l2_penalty
 
 
 def _fit_once(
-    features: np.ndarray, labels: np.ndarray, c_val: float, max_iter: int, tol: float
+    features: np.ndarray,
+    labels: np.ndarray,
+    c_val: float,
+    max_iter: int,
+    tol: float,
+    sample_weight: np.ndarray | None = None,
 ) -> tuple[LogisticRegression, bool]:
     """Run one L-BFGS fit and track ConvergenceWarning."""
     model = LogisticRegression(
@@ -66,29 +78,27 @@ def _fit_once(
     )
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", ConvergenceWarning)
-        model.fit(features, labels)
+        model.fit(features, labels, sample_weight=sample_weight)
         has_conv_warn = any(issubclass(w.category, ConvergenceWarning) for w in caught)
     return model, not has_conv_warn
 
 
-def fit_multinomial_logistic(
-    features: np.ndarray,
-    labels: np.ndarray,
+def _build_result(
+    model: LogisticRegression,
+    feat64: np.ndarray,
+    lab_int: np.ndarray,
     lambda_val: float,
-    tol: float = 1e-8,
-    max_iter: int = 10000,
+    c_val: float,
+    tol: float,
+    solver_tol: float,
+    max_iter: int,
+    conv: bool,
+    weight64: np.ndarray | None,
 ) -> LinearFitResult:
-    """Fit with C = 1 / (N * lambda) and ``tol`` as a gradient tolerance on the mean
-    objective; scikit-learn applies its own ``tol`` to the summed objective, so the
-    solver receives ``tol * N``.
-    """
-    feat64, lab_int = np.asarray(features, np.float64), np.asarray(labels, np.int64)
-    n_samples = feat64.shape[0]
-    c_val, solver_tol = 1.0 / (n_samples * lambda_val), tol * n_samples
-    model, conv = _fit_once(feat64, lab_int, c_val, max_iter, solver_tol)
+    """Assemble a LinearFitResult from a fitted model and its solver settings."""
     w = np.asarray(model.coef_, dtype=np.float64)
     b = np.asarray(model.intercept_, dtype=np.float64)
-    obj = _compute_objective(feat64, lab_int, w, b, lambda_val)
+    obj = _compute_objective(feat64, lab_int, w, b, lambda_val, weight64)
     return LinearFitResult(
         w,
         b,
@@ -102,6 +112,39 @@ def fit_multinomial_logistic(
         int(model.n_iter_[0]),
         obj,
         conv,
+        weight64 is not None,
+    )
+
+
+def fit_multinomial_logistic(
+    features: np.ndarray,
+    labels: np.ndarray,
+    lambda_val: float,
+    tol: float = 1e-8,
+    max_iter: int = 10000,
+    sample_weight: np.ndarray | None = None,
+) -> LinearFitResult:
+    """Fit with C = 1 / (N * lambda) and ``tol`` as a gradient tolerance on the mean
+    objective; scikit-learn applies its own ``tol`` to the summed objective, so the
+    solver receives ``tol * N``. ``sample_weight``, when given, must sum to N so this
+    mapping stays valid.
+    """
+    feat64, lab_int = np.asarray(features, np.float64), np.asarray(labels, np.int64)
+    n_samples = feat64.shape[0]
+    weight64 = None if sample_weight is None else np.asarray(sample_weight, np.float64)
+    c_val, solver_tol = 1.0 / (n_samples * lambda_val), tol * n_samples
+    model, conv = _fit_once(feat64, lab_int, c_val, max_iter, solver_tol, weight64)
+    return _build_result(
+        model,
+        feat64,
+        lab_int,
+        lambda_val,
+        c_val,
+        tol,
+        solver_tol,
+        max_iter,
+        conv,
+        weight64,
     )
 
 

@@ -1,0 +1,49 @@
+# BRACS patient-influence cell (exp-4 reuse: unequal patient influence vs. residual
+# coverage limitation).
+#
+# dataset/feature_extraction blocks are copied from
+# experiments/3_patient_shortage/configs/bracs.yaml (for regime detection and
+# baseline provenance verification only; this experiment extracts nothing).
+# CPU-only execution on Hydra.
+
+paths:
+  outputs: experiments/4_patient_influence/outputs/bracs/patch
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+  seed: 0
+  version: bracs-official-release
+  eligibility_rules:
+    metadata: official_BRACS_xlsx_rows_with_patient_slide_roi_and_subtype
+    images: roi_filename_stem_matches_released_image
+    labels: seven_class_official_roi_subtype
+    tiling: non_overlapping_full_256x256_tiles
+    split_unit: patient
+  root: /home/space/datasets/patho_ds/BRACS
+  tile_root: /tmp/bracs_roi_tiles
+  tile_squashfs: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch/prepared/roi_tiles.sqfs
+  tile_size: 256
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  weights_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/4_patient_influence/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch
+  container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch
+  exp3_outputs: /home/yannik.qu/master-thesis/experiments/3_patient_shortage/outputs/bracs/patch
+  max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
+  resources:
+    preflight: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 64G}
+    fit: {partition: cpu-2h, gpus: 0, cpus: 16, memory: 64G}
+    analyze: {partition: cpu-2h, gpus: 0, cpus: 8, memory: 64G}
+  squashfs: []
