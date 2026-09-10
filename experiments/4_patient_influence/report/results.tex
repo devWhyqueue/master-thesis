@@ -1,0 +1,98 @@
+\section{Results}
+\label{sec:results}
+Patient averaging does not reduce the established coverage deficit. Its pooled accuracy changes are negative on BRACS and close to zero on TCGA-UT, while spread support remains beneficial. The contribution distributions show that these outcomes arise under substantially different degrees of initial patient inequality.
+
+\subsection{Realized patient contributions}
+All twelve training-allocation audits passed, including matching class patch counts across support conditions, baseline compatibility, and preservation of class and total loss mass. All twelve patient-average fits converged. The regularization values in Table~\ref{tab:regularization} were retained. Each BRACS split contains 24 validation and 24 test patients; each TCGA-UT split contains \num{1067} in each partition. These are per-split counts, with possible patient overlap across repeated splits.
+
+Table~\ref{tab:contribution-results} summarizes the realized contribution distributions. BRACS exhibits appreciable inequality despite the allocation caps. Under concentrated support, \(D_c\) ranges from 4.27\% to 36.31\%, with an unweighted mean of 20.41\% across class--split combinations. Under spread support, the range is 2.74\%--35.58\% and the mean is 17.42\%. Patient averaging therefore produces a substantial intervention in both conditions.
+
+\begin{table}[htbp]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Dataset & Support & Patients \(G_c\) & Patches \(m_{ic}\) & Max. share (\%) & \(D_c\) (\%) \\
+\midrule
+BRACS & C & 20--49 & 1--375 & 9.65 & 4.27--36.31 \\
+& S & 30--69 & 1--339 & 8.72 & 2.74--35.58 \\
+TCGA-UT & C & 20--44 & 20--154 & 8.85 & 0.00--3.85 \\
+& S & 30--514 & 2--58 & 3.41 & 0.00--9.99 \\
+\bottomrule
+\end{tabular}
+\caption{Contribution ranges across classes and splits. Patch counts refer to individual patients within a class. Maximum share is the largest observed fraction of a class's patches supplied by one patient. \(D_c\), from Equation~\eqref{eq:influence}, measures the fraction of class loss mass redistributed by patient averaging.}
+\label{tab:contribution-results}
+\end{table}
+
+\noindent TCGA-UT contributions are much closer to equal. Concentrated-support \(D_c\) ranges from zero to 3.85\%, with a mean of 0.48\%. Spread-support \(D_c\) ranges from zero to 9.99\%, with a mean of 1.99\%. A relatively large maximum patient share under concentrated support can therefore reflect few contributing patients rather than substantial inequality among them. The full class- and split-specific contribution summaries accompany the report as supplementary data.
+
+\subsection{Weighting gains and residual coverage benefits}
+On BRACS, patient averaging reduces concentrated-support accuracy from 44.99\% to 43.63\% and spread-support accuracy from 47.43\% to 46.36\% (Table~\ref{tab:accuracy-results}). The corresponding changes are $-1.36$ and $-1.08$ points. Both intervals include zero, so neither establishes deterioration. However, their upper bounds, 0.18 and 0.42 points, are below the one-point threshold for a practically meaningful improvement.
+
+\begin{table}[htbp]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Dataset & Objective & Accuracy C (\%) & Accuracy S (\%) & Benefit (points) \\
+\midrule
+BRACS & Patch-average & 44.99 & 47.43 & 2.44 \\
+& & [41.89, 48.13] & [43.55, 51.18] & [0.31, 4.98] \\
+& Patient-average & 43.63 & 46.36 & 2.73 \\
+& & [40.57, 46.62] & [43.15, 49.58] & [0.67, 5.15] \\
+\addlinespace
+TCGA-UT & Patch-average & 75.15 & 79.84 & 4.70 \\
+& & [73.77, 76.39] & [78.50, 81.08] & [4.04, 5.34] \\
+& Patient-average & 75.14 & 79.84 & 4.70 \\
+& & [73.76, 76.38] & [78.49, 81.08] & [4.04, 5.32] \\
+\bottomrule
+\end{tabular}
+\caption{Patient-macro balanced accuracy and coverage benefit \(B_o=A_{o,\spr}-A_{o,\conc}\), averaged equally across three splits. Brackets contain paired-bootstrap 95\% intervals. Benefits are calculated before rounding the component accuracies.}
+\label{tab:accuracy-results}
+\end{table}
+
+\noindent Broader coverage still benefits patient-average training by 2.73 points on BRACS (95\% interval: 0.67 to 5.15). The interval supports a positive benefit but does not establish that it exceeds one point. The interaction is $-0.29$ points ($-1.88$ to 1.33), providing no supported shortage-specific gain from weighting. The point estimate of the coverage gap is slightly larger after patient averaging.
+
+\begin{table}[htbp]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Dataset & Weighting gain \(W_{\conc}\) & Weighting gain \(W_{\spr}\) & Interaction \(I\) \\
+\midrule
+BRACS & $-1.363$ & $-1.077$ & $-0.286$ \\
+& [$-3.089$, 0.175] & [$-3.183$, 0.421] & [$-1.884$, 1.325] \\
+TCGA-UT & $-0.004$ & $-0.007$ & 0.004 \\
+& [$-0.017$, 0.009] & [$-0.030$, 0.013] & [$-0.021$, 0.031] \\
+\bottomrule
+\end{tabular}
+\caption{Paired weighting effects in percentage points, with individual 95\% intervals. Three decimal places retain the small TCGA-UT effects. Positive values favour patient averaging; a positive interaction indicates a larger gain under concentrated support.}
+\label{tab:weighting-results}
+\end{table}
+
+\noindent On TCGA-UT, both objectives achieve almost identical accuracy. Concentrated-support weighting changes accuracy by $-0.004$ points (95\% interval: $-0.017$ to 0.009), and spread-support weighting by $-0.007$ points ($-0.030$ to 0.013). Both intervals lie entirely within $\pm1$ point. The residual coverage benefit is 4.70 points (4.04 to 5.32), virtually unchanged from the patch-average benefit. The near-zero interaction likewise provides no indication that weighting closes the coverage gap. Neither dataset meets the criterion for a practically negligible residual coverage difference.
+
+\subsection{Split consistency and secondary outcomes}
+Coverage benefits under patient averaging are positive in all three splits of both datasets (Table~\ref{tab:split-results}). BRACS concentrated-support weighting gains are negative in every split, while spread-support gains change sign. TCGA-UT weighting changes remain within 0.05 points of zero in each split and condition. The much wider range of BRACS coverage effects reinforces the uncertainty in its pooled estimate.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Dataset & Split & \(W_{\conc}\) & \(W_{\spr}\) & \(B_{\mathrm{patch}}\) & \(B_{\mathrm{patient}}\) \\
+\midrule
+BRACS & 0 & $-1.28$ & $-2.14$ & 2.45 & 1.59 \\
+& 1 & $-0.10$ & 0.18 & 0.27 & 0.55 \\
+& 2 & $-2.70$ & $-1.27$ & 4.60 & 6.04 \\
+TCGA-UT & 0 & 0.008 & 0.014 & 4.31 & 4.32 \\
+& 1 & $-0.008$ & 0.005 & 4.68 & 4.69 \\
+& 2 & $-0.011$ & $-0.041$ & 5.10 & 5.07 \\
+\bottomrule
+\end{tabular}
+\caption{Split-level point estimates in percentage points. The split identifiers refer to the fixed patient-disjoint partitions. The splits can share patients and do not constitute independent cohort replications.}
+\label{tab:split-results}
+\end{table}
+
+\noindent Patch-micro balanced accuracy shows the same absence of recovery. On BRACS, concentrated-support accuracy changes from 50.21\% to 49.38\%, and spread-support accuracy from 50.04\% to 49.73\%. On TCGA-UT, accuracy rounds to 75.77\% under concentrated support and 80.07\% under spread support for both objectives; the underlying changes are $-0.001$ and $-0.007$ points.
+
+BRACS class-level weighting gains are mixed. Under concentrated support, flat epithelial atypia and atypical ductal hyperplasia gain 1.92 and 1.93 points, while usual ductal hyperplasia loses 4.95 points. Under spread support, the largest class decline is 5.12 points for ductal carcinoma in situ. On TCGA-UT, all split-averaged class changes lie between $-0.225$ and 0.085 points under concentrated support, and between $-0.122$ and 0.083 points under spread support. These are descriptive secondary point estimates without class-specific uncertainty intervals. Complete class recalls for both objectives accompany the report as supplementary data.

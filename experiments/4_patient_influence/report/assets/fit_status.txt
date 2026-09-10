@@ -1,0 +1,65 @@
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced/patient/run.json:  "param": "lambda=1.0",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced/patient/run.json:    "lambda": 1.0,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced/patient/run.json:    "n_iter": 99,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced_spread/patient/run.json:  "param": "lambda=0.1",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced_spread/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced_spread/patient/run.json:    "lambda": 0.1,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced_spread/patient/run.json:    "n_iter": 265,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=0/results/balanced_spread/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced/patient/run.json:  "param": "lambda=1.0",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced/patient/run.json:    "lambda": 1.0,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced/patient/run.json:    "n_iter": 96,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced_spread/patient/run.json:  "param": "lambda=0.1",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced_spread/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced_spread/patient/run.json:    "lambda": 0.1,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced_spread/patient/run.json:    "n_iter": 244,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=1/results/balanced_spread/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced/patient/run.json:  "param": "lambda=1.0",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced/patient/run.json:    "lambda": 1.0,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced/patient/run.json:    "n_iter": 94,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced_spread/patient/run.json:  "param": "lambda=0.1",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced_spread/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced_spread/patient/run.json:    "lambda": 0.1,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced_spread/patient/run.json:    "n_iter": 248,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch/split=2/results/balanced_spread/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced/patient/run.json:  "param": "lambda=0.01",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced/patient/run.json:    "lambda": 0.01,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced/patient/run.json:    "n_iter": 141,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced_spread/patient/run.json:  "param": "lambda=0.01",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced_spread/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced_spread/patient/run.json:    "lambda": 0.01,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced_spread/patient/run.json:    "n_iter": 161,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=0/results/balanced_spread/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced/patient/run.json:  "param": "lambda=0.01",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced/patient/run.json:    "lambda": 0.01,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced/patient/run.json:    "n_iter": 132,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced_spread/patient/run.json:  "param": "lambda=0.01",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced_spread/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced_spread/patient/run.json:    "lambda": 0.01,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced_spread/patient/run.json:    "n_iter": 169,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=1/results/balanced_spread/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced/patient/run.json:  "param": "lambda=0.01",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced/patient/run.json:    "lambda": 0.01,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced/patient/run.json:    "n_iter": 140,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced/patient/run.json:    "weighted": true
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced_spread/patient/run.json:  "param": "lambda=0.01",
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced_spread/patient/run.json:    "converged": true,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced_spread/patient/run.json:    "lambda": 0.01,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced_spread/patient/run.json:    "n_iter": 172,
+/home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/tcga_ut/patch/split=2/results/balanced_spread/patient/run.json:    "weighted": true
+JobID|JobName|State|ExitCode|Elapsed
+4881247|imb-preflight|COMPLETED|0:0|00:01:02
+4881249|imb-analyze|COMPLETED|0:0|00:00:39
+4881252|imb-preflight|COMPLETED|0:0|00:09:55
+4881254|imb-analyze|COMPLETED|0:0|00:02:27

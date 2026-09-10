@@ -1,0 +1,558 @@
+{
+  "status": "pass",
+  "input_dim": 2560,
+  "splits": {
+    "0": {
+      "balanced": {
+        "cell_stats": {
+          "n_train": 16796,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 2400,
+            "1": 2400,
+            "2": 2400,
+            "3": 2399,
+            "4": 2399,
+            "5": 2399,
+            "6": 2399
+          },
+          "n_patients_train": 85,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "baseline": {
+          "support": "balanced",
+          "param": "lambda=1.0",
+          "lambda": 1.0,
+          "n_test": 22133,
+          "converged": true
+        },
+        "contribution_audit": [
+          {
+            "class": "N",
+            "n_c": 2400,
+            "G_c": 37,
+            "min_m_ic": 24,
+            "max_m_ic": 76,
+            "max_share": 0.03166666666666667,
+            "D_c": 0.11860360360360361
+          },
+          {
+            "class": "PB",
+            "n_c": 2400,
+            "G_c": 20,
+            "min_m_ic": 15,
+            "max_m_ic": 189,
+            "max_share": 0.07875,
+            "D_c": 0.22916666666666669
+          },
+          {
+            "class": "UDH",
+            "n_c": 2400,
+            "G_c": 31,
+            "min_m_ic": 6,
+            "max_m_ic": 114,
+            "max_share": 0.0475,
+            "D_c": 0.27084677419354836
+          },
+          {
+            "class": "FEA",
+            "n_c": 2399,
+            "G_c": 20,
+            "min_m_ic": 28,
+            "max_m_ic": 213,
+            "max_share": 0.08878699458107545,
+            "D_c": 0.21604835348061696
+          },
+          {
+            "class": "ADH",
+            "n_c": 2399,
+            "G_c": 39,
+            "min_m_ic": 4,
+            "max_m_ic": 85,
+            "max_share": 0.035431429762401004,
+            "D_c": 0.21184040358696457
+          },
+          {
+            "class": "DCIS",
+            "n_c": 2399,
+            "G_c": 20,
+            "min_m_ic": 25,
+            "max_m_ic": 225,
+            "max_share": 0.09378907878282618,
+            "D_c": 0.15391829929137138
+          },
+          {
+            "class": "IC",
+            "n_c": 2399,
+            "G_c": 20,
+            "min_m_ic": 4,
+            "max_m_ic": 158,
+            "max_share": 0.06586077532305128,
+            "D_c": 0.1444351813255523
+          }
+        ],
+        "weight_sum": 16796.0
+      },
+      "balanced_spread": {
+        "cell_stats": {
+          "n_train": 16796,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 2400,
+            "1": 2400,
+            "2": 2400,
+            "3": 2399,
+            "4": 2399,
+            "5": 2399,
+            "6": 2399
+          },
+          "n_patients_train": 103,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "baseline": {
+          "support": "balanced_spread",
+          "param": "lambda=0.1",
+          "lambda": 0.1,
+          "n_test": 22133,
+          "converged": true
+        },
+        "contribution_audit": [
+          {
+            "class": "N",
+            "n_c": 2400,
+            "G_c": 51,
+            "min_m_ic": 1,
+            "max_m_ic": 53,
+            "max_share": 0.022083333333333333,
+            "D_c": 0.08943627450980393
+          },
+          {
+            "class": "PB",
+            "n_c": 2400,
+            "G_c": 69,
+            "min_m_ic": 4,
+            "max_m_ic": 42,
+            "max_share": 0.0175,
+            "D_c": 0.13461956521739127
+          },
+          {
+            "class": "UDH",
+            "n_c": 2400,
+            "G_c": 50,
+            "min_m_ic": 1,
+            "max_m_ic": 71,
+            "max_share": 0.029583333333333333,
+            "D_c": 0.2525
+          },
+          {
+            "class": "FEA",
+            "n_c": 2399,
+            "G_c": 32,
+            "min_m_ic": 3,
+            "max_m_ic": 99,
+            "max_share": 0.04126719466444352,
+            "D_c": 0.17701385994164234
+          },
+          {
+            "class": "ADH",
+            "n_c": 2399,
+            "G_c": 39,
+            "min_m_ic": 4,
+            "max_m_ic": 85,
+            "max_share": 0.035431429762401004,
+            "D_c": 0.21184040358696457
+          },
+          {
+            "class": "DCIS",
+            "n_c": 2399,
+            "G_c": 34,
+            "min_m_ic": 2,
+            "max_m_ic": 81,
+            "max_share": 0.033764068361817424,
+            "D_c": 0.11065885295343648
+          },
+          {
+            "class": "IC",
+            "n_c": 2399,
+            "G_c": 42,
+            "min_m_ic": 4,
+            "max_m_ic": 64,
+            "max_share": 0.026677782409337224,
+            "D_c": 0.09575418329065685
+          }
+        ],
+        "weight_sum": 16796.0
+      }
+    },
+    "1": {
+      "balanced": {
+        "cell_stats": {
+          "n_train": 27202,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 3886,
+            "1": 3886,
+            "2": 3886,
+            "3": 3886,
+            "4": 3886,
+            "5": 3886,
+            "6": 3886
+          },
+          "n_patients_train": 89,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "baseline": {
+          "support": "balanced",
+          "param": "lambda=1.0",
+          "lambda": 1.0,
+          "n_test": 54552,
+          "converged": true
+        },
+        "contribution_audit": [
+          {
+            "class": "N",
+            "n_c": 3886,
+            "G_c": 49,
+            "min_m_ic": 14,
+            "max_m_ic": 100,
+            "max_share": 0.02573340195573855,
+            "D_c": 0.16173705714915926
+          },
+          {
+            "class": "PB",
+            "n_c": 3886,
+            "G_c": 20,
+            "min_m_ic": 4,
+            "max_m_ic": 282,
+            "max_share": 0.0725681935151827,
+            "D_c": 0.2094698919197118
+          },
+          {
+            "class": "UDH",
+            "n_c": 3886,
+            "G_c": 44,
+            "min_m_ic": 1,
+            "max_m_ic": 130,
+            "max_share": 0.033453422542460115,
+            "D_c": 0.2563280774809339
+          },
+          {
+            "class": "FEA",
+            "n_c": 3886,
+            "G_c": 24,
+            "min_m_ic": 1,
+            "max_m_ic": 341,
+            "max_share": 0.08775090066906845,
+            "D_c": 0.3486875965002573
+          },
+          {
+            "class": "ADH",
+            "n_c": 3886,
+            "G_c": 29,
+            "min_m_ic": 12,
+            "max_m_ic": 375,
+            "max_share": 0.09650025733401955,
+            "D_c": 0.36309830159547096
+          },
+          {
+            "class": "DCIS",
+            "n_c": 3886,
+            "G_c": 33,
+            "min_m_ic": 2,
+            "max_m_ic": 167,
+            "max_share": 0.042974781266083374,
+            "D_c": 0.22892590339836866
+          },
+          {
+            "class": "IC",
+            "n_c": 3886,
+            "G_c": 24,
+            "min_m_ic": 12,
+            "max_m_ic": 193,
+            "max_share": 0.049665465774575396,
+            "D_c": 0.14243437982501286
+          }
+        ],
+        "weight_sum": 27201.999999999996
+      },
+      "balanced_spread": {
+        "cell_stats": {
+          "n_train": 27202,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 3886,
+            "1": 3886,
+            "2": 3886,
+            "3": 3886,
+            "4": 3886,
+            "5": 3886,
+            "6": 3886
+          },
+          "n_patients_train": 103,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "baseline": {
+          "support": "balanced_spread",
+          "param": "lambda=0.1",
+          "lambda": 0.1,
+          "n_test": 54552,
+          "converged": true
+        },
+        "contribution_audit": [
+          {
+            "class": "N",
+            "n_c": 3886,
+            "G_c": 49,
+            "min_m_ic": 14,
+            "max_m_ic": 100,
+            "max_share": 0.02573340195573855,
+            "D_c": 0.16173705714915926
+          },
+          {
+            "class": "PB",
+            "n_c": 3886,
+            "G_c": 68,
+            "min_m_ic": 4,
+            "max_m_ic": 77,
+            "max_share": 0.019814719505918683,
+            "D_c": 0.20504980170143206
+          },
+          {
+            "class": "UDH",
+            "n_c": 3886,
+            "G_c": 46,
+            "min_m_ic": 1,
+            "max_m_ic": 120,
+            "max_share": 0.03088008234688626,
+            "D_c": 0.241155541632169
+          },
+          {
+            "class": "FEA",
+            "n_c": 3886,
+            "G_c": 33,
+            "min_m_ic": 1,
+            "max_m_ic": 209,
+            "max_share": 0.05378281008749357,
+            "D_c": 0.29384425833216365
+          },
+          {
+            "class": "ADH",
+            "n_c": 3886,
+            "G_c": 37,
+            "min_m_ic": 4,
+            "max_m_ic": 339,
+            "max_share": 0.08723623262995368,
+            "D_c": 0.3557955794188425
+          },
+          {
+            "class": "DCIS",
+            "n_c": 3886,
+            "G_c": 36,
+            "min_m_ic": 2,
+            "max_m_ic": 143,
+            "max_share": 0.03679876479670612,
+            "D_c": 0.19540229885057472
+          },
+          {
+            "class": "IC",
+            "n_c": 3886,
+            "G_c": 41,
+            "min_m_ic": 4,
+            "max_m_ic": 113,
+            "max_share": 0.02907874420998456,
+            "D_c": 0.13762348894719004
+          }
+        ],
+        "weight_sum": 27202.0
+      }
+    },
+    "2": {
+      "balanced": {
+        "cell_stats": {
+          "n_train": 13982,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 1998,
+            "1": 1998,
+            "2": 1998,
+            "3": 1997,
+            "4": 1997,
+            "5": 1997,
+            "6": 1997
+          },
+          "n_patients_train": 78,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "baseline": {
+          "support": "balanced",
+          "param": "lambda=1.0",
+          "lambda": 1.0,
+          "n_test": 31390,
+          "converged": true
+        },
+        "contribution_audit": [
+          {
+            "class": "N",
+            "n_c": 1998,
+            "G_c": 29,
+            "min_m_ic": 8,
+            "max_m_ic": 85,
+            "max_share": 0.04254254254254254,
+            "D_c": 0.14212488350419386
+          },
+          {
+            "class": "PB",
+            "n_c": 1998,
+            "G_c": 20,
+            "min_m_ic": 4,
+            "max_m_ic": 162,
+            "max_share": 0.08108108108108109,
+            "D_c": 0.23713713713713713
+          },
+          {
+            "class": "UDH",
+            "n_c": 1998,
+            "G_c": 28,
+            "min_m_ic": 1,
+            "max_m_ic": 121,
+            "max_share": 0.06056056056056056,
+            "D_c": 0.2841055341055341
+          },
+          {
+            "class": "FEA",
+            "n_c": 1997,
+            "G_c": 20,
+            "min_m_ic": 1,
+            "max_m_ic": 167,
+            "max_share": 0.08362543815723586,
+            "D_c": 0.2594892338507762
+          },
+          {
+            "class": "ADH",
+            "n_c": 1997,
+            "G_c": 37,
+            "min_m_ic": 4,
+            "max_m_ic": 67,
+            "max_share": 0.03355032548823235,
+            "D_c": 0.14456820365683662
+          },
+          {
+            "class": "DCIS",
+            "n_c": 1997,
+            "G_c": 20,
+            "min_m_ic": 28,
+            "max_m_ic": 170,
+            "max_share": 0.08512769153730596,
+            "D_c": 0.11947921882824236
+          },
+          {
+            "class": "IC",
+            "n_c": 1997,
+            "G_c": 20,
+            "min_m_ic": 70,
+            "max_m_ic": 111,
+            "max_share": 0.05558337506259389,
+            "D_c": 0.04266399599399101
+          }
+        ],
+        "weight_sum": 13982.0
+      },
+      "balanced_spread": {
+        "cell_stats": {
+          "n_train": 13982,
+          "n_classes": 7,
+          "class_counts": {
+            "0": 1998,
+            "1": 1998,
+            "2": 1998,
+            "3": 1997,
+            "4": 1997,
+            "5": 1997,
+            "6": 1997
+          },
+          "n_patients_train": 103,
+          "n_patients_val": 24,
+          "n_patients_test": 24
+        },
+        "baseline": {
+          "support": "balanced_spread",
+          "param": "lambda=0.1",
+          "lambda": 0.1,
+          "n_test": 31390,
+          "converged": true
+        },
+        "contribution_audit": [
+          {
+            "class": "N",
+            "n_c": 1998,
+            "G_c": 50,
+            "min_m_ic": 1,
+            "max_m_ic": 48,
+            "max_share": 0.024024024024024024,
+            "D_c": 0.13389389389389392
+          },
+          {
+            "class": "PB",
+            "n_c": 1998,
+            "G_c": 64,
+            "min_m_ic": 4,
+            "max_m_ic": 36,
+            "max_share": 0.018018018018018018,
+            "D_c": 0.10124186686686688
+          },
+          {
+            "class": "UDH",
+            "n_c": 1998,
+            "G_c": 46,
+            "min_m_ic": 1,
+            "max_m_ic": 68,
+            "max_share": 0.03403403403403404,
+            "D_c": 0.28391434913174046
+          },
+          {
+            "class": "FEA",
+            "n_c": 1997,
+            "G_c": 30,
+            "min_m_ic": 1,
+            "max_m_ic": 95,
+            "max_share": 0.04757135703555333,
+            "D_c": 0.22201635787013857
+          },
+          {
+            "class": "ADH",
+            "n_c": 1997,
+            "G_c": 37,
+            "min_m_ic": 4,
+            "max_m_ic": 67,
+            "max_share": 0.03355032548823235,
+            "D_c": 0.14456820365683662
+          },
+          {
+            "class": "DCIS",
+            "n_c": 1997,
+            "G_c": 38,
+            "min_m_ic": 28,
+            "max_m_ic": 55,
+            "max_share": 0.02754131196795193,
+            "D_c": 0.027422713016893772
+          },
+          {
+            "class": "IC",
+            "n_c": 1997,
+            "G_c": 44,
+            "min_m_ic": 6,
+            "max_m_ic": 50,
+            "max_share": 0.02503755633450175,
+            "D_c": 0.08208904265489142
+          }
+        ],
+        "weight_sum": 13982.000000000002
+      }
+    }
+  }
+}

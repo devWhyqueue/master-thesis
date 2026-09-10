@@ -19,7 +19,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent Reducing the number of training patients can impair classification even when class patch counts remain fixed. The preceding experiments found that several learning methods and alternative classifiers recover little of this damage. This prospective experiment asks whether unequal patient influence contributes to the remaining deficit. Multinomial logistic regression is compared under ordinary patch-average and patient-average training, using identical concentrated and spread patient allocations from BRACS and TCGA-UT. Patient averaging gives each contributing patient equal loss mass within a class while preserving that class's total influence. Frozen features, existing splits, and selected regularization remain fixed. The comparison separates the gain from equalizing patient influence from the benefit of broader coverage that remains afterwards. A residual coverage benefit would identify a limitation of this correction, without establishing which missing variation causes the loss.
+\noindent Reducing the number of training patients can impair classification even when class patch counts remain fixed. This experiment tests whether equalizing patient influence reduces that damage. Multinomial logistic regression is compared under patch-average and patient-average training on identical concentrated and spread allocations from BRACS and TCGA-UT. Frozen features, patient-disjoint splits, and regularization remain fixed. Under concentrated support, patient averaging changes patient-macro balanced accuracy by $-1.36$ percentage points on BRACS (95\% interval: $-3.09$ to 0.18) and $-0.004$ points on TCGA-UT ($-0.017$ to 0.009). Broader coverage still improves patient-average training by 2.73 and 4.70 points, respectively. The contribution audit distinguishes these outcomes: weighting substantially redistributes loss mass on BRACS, whereas TCGA-UT already has nearly equal patient contributions. Equalizing influence therefore leaves the established coverage deficit intact in these allocations. The remaining benefit of additional patients motivates examining which variation broader coverage supplies.
 \end{abstract}
 \tableofcontents
 \clearpage
@@ -133,27 +133,25 @@ The pooled score for objective \(o\in\{\mathrm{patch},\mathrm{patient}\}\) under
 
 Uncertainty is estimated with 2,000 paired Bayesian-bootstrap replicates over distinct test patients, following \citet{queisler2026patientShortage}. Each replicate assigns random positive patient weights from a \(\mathrm{Dirichlet}(1,\ldots,1)\) distribution. Each patient's weight is shared across objectives, support conditions, classes, and repeated test appearances across splits. Within-class recalls are recalculated as weighted patient means before averaging splits and forming contrasts. The 2.5th and 97.5th percentiles define individual exploratory 95\% intervals, accompanied by split-level estimates. The intervals describe patient variation conditional on the deterministic fits; they are not adjusted for multiple comparisons.
 
-\section{Interpretation criteria}
+\subsection{Interpretation criteria}
 \label{sec:interpretation}
 One percentage point is the prespecified practical-relevance threshold, following \citet{queisler2026patientShortage}. A point estimate above one point is practically promising; a lower interval bound above one point supports a positive effect exceeding that threshold. Intervals crossing zero remain inconclusive about direction. An interval excluding zero but overlapping one point supports direction without establishing a practically meaningful gain. A negligible residual coverage difference requires the entire interval for \(B_{\mathrm{patient}}\) to lie within \([-1,1]\) points.
 
-\begin{table}[htbp]
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}X@{}}
-\toprule
-Observed pattern & Supported interpretation \\
-\midrule
-Positive \(W_{\conc}\), larger than \(W_{\spr}\) & Equalizing influence helps under shortage, with an additional shortage-specific benefit if the interaction is supported. \\
-Positive \(W_{\conc}\) and residual \(B_{\mathrm{patient}}\) & Unequal influence contributes, but the correction leaves a coverage benefit. \\
-Residual \(B_{\mathrm{patient}}\), little supported \(W_{\conc}\) & The tested correction does not explain away the coverage deficit; a null gain alone does not exclude an influence effect. \\
-Positive \(W_{\conc}\), residual interval within \([-1,1]\) & The coverage gap is practically negligible under patient averaging. Spread accuracy indicates whether gap closure accompanies deterioration. \\
-\bottomrule
-\end{tabularx}
-\caption{Prospective interpretations. Effect magnitude and uncertainty qualify every pattern; these are not experimental findings.}
-\label{tab:interpretation}
-\end{table}
+Weighting gains are interpreted together with the patient contribution distribution. Near-zero \(D_c\) means the intervention changes little in that class, so a null result provides little evidence about strongly unequal patient influence elsewhere. Similar gains in both support conditions indicate a general weighting benefit; larger gains under concentrated support suggest a contribution specific to patient shortage. Broad or conflicting intervals leave the mechanism unresolved.
 
-\noindent Weighting gains are interpreted together with the patient contribution distribution. Near-zero \(D_c\) means the intervention changes little in that class, so a null result provides little evidence about strongly unequal patient influence elsewhere. Similar gains in both support conditions indicate a general weighting benefit; larger gains under concentrated support suggest a contribution specific to patient shortage. Broad or conflicting intervals leave the mechanism unresolved.
+\input{results}
+
+\section{Discussion}
+\label{sec:discussion}
+Equalizing patient influence does not recover the observed patient-shortage damage. On BRACS, the correction materially changes the loss distribution but provides no supported accuracy gain. On TCGA-UT, the correction is small because the training allocations already distribute patches nearly equally among patients. Broader coverage remains beneficial under both objectives. Together, these findings narrow the explanation of the established deficit: unequal contribution to the training loss is not sufficient to account for it under the tested procedure.
+
+The distinction between the datasets matters. BRACS supplies the more substantial intervention on unequal influence: concentrated-support weighting redistributes an average of 20.4\% of within-class loss mass. Its negative accuracy estimate does not establish harm because the interval includes zero, but the upper bound of 0.18 points excludes a one-point improvement within this conditional analysis. Equal patient weights can also increase the influence of patients represented by few patches. That change may emphasize less representative observations or less precisely sampled patient characteristics. These are possible explanations of the negative estimate, not mechanisms established by this comparison.
+
+TCGA-UT provides especially clear evidence that a coverage deficit can persist when patient contributions are already almost uniform. The concentrated allocation requires redistribution of only 0.48\% of within-class loss mass on average, and both weighting-gain intervals lie within $\pm1$ point. Yet the residual coverage benefit is 4.70 points, with its lower interval bound above four points. This combination weakens unequal patient influence as an explanation of the existing TCGA-UT deficit. It gives limited evidence about what patient averaging would do in a different allocation with strongly unequal contributions.
+
+The coverage benefit remains less precisely estimated on BRACS. The patient-average interval excludes zero, and the point estimate exceeds the practical threshold, but the interval does not establish a benefit larger than one point. This distinction prevents treating the two datasets as equally strong confirmations. Neither dataset supports a practically negligible residual coverage difference, and neither interaction establishes that weighting preferentially repairs shortage damage.
+
+The persistent coverage benefit motivates testing which observations additional patients supply. A follow-up could compare random and feature-diverse patient selection at matched patient counts, class patch counts, and contribution limits, with repeated patient draws. Comparing added patients with added patches from existing patients could separately examine within-patient redundancy. These comparisons would help distinguish patient composition and sampling depth as explanations of the residual deficit.
 
 \section{Limitations}
 \label{sec:limitations}
