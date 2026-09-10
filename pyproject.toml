@@ -53,6 +53,7 @@ where = [
     "experiments/2_benchmark_patch/code",
     "experiments/3_patient_shortage/code",
     "experiments/4_patient_influence/code",
+    "experiments/5_patient_breadth/code",
 ]
 exclude = ["tests*"]
 
@@ -66,6 +67,7 @@ testpaths = [
     "experiments/2_benchmark_patch/code/tests",
     "experiments/3_patient_shortage/tests",
     "experiments/4_patient_influence/tests",
+    "experiments/5_patient_breadth/tests",
 ]
 
 [tool.uv.sources]
