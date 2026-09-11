@@ -1,0 +1,158 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\title{Patient Shortage in Histopathology:\\Is the Residual Breadth Benefit\\a Site-Coverage Benefit?}
+\author{Yannik Queisler}
+\date{September 11, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At a fixed patch budget, TCGA-UT patch classifiers trained on more patients are more accurate, and adjusting for within-patient redundancy across all feature directions still leaves a benefit of 2.62 percentage points per doubling of patients. This experiment tests whether that residual reflects coverage of tissue source sites, the institutions that contributed TCGA tissue. Three nested training allocations share a budget of 160 patches per class: five patients from five sites with 32 patches each, twenty patients from the same five sites with eight patches each, and twenty patients from ten sites with eight patches each. The first step adds patients without adding sites; the second adds sites without changing the number of patients or patches. The resulting site gain and the residual breadth benefit within fixed sites are judged against a one-point practical threshold. A site gain without a within-site residual would identify site coverage as the missing source of information; a within-site residual without a site gain would point to variation between patients of the same institution, such as biological variation within a cancer type. Either outcome specifies the shortage that a subsequent measurable signal and mitigation method should target.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+How a labelling budget is spread over patients matters more than its size. At 160 patches per class on TCGA-UT, twenty patients contributing eight patches each outperform five patients contributing 32 patches each by 9.52 percentage points of patient-macro balanced accuracy \citep{queisler2026effectiveSupport}. Part of this advantage is redundancy: patches of one patient repeat each other, so they are worth fewer independent observations than their count suggests. \emph{Effective support} discounts the patch count for this redundancy through an intraclass correlation, the share of feature variance that lies between patients. Even with a correlation computed across all 2,560 feature directions, each doubling of patients still adds 2.62 points at equal effective support (95\% interval: 2.04 to 3.17), and the better redundancy measure removes only about 12\% of the residual \citep{queisler2026multidirectionalRedundancy}. Underestimated redundancy is therefore an unlikely explanation. Additional patients supply information that effective support does not count.
+
+Two sources of such information are plausible. TCGA-UT slides were contributed by many \emph{tissue source sites}, the hospitals and biobanks that collected and prepared the tissue. Sites differ in tissue handling, staining, and patient population, and deep models recognize these site-specific signatures in TCGA slides \citep{howard2021impact}. A classifier trained on patients from few sites may learn cancer types under a narrow set of site conditions and transfer poorly to other sites. Alternatively, patients differ biologically even within one institution: additional patients may contribute morphological variants of a cancer type that repeated crops of a few uniform tumour regions cannot supply \citep{komura2022universalEncoding}. Both accounts predict a benefit of breadth beyond effective support. They differ in one testable respect: under site coverage, additional patients help mainly when they come from sites not yet represented.
+
+Existing allocations cannot separate the two accounts. When patients are drawn at random, adding patients also adds sites, so any quantity computed from the breadth--depth grid moves together with patient count. Separating them requires an intervention that changes the number of sites while the number of patients and patches stays fixed, and that changes the number of patients while the sites stay fixed. Sites are the natural first candidate for such an intervention because they are recorded for every TCGA participant, whereas the dataset provides no labels for morphological subtypes. The experiment is informative in both directions: if new sites add nothing, a breadth benefit that persists within fixed sites localizes the missing information in variation between patients of the same institution.
+
+The question is therefore: \emph{does a training patient from a new tissue source site contribute more than an additional patient from a site that is already represented, and do additional patients still help beyond effective support when they add no new sites?}
+
+\section{Study design}
+\label{sec:design}
+Only the composition of the training allocations changes. The design inherits from \citet{queisler2026effectiveSupport} the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features formed by concatenating the class token and the mean patch token \citep{zimmermann2024virchow2}, the three fixed patient-disjoint train--validation--test splits, and the natural validation and test partitions. It also inherits the patch eligibility rule, the nested patch ordering, and the readout: multinomial logistic regression with its regularization strength selected on the validation partition separately for every fit. TCGA-UT participants are called patients throughout.
+
+A patient's site is the two-character tissue source site code in its TCGA barcode, which has the form \texttt{TCGA-XX-YYYY} with site code \texttt{XX}. A site thus stands for everything shared by the tissue of one contributing institution, including preparation, staining, and the local patient population. The design does not separate these components.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Allocation & Patients $G$ & Patches per patient $m$ & Sites $S$ & Patients per site \\
+\midrule
+Deep & 5 & 32 & 5 & 1 \\
+Broad, five sites & 20 & 8 & 5 & 4 \\
+Broad, ten sites & 20 & 8 & 10 & 2 \\
+\bottomrule
+\end{tabular}
+\caption{The three allocations share a budget of 160 patches per class and form two steps. From the deep to the broad five-site allocation, patient count quadruples within the same sites. From the broad five-site to the broad ten-site allocation, site count doubles while patients, patches per patient, and budget stay fixed.}
+\label{tab:allocations}
+\end{table}
+
+\noindent Table~\ref{tab:allocations} lists the three allocations. Each one fixes the number of patients $G$, patches per patient $m$, and sites $S$ for every class that enters the site contrast. The first step repeats the equal-budget comparison of \citet{queisler2026effectiveSupport} under one restriction: the fifteen additional patients come from the five sites that the deep allocation already covers. The second step moves the same logic one level up the hierarchy of patches, patients, and sites. Where the breadth--depth grid exchanged patches of a known patient for new patients, this step exchanges patients of a known site for patients of new sites: ten of the twenty patients are replaced by ten patients from five further sites. Four patients per site is the smallest number that lets twenty patients come from the deep allocation's five sites, and doubling the site count matches the per-doubling scale on which the residual breadth benefit is expressed.
+
+\subsection{Allocation rules}
+\label{sec:allocation}
+Three rules turn the allocations into concrete training sets. Together they ensure that each step changes only its intended factor and that the sites of both broad allocations are comparable.
+
+The first rule defines a common site pool. For split $r$ and class $c$, let $\mathcal E_{rc}$ contain the training patients with at least 32 patches of the class, as in \citet{queisler2026effectiveSupport}, and let $\mathcal E_{rcs}\subseteq\mathcal E_{rc}$ contain those from site $s$. The site pool is
+\begin{equation}
+ \mathcal S_{rc}=\{s:|\mathcal E_{rcs}|\ge 4\}.
+ \label{eq:site-pool}
+\end{equation}
+\noindent A class enters the site contrast, and is called a \emph{site class}, only if $|\mathcal S_{rc}|\ge 10$ in all three splits. Every site of both broad allocations is drawn from this pool, so sites that are only represented in the ten-site allocation must be as large as those shared with the five-site allocation. Without this requirement, the five-site allocation would draw from the largest contributing institutions and the ten-site allocation would add smaller ones, so the step would change site size as well as site count.
+
+The second rule nests sites and patients across the three allocations. For each split, site class, and draw $d\in\{1,\ldots,5\}$, ten sites are drawn without replacement from $\mathcal S_{rc}$, and five of them are chosen at random as \emph{core sites}; the other five are \emph{added sites}. For each of the ten sites, an ordered list of four patients is drawn without replacement from $\mathcal E_{rcs}$. The broad five-site allocation uses all four listed patients of every core site, the deep allocation uses the first listed patient of every core site, and the broad ten-site allocation uses the first two listed patients of every core and every added site. Writing $\mathcal P^{\mathrm D}$, $\mathcal P^{5}$, and $\mathcal P^{10}$ for the patient sets of the three allocations,
+\begin{equation}
+ \mathcal P^{\mathrm D}\subset\mathcal P^{5},
+ \qquad
+ |\mathcal P^{5}\cap\mathcal P^{10}|=10,
+ \qquad
+ \mathcal P^{\mathrm D}\subset\mathcal P^{10}.
+ \label{eq:nesting}
+\end{equation}
+\noindent Patches follow the nested round-robin order over each patient's slides, so a patient contributes its first $m$ patches. The eight patches of a deep patient in either broad allocation are therefore the first eight of its 32 deep patches. Classes are sampled independently, so a site that contributes to several cancer types can be drawn for each of them.
+
+The third rule keeps all other classes fixed. Classes that do not meet the site-pool requirement remain in training, so the classifier always solves the same 30-class task. For each split and draw, they receive one random allocation of ten patients contributing sixteen patches each, drawn as in \citet{queisler2026effectiveSupport} and shared by all three allocations. Every class thus keeps 160 patches, and only the training material of site classes differs between allocations. Before any model is fitted, the number of site classes per split is recorded. The experiment proceeds only if at least ten classes qualify, so that the site contrast rests on a substantial part of the label space; otherwise the site levels are redesigned against this census before any classifier is trained. The design requires 45 fits: three allocations, three splits, and five draws.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The evaluation asks two questions, one for each step of Table~\ref{tab:allocations}. Both use the same accuracy measure and the same uncertainty procedure.
+
+\subsection{Site gain and within-site residual breadth}
+\label{sec:contrasts}
+Accuracy is patient-macro balanced accuracy restricted to site classes: patch recall is averaged within each test patient and true class, then equally across patients within each class, and finally across the site classes. An allocation score $A$, in percent, averages the three splits and five draws equally, giving $A_{\mathrm D}$, $A_5$, and $A_{10}$ for the deep, five-site, and ten-site allocations. Balanced accuracy over all 30 classes is reported alongside.
+
+The \emph{site gain} compares the two broad allocations,
+\begin{equation}
+ \Delta_S=A_{10}-A_{5},
+ \label{eq:site-gain}
+\end{equation}
+\noindent and measures what five additional sites contribute when patients, patches per patient, and budget stay fixed. Under site coverage, $\Delta_S$ is positive; if sites are irrelevant beyond the patients they supply, it is close to zero.
+
+The first step cannot be read from the raw difference $A_5-A_{\mathrm D}$ alone, because quadrupling patients also raises effective support. With $\bar\rho_c$ the full-feature intraclass correlation of class $c$ averaged over the three splits \citep{queisler2026multidirectionalRedundancy}, effective support of class $c$ under $G$ patients contributing $m$ patches each is
+\begin{equation}
+ \Neff(G,m)=\frac{1}{|\mathcal C|}\sum_{c\in\mathcal C}\frac{Gm}{1+(m-1)\bar\rho_c},
+ \label{eq:neff}
+\end{equation}
+\noindent averaged over the set $\mathcal C$ of site classes. The part of the first step that effective support explains is $\hat\beta\log\bigl(\Neff(20,8)/\Neff(5,32)\bigr)$, where $\hat\beta$ is the effective-support slope of the surface $A=\alpha+\beta\log\Neff+\gamma\log G$. This surface is refitted to the stored predictions of the nine-cell breadth--depth grid \citep{queisler2026effectiveSupport}, with accuracy restricted to the same site classes; no classifier is retrained for this purpose. Because the first step quadruples patient count, the remainder is divided by two doublings, giving the \emph{within-site residual breadth benefit}
+\begin{equation}
+ b_W=\frac{A_5-A_{\mathrm D}-\hat\beta\log\bigl(\Neff(20,8)/\Neff(5,32)\bigr)}{2}
+ \label{eq:within-site}
+\end{equation}
+\noindent in percentage points per doubling of patients. The same refitted surface also gives a reference residual $b_{\mathrm{ref}}=\hat\gamma\log 2$ for the site classes, estimated from allocations in which sites were not controlled. If sites carry the residual breadth benefit, $b_W$ falls towards zero while $b_{\mathrm{ref}}$ stays positive. If sites do not matter, $b_W$ stays close to $b_{\mathrm{ref}}$.
+
+A secondary analysis asks whether a site gain reflects matching or diversity. For each draw, a test patient of a site class is assigned to one of three strata by its site: a core site, an added site, or a site not drawn for that class. The site gain is then computed separately within each stratum, averaging patient recalls with their weights in the primary endpoint. \emph{Site matching} predicts a gain concentrated on patients from added sites, whose conditions the ten-site allocation has seen and the five-site allocation has not, together with a small loss on core-site patients, whose sites lose two of four training patients. \emph{Site diversity} predicts a gain also for patients from sites drawn for neither allocation, the stratum closest to deployment at an unseen institution. Stratum sizes vary between draws, so these estimates are descriptive and carry no decision threshold.
+
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Test-patient uncertainty follows \citet{queisler2026effectiveSupport}. Each of 1,999 paired Bayesian bootstrap replicates assigns $\mathrm{Dirichlet}(1,\ldots,1)$ weights to the distinct test patients \citep{rubin1981bayesian}. A patient's weight is shared across allocations, splits, draws, classes, and repeated test appearances. Because the test partitions coincide with those of the breadth--depth grid, the same weights also enter the refitted surface, so $\hat\beta$, $b_{\mathrm{ref}}$, and $b_W$ are recomputed on every replicate and remain paired. Each stored distribution contains 2,000 entries: the observed estimate, computed with equal patient weights, followed by the 1,999 resampled estimates. The 2.5th and 97.5th percentiles of the resampled estimates, excluding the observed entry, give exploratory 95\% intervals, including one for the difference $b_W-b_{\mathrm{ref}}$. Correlations are held fixed at their point estimates. Dispersion of the contrasts across the fifteen split--draw combinations is reported as a descriptive measure of sensitivity to which sites and patients are drawn; it includes variation between splits and is not combined with the test-patient intervals.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the test-patient intervals for $\Delta_S$ and $b_W$ and on the practical threshold of one percentage point, used for both quantities as in \citet{queisler2026multidirectionalRedundancy}. Table~\ref{tab:accounts} summarizes the resulting readings.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYYY@{}}
+\toprule
+Account & Claim & Site gain $\Delta_S$ & Within-site residual $b_W$ \\
+\midrule
+Site coverage & Additional patients help because they add institutions & Interval above 1 & Interval within $[-1,1]$ \\
+\addlinespace
+Within-site patient variation & Additional patients help even from the same institutions & Interval within $[-1,1]$ & Interval above 1 \\
+\addlinespace
+Both & Sites and patients each contribute & Interval above 1 & Interval above 1 \\
+\bottomrule
+\end{tabularx}
+\caption{Each account predicts a distinct combination of the two contrasts. Intervals are test-patient 95\% intervals in percentage points; $b_W$ is expressed per doubling of patients. All other combinations, including any interval that crosses a threshold, are inconclusive.}
+\label{tab:accounts}
+\end{table}
+
+\paragraph{Site coverage.}
+If new sites add a practically relevant gain and no residual remains within fixed sites, the missing source of information on TCGA-UT is coverage of institutions. The deficit would then be a second level of redundancy: patients of one site resemble each other, just as patches of one patient do. This reading would motivate an effective support that discounts patches within patients and patients within sites, together with site-aware sampling or augmentation as a mitigation method. The stratified analysis indicates whether such a method should target matching of known sites or robustness to unseen ones.
+
+\paragraph{Within-site patient variation.}
+If new sites add nothing while the within-site residual stays above one point, the benefit of additional patients does not depend on institutional variety. The missing information would then lie in differences between patients of the same institution, most plausibly biological variation within a cancer type. A signal for this shortage would need to measure how much of a class's morphological range the training patients cover, rather than which sites they come from.
+
+\paragraph{Both and inconclusive outcomes.}
+If both contrasts exceed the threshold, sites explain part of the residual, and $b_W-b_{\mathrm{ref}}$ quantifies which part. All other combinations leave the accounts open. Neither contrast establishes which property of a site matters, and neither account excludes the other outside the tested range.
+
+\section{Limitations}
+\label{sec:limitations}
+A tissue source site bundles preparation, staining, patient population, and referral patterns. A positive site gain would show that institutional variety helps, but not which of these components carries the benefit; separating staining from population would require stain normalization or site-matched biological covariates. Conversely, a null site gain applies to the tested step from five to ten sites and does not exclude benefits from a much wider site range.
+
+The site pool restricts the contrast to sites with at least four eligible patients and to classes with at least ten such sites. Site classes are therefore larger cancer types collected by larger institutions. Rare cancer types, which are most exposed to patient shortage, enter only as fixed background classes, and conclusions may not transfer to them. Background classes are identical across allocations, but their recall can still change through confusions with site classes, which is why balanced accuracy over all classes is reported alongside.
+
+The within-site residual inherits the assumptions of the effective-support surface. Its correlations are estimated from patients of all sites. If patients of one site resemble each other more than patients of different sites, the surface overstates the effective support of the site-restricted allocations, and part of a site effect would appear in the first step as a smaller $b_W$ rather than only in $\Delta_S$. The surface slope is also estimated on randomly drawn allocations and transferred to site-restricted ones. Finally, all results are conditional on frozen Virchow2 features, multinomial logistic regression, the three overlapping splits, and the tested allocation sizes.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
