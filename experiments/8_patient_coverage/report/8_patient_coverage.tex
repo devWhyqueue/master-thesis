@@ -1,0 +1,170 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\title{Patient Shortage in Histopathology:\\Is the Residual Breadth Benefit\\a Patient-Coverage Benefit?}
+\author{Yannik Queisler}
+\date{September 11, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At a fixed patch budget, TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and coverage of tissue source sites explains little of this residual. This experiment tests whether additional patients help because they cover more of the variation between patients of a cancer type. Patient similarity is measured without labels, as the cosine distance between patient-mean Virchow2 embeddings, so the design applies to all 30 cancer types, including the smaller ones in which most of the residual arises. Three nested training allocations share a budget of 160 patches per class: five randomly drawn seed patients with 32 patches each, twenty patients formed by the seeds and their nearest neighbours with eight patches each, and twenty patients formed by the seeds and randomly drawn patients with eight patches each. The first step quadruples patients while adding little coverage; the second adds coverage while patients, patches, and effective support stay fixed. The \emph{coverage gain} compares the two broad allocations, and the \emph{within-neighbourhood residual} measures what the first step adds beyond effective support. A coverage gain above one percentage point together with a within-neighbourhood residual below one point per doubling of patients would identify patient coverage as the missing source of information; the reverse pattern would locate it in properties of additional patients that their mean embedding does not express.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+Spreading a labelling budget over more patients improves TCGA-UT patch classification. At 160 patches per class, twenty patients contributing eight patches each outperform five patients contributing 32 patches each by 9.52 percentage points of patient-macro balanced accuracy \citep{queisler2026effectiveSupport}. \emph{Effective support}, the patch count discounted for within-patient redundancy through an intraclass correlation, explains most of this advantage but not all of it: at equal effective support, each doubling of patients still adds 2.62 points (95\% interval: 2.04 to 3.17), even when the correlation is computed across all 2,560 feature directions \citep{queisler2026multidirectionalRedundancy}.
+
+Coverage of tissue source sites, the institutions that contributed TCGA tissue, accounts for little of this residual \citep{queisler2026siteCoverage}. For the thirteen cancer types with enough patients per site, doubling the number of sites at a fixed patient count adds 0.84 points (0.55 to 1.14), and most of this gain falls on test patients from the added sites, which is the pattern of site matching rather than of robustness to new institutions. Quadrupling patients within fixed sites, in contrast, still adds 1.79 points per doubling beyond effective support (1.22 to 2.34). Two gaps remain. First, additional patients from the same institutions carry information that neither effective support nor site count describes. Second, these thirteen larger cancer types carry only 0.79 points of residual per doubling, so most of the residual arises in the seventeen smaller types, which lack enough patients per site for a site intervention.
+
+A natural candidate for the missing information is \emph{patient coverage}: the share of a cancer type's between-patient variation that the training patients represent. Effective support counts how many independent observations a cohort provides, but not where in the space of patient appearances these observations lie. Patients of one cancer type differ in morphology even within one institution \citep{komura2022universalEncoding}, so five patients may represent a narrow part of a cancer type's appearance and twenty randomly drawn patients a wider one. Under patient coverage, the benefit of an additional patient depends on how different that patient is from the patients already in training. The competing account, \emph{count beyond coverage}, holds that additional patients help even when they resemble the patients already present, because they contribute information that a summary of a patient's average appearance does not express.
+
+The two accounts can be separated by choosing additional patients according to their similarity to the training cohort. Similarity in the frozen feature space needs no site or subtype labels and is defined for every cancer type, so such an intervention addresses both gaps left by the site experiment. The question is therefore: \emph{does a training patient unlike the current cohort contribute more than a patient resembling it, and do additional patients still help beyond effective support when they add little coverage?}
+
+\section{Study design}
+\label{sec:design}
+Only the composition of the training allocations changes. The design inherits from \citet{queisler2026effectiveSupport} the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features formed by concatenating the class token and the mean patch token \citep{zimmermann2024virchow2}, the three fixed patient-disjoint train--validation--test splits, and the natural validation and test partitions. It also inherits the patch eligibility rule, the nested patch ordering, and the readout: multinomial logistic regression with its regularization strength selected on the validation partition separately for every fit. TCGA-UT participants are called patients throughout.
+
+Patient similarity is measured on patient-mean embeddings. For split $r$, let $\bar{\mathbf x}_{irc}$ be the mean feature vector of all training patches of class $c$ from patient $i$, and let $\boldsymbol\mu_r$ be the average of these patient means over all classes. The embedding and the distance between patients $i$ and $j$ are
+\begin{equation}
+ \mathbf e_{irc}=\frac{\bar{\mathbf x}_{irc}-\boldsymbol\mu_r}{\lVert\bar{\mathbf x}_{irc}-\boldsymbol\mu_r\rVert},
+ \qquad
+ d(i,j)=1-\mathbf e_{irc}^{\top}\mathbf e_{jrc}.
+ \label{eq:distance}
+\end{equation}
+\noindent Centring removes the component shared by all tissue, so the cosine distance reflects how two patients differ rather than how much both resemble histology in general. The patient mean is the simplest summary of a patient's appearance in the representation that the classifier receives.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+Allocation & Patients $G$ & Patches per patient $m$ & Patients \\
+\midrule
+Deep & 5 & 32 & 5 random seeds \\
+Broad, neighbours & 20 & 8 & seeds, 15 nearest neighbours \\
+Broad, random & 20 & 8 & seeds, 15 random patients \\
+\bottomrule
+\end{tabular}
+\caption{The three allocations share a budget of 160 patches per class and form two steps. From the deep to the broad neighbour allocation, patient count quadruples while the added patients resemble the seeds. From the broad neighbour to the broad random allocation, coverage increases while patients, patches per patient, budget, and effective support stay fixed.}
+\label{tab:allocations}
+\end{table}
+
+\noindent Table~\ref{tab:allocations} lists the three allocations. The design mirrors the site experiment \citep{queisler2026siteCoverage} with neighbourhoods in feature space in place of institutions. The first step repeats the equal-budget comparison of \citet{queisler2026effectiveSupport} under one restriction: the fifteen additional patients are those most similar to the five seeds. The second step exchanges these similar patients for patients drawn without regard to similarity, which on average lie farther from the seeds. The broad random allocation is the equal-budget breadth comparison itself, so the design asks how much of that comparison survives when the added patients are chosen to add little coverage.
+
+\subsection{Allocation rules}
+\label{sec:allocation}
+Three rules turn the allocations into concrete training sets. Together they ensure that each step changes only its intended factor and that the amount of coverage each step adds is measured before any classifier is trained.
+
+The first rule admits every class. For split $r$ and class $c$, let $\mathcal E_{rc}$ contain the training patients with at least 32 patches of the class, as in \citet{queisler2026effectiveSupport}. These pools contain between 30 and 514 patients, and every allocation requires only twenty. All 30 classes therefore enter the contrasts, and no class serves as a fixed background class.
+
+The second rule nests the patients of the three allocations. For each split, class, and draw $d\in\{1,\ldots,5\}$, the five seeds are the patients of the five-patient draw of \citet{queisler2026effectiveSupport}, so the deep allocation coincides with the stored grid cell of five patients contributing 32 patches each and its predictions are reused. The seeds are placed in a random order. In each of three rounds, every seed in turn selects the patient of $\mathcal E_{rc}$ closest to it under Equation~\eqref{eq:distance} among those not yet selected, with ties broken by patient identifier. The broad random allocation adds fifteen patients drawn without replacement from the pool without the seeds. Writing $\mathcal P^{\mathrm D}$, $\mathcal P^{\mathrm N}$, and $\mathcal P^{\mathrm R}$ for the patient sets of the three allocations,
+\begin{equation}
+ \mathcal P^{\mathrm D}\subset\mathcal P^{\mathrm N},
+ \qquad
+ \mathcal P^{\mathrm D}\subset\mathcal P^{\mathrm R},
+ \qquad
+ |\mathcal P^{\mathrm N}|=|\mathcal P^{\mathrm R}|=20.
+ \label{eq:nesting}
+\end{equation}
+\noindent Because the seeds are a random draw and the remaining patients are drawn at random from the rest of the pool, the broad random allocation is distributed exactly like the twenty-patient draw of the breadth--depth grid; it differs only in being paired with the deep draw. Patches follow the nested round-robin order over each patient's slides, so the eight patches of a seed in either broad allocation are the first eight of its 32 deep patches. Classes are sampled independently. The design requires 30 new fits: two broad allocations, three splits, and five draws.
+
+The third rule verifies the manipulation. The \emph{coverage distance} of a patient set $\mathcal P$ is the mean distance from the class's validation patients to their nearest training patient,
+\begin{equation}
+ r_{rc}(\mathcal P)=\frac{1}{|\mathcal V_{rc}|}\sum_{i\in\mathcal V_{rc}}\min_{j\in\mathcal P}d(i,j),
+ \label{eq:coverage}
+\end{equation}
+\noindent where $\mathcal V_{rc}$ contains the validation patients with at least one patch of class $c$, embedded from their validation patches as in Equation~\eqref{eq:distance}. Held-out patients serve as the reference so that a patient counts towards coverage only through its similarity to other patients, not through its own membership. Let $r_{\mathrm D}$, $r_{\mathrm N}$, and $r_{\mathrm R}$ denote coverage distances averaged over classes and draws within a split. The \emph{coverage leakage}
+\begin{equation}
+ \kappa=\frac{r_{\mathrm D}-r_{\mathrm N}}{r_{\mathrm D}-r_{\mathrm R}}
+ \label{eq:leakage}
+\end{equation}
+\noindent is the share of the random allocation's coverage improvement that the neighbour allocation already attains. Before any model is fitted, $\kappa$ is recorded for every split, together with its class-level counterpart $\kappa_c$. The experiment proceeds only if $\kappa\le 0.5$ in all three splits, so that the first step adds at most half the coverage of the second; otherwise the neighbour rule is redesigned against this census before any classifier is trained.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The evaluation asks two questions, one for each step of Table~\ref{tab:allocations}. Both use the same accuracy measure and the same uncertainty procedure.
+
+\subsection{Coverage gain and within-neighbourhood residual}
+\label{sec:contrasts}
+Accuracy is patient-macro balanced accuracy over all 30 classes: patch recall is averaged within each test patient and true class, then equally across patients within each class, and finally across classes. An allocation score $A$, in percent, averages the three splits and five draws equally, giving $A_{\mathrm D}$, $A_{\mathrm N}$, and $A_{\mathrm R}$ for the deep, neighbour, and random allocations. By construction, $A_{\mathrm D}$ reproduces the stored grid cell of five patients contributing 32 patches each, and $A_{\mathrm R}$ is expected to lie close to the grid cell of twenty patients contributing eight patches each.
+
+The \emph{coverage gain} compares the two broad allocations,
+\begin{equation}
+ \Delta_C=A_{\mathrm R}-A_{\mathrm N},
+ \label{eq:coverage-gain}
+\end{equation}
+\noindent and measures what dissimilar patients contribute when patients, patches per patient, budget, and effective support stay fixed. Under patient coverage, $\Delta_C$ is positive; under count beyond coverage, it is close to zero.
+
+The first step also raises effective support, so it is read after adjusting for it, exactly as in \citet{queisler2026siteCoverage}. With $\bar\rho_c$ the full-feature intraclass correlation of class $c$ averaged over the three splits \citep{queisler2026multidirectionalRedundancy}, the effective support of $G$ patients contributing $m$ patches each is
+\begin{equation}
+ \Neff(G,m)=\frac{1}{30}\sum_{c=1}^{30}\frac{Gm}{1+(m-1)\bar\rho_c},
+ \label{eq:neff}
+\end{equation}
+\noindent which gives 10.06 per class for the deep and 36.58 for both broad allocations. The part of the first step that effective support explains is $\hat\beta\log\bigl(\Neff(20,8)/\Neff(5,32)\bigr)$, where $\hat\beta$ is the effective-support slope of the surface $A=\alpha+\beta\log\Neff+\gamma\log G$ fitted to the stored predictions of the nine-cell breadth--depth grid. Because all classes enter, this surface is the full-feature surface of \citet{queisler2026multidirectionalRedundancy}, and its reference residual $b_{\mathrm{ref}}=\hat\gamma\log 2$ must reproduce 2.62 points per doubling. Dividing the remainder of the first step by its two doublings of patients gives the \emph{within-neighbourhood residual breadth benefit}
+\begin{equation}
+ b_N=\frac{A_{\mathrm N}-A_{\mathrm D}-\hat\beta\log\bigl(\Neff(20,8)/\Neff(5,32)\bigr)}{2}
+ \label{eq:within-neighbourhood}
+\end{equation}
+\noindent in percentage points per doubling of patients. If coverage carries the residual breadth benefit, $b_N$ falls well below $b_{\mathrm{ref}}$, and it may become negative, because effective support treats similar patients as fully independent of each other. If coverage does not matter, $b_N$ stays close to $b_{\mathrm{ref}}$.
+
+Three secondary analyses describe how a coverage gain arises. First, each test patient of a class is assigned, per draw, to a near, middle, or far tertile by its distance to the nearest seed, and $\Delta_C$ is computed within each tertile with the patient weights of the primary endpoint. Patient coverage predicts a gain that grows from near to far test patients, whose appearance only the random allocation is likely to represent; count beyond coverage predicts a flat profile. Second, the class-level coverage gain is compared across the 30 classes with the class-level coverage difference $r_{\mathrm N}-r_{\mathrm R}$ by rank correlation, which indicates whether the coverage distance could serve as a class-level shortage signal. Third, all quantities are reported separately for the thirteen site classes of \citet{queisler2026siteCoverage} and the seventeen remaining classes, with the surface refitted to each subgroup; the share of neighbours that come from the tissue source site of their seed, compared with the corresponding share among randomly added patients, indicates how far the neighbour step also restricts sites. These analyses carry no decision threshold.
+
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Test-patient uncertainty follows \citet{queisler2026effectiveSupport}. Each of 2,000 paired Bayesian bootstrap replicates assigns $\mathrm{Dirichlet}(1,\ldots,1)$ weights to the distinct test patients \citep{rubin1981bayesian}. A patient's weight is shared across allocations, splits, draws, classes, and repeated test appearances. Because the test partitions coincide with those of the breadth--depth grid, the same weights also enter the refitted surface, so $\hat\beta$, $b_{\mathrm{ref}}$, and $b_N$ are recomputed on every replicate and remain paired. The 2.5th and 97.5th percentiles of the resampled estimates give exploratory 95\% intervals, including one for $b_N-b_{\mathrm{ref}}$. Correlations and embeddings are held fixed. The dispersion of each allocation's accuracy and of both steps across the fifteen split--draw combinations is reported as a descriptive measure of sensitivity to which seeds and patients are drawn.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the test-patient intervals for $\Delta_C$ and $b_N$ and on the practical threshold of one percentage point used in the preceding experiments. Table~\ref{tab:accounts} summarizes the resulting readings.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYYY@{}}
+\toprule
+Account & Claim & Coverage gain $\Delta_C$ & Within-neighbourhood residual $b_N$ \\
+\midrule
+Patient coverage & Additional patients help because they differ from the patients already in training & Interval above 1 & Interval below 1 \\
+\addlinespace
+Count beyond coverage & Additional patients help even when they resemble the patients already in training & Interval within $[-1,1]$ & Interval above 1 \\
+\addlinespace
+Both & Coverage and patient count each contribute & Interval above 1 & Interval above 1 \\
+\bottomrule
+\end{tabularx}
+\caption{Each account predicts a distinct combination of the two contrasts. Intervals are test-patient 95\% intervals in percentage points; $b_N$ is expressed per doubling of patients. Unlike the site experiment, the coverage account admits a negative $b_N$. All other combinations, including any interval that crosses a threshold, are inconclusive.}
+\label{tab:accounts}
+\end{table}
+
+\paragraph{Patient coverage.}
+If dissimilar patients add a practically relevant gain and similar patients add nothing beyond effective support, the missing information on TCGA-UT is coverage of between-patient variation. The coverage distance of Equation~\eqref{eq:coverage} would then be a candidate shortage signal that complements effective support: effective support counts independent observations, and coverage distance measures how much of a class's patient population they represent. The corresponding mitigation would select or weight patients for annotation by their distance to the patients already covered. The tertile analysis indicates whether such a method mainly benefits test patients unlike any training patient.
+
+\paragraph{Count beyond coverage.}
+If dissimilar patients add nothing while the within-neighbourhood residual stays above one point, the benefit of additional patients does not depend on how different their mean appearance is. The missing information would then lie in properties that a patient mean does not express, such as the distribution of a patient's patches or rare diagnostic regions within a slide. A signal for this shortage would need a distance between patients' patch distributions rather than between their averages.
+
+\paragraph{Both and inconclusive outcomes.}
+If both contrasts exceed the threshold, coverage explains part of the residual, and $b_N-b_{\mathrm{ref}}$ quantifies which part. Because the neighbour allocation still adds some coverage, part of $b_N$ may itself reflect coverage; the leakage $\kappa$ indicates how large this part can be. All other combinations leave the accounts open.
+
+\section{Limitations}
+\label{sec:limitations}
+Coverage is defined in one representation and on patient means. Two patients with similar mean embeddings can differ in regions that dominate a diagnosis but contribute little to the average, and variation that Virchow2 does not encode is invisible to the distance. A null coverage gain therefore excludes coverage only as measured here, and the count-beyond-coverage reading remains conditional on this choice.
+
+The two broad allocations differ in more than spread. Nearest neighbours are drawn from dense regions around the seeds and may share tissue source sites or preparation batches with them, because site-specific signatures are visible in deep features of TCGA slides \citep{howard2021impact}. The neighbour step then partly repeats the within-site step of \citet{queisler2026siteCoverage}, and the random step partly adds sites. The site gain of 0.84 points measured there offers a reference scale for how much of a coverage gain site coverage alone could explain, and the reported site shares quantify the overlap, but the design does not remove it.
+
+The manipulation is weakest where it matters most. In a pool of 30 patients, the fifteen nearest neighbours of five seeds make up half the pool and may be hardly closer to the seeds than randomly drawn patients. The smaller cancer types, which carry most of the residual breadth benefit, therefore contribute the least contrast in coverage. The class-level leakage $\kappa_c$ identifies these classes, and the subgroup analysis separates them from the site classes. Finally, the within-neighbourhood residual inherits the assumptions of the effective-support surface, whose slope is estimated on randomly drawn allocations and transferred to similarity-restricted ones, and all results are conditional on frozen Virchow2 features, multinomial logistic regression, the three overlapping splits, and the tested allocation sizes.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
