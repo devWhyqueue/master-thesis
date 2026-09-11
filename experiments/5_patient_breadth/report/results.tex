@@ -1,87 +1,92 @@
 \section{Results}
 \label{sec:results}
-The established coverage deficit resolves into two distinct phenomena depending on the dataset. On BRACS, the patient shortage is completely explained by within-patient redundancy: effective support accounts for the entire deficit, and the residual coverage benefit disappears. On TCGA-UT, effective support falls substantially short: a large coverage benefit persists even after accounting for redundancy, indicating that additional patients supply variation not captured by the correlation model.
+Broader patient sampling improves accuracy at a fixed patch budget in both datasets. On BRACS, additional patches from the same patients also improve accuracy, and effective support gives the closest single-predictor description of the grid. On TCGA-UT, depth gains are small, breadth dominates, and a positive residual breadth term remains after adjustment for effective support.
 
-\subsection{Effective support and residual coverage}
-All surface parameters and contrasts are summarized in Table~\ref{tab:breadth_surface_fits} and Table~\ref{tab:breadth_contrasts}. The nominal support account is cleanly rejected on both datasets. The augmented nominal model leaves large, practically relevant residual breadth coefficients $\gamma_n$: 3.01 points per log unit on BRACS (95\% interval: 2.05 to 4.03) and 6.78 points on TCGA-UT (6.41 to 7.15). At a fixed budget of 160 training patches per class, reallocating those patches from 5 patients at depth 32 to 20 patients at depth 8 improves accuracy by $X=3.66$ points on BRACS (2.17 to 5.29) and $X=9.45$ points on TCGA-UT (8.89 to 10.04). Nominal patch counts therefore fail to describe the support available to the classifier.
-
-When adjusted for within-patient redundancy, the two datasets diverge completely. On BRACS, the effective support predictor achieves the lowest residual standard deviation (0.40 points), and the augmented effective model yields a residual breadth coefficient $\gamma_e$ of 0.13 points per log unit ($-2.12$ to 2.19). This estimate is closely centred on zero and well below the 1.44-point threshold for practical relevance, though the interval is wide. The redundancy account therefore successfully explains the BRACS deficit: patients still matter, but only because patches from the same patient are correlated.
-
-On TCGA-UT, the effective support adjustment fails to explain the coverage benefit. The augmented effective model leaves a massive residual breadth coefficient $\gamma_e$ of 4.45 points per log unit (2.21 to 6.65), heavily exceeding the 1.44-point threshold. Even at matched effective support, adding more patients substantially improves accuracy. This establishes that TCGA-UT patients supply coverage beyond redundancy: variation that a scalar correlation cannot express.
-
-\subsection{Intraclass correlations and depth saturation}
-The correlation estimates support the saturation predictions (Table~\ref{tab:breadth_class_iccs}). On BRACS, the mean $\ICC$ is 0.130, implying that depth saturation should occur near $m\approx 7.7$. Depth gains beyond $m=8$ remain small but positive: $\Delta_m(20)=2.09$ points (0.79 to 3.45). This gradual saturation aligns with the lower $\ICC$.
-
-On TCGA-UT, the correlations are exceptionally high. The mean $\ICC$ is 0.457, placing the saturation transition near $m\approx 2.2$, well below the smallest grid depth of 8. As predicted, further depth increases yield virtually no benefit: $\Delta_m(20)=0.39$ points (0.00 to 0.80), and $\Delta_m(5)$ is just 0.05 points ($-0.49$ to 0.58). The design effect at $m=32$ reaches 15.17 on average, meaning that quadrupling the patch count per patient adds almost no effective observations.
+\subsection{Realized allocations and accuracy grid}
+Both common-pool feasibility audits passed without reducing the grid. Eligible patients per class and split range from 26 to 56 on BRACS and from 30 to 514 on TCGA-UT. These counts are identical across all three depth levels. All 135 selected fits per dataset converged, covering nine cells, three splits, and five draws. Their pooled patient-macro balanced accuracies reproduce the completed analyses. Table~\ref{tab:grid-results} reports the full grid, with each cell averaging fifteen fitted allocations.
 
 \begin{table}[htbp]
 \centering\small
-\setlength{\tabcolsep}{3.2pt}
-\begin{tabular}{@{}llcccc@{}}
-\toprule
-Dataset & Model & Predictors & Slope $\beta$ & Residual breadth $\gamma$ & Residual SD \\
-\midrule
-BRACS & Nominal & $\log n$ & 3.02 [2.49, 3.62] & -- & 1.43 \\
-& Breadth only & $\log G$ & 4.52 [3.82, 5.27] & -- & 1.06 \\
-& Effective & $\log \Neff$ & 4.51 [3.80, 5.29] & -- & 0.40 \\
-\addlinespace
-& Augmented nominal & $\log n + \gamma_n \log G$ & 3.02 [2.49, 3.62] & 3.01 [2.05, 4.03] & 0.46 \\
-& Augmented effective & $\log \Neff + \gamma_e \log G$ & 4.51 [3.80, 5.29] & 0.13 [$-2.12$, 2.19] & 0.43 \\
-\midrule
-TCGA-UT & Nominal & $\log n$ & 3.58 [3.39, 3.78] & -- & 3.08 \\
-& Breadth only & $\log G$ & 6.97 [6.65, 7.30] & -- & 0.21 \\
-& Effective & $\log \Neff$ & 6.94 [6.62, 7.26] & -- & 0.28 \\
-\addlinespace
-& Augmented nominal & $\log n + \gamma_n \log G$ & 3.58 [3.39, 3.78] & 6.78 [6.41, 7.15] & 0.18 \\
-& Augmented effective & $\log \Neff + \gamma_e \log G$ & 6.94 [6.62, 7.26] & 4.45 [2.21, 6.65] & 0.17 \\
-\bottomrule
-\end{tabular}
-\caption{Support surface regression fits over the nine grid cells. Both slope and residual breadth are expressed in percentage points per natural log unit.}
-\label{tab:breadth_surface_fits}
+\textbf{BRACS}\par\smallskip
+\input{tables/bracs/grid_accuracies}
+\par\medskip
+\textbf{TCGA-UT}\par\smallskip
+\input{tables/tcga_ut/grid_accuracies}
+\caption{Patient-macro balanced accuracy (\%) and paired-bootstrap 95\% intervals. $G$ denotes patients per class and $m$ patches per patient. Scores average splits and draws equally; intervals condition on the realized training allocations.}
+\label{tab:grid-results}
 \end{table}
+
+\noindent BRACS accuracy rises from 34.55\% at $(5,8)$ to 42.88\% at $(20,32)$; TCGA-UT rises from 61.97\% to 72.08\%. Point estimates increase with both factors throughout both grids. At 160 patches per class, BRACS accuracy progresses from 37.13\% at $(5,32)$ through 38.69\% at $(10,16)$ to 40.84\% at $(20,8)$. The corresponding TCGA-UT sequence is 62.25\%, 67.28\%, and 71.76\%. Thus the intermediate allocation also favours breadth at this budget; the conclusion does not depend only on the two extreme cells.
+
+\subsection{Equal-budget advantage and depth gains}
+The equal-budget breadth advantage is 3.71 points on BRACS (95\% interval: 2.21 to 5.35) and 9.52 points on TCGA-UT (8.96 to 10.07). Both lower bounds exceed the one-point practical threshold. These comparisons contradict a description based only on nominal patch count within the tested allocation procedure. They compare patient composition and depth at a fixed budget, with validation-selected regularization in each cell.
 
 \begin{table}[htbp]
 \centering\small
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lrr@{}}
-\toprule
-Contrast & BRACS [95\% CI] & TCGA-UT [95\% CI] \\
-\midrule
-\addlinespace[2pt]
-\multicolumn{3}{@{}l}{\textit{Depth gains at fixed breadth: $\Delta_m(G) = A(G, 32) - A(G, 8)$}} \\[3pt]
-\quad $\Delta_m(G=5)$ & 3.02 [1.70, 4.39] & 0.05 [$-0.49$, 0.58] \\
-\quad $\Delta_m(G=10)$ & 1.16 [$-0.35$, 2.76] & 0.33 [$-0.10$, 0.77] \\
-\quad $\Delta_m(G=20)$ & 2.09 [0.79, 3.45] & 0.39 [0.00, 0.80] \\
-\addlinespace[6pt]
-\multicolumn{3}{@{}l}{\textit{Breadth gains at fixed depth: $\Delta_G(m) = A(20, m) - A(5, m)$}} \\[3pt]
-\quad $\Delta_G(m=8)$ & 6.68 [5.34, 8.14] & 9.50 [8.84, 10.13] \\
-\quad $\Delta_G(m=16)$ & 6.38 [4.84, 8.06] & 9.65 [9.08, 10.21] \\
-\quad $\Delta_G(m=32)$ & 5.75 [4.34, 7.16] & 9.84 [9.27, 10.41] \\
-\addlinespace[6pt]
-\multicolumn{3}{@{}l}{\textit{Equal-budget advantage within $n_c=160$}} \\[3pt]
-\quad $X = A(20, 8) - A(5, 32)$ & 3.66 [2.17, 5.29] & 9.45 [8.89, 10.04] \\
-\bottomrule
-\end{tabular*}
-\caption{Key contrasts on the allocation grid. All estimates and 95\% intervals are reported in percentage points (pp). The equal-budget advantage compares the broadest and deepest cell within the $n_c=160$ set.}
-\label{tab:breadth_contrasts}
+\begin{minipage}[t]{0.48\textwidth}\centering
+\textbf{BRACS}\par\smallskip
+\input{tables/bracs/contrasts}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}\centering
+\textbf{TCGA-UT}\par\smallskip
+\input{tables/tcga_ut/contrasts}
+\end{minipage}
+\caption{Accuracy contrasts in percentage points, with paired 95\% intervals. $\Delta_m(G)$ quadruples depth from 8 to 32 at fixed breadth; $\Delta_G(m)$ quadruples breadth from 5 to 20 at fixed depth. $X$ exchanges depth for breadth at 160 patches per class.}
+\label{tab:contrasts-results}
 \end{table}
+
+\noindent BRACS depth gains remain positive at each breadth (Table~\ref{tab:contrasts-results}). At twenty patients per class, quadrupling depth improves accuracy by 2.04 points (1.13 to 2.93), establishing a gain above one point and failing the prespecified saturation criterion. On TCGA-UT, the same contrast is 0.32 points (0.24 to 0.41). This is a supported positive effect, but its entire interval lies within the practical equivalence band of $\pm1$ point. All three TCGA-UT depth-gain intervals fall inside this band. Practical saturation here means little additional accuracy over the tested depth range, not exactly zero benefit.
+
+Breadth gains at fixed depth range from 5.75 to 6.30 points on BRACS and from 9.80 to 9.88 points on TCGA-UT, with every lower interval bound above one point. These gains also increase the patch budget fourfold. The equal-budget contrast is therefore the stronger evidence that allocation over patients matters beyond the number of labelled patches.
+
+\subsection{Effective support and residual breadth}
+The mean projected intraclass correlation is 0.130 on BRACS and 0.457 on TCGA-UT. Mean design effects consequently rise from 1.91 to 5.02 over depths 8--32 on BRACS, and from 4.20 to 15.17 on TCGA-UT. At $G=20$, class-averaged effective support rises from 86.94 to 140.26 on BRACS, but only from 38.92 to 43.58 on TCGA-UT. The correlation model therefore predicts a much weaker return from additional depth in TCGA-UT, consistent with its small observed depth gains.
 
 \begin{table}[htbp]
 \centering\small
-\begin{tabular}{@{}llcc@{}}
-\toprule
-Dataset & Mean $\ICC$ & Mean $\DE_c(m=8)$ & Mean $\DE_c(m=32)$ \\
-\midrule
-BRACS & 0.130 & 1.91 & 5.02 \\
-TCGA-UT & 0.457 & 4.20 & 15.17 \\
-\bottomrule
-\end{tabular}
-\caption{Mean estimated intraclass correlations and design effects.}
-\label{tab:breadth_class_iccs}
+\textbf{BRACS}\par\smallskip
+\input{tables/bracs/surface_fits}
+\par\medskip
+\textbf{TCGA-UT}\par\smallskip
+\input{tables/tcga_ut/surface_fits}
+\caption{Single-predictor support surfaces over nine pooled cell scores. Slopes are percentage points per natural log unit; residual standard deviations are percentage points, using seven residual degrees of freedom. Ranking describes in-sample fit, not predictive validation.}
+\label{tab:surface-results}
 \end{table}
+
+\noindent On BRACS, effective support gives the smallest residual standard deviation among the three single-predictor models: 0.30 points, compared with 0.98 for breadth alone and 1.32 for nominal support (Table~\ref{tab:surface-results}). Adding breadth to nominal support leaves $\gamma_n=2.86$ points per log unit (1.74 to 4.07). Adding it to effective support instead gives $\gamma_e=0.13$ ($-1.60$ to 1.85). This residual is compatible with zero, but its interval extends outside the practical band of approximately $\pm1.44$ points per log unit. The BRACS grid is therefore well described by effective support without establishing that its residual breadth effect is practically negligible.
+
+\begin{table}[htbp]
+\centering\small
+\input{tables/residual_breadth}
+\caption{Residual breadth coefficients from the two-predictor models, with paired 95\% intervals. Coefficients are points per natural log unit; residual SD uses six residual degrees of freedom. The slope of the support predictor is jointly refitted in each model.}
+\label{tab:residual-results}
+\end{table}
+
+\noindent On TCGA-UT, breadth alone fits slightly more closely than effective support (residual SD 0.18 versus 0.25 points); nominal support fits poorly at 3.12 points. The residual after effective adjustment is $\gamma_e=4.30$ points per log unit (3.56 to 4.99), equivalent to 2.98 points (2.47 to 3.46) for a doubling of breadth at fixed effective support in the fitted model. Its lower bound exceeds the practical threshold. This supports a residual breadth association beyond this particular scalar adjustment. The grid contains no exact matched-effective-support intervention, so that conditional coefficient remains a model-based summary rather than a direct matched comparison.
+
+The reciprocal mean correlations place the approximate transition depths near 7.7 on BRACS and 2.2 on TCGA-UT. Both are at or below the smallest depth, but the BRACS gain shows that this transition is not a sharp accuracy plateau. Effective support still increases by about 61\% from depth 8 to 32 on BRACS, compared with 12\% on TCGA-UT. A design-effect transition alone does not imply that accuracy has saturated.
+
+\subsection{Split consistency, draw variation, and reporting scope}
+Equal-budget breadth gains are positive in every split, ranging from 3.49 to 3.99 points on BRACS and from 8.73 to 10.37 on TCGA-UT (Table~\ref{tab:split-results}). Depth gains at twenty patients range from 1.70 to 2.60 points on BRACS and from 0.27 to 0.37 on TCGA-UT. These split-level results preserve the pooled contrast between useful additional depth on BRACS and small depth gains on TCGA-UT.
+
+\begin{table}[htbp]
+\centering\small
+\input{tables/split_results}
+\caption{Split-level contrasts in points, averaging five draws per cell. Draw SD is calculated separately within each split and cell using divisor five; the displayed range spans its nine cells. This separates training-draw dispersion from differences between splits. Splits overlap and are not independent cohort replications.}
+\label{tab:split-results}
+\end{table}
+
+\noindent Draw variation is appreciable, particularly on BRACS. Within-split, within-cell standard deviations span 0.33--3.58 points on BRACS and 0.30--1.94 on TCGA-UT. These are descriptive dispersions over five training draws, not intervals for a fresh training cohort; the paired-bootstrap intervals above describe held-out patient variation conditional on those draws.
+
+Class correlations are reported in Table~\ref{tab:class-iccs}. BRACS ranges from 0.077 for usual ductal hyperplasia to 0.252 for invasive carcinoma; TCGA-UT ranges from 0.314 for lung squamous cell carcinoma to 0.641 for kidney renal clear cell carcinoma. These estimates characterize dependence along the leading principal direction, not all morphological heterogeneity. The completed analysis summarizes patient-macro balanced accuracy but does not contain the prespecified macro negative log-likelihood, expected calibration error, patch-micro balanced accuracy, or class-specific patient-macro recalls. Those secondary endpoints remain unreported here; no conclusion about probability quality, calibration, or class-specific recovery follows from the accuracy results.
 
 \section{Discussion}
 \label{sec:discussion}
-Separating patient count from sampling depth resolves the patient shortage deficit into two distinct mechanisms that standard benchmarks confound. The finding that within-patient redundancy explains the entire BRACS deficit is a strong validation of the effective support model: on this dataset, a smaller patient count is equivalent to a smaller dataset of independent observations.
+At the tested patch budget, allocating material across more patients is beneficial in both cohorts. Equal contributions remove unequal loss weight as an explanation, while common eligibility pools and nested depth samples prevent depth from changing the selected patients. The remaining contrast concerns how much additional evidence comes from more material from the same patients and how much comes from a broader patient sample. BRACS benefits from both; TCGA-UT gains substantially more from breadth, with less than half a point from quadrupling depth at any tested breadth.
 
-On TCGA-UT, however, effective support is insufficient. The large residual breadth effect demonstrates that patients in this cohort carry unique morphological or acquisition variation that cannot be reduced to scalar correlation. This distinction matters for dataset construction: for tasks resembling BRACS, deep sampling of fewer patients can theoretically substitute for broader recruitment, provided the budget scales by the design effect. For tasks resembling TCGA-UT, no amount of deep sampling can replace missing patients, because the representation depends on the diversity they introduce.
+The BRACS findings make redundancy-adjusted effective support a useful descriptive summary. Its fit is substantially closer than nominal support or breadth alone, and adding a residual breadth term gives little improvement. Nevertheless, the uncertainty interval does not establish practical equivalence to zero. It would therefore be premature to conclude that redundancy fully explains the established deficit, or that deeper sampling can generally replace additional patients. Even within this experiment, the direct equal-budget comparison favours breadth by more than two points at its lower interval bound.
+
+TCGA-UT combines high projected within-patient dependence, small depth gains, and a positive residual breadth coefficient after effective-support adjustment. This combination shows that the chosen scalar adjustment does not fully summarize the accuracy surface. It is compatible with additional patients supplying conditions absent from the observed ones, but also with dependence missed by the projection or misspecification of the log-linear surface. The result does not establish which morphological or acquisition factors matter, nor that no amount of additional depth could ever compensate for patient shortage.
+
+For dataset construction, the supported implication is restricted but concrete: within these common eligible pools, twenty patients contributing eight patches each outperform five contributing 32 each. The contrast holds across all fixed splits and both cohorts. Extending that recommendation to other tissue-availability distributions, representations, or budgets requires further allocation experiments. Multiple feature projections and repeated cohorts would help determine whether the residual breadth term reflects limitations of the redundancy measure or patient variation that requires a richer account.
 

@@ -1,18 +1,9 @@
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{lcccc}
+\begin{tabular}{@{}lrr@{}}
 \toprule
-Model & Predictors & Slope $\beta$ & Residual breadth $\gamma$ & Residual SD \\
+Predictor & Slope [95\% interval] & Residual SD \\
 \midrule
-Nominal & $\log n$ & 3.02 [2.49, 3.62] & -- & 1.43 \\
-Breadth only & $\log G$ & 4.52 [3.82, 5.27] & -- & 1.06 \\
-Effective & $\log \Neff$ & 4.51 [3.80, 5.29] & -- & 0.40 \\
-\midrule
-Augmented nominal & $\log n + \gamma_n \log G$ & 3.02 [2.49, 3.62] & 3.01 [2.05, 4.03] & 0.46 \\
-Augmented effective & $\log \Neff + \gamma_e \log G$ & 4.51 [3.80, 5.29] & 0.13 [-2.12, 2.19] & 0.43 \\
+$\log n$ & 2.90 [2.30, 3.54] & 1.32 \\
+$\log G$ & 4.33 [3.32, 5.45] & 0.98 \\
+$\log\Neff$ & 4.31 [3.36, 5.33] & 0.30 \\
 \bottomrule
 \end{tabular}
-\caption{Support surface regression fits over the nine grid cells.}
-\label{tab:breadth_surface_fits}
-\end{table}

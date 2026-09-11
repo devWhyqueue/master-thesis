@@ -1,0 +1,35 @@
+{
+  "retrieved": "2026-09-11",
+  "source_host": "hydra",
+  "source_root": "/home/yannik.qu/master-thesis/experiments/5_patient_breadth/outputs",
+  "source_commit": "35069b7",
+  "jobs": {
+    "tcga_ut": {
+      "analyze": 4881767,
+      "preflight": 4881765,
+      "fit_array": 4881766
+    },
+    "bracs": {
+      "analyze": 4881761,
+      "preflight": 4881759,
+      "fit_array": 4881760
+    }
+  },
+  "verification": "Both preflights and analyses and all 54 fit array tasks completed with exit code 0:0. All 270 selected run records converged. Sampling and analysis code hashes matched local files. Preflight SHA256 sidecars verified; all 18 accuracy means reproduced from run records.",
+  "run_summary": "Extracted split, grid, selected_lambda, solver.converged and test patient_macro_balanced_accuracy (times 100) from each run.json. Arrays and patient identifiers not copied.",
+  "reporting_notes": [
+    "analysis.json draw_dispersion pools all 15 split/draw scores; report instead computes within-split cell SD across five draws with divisor five.",
+    "Generated augmented-model beta columns in cluster tables reuse single-model slopes; report presents single-model slopes and augmented residual coefficients separately.",
+    "No probability-quality or class-specific endpoint summaries in analysis.json; report explicitly marks these unreported."
+  ],
+  "sha256": {
+    "bracs/analysis.json": "c5bbb6d80a122c23fd450e77c33f8b631f281e9d94ebdf6fe9c6e0d38f19fc0d",
+    "bracs/preflight.json": "40199b856114667742a31a94af908732c3c173c0bf9b0f76a6719347a7c0e633",
+    "bracs/preflight.json.sha256": "44b4a293385fb6654a91f0828979bd6d3725d29471ac82a45eb869e05a7e0bde",
+    "tcga_ut/preflight.json.sha256": "3d64f9d054f3fd4b6678b64d7a463b6aeb31686b57ab7f1087d966cfa8b6d22f",
+    "tcga_ut/analysis.json": "2027565562f063ece7672d52b3f368ba2cd05eb71fb6b4193d72a1d9cd79bec6",
+    "tcga_ut/run_summary.json": "a2ea1890cbd74df4c16f331a6c9613d24cf6b88b6a2f3487955fa2a1b20bbb1d",
+    "bracs/run_summary.json": "9458c4d0d599916ceacfb72d79243d9045782d07d41df28353238f0ce00a7b9f",
+    "tcga_ut/preflight.json": "a9ed34d18f326e6da969c9bcc3d314c592a1dcc99a223dc2ff7e39839372a667"
+  }
+}
