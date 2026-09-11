@@ -66,7 +66,25 @@ The mean projected intraclass correlation is 0.130 on BRACS and 0.457 on TCGA-UT
 
 The reciprocal mean correlations place the approximate transition depths near 7.7 on BRACS and 2.2 on TCGA-UT. Both are at or below the smallest depth, but the BRACS gain shows that this transition is not a sharp accuracy plateau. Effective support still increases by about 61\% from depth 8 to 32 on BRACS, compared with 12\% on TCGA-UT. A design-effect transition alone does not imply that accuracy has saturated.
 
-\subsection{Split consistency, draw variation, and reporting scope}
+\subsection{Probability quality and class-specific recall}
+The secondary endpoints move with the accuracy surface rather than against it. At the equal budget of 160 patches per class, the broad allocation lowers macro negative log-likelihood by 0.113 nats on BRACS (95\% interval: 0.081 to 0.145) and by 0.463 nats on TCGA-UT (0.446 to 0.482), and lowers expected calibration error by 9.39 points on BRACS (4.07 to 12.67) and 6.59 points on TCGA-UT (5.96 to 7.35). Patch-micro balanced accuracy rises by 3.99 points (2.64 to 5.13) and 9.55 points (9.01 to 10.10), close to the corresponding patient-macro gains of 3.71 and 9.52 points. The equal-budget conclusion therefore does not depend on aggregating patches within patients first.
+
+\begin{table}[htbp]
+\centering\small
+\textbf{BRACS}\par\smallskip
+\input{tables/bracs/secondary}
+\par\medskip
+\textbf{TCGA-UT}\par\smallskip
+\input{tables/tcga_ut/secondary}
+\caption{Secondary endpoints per cell with paired 95\% intervals, computed from the stored test probabilities of the same fits. $X$ is the equal-budget contrast $(20, 8)$ minus $(5, 32)$, so a negative entry favours the broad allocation for the two probability-quality endpoints and a positive entry favours it for accuracy. Probabilities are evaluated as produced, without temperature scaling.}
+\label{tab:secondary-results}
+\end{table}
+
+\noindent Depth behaves as it does for accuracy. At twenty patients per class, quadrupling depth lowers BRACS macro negative log-likelihood by 0.107 nats and leaves its calibration error within 0.25 points, whereas the TCGA-UT changes are 0.009 nats and 0.29 points. The two cohorts differ in how the narrow allocations respond to depth: BRACS calibration error at five patients per class rises from 12.87\% at $m=8$ to 19.05\% at $m=32$, while the corresponding TCGA-UT values fall from 16.53\% to 11.91\%. Additional patches from five patients thus sharpen confidence without matching accuracy gains on BRACS. Calibration error over ten equal-width bins is unstable at these classwise sample sizes, so this contrast is weaker evidence than the negative log-likelihood values beside it.
+
+Class-specific patient-macro recalls (Table~\ref{tab:class-recalls}) show that the equal-budget advantage is not carried by a single class. On TCGA-UT, all 30 cancer types gain, from 1.44 points for pheochromocytoma and paraganglioma to 19.27 points for uterine carcinosarcoma, and every lower interval bound exceeds zero. On BRACS, six of seven lesion classes gain, led by invasive carcinoma at 9.09 points (6.46 to 11.71); atypical ductal hyperplasia is the sole negative estimate at $-2.29$ points ($-5.54$ to 0.87) and its interval contains zero. Each cell's class recalls average to its reported balanced accuracy by construction, so these entries decompose the primary endpoint rather than adding an independent test.
+
+\subsection{Split consistency and draw variation}
 Equal-budget breadth gains are positive in every split, ranging from 3.49 to 3.99 points on BRACS and from 8.73 to 10.37 on TCGA-UT (Table~\ref{tab:split-results}). Depth gains at twenty patients range from 1.70 to 2.60 points on BRACS and from 0.27 to 0.37 on TCGA-UT. These split-level results preserve the pooled contrast between useful additional depth on BRACS and small depth gains on TCGA-UT.
 
 \begin{table}[htbp]
@@ -78,7 +96,7 @@ Equal-budget breadth gains are positive in every split, ranging from 3.49 to 3.9
 
 \noindent Draw variation is appreciable, particularly on BRACS. Within-split, within-cell standard deviations span 0.33--3.58 points on BRACS and 0.30--1.94 on TCGA-UT. These are descriptive dispersions over five training draws, not intervals for a fresh training cohort; the paired-bootstrap intervals above describe held-out patient variation conditional on those draws.
 
-Class correlations are reported in Table~\ref{tab:class-iccs}. BRACS ranges from 0.077 for usual ductal hyperplasia to 0.252 for invasive carcinoma; TCGA-UT ranges from 0.314 for lung squamous cell carcinoma to 0.641 for kidney renal clear cell carcinoma. These estimates characterize dependence along the leading principal direction, not all morphological heterogeneity. The completed analysis summarizes patient-macro balanced accuracy but does not contain the prespecified macro negative log-likelihood, expected calibration error, patch-micro balanced accuracy, or class-specific patient-macro recalls. Those secondary endpoints remain unreported here; no conclusion about probability quality, calibration, or class-specific recovery follows from the accuracy results.
+Class correlations are reported in Table~\ref{tab:class-iccs}. BRACS ranges from 0.077 for usual ductal hyperplasia to 0.252 for invasive carcinoma; TCGA-UT ranges from 0.314 for lung squamous cell carcinoma to 0.641 for kidney renal clear cell carcinoma. These estimates characterize dependence along the leading principal direction, not all morphological heterogeneity. Every prespecified endpoint of Section~\ref{sec:evaluation} is reported: the primary accuracy surface above, and the probability-quality, patch-micro, and class-specific summaries of Table~\ref{tab:secondary-results} and Table~\ref{tab:class-recalls}.
 
 \section{Discussion}
 \label{sec:discussion}

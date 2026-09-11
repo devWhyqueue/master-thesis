@@ -55,6 +55,14 @@ for (const c of cohorts) {
   ]));
   const names = {N:'Normal',PB:'Pathological benign',UDH:'Usual ductal hyperplasia',FEA:'Flat epithelial atypia',ADH:'Atypical ductal hyperplasia',DCIS:'Ductal carcinoma in situ',IC:'Invasive carcinoma'};
   writeFileSync(`tables/${c.id}/class_iccs.tex`, table('p{9cm}rrr', 'Class & $\\ICC_c$ & $\\DE_c(8)$ & $\\DE_c(32)$', Object.entries(c.preflight.cohort_iccs).map(([name,v]) => `${names[name] ?? name.replaceAll('_',' ')} & ${v.toFixed(3)} & ${f(1+7*v)} & ${f(1+31*v)}`)));
+  const s = c.analysis.secondary;
+  const secondaryKeys = ['macro_nll', 'expected_calibration_error', 'patch_micro_balanced_accuracy'];
+  for (const k of secondaryKeys) assert(Math.abs(s.cells['G20_m8'][k].point - s.cells['G5_m32'][k].point - s.equal_budget_X[k].point) < 1e-9);
+  writeFileSync(`tables/${c.id}/secondary.tex`, table('lrrr', '$(G, m)$ & Macro NLL (nats) & ECE (\\%) & Patch-micro BA (\\%)', [
+    ...[5, 10, 20].flatMap(g => [8, 16, 32].map(m => `(${g}, ${m}) & ` + secondaryKeys.map(k => estimate(s.cells[`G${g}_m${m}`][k])).join(' & '))),
+    `$X$ & ` + secondaryKeys.map(k => estimate(s.equal_budget_X[k])).join(' & '),
+  ]));
+  writeFileSync(`tables/${c.id}/class_recalls.tex`, table('p{6cm}rrr', 'Class & $(5, 32)$ & $(20, 8)$ & $X$', Object.entries(s.class_recalls).map(([name, e]) => `${names[name] ?? name.replaceAll('_',' ')} & ${estimate(e.G5_m32)} & ${estimate(e.G20_m8)} & ${estimate(e.equal_budget_X)}`)));
 }
 writeFileSync('tables/residual_breadth.tex', table('llrr', 'Dataset & Adjustment & $\\gamma$ [95\\% interval] & Residual SD', cohorts.flatMap(c => ['n','e'].map(k => `${c.name} & ${k === 'n' ? 'Nominal' : 'Effective'} & ${estimate(c.analysis.surface_parameters[`gamma_${k}`])} & ${f(c.analysis.surface_parameters[k === 'n' ? 'res_std_aug_nom' : 'res_std_aug_eff'].point)}`))));
 writeFileSync('tables/split_results.tex', table('lrrrr', 'Dataset / split & $X$ & $\\Delta_m(20)$ & $\\Delta_G(8)$ & Draw SD range', cohorts.flatMap(c => [0,1,2].map(s => {

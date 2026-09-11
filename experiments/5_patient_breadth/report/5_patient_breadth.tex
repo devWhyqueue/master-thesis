@@ -21,7 +21,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent Training on fewer patients impairs histopathology patch classification even when class patch counts are held fixed, and neither a different downstream classifier nor an equalized training objective recovers the loss. This experiment separates patient breadth from patch depth on a three-by-three allocation grid in BRACS and TCGA-UT, using frozen Virchow2 features and fixed patient-disjoint splits. All cells draw from common maximum-depth patient pools; fixed-breadth depth comparisons use the same patients and nested patches. At 160 patches per class, allocating eight patches to each of twenty patients instead of 32 patches to each of five patients improves patient-macro balanced accuracy by 3.71 percentage points on BRACS (95\% interval: 2.21 to 5.35) and 9.52 points on TCGA-UT (8.96 to 10.07). Redundancy-adjusted effective support describes the BRACS grid best among the single-predictor models, but its residual breadth interval does not establish practical equivalence to zero. On TCGA-UT, additional depth produces gains below one point, while a positive residual breadth coefficient remains after adjustment for effective support. The findings favour broader patient sampling at the tested budget and identify a limitation of scalar redundancy adjustment on TCGA-UT; they do not identify the biological or acquisition variation responsible.
+\noindent Training on fewer patients impairs histopathology patch classification even when class patch counts are held fixed, and neither a different downstream classifier nor an equalized training objective recovers the loss. This experiment separates patient breadth from patch depth on a three-by-three allocation grid in BRACS and TCGA-UT, using frozen Virchow2 features and fixed patient-disjoint splits. All cells draw from common maximum-depth patient pools; fixed-breadth depth comparisons use the same patients and nested patches. At 160 patches per class, allocating eight patches to each of twenty patients instead of 32 patches to each of five patients improves patient-macro balanced accuracy by 3.71 percentage points on BRACS (95\% interval: 2.21 to 5.35) and 9.52 points on TCGA-UT (8.96 to 10.07). Macro negative log-likelihood, expected calibration error, patch-micro balanced accuracy, and class-specific recalls move in the same direction at that budget. Redundancy-adjusted effective support describes the BRACS grid best among the single-predictor models, but its residual breadth interval does not establish practical equivalence to zero. On TCGA-UT, additional depth produces gains below one point, while a positive residual breadth coefficient remains after adjustment for effective support. The findings favour broader patient sampling at the tested budget and identify a limitation of scalar redundancy adjustment on TCGA-UT; they do not identify the biological or acquisition variation responsible.
 \end{abstract}
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -172,7 +172,7 @@ The grid is bounded by the rarest class in each cohort, so its largest allocatio
 
 The redundancy adjustment inherits the approximations of the taxonomy. Its correlation is estimated from a one-dimensional projection of the representation under an exchangeable within-patient correlation model, so dependence that the leading principal direction does not express is absorbed into the residual breadth term. The support surface itself is a descriptive least-squares summary over nine cells; it establishes which predictor orders the observations, not a causal or generative account of the learning problem. All estimates are conditional on frozen Virchow2 features, on multinomial logistic regression, and on the three fixed splits, whose partitions overlap across splits.
 
-Finally, the experiment locates the deficit in the training material but cannot say whether the missing information is absent from the cohort or merely inexpressible in this representation. A residual breadth term is compatible with both, and separating them requires varying the representation rather than the allocation. The prespecified probability-quality endpoints are not summarized in the completed analysis. Discrimination gains therefore cannot be interpreted as improvements in calibration.
+Finally, the experiment locates the deficit in the training material but cannot say whether the missing information is absent from the cohort or merely inexpressible in this representation. A residual breadth term is compatible with both, and separating them requires varying the representation rather than the allocation. The probability-quality endpoints inherit their own limits: probabilities are evaluated as produced, so calibration differences also reflect how confidently each allocation predicts, and a post-hoc temperature fitted on validation data could remove part of them. Expected calibration error over ten equal-width bins is further unstable at these classwise sample sizes and is read here only alongside the negative log-likelihood.
 
 
 \clearpage
@@ -190,6 +190,22 @@ The class estimates below average the three training-split correlations. Design 
 \input{tables/tcga_ut/class_iccs}
 \caption{Class-specific intraclass correlations and implied design effects at depths 8 and 32. Larger values indicate stronger projected within-patient dependence.}
 \label{tab:class-iccs}
+\end{table}
+\clearpage
+
+\section{Class-specific recalls at the equal budget}
+The entries below are patient-macro recalls in percent at the two cells of the $n_c=160$ set, with $X$ their difference. Each column's class mean is the cell's patient-macro balanced accuracy.
+
+\begin{table}[!htbp]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\textbf{BRACS}\par\smallskip
+\input{tables/bracs/class_recalls}
+\par\medskip
+\textbf{TCGA-UT}\par\smallskip
+\input{tables/tcga_ut/class_recalls}
+\caption{Class-specific patient-macro recall at the broad allocation $(20, 8)$ and the deep allocation $(5, 32)$, with paired 95\% intervals. Positive $X$ favours breadth.}
+\label{tab:class-recalls}
 \end{table}
 \clearpage
 
