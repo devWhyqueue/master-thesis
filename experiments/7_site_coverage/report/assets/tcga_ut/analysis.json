@@ -1,0 +1,331 @@
+{
+  "allocation_accuracy": {
+    "all_classes": {
+      "broad10": {
+        "ci_2_5": 67.54389046213349,
+        "ci_97_5": 70.12308566814195,
+        "point": 68.85870905543088
+      },
+      "broad5": {
+        "ci_2_5": 67.19321192348848,
+        "ci_97_5": 69.74404283458114,
+        "point": 68.49605648143496
+      },
+      "deep": {
+        "ci_2_5": 63.77372581841897,
+        "ci_97_5": 66.21925267927485,
+        "point": 65.00518240894506
+      }
+    },
+    "site_class": {
+      "broad10": {
+        "ci_2_5": 68.94622698710357,
+        "ci_97_5": 71.49466275156024,
+        "draw_dispersion": 1.2936368797341142,
+        "point": 70.25296538292994
+      },
+      "broad5": {
+        "ci_2_5": 68.16391736905864,
+        "ci_97_5": 70.63260113359638,
+        "draw_dispersion": 1.5486030003239861,
+        "point": 69.41184162012287
+      },
+      "deep": {
+        "ci_2_5": 57.27292350678756,
+        "ci_97_5": 59.67885807716101,
+        "draw_dispersion": 2.8762755882218403,
+        "point": 58.500079643393455
+      }
+    }
+  },
+  "interpretation": {
+    "label": "inconclusive",
+    "threshold_pp": 1.0
+  },
+  "n_site_classes": 13,
+  "reference_residual": {
+    "ci_2_5": 0.19017174687773386,
+    "ci_97_5": 1.3759745604471567,
+    "point": 0.7881355803200979
+  },
+  "site_classes": [
+    "Bladder_Urothelial_Carcinoma",
+    "Brain_Lower_Grade_Glioma",
+    "Breast_invasive_carcinoma",
+    "Colon_adenocarcinoma",
+    "Glioblastoma_multiforme",
+    "Head_and_Neck_squamous_cell_carcinoma",
+    "Kidney_renal_papillary_cell_carcinoma",
+    "Lung_adenocarcinoma",
+    "Lung_squamous_cell_carcinoma",
+    "Prostate_adenocarcinoma",
+    "Skin_Cutaneous_Melanoma",
+    "Thyroid_carcinoma",
+    "Uterine_Corpus_Endometrial_Carcinoma"
+  ],
+  "site_gain": {
+    "ci_2_5": 0.5500476089746396,
+    "ci_97_5": 1.142316649973505,
+    "point": 0.8411237628070722
+  },
+  "strata": {
+    "Bladder_Urothelial_Carcinoma": {
+      "broad10": {
+        "added_recall": 52.664276746806806,
+        "added_share": 0.18759689922480619,
+        "core_recall": 51.31558368507579,
+        "core_share": 0.17519379844961236,
+        "other_recall": 51.88466879285938,
+        "other_share": 0.6372093023255813
+      },
+      "broad5": {
+        "added_recall": 45.86693927310873,
+        "added_share": 0.18759689922480619,
+        "core_recall": 54.92867047579995,
+        "core_share": 0.17519379844961236,
+        "other_recall": 52.41452377132374,
+        "other_share": 0.6372093023255813
+      }
+    },
+    "Brain_Lower_Grade_Glioma": {
+      "broad10": {
+        "added_recall": 82.63425563355827,
+        "added_share": 0.19142857142857142,
+        "core_recall": 79.42218171473189,
+        "core_share": 0.2285714285714286,
+        "other_recall": 76.24705482339974,
+        "other_share": 0.58
+      },
+      "broad5": {
+        "added_recall": 81.96430564479263,
+        "added_share": 0.19142857142857142,
+        "core_recall": 81.87562458250173,
+        "core_share": 0.2285714285714286,
+        "other_recall": 77.66089781514064,
+        "other_share": 0.58
+      }
+    },
+    "Breast_invasive_carcinoma": {
+      "broad10": {
+        "added_recall": 69.49727902963346,
+        "added_share": 0.17333333333333334,
+        "core_recall": 71.03261504084337,
+        "core_share": 0.1618181818181818,
+        "other_recall": 69.11223992121478,
+        "other_share": 0.6648484848484848
+      },
+      "broad5": {
+        "added_recall": 69.07823263412864,
+        "added_share": 0.17333333333333334,
+        "core_recall": 71.5300131075547,
+        "core_share": 0.1618181818181818,
+        "other_recall": 68.16616040152134,
+        "other_share": 0.6648484848484848
+      }
+    },
+    "Colon_adenocarcinoma": {
+      "broad10": {
+        "added_recall": 62.53180048704204,
+        "added_share": 0.42150537634408586,
+        "core_recall": 68.89139488381447,
+        "core_share": 0.2924731182795698,
+        "other_recall": 63.26078677458637,
+        "other_share": 0.28602150537634397
+      },
+      "broad5": {
+        "added_recall": 53.88842586057262,
+        "added_share": 0.42150537634408586,
+        "core_recall": 69.34911944212384,
+        "core_share": 0.2924731182795698,
+        "other_recall": 61.63582853250512,
+        "other_share": 0.28602150537634397
+      }
+    },
+    "Glioblastoma_multiforme": {
+      "broad10": {
+        "added_recall": 75.75392041279383,
+        "added_share": 0.45679012345679,
+        "core_recall": 75.41257202460254,
+        "core_share": 0.48148148148148134,
+        "other_recall": 77.90877473218458,
+        "other_share": 0.06172839506172838
+      },
+      "broad5": {
+        "added_recall": 73.73318611441027,
+        "added_share": 0.45679012345679,
+        "core_recall": 76.55999447122475,
+        "core_share": 0.48148148148148134,
+        "other_recall": 75.60008419322145,
+        "other_share": 0.06172839506172838
+      }
+    },
+    "Head_and_Neck_squamous_cell_carcinoma": {
+      "broad10": {
+        "added_recall": 73.95126806006024,
+        "added_share": 0.34305555555555556,
+        "core_recall": 69.15456623781209,
+        "core_share": 0.41805555555555557,
+        "other_recall": 67.53865184736877,
+        "other_share": 0.2388888888888889
+      },
+      "broad5": {
+        "added_recall": 73.69158403018156,
+        "added_share": 0.34305555555555556,
+        "core_recall": 70.53860975689123,
+        "core_share": 0.41805555555555557,
+        "other_recall": 63.79900343532619,
+        "other_share": 0.2388888888888889
+      }
+    },
+    "Kidney_renal_papillary_cell_carcinoma": {
+      "broad10": {
+        "added_recall": 81.64054841309743,
+        "added_share": 0.28541666666666665,
+        "core_recall": 80.17279580562258,
+        "core_share": 0.2916666666666667,
+        "other_recall": 76.42607303394682,
+        "other_share": 0.42291666666666666
+      },
+      "broad5": {
+        "added_recall": 80.4889866843094,
+        "added_share": 0.28541666666666665,
+        "core_recall": 79.42132056578134,
+        "core_share": 0.2916666666666667,
+        "other_recall": 76.84440569075988,
+        "other_share": 0.42291666666666666
+      }
+    },
+    "Lung_adenocarcinoma": {
+      "broad10": {
+        "added_recall": 61.822021316089355,
+        "added_share": 0.2041025641025641,
+        "core_recall": 61.05031725299854,
+        "core_share": 0.12000000000000002,
+        "other_recall": 56.36723739552249,
+        "other_share": 0.6758974358974358
+      },
+      "broad5": {
+        "added_recall": 55.823224851869305,
+        "added_share": 0.2041025641025641,
+        "core_recall": 60.599397169751605,
+        "core_share": 0.12000000000000002,
+        "other_recall": 54.792164369482634,
+        "other_share": 0.6758974358974358
+      }
+    },
+    "Lung_squamous_cell_carcinoma": {
+      "broad10": {
+        "added_recall": 58.47380782173982,
+        "added_share": 0.16060606060606059,
+        "core_recall": 62.95831233344238,
+        "core_share": 0.1616161616161616,
+        "other_recall": 56.53389180057535,
+        "other_share": 0.6777777777777777
+      },
+      "broad5": {
+        "added_recall": 49.593326995149916,
+        "added_share": 0.16060606060606059,
+        "core_recall": 62.956594386701795,
+        "core_share": 0.1616161616161616,
+        "other_recall": 55.43837373954613,
+        "other_share": 0.6777777777777777
+      }
+    },
+    "Prostate_adenocarcinoma": {
+      "broad10": {
+        "added_recall": 96.81490322599265,
+        "added_share": 0.2311111111111111,
+        "core_recall": 95.24101091579982,
+        "core_share": 0.23999999999999996,
+        "other_recall": 71.90388581791879,
+        "other_share": 0.5288888888888889
+      },
+      "broad5": {
+        "added_recall": 93.64903948789971,
+        "added_share": 0.2311111111111111,
+        "core_recall": 94.72238781817376,
+        "core_share": 0.23999999999999996,
+        "other_recall": 71.58584380700955,
+        "other_share": 0.5288888888888889
+      }
+    },
+    "Skin_Cutaneous_Melanoma": {
+      "broad10": {
+        "added_recall": 59.64408831908831,
+        "added_share": 0.09305555555555553,
+        "core_recall": 54.50298611395103,
+        "core_share": 0.13333333333333333,
+        "other_recall": 70.3546034400042,
+        "other_share": 0.773611111111111
+      },
+      "broad5": {
+        "added_recall": 55.758981142314475,
+        "added_share": 0.09305555555555553,
+        "core_recall": 56.201608527924314,
+        "core_share": 0.13333333333333333,
+        "other_recall": 68.99738403504011,
+        "other_share": 0.773611111111111
+      }
+    },
+    "Thyroid_carcinoma": {
+      "broad10": {
+        "added_recall": 93.63834327138164,
+        "added_share": 0.3047619047619047,
+        "core_recall": 94.79290076950245,
+        "core_share": 0.3809523809523809,
+        "other_recall": 93.31333888849369,
+        "other_share": 0.3142857142857142
+      },
+      "broad5": {
+        "added_recall": 93.09031668572862,
+        "added_share": 0.3047619047619047,
+        "core_recall": 95.82344929223358,
+        "core_share": 0.3809523809523809,
+        "other_recall": 93.2089306969897,
+        "other_share": 0.3142857142857142
+      }
+    },
+    "Uterine_Corpus_Endometrial_Carcinoma": {
+      "broad10": {
+        "added_recall": 67.29127005124887,
+        "added_share": 0.12046783625730993,
+        "core_recall": 60.05761684303351,
+        "core_share": 0.07602339181286549,
+        "other_recall": 70.94032264300183,
+        "other_share": 0.8035087719298245
+      },
+      "broad5": {
+        "added_recall": 64.93732970116248,
+        "added_share": 0.12046783625730993,
+        "core_recall": 64.97560626102293,
+        "core_share": 0.07602339181286549,
+        "other_recall": 71.00340423420472,
+        "other_share": 0.8035087719298245
+      }
+    }
+  },
+  "surface": {
+    "beta": {
+      "ci_2_5": 4.921384154633962,
+      "ci_97_5": 6.49032844128126,
+      "point": 5.6988517628515005
+    },
+    "gamma": {
+      "ci_2_5": 0.2743598361376979,
+      "ci_97_5": 1.9851116747464843,
+      "point": 1.1370392932759505
+    },
+    "neff_broad": 37.43737316093997,
+    "neff_deep": 10.356349613768096
+  },
+  "within_site_minus_reference": {
+    "ci_2_5": 0.7001874897663505,
+    "ci_97_5": 1.3113697775533817,
+    "point": 1.0060346394836928
+  },
+  "within_site_residual": {
+    "ci_2_5": 1.218267461182839,
+    "ci_97_5": 2.335243425209133,
+    "point": 1.7941702198037905
+  }
+}
