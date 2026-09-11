@@ -1,0 +1,103 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\newcommand{\Neffc}{N_{\mathrm{eff},c}}
+\title{Does Multidirectional Redundancy\\Explain Patient Shortage?}
+\author{Yannik Queisler}
+\date{Experiment 6: protocol --- September 11, 2026}
+\begin{document}
+\maketitle
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+
+\section{Question and motivation}
+Training on fewer patients harms histopathology patch classification at unchanged patch counts. The thesis aims to measure this shortage before developing mitigation. This experiment will test whether the current redundancy measure misses dependence already present in the features.
+
+Experiment 5 compared patient breadth with patch depth using frozen Virchow2 features \citep{queisler2026effectiveSupport}. At 160 patches per class, twenty patients contributing eight patches each outperformed five patients contributing 32 patches each by 3.71 percentage points on BRACS and 9.52 points on TCGA-UT. Accounting for within-patient correlation reduced the residual breadth coefficient on BRACS to 0.13 points per log unit, although its interval still admitted a practically relevant effect. On TCGA-UT, the residual corresponded to 2.98 points per doubling of patients.
+
+That residual does not establish missing patient coverage. The correlation used only the leading principal direction of the features. TCGA-UT contains repeated crops of a few tumour regions, whose dependence may extend across many directions. Experiment 5 also showed that larger correlations could absorb the residual while fitting the grid equally well. \emph{Does full-feature correlation account for the remaining breadth benefit?} TCGA-UT will be the main case; BRACS will provide a comparison where the existing measure fits closely.
+
+\section{A paired comparison of redundancy measures}
+Only the redundancy measurement will change. Both datasets will retain experiment 5's classes, frozen 2,560-dimensional features, three patient-disjoint splits, and nine allocations: 5, 10, or 20 patients per class, each contributing 8, 16, or 32 patches. The five training draws per cell, logistic-regression predictions, and natural validation and test populations will remain fixed. No classifier will be retrained.
+
+\begin{table}[!htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYY@{}}
+\toprule
+& Single-direction baseline & Full-feature measure \\
+\midrule
+Input & Projection onto the original leading principal direction & All 2,560 feature coordinates \\
+Dependence measured & Patient differences along one direction & Patient differences in total feature variance \\
+Shared controls & \multicolumn{2}{p{0.66\textwidth}}{Same sampled patients and patches, unequal-patient-size correction, and accuracy observations} \\
+\bottomrule
+\end{tabularx}
+\caption{The comparison will isolate how redundancy is measured, without changing the training material or classifier.}
+\label{tab:comparison}
+\end{table}
+
+\clearpage
+\section{Measuring full-feature correlation}
+The \emph{full-feature correlation} will estimate the proportion of total feature variance attributable to differences between patients, within each class. It will follow the covariance-trace interpretation of multivariate intraclass correlation \citep{shou2013reliability}. Here this principle will be applied to patch embeddings with the unequal-cluster correction inherited from experiment 5. It will be treated as a descriptive extension, not as a validated effective sample size for classifier learning.
+
+For every class and training split, both measures will use exactly the patient and patch sample used for the original correlation: at most 200 patients and at most 200 patches per patient. The sample will come from the training partition, including patients outside the grid's maximum-depth eligible pool, as in experiment 5. Stored identities or deterministic reconstruction from the original seeds and row order will be required; a fresh sample will not count as the paired comparison. The original principal direction will remain fixed. Features will retain their original scaling, without whitening or selection of directions using accuracy.
+
+For one class and split, let $H$ patients contribute $n_i$ sampled feature vectors $x_{ij}$, with $N=\sum_i n_i$. Let $\bar x_i$ and $\bar x$ denote the patient mean and the patch-weighted grand mean. The estimator will use
+\begin{align}
+ B&=\frac{\sum_i n_i\lVert\bar x_i-\bar x\rVert^2}{H-1},
+ & W&=\frac{\sum_i\sum_j\lVert x_{ij}-\bar x_i\rVert^2}{N-H},\nonumber\\
+ \widetilde m&=\frac{N-\sum_i n_i^2/N}{H-1},
+ & \widehat\rho_{\mathrm{full}}&=\frac{B-W}{B+(\widetilde m-1)W}.
+ \label{eq:correlation}
+\end{align}
+\noindent Squared Euclidean distances sum variation across coordinates before the ratio is formed. Thus, the measure will pool variance rather than average coordinate-wise correlations. Coordinates with more variance will contribute more; rotating the feature basis will leave the result unchanged, but rescaling individual coordinates need not.
+
+Raw estimates will be retained. For support calculations, each class--split estimate will be clipped to $[0,1]$, matching the baseline convention. Fewer than two patients, no within-patient degrees of freedom, non-finite values, or a non-positive denominator will make an estimate undefined and stop the affected analysis. Undefined estimates will not be replaced by zero or silently omitted.
+
+For each measure, clipped class correlations will be averaged equally across the three splits. Each resulting class correlation $\bar\rho_c$ will define effective support at breadth $G$ and depth $m$ as $\Neffc(G,m)=Gm/[1+(m-1)\bar\rho_c]$. The cell predictor will then average $\Neffc$ equally across classes. Averaging correlations across classes before this nonlinear conversion would change the predictor and will not be used.
+
+\clearpage
+\section{Analysis and uncertainty}
+The observed endpoint will remain patient-macro balanced accuracy: patch recall averaged first within each patient and true class, then equally across patients and classes. Cell accuracy will average the three splits and five draws equally. The primary analysis will fit the same descriptive surface separately for each dataset and correlation measure:
+\begin{equation}
+ A(G,m)=\alpha+\beta\log\Neff(G,m)+\gamma\log G,
+ \qquad b=\gamma\log 2.
+ \label{eq:surface}
+\end{equation}
+\noindent Accuracy $A$ will be expressed in percent, so $b$ will be the residual benefit in percentage points per doubling of patients, conditional on effective support in this fitted surface. It will not be an observed matched-support intervention.
+
+The comparison will report class correlations, cell effective support, and $b$ with 95\% intervals. It will also report the residual standard deviation of the effective-support-only fit, $A=\alpha+\beta\log\Neff$, using seven residual degrees of freedom for nine cells. The full-feature fit will count as no worse when this standard deviation is no larger than the baseline value on the same cells. This comparison will assess descriptive fit, not out-of-sample prediction. No correlation adjustment will be selected to improve the accuracy fit.
+
+\paragraph{Test-patient uncertainty.}
+The inherited 2,000 paired Bayesian bootstrap replicates will assign Dirichlet weights to distinct test patients \citep{rubin1981bayesian}. Each patient's weight will be shared across measures, cells, draws, splits, classes, and repeated test appearances. Patient-macro scores and surfaces will be recomputed, with correlations held fixed. The 2.5th and 97.5th percentiles will give exploratory 95\% intervals, conditional on the realized training allocations and estimated correlations. Overlapping splits will not be treated as independent replications.
+
+\paragraph{Training-patient sensitivity.}
+A separate 2,000-replicate cluster bootstrap will assess correlation uncertainty. Within each dataset, distinct patients in the union of correlation samples will be sampled with replacement. A patient's multiplicity will be shared across its sampled appearances in all classes and splits, retaining all originally sampled patches in each appearance. Repeated copies will be treated as separate bootstrap clusters. Both measures will use the same resample, with the original projection fixed. Correlations, effective support, and surfaces will be recomputed while cell accuracies remain fixed. Undefined replicates or rank-deficient surfaces will stop the affected analysis for diagnosis rather than be silently discarded.
+
+These sensitivity intervals will be reported separately from test-patient intervals; they will not be described as joint uncertainty or as variation from retraining on new cohorts. The baseline projection and sampled within-patient patches will remain conditional. Between-draw accuracy dispersion from experiment 5 will accompany the interpretation, without treating the five draws as independent test cohorts.
+
+\clearpage
+\section{Decision and next step}
+The following criteria will use the full-feature residual's test-patient interval and the inherited practical threshold of one percentage point per doubling of patients. Training-patient sensitivity will be reported alongside each decision; a different conclusion under that sensitivity analysis will qualify the finding as fragile.
+
+\paragraph{Consistent with underestimated redundancy.}
+If the interval for $b$ lies wholly within $[-1,1]$ points and the effective-support-only fit is no worse than baseline, the result will support the account that the original projection understated redundancy. This would motivate evaluating the full-feature measure as a shortage signal before using it for mitigation.
+
+\paragraph{A practically meaningful residual remains.}
+If the interval lies wholly above $+1$ point, patient breadth will retain a practically meaningful benefit unexplained by this measure. This would motivate a subsequent controlled study of patient coverage, including possible institution-related variation. It would not establish that institutions or morphology cause the residual.
+
+\paragraph{Inconclusive.}
+All other outcomes will leave the two accounts unresolved, including an interval crossing a decision boundary or a small residual accompanied by a worse effective-support-only fit. Neither a favourable fit nor a remaining residual will establish a causal mechanism: both measures compress dependence into one scalar, and both rely on the exchangeable within-patient model. Results will remain conditional on Virchow2, logistic regression, the sampled cohorts, and the nine-cell range.
+
+This protocol will reuse experiment 5's recorded provenance and predictions. Patient-level prediction arrays remain on Hydra; local report summaries alone cannot reproduce the paired bootstrap. Before analysis, the original baseline estimates and sample identities will have to be reproduced. This document specifies the experiment only: institution interventions, representation comparisons, mitigation development, and execution will remain outside its scope.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
