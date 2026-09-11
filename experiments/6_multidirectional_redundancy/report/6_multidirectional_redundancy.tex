@@ -7,49 +7,55 @@
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 \newcommand{\Neff}{N_{\mathrm{eff}}}
 \newcommand{\Neffc}{N_{\mathrm{eff},c}}
-\title{Does Multidirectional Redundancy\\Explain Patient Shortage?}
+\title{Patient Shortage in Histopathology:\\Does Full-Feature Redundancy Explain\\the Residual Breadth Benefit?}
 \author{Yannik Queisler}
-\date{Experiment 6: protocol --- September 11, 2026}
+\date{September 11, 2026}
+
 \begin{document}
-\maketitle
 \raggedbottom
 \widowpenalty=10000
 \clubpenalty=10000
 \setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At a fixed patch budget, histopathology patch classifiers trained on more patients are more accurate. On TCGA-UT, adjusting patch counts for within-patient redundancy leaves a residual benefit of about three percentage points per doubling of patients, but that adjustment measures dependence along a single principal direction of the features. Because TCGA-UT patches are repeated crops of a few uniform tumour regions per slide, their dependence may extend across many directions. This experiment replaces the single-direction correlation with a full-feature intraclass correlation, the share of total feature variance that lies between patients, and recomputes effective support on exactly the same patient and patch samples. The stored predictions of the breadth--depth grid remain unchanged, so no classifier is retrained. If the residual breadth benefit shrinks to practical irrelevance without degrading the fit of effective support, the residual reflects underestimated redundancy; if it persists, additional patients contribute information beyond their effective observations.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
 
-\section{Question and motivation}
-Training on fewer patients harms histopathology patch classification at unchanged patch counts. The thesis aims to measure this shortage before developing mitigation. This experiment will test whether the current redundancy measure misses dependence already present in the features.
+\section{Motivation}
+\label{sec:motivation}
+Patches from one patient share acquisition conditions and much of their morphology, so they are worth fewer independent observations than their number suggests. \emph{Effective support} expresses this by dividing the patch count by a design effect that grows with the \emph{intraclass correlation}, the share of feature variance that lies between patients rather than within them. The breadth--depth comparison of \citet{queisler2026effectiveSupport} tested whether this adjustment explains why patient count matters. It trained multinomial logistic regression on frozen Virchow2 features using allocations that vary the number of patients and the patches per patient independently. At 160 patches per class, twenty patients contributing eight patches each outperformed five patients contributing 32 patches each by 9.52 percentage points on TCGA-UT (95\% interval: 8.96 to 10.07). Even at equal effective support, each doubling of patients still added 2.98 points (2.47 to 3.46).
 
-Experiment 5 compared patient breadth with patch depth using frozen Virchow2 features \citep{queisler2026effectiveSupport}. At 160 patches per class, twenty patients contributing eight patches each outperformed five patients contributing 32 patches each by 3.71 percentage points on BRACS and 9.52 points on TCGA-UT. Accounting for within-patient correlation reduced the residual breadth coefficient on BRACS to 0.13 points per log unit, although its interval still admitted a practically relevant effect. On TCGA-UT, the residual corresponded to 2.98 points per doubling of patients.
+That residual need not indicate missing patient coverage. The correlation was computed on a scalar score, the projection of each feature vector onto the leading principal direction fitted across all 30 cancer types. TCGA-UT patches are rotated and rescaled crops of a few pathologist-selected uniform tumour regions per slide \citep{komura2022universalEncoding}, so patches of one patient share tissue in every feature direction, not only along a direction that need not align with the variation within any single class. The scalar correlation may therefore understate redundancy. The breadth--depth grid cannot rule this out: correlations about 1.56 times as large as estimated would absorb the residual and fit the nine allocations equally well \citep{queisler2026effectiveSupport}.
 
-That residual does not establish missing patient coverage. The correlation used only the leading principal direction of the features. TCGA-UT contains repeated crops of a few tumour regions, whose dependence may extend across many directions. Experiment 5 also showed that larger correlations could absorb the residual while fitting the grid equally well. \emph{Does full-feature correlation account for the remaining breadth benefit?} TCGA-UT will be the main case; BRACS will provide a comparison where the existing measure fits closely.
+The question is therefore: \emph{does a correlation that uses all feature directions account for the residual breadth benefit on TCGA-UT?} If redundancy was underestimated, effective support computed from the full features should absorb the residual. If the residual persists, patients contribute variation that no redundancy adjustment of this form captures.
 
-\section{A paired comparison of redundancy measures}
-Only the redundancy measurement will change. Both datasets will retain experiment 5's classes, frozen 2,560-dimensional features, three patient-disjoint splits, and nine allocations: 5, 10, or 20 patients per class, each contributing 8, 16, or 32 patches. The five training draws per cell, logistic-regression predictions, and natural validation and test populations will remain fixed. No classifier will be retrained.
+\section{Study design}
+\label{sec:design}
+Only the redundancy measure changes. The design inherits the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features, three fixed patient-disjoint train--validation--test splits, and the nine allocations of \citet{queisler2026effectiveSupport}: 5, 10, or 20 patients per class, each contributing 8, 16, or 32 patches. TCGA-UT participants are called patients throughout. The five training draws per allocation, the logistic-regression predictions on the natural test partitions, and hence every cell accuracy stay fixed, so any change in the analysis is attributable to the correlation alone. Table~\ref{tab:comparison} contrasts the two measures.
 
-\begin{table}[!htbp]
+\begin{table}[htbp]
 \centering
 \renewcommand{\arraystretch}{1.15}
 \begin{tabularx}{\textwidth}{@{}lYY@{}}
 \toprule
-& Single-direction baseline & Full-feature measure \\
+& Single-direction correlation & Full-feature correlation \\
 \midrule
-Input & Projection onto the original leading principal direction & All 2,560 feature coordinates \\
-Dependence measured & Patient differences along one direction & Patient differences in total feature variance \\
-Shared controls & \multicolumn{2}{p{0.66\textwidth}}{Same sampled patients and patches, unequal-patient-size correction, and accuracy observations} \\
+Input & Projection onto the leading principal direction & All 2,560 feature coordinates \\
+Dependence captured & Between-patient differences along one direction & Between-patient differences in total feature variance \\
 \bottomrule
 \end{tabularx}
-\caption{The comparison will isolate how redundancy is measured, without changing the training material or classifier.}
+\caption{The two redundancy measures differ only in which feature variation they use. Both are computed from the same sampled patients and patches, both apply the same correction for unequal patient sizes, and both are evaluated against the same cell accuracies.}
 \label{tab:comparison}
 \end{table}
 
-\clearpage
-\section{Measuring full-feature correlation}
-The \emph{full-feature correlation} will estimate the proportion of total feature variance attributable to differences between patients, within each class. It will follow the covariance-trace interpretation of multivariate intraclass correlation \citep{shou2013reliability}. Here this principle will be applied to patch embeddings with the unequal-cluster correction inherited from experiment 5. It will be treated as a descriptive extension, not as a validated effective sample size for classifier learning.
+\section{Full-feature correlation}
+\label{sec:correlation}
+The full-feature correlation follows the covariance-trace form of multivariate intraclass correlation \citep{shou2013reliability}: variance is summed over all coordinates first, and the correlation is then formed from these totals. It is applied here to patch embeddings with patients as clusters, and serves as a descriptive measure of redundancy rather than as a validated effective sample size for classifier learning.
 
-For every class and training split, both measures will use exactly the patient and patch sample used for the original correlation: at most 200 patients and at most 200 patches per patient. The sample will come from the training partition, including patients outside the grid's maximum-depth eligible pool, as in experiment 5. Stored identities or deterministic reconstruction from the original seeds and row order will be required; a fresh sample will not count as the paired comparison. The original principal direction will remain fixed. Features will retain their original scaling, without whitening or selection of directions using accuracy.
-
-For one class and split, let $H$ patients contribute $n_i$ sampled feature vectors $x_{ij}$, with $N=\sum_i n_i$. Let $\bar x_i$ and $\bar x$ denote the patient mean and the patch-weighted grand mean. The estimator will use
+For one class in one training split, let $H$ patients contribute $n_i$ feature vectors $x_{ij}$, with $N=\sum_i n_i$ patches in total. Let $\bar x_i$ denote the mean feature vector of patient $i$ and $\bar x$ the mean over all patches. Four quantities define the estimator. The \emph{between-patient mean square} $B$ measures how far patient means lie from the overall mean, weighting each patient by its number of patches. The \emph{within-patient mean square} $W$ measures how far patches lie from their own patient's mean. Because patients contribute unequal numbers of patches, the \emph{effective patient size} $\widetilde m$ replaces the common patch count of a balanced design. Together they give the correlation $\widehat\rho_{\mathrm{full}}$:
 \begin{align}
  B&=\frac{\sum_i n_i\lVert\bar x_i-\bar x\rVert^2}{H-1},
  & W&=\frac{\sum_i\sum_j\lVert x_{ij}-\bar x_i\rVert^2}{N-H},\nonumber\\
@@ -57,46 +63,57 @@ For one class and split, let $H$ patients contribute $n_i$ sampled feature vecto
  & \widehat\rho_{\mathrm{full}}&=\frac{B-W}{B+(\widetilde m-1)W}.
  \label{eq:correlation}
 \end{align}
-\noindent Squared Euclidean distances sum variation across coordinates before the ratio is formed. Thus, the measure will pool variance rather than average coordinate-wise correlations. Coordinates with more variance will contribute more; rotating the feature basis will leave the result unchanged, but rescaling individual coordinates need not.
+\noindent For scalar scores, the squared norms reduce to squared differences and Equation~\eqref{eq:correlation} becomes the one-way random-effects estimator with unequal-cluster correction used for the single-direction correlation \citep{kenny1985separating}. The two measures thus differ only in their input.
 
-Raw estimates will be retained. For support calculations, each class--split estimate will be clipped to $[0,1]$, matching the baseline convention. Fewer than two patients, no within-patient degrees of freedom, non-finite values, or a non-positive denominator will make an estimate undefined and stop the affected analysis. Undefined estimates will not be replaced by zero or silently omitted.
+The estimator reads intuitively. If a patient's patches were independent draws around the class mean, patient means would scatter only through sampling noise, $B$ would be close to $W$, and the correlation would be close to zero. If a patient's patches were near-copies of each other, $W$ would be small relative to $B$, and the correlation would approach one. Because each squared norm adds squared differences over all 2,560 coordinates, $B$ and $W$ collect patient-specific shifts from every feature direction, so a patient whose patches share tissue in directions other than the leading principal direction still raises the correlation. Directions with larger variance carry more weight. Rotating the feature basis leaves the estimate unchanged, whereas rescaling individual coordinates does not; the features therefore keep their original scale, without whitening or selection of directions.
 
-For each measure, clipped class correlations will be averaged equally across the three splits. Each resulting class correlation $\bar\rho_c$ will define effective support at breadth $G$ and depth $m$ as $\Neffc(G,m)=Gm/[1+(m-1)\bar\rho_c]$. The cell predictor will then average $\Neffc$ equally across classes. Averaging correlations across classes before this nonlinear conversion would change the predictor and will not be used.
+Both measures use the same sample: for every class and training split, at most 200 patients and at most 200 patches per patient, drawn from the full training partition as in \citet{queisler2026effectiveSupport}. The two correlations therefore differ only in how dependence is summarized, not in which material it is measured on. Estimates are clipped to $[0,1]$ before use, as for the single-direction measure, and raw values are reported. An estimate is undefined when fewer than two patients or no within-patient degrees of freedom are available, or when the denominator is not positive; such estimates are neither set to zero nor omitted.
 
-\clearpage
-\section{Analysis and uncertainty}
-The observed endpoint will remain patient-macro balanced accuracy: patch recall averaged first within each patient and true class, then equally across patients and classes. Cell accuracy will average the three splits and five draws equally. The primary analysis will fit the same descriptive surface separately for each dataset and correlation measure:
+For each measure, the clipped correlations of a class are averaged over the three splits to give $\bar\rho_c$. With $G$ patients per class each contributing $m$ patches, effective support of class $c$ is
+\begin{equation}
+ \Neffc(G,m)=\frac{Gm}{1+(m-1)\bar\rho_c},
+ \label{eq:neff}
+\end{equation}
+\noindent and the cell predictor $\Neff(G,m)$ averages $\Neffc$ over classes. Larger correlations reduce effective support most at large depth, where many patches come from each patient, so a larger full-feature correlation lowers the deep cells more than the broad ones.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The analysis asks whether a better measure of redundancy leaves less for patient count to explain. It refits the support surface of \citet{queisler2026effectiveSupport} once with each correlation measure and compares how much breadth benefit remains.
+
+\subsection{Residual breadth benefit}
+\label{sec:residual}
+Accuracy is patient-macro balanced accuracy: patch recall averaged first within each test patient and true class, then equally across patients and classes. A cell accuracy $A(G,m)$, in percent, averages the three splits and five draws equally. Across the nine cells, the surface
 \begin{equation}
  A(G,m)=\alpha+\beta\log\Neff(G,m)+\gamma\log G,
- \qquad b=\gamma\log 2.
+ \qquad b=\gamma\log 2,
  \label{eq:surface}
 \end{equation}
-\noindent Accuracy $A$ will be expressed in percent, so $b$ will be the residual benefit in percentage points per doubling of patients, conditional on effective support in this fitted surface. It will not be an observed matched-support intervention.
+\noindent separates two contributions. The term $\beta\log\Neff$ captures what effective support explains, and $\gamma\log G$ captures what patient count adds beyond it. The \emph{residual breadth benefit} $b$ is the resulting gain in percentage points per doubling of patients at fixed effective support. With the single-direction correlation, $b$ is 2.98 points \citep{queisler2026effectiveSupport}. If that correlation understated redundancy, the full-feature measure should lower the effective support of deep cells, attribute more of the breadth benefit to $\beta\log\Neff$, and shrink $b$. The surface is a descriptive summary of the nine cells, not a matched-support intervention.
 
-The comparison will report class correlations, cell effective support, and $b$ with 95\% intervals. It will also report the residual standard deviation of the effective-support-only fit, $A=\alpha+\beta\log\Neff$, using seven residual degrees of freedom for nine cells. The full-feature fit will count as no worse when this standard deviation is no larger than the baseline value on the same cells. This comparison will assess descriptive fit, not out-of-sample prediction. No correlation adjustment will be selected to improve the accuracy fit.
+A smaller $b$ alone is not sufficient, because a correlation can shift the breadth benefit away from $\gamma$ while making effective support a worse description of the grid. The analysis therefore also fits effective support alone, $A=\alpha+\beta\log\Neff$, and compares its residual standard deviation, with seven residual degrees of freedom, between the two measures. The full-feature measure counts as fitting no worse when this value does not exceed that of the single-direction measure, which was 0.25 points \citep{queisler2026effectiveSupport}. Neither correlation is adjusted to improve the fit. Class correlations and cell effective support are reported alongside, showing where the two measures disagree.
 
-\paragraph{Test-patient uncertainty.}
-The inherited 2,000 paired Bayesian bootstrap replicates will assign Dirichlet weights to distinct test patients \citep{rubin1981bayesian}. Each patient's weight will be shared across measures, cells, draws, splits, classes, and repeated test appearances. Patient-macro scores and surfaces will be recomputed, with correlations held fixed. The 2.5th and 97.5th percentiles will give exploratory 95\% intervals, conditional on the realized training allocations and estimated correlations. Overlapping splits will not be treated as independent replications.
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Two sources of uncertainty are reported separately, because they answer different questions.
 
-\paragraph{Training-patient sensitivity.}
-A separate 2,000-replicate cluster bootstrap will assess correlation uncertainty. Within each dataset, distinct patients in the union of correlation samples will be sampled with replacement. A patient's multiplicity will be shared across its sampled appearances in all classes and splits, retaining all originally sampled patches in each appearance. Repeated copies will be treated as separate bootstrap clusters. Both measures will use the same resample, with the original projection fixed. Correlations, effective support, and surfaces will be recomputed while cell accuracies remain fixed. Undefined replicates or rank-deficient surfaces will stop the affected analysis for diagnosis rather than be silently discarded.
+\emph{Test-patient uncertainty} asks how much the result depends on which patients happen to form the test partitions. Each of the 2,000 paired Bayesian bootstrap replicates of \citet{queisler2026effectiveSupport} assigns Dirichlet weights to the distinct test patients \citep{rubin1981bayesian}. A patient's weight is shared across both measures, all cells, draws, splits, classes, and repeated test appearances, so differences between the measures are not blurred by different resamples. Accuracies and surfaces are recomputed with correlations held fixed, and the 2.5th and 97.5th percentiles give exploratory 95\% intervals.
 
-These sensitivity intervals will be reported separately from test-patient intervals; they will not be described as joint uncertainty or as variation from retraining on new cohorts. The baseline projection and sampled within-patient patches will remain conditional. Between-draw accuracy dispersion from experiment 5 will accompany the interpretation, without treating the five draws as independent test cohorts.
+\emph{Training-patient sensitivity} asks how much the result depends on which training patients entered the correlation estimates. A separate set of 2,000 cluster bootstrap replicates resamples the distinct patients in the correlation samples with replacement. A resampled patient keeps all of its sampled patches in every class and split in which it appears, and both measures use the same resample. Correlations, effective support, and surfaces are recomputed, while cell accuracies stay fixed. These intervals are not combined with the test-patient intervals and do not describe retraining on new cohorts. Between-draw accuracy dispersion from the breadth--depth grid accompanies both.
 
-\clearpage
-\section{Decision and next step}
-The following criteria will use the full-feature residual's test-patient interval and the inherited practical threshold of one percentage point per doubling of patients. Training-patient sensitivity will be reported alongside each decision; a different conclusion under that sensitivity analysis will qualify the finding as fragile.
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the test-patient interval for the full-feature residual $b$ and on the practical threshold of one percentage point per doubling of patients \citep{queisler2026effectiveSupport}. Training-patient sensitivity accompanies each conclusion; a conclusion that changes under it is reported as fragile.
 
-\paragraph{Consistent with underestimated redundancy.}
-If the interval for $b$ lies wholly within $[-1,1]$ points and the effective-support-only fit is no worse than baseline, the result will support the account that the original projection understated redundancy. This would motivate evaluating the full-feature measure as a shortage signal before using it for mitigation.
+\paragraph{Underestimated redundancy.}
+If the interval for $b$ lies within $[-1,1]$ points and effective support alone fits no worse than with the single-direction correlation, the residual breadth benefit is attributable to redundancy that the leading principal direction missed. Full-feature effective support would then be the more complete summary of patient shortage on TCGA-UT.
 
-\paragraph{A practically meaningful residual remains.}
-If the interval lies wholly above $+1$ point, patient breadth will retain a practically meaningful benefit unexplained by this measure. This would motivate a subsequent controlled study of patient coverage, including possible institution-related variation. It would not establish that institutions or morphology cause the residual.
+\paragraph{Breadth beyond redundancy.}
+If the interval lies above one point, additional patients retain a practically relevant benefit that this redundancy measure does not explain. Patients would then contribute variation beyond their effective observations, such as additional morphology or institution-specific acquisition; the present design does not identify which.
 
-\paragraph{Inconclusive.}
-All other outcomes will leave the two accounts unresolved, including an interval crossing a decision boundary or a small residual accompanied by a worse effective-support-only fit. Neither a favourable fit nor a remaining residual will establish a causal mechanism: both measures compress dependence into one scalar, and both rely on the exchangeable within-patient model. Results will remain conditional on Virchow2, logistic regression, the sampled cohorts, and the nine-cell range.
+\paragraph{Inconclusive outcomes.}
+All other outcomes, including an interval that crosses a threshold or a small residual accompanied by a worse fit of effective support alone, leave both accounts open.
 
-This protocol will reuse experiment 5's recorded provenance and predictions. Patient-level prediction arrays remain on Hydra; local report summaries alone cannot reproduce the paired bootstrap. Before analysis, the original baseline estimates and sample identities will have to be reproduced. This document specifies the experiment only: institution interventions, representation comparisons, mitigation development, and execution will remain outside its scope.
+Neither outcome establishes a causal mechanism. Both measures compress dependence into one scalar per class and assume that patches within a patient are exchangeable. All results are conditional on Virchow2 features, logistic regression, the sampled training patients, and the range of the nine allocations. Interventions on institutions, comparisons of representations, and methods that mitigate patient shortage lie outside the scope of this experiment.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
