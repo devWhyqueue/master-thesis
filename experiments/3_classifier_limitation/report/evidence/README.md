@@ -1,7 +1,7 @@
 # Result provenance
 
 Retrieved from Hydra on 2026-09-10. Source root:
-`/home/yannik.qu/master-thesis/experiments/3_patient_shortage/outputs/{dataset}/patch/`.
+`/home/yannik.qu/master-thesis/experiments/3_classifier_limitation/outputs/{dataset}/patch/`.
 
 Each dataset directory preserves `tables/decodability.json`, `data/preflight.json`,
 `data/probe_selection.json`, and the original SHA-256 sidecars for the two data files.

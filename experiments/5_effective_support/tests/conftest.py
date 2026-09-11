@@ -7,7 +7,7 @@ from pathlib import Path
 
 _CODE = Path(__file__).resolve().parents[1] / "code"
 _EXP2_CODE = _CODE.parents[1] / "2_benchmark_patch" / "code"
-_EXP3_CODE = _CODE.parents[1] / "3_patient_shortage" / "code"
+_EXP3_CODE = _CODE.parents[1] / "3_classifier_limitation" / "code"
 _EXP4_CODE = _CODE.parents[1] / "4_patient_influence" / "code"
 
 for _code_dir in (_CODE, _EXP2_CODE, _EXP3_CODE, _EXP4_CODE):

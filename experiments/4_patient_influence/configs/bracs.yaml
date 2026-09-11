@@ -2,7 +2,7 @@
 # coverage limitation).
 #
 # dataset/feature_extraction blocks are copied from
-# experiments/3_patient_shortage/configs/bracs.yaml (for regime detection and
+# experiments/3_classifier_limitation/configs/bracs.yaml (for regime detection and
 # baseline provenance verification only; this experiment extracts nothing).
 # CPU-only execution on Hydra.
 
@@ -40,7 +40,7 @@ slurm:
   output_dir: /home/yannik.qu/master-thesis/experiments/4_patient_influence/outputs/bracs/patch
   container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/bracs/patch
-  exp3_outputs: /home/yannik.qu/master-thesis/experiments/3_patient_shortage/outputs/bracs/patch
+  exp3_outputs: /home/yannik.qu/master-thesis/experiments/3_classifier_limitation/outputs/bracs/patch
   max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
   resources:
     preflight: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 64G}

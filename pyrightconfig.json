@@ -1,12 +1,12 @@
 {
   "include": [
     "experiments/2_benchmark_patch/code",
-    "experiments/3_patient_shortage/code",
+    "experiments/3_classifier_limitation/code",
     "experiments/4_patient_influence/code"
   ],
   "extraPaths": [
     "experiments/2_benchmark_patch/code",
-    "experiments/3_patient_shortage/code",
+    "experiments/3_classifier_limitation/code",
     "experiments/4_patient_influence/code"
   ],
   "venvPath": ".",

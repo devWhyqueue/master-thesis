@@ -1,7 +1,7 @@
 {
   "retrieved": "2026-09-11",
   "source_host": "hydra",
-  "source_root": "/home/yannik.qu/master-thesis/experiments/5_patient_breadth/outputs",
+  "source_root": "/home/yannik.qu/master-thesis/experiments/5_effective_support/outputs",
   "source_commit": "35069b7",
   "jobs": {
     "tcga_ut": {

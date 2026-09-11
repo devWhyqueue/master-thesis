@@ -1,8 +1,12 @@
-# TCGA-UT patient-breadth cell (exp-5: breadth, depth, and effective support).
+# TCGA-UT decodability-under-patient-shortage cell (exp-4).
+#
+# dataset/feature_extraction blocks are copied from
+# experiments/2_benchmark_patch/configs/tcga_ut_patch.yaml (for regime
+# detection and provenance only; exp-4 extracts nothing).
 # CPU-only execution on Hydra.
 
 paths:
-  outputs: experiments/5_patient_breadth/outputs/tcga_ut/patch
+  outputs: experiments/3_classifier_limitation/outputs/tcga_ut/patch
 
 dataset:
   name: tcga_ut
@@ -37,15 +41,15 @@ feature_extraction:
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
-  code_dir: /home/yannik.qu/master-thesis/experiments/5_patient_breadth/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/5_patient_breadth/outputs/tcga_ut/patch
+  code_dir: /home/yannik.qu/master-thesis/experiments/3_classifier_limitation/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/3_classifier_limitation/outputs/tcga_ut/patch
   container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch
-  exp3_outputs: /home/yannik.qu/master-thesis/experiments/3_patient_shortage/outputs/tcga_ut/patch
   max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
   resources:
     preflight: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 64G}
-    fit: {partition: cpu-5h, gpus: 0, cpus: 16, memory: 64G, time: "04:30:00"}
+    probe-val: {partition: cpu-5h, gpus: 0, cpus: 16, memory: 64G, time: "04:30:00"}
+    select: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 16G}
+    probe-test: {partition: cpu-2h, gpus: 0, cpus: 16, memory: 64G}
     analyze: {partition: cpu-2h, gpus: 0, cpus: 8, memory: 64G}
   squashfs: []
-

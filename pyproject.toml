@@ -51,9 +51,9 @@ include-package-data = false
 where = [
     ".agents/skills/bib/src",
     "experiments/2_benchmark_patch/code",
-    "experiments/3_patient_shortage/code",
+    "experiments/3_classifier_limitation/code",
     "experiments/4_patient_influence/code",
-    "experiments/5_patient_breadth/code",
+    "experiments/5_effective_support/code",
 ]
 exclude = ["tests*"]
 
@@ -65,9 +65,9 @@ addopts = "-s"
 testpaths = [
     ".agents/skills/bib/tests",
     "experiments/2_benchmark_patch/code/tests",
-    "experiments/3_patient_shortage/tests",
+    "experiments/3_classifier_limitation/tests",
     "experiments/4_patient_influence/tests",
-    "experiments/5_patient_breadth/tests",
+    "experiments/5_effective_support/tests",
 ]
 
 [tool.uv.sources]
