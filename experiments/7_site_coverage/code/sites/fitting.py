@@ -56,7 +56,7 @@ class FitResult(NamedTuple):
 
     dists: dict[str, np.ndarray]
     all_dists: dict[str, np.ndarray]
-    dispersion: dict[str, float]
+    points: dict[str, np.ndarray]
     contrasts: Contrasts
 
 
@@ -140,21 +140,21 @@ def _grid_fit(
 
 def _allocation_fit(
     ctx: Context,
-) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, float]]:
-    """Site-class-restricted and all-class accuracy of the three new allocations."""
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
+    """Site-class and all-class accuracy of the three allocations, plus per-fit points."""
     dists: dict[str, np.ndarray] = {}
     all_dists: dict[str, np.ndarray] = {}
-    dispersion: dict[str, float] = {}
+    points: dict[str, np.ndarray] = {}
     for name in ("deep", "broad5", "broad10"):
         dirs = _allocation_dirs(ctx.paths7, name)
-        site_dist, disp = allocation_distribution(
+        site_dist, site_points = allocation_distribution(
             dirs, ctx.class_names, ctx.ctx_l, ctx.site_idx
         )
         all_dist, _ = allocation_distribution(
             dirs, ctx.class_names, ctx.ctx_l, ctx.all_idx
         )
-        dists[name], all_dists[name], dispersion[name] = site_dist, all_dist, disp
-    return dists, all_dists, dispersion
+        dists[name], all_dists[name], points[name] = site_dist, all_dist, site_points
+    return dists, all_dists, points
 
 
 def _surface_bootstrap(
@@ -192,6 +192,6 @@ def _contrasts(
 def fit(config: dict[str, Any], ctx: Context) -> FitResult:
     """Grid and allocation accuracy, the surface refit, and the paired contrasts."""
     grid_site_dist, neff_site_grid = _grid_fit(config, ctx)
-    dists, all_dists, dispersion = _allocation_fit(ctx)
+    dists, all_dists, points = _allocation_fit(ctx)
     contrasts = _contrasts(ctx.rho_site, grid_site_dist, neff_site_grid, dists)
-    return FitResult(dists, all_dists, dispersion, contrasts)
+    return FitResult(dists, all_dists, points, contrasts)

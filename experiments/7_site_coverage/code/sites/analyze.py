@@ -31,7 +31,7 @@ def run_analyze(config: dict[str, Any]) -> Path:
     strata = strata_analysis(config, ctx.paths7, ctx.site_classes, ctx.class_names)
     results = build_results(
         ctx.site_classes,
-        allocation_payload(result.dists, result.all_dists, result.dispersion),
+        allocation_payload(result.dists, result.all_dists, result.points),
         delta_s,
         b_w,
         b_ref,

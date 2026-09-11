@@ -79,12 +79,10 @@ def allocation_distribution(
     class_names: list[str],
     ctxs: list[BootstrapContext],
     class_idx: np.ndarray,
-) -> tuple[np.ndarray, float]:
-    """Pooled (n_replicates,) accuracy (%) over ``class_idx`` classes, and its dispersion."""
+) -> tuple[np.ndarray, np.ndarray]:
+    """Pooled (R,) and per-fit observed (F,) accuracy (%) over the given classes."""
     per_fit = np.stack(
         [_recall_matrix(d, class_names, ctx) for d, ctx in zip(dirs, ctxs)]
     )
     per_fit_class_mean = per_fit[:, class_idx, :].mean(axis=1) * 100.0  # (F, R)
-    pooled = per_fit_class_mean.mean(axis=0)
-    dispersion = float(np.std(per_fit_class_mean[:, 0]))
-    return pooled, dispersion
+    return per_fit_class_mean.mean(axis=0), per_fit_class_mean[:, 0]

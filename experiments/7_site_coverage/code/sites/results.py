@@ -20,18 +20,41 @@ __all__ = [
 ]
 
 
+def _draw_contrasts(points: dict[str, np.ndarray]) -> dict[str, Any]:
+    """Descriptive spread of the paired site-class contrasts across split-draw fits."""
+    diffs = {
+        "site_gain": points["broad10"] - points["broad5"],
+        "first_step": points["broad5"] - points["deep"],
+    }
+    return {
+        name: {
+            "values": diff.tolist(),
+            "mean": float(diff.mean()),
+            "sd": float(np.std(diff)),
+            "min": float(diff.min()),
+            "max": float(diff.max()),
+            "n_positive": int((diff > 0).sum()),
+        }
+        for name, diff in diffs.items()
+    }
+
+
 def allocation_payload(
     dists: dict[str, np.ndarray],
     all_dists: dict[str, np.ndarray],
-    dispersion: dict[str, float],
+    points: dict[str, np.ndarray],
 ) -> dict[str, Any]:
-    """Per-allocation site-class and all-class accuracy payload."""
+    """Per-allocation accuracy payload and the split-draw spread of its contrasts."""
     return {
         "site_class": {
-            name: {**pack_estimate(dists[name]), "draw_dispersion": dispersion[name]}
+            name: {
+                **pack_estimate(dists[name]),
+                "draw_dispersion": float(np.std(points[name])),
+            }
             for name in ALLOCATIONS
         },
         "all_classes": {name: pack_estimate(all_dists[name]) for name in ALLOCATIONS},
+        "draw_contrasts": _draw_contrasts(points),
     }
 
 
