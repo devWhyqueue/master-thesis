@@ -11,13 +11,13 @@ from imbalance_benchmark.common import output_root
 
 from breadth import BREADTH_LADDER, DEPTH_LADDER
 from breadth.analyze.figures import generate_figures
+from breadth.analyze.tables import (
+    build_class_recall_table,
+    build_secondary_table,
+    format_cell,
+)
 
 __all__ = ["generate_latex_tables", "generate_figures", "write_report"]
-
-
-def _format_cell(point: float, low: float, high: float) -> str:
-    """Format point and 95% CI for LaTeX table."""
-    return f"{point:.2f} [{low:.2f}, {high:.2f}]"
 
 
 def _build_grid_table(cell_accs: dict[str, dict[str, Any]]) -> str:
@@ -37,7 +37,7 @@ def _build_grid_table(cell_accs: dict[str, dict[str, Any]]) -> str:
         row_cells = []
         for m in DEPTH_LADDER:
             c = cell_accs[f"G{g}_m{m}"]
-            row_cells.append(_format_cell(c["point"], c["ci_2_5"], c["ci_97_5"]))
+            row_cells.append(format_cell(c["point"], c["ci_2_5"], c["ci_97_5"]))
         lines.append(f"{g} & " + " & ".join(row_cells) + r" \\")
 
     lines.extend(
@@ -65,18 +65,26 @@ def _build_contrast_table(contrasts: dict[str, Any]) -> str:
         r"\multicolumn{2}{l}{\textit{Depth gains at fixed breadth $\Delta_m(G) = A(G, 32) - A(G, 8)$}} \\",
     ]
     for g, est in contrasts["delta_m"].items():
-        lines.append(f"$\\Delta_m(G={g})$ & {_format_cell(est['point'], est['ci_2_5'], est['ci_97_5'])} \\\\")
+        lines.append(
+            f"$\\Delta_m(G={g})$ & {format_cell(est['point'], est['ci_2_5'], est['ci_97_5'])} \\\\"
+        )
 
-    lines.extend([
-        r"\midrule",
-        r"\multicolumn{2}{l}{\textit{Breadth gains at fixed depth $\Delta_G(m) = A(20, m) - A(5, m)$}} \\",
-    ])
+    lines.extend(
+        [
+            r"\midrule",
+            r"\multicolumn{2}{l}{\textit{Breadth gains at fixed depth $\Delta_G(m) = A(20, m) - A(5, m)$}} \\",
+        ]
+    )
     for m, est in contrasts["delta_g"].items():
-        lines.append(f"$\\Delta_G(m={m})$ & {_format_cell(est['point'], est['ci_2_5'], est['ci_97_5'])} \\\\")
+        lines.append(
+            f"$\\Delta_G(m={m})$ & {format_cell(est['point'], est['ci_2_5'], est['ci_97_5'])} \\\\"
+        )
 
     lines.append(r"\midrule")
     x_est = contrasts["equal_budget_advantage_X"]
-    lines.append(f"Equal-budget advantage $X = A(20, 8) - A(5, 32)$ & {_format_cell(x_est['point'], x_est['ci_2_5'], x_est['ci_97_5'])} \\\\")
+    lines.append(
+        f"Equal-budget advantage $X = A(20, 8) - A(5, 32)$ & {format_cell(x_est['point'], x_est['ci_2_5'], x_est['ci_97_5'])} \\\\"
+    )
     lines.extend(
         [
             r"\bottomrule",
@@ -100,12 +108,12 @@ def _build_surface_table(surface_params: dict[str, Any]) -> str:
         r"\toprule",
         r"Model & Predictors & Slope $\beta$ & Residual breadth $\gamma$ & Residual SD \\",
         r"\midrule",
-        f"Nominal & $\\log n$ & {_format_cell(p['beta_n']['point'], p['beta_n']['ci_2_5'], p['beta_n']['ci_97_5'])} & -- & {p['res_std_n']['point']:.2f} \\\\",
-        f"Breadth only & $\\log G$ & {_format_cell(p['beta_g']['point'], p['beta_g']['ci_2_5'], p['beta_g']['ci_97_5'])} & -- & {p['res_std_g']['point']:.2f} \\\\",
-        f"Effective & $\\log \\Neff$ & {_format_cell(p['beta_neff']['point'], p['beta_neff']['ci_2_5'], p['beta_neff']['ci_97_5'])} & -- & {p['res_std_neff']['point']:.2f} \\\\",
+        f"Nominal & $\\log n$ & {format_cell(p['beta_n']['point'], p['beta_n']['ci_2_5'], p['beta_n']['ci_97_5'])} & -- & {p['res_std_n']['point']:.2f} \\\\",
+        f"Breadth only & $\\log G$ & {format_cell(p['beta_g']['point'], p['beta_g']['ci_2_5'], p['beta_g']['ci_97_5'])} & -- & {p['res_std_g']['point']:.2f} \\\\",
+        f"Effective & $\\log \\Neff$ & {format_cell(p['beta_neff']['point'], p['beta_neff']['ci_2_5'], p['beta_neff']['ci_97_5'])} & -- & {p['res_std_neff']['point']:.2f} \\\\",
         r"\midrule",
-        f"Augmented nominal & $\\log n + \\gamma_n \\log G$ & {_format_cell(p['beta_n']['point'], p['beta_n']['ci_2_5'], p['beta_n']['ci_97_5'])} & {_format_cell(p['gamma_n']['point'], p['gamma_n']['ci_2_5'], p['gamma_n']['ci_97_5'])} & {p['res_std_aug_nom']['point']:.2f} \\\\",
-        f"Augmented effective & $\\log \\Neff + \\gamma_e \\log G$ & {_format_cell(p['beta_neff']['point'], p['beta_neff']['ci_2_5'], p['beta_neff']['ci_97_5'])} & {_format_cell(p['gamma_e']['point'], p['gamma_e']['ci_2_5'], p['gamma_e']['ci_97_5'])} & {p['res_std_aug_eff']['point']:.2f} \\\\",
+        f"Augmented nominal & $\\log n + \\gamma_n \\log G$ & {format_cell(p['beta_n']['point'], p['beta_n']['ci_2_5'], p['beta_n']['ci_97_5'])} & {format_cell(p['gamma_n']['point'], p['gamma_n']['ci_2_5'], p['gamma_n']['ci_97_5'])} & {p['res_std_aug_nom']['point']:.2f} \\\\",
+        f"Augmented effective & $\\log \\Neff + \\gamma_e \\log G$ & {format_cell(p['beta_neff']['point'], p['beta_neff']['ci_2_5'], p['beta_neff']['ci_97_5'])} & {format_cell(p['gamma_e']['point'], p['gamma_e']['ci_2_5'], p['gamma_e']['ci_97_5'])} & {p['res_std_aug_eff']['point']:.2f} \\\\",
         r"\bottomrule",
         r"\end{tabular}",
         r"\caption{Support surface regression fits over the nine grid cells.}",
@@ -129,11 +137,15 @@ def _build_icc_table(cohort_iccs: dict[str, float]) -> str:
     for c_name, icc_val in sorted(cohort_iccs.items()):
         de_8 = 1.0 + 7.0 * icc_val
         de_32 = 1.0 + 31.0 * icc_val
-        lines.append(f"{c_name.replace('_', ' ')} & {icc_val:.4f} & {de_8:.2f} & {de_32:.2f} \\\\")
+        lines.append(
+            f"{c_name.replace('_', ' ')} & {icc_val:.4f} & {de_8:.2f} & {de_32:.2f} \\\\"
+        )
 
     mean_icc = float(np.mean(list(cohort_iccs.values())))
     lines.append(r"\midrule")
-    lines.append(f"Mean & {mean_icc:.4f} & {1.0 + 7.0 * mean_icc:.2f} & {1.0 + 31.0 * mean_icc:.2f} \\\\")
+    lines.append(
+        f"Mean & {mean_icc:.4f} & {1.0 + 7.0 * mean_icc:.2f} & {1.0 + 31.0 * mean_icc:.2f} \\\\"
+    )
     lines.extend(
         [
             r"\bottomrule",
@@ -163,6 +175,12 @@ def generate_latex_tables(
     (dest_dir / "class_iccs.tex").write_text(
         _build_icc_table(cohort_iccs), encoding="utf-8"
     )
+    (dest_dir / "secondary_endpoints.tex").write_text(
+        build_secondary_table(results["secondary"]), encoding="utf-8"
+    )
+    (dest_dir / "class_recalls.tex").write_text(
+        build_class_recall_table(results["secondary"]), encoding="utf-8"
+    )
 
 
 def write_report(
@@ -183,4 +201,3 @@ def write_report(
     generate_latex_tables(results, cohort_iccs, tables_dir)
     generate_figures(results, figures_dir)
     return report_p
-

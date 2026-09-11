@@ -78,3 +78,5 @@ def test_tune_and_fit_draw_synthetic():
     assert len(test_preds) == n_test
     assert test_probs.shape == (n_test, 3)
     assert "patient_macro_balanced_accuracy" in test_end
+    # The prespecified probability-quality endpoints must land in the run record.
+    assert {"patient_macro_nll", "expected_calibration_error"} <= set(test_end)

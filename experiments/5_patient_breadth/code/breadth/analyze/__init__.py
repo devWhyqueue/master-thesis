@@ -26,7 +26,7 @@ def run_analyze(config: dict[str, Any]) -> Path:
     """Run full contrast and support surface analysis across the 3x3 grid."""
     exp2_p = exp2_split_paths(config, 0)
     freeze = load_freeze_meta(exp2_p)
-    n_classes = len(freeze["class_names"])
+    class_names = list(freeze["class_names"])
 
     preflight_p = output_root(config) / "data" / "preflight.json"
     verify_signed_file(preflight_p)
@@ -34,12 +34,15 @@ def run_analyze(config: dict[str, Any]) -> Path:
     cohort_iccs = preflight.get("cohort_iccs", {})
 
     logger.info("Collecting bootstrap distributions across grid and draws...")
-    pooled_dists, dispersions = collect_cell_distributions(config, n_classes)
+    pooled_dists, dispersions, secondaries = collect_cell_distributions(
+        config, class_names
+    )
 
     logger.info("Computing contrasts and fitting support surface models...")
-    results = compute_contrasts_and_surface(config, pooled_dists, dispersions)
+    results = compute_contrasts_and_surface(
+        config, pooled_dists, dispersions, secondaries, class_names
+    )
 
     report_p = write_report(config, results, cohort_iccs)
     logger.info("Patient-breadth analysis complete: %s", report_p)
     return report_p
-

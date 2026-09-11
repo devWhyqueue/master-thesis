@@ -110,6 +110,34 @@ def test_generate_latex_tables_and_figures(tmp_path: Path):
             "gamma_e": {"point": 0.2, "ci_2_5": -0.3, "ci_97_5": 0.8},
             "res_std_aug_eff": {"point": 0.4, "ci_2_5": 0.3, "ci_97_5": 0.5},
         },
+        "secondary": {
+            "cells": {
+                f"G{g}_m{m}": {
+                    key: {"point": 1.0, "ci_2_5": 0.5, "ci_97_5": 1.5}
+                    for key in (
+                        "macro_nll",
+                        "expected_calibration_error",
+                        "patch_micro_balanced_accuracy",
+                    )
+                }
+                for g, m in GRID_CELLS
+            },
+            "equal_budget_X": {
+                key: {"point": -0.2, "ci_2_5": -0.5, "ci_97_5": 0.1}
+                for key in (
+                    "macro_nll",
+                    "expected_calibration_error",
+                    "patch_micro_balanced_accuracy",
+                )
+            },
+            "class_recalls": {
+                "Class_1": {
+                    "G5_m32": {"point": 50.0, "ci_2_5": 45.0, "ci_97_5": 55.0},
+                    "G20_m8": {"point": 55.0, "ci_2_5": 50.0, "ci_97_5": 60.0},
+                    "equal_budget_X": {"point": 5.0, "ci_2_5": 1.0, "ci_97_5": 9.0},
+                }
+            },
+        },
     }
     mock_iccs = {"Class_1": 0.1}
 
@@ -119,6 +147,8 @@ def test_generate_latex_tables_and_figures(tmp_path: Path):
     assert (out_tables / "contrasts.tex").exists()
     assert (out_tables / "surface_fits.tex").exists()
     assert (out_tables / "class_iccs.tex").exists()
+    assert (out_tables / "secondary_endpoints.tex").exists()
+    assert (out_tables / "class_recalls.tex").exists()
 
     out_figures = tmp_path / "figures"
     generate_figures(mock_results, out_figures)

@@ -19,6 +19,7 @@ from decodability.linear import (
 from imbalance_benchmark.analysis.query import load_test_identity
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     _cluster_discrimination,
+    clustered_endpoints,
 )
 from imbalance_benchmark.common import (
     ensure_dirs,
@@ -86,9 +87,7 @@ def _load_eval_partition(
     manifest_path: str | Path, class_names: list[str], split_name: str
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Load features, integer targets, and patient identity for validation/test."""
-    ds = ImbalanceDataset(
-        manifest_path, split_name=split_name, class_names=class_names
-    )
+    ds = ImbalanceDataset(manifest_path, split_name=split_name, class_names=class_names)
     return (
         _load_features_for_df(ds.df),
         ds.get_int_targets(),
@@ -132,18 +131,20 @@ def tune_and_fit_draw(
     train_x: np.ndarray,
     train_y: np.ndarray,
     evals: EvalPartition,
-) -> tuple[LinearFitResult, float, np.ndarray, np.ndarray, dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    LinearFitResult, float, np.ndarray, np.ndarray, dict[str, Any], dict[str, Any]
+]:
     """Select best lambda on validation and evaluate on test."""
     best_fit, best_lam, val_end = _select_best_lambda(
         train_x, train_y, evals.val_x, evals.val_y, evals.val_id
     )
-    t_cases = evals.test_id["case_id"].astype(str).to_numpy()
-    t_slides = evals.test_id["slide_id"].astype(str).to_numpy()
     test_preds, test_probs = predict_logreg(
         evals.test_x, best_fit.coef, best_fit.intercept
     )
-    test_end = _cluster_discrimination(
-        evals.test_y, test_preds, t_cases, t_slides, is_mil=False
+    # Full endpoint set, so a run record carries the prespecified probability-quality
+    # endpoints without a later pass over the stored arrays.
+    test_end = clustered_endpoints(
+        evals.test_y, test_preds, test_probs, evals.test_id, is_mil=False
     )
     return best_fit, best_lam, test_preds, test_probs, val_end, test_end
 
@@ -234,10 +235,7 @@ def run_fit_shard(config: dict[str, Any], shard_index: int) -> None:
     split_idx, g, m = decode_shard_index(shard_index)
     train_df, classes, evals, paths = _init_shard(config, split_idx)
     for draw_idx in range(N_DRAWS):
-        logger.info(
-            "Fitting split %d, G=%d, m=%d, draw %d", split_idx, g, m, draw_idx
-        )
+        logger.info("Fitting split %d, G=%d, m=%d, draw %d", split_idx, g, m, draw_idx)
         _run_one_draw(
             config, paths, train_df, classes, (split_idx, g, m, draw_idx), evals
         )
-
