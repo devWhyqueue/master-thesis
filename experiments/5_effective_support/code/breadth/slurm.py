@@ -66,10 +66,11 @@ def submit_workflow(
     config_path: str | None = None,
     dry_run: bool = False,
     submit: Callable[[str, bool], str] = _submit_script,
+    jobs: list[SlurmJob] | None = None,
 ) -> dict[str, str]:
     """Render and submit the DAG jobs in dependency order."""
     submitted: dict[str, str] = {}
-    for job in build_workflow(config):
+    for job in jobs if jobs is not None else build_workflow(config):
         dependencies = tuple(submitted[name] for name in job.dependencies)
         scheduled = replace(job, dependencies=dependencies)
         script = render_sbatch(scheduled, config, config_path)

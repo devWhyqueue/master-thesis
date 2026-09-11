@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import torch
+from imbalance_benchmark.analysis.query import load_test_identity
+from imbalance_benchmark.datasets.data import ImbalanceDataset
+from imbalance_benchmark.datasets.features import load_feature_row
 
 from breadth import (
     BREADTH_LADDER,
@@ -18,7 +23,10 @@ __all__ = [
     "eligible_patients_by_class",
     "check_grid_eligibility",
     "sample_patient_patches_round_robin",
+    "sample_class_patches",
     "sample_cell_draw",
+    "load_features_for_df",
+    "load_eval_partition",
 ]
 
 
@@ -124,6 +132,38 @@ def sample_patient_patches_round_robin(patient_df: pd.DataFrame, m: int) -> list
     return selected
 
 
+def sample_class_patches(
+    train_df: pd.DataFrame,
+    class_names: list[str],
+    class_index: int,
+    cell: tuple[int, int],
+    draw: tuple[int, int],
+    base_seed: int = 0,
+) -> list[int]:
+    """Sample one class's G patients x m nested-prefix patches for one draw.
+
+    ``cell`` is ``(g, m)``; ``draw`` is ``(split_index, draw_index)``. Patient
+    selection always keys off ``max(DEPTH_LADDER)`` eligibility, so the same
+    patients are paired across every depth of one breadth.
+    """
+    g, m = cell
+    split_index, draw_index = draw
+    c_name = class_names[class_index]
+    eligible = eligible_patients_by_class(train_df, c_name, max(DEPTH_LADDER))
+    if len(eligible) < g:
+        raise RuntimeError(f"Class {c_name} has only {len(eligible)} eligible")
+    seed = derive_draw_seed(
+        base_seed, split_index, g, max(DEPTH_LADDER), draw_index, class_index
+    )
+    chosen = np.random.default_rng(seed).choice(eligible, size=g, replace=False)
+    cls_df = train_df[train_df["cancer_type"] == c_name]
+    selected: list[int] = []
+    for case in chosen:
+        p_df = cast(pd.DataFrame, cls_df[cls_df["case_id"].astype(str) == str(case)])
+        selected.extend(sample_patient_patches_round_robin(p_df, m))
+    return selected
+
+
 def sample_cell_draw(
     train_df: pd.DataFrame,
     class_names: list[str],
@@ -137,18 +177,41 @@ def sample_cell_draw(
     if m not in DEPTH_LADDER:
         raise ValueError("Depth must belong to the configured grid")
     selected_indices: list[int] = []
-    for cls_idx, c_name in enumerate(class_names):
-        eligible = eligible_patients_by_class(train_df, c_name, max(DEPTH_LADDER))
-        if len(eligible) < g:
-            raise RuntimeError(f"Class {c_name} has only {len(eligible)} eligible")
-        seed = derive_draw_seed(
-            base_seed, split_index, g, max(DEPTH_LADDER), draw_index, cls_idx
-        )
-        chosen = np.random.default_rng(seed).choice(eligible, size=g, replace=False)
-        cls_df = train_df[train_df["cancer_type"] == c_name]
-        for case in chosen:
-            p_df = cast(
-                pd.DataFrame, cls_df[cls_df["case_id"].astype(str) == str(case)]
+    for cls_idx in range(len(class_names)):
+        selected_indices.extend(
+            sample_class_patches(
+                train_df,
+                class_names,
+                cls_idx,
+                (g, m),
+                (split_index, draw_index),
+                base_seed,
             )
-            selected_indices.extend(sample_patient_patches_round_robin(p_df, m))
+        )
     return train_df.loc[selected_indices].copy().reset_index(drop=True)
+
+
+def load_features_for_df(df: pd.DataFrame) -> np.ndarray:
+    """Load features for a slice of manifest rows directly."""
+    paths = df["feature_path"].astype(str).to_numpy()
+    f_idx = df["feature_index"].to_numpy() if "feature_index" in df.columns else None
+    rows = [
+        load_feature_row(
+            paths[i],
+            int(f_idx[i]) if f_idx is not None and pd.notna(f_idx[i]) else None,
+        )
+        for i in range(len(df))
+    ]
+    return torch.stack(rows).numpy()
+
+
+def load_eval_partition(
+    manifest_path: str | Path, class_names: list[str], split_name: str
+) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+    """Load features, integer targets, and patient identity for validation/test."""
+    ds = ImbalanceDataset(manifest_path, split_name=split_name, class_names=class_names)
+    return (
+        load_features_for_df(ds.df),
+        ds.get_int_targets(),
+        load_test_identity(manifest_path, is_mil=False, split_name=split_name),
+    )

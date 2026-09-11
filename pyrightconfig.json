@@ -4,14 +4,16 @@
     "experiments/3_classifier_limitation/code",
     "experiments/4_patient_influence/code",
     "experiments/5_effective_support/code",
-    "experiments/6_multidirectional_redundancy/code"
+    "experiments/6_multidirectional_redundancy/code",
+    "experiments/7_site_coverage/code"
   ],
   "extraPaths": [
     "experiments/2_benchmark_patch/code",
     "experiments/3_classifier_limitation/code",
     "experiments/4_patient_influence/code",
     "experiments/5_effective_support/code",
-    "experiments/6_multidirectional_redundancy/code"
+    "experiments/6_multidirectional_redundancy/code",
+    "experiments/7_site_coverage/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
