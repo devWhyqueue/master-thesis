@@ -7,7 +7,8 @@
     "tcga_ut": {
       "census": 4884004,
       "fit": "4884005_[0-8]",
-      "analyze": 4884006
+      "analyze": 4884006,
+      "analyze_rerun": 4884090
     }
   },
   "verification": "The census gate wrote and signed data/census.json before checking it, then would have raised (blocking the afterok fit array) if fewer than 10 classes qualified; it did not raise. 13 classes qualified in all 3 splits. The analyze stage's built-in guard refit the all-class support surface from exp-5's stored grid predictions and exp-6's full-feature ICC and compared its point b = gamma_e * ln2 against exp-6's own analysis.json:surfaces.full.b.point within 1e-6; the job did not raise, confirming the reimplemented surface refit reproduces exp-6 exactly on the unrestricted class set before it is applied to the site-class-restricted grid. No classifier used in the guard or the grid refit was retrained; both read exp-5's/exp-6's stored predictions and correlations only. The 45 new fits (3 allocations x 3 splits x 5 draws) trained fresh multinomial logistic models on the sampled site allocations.",
@@ -15,13 +16,14 @@
   "reporting_notes": [
     "Site-class-restricted accuracy (%, patient-macro balanced, mean of 15 split-draw points): deep 58.50 [57.27, 59.68], broad5 69.41 [68.16, 70.63], broad10 70.25 [68.95, 71.49]; all-30-class accuracy alongside: deep 65.01, broad5 68.50, broad10 68.86.",
     "Site gain Delta_S = 0.84pp, 95% CI [0.55, 1.14] -- crosses the 1pp threshold from below.",
-    "Within-site residual b_W = 1.79pp per doubling, 95% CI [1.22, 2.35] -- interval lies entirely above 1pp.",
+    "Within-site residual b_W = 1.79pp per doubling, 95% CI [1.22, 2.34] -- interval lies entirely above 1pp.",
     "Reference residual b_ref (site classes, sites not controlled) = 0.79pp, 95% CI [0.19, 1.38]; b_W - b_ref = 1.01pp, 95% CI [0.70, 1.31], both intervals excluding zero.",
     "Refitted site-class surface: beta_hat = 5.70 [4.92, 6.49] (log-Neff slope), gamma_hat = 1.14 [0.27, 1.99] (log-G slope); Neff(5,32) = 10.36, Neff(20,8) = 37.44 on the site-class subset.",
-    "Interpretation label: inconclusive. Delta_S crosses the 1pp threshold (does not sit entirely above it), so neither the site_coverage nor the both reading is established, even though b_W alone clears the threshold. Results prose and the stratified core/added/other breakdown are not yet written up in the report body."
+    "Interpretation label: inconclusive. Delta_S crosses the 1pp threshold (does not sit entirely above it), so neither the site_coverage nor the both reading is established, even though b_W alone clears the threshold.",
+    "Split-draw spread (descriptive, re-run 4884090): site gain per split-draw fit mean 0.84, SD 1.39, range -1.72 to 3.28, positive in 11 of 15; raw first step A_5 - A_D mean 10.91, SD 2.90, range 4.64 to 15.32, positive in 15 of 15."
   ],
   "sha256": {
-    "tcga_ut/analysis.json": "740971e1061351e861b6bbfb8f5ac4e0810464e5128a0edaa9ebaf523969b8ad",
+    "tcga_ut/analysis.json": "f1c08ae5ca33423df0eba48d822f9bb477b11ce2e6a6d90766a3e7f932bee01e",
     "tcga_ut/distributions.npz": "7fe3b6f50f21bb6f168aa1d8add7c3f63fc1c0957f0e227a36e8232d26f027cc",
     "tcga_ut/census.json": "cf8f22b029c11efd5e17ccc3af3c3e3859460974348cca81feef4b1b5506bf57"
   },
@@ -29,12 +31,13 @@
     "date": "2026-09-11",
     "source_commit": "f36edba8dfc0a60ee958d441ab25515917dcc9f6",
     "job_states": "4884004, 4884005_0..8, and 4884006: all COMPLETED, 0:0",
-    "analysis_sha256": "740971e1061351e861b6bbfb8f5ac4e0810464e5128a0edaa9ebaf523969b8ad",
+    "analysis_sha256": "f1c08ae5ca33423df0eba48d822f9bb477b11ce2e6a6d90766a3e7f932bee01e",
     "checks": [
-      "Local analysis.json, distributions.npz, and census.json SHA-256 match the live Hydra artifacts byte-for-byte."
+      "Local analysis.json, distributions.npz, and census.json SHA-256 match the live Hydra artifacts byte-for-byte.",
+      "Analyze re-run 4884090 (COMPLETED 0:0, 00:02:40) at commit 2058fcc added allocation_accuracy.draw_contrasts; every other analysis.json value is identical to job 4884006's, and distributions.npz and census.json are byte-identical."
     ],
-    "bootstrap_entries": 2000,
-    "resampled_draws": 1999,
+    "bootstrap_entries": 2001,
+    "resampled_draws": 2000,
     "interval_rule": "2.5th and 97.5th percentiles of entries 1 onward; entry 0 is the observed (all-ones-weight) estimate",
     "dispersion_definition": "Population SD over 15 split-draw accuracy points, restricted to site classes, including between-split variation"
   }
