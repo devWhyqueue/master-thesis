@@ -54,6 +54,7 @@ where = [
     "experiments/3_classifier_limitation/code",
     "experiments/4_patient_influence/code",
     "experiments/5_effective_support/code",
+    "experiments/6_multidirectional_redundancy/code",
 ]
 exclude = ["tests*"]
 
@@ -68,6 +69,7 @@ testpaths = [
     "experiments/3_classifier_limitation/tests",
     "experiments/4_patient_influence/tests",
     "experiments/5_effective_support/tests",
+    "experiments/6_multidirectional_redundancy/tests",
 ]
 
 [tool.uv.sources]

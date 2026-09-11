@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 from imbalance_benchmark.analysis.predictors.signals.icc import icc_estimate
 
 __all__ = [
@@ -13,6 +12,7 @@ __all__ = [
     "effective_support",
     "cell_effective_support",
     "pca_leading_direction",
+    "sample_class_indices",
     "sample_class_scores",
     "compute_class_icc",
 ]
@@ -50,17 +50,15 @@ def pca_leading_direction(features: np.ndarray) -> np.ndarray:
     return vt[0]
 
 
-def sample_class_scores(
-    class_features: np.ndarray,
+def sample_class_indices(
     case_ids: np.ndarray,
-    direction: np.ndarray,
     rng: np.random.Generator,
     case_cap: int = ICC_CASE_CAP,
     patch_cap: int = ICC_PATCH_CAP,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Capped sample of scalar projected scores and case IDs for one class."""
+    """Capped sample of row indices and their case IDs for one class."""
     if len(case_ids) == 0:
-        return np.array([]), np.array([])
+        return np.array([], dtype=int), np.array([])
 
     unique_cases = np.unique(case_ids)
     n_cases_to_take = min(case_cap, len(unique_cases))
@@ -76,9 +74,26 @@ def sample_class_scores(
         chosen_indices.extend(take)
         chosen_case_list.extend([str(case)] * len(take))
 
+    return np.asarray(chosen_indices, dtype=int), np.asarray(chosen_case_list)
+
+
+def sample_class_scores(
+    class_features: np.ndarray,
+    case_ids: np.ndarray,
+    direction: np.ndarray,
+    rng: np.random.Generator,
+    case_cap: int = ICC_CASE_CAP,
+    patch_cap: int = ICC_PATCH_CAP,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Capped sample of scalar projected scores and case IDs for one class."""
+    chosen_indices, chosen_case_list = sample_class_indices(
+        case_ids, rng, case_cap, patch_cap
+    )
+    if len(chosen_indices) == 0:
+        return np.array([]), np.array([])
     sampled_features = class_features[chosen_indices]
     scores = sampled_features @ direction
-    return scores, np.asarray(chosen_case_list)
+    return scores, chosen_case_list
 
 
 def compute_class_icc(
@@ -93,4 +108,3 @@ def compute_class_icc(
     )
     est = icc_estimate(scores, sampled_cases)
     return float(est) if est is not None else 0.0
-

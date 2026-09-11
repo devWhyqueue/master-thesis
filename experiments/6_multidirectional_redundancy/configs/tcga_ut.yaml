@@ -1,0 +1,50 @@
+# TCGA-UT multidirectional redundancy (exp-6: full-feature ICC re-analysis of exp-5).
+# CPU-only execution on Hydra. No retraining: reuses exp-5's stored predictions.
+
+paths:
+  outputs: experiments/6_multidirectional_redundancy/outputs/tcga_ut/patch
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+  root: /mnt/tcga-ut
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
+  expected_slide_count: 8736
+  expected_class_count: 32
+  expected_patch_count: 1608060
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  weights_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/6_multidirectional_redundancy/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/6_multidirectional_redundancy/outputs/tcga_ut/patch
+  container: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/2_benchmark_patch/outputs/tcga_ut/patch
+  exp3_outputs: /home/yannik.qu/master-thesis/experiments/3_classifier_limitation/outputs/tcga_ut/patch
+  exp5_outputs: /home/yannik.qu/master-thesis/experiments/5_effective_support/outputs/tcga_ut/patch
+  max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
+  resources:
+    correlate: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G, time: "04:30:00"}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G, time: "04:30:00"}
+  squashfs: []
