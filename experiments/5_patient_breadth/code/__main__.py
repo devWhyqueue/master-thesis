@@ -13,7 +13,9 @@ from imbalance_benchmark.common import load_config
 from breadth import FIT_SHARD_COUNT
 from breadth import analyze as analyze_stage
 from breadth import audit as audit_stage
+from breadth import calibrate as calibrate_stage
 from breadth import fit as fit_stage
+from breadth.analyze import diagnostics as diagnostics_stage
 from breadth import slurm as slurm_stage
 
 
@@ -30,7 +32,13 @@ def _parser() -> argparse.ArgumentParser:
         "--shard-index", type=int, choices=range(FIT_SHARD_COUNT), required=True
     )
 
+    calibrate_parser = sub.add_parser("calibrate")
+    calibrate_parser.add_argument(
+        "--shard-index", type=int, choices=range(FIT_SHARD_COUNT), required=True
+    )
+
     sub.add_parser("analyze")
+    sub.add_parser("diagnose")
 
     submit = sub.add_parser("submit")
     submit.add_argument("--dry-run", action="store_true")
@@ -48,9 +56,19 @@ def cmd_fit(args: argparse.Namespace) -> None:
     fit_stage.run_fit_shard(load_config(args.config), args.shard_index)
 
 
+def cmd_calibrate(args: argparse.Namespace) -> None:
+    """Fit validation temperatures for one shard's selected fits."""
+    calibrate_stage.run_calibrate_shard(load_config(args.config), args.shard_index)
+
+
 def cmd_analyze(args: argparse.Namespace) -> None:
     """Compute contrasts, generate tables, and plot support surfaces."""
     analyze_stage.run_analyze(load_config(args.config))
+
+
+def cmd_diagnose(args: argparse.Namespace) -> None:
+    """Write the exploratory ICC-sample and site-coverage diagnostics."""
+    diagnostics_stage.run_diagnostics(load_config(args.config))
 
 
 def cmd_submit(args: argparse.Namespace) -> None:
@@ -65,7 +83,9 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
     return {
         "preflight": cmd_preflight,
         "fit": cmd_fit,
+        "calibrate": cmd_calibrate,
         "analyze": cmd_analyze,
+        "diagnose": cmd_diagnose,
         "submit": cmd_submit,
     }
 
@@ -82,4 +102,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

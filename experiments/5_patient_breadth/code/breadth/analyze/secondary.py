@@ -16,9 +16,13 @@ __all__ = [
     "pack_estimate",
 ]
 
+# Probability quality is read after validation temperature scaling; the raw_*
+# endpoints keep the unscaled probabilities for comparison.
 SECONDARY_SCALARS: tuple[str, ...] = (
     "macro_nll",
     "expected_calibration_error",
+    "raw_macro_nll",
+    "raw_expected_calibration_error",
     "patch_micro_balanced_accuracy",
 )
 
@@ -70,20 +74,31 @@ def _patch_micro_balanced_accuracy(
     return np.nanmean(recall, axis=0)
 
 
-def _scalar_distributions(
-    ctx: BootstrapContext,
-    arrays: tuple[np.ndarray, np.ndarray, np.ndarray],
-    n_classes: int,
-) -> dict[str, np.ndarray]:
-    """Distributions of the three scalar secondary endpoints for one draw."""
-    labels, preds, probs = arrays
+def _probability_quality(
+    ctx: BootstrapContext, labels: np.ndarray, probs: np.ndarray, n_classes: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Macro NLL (nats) and ECE (percentage points) distributions of one draw."""
     stacked = probs[np.newaxis, :, :]
     macro_nll = ctx.tail_nll_distribution(labels, stacked, list(range(n_classes)))
     if macro_nll is None:
         raise ValueError("Macro NLL needs at least one class")
+    return macro_nll, ctx.ece_distribution(labels, stacked) * 100.0
+
+
+def _scalar_distributions(
+    ctx: BootstrapContext,
+    arrays: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    n_classes: int,
+) -> dict[str, np.ndarray]:
+    """Distributions of the scalar secondary endpoints for one draw."""
+    labels, preds, probs, scaled = arrays
+    nll, ece = _probability_quality(ctx, labels, scaled, n_classes)
+    raw_nll, raw_ece = _probability_quality(ctx, labels, probs, n_classes)
     return {
-        "macro_nll": macro_nll,
-        "expected_calibration_error": ctx.ece_distribution(labels, stacked) * 100.0,
+        "macro_nll": nll,
+        "expected_calibration_error": ece,
+        "raw_macro_nll": raw_nll,
+        "raw_expected_calibration_error": raw_ece,
         "patch_micro_balanced_accuracy": _patch_micro_balanced_accuracy(
             ctx, labels, preds, n_classes
         )
@@ -93,15 +108,16 @@ def _scalar_distributions(
 
 def draw_secondary_distributions(
     ctx: BootstrapContext,
-    arrays: tuple[np.ndarray, np.ndarray, np.ndarray],
+    arrays: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     class_names: list[str],
 ) -> dict[str, np.ndarray]:
     """Bootstrap distributions of every secondary endpoint for one draw.
 
-    Accuracies and the calibration error are in percentage points; the macro
-    negative log-likelihood stays in nats.
+    ``arrays`` holds labels, predictions, raw and temperature-scaled
+    probabilities. Accuracies and the calibration error are in percentage
+    points; the macro negative log-likelihood stays in nats.
     """
-    labels, preds, _ = arrays
+    labels, preds, _, _ = arrays
     n_classes = len(class_names)
     recalls = _patient_macro_recalls(ctx, labels, preds, n_classes)
     dists = _scalar_distributions(ctx, arrays, n_classes)

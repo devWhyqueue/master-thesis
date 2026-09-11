@@ -5,33 +5,47 @@
   "source_commit": "35069b7",
   "jobs": {
     "tcga_ut": {
-      "analyze": 4882560,
+      "analyze": 4882772,
       "preflight": 4881765,
-      "fit_array": 4881766
+      "fit_array": 4881766,
+      "calibrate_array": [
+        4882708,
+        4882771
+      ],
+      "diagnose": 4882710
     },
     "bracs": {
-      "analyze": 4882559,
+      "analyze": 4882706,
       "preflight": 4881759,
-      "fit_array": 4881760
+      "fit_array": 4881760,
+      "calibrate_array": [
+        4882705
+      ],
+      "diagnose": 4882707
     }
   },
-  "verification": "Both preflights and all 54 fit array tasks completed with exit code 0:0 under source_commit; all 270 selected run records converged. The accuracy-only analyses (jobs 4881761 and 4881767) were superseded by re-analyses of the same stored test arrays under analysis_commit, which add the prespecified secondary endpoints; both completed with exit code 0:0 and reproduce every previously reported accuracy, contrast and surface estimate. Preflight SHA256 sidecars verified; all 18 accuracy means reproduced from run records.",
+  "verification": "Both preflights and all 54 fit array tasks completed with exit code 0:0 under source_commit; all 270 selected run records converged. The calibrate arrays refit every draw at its stored selected_lambda, reproduced 100% of stored test predictions, and fitted one validation temperature per draw; TCGA-UT tasks 7-9 of 4882708 failed a rescaling check (stored probabilities underflowed) and were rerun as 4882771 with exact scaled probabilities stored for the 13 affected draws. The analyses 4882706 and 4882772 reread the same stored test arrays, add temperature-scaled probability endpoints, and reproduce every previously reported accuracy, contrast and surface estimate. Diagnostics 4882707 and 4882710 are exploratory. Preflight SHA256 sidecars verified; all 18 accuracy means reproduced from run records.",
   "run_summary": "Extracted split, grid, selected_lambda, solver.converged and test patient_macro_balanced_accuracy (times 100) from each run.json. Arrays and patient identifiers not copied.",
   "reporting_notes": [
     "analysis.json draw_dispersion pools all 15 split/draw scores; report instead computes within-split cell SD across five draws with divisor five.",
     "Generated augmented-model beta columns in cluster tables reuse single-model slopes; report presents single-model slopes and augmented residual coefficients separately.",
     "Secondary endpoints are recomputed from the stored test labels, predictions and probabilities of the same fits; no model was refitted for them.",
-    "Class-specific patient-macro recalls use the case-class divisor of the primary endpoint, so each cell's class mean equals its reported balanced accuracy."
+    "Class-specific patient-macro recalls use the case-class divisor of the primary endpoint, so each cell's class mean equals its reported balanced accuracy.",
+    "macro_nll and expected_calibration_error are temperature-scaled; raw_macro_nll and raw_expected_calibration_error keep the unscaled probabilities.",
+    "Fitted temperatures: BRACS 0.103-12.88 (median 0.665), TCGA-UT 0.527-1.613 (median 0.852).",
+    "diagnostics.json site coverage uses the TCGA barcode tissue source site; its equal-budget decomposition sums to the reported X."
   ],
   "sha256": {
-    "bracs/analysis.json": "aeea3f2de5884283d48eac88ba8bb17698fabbd958f0ed1e58ff92e70dc7195b",
+    "bracs/analysis.json": "4ea0dc8c7012015973940f0d95b6800a15e41dbce2722299a4f8edf77a082896",
+    "bracs/diagnostics.json": "e0afc89cfd7a9c0b8eecba4698753db4aeb2de9da0541ea7330f0877481a4fd7",
     "bracs/preflight.json": "40199b856114667742a31a94af908732c3c173c0bf9b0f76a6719347a7c0e633",
     "bracs/preflight.json.sha256": "44b4a293385fb6654a91f0828979bd6d3725d29471ac82a45eb869e05a7e0bde",
-    "tcga_ut/preflight.json.sha256": "3d64f9d054f3fd4b6678b64d7a463b6aeb31686b57ab7f1087d966cfa8b6d22f",
-    "tcga_ut/analysis.json": "93bd48984330e3b40dac713e1e3423f919478a38a601e12065442db217028469",
-    "tcga_ut/run_summary.json": "a2ea1890cbd74df4c16f331a6c9613d24cf6b88b6a2f3487955fa2a1b20bbb1d",
     "bracs/run_summary.json": "9458c4d0d599916ceacfb72d79243d9045782d07d41df28353238f0ce00a7b9f",
-    "tcga_ut/preflight.json": "a9ed34d18f326e6da969c9bcc3d314c592a1dcc99a223dc2ff7e39839372a667"
+    "tcga_ut/analysis.json": "712eab192bf8a0975259fc0bf22b214c43ff8603fe2f895accb16186e9ccc143",
+    "tcga_ut/diagnostics.json": "6a67fc769d1dc764d9ebcb3bea0297ac637f38d8d1abb962f80cc0889ebbbf18",
+    "tcga_ut/preflight.json": "a9ed34d18f326e6da969c9bcc3d314c592a1dcc99a223dc2ff7e39839372a667",
+    "tcga_ut/preflight.json.sha256": "3d64f9d054f3fd4b6678b64d7a463b6aeb31686b57ab7f1087d966cfa8b6d22f",
+    "tcga_ut/run_summary.json": "a2ea1890cbd74df4c16f331a6c9613d24cf6b88b6a2f3487955fa2a1b20bbb1d"
   },
-  "analysis_commit": "ae007af"
+  "analysis_commit": "8718a23 plus uncommitted calibrate and diagnose stages"
 }

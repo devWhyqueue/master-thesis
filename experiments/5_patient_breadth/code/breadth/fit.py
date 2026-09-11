@@ -191,6 +191,19 @@ def _build_draw_record(
     }
 
 
+def draw_training_data(
+    train_df: pd.DataFrame, class_names: list[str], meta: tuple[int, int, int, int]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sample one draw's training allocation and load its features and targets."""
+    split_idx, g, m, draw_idx = meta
+    sample_df = sample_cell_draw(
+        train_df, class_names, g, m, split_idx, draw_idx, base_seed=0
+    )
+    cmap = {name: i for i, name in enumerate(class_names)}
+    train_y = np.array([cmap[c] for c in sample_df["cancer_type"]], dtype=np.int64)
+    return _load_features_for_df(sample_df), train_y
+
+
 def _run_one_draw(
     config: dict[str, Any],
     paths: dict[str, Path],
@@ -200,13 +213,8 @@ def _run_one_draw(
     evals: EvalPartition,
 ) -> None:
     """Execute validation selection and test evaluation for one draw."""
-    split_idx, g, m, draw_idx = meta
-    sample_df = sample_cell_draw(
-        train_df, class_names, g, m, split_idx, draw_idx, base_seed=0
-    )
-    cmap = {name: i for i, name in enumerate(class_names)}
-    train_y = np.array([cmap[c] for c in sample_df["cancer_type"]], dtype=np.int64)
-    train_x = _load_features_for_df(sample_df)
+    _, g, m, draw_idx = meta
+    train_x, train_y = draw_training_data(train_df, class_names, meta)
 
     fit, lam, t_p, t_pr, v_e, t_e = tune_and_fit_draw(train_x, train_y, evals)
     rec = _build_draw_record(
@@ -215,7 +223,7 @@ def _run_one_draw(
     write_run_record(draw_dir(paths, g, m, draw_idx), rec, keep_arrays=True)
 
 
-def _init_shard(
+def init_shard(
     config: dict[str, Any], split_idx: int
 ) -> tuple[pd.DataFrame, list[str], EvalPartition, dict[str, Path]]:
     """Load train manifest, class names, and validation/test partitions."""
@@ -233,7 +241,7 @@ def _init_shard(
 def run_fit_shard(config: dict[str, Any], shard_index: int) -> None:
     """Execute all draws for one (split, G, m) shard."""
     split_idx, g, m = decode_shard_index(shard_index)
-    train_df, classes, evals, paths = _init_shard(config, split_idx)
+    train_df, classes, evals, paths = init_shard(config, split_idx)
     for draw_idx in range(N_DRAWS):
         logger.info("Fitting split %d, G=%d, m=%d, draw %d", split_idx, g, m, draw_idx)
         _run_one_draw(

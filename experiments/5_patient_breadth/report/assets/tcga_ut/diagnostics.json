@@ -1,0 +1,626 @@
+{
+  "icc_sample": {
+    "0": {
+      "Adrenocortical_carcinoma": {
+        "median_patches_per_patient": 540.0,
+        "patients": 35,
+        "patients_above_patch_cap": 30,
+        "sampled_patients": 35
+      },
+      "Bladder_Urothelial_Carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 203,
+        "patients_above_patch_cap": 11,
+        "sampled_patients": 200
+      },
+      "Brain_Lower_Grade_Glioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 327,
+        "patients_above_patch_cap": 74,
+        "sampled_patients": 200
+      },
+      "Breast_invasive_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 514,
+        "patients_above_patch_cap": 57,
+        "sampled_patients": 200
+      },
+      "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 141,
+        "patients_above_patch_cap": 3,
+        "sampled_patients": 141
+      },
+      "Colon_adenocarcinoma": {
+        "median_patches_per_patient": 240.0,
+        "patients": 147,
+        "patients_above_patch_cap": 89,
+        "sampled_patients": 147
+      },
+      "Esophageal_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 78,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 78
+      },
+      "Glioblastoma_multiforme": {
+        "median_patches_per_patient": 250.0,
+        "patients": 255,
+        "patients_above_patch_cap": 131,
+        "sampled_patients": 200
+      },
+      "Head_and_Neck_squamous_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 221,
+        "patients_above_patch_cap": 109,
+        "sampled_patients": 200
+      },
+      "Kidney_Chromophobe": {
+        "median_patches_per_patient": 180.0,
+        "patients": 58,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 58
+      },
+      "Kidney_renal_clear_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 269,
+        "patients_above_patch_cap": 2,
+        "sampled_patients": 200
+      },
+      "Kidney_renal_papillary_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 150,
+        "patients_above_patch_cap": 4,
+        "sampled_patients": 150
+      },
+      "Liver_hepatocellular_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 190,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 190
+      },
+      "Lung_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 304,
+        "patients_above_patch_cap": 108,
+        "sampled_patients": 200
+      },
+      "Lung_squamous_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 305,
+        "patients_above_patch_cap": 144,
+        "sampled_patients": 200
+      },
+      "Mesothelioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 43,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 43
+      },
+      "Ovarian_serous_cystadenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 58,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 58
+      },
+      "Pancreatic_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 88,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 88
+      },
+      "Pheochromocytoma_and_Paraganglioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 30,
+        "patients_above_patch_cap": 1,
+        "sampled_patients": 30
+      },
+      "Prostate_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 213,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 200
+      },
+      "Rectum_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 45,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 45
+      },
+      "Sarcoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 149,
+        "patients_above_patch_cap": 56,
+        "sampled_patients": 149
+      },
+      "Skin_Cutaneous_Melanoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 227,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 200
+      },
+      "Stomach_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 182,
+        "patients_above_patch_cap": 89,
+        "sampled_patients": 182
+      },
+      "Testicular_Germ_Cell_Tumors": {
+        "median_patches_per_patient": 180.0,
+        "patients": 92,
+        "patients_above_patch_cap": 34,
+        "sampled_patients": 92
+      },
+      "Thymoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 59,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 59
+      },
+      "Thyroid_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 259,
+        "patients_above_patch_cap": 4,
+        "sampled_patients": 200
+      },
+      "Uterine_Carcinosarcoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 35,
+        "patients_above_patch_cap": 12,
+        "sampled_patients": 35
+      },
+      "Uterine_Corpus_Endometrial_Carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 267,
+        "patients_above_patch_cap": 18,
+        "sampled_patients": 200
+      },
+      "Uveal_Melanoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 39,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 39
+      }
+    },
+    "1": {
+      "Adrenocortical_carcinoma": {
+        "median_patches_per_patient": 540.0,
+        "patients": 35,
+        "patients_above_patch_cap": 30,
+        "sampled_patients": 35
+      },
+      "Bladder_Urothelial_Carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 203,
+        "patients_above_patch_cap": 11,
+        "sampled_patients": 200
+      },
+      "Brain_Lower_Grade_Glioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 327,
+        "patients_above_patch_cap": 72,
+        "sampled_patients": 200
+      },
+      "Breast_invasive_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 514,
+        "patients_above_patch_cap": 52,
+        "sampled_patients": 200
+      },
+      "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 141,
+        "patients_above_patch_cap": 3,
+        "sampled_patients": 141
+      },
+      "Colon_adenocarcinoma": {
+        "median_patches_per_patient": 240.0,
+        "patients": 147,
+        "patients_above_patch_cap": 91,
+        "sampled_patients": 147
+      },
+      "Esophageal_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 78,
+        "patients_above_patch_cap": 1,
+        "sampled_patients": 78
+      },
+      "Glioblastoma_multiforme": {
+        "median_patches_per_patient": 180.0,
+        "patients": 255,
+        "patients_above_patch_cap": 122,
+        "sampled_patients": 200
+      },
+      "Head_and_Neck_squamous_cell_carcinoma": {
+        "median_patches_per_patient": 240.0,
+        "patients": 221,
+        "patients_above_patch_cap": 116,
+        "sampled_patients": 200
+      },
+      "Kidney_Chromophobe": {
+        "median_patches_per_patient": 180.0,
+        "patients": 58,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 58
+      },
+      "Kidney_renal_clear_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 269,
+        "patients_above_patch_cap": 1,
+        "sampled_patients": 200
+      },
+      "Kidney_renal_papillary_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 150,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 150
+      },
+      "Liver_hepatocellular_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 190,
+        "patients_above_patch_cap": 6,
+        "sampled_patients": 190
+      },
+      "Lung_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 304,
+        "patients_above_patch_cap": 100,
+        "sampled_patients": 200
+      },
+      "Lung_squamous_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 305,
+        "patients_above_patch_cap": 147,
+        "sampled_patients": 200
+      },
+      "Mesothelioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 43,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 43
+      },
+      "Ovarian_serous_cystadenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 58,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 58
+      },
+      "Pancreatic_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 88,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 88
+      },
+      "Pheochromocytoma_and_Paraganglioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 30,
+        "patients_above_patch_cap": 1,
+        "sampled_patients": 30
+      },
+      "Prostate_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 213,
+        "patients_above_patch_cap": 6,
+        "sampled_patients": 200
+      },
+      "Rectum_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 45,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 45
+      },
+      "Sarcoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 149,
+        "patients_above_patch_cap": 59,
+        "sampled_patients": 149
+      },
+      "Skin_Cutaneous_Melanoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 227,
+        "patients_above_patch_cap": 7,
+        "sampled_patients": 200
+      },
+      "Stomach_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 182,
+        "patients_above_patch_cap": 84,
+        "sampled_patients": 182
+      },
+      "Testicular_Germ_Cell_Tumors": {
+        "median_patches_per_patient": 180.0,
+        "patients": 92,
+        "patients_above_patch_cap": 35,
+        "sampled_patients": 92
+      },
+      "Thymoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 59,
+        "patients_above_patch_cap": 7,
+        "sampled_patients": 59
+      },
+      "Thyroid_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 259,
+        "patients_above_patch_cap": 6,
+        "sampled_patients": 200
+      },
+      "Uterine_Carcinosarcoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 35,
+        "patients_above_patch_cap": 11,
+        "sampled_patients": 35
+      },
+      "Uterine_Corpus_Endometrial_Carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 267,
+        "patients_above_patch_cap": 19,
+        "sampled_patients": 200
+      },
+      "Uveal_Melanoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 39,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 39
+      }
+    },
+    "2": {
+      "Adrenocortical_carcinoma": {
+        "median_patches_per_patient": 540.0,
+        "patients": 35,
+        "patients_above_patch_cap": 30,
+        "sampled_patients": 35
+      },
+      "Bladder_Urothelial_Carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 203,
+        "patients_above_patch_cap": 12,
+        "sampled_patients": 200
+      },
+      "Brain_Lower_Grade_Glioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 327,
+        "patients_above_patch_cap": 75,
+        "sampled_patients": 200
+      },
+      "Breast_invasive_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 514,
+        "patients_above_patch_cap": 60,
+        "sampled_patients": 200
+      },
+      "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 141,
+        "patients_above_patch_cap": 4,
+        "sampled_patients": 141
+      },
+      "Colon_adenocarcinoma": {
+        "median_patches_per_patient": 240.0,
+        "patients": 147,
+        "patients_above_patch_cap": 87,
+        "sampled_patients": 147
+      },
+      "Esophageal_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 78,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 78
+      },
+      "Glioblastoma_multiforme": {
+        "median_patches_per_patient": 180.0,
+        "patients": 255,
+        "patients_above_patch_cap": 125,
+        "sampled_patients": 200
+      },
+      "Head_and_Neck_squamous_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 221,
+        "patients_above_patch_cap": 106,
+        "sampled_patients": 200
+      },
+      "Kidney_Chromophobe": {
+        "median_patches_per_patient": 180.0,
+        "patients": 58,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 58
+      },
+      "Kidney_renal_clear_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 269,
+        "patients_above_patch_cap": 3,
+        "sampled_patients": 200
+      },
+      "Kidney_renal_papillary_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 150,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 150
+      },
+      "Liver_hepatocellular_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 190,
+        "patients_above_patch_cap": 6,
+        "sampled_patients": 190
+      },
+      "Lung_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 304,
+        "patients_above_patch_cap": 101,
+        "sampled_patients": 200
+      },
+      "Lung_squamous_cell_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 305,
+        "patients_above_patch_cap": 138,
+        "sampled_patients": 200
+      },
+      "Mesothelioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 43,
+        "patients_above_patch_cap": 6,
+        "sampled_patients": 43
+      },
+      "Ovarian_serous_cystadenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 58,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 58
+      },
+      "Pancreatic_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 88,
+        "patients_above_patch_cap": 6,
+        "sampled_patients": 88
+      },
+      "Pheochromocytoma_and_Paraganglioma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 30,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 30
+      },
+      "Prostate_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 213,
+        "patients_above_patch_cap": 9,
+        "sampled_patients": 200
+      },
+      "Rectum_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 45,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 45
+      },
+      "Sarcoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 149,
+        "patients_above_patch_cap": 60,
+        "sampled_patients": 149
+      },
+      "Skin_Cutaneous_Melanoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 227,
+        "patients_above_patch_cap": 10,
+        "sampled_patients": 200
+      },
+      "Stomach_adenocarcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 182,
+        "patients_above_patch_cap": 82,
+        "sampled_patients": 182
+      },
+      "Testicular_Germ_Cell_Tumors": {
+        "median_patches_per_patient": 180.0,
+        "patients": 92,
+        "patients_above_patch_cap": 36,
+        "sampled_patients": 92
+      },
+      "Thymoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 59,
+        "patients_above_patch_cap": 2,
+        "sampled_patients": 59
+      },
+      "Thyroid_carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 259,
+        "patients_above_patch_cap": 5,
+        "sampled_patients": 200
+      },
+      "Uterine_Carcinosarcoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 35,
+        "patients_above_patch_cap": 12,
+        "sampled_patients": 35
+      },
+      "Uterine_Corpus_Endometrial_Carcinoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 267,
+        "patients_above_patch_cap": 23,
+        "sampled_patients": 200
+      },
+      "Uveal_Melanoma": {
+        "median_patches_per_patient": 180.0,
+        "patients": 39,
+        "patients_above_patch_cap": 0,
+        "sampled_patients": 39
+      }
+    }
+  },
+  "site_coverage": {
+    "cells": {
+      "G10_m16": {
+        "seen_recall": 71.09674587898563,
+        "seen_share": 0.5034610387411955,
+        "sites": 5.984444444444445,
+        "unseen_recall": 63.15278003026421
+      },
+      "G10_m32": {
+        "seen_recall": 71.25454765308831,
+        "seen_share": 0.5034610387411955,
+        "sites": 5.984444444444445,
+        "unseen_recall": 63.210698510065406
+      },
+      "G10_m8": {
+        "seen_recall": 70.82115957846824,
+        "seen_share": 0.5034610387411955,
+        "sites": 5.984444444444445,
+        "unseen_recall": 62.94593399532351
+      },
+      "G20_m16": {
+        "seen_recall": 74.42650849426485,
+        "seen_share": 0.6198734294600412,
+        "sites": 8.93111111111111,
+        "unseen_recall": 66.87299430665537
+      },
+      "G20_m32": {
+        "seen_recall": 74.50960826037688,
+        "seen_share": 0.6198734294600412,
+        "sites": 8.93111111111111,
+        "unseen_recall": 66.89877532755939
+      },
+      "G20_m8": {
+        "seen_recall": 74.12995330597647,
+        "seen_share": 0.6198734294600412,
+        "sites": 8.93111111111111,
+        "unseen_recall": 66.68193519424686
+      },
+      "G5_m16": {
+        "seen_recall": 69.20515018028486,
+        "seen_share": 0.37246566280589555,
+        "sites": 3.7555555555555555,
+        "unseen_recall": 57.77872604471467
+      },
+      "G5_m32": {
+        "seen_recall": 69.36578125806437,
+        "seen_share": 0.37246566280589555,
+        "sites": 3.7555555555555555,
+        "unseen_recall": 57.85744958310213
+      },
+      "G5_m8": {
+        "seen_recall": 68.87004805466543,
+        "seen_share": 0.37246566280589555,
+        "sites": 3.7555555555555555,
+        "unseen_recall": 57.70626137657521
+      }
+    },
+    "equal_budget_decomposition": {
+      "gained": {
+        "contribution": 3.5476736889881417,
+        "share": 0.2703788173156463
+      },
+      "lost": {
+        "contribution": 0.05003137271105769,
+        "share": 0.02297105066150035
+      },
+      "seen_both": {
+        "contribution": 2.4217716093872723,
+        "share": 0.3494946121443952
+      },
+      "unseen_both": {
+        "contribution": 3.4974071871454995,
+        "share": 0.3571555198784582
+      }
+    }
+  }
+}

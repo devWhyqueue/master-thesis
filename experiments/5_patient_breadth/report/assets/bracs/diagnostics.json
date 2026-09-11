@@ -1,0 +1,136 @@
+{
+  "icc_sample": {
+    "0": {
+      "ADH": {
+        "median_patches_per_patient": 94.0,
+        "patients": 39,
+        "patients_above_patch_cap": 13,
+        "sampled_patients": 39
+      },
+      "DCIS": {
+        "median_patches_per_patient": 354.5,
+        "patients": 34,
+        "patients_above_patch_cap": 23,
+        "sampled_patients": 34
+      },
+      "FEA": {
+        "median_patches_per_patient": 246.0,
+        "patients": 32,
+        "patients_above_patch_cap": 18,
+        "sampled_patients": 32
+      },
+      "IC": {
+        "median_patches_per_patient": 445.0,
+        "patients": 42,
+        "patients_above_patch_cap": 31,
+        "sampled_patients": 42
+      },
+      "N": {
+        "median_patches_per_patient": 155.0,
+        "patients": 51,
+        "patients_above_patch_cap": 23,
+        "sampled_patients": 51
+      },
+      "PB": {
+        "median_patches_per_patient": 242.0,
+        "patients": 69,
+        "patients_above_patch_cap": 38,
+        "sampled_patients": 69
+      },
+      "UDH": {
+        "median_patches_per_patient": 138.5,
+        "patients": 50,
+        "patients_above_patch_cap": 18,
+        "sampled_patients": 50
+      }
+    },
+    "1": {
+      "ADH": {
+        "median_patches_per_patient": 94.0,
+        "patients": 37,
+        "patients_above_patch_cap": 10,
+        "sampled_patients": 37
+      },
+      "DCIS": {
+        "median_patches_per_patient": 259.0,
+        "patients": 36,
+        "patients_above_patch_cap": 21,
+        "sampled_patients": 36
+      },
+      "FEA": {
+        "median_patches_per_patient": 142.0,
+        "patients": 33,
+        "patients_above_patch_cap": 13,
+        "sampled_patients": 33
+      },
+      "IC": {
+        "median_patches_per_patient": 450.0,
+        "patients": 41,
+        "patients_above_patch_cap": 28,
+        "sampled_patients": 41
+      },
+      "N": {
+        "median_patches_per_patient": 135.0,
+        "patients": 49,
+        "patients_above_patch_cap": 20,
+        "sampled_patients": 49
+      },
+      "PB": {
+        "median_patches_per_patient": 394.0,
+        "patients": 68,
+        "patients_above_patch_cap": 42,
+        "sampled_patients": 68
+      },
+      "UDH": {
+        "median_patches_per_patient": 131.5,
+        "patients": 46,
+        "patients_above_patch_cap": 13,
+        "sampled_patients": 46
+      }
+    },
+    "2": {
+      "ADH": {
+        "median_patches_per_patient": 98.0,
+        "patients": 37,
+        "patients_above_patch_cap": 11,
+        "sampled_patients": 37
+      },
+      "DCIS": {
+        "median_patches_per_patient": 305.5,
+        "patients": 38,
+        "patients_above_patch_cap": 25,
+        "sampled_patients": 38
+      },
+      "FEA": {
+        "median_patches_per_patient": 180.0,
+        "patients": 30,
+        "patients_above_patch_cap": 12,
+        "sampled_patients": 30
+      },
+      "IC": {
+        "median_patches_per_patient": 618.0,
+        "patients": 44,
+        "patients_above_patch_cap": 32,
+        "sampled_patients": 44
+      },
+      "N": {
+        "median_patches_per_patient": 128.0,
+        "patients": 50,
+        "patients_above_patch_cap": 21,
+        "sampled_patients": 50
+      },
+      "PB": {
+        "median_patches_per_patient": 299.0,
+        "patients": 64,
+        "patients_above_patch_cap": 38,
+        "sampled_patients": 64
+      },
+      "UDH": {
+        "median_patches_per_patient": 120.0,
+        "patients": 46,
+        "patients_above_patch_cap": 16,
+        "sampled_patients": 46
+      }
+    }
+  }
+}

@@ -26,6 +26,7 @@ from breadth import (
     N_SPLITS,
     draw_dir,
 )
+from breadth.calibrate import scaled_test_probabilities
 from breadth.analyze.secondary import (
     build_secondary_results,
     draw_secondary_distributions,
@@ -45,8 +46,8 @@ CellSecondaries = dict[tuple[int, int], dict[str, np.ndarray]]
 
 def load_draw_record(
     config: dict[str, Any], split_index: int, g: int, m: int, draw_index: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Load test labels, predictions, and probabilities for one (split, cell, draw)."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load test labels, predictions, raw and scaled probabilities of one draw."""
     paths = split_paths(ensure_dirs(config), split_index)
     d_dir = draw_dir(paths, g, m, draw_index)
     rec = read_run_record(
@@ -55,10 +56,12 @@ def load_draw_record(
     if rec is None or "test" not in rec.get("splits", {}):
         raise RuntimeError(f"Missing run record at {d_dir}")
     t_data = rec["splits"]["test"]
+    probs = np.asarray(t_data["probabilities"], dtype=np.float64)
     return (
         np.asarray(t_data["labels"]),
         np.asarray(t_data["preds"]),
-        np.asarray(t_data["probabilities"]),
+        probs,
+        scaled_test_probabilities(d_dir, probs),
     )
 
 
@@ -92,7 +95,8 @@ def _collect_cell_replicates(
         ctx = contexts[s_idx]
         for g, m in GRID_CELLS:
             for d_idx in range(N_DRAWS):
-                labels, preds, probs = load_draw_record(config, s_idx, g, m, d_idx)
+                arrays = load_draw_record(config, s_idx, g, m, d_idx)
+                labels, preds = arrays[0], arrays[1]
                 dist = (
                     ctx.ba_distribution(labels, preds[np.newaxis, :], n_classes) * 100.0
                 )
@@ -100,9 +104,7 @@ def _collect_cell_replicates(
                 raw_points[(g, m)].append(float(dist[0]))
                 _accumulate_secondary(
                     secondaries[(g, m)],
-                    draw_secondary_distributions(
-                        ctx, (labels, preds, probs), class_names
-                    ),
+                    draw_secondary_distributions(ctx, arrays, class_names),
                     n_fits,
                 )
     return cell_splits, raw_points, secondaries

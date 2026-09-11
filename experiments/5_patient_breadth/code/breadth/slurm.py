@@ -26,20 +26,27 @@ def _job(
     array_size: int = 0,
 ) -> SlurmJob:
     """Build one stage's job with its resolved SLURM resources."""
-    res = resources_for(config, stage, False)
+    res = resources_for(config, stage, False, fallback="fit")
     return SlurmJob(
         stage, command, dependencies=dependencies, array_size=array_size, **res
     )
 
 
 def build_workflow(config: dict[str, Any]) -> list[SlurmJob]:
-    """Build the full DAG: preflight -> fit (array 0-26) -> analyze."""
+    """Build the full DAG: preflight -> fit -> calibrate (arrays 0-26) -> analyze."""
     preflight = _job(config, "preflight", "preflight")
     fit = _job(
         config, "fit", "fit", dependencies=(preflight.name,), array_size=FIT_SHARD_COUNT
     )
-    analyze = _job(config, "analyze", "analyze", dependencies=(fit.name,))
-    return [preflight, fit, analyze]
+    calibrate = _job(
+        config,
+        "calibrate",
+        "calibrate",
+        dependencies=(fit.name,),
+        array_size=FIT_SHARD_COUNT,
+    )
+    analyze = _job(config, "analyze", "analyze", dependencies=(calibrate.name,))
+    return [preflight, fit, calibrate, analyze]
 
 
 def _submit_script(script: str, dry_run: bool) -> str:
@@ -75,4 +82,3 @@ def submit_workflow(
         submitted[job.name] = jid
         logger.info("%s: %s", job.name, jid)
     return submitted
-
