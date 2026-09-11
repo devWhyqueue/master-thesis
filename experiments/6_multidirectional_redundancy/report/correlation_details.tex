@@ -1,0 +1,24 @@
+\section{Class-specific correlation estimates}
+\label{sec:class-details}
+Table~\ref{tab:class-correlations} reports the split-averaged correlations used to calculate effective support and their training-patient sensitivity intervals. These are descriptive class-level comparisons; no adjustment for multiple class comparisons is applied. Table~\ref{tab:raw-correlations} gives the corresponding raw estimates for each split. All estimates, including the resampled values, lie within $[0,1]$, so raw and clipped point estimates coincide.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\input{tables/class_correlations}
+\caption{Class-specific correlations averaged over three training splits, with separate 95\% training-patient sensitivity intervals for each measure. Full-feature correlation is higher in 22 of 30 classes; increases are not uniform across cancer types.}
+\label{tab:class-correlations}
+\end{table}
+
+\clearpage
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\input{tables/raw_correlations}
+\caption{Unclipped correlations for each class and training split, computed on the same sampled patients and patches for both measures. Every estimate is finite and positive. Split variation is descriptive because the training partitions overlap.}
+\label{tab:raw-correlations}
+\end{table}

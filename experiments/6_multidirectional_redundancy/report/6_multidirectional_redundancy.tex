@@ -18,7 +18,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent At a fixed patch budget, histopathology patch classifiers trained on more patients are more accurate. On TCGA-UT, adjusting patch counts for within-patient redundancy leaves a residual benefit of about three percentage points per doubling of patients, but that adjustment measures dependence along a single principal direction of the features. Because TCGA-UT patches are repeated crops of a few uniform tumour regions per slide, their dependence may extend across many directions. This experiment replaces the single-direction correlation with a full-feature intraclass correlation, the share of total feature variance that lies between patients, and recomputes effective support on exactly the same patient and patch samples. The stored predictions of the breadth--depth grid remain unchanged, so no classifier is retrained. If the residual breadth benefit shrinks to practical irrelevance without degrading the fit of effective support, the residual reflects underestimated redundancy; if it persists, additional patients contribute information beyond their effective observations.
+\noindent At a fixed patch budget, histopathology patch classifiers trained on more patients are more accurate. On TCGA-UT, adjusting patch counts for within-patient redundancy measured along a single principal feature direction leaves a residual benefit of about three percentage points per doubling of patients. This experiment asks whether dependence across other feature directions explains that residual. A full-feature intraclass correlation replaces the single-direction measure on the same patient and patch samples, while predictions from the nine-cell breadth--depth grid remain fixed. Mean correlation increases from 0.457 to 0.487, and the residual breadth benefit falls from 2.98 to 2.62 percentage points per doubling (test-patient 95\% interval: 2.04 to 3.17). Effective support alone fits the grid better, with residual standard deviation falling from 0.253 to 0.201 points. Nevertheless, the remaining breadth benefit exceeds the one-point practical threshold under both test-patient uncertainty and training-patient sensitivity. Full-feature redundancy explains only a small part of the residual breadth benefit: about 12\% of the original estimate. Most of the benefit of additional patients remains unexplained by this correlation-based adjustment.
 \end{abstract}
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -30,7 +30,7 @@ Patches from one patient share acquisition conditions and much of their morpholo
 
 That residual need not indicate missing patient coverage. The correlation was computed on a scalar score, the projection of each feature vector onto the leading principal direction fitted across all 30 cancer types. TCGA-UT patches are rotated and rescaled crops of a few pathologist-selected uniform tumour regions per slide \citep{komura2022universalEncoding}, so patches of one patient share tissue in every feature direction, not only along a direction that need not align with the variation within any single class. The scalar correlation may therefore understate redundancy. The breadth--depth grid cannot rule this out: correlations about 1.56 times as large as estimated would absorb the residual and fit the nine allocations equally well \citep{queisler2026effectiveSupport}.
 
-The question is therefore: \emph{does a correlation that uses all feature directions account for the residual breadth benefit on TCGA-UT?} If redundancy was underestimated, effective support computed from the full features should absorb the residual. If the residual persists, patients contribute variation that no redundancy adjustment of this form captures.
+The question is therefore: \emph{does a correlation that uses all feature directions account for the residual breadth benefit on TCGA-UT?} If redundancy was underestimated, effective support computed from the full features should absorb the residual. If the residual persists, this full-feature adjustment is insufficient to account for the observed breadth benefit.
 
 \section{Study design}
 \label{sec:design}
@@ -96,16 +96,16 @@ A smaller $b$ alone is not sufficient, because a correlation can shift the bread
 \label{sec:uncertainty}
 Two sources of uncertainty are reported separately, because they answer different questions.
 
-\emph{Test-patient uncertainty} asks how much the result depends on which patients happen to form the test partitions. Each of the 2,000 paired Bayesian bootstrap replicates of \citet{queisler2026effectiveSupport} assigns Dirichlet weights to the distinct test patients \citep{rubin1981bayesian}. A patient's weight is shared across both measures, all cells, draws, splits, classes, and repeated test appearances, so differences between the measures are not blurred by different resamples. Accuracies and surfaces are recomputed with correlations held fixed, and the 2.5th and 97.5th percentiles give exploratory 95\% intervals.
+\emph{Test-patient uncertainty} asks how much the result depends on which patients happen to form the test partitions. Each of the 1,999 paired Bayesian bootstrap draws of \citet{queisler2026effectiveSupport} assigns Dirichlet weights to the distinct test patients \citep{rubin1981bayesian}. A patient's weight is shared across both measures, all cells, draws, splits, classes, and repeated test appearances, so differences between the measures are not blurred by different resamples. Accuracies and surfaces are recomputed with correlations held fixed, and the 2.5th and 97.5th percentiles give exploratory 95\% intervals.
 
-\emph{Training-patient sensitivity} asks how much the result depends on which training patients entered the correlation estimates. A separate set of 2,000 cluster bootstrap replicates resamples the distinct patients in the correlation samples with replacement. A resampled patient keeps all of its sampled patches in every class and split in which it appears, and both measures use the same resample. Correlations, effective support, and surfaces are recomputed, while cell accuracies stay fixed. These intervals are not combined with the test-patient intervals and do not describe retraining on new cohorts. Between-draw accuracy dispersion from the breadth--depth grid accompanies both.
+\emph{Training-patient sensitivity} asks how much the result depends on which training patients entered the correlation estimates. A separate set of 1,999 cluster bootstrap draws resamples the distinct patients in the correlation samples with replacement. A resampled patient keeps all of its sampled patches in every class and split in which it appears, and both measures use the same resample. Correlations, effective support, and surfaces are recomputed, while cell accuracies stay fixed. These intervals are not combined with the test-patient intervals and do not describe retraining on new cohorts. Each stored distribution contains 2,000 entries: the observed estimate followed by 1,999 resampled estimates; percentile intervals exclude the observed entry. Accuracy dispersion across the 15 split--draw combinations accompanies both analyses. It includes variation between splits and is not a pure within-split measure of training-draw variability.
 
 \section{Interpretation criteria}
 \label{sec:interpretation}
 Conclusions rest on the test-patient interval for the full-feature residual $b$ and on the practical threshold of one percentage point per doubling of patients \citep{queisler2026effectiveSupport}. Training-patient sensitivity accompanies each conclusion; a conclusion that changes under it is reported as fragile.
 
 \paragraph{Underestimated redundancy.}
-If the interval for $b$ lies within $[-1,1]$ points and effective support alone fits no worse than with the single-direction correlation, the residual breadth benefit is attributable to redundancy that the leading principal direction missed. Full-feature effective support would then be the more complete summary of patient shortage on TCGA-UT.
+If the interval for $b$ lies within $[-1,1]$ points and effective support alone fits no worse than with the single-direction correlation, the result supports the account that the leading principal direction missed relevant redundancy. Full-feature effective support would then be the more complete summary of patient shortage on TCGA-UT.
 
 \paragraph{Breadth beyond redundancy.}
 If the interval lies above one point, additional patients retain a practically relevant benefit that this redundancy measure does not explain. Patients would then contribute variation beyond their effective observations, such as additional morphology or institution-specific acquisition; the present design does not identify which.
@@ -115,6 +115,11 @@ All other outcomes, including an interval that crosses a threshold or a small re
 
 Neither outcome establishes a causal mechanism. Both measures compress dependence into one scalar per class and assume that patches within a patient are exchangeable. All results are conditional on Virchow2 features, logistic regression, the sampled training patients, and the range of the nine allocations. Interventions on institutions, comparisons of representations, and methods that mitigate patient shortage lie outside the scope of this experiment.
 
+\input{results}
+
 \bibliographystyle{plainnat}
 \bibliography{references}
+\clearpage
+\appendix
+\input{correlation_details}
 \end{document}

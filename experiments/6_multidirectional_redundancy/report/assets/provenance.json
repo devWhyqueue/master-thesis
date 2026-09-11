@@ -9,7 +9,7 @@
       "analyze": 4883734
     }
   },
-  "verification": "Both jobs completed with exit code 0:0 under source_commit. The correlate stage's built-in guard compared its clipped single-direction ICC (replicate 0) against exp-5's signed preflight.json:split_iccs within 1e-4 across all 3 splits and 30 classes; the job did not raise, confirming the reproduced patient/patch sample is identical to exp-5's. The analyze stage's built-in guard compared the single-measure surface's point residual breadth b = gamma_e * ln2 and res_std_neff against exp-5's own analysis.json:surface_parameters within 1e-6; the job did not raise, confirming b=2.9787 and res_std_neff=0.2526 reproduce exp-5 (2.98 and 0.25 as reported). No classifier was retrained; both stages read exp-5's stored predictions and frozen exp-2 feature files only.",
+  "verification": "Both jobs completed with exit code 0:0 under source_commit. The correlate stage's built-in guard compared its clipped single-direction ICC (replicate 0) against exp-5's signed preflight.json:split_iccs within 1e-4 across all 3 splits and 30 classes; the job did not raise, confirming agreement with exp-5's single-direction correlation estimates on the deterministically reproduced sample. The analyze stage's built-in guard compared the single-measure surface's point residual breadth b = gamma_e * ln2 and res_std_neff against exp-5's own analysis.json:surface_parameters within 1e-6; the job did not raise, confirming b=2.9787 and res_std_neff=0.2526 reproduce exp-5 (2.98 and 0.25 as reported). No classifier was retrained; both stages read exp-5's stored predictions and frozen exp-2 feature files only.",
   "run_summary": "correlate: per split and class, reproduced exp-5's sampled patient/patch indices, then computed both the single-direction and full-feature covariance-trace ICC on those indices under a shared training-patient cluster bootstrap (2000 replicates, row 0 = unweighted). analyze: clipped and split-averaged the correlations, computed cell effective support per measure, refit the support surface against exp-5's stored bootstrap accuracy distributions (test-patient: correlation fixed at point; training-patient: accuracies fixed at point), and classified the full-feature residual breadth against the +-1pp threshold.",
   "reporting_notes": [
     "Full-feature ICC lowers the residual breadth from 2.98 to 2.62 points and improves (does not worsen) the effective-support-only fit (res_std_neff 0.2526 -> 0.2014), yet the full measure's residual breadth interval still lies entirely above 1 point under both test-patient and training-patient resampling: label_test = label_training = breadth_beyond_redundancy, fragile = false.",
@@ -17,5 +17,24 @@
   ],
   "sha256": {
     "tcga_ut/analysis.json": "bb593ad07b6f66e4613b90ab052490e7cad6f1b9eefa01a08880683c1edb3c90"
+  },
+  "live_verification": {
+    "date": "2026-09-11",
+    "source_commit": "25cf6fa6d6420b5d5f5055b13d43e4b113adaf9e",
+    "job_states": "4883733 and 4883734: COMPLETED, 0:0",
+    "analysis_sha256": "bb593ad07b6f66e4613b90ab052490e7cad6f1b9eefa01a08880683c1edb3c90",
+    "correlations_sha256": "0ddd652cea9b7653e550b3ed2ffe08065bf286ebde235a31e60b09bda9a10fd8",
+    "baseline_preflight_sha256": "a9ed34d18f326e6da969c9bcc3d314c592a1dcc99a223dc2ff7e39839372a667",
+    "checks": [
+      "Local analysis SHA-256 matches live Hydra artifact. Correlations SHA-256 matches stored sidecar.",
+      "Downloaded correlation arrays have shape (2000, 3, 30) per measure; all entries finite and within [0,1].",
+      "All 90 point single-direction correlations match signed baseline preflight within 1e-4.",
+      "All nine cell point accuracies, interval endpoints, and pooled split-draw dispersions match live baseline analysis.",
+      "Independently recomputed effective supports, point least-squares fits, and training-patient intervals from raw correlations and stored accuracy points; numerical agreement within 1e-10."
+    ],
+    "bootstrap_entries": 2000,
+    "resampled_draws": 1999,
+    "interval_rule": "2.5th and 97.5th percentiles of entries 1 onward; entry 0 is observed estimate",
+    "dispersion_definition": "Population SD over 15 split-draw accuracy points, including between-split variation."
   }
 }

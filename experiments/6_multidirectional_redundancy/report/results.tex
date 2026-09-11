@@ -1,0 +1,43 @@
+\section{Results}
+\label{sec:results}
+Full-feature correlation reduces the residual breadth benefit but does not bring it below practical relevance. The analysis retains all 30 cancer types, three splits, and nine allocations, each averaging five training draws per split. The 135 stored classifier evaluations are unchanged. Both correlation measures are defined for all 90 class--split combinations and for every training bootstrap draw; all raw correlations lie within $[0,1]$, so clipping has no effect on these results.
+
+\subsection{Residual breadth and quality of fit}
+The full-feature residual is 2.62 percentage points per doubling of patients, compared with 2.98 for the single-direction measure (Table~\ref{tab:surfaces}). Its test-patient interval, 2.04 to 3.17 points, lies entirely above the one-point practical threshold. The training-patient sensitivity interval, 2.60 to 2.70 points, gives the same interpretation. Under the criteria in Section~\ref{sec:interpretation}, the outcome therefore supports breadth beyond the redundancy captured by this measure, and the classification does not change under training-patient resampling.
+
+\begin{table}[htbp]
+\centering
+\small
+\input{tables/surfaces}
+\caption{Full-feature correlation reduces both the residual breadth benefit and the error of the effective-support-only fit. Residual breadth is in percentage points per doubling of patients; fit error is the residual standard deviation in percentage points across nine cells, with seven residual degrees of freedom. Test-patient and training-patient 95\% intervals describe separate sources of uncertainty. Differences use paired draws, not differences between interval endpoints.}
+\label{tab:surfaces}
+\end{table}
+
+\noindent The paired reduction in residual breadth is 0.36 points (test-patient interval for full minus single: $-0.44$ to $-0.28$; training-patient interval: $-0.53$ to $-0.30$), or approximately 12\% of the original point estimate. This reduction is accompanied by a better fit of effective support alone: residual standard deviation decreases from 0.253 to 0.201 points. The paired change is $-0.051$ points, with both uncertainty intervals below zero. Thus, the failure to absorb the breadth benefit cannot be attributed to a deterioration in this fit criterion.
+
+\subsection{Correlations, support, and unchanged accuracy}
+The class-averaged correlation increases from 0.457 to 0.487. Full-feature estimates exceed single-direction estimates in 22 of 30 classes, but the change is not uniform (Appendix~\ref{sec:class-details}). The largest increase is for uveal melanoma, from 0.329 to 0.476, whereas kidney renal clear cell carcinoma decreases from 0.641 to 0.548. Across classes, single-direction estimates range from 0.314 to 0.641 and full-feature estimates from 0.367 to 0.582. Using all directions therefore changes the distribution of class correlations rather than simply multiplying them by a common factor.
+
+\begin{table}[htbp]
+\centering
+\small
+\input{tables/grid}
+\caption{The nine allocations retain identical accuracies under both redundancy measures. $G$ is patients per class and $m$ is patches per patient. Accuracy is patient-macro balanced accuracy in percent, with test-patient 95\% intervals. SD is the population standard deviation across all 15 split--draw accuracies, in percentage points. Effective support is averaged over classes and expressed per class.}
+\label{tab:grid}
+\end{table}
+
+\noindent Full-feature effective support is lower in every cell (Table~\ref{tab:grid}). The relative reduction grows with depth: approximately 6.0\% at eight patches per patient, 7.1\% at sixteen, and 7.7\% at thirty-two. At the fixed budget of 160 patches per class, effective support falls from 10.90 to 10.06 for five patients contributing 32 patches each, and from 38.92 to 36.58 for twenty patients contributing eight patches each. The corresponding accuracy difference remains 9.52 percentage points: changing the redundancy measure changes the explanation of the grid, not the predictions.
+
+Increasing depth from eight to thirty-two patches improves accuracy by only 0.28 to 0.34 points at fixed breadth. Increasing breadth from five to twenty patients improves accuracy by 9.80 to 9.88 points at fixed depth. The full-feature adjustment reflects this weak depth response more closely, but does not fully explain the breadth response. Dispersion across the 15 split--draw evaluations ranges from 0.52 to 1.54 points; these descriptive values include split variation and should not be read as uncertainty intervals for the fitted residual.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Full-feature redundancy explains only a small part of the residual breadth benefit on TCGA-UT. Accounting for dependence across all feature directions lowers the residual by about 12\%, while 2.62 percentage points per doubling of patients remain. Together with the improved fit of effective support alone, this suggests that the single-direction measure missed some relevant dependence, but that measuring total feature redundancy more completely is insufficient to explain why additional patients help.
+
+The contrast between breadth and depth points towards a distinction between repeated observations and coverage of different patient characteristics. Quadrupling the patches per patient adds at most 0.34 points, whereas quadrupling patient count adds approximately 9.8 points. One hypothesis is that extra patches mainly refine patterns already represented by a patient's tissue, while extra patients introduce patterns absent from the smaller cohort. Effective support describes how much observations repeat each other, but does not directly describe which diagnostically relevant patterns the training set covers. This could explain why it follows the overall accuracy trend closely yet leaves a systematic breadth benefit.
+
+A concrete candidate is variation associated with the institutions contributing TCGA-UT slides. Additional patients may broaden the range of staining, preparation, or scanning conditions encountered during training, making cancer recognition less dependent on a narrow set of acquisition conditions. Another candidate is biological variation within each cancer type: additional patients may contribute morphological subtypes or tumour appearances that repeated crops from the same tissue cannot supply. Both hypotheses predict a benefit from covering distinct patient characteristics, rather than from increasing the number of observations alone. The present result motivates these explanations without distinguishing between them.
+
+The class-specific changes also suggest that the missing information may depend on the classification task. Full-feature correlation increases in 22 classes but decreases in eight, showing that the leading direction does not uniformly underestimate within-patient dependence. Moreover, total feature variance need not emphasize the directions that distinguish one cancer type from another. A patient could therefore add useful variation near a class boundary without greatly changing the covariance-trace correlation. A useful shortage signal would need to capture this contribution to class coverage, rather than assume that all feature variation has equal predictive value.
+
+A follow-up experiment could test institutional coverage directly. For cancer types with sufficient source-site metadata and patient counts, training cohorts would vary the number of represented institutions while holding patients and patches per class fixed, with evaluation on a common patient-disjoint test set. Repeating this comparison across patient counts would test whether institutional coverage explains part of the remaining breadth benefit. A positive result would motivate a measurable institution-coverage signal and, subsequently, a mitigation method targeting that shortage.
