@@ -1,0 +1,35 @@
+{
+  "retrieved": "2026-09-13",
+  "source_host": "hydra",
+  "source_root": "/home/yannik.qu/master-thesis/experiments/08_patient_coverage/outputs",
+  "source_commit": "29bfc3b",
+  "jobs": {
+    "tcga_ut": {
+      "census": 4884173,
+      "fit": "4884174_[0-5] (cancelled, dependency never satisfied)",
+      "analyze": "4884175 (cancelled, dependency never satisfied)",
+      "diagnostic": 4884182
+    }
+  },
+  "verification": "The census stage wrote and signed data/census.json and data/allocations.json before evaluating the gate, then raised because coverage leakage kappa exceeded MAX_LEAKAGE = 0.5 in all three splits; job 4884173 ended FAILED 1:0 after 00:06:29. The afterok fit array (4884174) and analyze job (4884175) could never run and were cancelled. No classifier was trained for this experiment, so there is no analysis.json and no accuracy contrast. Local census.json matches the live Hydra artifact byte-for-byte (SHA-256 ef63413e...) and matches its own sidecar signature data/census.json.sha256.",
+  "run_summary": "census: for each split, embedded every eligible (>=32-patch) training patient of each of the 30 TCGA-UT classes as its centred, normalised patient-class mean Virchow2 vector, drew the five seeds of exp-5's five-patient grid cell for each of five draws, expanded them to the neighbour and random broad allocations, and computed the coverage distance of each allocation against the class's validation patients (Eq. coverage), the split- and class-level leakage kappa (Eq. leakage), and the tissue-source-site shares of the added patients. diagnostic (4884182, scratch job, not committed): recomputed pool sizes, the Spearman correlation between pool size and class leakage, and the mean distance from added patients to their selecting seed for the largest class, to distinguish a property of the embedding from a defect of the neighbour rule.",
+  "reporting_notes": [
+    "Split-level coverage distances (mean over 30 classes and 5 draws): r_deep 0.387/0.385/0.385, r_neighbours 0.311/0.307/0.304, r_random 0.296/0.293/0.292 for splits 0/1/2.",
+    "Split-level leakage kappa = 0.837 / 0.851 / 0.876, all far above the prespecified maximum of 0.5; the gate failed in every split.",
+    "Class-level kappa over the 90 class-split combinations: min 0.524 (rectum adenocarcinoma, split 1), max 1.245 (ovarian serous cystadenocarcinoma, split 0), none at or below 0.5, 17 above 1.0. Class means over splits range 0.686 (thyroid carcinoma, rectum adenocarcinoma) to 1.050 (ovarian serous cystadenocarcinoma, uterine carcinosarcoma), median 0.863, mean 0.867.",
+    "Seed-site shares of added patients (mean over classes and splits): neighbours 56.0% from any seed's site, 34.8% from the selecting seed's site; random additions 46.3% from any seed's site.",
+    "Diagnostic: Spearman(pool size, class kappa) = -0.041, p = 0.83 over the 30 classes, pools spanning 30 to 513 patients. For breast invasive carcinoma (largest pool), neighbours sit at mean cosine distance 0.28 from their selecting seed against 0.52 for random additions, so the selection rule works as specified while kappa stays at 0.85.",
+    "Outcome: the experiment stops at the census; Delta_C and b_N are unmeasured and the interpretation table is untested."
+  ],
+  "sha256": {
+    "tcga_ut/census.json": "ef63413ecd74357cbb7c6813a144bd9a94d5e3e4a4eaecc3272d4a7ce15a6109"
+  },
+  "live_verification": {
+    "date": "2026-09-13",
+    "job_states": "4884173 FAILED 1:0 (00:06:29); 4884174_[0-5] and 4884175 CANCELLED before start; 4884182 COMPLETED 0:0 (00:02:52)",
+    "checks": [
+      "Local assets/tcga_ut/census.json SHA-256 equals the live Hydra artifact and its committed sidecar.",
+      "data/allocations.json (1.6 MB, signed) remains on Hydra only; it lists the sampled patients of every allocation but feeds no reported quantity."
+    ]
+  }
+}
