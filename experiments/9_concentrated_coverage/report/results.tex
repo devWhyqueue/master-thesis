@@ -1,0 +1,168 @@
+\section{Results}
+\label{sec:results}
+The manipulation check ran for all 30 cancer types, three splits, and five draws per class, and it stopped the experiment before any classifier was trained. Coverage leakage is $\kappa=0.69$, $0.67$, and $0.73$ in the three splits, against a permitted maximum of $0.5$. Concentrating all additions around one focal seed lowers leakage from the 0.84 to 0.88 of the neighbour allocation \citep{queisler2026patientCoverage}, but the concentrated allocation still attains about two thirds of the coverage improvement of the random allocation. The coverage gain $\Delta_C$ and the within-concentration residual $b_C$ are therefore not estimated, and the accounts of Table~\ref{tab:accounts} remain untested. The check does measure where the coverage improvement arises, and a diagnostic on the same embeddings, reported in Sections~\ref{sec:diagnosis} and~\ref{sec:alternatives}, tests the design's central premise and several alternative allocation rules before any further fitting.
+
+\subsection{Manipulation check}
+\label{sec:check-results}
+The concentrated allocation shortens the coverage distance of held-out patients by clearly less than the random allocation, but by far more than half as much (Table~\ref{tab:check}). Averaged over classes and draws, validation patients lie at a mean distance of 0.386 from their nearest patient of the deep allocation. Adding fifteen neighbours of the focal seed shortens this distance to 0.322, and adding fifteen random patients shortens it to 0.294. The room between the two broad allocations thus grows from 0.013 in the neighbour design to 0.028, yet the concentrated allocation still delivers a reduction of 0.062 to 0.068. The three splits agree closely.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Split & $r_{\mathrm D}$ & $r_{\mathrm C}$ & $r_{\mathrm R}$ & $r_{\mathrm D}-r_{\mathrm R}$ & $\kappa$ \\
+\midrule
+1 & 0.387 & 0.324 & 0.296 & 0.091 & 0.690 \\
+2 & 0.385 & 0.324 & 0.293 & 0.092 & 0.668 \\
+3 & 0.385 & 0.317 & 0.292 & 0.093 & 0.734 \\
+\bottomrule
+\end{tabular}
+\caption{The concentrated allocation attains about two thirds of the coverage improvement of the random allocation, so the manipulation check of Section~\ref{sec:allocation} fails in every split. Coverage distances are mean cosine distances from validation patients to their nearest training patient, averaged over the 30 classes and five draws; $\kappa$ is the coverage leakage of Equation~\eqref{eq:leakage}, which the design requires to be at most 0.5.}
+\label{tab:check}
+\end{table}
+
+\subsection{Leakage by cancer type}
+\label{sec:check-classes}
+Concentration lowers leakage in almost every cancer type, but only one reaches the intended contrast. Averaged over splits, class-level leakage has a median of 0.69, down from 0.86 for the neighbour allocation, and ranges from 0.38 for testicular germ cell tumours to 1.04 for uveal melanoma (Table~\ref{tab:class-check}). Across the 90 combinations of classes and splits, six fall to 0.5 or below: testicular germ cell tumours in all three splits, and rectum adenocarcinoma, lung adenocarcinoma, and thyroid carcinoma in one split each. Six combinations exceed one: uveal melanoma and uterine carcinosarcoma in two splits each, and ovarian serous cystadenocarcinoma and rectum adenocarcinoma in one split each. Leakage stays high in small and large classes alike, as it did for the neighbour allocation.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{Coverage distance} & & \multicolumn{2}{c}{Focal-site share, \%} \\
+\cmidrule(lr){2-4}\cmidrule(l){6-7}
+Cancer type & $r_{\mathrm D}$ & $r_{\mathrm C}$ & $r_{\mathrm R}$ & $\kappa_c$ & Concentrated & Random \\
+\midrule
+Adrenocortical carcinoma & 0.309 & 0.258 & 0.246 & 0.81 & 72 & 71 \\
+Bladder urothelial carcinoma & 0.573 & 0.479 & 0.430 & 0.66 & 12 & 6 \\
+Brain lower grade glioma & 0.261 & 0.219 & 0.196 & 0.65 & 24 & 8 \\
+Breast invasive carcinoma & 0.541 & 0.468 & 0.430 & 0.66 & 18 & 11 \\
+Cervical squamous and endocervical carcinoma & 0.521 & 0.442 & 0.383 & 0.57 & 11 & 10 \\
+Colon adenocarcinoma & 0.310 & 0.270 & 0.245 & 0.62 & 24 & 5 \\
+Esophageal carcinoma & 0.560 & 0.466 & 0.410 & 0.62 & 22 & 7 \\
+Glioblastoma multiforme & 0.324 & 0.270 & 0.245 & 0.69 & 45 & 13 \\
+Head and neck squamous cell carcinoma & 0.359 & 0.301 & 0.274 & 0.69 & 21 & 12 \\
+Kidney chromophobe & 0.203 & 0.159 & 0.153 & 0.86 & 18 & 15 \\
+Kidney renal clear cell carcinoma & 0.256 & 0.218 & 0.191 & 0.59 & 36 & 18 \\
+Kidney renal papillary cell carcinoma & 0.355 & 0.297 & 0.276 & 0.73 & 9 & 3 \\
+Liver hepatocellular carcinoma & 0.368 & 0.309 & 0.285 & 0.71 & 32 & 19 \\
+Lung adenocarcinoma & 0.500 & 0.429 & 0.385 & 0.62 & 21 & 7 \\
+Lung squamous cell carcinoma & 0.499 & 0.424 & 0.394 & 0.71 & 16 & 5 \\
+Mesothelioma & 0.512 & 0.421 & 0.398 & 0.79 & 8 & 5 \\
+Ovarian serous cystadenocarcinoma & 0.441 & 0.346 & 0.341 & 0.95 & 56 & 44 \\
+Pancreatic adenocarcinoma & 0.438 & 0.356 & 0.344 & 0.87 & 13 & 6 \\
+Pheochromocytoma and paraganglioma & 0.249 & 0.183 & 0.161 & 0.76 & 68 & 69 \\
+Prostate adenocarcinoma & 0.189 & 0.167 & 0.153 & 0.61 & 16 & 9 \\
+Rectum adenocarcinoma & 0.272 & 0.221 & 0.199 & 0.70 & 20 & 13 \\
+Sarcoma & 0.379 & 0.325 & 0.287 & 0.59 & 40 & 26 \\
+Skin cutaneous melanoma & 0.493 & 0.420 & 0.396 & 0.76 & 20 & 11 \\
+Stomach adenocarcinoma & 0.564 & 0.461 & 0.416 & 0.70 & 27 & 16 \\
+Testicular germ cell tumours & 0.274 & 0.245 & 0.198 & 0.38 & 48 & 39 \\
+Thymoma & 0.318 & 0.260 & 0.223 & 0.61 & 13 & 9 \\
+Thyroid carcinoma & 0.341 & 0.282 & 0.237 & 0.56 & 21 & 17 \\
+Uterine carcinosarcoma & 0.483 & 0.397 & 0.395 & 0.98 & 17 & 13 \\
+Uterine corpus endometrial carcinoma & 0.439 & 0.375 & 0.339 & 0.64 & 16 & 3 \\
+Uveal melanoma & 0.239 & 0.179 & 0.182 & 1.04 & 35 & 25 \\
+\midrule
+Mean over classes & 0.386 & 0.322 & 0.294 & 0.70 & 27 & 17 \\
+\bottomrule
+\end{tabular}
+\caption{Class-level leakage stays above the permitted 0.5 for every cancer type except testicular germ cell tumours. Coverage distances and leakage are averaged over the three splits and five draws; $\kappa_c$ is computed from the class's own coverage distances. The focal-site shares give the percentage of added patients that come from the tissue source site of the focal seed, for the concentrated and the random addition rule.}
+\label{tab:class-check}
+\end{table}
+
+Concentration restricts institutions only mildly. On average, 27 percent of the concentrated additions share the focal seed's tissue source site, against 17 percent of the random additions. Two classes with few contributing sites, adrenocortical carcinoma and pheochromocytoma and paraganglioma, reach about 70 percent under both rules, so the difference between the rules there is nil. The overlap with site coverage that Section~\ref{sec:limitations} anticipates is thus small compared with the failure of the coverage manipulation.
+
+\subsection{Why concentration does not withhold coverage}
+\label{sec:diagnosis}
+The design rests on one premise: a validation patient whose nearest seed is not the focal seed should gain nothing from the concentrated additions. A diagnostic on the same embeddings, draws, and allocations tests this premise directly. It reproduces the coverage distances of Table~\ref{tab:check} exactly and splits each allocation's improvement $r_{\mathrm D}-r$ into the contributions of validation patients in the focal cell and in the other cells, each expressed as a share of the random allocation's total improvement $r_{\mathrm D}-r_{\mathrm R}$ (Table~\ref{tab:decomposition}).
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & & \multicolumn{2}{c}{Concentrated, \%} & \multicolumn{2}{c}{Random, \%} & \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+Split & Focal cell, \% & Focal & Other & Focal & Other & Other cells closer, \% \\
+\midrule
+1 & 17 & 21 & 48 & 18 & 82 & 57 \\
+2 & 21 & 24 & 43 & 20 & 80 & 56 \\
+3 & 23 & 29 & 45 & 25 & 75 & 55 \\
+\bottomrule
+\end{tabular}
+\caption{Most of the concentrated allocation's coverage improvement comes from validation patients outside the focal cell, which the design assumed it would not reach. The focal cell holds the validation patients whose nearest seed is the focal seed. The middle columns give each cell's contribution to an allocation's coverage improvement as a percentage of the random allocation's total improvement; the concentrated columns sum to $100\kappa$. The last column gives the percentage of other-cell validation patients whose nearest training patient is closer in the concentrated than in the deep allocation.}
+\label{tab:decomposition}
+\end{table}
+
+\noindent The focal cell behaves as intended but is small. It holds 17 to 23 percent of the validation patients, close to the one fifth expected from five seeds, and concentrated additions improve coverage there only slightly more than random additions do, contributing 21 to 29 percent of the random allocation's improvement against 18 to 25 percent. The premise fails in the other cells. For 55 to 57 percent of the validation patients outside the focal cell, one of the fifteen neighbours of the focal seed lies closer than their own nearest seed, and these patients contribute 43 to 48 percent of the random allocation's improvement, about twice the contribution of the focal cell. Leakage thus arises mainly where the design expected none.
+
+The reason is the scale of the seed cells. Five randomly drawn seeds leave validation patients at a mean distance of 0.39 from their nearest seed, so a cell is not a tight neighbourhood but a large share of the class. The fifteen patients nearest to one seed spread over a region that lies closer to many validation patients than their own seed does. The same diagnostic shows how weakly the coverage distance separates cohorts by composition: twenty patients consisting of the focal seed and its nineteen nearest neighbours cover validation patients at 0.346 to 0.356, better than the five random seeds at 0.385. Under the patient-mean embedding, adding almost any patients shortens the nearest-patient distance for many held-out patients.
+
+\subsection{Alternative allocation rules}
+\label{sec:alternatives}
+Because each manipulation check costs no classifier fits, the diagnostic also evaluated alternative allocation rules against the same criterion before any redesign is fixed. Two coverage-maximizing rules select from the training pool without using validation patients: \emph{farthest-point selection} repeatedly adds the pool patient farthest from the current set, and \emph{facility-location selection} repeatedly adds the pool patient that most lowers the mean distance from all pool patients to their nearest selected patient. For an upward contrast, the random allocation is the low arm, and the criterion requires it to attain at most half of the high arm's improvement. A \emph{fully concentrated} variant replaces the random seeds by the focal seed and its four nearest neighbours, so that the deep allocation is itself concentrated and must be fitted anew. Table~\ref{tab:alternatives} lists the leakage of every variant.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}YYrrrr@{}}
+\toprule
+Low-coverage arm & High-coverage arm & \multicolumn{3}{c}{Leakage per split} & Cells $\le 0.5$ \\
+\midrule
+Seeds + neighbours of all seeds & Seeds + random & 0.84 & 0.85 & 0.88 & 0 of 90 \\
+Seeds + neighbours of focal seed & Seeds + random & 0.69 & 0.67 & 0.73 & 6 of 90 \\
+Seeds + random & Seeds + farthest-point & 1.39 & 1.35 & 1.37 & 0 of 90 \\
+Seeds + random & Seeds + facility-location & 0.80 & 0.80 & 0.80 & 1 of 90 \\
+Seeds + neighbours of focal seed & Seeds + facility-location & 0.55 & 0.53 & 0.59 & 36 of 90 \\
+Focal seed + 19 neighbours & Focal seed + 4 neighbours + random & 0.64 & 0.61 & 0.66 & 13 of 90 \\
+Focal seed + 19 neighbours & Focal seed + 4 neighbours + facility-location & 0.56 & 0.53 & 0.57 & 32 of 90 \\
+\bottomrule
+\end{tabularx}
+\caption{No nested allocation rule reaches the permitted leakage of 0.5 in any split. Leakage is the share of the high arm's coverage improvement over the five-patient allocation that the low arm already attains, computed as in Equation~\eqref{eq:leakage} from coverage distances averaged over classes and draws. The first two rows are the neighbour design of \citet{queisler2026patientCoverage} and the design of this report. Cells count class--split combinations at or below 0.5.}
+\label{tab:alternatives}
+\end{table}
+
+Three observations constrain any redesign. First, farthest-point selection covers held-out patients worse than random selection, with leakage above one, because it adds outlying patients whom few validation patients resemble. Second, facility-location selection covers better than random selection, at 0.269 to 0.273 against 0.292 to 0.296, but random selection still attains 80 percent of its improvement, so an upward contrast is as weak as the downward ones. Third, combining the concentrated and the facility-location arm roughly halves the leakage of the neighbour design but still stops at 0.53 to 0.59. All seven variants build a twenty-patient allocation on top of a five-patient one, and within this nested structure the step from five to twenty patients dominates every coverage change that the selection rule can add.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Whether the residual breadth benefit of TCGA-UT is a patient-coverage benefit remains open after a second stopped manipulation check. Concentrating all additions around one seed lowers leakage from 0.84--0.88 to 0.67--0.73, but no classifier was trained, so neither the coverage gain nor the within-concentration residual constrains the accounts of Table~\ref{tab:accounts}.
+
+The two checks together yield a result about the design space. The diagnostic refutes the assumption on which the concentrated design rests: seed cells do not localize coverage, and validation patients outside the focal cell supply about twice as much of the concentrated allocation's improvement as those inside it. Across seven nested variants, including upward contrasts with coverage-maximizing rules, the best leakage is 0.53. Under the patient-mean embedding, any nested design that must add little coverage while quadrupling patients runs against the fact that quadrupling patients shortens the nearest-patient distance for most held-out patients, whichever patients are added. A clean within-concentration residual, which requires a step that raises patient count at nearly constant coverage, is therefore out of reach for this coverage measure.
+
+The measure is not insensitive to composition, however. Its dynamic range between cohorts of equal size is large once no five-patient allocation has to be nested inside both arms: in the diagnostic, twenty patients forming one tight neighbourhood cover validation patients at 0.346 to 0.356, and twenty patients selected by facility location starting from the same focal seed cover them at 0.268 to 0.271. This difference is almost as large as the coverage change from five to twenty random patients. The question whether dissimilar patients help can thus still be asked directly, at a fixed patient count, even though the question whether similar patients help beyond effective support cannot be asked with nested allocations.
+
+\subsection{Follow-up: coverage contrast at fixed patient count}
+\label{sec:follow-up}
+A follow-up experiment drops the deep arm and contrasts two twenty-patient allocations with eight patches each, drawn per split, class, and draw around the focal seed of this report. The \emph{clustered} allocation contains the focal seed and its nineteen nearest pool patients; the \emph{dispersed} allocation contains the focal seed and nineteen patients added by facility-location selection on the training pool. Both allocations share patients, patches per patient, budget, and effective support, and both are anchored at the same randomly drawn patient, so the contrast isolates how widely the cohort spreads. The \emph{dispersion gain} $\Delta_S=A_{\mathrm{dispersed}}-A_{\mathrm{clustered}}$ is read with the patient-macro balanced accuracy, bootstrap, and one-point threshold used throughout; the design requires 30 fits.
+
+The manipulation check changes its reference. Instead of a share of a nested improvement, it requires the coverage contrast to carry at least half of the coverage change that accompanies the breadth gain,
+\begin{equation}
+ \rho=\frac{r_{\mathrm{clustered}}-r_{\mathrm{dispersed}}}{r_{\mathrm D}-r_{\mathrm R}}\ge 0.5
+ \label{eq:contrast-ratio}
+\end{equation}
+\noindent in all three splits, where $r_{\mathrm D}$ and $r_{\mathrm R}$ are the deep and random coverage distances of Table~\ref{tab:check}. This check was evaluated on the same embeddings before fixing the design, and it passes in every split (Table~\ref{tab:follow-up}).
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Split & $r_{\mathrm{clustered}}$ & $r_{\mathrm{dispersed}}$ & $r_{\mathrm D}-r_{\mathrm R}$ & $\rho$ & Classes with $\rho_c\ge 0.5$ \\
+\midrule
+1 & 0.353 & 0.271 & 0.091 & 0.90 & 24 of 30 \\
+2 & 0.356 & 0.268 & 0.092 & 0.95 & 23 of 30 \\
+3 & 0.346 & 0.268 & 0.093 & 0.84 & 21 of 30 \\
+\bottomrule
+\end{tabular}
+\caption{The clustered and dispersed twenty-patient allocations differ in coverage by 84 to 95 percent of the coverage change from five to twenty random patients, so the manipulation check of Equation~\eqref{eq:contrast-ratio} passes in every split. Coverage distances are averaged over the 30 classes and five draws; $\rho_c$ is the class-level ratio computed from the class's own coverage distances.}
+\label{tab:follow-up}
+\end{table}
+
+\noindent The contrast is also large in the cohorts themselves. The mean pairwise distance among the twenty patients is 0.35 to 0.37 for the clustered, 0.67 for the dispersed, and 0.59 to 0.60 for the random allocation, so the dispersed allocation is slightly more spread out than random selection and the clustered allocation far less. Eight classes fall below $\rho_c=0.5$ on average, among them uterine carcinosarcoma and uveal melanoma, in which both rules reach the same coverage; their class-level contrasts are reported but the gate applies at split level.
+
+If the coverage account holds, $\Delta_S$ should be of the order of the residual breadth benefit, because the contrast reproduces most of the coverage change of the breadth step; an interval above one point would establish that dissimilar patients carry information that similar ones do not. An interval within $[-1,1]$ would show that patient-mean coverage does not carry the residual, and would point to the distribution of a patient's patches as the next candidate. The design gives up the within-concentration residual, so it cannot show directly that count helps beyond coverage. It also inherits the limitation of Section~\ref{sec:limitations} in stronger form: the clustered allocation over-represents one appearance of each cancer type, and 24 to 27 percent of its added patients share the focal seed's tissue source site against 16 to 18 percent of the dispersed additions. A secondary analysis by each test patient's distance to the focal seed, which separates a coverage gain from a shift of the class boundary towards one appearance, therefore belongs in the protocol.

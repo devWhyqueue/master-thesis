@@ -1,0 +1,929 @@
+{
+  "max_leakage": 0.5,
+  "splits": {
+    "0": {
+      "classes": {
+        "Adrenocortical_carcinoma": {
+          "kappa": 0.5714721235506555,
+          "r_concentrated": 0.32415249632716087,
+          "r_deep": 0.368756697953242,
+          "r_random": 0.29070529389008753,
+          "site_shares": {
+            "concentrated_focal_site": 0.6933333333333334,
+            "random_focal_site": 0.7066666666666668
+          }
+        },
+        "Bladder_Urothelial_Carcinoma": {
+          "kappa": 0.7166260835190535,
+          "r_concentrated": 0.4785577479831674,
+          "r_deep": 0.5947406616779153,
+          "r_random": 0.43261578740007467,
+          "site_shares": {
+            "concentrated_focal_site": 0.08,
+            "random_focal_site": 0.013333333333333332
+          }
+        },
+        "Brain_Lower_Grade_Glioma": {
+          "kappa": 0.548405956293454,
+          "r_concentrated": 0.24233230198198089,
+          "r_deep": 0.2896389903241861,
+          "r_random": 0.20337681939165297,
+          "site_shares": {
+            "concentrated_focal_site": 0.2533333333333333,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Breast_invasive_carcinoma": {
+          "kappa": 0.6239313076789672,
+          "r_concentrated": 0.46481949510122594,
+          "r_deep": 0.5384030309740648,
+          "r_random": 0.42046771507114816,
+          "site_shares": {
+            "concentrated_focal_site": 0.2,
+            "random_focal_site": 0.13333333333333336
+          }
+        },
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+          "kappa": 0.5426636653017273,
+          "r_concentrated": 0.4557471583371059,
+          "r_deep": 0.5312028375558749,
+          "r_random": 0.39215597659308166,
+          "site_shares": {
+            "concentrated_focal_site": 0.14666666666666667,
+            "random_focal_site": 0.14666666666666667
+          }
+        },
+        "Colon_adenocarcinoma": {
+          "kappa": 0.6054031769385303,
+          "r_concentrated": 0.27109361061976517,
+          "r_deep": 0.3064869788056511,
+          "r_random": 0.248024503658317,
+          "site_shares": {
+            "concentrated_focal_site": 0.33333333333333337,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Esophageal_carcinoma": {
+          "kappa": 0.5829345370550155,
+          "r_concentrated": 0.4919924099860772,
+          "r_deep": 0.5848932590729057,
+          "r_random": 0.4255257088910903,
+          "site_shares": {
+            "concentrated_focal_site": 0.28,
+            "random_focal_site": 0.08
+          }
+        },
+        "Glioblastoma_multiforme": {
+          "kappa": 0.6125730576467883,
+          "r_concentrated": 0.2924598837395998,
+          "r_deep": 0.3443441476660417,
+          "r_random": 0.25964524803477756,
+          "site_shares": {
+            "concentrated_focal_site": 0.4,
+            "random_focal_site": 0.12
+          }
+        },
+        "Head_and_Neck_squamous_cell_carcinoma": {
+          "kappa": 0.7188969527971811,
+          "r_concentrated": 0.28978119138450176,
+          "r_deep": 0.3529103105253748,
+          "r_random": 0.26509644666736043,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.13333333333333333
+          }
+        },
+        "Kidney_Chromophobe": {
+          "kappa": 0.8252172133251601,
+          "r_concentrated": 0.1594399583599473,
+          "r_deep": 0.19679348884273906,
+          "r_random": 0.15152839999143153,
+          "site_shares": {
+            "concentrated_focal_site": 0.2666666666666667,
+            "random_focal_site": 0.18666666666666668
+          }
+        },
+        "Kidney_renal_clear_cell_carcinoma": {
+          "kappa": 0.6576296623111209,
+          "r_concentrated": 0.22591249262763094,
+          "r_deep": 0.2722259630612788,
+          "r_random": 0.20180111289426,
+          "site_shares": {
+            "concentrated_focal_site": 0.39999999999999997,
+            "random_focal_site": 0.21333333333333332
+          }
+        },
+        "Kidney_renal_papillary_cell_carcinoma": {
+          "kappa": 0.7492073800362062,
+          "r_concentrated": 0.2692691814318354,
+          "r_deep": 0.3255629154745759,
+          "r_random": 0.250425195875471,
+          "site_shares": {
+            "concentrated_focal_site": 0.14666666666666667,
+            "random_focal_site": 0.013333333333333332
+          }
+        },
+        "Liver_hepatocellular_carcinoma": {
+          "kappa": 0.5995380531908233,
+          "r_concentrated": 0.3165803934945092,
+          "r_deep": 0.36645297951599565,
+          "r_random": 0.2832679577212026,
+          "site_shares": {
+            "concentrated_focal_site": 0.30666666666666664,
+            "random_focal_site": 0.07999999999999999
+          }
+        },
+        "Lung_adenocarcinoma": {
+          "kappa": 0.6477179245959537,
+          "r_concentrated": 0.39245782251823713,
+          "r_deep": 0.4539616135464266,
+          "r_random": 0.3590070219060061,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.06666666666666667
+          }
+        },
+        "Lung_squamous_cell_carcinoma": {
+          "kappa": 0.6665047763901131,
+          "r_concentrated": 0.4419921938363129,
+          "r_deep": 0.5202063266520945,
+          "r_random": 0.40285663076634143,
+          "site_shares": {
+            "concentrated_focal_site": 0.22666666666666666,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Mesothelioma": {
+          "kappa": 0.7945087399401283,
+          "r_concentrated": 0.4352763048909057,
+          "r_deep": 0.5325572867947708,
+          "r_random": 0.41011561055695384,
+          "site_shares": {
+            "concentrated_focal_site": 0.07999999999999999,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Ovarian_serous_cystadenocarcinoma": {
+          "kappa": 1.040749567777513,
+          "r_concentrated": 0.31944544751188353,
+          "r_deep": 0.40878922134831974,
+          "r_random": 0.3229436187147996,
+          "site_shares": {
+            "concentrated_focal_site": 0.6666666666666667,
+            "random_focal_site": 0.5333333333333333
+          }
+        },
+        "Pancreatic_adenocarcinoma": {
+          "kappa": 0.951975175816814,
+          "r_concentrated": 0.37652657791816,
+          "r_deep": 0.4564019161649653,
+          "r_random": 0.3724970620512321,
+          "site_shares": {
+            "concentrated_focal_site": 0.14666666666666667,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Pheochromocytoma_and_Paraganglioma": {
+          "kappa": 0.7746521414827355,
+          "r_concentrated": 0.21324760172580043,
+          "r_deep": 0.27390820545944566,
+          "r_random": 0.19560131068014922,
+          "site_shares": {
+            "concentrated_focal_site": 0.6799999999999999,
+            "random_focal_site": 0.68
+          }
+        },
+        "Prostate_adenocarcinoma": {
+          "kappa": 0.7702049812764138,
+          "r_concentrated": 0.1848207868253991,
+          "r_deep": 0.20932243177362944,
+          "r_random": 0.1775105822739998,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Rectum_adenocarcinoma": {
+          "kappa": 0.6801677505082914,
+          "r_concentrated": 0.1895315248180292,
+          "r_deep": 0.2270076033938695,
+          "r_random": 0.17190931543794347,
+          "site_shares": {
+            "concentrated_focal_site": 0.09333333333333334,
+            "random_focal_site": 0.06666666666666667
+          }
+        },
+        "Sarcoma": {
+          "kappa": 0.5958022941476514,
+          "r_concentrated": 0.32942304071777007,
+          "r_deep": 0.3752673548131683,
+          "r_random": 0.29832184025958197,
+          "site_shares": {
+            "concentrated_focal_site": 0.6133333333333333,
+            "random_focal_site": 0.4133333333333333
+          }
+        },
+        "Skin_Cutaneous_Melanoma": {
+          "kappa": 0.7387184939097059,
+          "r_concentrated": 0.4213132041449903,
+          "r_deep": 0.5020576034526947,
+          "r_random": 0.39275426263559876,
+          "site_shares": {
+            "concentrated_focal_site": 0.30666666666666664,
+            "random_focal_site": 0.18666666666666668
+          }
+        },
+        "Stomach_adenocarcinoma": {
+          "kappa": 0.6782438882452823,
+          "r_concentrated": 0.46550736142177807,
+          "r_deep": 0.5681195566026043,
+          "r_random": 0.416828557952695,
+          "site_shares": {
+            "concentrated_focal_site": 0.30666666666666664,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Testicular_Germ_Cell_Tumors": {
+          "kappa": 0.45349118097842195,
+          "r_concentrated": 0.20183793789048451,
+          "r_deep": 0.2366322468013719,
+          "r_random": 0.15990681007773477,
+          "site_shares": {
+            "concentrated_focal_site": 0.36,
+            "random_focal_site": 0.22666666666666666
+          }
+        },
+        "Thymoma": {
+          "kappa": 0.6029965042705212,
+          "r_concentrated": 0.24152355408916834,
+          "r_deep": 0.2796814372863315,
+          "r_random": 0.21640099879801075,
+          "site_shares": {
+            "concentrated_focal_site": 0.12000000000000002,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Thyroid_carcinoma": {
+          "kappa": 0.6161814963572924,
+          "r_concentrated": 0.264273373911718,
+          "r_deep": 0.33247498057653174,
+          "r_random": 0.22179069831878104,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.10666666666666666
+          }
+        },
+        "Uterine_Carcinosarcoma": {
+          "kappa": 1.0692738773005632,
+          "r_concentrated": 0.409274306311171,
+          "r_deep": 0.4851105596167953,
+          "r_random": 0.41418742671741426,
+          "site_shares": {
+            "concentrated_focal_site": 0.2533333333333333,
+            "random_focal_site": 0.18666666666666668
+          }
+        },
+        "Uterine_Corpus_Endometrial_Carcinoma": {
+          "kappa": 0.6393433556278451,
+          "r_concentrated": 0.36949847315754136,
+          "r_deep": 0.4421811459981503,
+          "r_random": 0.3284978298256792,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.026666666666666665
+          }
+        },
+        "Uveal_Melanoma": {
+          "kappa": 1.1775468375825955,
+          "r_concentrated": 0.19263026691249058,
+          "r_deep": 0.23558587134242487,
+          "r_random": 0.1991069789035317,
+          "site_shares": {
+            "concentrated_focal_site": 0.33333333333333337,
+            "random_focal_site": 0.18666666666666668
+          }
+        }
+      },
+      "kappa": 0.6898034847768388,
+      "r_concentrated": 0.3243572699992116,
+      "r_deep": 0.3870559207691146,
+      "r_random": 0.29616242406521365
+    },
+    "1": {
+      "classes": {
+        "Adrenocortical_carcinoma": {
+          "kappa": 0.9874398508163835,
+          "r_concentrated": 0.1935642193989493,
+          "r_deep": 0.24761314071905166,
+          "r_random": 0.192876721811696,
+          "site_shares": {
+            "concentrated_focal_site": 0.7733333333333334,
+            "random_focal_site": 0.7466666666666667
+          }
+        },
+        "Bladder_Urothelial_Carcinoma": {
+          "kappa": 0.5450255427637835,
+          "r_concentrated": 0.49716935642629245,
+          "r_deep": 0.5761992332992925,
+          "r_random": 0.4311970807905395,
+          "site_shares": {
+            "concentrated_focal_site": 0.12,
+            "random_focal_site": 0.08
+          }
+        },
+        "Brain_Lower_Grade_Glioma": {
+          "kappa": 0.8218054614443533,
+          "r_concentrated": 0.2045773980493238,
+          "r_deep": 0.247597916375291,
+          "r_random": 0.19524913026433346,
+          "site_shares": {
+            "concentrated_focal_site": 0.31999999999999995,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Breast_invasive_carcinoma": {
+          "kappa": 0.6393561187361261,
+          "r_concentrated": 0.47332716015568294,
+          "r_deep": 0.5517183025550121,
+          "r_random": 0.4291087894806833,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.14666666666666667
+          }
+        },
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+          "kappa": 0.5214364599923689,
+          "r_concentrated": 0.4297773443299926,
+          "r_deep": 0.4979045939750587,
+          "r_random": 0.3672515712729961,
+          "site_shares": {
+            "concentrated_focal_site": 0.13333333333333336,
+            "random_focal_site": 0.12
+          }
+        },
+        "Colon_adenocarcinoma": {
+          "kappa": 0.5481959972995641,
+          "r_concentrated": 0.2806958188555796,
+          "r_deep": 0.32377322311606954,
+          "r_random": 0.2451929261553274,
+          "site_shares": {
+            "concentrated_focal_site": 0.29333333333333333,
+            "random_focal_site": 0.08
+          }
+        },
+        "Esophageal_carcinoma": {
+          "kappa": 0.653119431320654,
+          "r_concentrated": 0.4218082481773492,
+          "r_deep": 0.5084913265477293,
+          "r_random": 0.37576969216747397,
+          "site_shares": {
+            "concentrated_focal_site": 0.22666666666666666,
+            "random_focal_site": 0.12
+          }
+        },
+        "Glioblastoma_multiforme": {
+          "kappa": 0.7654575408522463,
+          "r_concentrated": 0.25989858676942523,
+          "r_deep": 0.3127045491066194,
+          "r_random": 0.2437184074606687,
+          "site_shares": {
+            "concentrated_focal_site": 0.37333333333333335,
+            "random_focal_site": 0.14666666666666667
+          }
+        },
+        "Head_and_Neck_squamous_cell_carcinoma": {
+          "kappa": 0.7308604364465675,
+          "r_concentrated": 0.3216027265250266,
+          "r_deep": 0.3910590455474632,
+          "r_random": 0.2960254172939868,
+          "site_shares": {
+            "concentrated_focal_site": 0.09333333333333334,
+            "random_focal_site": 0.04
+          }
+        },
+        "Kidney_Chromophobe": {
+          "kappa": 0.8397567072834519,
+          "r_concentrated": 0.14166175809072643,
+          "r_deep": 0.19221526657006321,
+          "r_random": 0.13201508234900056,
+          "site_shares": {
+            "concentrated_focal_site": 0.09333333333333334,
+            "random_focal_site": 0.09333333333333332
+          }
+        },
+        "Kidney_renal_clear_cell_carcinoma": {
+          "kappa": 0.5872016197557464,
+          "r_concentrated": 0.20680728812660396,
+          "r_deep": 0.244797585647909,
+          "r_random": 0.1801003909482289,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.12
+          }
+        },
+        "Kidney_renal_papillary_cell_carcinoma": {
+          "kappa": 0.685264672275806,
+          "r_concentrated": 0.3055045713098935,
+          "r_deep": 0.35833799300458297,
+          "r_random": 0.2812387000857952,
+          "site_shares": {
+            "concentrated_focal_site": 0.06666666666666667,
+            "random_focal_site": 0.026666666666666665
+          }
+        },
+        "Liver_hepatocellular_carcinoma": {
+          "kappa": 0.6670072006753617,
+          "r_concentrated": 0.301994479973492,
+          "r_deep": 0.35478954010040414,
+          "r_random": 0.2756373809131333,
+          "site_shares": {
+            "concentrated_focal_site": 0.4,
+            "random_focal_site": 0.30666666666666664
+          }
+        },
+        "Lung_adenocarcinoma": {
+          "kappa": 0.49969546239551876,
+          "r_concentrated": 0.4622513146757584,
+          "r_deep": 0.519748632545955,
+          "r_random": 0.4046839137379096,
+          "site_shares": {
+            "concentrated_focal_site": 0.21333333333333332,
+            "random_focal_site": 0.06666666666666667
+          }
+        },
+        "Lung_squamous_cell_carcinoma": {
+          "kappa": 0.7606173079274053,
+          "r_concentrated": 0.4182675331630681,
+          "r_deep": 0.4863086887051059,
+          "r_random": 0.3968535121887548,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Mesothelioma": {
+          "kappa": 0.6958122080435665,
+          "r_concentrated": 0.4165892907583113,
+          "r_deep": 0.49248270533041427,
+          "r_random": 0.38341101372342956,
+          "site_shares": {
+            "concentrated_focal_site": 0.09333333333333334,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Ovarian_serous_cystadenocarcinoma": {
+          "kappa": 0.985293260922275,
+          "r_concentrated": 0.36284521701829997,
+          "r_deep": 0.4698303334300437,
+          "r_random": 0.3612483298227103,
+          "site_shares": {
+            "concentrated_focal_site": 0.39999999999999997,
+            "random_focal_site": 0.37333333333333335
+          }
+        },
+        "Pancreatic_adenocarcinoma": {
+          "kappa": 0.9070381186221452,
+          "r_concentrated": 0.349697760606353,
+          "r_deep": 0.4402154799790652,
+          "r_random": 0.3404206449943845,
+          "site_shares": {
+            "concentrated_focal_site": 0.12000000000000002,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Pheochromocytoma_and_Paraganglioma": {
+          "kappa": 0.5769349115100195,
+          "r_concentrated": 0.20278033402530418,
+          "r_deep": 0.2626241425903064,
+          "r_random": 0.15889700219526215,
+          "site_shares": {
+            "concentrated_focal_site": 0.6933333333333332,
+            "random_focal_site": 0.7066666666666668
+          }
+        },
+        "Prostate_adenocarcinoma": {
+          "kappa": 0.5601062854707635,
+          "r_concentrated": 0.15976074881569377,
+          "r_deep": 0.18781395480077584,
+          "r_random": 0.13772845011570764,
+          "site_shares": {
+            "concentrated_focal_site": 0.10666666666666666,
+            "random_focal_site": 0.06666666666666668
+          }
+        },
+        "Rectum_adenocarcinoma": {
+          "kappa": 0.4430764019129424,
+          "r_concentrated": 0.27939097644059935,
+          "r_deep": 0.3176445224286557,
+          "r_random": 0.23130829277864473,
+          "site_shares": {
+            "concentrated_focal_site": 0.2533333333333333,
+            "random_focal_site": 0.14666666666666667
+          }
+        },
+        "Sarcoma": {
+          "kappa": 0.6989354410040154,
+          "r_concentrated": 0.30749294489651235,
+          "r_deep": 0.3659440499835317,
+          "r_random": 0.28231528878771256,
+          "site_shares": {
+            "concentrated_focal_site": 0.29333333333333333,
+            "random_focal_site": 0.14666666666666667
+          }
+        },
+        "Skin_Cutaneous_Melanoma": {
+          "kappa": 0.6567629060910086,
+          "r_concentrated": 0.4412218940003119,
+          "r_deep": 0.49953103545821625,
+          "r_random": 0.4107484003289656,
+          "site_shares": {
+            "concentrated_focal_site": 0.17333333333333334,
+            "random_focal_site": 0.10666666666666666
+          }
+        },
+        "Stomach_adenocarcinoma": {
+          "kappa": 0.5770704820467739,
+          "r_concentrated": 0.4921646460344542,
+          "r_deep": 0.5843436243185742,
+          "r_random": 0.424607541548968,
+          "site_shares": {
+            "concentrated_focal_site": 0.30666666666666664,
+            "random_focal_site": 0.21333333333333332
+          }
+        },
+        "Testicular_Germ_Cell_Tumors": {
+          "kappa": 0.3978396310822712,
+          "r_concentrated": 0.28306336203216115,
+          "r_deep": 0.317047562200814,
+          "r_random": 0.2316257049660201,
+          "site_shares": {
+            "concentrated_focal_site": 0.7733333333333332,
+            "random_focal_site": 0.5999999999999999
+          }
+        },
+        "Thymoma": {
+          "kappa": 0.6214326496984238,
+          "r_concentrated": 0.2922795436379311,
+          "r_deep": 0.3639630356826839,
+          "r_random": 0.24861104688785604,
+          "site_shares": {
+            "concentrated_focal_site": 0.12,
+            "random_focal_site": 0.07999999999999999
+          }
+        },
+        "Thyroid_carcinoma": {
+          "kappa": 0.603766223486189,
+          "r_concentrated": 0.27549616815431677,
+          "r_deep": 0.33022471598542275,
+          "r_random": 0.23957945346129633,
+          "site_shares": {
+            "concentrated_focal_site": 0.2533333333333333,
+            "random_focal_site": 0.22666666666666666
+          }
+        },
+        "Uterine_Carcinosarcoma": {
+          "kappa": 1.0057639211112956,
+          "r_concentrated": 0.3872126413780276,
+          "r_deep": 0.45196160700994686,
+          "r_random": 0.38758371049485174,
+          "site_shares": {
+            "concentrated_focal_site": 0.09333333333333334,
+            "random_focal_site": 0.06666666666666667
+          }
+        },
+        "Uterine_Corpus_Endometrial_Carcinoma": {
+          "kappa": 0.6110485081222472,
+          "r_concentrated": 0.3622507956984333,
+          "r_deep": 0.4163735900876328,
+          "r_random": 0.32779994385532485,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.04
+          }
+        },
+        "Uveal_Melanoma": {
+          "kappa": 0.9715998849553328,
+          "r_concentrated": 0.1775474555427619,
+          "r_deep": 0.2491425728818622,
+          "r_random": 0.17545471181095262,
+          "site_shares": {
+            "concentrated_focal_site": 0.36,
+            "random_focal_site": 0.21333333333333332
+          }
+        }
+      },
+      "kappa": 0.6682063280871159,
+      "r_concentrated": 0.32362338610222113,
+      "r_deep": 0.3854133989994518,
+      "r_random": 0.2929419417564205
+    },
+    "2": {
+      "classes": {
+        "Adrenocortical_carcinoma": {
+          "kappa": 0.9664798645707364,
+          "r_concentrated": 0.25621001064148535,
+          "r_deep": 0.312080784185748,
+          "r_random": 0.25427226111933343,
+          "site_shares": {
+            "concentrated_focal_site": 0.7066666666666668,
+            "random_focal_site": 0.6666666666666666
+          }
+        },
+        "Bladder_Urothelial_Carcinoma": {
+          "kappa": 0.7062185481887242,
+          "r_concentrated": 0.46175378853957305,
+          "r_deep": 0.5483599684034031,
+          "r_random": 0.42572628781549804,
+          "site_shares": {
+            "concentrated_focal_site": 0.17333333333333334,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Brain_Lower_Grade_Glioma": {
+          "kappa": 0.6525334332777922,
+          "r_concentrated": 0.20966187716600762,
+          "r_deep": 0.2460914780931948,
+          "r_random": 0.19026353262809462,
+          "site_shares": {
+            "concentrated_focal_site": 0.14666666666666667,
+            "random_focal_site": 0.09333333333333334
+          }
+        },
+        "Breast_invasive_carcinoma": {
+          "kappa": 0.7203063768093263,
+          "r_concentrated": 0.4659649054388419,
+          "r_deep": 0.5318335202858455,
+          "r_random": 0.4403882450978406,
+          "site_shares": {
+            "concentrated_focal_site": 0.13333333333333333,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+          "kappa": 0.6360190641834932,
+          "r_concentrated": 0.44186450908435715,
+          "r_deep": 0.5342152716656136,
+          "r_random": 0.38901402254926165,
+          "site_shares": {
+            "concentrated_focal_site": 0.04,
+            "random_focal_site": 0.04
+          }
+        },
+        "Colon_adenocarcinoma": {
+          "kappa": 0.7403139112792855,
+          "r_concentrated": 0.2574319017048012,
+          "r_deep": 0.3004293798468812,
+          "r_random": 0.24234931747471933,
+          "site_shares": {
+            "concentrated_focal_site": 0.08,
+            "random_focal_site": 0.026666666666666665
+          }
+        },
+        "Esophageal_carcinoma": {
+          "kappa": 0.6403800912379213,
+          "r_concentrated": 0.48524847739348786,
+          "r_deep": 0.5862456898204537,
+          "r_random": 0.4285312108588612,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.013333333333333332
+          }
+        },
+        "Glioblastoma_multiforme": {
+          "kappa": 0.7109043891872493,
+          "r_concentrated": 0.25635070071400673,
+          "r_deep": 0.3135113916359642,
+          "r_random": 0.2331057959027501,
+          "site_shares": {
+            "concentrated_focal_site": 0.5733333333333334,
+            "random_focal_site": 0.12
+          }
+        },
+        "Head_and_Neck_squamous_cell_carcinoma": {
+          "kappa": 0.6059477335083229,
+          "r_concentrated": 0.2902683866161563,
+          "r_deep": 0.3344054061918792,
+          "r_random": 0.2615657582569362,
+          "site_shares": {
+            "concentrated_focal_site": 0.38666666666666666,
+            "random_focal_site": 0.17333333333333334
+          }
+        },
+        "Kidney_Chromophobe": {
+          "kappa": 0.929616131104665,
+          "r_concentrated": 0.17722803368828038,
+          "r_deep": 0.2196698918052741,
+          "r_random": 0.17401464046345416,
+          "site_shares": {
+            "concentrated_focal_site": 0.17333333333333334,
+            "random_focal_site": 0.16
+          }
+        },
+        "Kidney_renal_clear_cell_carcinoma": {
+          "kappa": 0.5058210194426754,
+          "r_concentrated": 0.22096347903906305,
+          "r_deep": 0.250660574727638,
+          "r_random": 0.1919498953626408,
+          "site_shares": {
+            "concentrated_focal_site": 0.4533333333333333,
+            "random_focal_site": 0.2
+          }
+        },
+        "Kidney_renal_papillary_cell_carcinoma": {
+          "kappa": 0.7573724005594297,
+          "r_concentrated": 0.31740123299377565,
+          "r_deep": 0.3823735616640557,
+          "r_random": 0.296587060040431,
+          "site_shares": {
+            "concentrated_focal_site": 0.06666666666666667,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Liver_hepatocellular_carcinoma": {
+          "kappa": 0.8559781197324594,
+          "r_concentrated": 0.30854608156435914,
+          "r_deep": 0.3826084441251402,
+          "r_random": 0.2960847808988773,
+          "site_shares": {
+            "concentrated_focal_site": 0.2533333333333333,
+            "random_focal_site": 0.18666666666666668
+          }
+        },
+        "Lung_adenocarcinoma": {
+          "kappa": 0.7010796956612808,
+          "r_concentrated": 0.4313644868670809,
+          "r_deep": 0.5265296993631259,
+          "r_random": 0.3907887656504727,
+          "site_shares": {
+            "concentrated_focal_site": 0.2,
+            "random_focal_site": 0.07999999999999999
+          }
+        },
+        "Lung_squamous_cell_carcinoma": {
+          "kappa": 0.7220910208836855,
+          "r_concentrated": 0.4132120819159395,
+          "r_deep": 0.4906586801740852,
+          "r_random": 0.3834054447531994,
+          "site_shares": {
+            "concentrated_focal_site": 0.10666666666666666,
+            "random_focal_site": 0.05333333333333333
+          }
+        },
+        "Mesothelioma": {
+          "kappa": 0.8844855432408327,
+          "r_concentrated": 0.4124766804838053,
+          "r_deep": 0.510047428418129,
+          "r_random": 0.39973386967208563,
+          "site_shares": {
+            "concentrated_focal_site": 0.05333333333333333,
+            "random_focal_site": 0.04
+          }
+        },
+        "Ovarian_serous_cystadenocarcinoma": {
+          "kappa": 0.838054266289243,
+          "r_concentrated": 0.3545964789092171,
+          "r_deep": 0.4437885346720333,
+          "r_random": 0.33736099250612683,
+          "site_shares": {
+            "concentrated_focal_site": 0.6133333333333333,
+            "random_focal_site": 0.42666666666666664
+          }
+        },
+        "Pancreatic_adenocarcinoma": {
+          "kappa": 0.7713844735815578,
+          "r_concentrated": 0.3426311348681495,
+          "r_deep": 0.41820342973763686,
+          "r_random": 0.32023374346873484,
+          "site_shares": {
+            "concentrated_focal_site": 0.13333333333333333,
+            "random_focal_site": 0.04
+          }
+        },
+        "Pheochromocytoma_and_Paraganglioma": {
+          "kappa": 0.9616462606335416,
+          "r_concentrated": 0.13180901772657977,
+          "r_deep": 0.2112902181753069,
+          "r_random": 0.12863903582020247,
+          "site_shares": {
+            "concentrated_focal_site": 0.6666666666666667,
+            "random_focal_site": 0.68
+          }
+        },
+        "Prostate_adenocarcinoma": {
+          "kappa": 0.5296244400727445,
+          "r_concentrated": 0.15555847987023308,
+          "r_deep": 0.1704015720799133,
+          "r_random": 0.14237587861372525,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.10666666666666666
+          }
+        },
+        "Rectum_adenocarcinoma": {
+          "kappa": 1.0194174948413148,
+          "r_concentrated": 0.19336302238507108,
+          "r_deep": 0.2708017347719661,
+          "r_random": 0.19483804690240553,
+          "site_shares": {
+            "concentrated_focal_site": 0.26666666666666666,
+            "random_focal_site": 0.1733333333333333
+          }
+        },
+        "Sarcoma": {
+          "kappa": 0.5121202103043924,
+          "r_concentrated": 0.33720232363059865,
+          "r_deep": 0.3953559023124823,
+          "r_random": 0.2818013549390863,
+          "site_shares": {
+            "concentrated_focal_site": 0.29333333333333333,
+            "random_focal_site": 0.22666666666666666
+          }
+        },
+        "Skin_Cutaneous_Melanoma": {
+          "kappa": 0.8732026664703288,
+          "r_concentrated": 0.39681133634221427,
+          "r_deep": 0.4788698794056262,
+          "r_random": 0.38489565530584186,
+          "site_shares": {
+            "concentrated_focal_site": 0.12,
+            "random_focal_site": 0.04
+          }
+        },
+        "Stomach_adenocarcinoma": {
+          "kappa": 0.8540774896560076,
+          "r_concentrated": 0.4256384937639409,
+          "r_deep": 0.5408177085225956,
+          "r_random": 0.40595967028411584,
+          "site_shares": {
+            "concentrated_focal_site": 0.18666666666666668,
+            "random_focal_site": 0.17333333333333334
+          }
+        },
+        "Testicular_Germ_Cell_Tumors": {
+          "kappa": 0.28092240571367355,
+          "r_concentrated": 0.2504851054279037,
+          "r_deep": 0.2697937917332068,
+          "r_random": 0.20106062587464865,
+          "site_shares": {
+            "concentrated_focal_site": 0.3066666666666667,
+            "random_focal_site": 0.3333333333333333
+          }
+        },
+        "Thymoma": {
+          "kappa": 0.6009927041114419,
+          "r_concentrated": 0.24721801308308722,
+          "r_deep": 0.3118325721711935,
+          "r_random": 0.20431952143684579,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.10666666666666666
+          }
+        },
+        "Thyroid_carcinoma": {
+          "kappa": 0.4816354416314191,
+          "r_concentrated": 0.3070381210994915,
+          "r_deep": 0.3606195148899345,
+          "r_random": 0.2493706549452646,
+          "site_shares": {
+            "concentrated_focal_site": 0.16,
+            "random_focal_site": 0.17333333333333334
+          }
+        },
+        "Uterine_Carcinosarcoma": {
+          "kappa": 0.9088352093485942,
+          "r_concentrated": 0.3950751801257607,
+          "r_deep": 0.5119257956835471,
+          "r_random": 0.38335395520485477,
+          "site_shares": {
+            "concentrated_focal_site": 0.17333333333333334,
+            "random_focal_site": 0.13333333333333336
+          }
+        },
+        "Uterine_Corpus_Endometrial_Carcinoma": {
+          "kappa": 0.6733596250046378,
+          "r_concentrated": 0.39298502300427873,
+          "r_deep": 0.4591599503558962,
+          "r_random": 0.36088419265634347,
+          "site_shares": {
+            "concentrated_focal_site": 0.10666666666666666,
+            "random_focal_site": 0.026666666666666665
+          }
+        },
+        "Uveal_Melanoma": {
+          "kappa": 1.0508130185379234,
+          "r_concentrated": 0.16763610349985875,
+          "r_deep": 0.23292155942717202,
+          "r_random": 0.1707930410556068,
+          "site_shares": {
+            "concentrated_focal_site": 0.3466666666666667,
+            "random_focal_site": 0.3466666666666667
+          }
+        }
+      },
+      "kappa": 0.7338710155472904,
+      "r_concentrated": 0.3167998155862469,
+      "r_deep": 0.3848501111448314,
+      "r_random": 0.2921222419186086
+    }
+  }
+}
