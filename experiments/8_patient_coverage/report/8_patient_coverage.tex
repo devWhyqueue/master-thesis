@@ -8,7 +8,7 @@
 \newcommand{\Neff}{N_{\mathrm{eff}}}
 \title{Patient Shortage in Histopathology:\\Is the Residual Breadth Benefit\\a Patient-Coverage Benefit?}
 \author{Yannik Queisler}
-\date{September 11, 2026}
+\date{September 13, 2026}
 
 \begin{document}
 \raggedbottom
@@ -17,7 +17,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent At a fixed patch budget, TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and coverage of tissue source sites explains little of this residual. This experiment tests whether additional patients help because they cover more of the variation between patients of a cancer type. Patient similarity is measured without labels, as the cosine distance between patient-mean Virchow2 embeddings, so the design applies to all 30 cancer types, including the smaller ones in which most of the residual arises. Three nested training allocations share a budget of 160 patches per class: five randomly drawn seed patients with 32 patches each, twenty patients formed by the seeds and their nearest neighbours with eight patches each, and twenty patients formed by the seeds and randomly drawn patients with eight patches each. The first step quadruples patients while adding little coverage; the second adds coverage while patients, patches, and effective support stay fixed. The \emph{coverage gain} compares the two broad allocations, and the \emph{within-neighbourhood residual} measures what the first step adds beyond effective support. A coverage gain above one percentage point together with a within-neighbourhood residual below one point per doubling of patients would identify patient coverage as the missing source of information; the reverse pattern would locate it in properties of additional patients that their mean embedding does not express.
+\noindent At a fixed patch budget, TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and coverage of tissue source sites explains little of this residual. This experiment tests whether additional patients help because they cover more of the variation between patients of a cancer type. Patient similarity is measured without labels, as the cosine distance between patient-mean Virchow2 embeddings, so the design applies to all 30 cancer types, including the smaller ones in which most of the residual arises. Three nested training allocations share a budget of 160 patches per class: five randomly drawn seed patients with 32 patches each, twenty patients formed by the seeds and their nearest neighbours with eight patches each, and twenty patients formed by the seeds and randomly drawn patients with eight patches each. The first step quadruples patients while adding little coverage; the second adds coverage while patients, patches, and effective support stay fixed. The \emph{coverage gain} compares the two broad allocations, and the \emph{within-neighbourhood residual} measures what the first step adds beyond effective support. A coverage gain above one percentage point together with a within-neighbourhood residual below one point per doubling of patients would identify patient coverage as the missing source of information; the reverse pattern would locate it in properties of additional patients that their mean embedding does not express. A census run before any classifier is trained requires the neighbour allocation to attain at most half of the coverage improvement of the random allocation. It attains 84 to 88 percent of it in the three splits, and no cancer type meets the requirement, so the experiment stops at the census and both contrasts remain unmeasured. The cause is neither the size of the patient pools nor the selection rule, which picks patients twice as close to their seeds as random additions are, but the geometry of the coverage measure: patients clustered around five fixed seeds shorten the distance from held-out patients to their nearest training patient almost as much as scattered patients do, because the two rules differ only for held-out patients far from every seed. Withholding coverage at a fixed patient count therefore requires a selection rule built around the coverage measure itself, and coverage distance responds far more to how many patients a cohort holds than to which patients they are.
 \end{abstract}
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -156,6 +156,8 @@ If dissimilar patients add nothing while the within-neighbourhood residual stays
 
 \paragraph{Both and inconclusive outcomes.}
 If both contrasts exceed the threshold, coverage explains part of the residual, and $b_N-b_{\mathrm{ref}}$ quantifies which part. Because the neighbour allocation still adds some coverage, part of $b_N$ may itself reflect coverage; the leakage $\kappa$ indicates how large this part can be. All other combinations leave the accounts open.
+
+\input{results}
 
 \section{Limitations}
 \label{sec:limitations}

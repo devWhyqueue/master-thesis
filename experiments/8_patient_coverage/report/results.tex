@@ -1,0 +1,91 @@
+\section{Results}
+\label{sec:results}
+The coverage census ran for all 30 cancer types, three splits, and five draws per class, and its gate stopped the experiment before any classifier was trained. Coverage leakage is $\kappa=0.84$, $0.85$, and $0.88$ in the three splits, against a permitted maximum of $0.5$. The neighbour allocation therefore does not withhold coverage: it attains between 84 and 88 percent of the coverage improvement that the random allocation achieves over the deep allocation. Because the manipulation fails, the coverage gain $\Delta_C$ and the within-neighbourhood residual $b_N$ are not estimated, and the accounts of Table~\ref{tab:accounts} remain untested. What the census does measure is the geometry of patient similarity in the embedding of Equation~\eqref{eq:distance}, which is reported here because it constrains any redesign of the intervention.
+
+\subsection{Coverage census}
+\label{sec:census-results}
+The two broad allocations reduce the coverage distance of held-out patients by almost the same amount, although one is composed of the nearest neighbours of the seeds and the other of patients drawn without regard to similarity (Table~\ref{tab:census}). Averaged over classes and draws, the deep allocation leaves validation patients at a mean distance of 0.386 from their nearest training patient. Quadrupling patients shortens this distance to 0.307 when the added patients are neighbours and to 0.294 when they are drawn at random. The entire room between the two broad allocations is thus 0.013 to 0.015, against a reduction of 0.076 to 0.081 that the neighbour allocation already delivers. The three splits agree closely, both in the absolute distances and in the leakage.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Split & $r_{\mathrm D}$ & $r_{\mathrm N}$ & $r_{\mathrm R}$ & $r_{\mathrm D}-r_{\mathrm R}$ & $\kappa$ \\
+\midrule
+1 & 0.387 & 0.311 & 0.296 & 0.091 & 0.837 \\
+2 & 0.385 & 0.307 & 0.293 & 0.093 & 0.851 \\
+3 & 0.385 & 0.304 & 0.292 & 0.093 & 0.876 \\
+\bottomrule
+\end{tabular}
+\caption{The neighbour allocation attains most of the coverage improvement that the random allocation achieves, so the gate of Section~\ref{sec:allocation} fails in every split. Coverage distances are mean cosine distances from validation patients to their nearest training patient, averaged over the 30 classes and five draws; $\kappa$ is the coverage leakage of Equation~\eqref{eq:leakage}, which the design requires to be at most 0.5.}
+\label{tab:census}
+\end{table}
+
+\subsection{Leakage by cancer type}
+\label{sec:census-classes}
+No cancer type reaches the intended contrast. Across the 90 combinations of 30 classes and three splits, class-level leakage ranges from 0.52 to 1.24, and none falls to the permitted 0.5. Averaged over splits, the lowest values belong to rectum adenocarcinoma and thyroid carcinoma at 0.69 and the highest to ovarian serous cystadenocarcinoma and uterine carcinosarcoma at 1.05, with a median of 0.86 (Table~\ref{tab:class-census}). In 17 of the 90 combinations the leakage exceeds one, meaning that the nearest neighbours of the seeds shorten the distance from held-out patients to their nearest training patient by more than randomly drawn patients do. The failure is thus not confined to the smaller cancer types that the design expected to provide the weakest contrast.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{Coverage distance} & & \multicolumn{2}{c}{Seed-site share, \%} \\
+\cmidrule(lr){2-4}\cmidrule(l){6-7}
+Cancer type & $r_{\mathrm D}$ & $r_{\mathrm N}$ & $r_{\mathrm R}$ & $\kappa_c$ & Neighbours & Random \\
+\midrule
+Adrenocortical carcinoma & 0.309 & 0.253 & 0.246 & 0.92 & 92 & 90 \\
+Bladder urothelial carcinoma & 0.573 & 0.455 & 0.430 & 0.82 & 40 & 29 \\
+Brain lower grade glioma & 0.261 & 0.205 & 0.196 & 0.87 & 59 & 39 \\
+Breast invasive carcinoma & 0.541 & 0.448 & 0.430 & 0.85 & 40 & 35 \\
+Cervical squamous and endocervical carcinoma & 0.521 & 0.415 & 0.383 & 0.76 & 47 & 36 \\
+Colon adenocarcinoma & 0.310 & 0.261 & 0.245 & 0.77 & 56 & 38 \\
+Esophageal carcinoma & 0.560 & 0.442 & 0.410 & 0.79 & 59 & 42 \\
+Glioblastoma multiforme & 0.324 & 0.259 & 0.245 & 0.84 & 74 & 45 \\
+Head and neck squamous cell carcinoma & 0.359 & 0.294 & 0.274 & 0.77 & 49 & 43 \\
+Kidney chromophobe & 0.203 & 0.153 & 0.153 & 0.99 & 66 & 63 \\
+Kidney renal clear cell carcinoma & 0.256 & 0.205 & 0.191 & 0.78 & 72 & 55 \\
+Kidney renal papillary cell carcinoma & 0.355 & 0.285 & 0.276 & 0.89 & 21 & 19 \\
+Liver hepatocellular carcinoma & 0.368 & 0.296 & 0.285 & 0.87 & 55 & 51 \\
+Lung adenocarcinoma & 0.500 & 0.408 & 0.385 & 0.80 & 39 & 28 \\
+Lung squamous cell carcinoma & 0.499 & 0.402 & 0.394 & 0.93 & 37 & 23 \\
+Mesothelioma & 0.512 & 0.402 & 0.398 & 0.97 & 37 & 36 \\
+Ovarian serous cystadenocarcinoma & 0.441 & 0.337 & 0.341 & 1.05 & 82 & 78 \\
+Pancreatic adenocarcinoma & 0.438 & 0.343 & 0.344 & 1.02 & 39 & 31 \\
+Pheochromocytoma and paraganglioma & 0.249 & 0.174 & 0.161 & 0.86 & 82 & 83 \\
+Prostate adenocarcinoma & 0.189 & 0.157 & 0.153 & 0.90 & 47 & 32 \\
+Rectum adenocarcinoma & 0.272 & 0.222 & 0.199 & 0.69 & 58 & 50 \\
+Sarcoma & 0.379 & 0.290 & 0.287 & 0.97 & 62 & 53 \\
+Skin cutaneous melanoma & 0.493 & 0.403 & 0.396 & 0.93 & 54 & 46 \\
+Stomach adenocarcinoma & 0.564 & 0.450 & 0.416 & 0.77 & 71 & 49 \\
+Testicular germ cell tumours & 0.274 & 0.205 & 0.198 & 0.89 & 67 & 58 \\
+Thymoma & 0.318 & 0.244 & 0.223 & 0.81 & 44 & 41 \\
+Thyroid carcinoma & 0.341 & 0.270 & 0.237 & 0.69 & 58 & 42 \\
+Uterine carcinosarcoma & 0.483 & 0.392 & 0.395 & 1.05 & 51 & 51 \\
+Uterine corpus endometrial carcinoma & 0.439 & 0.358 & 0.339 & 0.81 & 44 & 26 \\
+Uveal melanoma & 0.239 & 0.185 & 0.182 & 0.95 & 76 & 77 \\
+\midrule
+Mean over classes & 0.386 & 0.307 & 0.294 & 0.87 & 56 & 46 \\
+\bottomrule
+\end{tabular}
+\caption{Class-level leakage stays far above the permitted 0.5 for every cancer type, and exceeds one where neighbours cover held-out patients better than random additions. Coverage distances and leakage are averaged over the three splits and five draws; $\kappa_c$ is computed from the class's own coverage distances. The seed-site shares give the percentage of added patients that come from a tissue source site of one of the five seeds, for the neighbour and the random addition rule.}
+\label{tab:class-census}
+\end{table}
+
+\noindent The site composition of the two rules differs less than their construction suggests. Neighbours come from a site of one of the seeds in 56 percent of cases and randomly added patients in 46 percent, and 35 percent of neighbours share the site of the seed that selected them. The neighbour rule therefore restricts institutions only mildly, so the overlap with the site experiment that Section~\ref{sec:limitations} anticipates is smaller than the failure of the coverage manipulation itself.
+
+\subsection{Why similar patients cover as well as dissimilar ones}
+\label{sec:diagnosis}
+Three checks on the same embeddings separate a property of the data from a defect of the rule. First, leakage is unrelated to how much choice a class offers: the rank correlation between the size of the eligible pool and $\kappa_c$ is $-0.04$ over the 30 classes, with a $p$-value of 0.83, and the largest pool, that of breast invasive carcinoma with over 500 patients, yields $\kappa_c=0.85$, the same value as classes with a pool of 30. Second, the rule selects the patients it is meant to select. In that same class, the fifteen neighbours lie at a mean cosine distance of 0.28 from the seed that selected them, whereas randomly added patients lie at 0.52, so neighbours are genuinely twice as close to their seeds as random additions are.
+
+The cause is geometric and follows from the definition of coverage distance. Equation~\eqref{eq:coverage} averages, over validation patients, the distance to the \emph{nearest} training patient, and the five seeds are present in all three allocations. Placing fifteen further patients tightly around these five points shortens that minimum only for validation patients that already lie near a seed; for every other validation patient the nearest training patient remains its seed, at the distance the deep allocation already achieved. Fifteen scattered patients shorten the minimum for a wider part of the validation set, but their advantage is confined to validation patients far from every seed, which are a minority under any draw. Nearest-neighbour expansion from a seed set is therefore not the opposite of coverage-maximizing selection on a common scale; both rules inherit most of their coverage from the shared seeds, and they differ only in the tail of the validation set.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Whether the residual breadth benefit of TCGA-UT is a patient-coverage benefit remains open. The design separates the two accounts only if the two broad allocations differ in coverage, and they do not: at twenty patients per class, a cohort assembled from the nearest neighbours of five seeds covers held-out patients of the same cancer type nearly as well as a cohort drawn without regard to similarity. No classifier was trained, so neither the coverage gain nor the within-neighbourhood residual constrains the accounts of Table~\ref{tab:accounts}.
+
+The census nevertheless yields a result about the proposed shortage signal itself. Coverage distance responds strongly to how many patients a cohort contains, falling by about a fifth from five to twenty patients, and weakly to which patients they are, with 84 to 88 percent of that reduction reached by the most redundant admissible choice. A signal with this little dynamic range across selection rules is a poor instrument for ranking cohorts of equal size, which is what a sampling or annotation policy would need. This holds for the patient-mean embedding used here; a distance between patients' patch distributions may separate cohorts that patient means do not.
+
+A redesigned intervention must therefore build the contrast around the coverage measure rather than around similarity between added patients. Two directions are available. The contrast can be created upward, with the random allocation as the low-coverage arm and a coverage-maximizing rule, such as farthest-point selection that repeatedly adds the patient farthest from the current training set, as the high-coverage arm; the census then requires the high arm to reduce coverage distance substantially further than random selection. Alternatively it can be created downward by concentrating all fifteen additions in a single neighbourhood, which leaves the coverage of the remaining seeds untouched and keeps the added patients redundant with one seed rather than with five. Either variant changes only the allocation rule of Section~\ref{sec:allocation}; the endpoints, the effective-support adjustment, and the interpretation criteria carry over unchanged, and the census remains the gate that decides whether fitting is worthwhile.
