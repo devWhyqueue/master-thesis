@@ -90,14 +90,17 @@ def _group_rows(
 
 
 def _tertile_rows(
-    pairs_n: pd.DataFrame, pairs_r: pd.DataFrame, distances: dict[str, float]
+    pairs_n: pd.DataFrame,
+    pairs_r: pd.DataFrame,
+    distances: dict[str, float],
+    low: str = "neighbours",
 ) -> list[dict[str, float]]:
-    """Near/middle/far tertile recall_neighbours, recall_random, and gain."""
+    """Near/middle/far tertile recall_<low>, recall_random, and gain."""
     case_ids = pairs_n["case_id"].to_numpy()
     dist = np.array([distances[str(c)] for c in case_ids])
     order = np.argsort(dist, kind="stable")
     groups = np.array_split(order, 3)
-    return _group_rows(pairs_n, pairs_r, groups)
+    return _group_rows(pairs_n, pairs_r, groups, low=low)
 
 
 def _tertile_labels(rows: list[list[dict[str, float]]]) -> dict[str, Any]:

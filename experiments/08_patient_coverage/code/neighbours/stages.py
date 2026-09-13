@@ -9,7 +9,7 @@ import pandas as pd
 
 from breadth.fit import fit_and_record, init_shard
 
-from neighbours import ALLOCATIONS, FIT_SHARD_COUNT, N_DRAWS, allocation_dir
+from neighbours import ALLOCATIONS, N_DRAWS, N_SPLITS, allocation_dir
 from neighbours.allocation import allocation_frames
 from neighbours.census import load_allocations
 
@@ -23,9 +23,10 @@ FramesFn = Callable[[pd.DataFrame, list[str], dict[str, Any]], dict[str, pd.Data
 def decode_shard_index(
     shard_index: int, names: tuple[str, ...] = tuple(ALLOCATIONS)
 ) -> tuple[int, str]:
-    """Decode a shard index into (split_index, allocation) over 3 splits x len(names)."""
-    if shard_index not in range(FIT_SHARD_COUNT):
-        raise ValueError(f"shard_index must be in [0, {FIT_SHARD_COUNT - 1}]")
+    """Decode a shard index into (split_index, allocation) over N_SPLITS x len(names)."""
+    total = N_SPLITS * len(names)
+    if shard_index not in range(total):
+        raise ValueError(f"shard_index must be in [0, {total - 1}]")
     s_idx = shard_index // len(names)
     a_idx = shard_index % len(names)
     return s_idx, names[a_idx]
