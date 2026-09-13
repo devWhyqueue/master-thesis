@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import numpy as np
-from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.common import ensure_dirs, output_root, split_paths, write_json
 
-from breadth import N_SPLITS, exp2_split_paths
+from breadth import N_SPLITS
 from breadth.analyze.diagnostics import _mean_leaves
 from breadth.analyze.secondary import pack_estimate
+from breadth.analyze.canonical import canonical_class_names
 
-from sites.recall import PathsBySplit, allocation_dirs, contexts, ctx_list
+from sites.recall import PathsBySplit, allocation_dirs, contexts, ctx_list, perm_list
 from sites.stages import load_census as load_site_census
 
 from neighbours.accuracy import _subgroup_indices, recall_stack, subgroup_distribution
@@ -37,6 +37,7 @@ class Context(NamedTuple):
     site_classes: list[str]
     subgroup_idx: dict[str, np.ndarray]
     ctx_l: list[Any]
+    perms: list[np.ndarray]
     paths10: PathsBySplit
 
 
@@ -66,12 +67,13 @@ def classify(con_ci: tuple[float, float], sel_ci: tuple[float, float]) -> str:
 
 def prepare(config: dict[str, Any]) -> Context:
     """Load context, subgroup class sets, and per-split bootstrap contexts."""
-    class_names = list(load_freeze_meta(exp2_split_paths(config, 0))["class_names"])
+    class_names = canonical_class_names(config)
     site_classes = list(load_site_census(exp7_config(config))["site_classes"])
     subgroup_idx = _subgroup_indices(class_names, site_classes)
     ctx_l = ctx_list(contexts(config))
+    perms = perm_list(config, class_names)
     paths10 = {s: split_paths(ensure_dirs(config), s) for s in range(N_SPLITS)}
-    return Context(class_names, site_classes, subgroup_idx, ctx_l, paths10)
+    return Context(class_names, site_classes, subgroup_idx, ctx_l, perms, paths10)
 
 
 def _subgroup_fit(
@@ -96,9 +98,10 @@ def _subgroup_fit(
 
 def fit(config: dict[str, Any], ctx: Context) -> dict[str, SubgroupFit]:
     """Per-allocation recall stacks and, per subgroup, the two primary contrasts."""
+    n_classes = len(ctx.class_names)
     stacks = {
         name: recall_stack(
-            allocation_dirs(ctx.paths10, name), ctx.class_names, ctx.ctx_l
+            allocation_dirs(ctx.paths10, name), ctx.ctx_l, ctx.perms, n_classes
         )
         for name in ALLOCATIONS
     }

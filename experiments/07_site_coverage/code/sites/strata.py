@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.analysis.query import load_test_identity, read_run_record
 
 from breadth import N_DRAWS, N_SPLITS, exp2_split_paths
@@ -113,12 +114,16 @@ def strata_analysis(
     config: dict[str, Any],
     paths7: PathsBySplit,
     site_classes: list[str],
-    class_names: list[str],
 ) -> dict[str, Any]:
-    """Descriptive core/added/other site breakdown, averaged over split-draws."""
-    cmap = {name: i for i, name in enumerate(class_names)}
+    """Descriptive core/added/other site breakdown, averaged over split-draws.
+
+    Each split's stored fits were labelled against that split's own frozen
+    class order, so ``cmap`` is rebuilt per split rather than shared.
+    """
     per_class: dict[str, list[dict[str, Any]]] = {c: [] for c in site_classes}
     for s in range(N_SPLITS):
+        class_names = list(load_freeze_meta(exp2_split_paths(config, s))["class_names"])
+        cmap = {name: i for i, name in enumerate(class_names)}
         for c, rows in _split_summaries(config, paths7, s, site_classes, cmap).items():
             per_class[c].extend(rows)
     return {c: _mean_leaves(rows) for c, rows in per_class.items() if rows}

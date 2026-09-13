@@ -6,17 +6,17 @@ import logging
 from typing import Any, NamedTuple
 
 import numpy as np
-from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.common import ensure_dirs, split_paths
 
-from breadth import GRID_CELLS, N_SPLITS, exp2_split_paths
+from breadth import GRID_CELLS, N_SPLITS
+from breadth.analyze.canonical import canonical_class_names
 
 from redundancy import exp5_config
 from redundancy.estimator import cell_effective_support
 from redundancy.surfaces import LN2
 
 from sites.fitting import _class_correlations, _guard_against_exp6, _surface_bootstrap
-from sites.recall import PathsBySplit, contexts, ctx_list, grid_dirs
+from sites.recall import PathsBySplit, contexts, ctx_list, grid_dirs, perm_list
 from sites.recall import _recall_matrix
 from sites.recall import allocation_dirs as _site_allocation_dirs
 from sites.stages import load_census as load_site_census
@@ -40,6 +40,7 @@ class Context(NamedTuple):
     site_classes: list[str]
     subgroup_idx: dict[str, np.ndarray]
     ctx_l: list[Any]
+    perms: list[np.ndarray]
     paths5: PathsBySplit
     paths8: PathsBySplit
     rho: dict[str, np.ndarray]
@@ -64,10 +65,12 @@ class SubgroupFit(NamedTuple):
 
 
 def recall_stack(
-    dirs: list[Any], class_names: list[str], ctxs: list[Any]
+    dirs: list[Any], ctxs: list[Any], perms: list[np.ndarray], n_classes: int
 ) -> np.ndarray:
     """Per-fit, per-class recall distributions (F, C, R), each fit loaded once."""
-    return np.stack([_recall_matrix(d, class_names, ctx) for d, ctx in zip(dirs, ctxs)])
+    return np.stack(
+        [_recall_matrix(d, ctx, n_classes, p) for d, ctx, p in zip(dirs, ctxs, perms)]
+    )
 
 
 def subgroup_distribution(
@@ -89,10 +92,11 @@ def _subgroup_indices(
 
 def prepare(config: dict[str, Any]) -> Context:
     """Load context, subgroup class sets, and class correlations."""
-    class_names = list(load_freeze_meta(exp2_split_paths(config, 0))["class_names"])
+    class_names = canonical_class_names(config)
     site_classes = list(load_site_census(exp7_config(config))["site_classes"])
     subgroup_idx = _subgroup_indices(class_names, site_classes)
     ctx_l = ctx_list(contexts(config))
+    perms = perm_list(config, class_names)
     paths5 = {
         s: split_paths(ensure_dirs(exp5_config(config)), s) for s in range(N_SPLITS)
     }
@@ -104,13 +108,18 @@ def prepare(config: dict[str, Any]) -> Context:
         "site": rho_site,
         "other": rho_all[subgroup_idx["other"]],
     }
-    return Context(class_names, site_classes, subgroup_idx, ctx_l, paths5, paths8, rho)
+    return Context(
+        class_names, site_classes, subgroup_idx, ctx_l, perms, paths5, paths8, rho
+    )
 
 
 def _grid_stacks(ctx: Context) -> dict[tuple[int, int], np.ndarray]:
     """Every grid cell's (F, C, R) recall stack, loaded once for all subgroups."""
+    n_classes = len(ctx.class_names)
     return {
-        (g, m): recall_stack(grid_dirs(ctx.paths5, g, m), ctx.class_names, ctx.ctx_l)
+        (g, m): recall_stack(
+            grid_dirs(ctx.paths5, g, m), ctx.ctx_l, ctx.perms, n_classes
+        )
         for g, m in GRID_CELLS
     }
 
@@ -120,9 +129,10 @@ def _allocation_stacks(
 ) -> dict[str, np.ndarray]:
     """The deep (reused from the grid) and broad allocations' (F, C, R) stacks."""
     stacks = {"deep": grid_stacks[DEEP_CELL]}
+    n_classes = len(ctx.class_names)
     for name in (low, "random"):
         stacks[name] = recall_stack(
-            _site_allocation_dirs(ctx.paths8, name), ctx.class_names, ctx.ctx_l
+            _site_allocation_dirs(ctx.paths8, name), ctx.ctx_l, ctx.perms, n_classes
         )
     return stacks
 

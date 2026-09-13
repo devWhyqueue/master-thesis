@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.analysis.query import load_test_identity, read_run_record
 from scipy.stats import spearmanr
 
@@ -191,13 +192,20 @@ def _accumulate_split(
 def secondary_analysis(
     config: dict[str, Any], paths8: PathsBySplit, class_names: list[str]
 ) -> dict[str, Any]:
-    """Coverage-gain tertiles and the class-level rank correlation (descriptive)."""
-    cmap = {name: i for i, name in enumerate(class_names)}
+    """Coverage-gain tertiles and the class-level rank correlation (descriptive).
+
+    Each split's stored fits were labelled against that split's own frozen
+    class order, so ``cmap`` is rebuilt per split rather than shared.
+    """
     allocations = load_allocations(config)
     census = load_census(config)
     tertile_rows: tuple[list[Any], list[Any], list[Any]] = ([], [], [])
     class_gains: dict[str, list[float]] = {name: [] for name in class_names}
     for s in range(N_SPLITS):
+        split_class_names = list(
+            load_freeze_meta(exp2_split_paths(config, s))["class_names"]
+        )
+        cmap = {name: i for i, name in enumerate(split_class_names)}
         _accumulate_split(
             config, paths8, s, class_names, cmap, allocations, class_gains, tertile_rows
         )

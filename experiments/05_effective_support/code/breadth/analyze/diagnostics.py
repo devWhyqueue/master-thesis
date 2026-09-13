@@ -200,20 +200,34 @@ def _split_diagnostics(
     )
 
 
+def _run_split_diagnostics(
+    config: dict[str, Any],
+    split_idx: int,
+    payload: dict[str, Any],
+    cells: CellRows,
+    decompositions: list[dict[str, Any]],
+) -> None:
+    """Diagnose one split, using that split's own frozen class order -- not a
+    shared one, which would disagree with what its fit actually used."""
+    class_names = list(
+        load_freeze_meta(exp2_split_paths(config, split_idx))["class_names"]
+    )
+    census, coverage = _split_diagnostics(config, split_idx, class_names)
+    payload["icc_sample"][str(split_idx)] = census
+    if coverage is None:
+        return
+    for cell, rows in coverage[0].items():
+        cells[cell].extend(rows)
+    decompositions.extend(coverage[1])
+
+
 def run_diagnostics(config: dict[str, Any]) -> Path:
     """Write ``data/diagnostics.json`` for one dataset."""
-    class_names = list(load_freeze_meta(exp2_split_paths(config, 0))["class_names"])
     payload: dict[str, Any] = {"icc_sample": {}}
     cells: CellRows = {c: [] for c in GRID_CELLS}
     decompositions: list[dict[str, Any]] = []
     for split_idx in range(N_SPLITS):
-        census, coverage = _split_diagnostics(config, split_idx, class_names)
-        payload["icc_sample"][str(split_idx)] = census
-        if coverage is None:
-            continue
-        for cell, rows in coverage[0].items():
-            cells[cell].extend(rows)
-        decompositions.extend(coverage[1])
+        _run_split_diagnostics(config, split_idx, payload, cells, decompositions)
     if decompositions:
         payload["site_coverage"] = {
             "cells": {f"G{g}_m{m}": _mean_leaves(r) for (g, m), r in cells.items()},

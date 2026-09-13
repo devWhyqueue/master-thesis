@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.analysis.query import load_test_identity
 
 from breadth import N_DRAWS, N_SPLITS, exp2_split_paths
@@ -71,11 +72,18 @@ def _accumulate_split(
 def focal_strata(
     config: dict[str, Any], paths: PathsBySplit, class_names: list[str]
 ) -> dict[str, Any]:
-    """Coverage gain within the focal cell and within the other cells (descriptive)."""
-    cmap = {name: i for i, name in enumerate(class_names)}
+    """Coverage gain within the focal cell and within the other cells (descriptive).
+
+    Each split's stored fits were labelled against that split's own frozen
+    class order, so ``cmap`` is rebuilt per split rather than shared.
+    """
     allocations = load_allocations(config)
     strata_rows: tuple[list[Any], list[Any]] = ([], [])
     for s in range(N_SPLITS):
+        split_class_names = list(
+            load_freeze_meta(exp2_split_paths(config, s))["class_names"]
+        )
+        cmap = {name: i for i, name in enumerate(split_class_names)}
         _accumulate_split(config, paths, s, class_names, cmap, allocations, strata_rows)
     return {
         name: _mean_leaves(bucket)

@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 from decodability import exp2_split_paths
+from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.analysis.query import read_run_record
 from imbalance_benchmark.common import (
@@ -76,14 +77,14 @@ def _accumulate_secondary(
 def _collect_cell_replicates(
     contexts: dict[int, BootstrapContext],
     config: dict[str, Any],
-    class_names: list[str],
+    n_classes: int,
 ) -> tuple[
     dict[tuple[int, int], list[list[np.ndarray]]],
     dict[tuple[int, int], list[float]],
     CellSecondaries,
 ]:
-    """Sample bootstrap distributions for each split, cell, and draw."""
-    n_classes = len(class_names)
+    """Sample bootstrap distributions for each split, cell, and draw, labelling
+    per-class recalls with that split's own frozen class order."""
     cell_splits: dict[tuple[int, int], list[list[Any]]] = {
         c: [[None] * N_DRAWS for _ in range(N_SPLITS)] for c in GRID_CELLS
     }
@@ -93,6 +94,9 @@ def _collect_cell_replicates(
 
     for s_idx in range(N_SPLITS):
         ctx = contexts[s_idx]
+        split_class_names = list(
+            load_freeze_meta(exp2_split_paths(config, s_idx))["class_names"]
+        )
         for g, m in GRID_CELLS:
             for d_idx in range(N_DRAWS):
                 arrays = load_draw_record(config, s_idx, g, m, d_idx)
@@ -104,7 +108,7 @@ def _collect_cell_replicates(
                 raw_points[(g, m)].append(float(dist[0]))
                 _accumulate_secondary(
                     secondaries[(g, m)],
-                    draw_secondary_distributions(ctx, arrays, class_names),
+                    draw_secondary_distributions(ctx, arrays, split_class_names),
                     n_fits,
                 )
     return cell_splits, raw_points, secondaries
@@ -124,7 +128,7 @@ def collect_cell_distributions(
         for i in range(N_SPLITS)
     }
     cell_splits, raw_points, secondaries = _collect_cell_replicates(
-        contexts, config, class_names
+        contexts, config, len(class_names)
     )
     pooled_dists: CellDists = {}
     dispersions: dict[tuple[int, int], float] = {}

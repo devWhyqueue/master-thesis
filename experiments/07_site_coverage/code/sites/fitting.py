@@ -6,10 +6,10 @@ import json
 from typing import Any, NamedTuple
 
 import numpy as np
-from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.common import ensure_dirs, output_root, split_paths
 
-from breadth import GRID_CELLS, N_SPLITS, exp2_split_paths
+from breadth import GRID_CELLS, N_SPLITS
+from breadth.analyze.canonical import canonical_class_names
 from breadth.surface import fit_candidate_models
 
 from redundancy import exp5_config
@@ -24,6 +24,7 @@ from sites.recall import (
     contexts,
     ctx_list,
     grid_dirs,
+    perm_list,
 )
 from sites.recall import allocation_dirs as _allocation_dirs
 from sites.stages import load_census
@@ -45,6 +46,7 @@ class Context(NamedTuple):
     site_idx: np.ndarray
     all_idx: np.ndarray
     ctx_l: list[Any]
+    perms: list[np.ndarray]
     paths5: PathsBySplit
     paths7: PathsBySplit
     rho_site: np.ndarray
@@ -74,11 +76,12 @@ def _class_correlations(
 
 def prepare(config: dict[str, Any]) -> Context:
     """Load context and class correlations needed by every downstream stage."""
-    class_names = list(load_freeze_meta(exp2_split_paths(config, 0))["class_names"])
+    class_names = canonical_class_names(config)
     site_classes = load_census(config)["site_classes"]
     site_idx = np.array([class_names.index(c) for c in site_classes])
     all_idx = np.arange(len(class_names))
     ctx_l = ctx_list(contexts(config))
+    perms = perm_list(config, class_names)
     paths5 = {
         s: split_paths(ensure_dirs(exp5_config(config)), s) for s in range(N_SPLITS)
     }
@@ -90,6 +93,7 @@ def prepare(config: dict[str, Any]) -> Context:
         site_idx,
         all_idx,
         ctx_l,
+        perms,
         paths5,
         paths7,
         rho_site,
@@ -122,13 +126,14 @@ def _grid_fit(
     """Site-class-restricted grid accuracy distributions and their Neff array."""
     grid_site_dist: dict[tuple[int, int], np.ndarray] = {}
     grid_all_point: dict[tuple[int, int], float] = {}
+    n_classes = len(ctx.class_names)
     for g, m in GRID_CELLS:
         dirs = grid_dirs(ctx.paths5, g, m)
         site_dist, _ = allocation_distribution(
-            dirs, ctx.class_names, ctx.ctx_l, ctx.site_idx
+            dirs, ctx.ctx_l, ctx.perms, n_classes, ctx.site_idx
         )
         all_dist, _ = allocation_distribution(
-            dirs, ctx.class_names, ctx.ctx_l, ctx.all_idx
+            dirs, ctx.ctx_l, ctx.perms, n_classes, ctx.all_idx
         )
         grid_site_dist[(g, m)] = site_dist
         grid_all_point[(g, m)] = float(all_dist[0])
@@ -145,13 +150,14 @@ def _allocation_fit(
     dists: dict[str, np.ndarray] = {}
     all_dists: dict[str, np.ndarray] = {}
     points: dict[str, np.ndarray] = {}
+    n_classes = len(ctx.class_names)
     for name in ("deep", "broad5", "broad10"):
         dirs = _allocation_dirs(ctx.paths7, name)
         site_dist, site_points = allocation_distribution(
-            dirs, ctx.class_names, ctx.ctx_l, ctx.site_idx
+            dirs, ctx.ctx_l, ctx.perms, n_classes, ctx.site_idx
         )
         all_dist, _ = allocation_distribution(
-            dirs, ctx.class_names, ctx.ctx_l, ctx.all_idx
+            dirs, ctx.ctx_l, ctx.perms, n_classes, ctx.all_idx
         )
         dists[name], all_dists[name], points[name] = site_dist, all_dist, site_points
     return dists, all_dists, points

@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.analysis.query import load_test_identity
 
 from breadth import N_SPLITS, exp2_split_paths
@@ -84,13 +85,20 @@ def secondary_analysis(
     class_names: list[str],
     subgroup_idx: dict[str, np.ndarray],
 ) -> dict[str, Any]:
-    """Concentration damage within tertiles of the test-patient coverage improvement."""
-    cmap = {name: i for i, name in enumerate(class_names)}
+    """Concentration damage within tertiles of the test-patient coverage improvement.
+
+    Each split's stored fits were labelled against that split's own frozen
+    class order, so ``cmap`` is rebuilt per split rather than shared.
+    """
     allocations = load_allocations(config)
     tertile_rows_by_class: dict[str, TertileRows] = {
         name: ([], [], []) for name in class_names
     }
     for s in range(N_SPLITS):
+        split_class_names = list(
+            load_freeze_meta(exp2_split_paths(config, s))["class_names"]
+        )
+        cmap = {name: i for i, name in enumerate(split_class_names)}
         _accumulate_split(
             config, paths10, s, class_names, cmap, allocations, tertile_rows_by_class
         )

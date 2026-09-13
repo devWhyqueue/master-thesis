@@ -28,7 +28,7 @@ def run_analyze(config: dict[str, Any]) -> Path:
     ctx = prepare(config)
     result = fit(config, ctx)
     beta_dist, gamma_dist, neff_deep, neff_broad, b_w, b_ref, delta_s = result.contrasts
-    strata = strata_analysis(config, ctx.paths7, ctx.site_classes, ctx.class_names)
+    strata = strata_analysis(config, ctx.paths7, ctx.site_classes)
     results = build_results(
         ctx.site_classes,
         allocation_payload(result.dists, result.all_dists, result.points),
