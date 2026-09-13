@@ -21,7 +21,7 @@ from sites.recall import _recall_matrix
 from sites.recall import allocation_dirs as _site_allocation_dirs
 from sites.stages import load_census as load_site_census
 
-from neighbours import ALLOCATIONS, DEEP_CELL, exp7_config
+from neighbours import DEEP_CELL, exp7_config
 
 __all__ = ["Context", "SubgroupFit", "prepare", "fit"]
 
@@ -49,16 +49,16 @@ class SubgroupFit(NamedTuple):
     """One subgroup's allocation accuracy, refitted surface, and contrasts."""
 
     a_deep: np.ndarray
-    a_neighbours: np.ndarray
+    a_low: np.ndarray
     a_random: np.ndarray
     points_deep: np.ndarray
-    points_neighbours: np.ndarray
+    points_low: np.ndarray
     points_random: np.ndarray
     beta: np.ndarray
     gamma: np.ndarray
     neff_deep: float
     neff_broad: float
-    b_n: np.ndarray
+    b_low: np.ndarray
     b_ref: np.ndarray
     delta_c: np.ndarray
 
@@ -116,11 +116,11 @@ def _grid_stacks(ctx: Context) -> dict[tuple[int, int], np.ndarray]:
 
 
 def _allocation_stacks(
-    ctx: Context, grid_stacks: dict[tuple[int, int], np.ndarray]
+    ctx: Context, grid_stacks: dict[tuple[int, int], np.ndarray], low: str
 ) -> dict[str, np.ndarray]:
     """The deep (reused from the grid) and broad allocations' (F, C, R) stacks."""
     stacks = {"deep": grid_stacks[DEEP_CELL]}
-    for name in ALLOCATIONS:
+    for name in (low, "random"):
         stacks[name] = recall_stack(
             _site_allocation_dirs(ctx.paths8, name), ctx.class_names, ctx.ctx_l
         )
@@ -152,6 +152,7 @@ def _subgroup_fit(
     subgroup: str,
     grid_stacks: dict[tuple[int, int], np.ndarray],
     allocation_stacks: dict[str, np.ndarray],
+    low: str,
 ) -> SubgroupFit:
     idx = ctx.subgroup_idx[subgroup]
     rho = ctx.rho[subgroup]
@@ -168,34 +169,34 @@ def _subgroup_fit(
     log_ratio = float(np.log(neff_broad / neff_deep))
 
     a_deep, points_deep = subgroup_distribution(allocation_stacks["deep"], idx)
-    a_neighbours, points_neighbours = subgroup_distribution(
-        allocation_stacks["neighbours"], idx
-    )
+    a_low, points_low = subgroup_distribution(allocation_stacks[low], idx)
     a_random, points_random = subgroup_distribution(allocation_stacks["random"], idx)
 
     explained = beta * log_ratio
-    b_n = (a_neighbours - a_deep - explained) / 2.0
+    b_low = (a_low - a_deep - explained) / 2.0
     b_ref = gamma * LN2
-    delta_c = a_random - a_neighbours
+    delta_c = a_random - a_low
 
     return SubgroupFit(
         a_deep,
-        a_neighbours,
+        a_low,
         a_random,
         points_deep,
-        points_neighbours,
+        points_low,
         points_random,
         beta,
         gamma,
         neff_deep,
         neff_broad,
-        b_n,
+        b_low,
         b_ref,
         delta_c,
     )
 
 
-def fit(config: dict[str, Any], ctx: Context) -> dict[str, SubgroupFit]:
+def fit(
+    config: dict[str, Any], ctx: Context, low: str = "neighbours"
+) -> dict[str, SubgroupFit]:
     """Grid and allocation accuracy, the surface refit, and the contrasts, per subgroup."""
     grid_stacks = _grid_stacks(ctx)
     all_idx = ctx.subgroup_idx["all"]
@@ -206,8 +207,8 @@ def fit(config: dict[str, Any], ctx: Context) -> dict[str, SubgroupFit]:
     neff_all_grid = cell_effective_support(ctx.rho["all"][np.newaxis, :], GRID_CELLS)[0]
     _guard_against_exp6(config, grid_all_point, neff_all_grid)
 
-    allocation_stacks = _allocation_stacks(ctx, grid_stacks)
+    allocation_stacks = _allocation_stacks(ctx, grid_stacks, low)
     return {
-        subgroup: _subgroup_fit(ctx, subgroup, grid_stacks, allocation_stacks)
+        subgroup: _subgroup_fit(ctx, subgroup, grid_stacks, allocation_stacks, low)
         for subgroup in ctx.subgroup_idx
     }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -74,6 +74,51 @@ def _site_shares(
     }
 
 
+def _coverage_r_values(
+    embeddings: dict[tuple[str, str], np.ndarray],
+    full_df: pd.DataFrame,
+    c_name: str,
+    e_seeds: np.ndarray,
+    seeds: list[str],
+    low: tuple[str, list[str]],
+    randoms: list[str],
+) -> dict[str, float]:
+    """The deep, low-coverage, and random coverage distances (Eq. coverage)."""
+    low_key, low_patients = low
+    e_val = _embedding_matrix(
+        embeddings, _patients_of(full_df, "validation", c_name), c_name
+    )
+    return {
+        "r_deep": _coverage_distance(e_val, e_seeds),
+        f"r_{low_key}": _coverage_distance(
+            e_val, _embedding_matrix(embeddings, seeds + low_patients, c_name)
+        ),
+        "r_random": _coverage_distance(
+            e_val, _embedding_matrix(embeddings, seeds + randoms, c_name)
+        ),
+    }
+
+
+def _class_test_geometry(
+    embeddings: dict[tuple[str, str], np.ndarray],
+    full_df: pd.DataFrame,
+    c_name: str,
+    e_seeds: np.ndarray,
+) -> tuple[list[str], np.ndarray]:
+    """One class's test patients and their cosine distance to every seed."""
+    test_patients = _patients_of(full_df, "test", c_name)
+    e_test = _embedding_matrix(embeddings, test_patients, c_name)
+    return test_patients, cosine_distances(e_test, e_seeds)
+
+
+def _test_distance_dict(
+    test_patients: list[str], test_seed_dist: np.ndarray
+) -> dict[str, float]:
+    """Each test patient's distance to its nearest seed (Eq. distance)."""
+    test_dist = np.min(test_seed_dist, axis=1)
+    return dict(zip(test_patients, (float(d) for d in test_dist)))
+
+
 def _class_draw(
     train_df: pd.DataFrame,
     full_df: pd.DataFrame,
@@ -81,43 +126,39 @@ def _class_draw(
     class_names: list[str],
     c_idx: int,
     c_name: str,
-    split: int,
-    draw: int,
+    draw: tuple[int, int],
 ) -> dict[str, Any]:
     """One (split, draw, class)'s seed/neighbour/random draw and its census rows."""
-    seeds = seed_patients(train_df, class_names, c_idx, split, draw)
+    split, draw_idx = draw
+    seeds = seed_patients(train_df, class_names, c_idx, split, draw_idx)
     pool = eligible_patients_by_class(train_df, c_name, _MAX_DEPTH)
-    rng = draw_rng(split, draw, c_idx)
+    rng = draw_rng(split, draw_idx, c_idx)
 
     e_seeds = _embedding_matrix(embeddings, seeds, c_name)
-    e_pool = _embedding_matrix(embeddings, pool, c_name)
-    dist_seed_pool = cosine_distances(e_seeds, e_pool)
-
+    dist_seed_pool = cosine_distances(
+        e_seeds, _embedding_matrix(embeddings, pool, c_name)
+    )
     neighbours = neighbour_patients(seeds, pool, dist_seed_pool, rng)
     randoms = random_patients(seeds, pool, rng)
     neighbour_ids = [patient for patient, _selector in neighbours]
 
-    e_val = _embedding_matrix(
-        embeddings, _patients_of(full_df, "validation", c_name), c_name
+    r_values = _coverage_r_values(
+        embeddings,
+        full_df,
+        c_name,
+        e_seeds,
+        seeds,
+        ("neighbours", neighbour_ids),
+        randoms,
     )
-    r_deep = _coverage_distance(e_val, e_seeds)
-    r_neighbours = _coverage_distance(
-        e_val, _embedding_matrix(embeddings, seeds + neighbour_ids, c_name)
+    test_patients, test_seed_dist = _class_test_geometry(
+        embeddings, full_df, c_name, e_seeds
     )
-    r_random = _coverage_distance(
-        e_val, _embedding_matrix(embeddings, seeds + randoms, c_name)
-    )
-
-    test_patients = _patients_of(full_df, "test", c_name)
-    e_test = _embedding_matrix(embeddings, test_patients, c_name)
-    test_dist = np.min(cosine_distances(e_test, e_seeds), axis=1)
 
     return {
         "record": {"seeds": seeds, "neighbours": neighbours, "random": randoms},
-        "r_deep": r_deep,
-        "r_neighbours": r_neighbours,
-        "r_random": r_random,
-        "test_distances": dict(zip(test_patients, (float(d) for d in test_dist))),
+        **r_values,
+        "test_distances": _test_distance_dict(test_patients, test_seed_dist),
         "site_shares": _site_shares(neighbour_ids, neighbours, randoms, seeds),
     }
 
@@ -128,15 +169,23 @@ def kappa(r_deep: float, r_neighbours: float, r_random: float) -> float:
     return (r_deep - r_neighbours) / denom if denom != 0 else float("nan")
 
 
+def _r_means(rows: list[dict[str, Any]]) -> dict[str, float]:
+    """Mean of every ``r_*`` key present in a set of rows sharing the same keys."""
+    r_keys = [key for key in rows[0] if key.startswith("r_")]
+    return {key: float(np.mean([row[key] for row in rows])) for key in r_keys}
+
+
+def _r_kappa(r_means: dict[str, float]) -> float:
+    """Leakage kappa from ``r_deep``, ``r_random``, and the one other ``r_*`` mean."""
+    low_key = next(k for k in r_means if k not in ("r_deep", "r_random"))
+    return kappa(r_means["r_deep"], r_means[low_key], r_means["r_random"])
+
+
 def _class_census(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    r_deep = float(np.mean([row["r_deep"] for row in rows]))
-    r_neighbours = float(np.mean([row["r_neighbours"] for row in rows]))
-    r_random = float(np.mean([row["r_random"] for row in rows]))
+    r_means = _r_means(rows)
     return {
-        "r_deep": r_deep,
-        "r_neighbours": r_neighbours,
-        "r_random": r_random,
-        "kappa": kappa(r_deep, r_neighbours, r_random),
+        **r_means,
+        "kappa": _r_kappa(r_means),
         "site_shares": {
             key: float(np.nanmean([row["site_shares"][key] for row in rows]))
             for key in rows[0]["site_shares"]
@@ -145,14 +194,10 @@ def _class_census(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _split_summary(class_census: dict[str, Any]) -> dict[str, Any]:
-    r_deep = float(np.mean([v["r_deep"] for v in class_census.values()]))
-    r_neighbours = float(np.mean([v["r_neighbours"] for v in class_census.values()]))
-    r_random = float(np.mean([v["r_random"] for v in class_census.values()]))
+    r_means = _r_means(list(class_census.values()))
     return {
-        "r_deep": r_deep,
-        "r_neighbours": r_neighbours,
-        "r_random": r_random,
-        "kappa": kappa(r_deep, r_neighbours, r_random),
+        **r_means,
+        "kappa": _r_kappa(r_means),
         "classes": class_census,
     }
 
@@ -163,6 +208,7 @@ def split_census(
     embeddings: dict[tuple[str, str], np.ndarray],
     class_names: list[str],
     split: int,
+    class_draw: Callable[..., dict[str, Any]] = _class_draw,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """One split's per-class census, allocation records, and split-level kappa."""
     class_rows: dict[str, list[dict[str, Any]]] = {name: [] for name in class_names}
@@ -171,8 +217,8 @@ def split_census(
     }
     for c_idx, c_name in enumerate(class_names):
         for draw in range(N_DRAWS):
-            drawn = _class_draw(
-                train_df, full_df, embeddings, class_names, c_idx, c_name, split, draw
+            drawn = class_draw(
+                train_df, full_df, embeddings, class_names, c_idx, c_name, (split, draw)
             )
             class_rows[c_name].append(drawn)
             allocation_records[draw][c_name] = drawn["record"]

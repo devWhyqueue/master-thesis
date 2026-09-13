@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 from decodability.evidence import load_freeze_meta
@@ -18,7 +18,7 @@ from imbalance_benchmark.common import (
 from breadth import N_SPLITS, exp2_split_paths
 
 from neighbours import MAX_LEAKAGE
-from neighbours.coverage import split_census
+from neighbours.coverage import _class_draw, split_census
 from neighbours.embedding import (
     assert_consistent_patch_counts,
     embed,
@@ -51,6 +51,7 @@ def _all_splits_census(
     full_dfs: dict[int, pd.DataFrame],
     train_dfs: dict[int, pd.DataFrame],
     means: dict[tuple[str, str], Any],
+    class_draw: Callable[..., dict[str, Any]],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Every split's census summary and allocation records."""
     splits: dict[str, Any] = {}
@@ -58,7 +59,7 @@ def _all_splits_census(
     for s in range(N_SPLITS):
         embeddings = embed(means, training_mu(means, train_dfs[s]))
         split_summary, allocations = split_census(
-            full_dfs[s], train_dfs[s], embeddings, class_names, s
+            full_dfs[s], train_dfs[s], embeddings, class_names, s, class_draw=class_draw
         )
         splits[str(s)] = split_summary
         all_allocations[str(s)] = allocations
@@ -68,16 +69,7 @@ def _all_splits_census(
 def _write_census_outputs(
     config: dict[str, Any], splits: dict[str, Any], all_allocations: dict[str, Any]
 ) -> Path:
-    payload = {
-        "max_leakage": MAX_LEAKAGE,
-        "splits": {
-            s: {
-                key: v[key]
-                for key in ("r_deep", "r_neighbours", "r_random", "kappa", "classes")
-            }
-            for s, v in splits.items()
-        },
-    }
+    payload = {"max_leakage": MAX_LEAKAGE, "splits": splits}
     census_p = output_root(config) / "data" / "census.json"
     write_json(census_p, payload)
     sign_file(census_p)
@@ -88,7 +80,9 @@ def _write_census_outputs(
     return census_p
 
 
-def run_census(config: dict[str, Any]) -> Path:
+def run_census(
+    config: dict[str, Any], class_draw: Callable[..., dict[str, Any]] = _class_draw
+) -> Path:
     """Census the patient-coverage pool per split; write, sign, and gate on kappa.
 
     Writes before gating so a failing census is still inspectable, and raises
@@ -100,7 +94,7 @@ def run_census(config: dict[str, Any]) -> Path:
         assert_consistent_patch_counts(counts, full_dfs[s])
 
     splits, all_allocations = _all_splits_census(
-        class_names, full_dfs, train_dfs, means
+        class_names, full_dfs, train_dfs, means, class_draw
     )
     census_p = _write_census_outputs(config, splits, all_allocations)
 
@@ -108,7 +102,7 @@ def run_census(config: dict[str, Any]) -> Path:
     if failing:
         raise RuntimeError(
             f"Coverage leakage kappa exceeds {MAX_LEAKAGE} for split(s) {failing}; "
-            "redesign the neighbour rule against this census before fitting."
+            "redesign the low-coverage rule against this census before fitting."
         )
     return census_p
 

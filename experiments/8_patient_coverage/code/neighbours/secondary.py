@@ -20,11 +20,15 @@ __all__ = ["secondary_analysis"]
 
 
 def _draw_pairs(
-    paths8: PathsBySplit, s: int, d: int, case_ids: np.ndarray
+    paths8: PathsBySplit,
+    s: int,
+    d: int,
+    case_ids: np.ndarray,
+    allocations: tuple[str, str] = ("neighbours", "random"),
 ) -> dict[str, pd.DataFrame]:
-    """Patient-class pairs for the neighbours and random allocations at one (split, draw)."""
+    """Patient-class pairs for the given allocations at one (split, draw)."""
     pairs = {}
-    for allocation in ("neighbours", "random"):
+    for allocation in allocations:
         result_dir = allocation_dir(paths8[s], allocation, d)
         rec = read_run_record(
             result_dir, splits=("test",), array_fields=("labels", "preds")
@@ -45,6 +49,46 @@ def _class_pairs(pairs: pd.DataFrame, c_idx: int) -> pd.DataFrame:
     return class_pairs
 
 
+def _group_rows(
+    pairs_low: pd.DataFrame,
+    pairs_r: pd.DataFrame,
+    groups: list[np.ndarray],
+    low: str = "neighbours",
+) -> list[dict[str, float]]:
+    """Weighted recall_<low>, recall_random, and gain for each patient group.
+
+    An empty group (e.g. no test patients in a focal cell for one class) gets
+    NaN rather than raising, matching ``_mean_leaves``'s nan-aware pooling.
+    """
+    case_ids = pairs_low["case_id"].to_numpy()
+    weight = pairs_low["weight"].to_numpy()
+    recall_low = pairs_low["recall"].to_numpy() * 100.0
+    recall_r_by_case = dict(zip(pairs_r["case_id"], pairs_r["recall"] * 100.0))
+    recall_r = np.array([recall_r_by_case[c] for c in case_ids])
+    rows = []
+    for group in groups:
+        if len(group) == 0:
+            rows.append(
+                {
+                    f"recall_{low}": float("nan"),
+                    "recall_random": float("nan"),
+                    "gain": float("nan"),
+                }
+            )
+            continue
+        w = weight[group]
+        recall_low_g = float(np.average(recall_low[group], weights=w))
+        recall_random_g = float(np.average(recall_r[group], weights=w))
+        rows.append(
+            {
+                f"recall_{low}": recall_low_g,
+                "recall_random": recall_random_g,
+                "gain": recall_random_g - recall_low_g,
+            }
+        )
+    return rows
+
+
 def _tertile_rows(
     pairs_n: pd.DataFrame, pairs_r: pd.DataFrame, distances: dict[str, float]
 ) -> list[dict[str, float]]:
@@ -53,23 +97,7 @@ def _tertile_rows(
     dist = np.array([distances[str(c)] for c in case_ids])
     order = np.argsort(dist, kind="stable")
     groups = np.array_split(order, 3)
-    weight = pairs_n["weight"].to_numpy()
-    recall_n = pairs_n["recall"].to_numpy() * 100.0
-    recall_r_by_case = dict(zip(pairs_r["case_id"], pairs_r["recall"] * 100.0))
-    recall_r = np.array([recall_r_by_case[c] for c in case_ids])
-    rows = []
-    for group in groups:
-        w = weight[group]
-        recall_neighbours = float(np.average(recall_n[group], weights=w))
-        recall_random = float(np.average(recall_r[group], weights=w))
-        rows.append(
-            {
-                "recall_neighbours": recall_neighbours,
-                "recall_random": recall_random,
-                "gain": recall_random - recall_neighbours,
-            }
-        )
-    return rows
+    return _group_rows(pairs_n, pairs_r, groups)
 
 
 def _tertile_labels(rows: list[list[dict[str, float]]]) -> dict[str, Any]:
