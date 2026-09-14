@@ -10,7 +10,9 @@
     "experiments/09_concentrated_coverage/code",
     "experiments/10_cohort_composition/code",
     "experiments/11_coverage_redundancy/code",
-    "experiments/12_shortage_selection/code"
+    "experiments/12_shortage_selection/code",
+    "experiments/13_coverage_similarity/code",
+    "experiments/14_shortage_decomposition/code"
   ],
   "extraPaths": [
     "experiments/02_benchmark_patch/code",
@@ -23,7 +25,9 @@
     "experiments/09_concentrated_coverage/code",
     "experiments/10_cohort_composition/code",
     "experiments/11_coverage_redundancy/code",
-    "experiments/12_shortage_selection/code"
+    "experiments/12_shortage_selection/code",
+    "experiments/13_coverage_similarity/code",
+    "experiments/14_shortage_decomposition/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
