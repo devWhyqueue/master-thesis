@@ -41,7 +41,7 @@ slurm:
   project_root: /home/yannik.qu/master-thesis
   code_dir: /home/yannik.qu/master-thesis/experiments/10_cohort_composition/code
   output_dir: /home/yannik.qu/master-thesis/experiments/10_cohort_composition/outputs/tcga_ut/patch
-  container: /home/yannik.qu/master-thesis/experiments/02_benchmark_patch/environment.sif
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/02_benchmark_patch/outputs/tcga_ut/patch
   exp3_outputs: /home/yannik.qu/master-thesis/experiments/03_classifier_limitation/outputs/tcga_ut/patch
   exp5_outputs: /home/yannik.qu/master-thesis/experiments/05_effective_support/outputs/tcga_ut/patch

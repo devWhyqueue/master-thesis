@@ -43,7 +43,7 @@ slurm:
   project_root: /home/yannik.qu/master-thesis
   code_dir: /home/yannik.qu/master-thesis/experiments/03_classifier_limitation/code
   output_dir: /home/yannik.qu/master-thesis/experiments/03_classifier_limitation/outputs/tcga_ut/patch
-  container: /home/yannik.qu/master-thesis/experiments/02_benchmark_patch/environment.sif
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/02_benchmark_patch/outputs/tcga_ut/patch
   max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
   resources:

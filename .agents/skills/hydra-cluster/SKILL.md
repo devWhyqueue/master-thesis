@@ -43,7 +43,7 @@ has its own empty `/tmp`.
 import subprocess, shlex
 from pathlib import Path
 
-SIF = "/home/yannik.qu/master-thesis/experiments/02_benchmark_patch/environment.sif"
+SIF = "/home/yannik.qu/master-thesis/experiments/environment.sif"
 PYPATH = "/home/yannik.qu/master-thesis/experiments/02_benchmark_patch/code"
 RESULTS = "/home/yannik.qu/master-thesis/experiments/02_benchmark_patch/outputs"
 

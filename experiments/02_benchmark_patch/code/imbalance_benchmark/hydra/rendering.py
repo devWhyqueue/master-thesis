@@ -241,6 +241,6 @@ def _cluster_paths(config: dict[str, Any]) -> tuple[str, str, str, str]:
     code = str(slurm.get("code_dir", posixpath.join(benchmark, "code")))
     output = str(slurm.get("output_dir", posixpath.join(benchmark, "outputs")))
     container = str(
-        slurm.get("container", posixpath.join(benchmark, "environment.sif"))
+        slurm.get("container", posixpath.join(root, "experiments/environment.sif"))
     )
     return root, code, output, container
