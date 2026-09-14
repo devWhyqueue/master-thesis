@@ -60,7 +60,7 @@ Dispersed & 5 & 32 & focal patient, 4 coverage-maximizing patients \\
 
 \subsection{Allocation rules}
 \label{sec:allocation}
-The pool $\mathcal E_{rc}$ contains the training patients with at least 32 patches of class $c$; pools hold between 30 and 514 patients. For each split, class, and draw $d\in\{1,\ldots,5\}$, the five \emph{anchor patients} are the patients of the stored five-patient draw of \citet{queisler2026effectiveSupport}. The random allocation consists of these anchors. It is therefore the cohort of the breadth--depth grid at five patients and 32 patches, and its stored classifiers are reused, because allocation, patches, and fitting settings match exactly.
+The pool $\mathcal E_{rc}$ contains the training patients with at least 32 patches of class $c$; pools hold between 30 and 514 patients. For each split, class, and draw $d\in\{1,\ldots,5\}$, the five \emph{anchor patients} are drawn with the five-patient sampling rule of \citet{queisler2026effectiveSupport}, as reused by \citet{queisler2026cohortComposition}, whose split-0 class order is used for every split. The anchors therefore coincide with the breadth--depth grid's stored five-patient draw only in split 0; in the other two splits the class order differs, so the random allocation is fitted fresh at $G=5$, $m=32$ in all three splits (30 classifiers in total) rather than reused from the grid's stored classifiers.
 
 The \emph{focal patient} $f$ is the anchor drawn uniformly at random in \citet{queisler2026cohortComposition}. The dispersed allocation starts from $S_0=\{f\}$ and adds four patients greedily by \emph{coverage-maximizing selection}, known as facility location in operations research:
 \begin{equation}
