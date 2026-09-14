@@ -6,8 +6,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from neighbours.accuracy import _guard_deep_reuse
 from neighbours.analyze import classify
 from neighbours.secondary import _tertile_rows
+
+
+def test_guard_deep_reuse_rejects_differing_class_orders():
+    """Stored deep predictions are reusable only if every split shares one class order."""
+    same = np.array([0, 1, 2])
+    _guard_deep_reuse([same, same.copy()])
+    with pytest.raises(RuntimeError):
+        _guard_deep_reuse([same, np.array([1, 0, 2])])
 
 
 @pytest.mark.parametrize(

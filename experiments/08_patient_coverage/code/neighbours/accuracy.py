@@ -124,10 +124,21 @@ def _grid_stacks(ctx: Context) -> dict[tuple[int, int], np.ndarray]:
     }
 
 
+def _guard_deep_reuse(perms: list[np.ndarray]) -> None:
+    """Guard: stored G5_m32 predictions share the census anchors only under one class order."""
+    if any(not np.array_equal(p, perms[0]) for p in perms):
+        raise RuntimeError(
+            "Census anchors use split 0's class order, so exp-5's stored G5_m32 "
+            "predictions match them only when every split shares that order; "
+            "refit the deep allocation instead of reusing the grid cell."
+        )
+
+
 def _allocation_stacks(
     ctx: Context, grid_stacks: dict[tuple[int, int], np.ndarray], low: str
 ) -> dict[str, np.ndarray]:
     """The deep (reused from the grid) and broad allocations' (F, C, R) stacks."""
+    _guard_deep_reuse(ctx.perms)
     stacks = {"deep": grid_stacks[DEEP_CELL]}
     n_classes = len(ctx.class_names)
     for name in (low, "random"):

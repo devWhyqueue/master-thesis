@@ -42,8 +42,9 @@ def run_fit_shard(
 
     The seed/low-coverage/random patients were already drawn by the census
     stage and are read from ``data/allocations.json``, so fitting never
-    touches Virchow2 embeddings again; no deep allocation is refit here
-    since it coincides with the stored exp-5 G5_m32 grid cell.
+    touches Virchow2 embeddings again. No deep allocation is refit here; the
+    analyze stage reuses exp-5's G5_m32 cell, which is valid only when every
+    split shares split 0's class order (guarded in ``accuracy``).
     """
     split_idx, allocation = decode_shard_index(shard_index, tuple(allocations))
     train_df, class_names, evals, paths = init_shard(config, split_idx)

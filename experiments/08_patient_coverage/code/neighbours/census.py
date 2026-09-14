@@ -36,7 +36,12 @@ def _manifest(config: dict[str, Any], split_idx: int) -> pd.DataFrame:
 def _load_manifests(
     config: dict[str, Any],
 ) -> tuple[list[str], dict[int, pd.DataFrame], dict[int, pd.DataFrame]]:
-    """Class names, full manifests, and their train-only partitions per split."""
+    """Class names, full manifests, and their train-only partitions per split.
+
+    The class order is split 0's for every split. Anchor seeds key off a
+    class's position in this order, so they coincide with exp-5's stored
+    five-patient draw only in split 0; exp-10/11/12 rely on this rule.
+    """
     class_names = list(load_freeze_meta(exp2_split_paths(config, 0))["class_names"])
     full_dfs = {s: _manifest(config, s) for s in range(N_SPLITS)}
     train_dfs = {

@@ -30,7 +30,7 @@ _N_ADDED = _BROAD_G - DEEP_CELL[0]  # 15
 def seed_patients(
     train_df: pd.DataFrame, class_names: list[str], c_idx: int, split: int, draw: int
 ) -> list[str]:
-    """Ordered unique seed patients: the exp-5 five-patient, 32-patch draw."""
+    """Ordered unique seed patients: exp-5's five-patient rule under ``class_names``' order."""
     patches = sample_class_patches(
         train_df, class_names, c_idx, DEEP_CELL, (split, draw)
     )
