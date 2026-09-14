@@ -1,0 +1,150 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\title{Patient Shortage in Histopathology:\\Separating Coverage from\\Between-Patient Similarity}
+\author{Yannik Queisler}
+\date{September 14, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Choosing five TCGA-UT patients per cancer type by coverage-maximizing selection improves patient-macro balanced accuracy by 5.52 percentage points over random selection and recovers 58 percent of the advantage of twenty random patients. Selection changes two properties together: the cohort covers other patients better, and its patients are less similar to one another. This protocol proposes four five-patient cohorts that vary coverage at matched similarity and similarity at matched coverage, all with 160 patches per class. A matched ten-patient cohort will test whether patient count retains a benefit when coverage and similarity-adjusted effective support are both held steady. A preliminary assessment will establish cohort feasibility and the precision of the planned comparisons before training. The experiment will identify the contribution of each measured property within the fixed TCGA-UT, Virchow2, and logistic-regression setting.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+At the same budget of 160 patches per TCGA-UT class, twenty patients with eight patches each outperform five patients with 32 patches each by 9.52 percentage points of patient-macro balanced accuracy \citep{queisler2026effectiveSupport}. Accounting for within-patient feature correlation still leaves a benefit of 2.62 points per doubling of patients \citep{queisler2026multidirectionalRedundancy}. Coverage is a candidate explanation: additional patients may supply appearances of a cancer type that a small cohort misses.
+
+Selecting five patients to cover the training pool improves accuracy by 5.52 points (test-patient 95\% interval: 4.83 to 6.23), recovering 58 percent of the breadth advantage \citep{queisler2026shortageSelection}. The gain falls most strongly on test patients whose distance to the selected cohort shrinks. Selection also lowers between-patient similarity. Separating these two changes is the next step towards explaining the gain.
+
+A relation fitted to random cohorts attributes most of the selection gain to coverage \citep{queisler2026coverageRedundancy}. A controlled comparison will extend this evidence by varying similarity over a wider range. Five selected and ten random patients also achieve approximately equal accuracy, with mean coverage distances of 0.324 and 0.333 and similarity-adjusted effective supports of 17.9 and 25.1. Across the 450 paired class--split--draw comparisons, the mean absolute coverage mismatch is 0.023 and its maximum is 0.107. These diagnostics, computed from the stored cohort quantities of the two reports, motivate matching both properties class by class before comparing patient counts.
+
+The primary question is therefore: \emph{does coverage improve accuracy when between-patient similarity is held steady, and does similarity matter when coverage is held steady?} A secondary question asks whether additional patients retain a benefit once both measured explanations are controlled.
+
+\section{Study design}
+\label{sec:design}
+The experiment will retain the 30 eligible cancer types, frozen 2,560-dimensional Virchow2 features, three fixed patient-disjoint splits, natural validation and test partitions, and multinomial logistic regression with validation-selected regularization \citep{queisler2026shortageSelection}. Every cohort will use the same eligible training pool: patients with at least 32 patches of the class. The established round-robin patch order will provide 32 or 16 patches per patient, nested whenever a patient appears in both allocations. Every class will receive 160 patches.
+
+\subsection{Two measured properties}
+\label{sec:quantities}
+\emph{Coverage distance} $r$ is the mean distance from a reference patient to its nearest cohort patient; smaller values mean better coverage. Distance will remain the cosine distance between patient-mean embeddings after centering on the mean of training patient embeddings. For a cohort $S$ and class-specific reference set $\mathcal R$, it is
+\begin{equation}
+ r(S;\mathcal R)=\frac{1}{|\mathcal R|}\sum_{i\in\mathcal R}\min_{j\in S}d(i,j).
+ \label{eq:coverage}
+\end{equation}
+\noindent Training-pool patients will form the reference set during cohort selection. Validation patients will provide a separate check after selection. Test patients will be reserved for accuracy evaluation.
+
+\emph{Between-patient similarity} $\omega$ measures whether selected patients deviate from their class mean in similar feature directions. The definition and full-feature correlation estimates will remain those of \citet{queisler2026coverageRedundancy}; Appendix~\ref{app:quantities} states the formulas. Lower $\omega$ indicates less aligned deviations, with negative values possible when selected patients balance opposite deviations.
+
+\subsection{Controlled cohorts}
+\label{sec:arms}
+Four five-patient cohorts will cross good and poor coverage with low and high similarity (Table~\ref{tab:arms}). Each cohort is named for this combination of measured properties. Good and poor coverage denote relative levels within the experiment. Repeating each comparison at two levels of the other property will show whether their effects depend on each other.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}Yrr@{}}
+\toprule
+Cohort & Patients & Patches each \\
+\midrule
+Good coverage, low similarity & 5 & 32 \\
+Poor coverage, low similarity & 5 & 32 \\
+Good coverage, high similarity & 5 & 32 \\
+Poor coverage, high similarity & 5 & 32 \\
+\addlinespace
+Ten-patient match & 10 & 16 \\
+\bottomrule
+\end{tabularx}
+\caption{All cohorts receive 160 patches per class. Coverage will be compared within each similarity level, and similarity within each coverage level. The ten-patient match will reproduce the coverage and similarity-adjusted effective support of the good-coverage, low-similarity cohort.}
+\label{tab:arms}
+\end{table}
+
+\noindent The \emph{ten-patient match} will use ten patients from the same eligible pool. Comparing it with the good-coverage, low-similarity cohort will test the remaining net effect of spreading the patch budget over more patients after matching both coverage and similarity-adjusted effective support. Matching effective support accounts jointly for patient count, patch depth, and similarity.
+
+\subsection{Manipulation check before training}
+\label{sec:check}
+Cohorts will be selected from training geometry. For every class, split, and draw, the two cohorts at each coverage level must differ in validation coverage distance by at most 0.005. The two cohorts at each similarity level must differ in $\omega$ by at most 0.01. The ten-patient match must reproduce the good-coverage, low-similarity cohort within 0.005 in validation coverage and within 5 percent of its class-specific similarity-adjusted effective support. The same tolerances will be targeted during training-pool selection.
+
+The manipulated differences must also be substantial. Averaged over all 30 classes and the planned draws within each split, poor minus good coverage distance must reach 0.03 at both similarity levels. High minus low similarity must reach 0.05 at both coverage levels. Class-specific changes, including reversals, will be reported alongside these averages. Coverage-distance distributions and tissue source site composition will describe the variation around matched means.
+
+Training will proceed when all 30 classes meet the matching tolerances in every planned draw and each split meets both manipulation thresholds. A failed construction or validation check will end the experiment before fitting, with the original tolerances and class set retained. The preliminary assessment will establish the feasibility of these proposed tolerances.
+
+\section{Evaluation}
+\label{sec:evaluation}
+Accuracy will remain patient-macro balanced accuracy: patch recall is averaged within each test patient and true class, then over patients within class, and finally over classes. Let $A_{\mathrm{coverage,similarity}}$ denote cohort accuracy in percent, averaged equally over splits and fresh draws. Four primary contrasts will measure the two properties directly:
+\begin{align}
+ \Delta_{\mathrm{coverage,low}}&=A_{\mathrm{good,low}}-A_{\mathrm{poor,low}},&
+ \Delta_{\mathrm{coverage,high}}&=A_{\mathrm{good,high}}-A_{\mathrm{poor,high}},\nonumber\\
+ \Delta_{\mathrm{similarity,good}}&=A_{\mathrm{good,low}}-A_{\mathrm{good,high}},&
+ \Delta_{\mathrm{similarity,poor}}&=A_{\mathrm{poor,low}}-A_{\mathrm{poor,high}}.
+ \label{eq:contrasts}
+\end{align}
+\noindent Positive values favour better coverage or lower similarity. The difference between the two coverage contrasts, equal to the difference between the two similarity contrasts, will describe their interaction. The secondary breadth contrast will be $\Delta_G=A_{\mathrm{ten\text{-}patient\ match}}-A_{\mathrm{good,low}}$.
+
+Paired bootstrap inference will vary test patients and training draws together. A test patient's resampling weight will be shared wherever that patient appears across cohorts and overlapping splits; draw resampling will retain all five cohorts together within each fixed split. Simultaneous 95\% intervals will cover the four primary contrasts as a family. Separate conditional test-patient intervals will retain the earlier reports' interpretation with training allocations fixed. Appendix~\ref{app:precision} describes uncertainty and precision planning.
+
+Before training, a simulation based on stored prediction variability will choose the smallest of 20, 40, or 60 fresh draws per split that reaches 80 percent simulated power for a two-point benefit and for equivalence when the true contrast is zero. The simulation will preserve uncertainty from the fixed evaluation sample while varying the number of training draws. If every candidate draw count falls short, training will stop with a precision limitation. The selected count will be frozen before observing follow-up accuracy; the experiment will require 300, 600, or 900 cohort fits, excluding regularization candidates.
+
+\section{Interpretation}
+\label{sec:interpretation}
+The practical threshold will remain one percentage point. A contrast will support a meaningful benefit when its interval lies above 1 and practical equivalence when its entire interval lies within $[-1,1]$. An interval crossing these boundaries will be inconclusive. The equivalence criterion rules out differences large enough to matter under the prespecified margin \citep{lakens2017equivalence}. Using simultaneous 95\% intervals is more conservative than an unadjusted equivalence test based on a 90\% interval.
+
+\paragraph{Coverage dominates over the tested range.}
+Both coverage contrasts must exceed the one-point threshold, while both similarity contrasts must meet equivalence. This pattern would support coverage as the stronger measured explanation across the achieved levels of similarity. A clear coverage effect with imprecise similarity contrasts would establish a coverage contribution and leave the size of the similarity contribution open.
+
+\paragraph{Similarity contributes, or the properties interact.}
+A benefit of lower similarity at matched coverage would support a contribution from similarity beyond coverage distance. Benefits of both properties would support a joint explanation. An interaction interval excluding zero would indicate that the effect of one property depends on the other. Reversed effects would indicate settings in which better coverage or lower similarity reduces accuracy.
+
+\paragraph{Breadth remains, or both measurements are sufficient within precision.}
+An interval above 1 for $\Delta_G$ would support a remaining breadth benefit after matching. An interval within $[-1,1]$ would support practical equivalence between the ten-patient match and the good-coverage, low-similarity cohort. An interval below $-1$ would favour the five-patient cohort. These outcomes will describe the remaining net effect of spreading the fixed patch budget over more patients.
+
+\section{Limitations}
+\label{sec:limitations}
+Between-patient similarity measures alignment in feature space rather than statistical dependence between independently sampled patients. A benefit of lower similarity would support this measured explanation while leaving its interpretation as redundancy open. Patient-mean geometry can miss patch-level diversity, diagnostic boundaries, and variation in tissue preparation. Matching coverage and effective support therefore leaves room for other cohort differences and for opposing effects that cancel. Equivalence would establish a small net contrast within the chosen margin, not complete causal mediation. At a fixed patch budget, changing patient count also changes patch depth.
+
+The conclusions will remain conditional on the fixed TCGA-UT pool, Virchow2 representation, logistic regression, and three overlapping splits. These splits share patients and are not independent replications. Fresh training draws provide further cohort comparisons, while external confirmation would require new evaluation patients. The selection procedure uses known cancer types to construct each cohort, and its precision estimates rely on historical variability as a proxy for the proposed cohorts. More training draws reduce uncertainty from cohort selection while leaving a limit imposed by the finite evaluation sample.
+
+The proposed matching tolerances still require a feasibility assessment. An unsuccessful search would establish a limitation of the chosen construction procedure, not prove that separation is mathematically impossible. Using validation feedback to revise targets would turn validation into part of selection and require a separately declared protocol. Probability quality is outside this mechanism study; calibration would require its own evaluation. This report specifies the follow-up experiment, whose cohort feasibility and accuracy remain to be evaluated.
+
+\appendix
+\section{Cohort geometry and search}
+\label{app:quantities}
+The geometry will reproduce \citet{queisler2026coverageRedundancy}. Within each split and class, let $\bar{\mathbf x}_i$ be a patient's mean feature vector, $\boldsymbol\mu_c$ the mean over eligible training patients, and $\tau_c^2$ the between-patient variance estimate. For a cohort $S$ of $G$ patients,
+\begin{equation}
+ \omega_c(S)=\frac{\displaystyle\sum_{i\in S}\sum_{j\in S\setminus\{i\}}
+ (\bar{\mathbf x}_i-\boldsymbol\mu_c)^\top(\bar{\mathbf x}_j-\boldsymbol\mu_c)}
+ {G(G-1)\tau_c^2},\qquad
+ {\Neff}_{c}^{\omega}(S)=\frac{Gm}{1+(m-1)\bar\rho_c+m(G-1)\bar\rho_c\omega_c(S)}.
+ \label{eq:support}
+\end{equation}
+\noindent Here $m$ is patch depth and $\bar\rho_c$ is the frozen full-feature intraclass correlation of class $c$. These supports will be matched class by class between the ten-patient match and the good-coverage, low-similarity cohort. A valid candidate requires a positive denominator and a defined variance estimate. The class mean used for $\omega$ differs from the across-class training mean used to center coverage embeddings.
+
+Candidate generation will combine random cohorts, facility-location selection, farthest-first selection, and patient swaps. Facility location shortens mean distance to the selected set; farthest-first repeatedly adds the patient most distant from its nearest selected patient. Farthest-first also serves coverage-oriented clustering \citep{baram2004online}. Candidates from all procedures will be assessed jointly on their achieved coverage and similarity.
+
+Search effort, random seeds, target selection, and tie-breaking will be fixed before the validation check. Patient swaps will replace one selected patient with an eligible unselected patient using training geometry. The search will seek jointly feasible sets of all five cohorts and rank candidates by training-pool measurements. After selection, validation will be used once for the prespecified acceptance check. A failed check will end this protocol's training stage.
+
+\section{Uncertainty and precision planning}
+\label{app:precision}
+Joint inference will use 10,000 paired bootstrap replicates. Distinct test patients will be resampled within true class, with their weights shared across all occurrences, and fresh draw identifiers will be resampled within each fixed split, jointly across cohorts. Accuracy will be recomputed with its within-class normalization in every replicate. Inference over draws will be conditional on the available training pools.
+
+For simultaneous primary intervals, each bootstrap contrast will be centered on its observed contrast and divided by its bootstrap standard error. The 95th percentile of the maximum absolute standardized deviation over the four contrasts will supply a common critical value. Each interval will be the observed contrast plus or minus that critical value times its standard error. The interaction and secondary breadth comparison will receive separate 95\% intervals. Undefined standard errors will be reported as an inference failure. Supporting conditional intervals will use the preceding reports' paired test-patient Bayesian bootstrap with fixed draws \citep{rubin1981bayesian}.
+
+The precision simulation will use stored patient-level predictions from the random breadth--depth and five-patient selection experiments. It will preserve paired patient and draw structure, center historical contrasts, and impose zero or two-point effects at the contrast level. It will retain test-patient uncertainty while varying the number of fresh training draws, applying the same interval and decision rules as the proposed analysis. Simulated success for a two-point primary benefit will mean a lower simultaneous bound above one point; success for equivalence will mean an interval contained in $[-1,1]$. Each primary contrast and the secondary breadth comparison must achieve 80 percent simulated success in both scenarios before a draw count is accepted.
+
+The simulation will also report a sensitivity condition with training-draw dispersion increased by 50 percent. Draw-count acceptance will use the prespecified criterion based on stored variability. At least 2,000 simulated studies per condition will quantify Monte Carlo uncertainty. These calculations will establish the expected precision of the planned comparisons.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
