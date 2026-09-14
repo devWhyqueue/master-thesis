@@ -1,0 +1,45 @@
+\section{Results}
+\label{sec:results}
+The precision simulation of Appendix~\ref{app:precision} found no draw count that meets the prespecified criterion. With 60 fresh draws per split, the largest candidate, a two-point primary benefit is detected in 59 percent of simulated studies and practical equivalence is established in 19 to 21 percent, against the required 80 percent in both scenarios. As Section~\ref{sec:evaluation} specifies, the experiment therefore stops with a precision limitation. Cohort search depends on the selected draw count, so the manipulation check was not run and no classifier was trained. The four primary contrasts, their interaction, and the breadth contrast $\Delta_G$ remain unmeasured, and so does the feasibility of the matching tolerances.
+
+\subsection{Simulated success by draw count}
+\label{sec:precision-results}
+Each simulated primary contrast inherits the training-draw and test-patient variability of the selection contrast between five selected and five random patients \citep{queisler2026shortageSelection}. The breadth contrast inherits the variability of ten random patients with sixteen patches each minus five selected patients. Both templates combine 15 stored split--draw fits with 2,000 test-patient replicates. The simulation draws 2,000 studies per condition, so success rates carry Monte Carlo standard errors of at most 1.1 percentage points.
+
+Success grows slowly with the number of draws and stays below 80 percent everywhere (Table~\ref{tab:precision}). Tripling the draws from 20 to 60 raises the rate of detecting a two-point primary benefit from 48--49 to 59 percent and the rate of establishing primary equivalence from at most 1 to about 20 percent. The breadth contrast, which uses an unadjusted interval, fares better but also falls short, at 74 and 48 percent. Increasing training-draw dispersion by 50 percent lowers every rate further; primary equivalence then reaches at most 4 percent.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}rlrrrrrr@{}}
+\toprule
+ & & \multicolumn{2}{c}{Primary contrasts, \%} & \multicolumn{2}{c}{Breadth contrast, \%} & \multicolumn{2}{c}{Half-width, points} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}
+Draws & Dispersion & Benefit & Equivalence & Benefit & Equivalence & Primary & Breadth \\
+\midrule
+20 & Stored & 48--49 & 0--1 & 67 & 36 & 1.02 & 0.81 \\
+ & $\times 1.5$ & 32--33 & 0 & 60 & 17 & 1.20 & 0.90 \\
+\addlinespace
+40 & Stored & 54--56 & 13--14 & 73 & 44 & 0.93 & 0.77 \\
+ & $\times 1.5$ & 43--45 & 0 & 68 & 35 & 1.05 & 0.82 \\
+\addlinespace
+60 & Stored & 59 & 19--21 & 74 & 48 & 0.89 & 0.75 \\
+ & $\times 1.5$ & 50--51 & 4 & 69 & 37 & 0.98 & 0.79 \\
+\bottomrule
+\end{tabular}
+\caption{No draw count reaches 80 percent simulated success, the prespecified requirement for every contrast in both scenarios. Draws are fresh training draws per split. Benefit is the percentage of simulated studies whose lower interval bound exceeds one point under a true two-point contrast; equivalence is the percentage whose interval lies within $[-1,1]$ under a true zero contrast. Primary columns give the range over the four primary contrasts, which use simultaneous 95\% intervals; the breadth contrast uses a separate 95\% interval. Dispersion is the stored training-draw variability or that variability increased by 50 percent. Half-widths are medians over 300 simulated studies per condition.}
+\label{tab:precision}
+\end{table}
+
+\subsection{Why additional draws do not suffice}
+\label{sec:precision-floor}
+The limit lies in the fixed evaluation sample. With training draws held fixed, test-patient resampling alone gives the selection contrast a standard error of 0.38 points, consistent with the interval half-width of 0.70 points reported for the selection gain \citep{queisler2026shortageSelection}. At 60 draws, the simulated standard error is 0.40 points, so additional draws have almost exhausted what they can remove. The simultaneous critical value over the four primary contrasts is 2.23, which lies between the unadjusted 1.96 and a Bonferroni value of 2.64 because the contrasts share test patients. The resulting half-width of 0.89 points consumes most of the one-point margin.
+
+Both decision rules then depend on how far the estimate falls from the true contrast. Across simulated studies at 60 draws, this estimation error has a standard deviation of 0.41 points. Equivalence requires the whole interval within $[-1,1]$, which a zero contrast achieves only when its estimate lies within 0.11 points of zero. Detecting a two-point benefit requires the estimate to fall short of the true value by at most 0.11 points. Under a normal approximation, these conditions hold with probabilities of about 21 and 61 percent, close to the simulated rates. Even with unlimited draws, the test-patient standard error of 0.38 points and a critical value near 2.2 would leave a half-width of about 0.85 points. Equivalence would then remain below one third and benefit detection below two thirds. Under the same approximation, 60 draws would detect a benefit with 80 percent success from a true primary contrast of about 2.2 points; establishing equivalence would require a half-width of about 0.47 points, which this evaluation sample cannot provide.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Whether the gain from coverage-maximizing selection arises from better coverage or from lower between-patient similarity remains open. The precision simulation, run before cohort search and training, shows that the planned comparison cannot deliver the prespecified conclusions on the TCGA-UT evaluation sample. Detecting a two-point benefit narrowly misses the required success rate. Practical equivalence at the one-point margin, which the interpretation of Section~\ref{sec:interpretation} needs to call either property negligible, is out of reach at any number of training draws.
+
+The result constrains any redesign more than the number of fits does. Every contrast evaluated on these test patients carries a standard error of at least 0.38 points, so simultaneous 95\% intervals cannot be narrower than about 0.85 points on each side. A redesign that keeps the evaluation sample would have to change what it asks: a wider equivalence margin, fewer contrasts under simultaneous inference, or one-sided tests for benefits only, which would leave small effects of either property inconclusive rather than negligible. Each option would require a separately declared protocol. Alternatively, additional evaluation patients would shrink the test-patient floor directly. Whether cohorts matching the proposed tolerances exist at all can be assessed independently, because the manipulation check requires no classifier fits.
