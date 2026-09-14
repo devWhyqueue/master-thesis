@@ -63,7 +63,9 @@ def build_split_geometry(
         val = _patients_of(full_df, "validation", c_name)
         e_pool = _stack(ctx.embeddings, pool, c_name)
         e_val = _stack(ctx.embeddings, val, c_name)
-        dev = e_pool - e_pool.mean(axis=0)
+        # omega's tau2 is in raw feature units, so deviations must use raw means.
+        raw_pool = _stack(ctx.means, pool, c_name)
+        dev = raw_pool - raw_pool.mean(axis=0)
         out[c_name] = ClassGeometry(
             pool=pool,
             d_pool=cosine_distances(e_pool, e_pool),

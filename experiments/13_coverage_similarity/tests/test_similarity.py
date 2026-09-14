@@ -38,6 +38,34 @@ def test_gram_omega_matches_omega_similarity():
     assert omega_of(geo, idx) == pytest.approx(expected)
 
 
+def test_split_geometry_omega_uses_raw_means(monkeypatch):
+    """build_split_geometry's Gram uses raw means, matching tau2's units, not unit embeddings."""
+    from types import SimpleNamespace
+
+    import similarity.geometry as geometry
+
+    rng = np.random.default_rng(1)
+    pool = [f"p{i}" for i in range(8)]
+    raw = 50.0 * rng.normal(size=(8, 6))
+    unit = raw / np.linalg.norm(raw, axis=1, keepdims=True)
+    means = {(p, "cls"): raw[i] for i, p in enumerate(pool)}
+    ctx = SimpleNamespace(
+        class_names=["cls"],
+        eligible_by_class={"cls": pool},
+        embeddings={(p, "cls"): unit[i] for i, p in enumerate(pool)},
+        means=means,
+        tau2_by_class={"cls": 400.0},
+        rho_by_class={"cls": 0.1},
+    )
+    monkeypatch.setattr(geometry, "_build_split_context", lambda *args: ctx)
+    monkeypatch.setattr(geometry, "_patients_of", lambda df, part, c: pool[:2])
+
+    geo = geometry.build_split_geometry({}, 0, None, None, ())["cls"]
+    idx = np.array([1, 4, 6])
+    expected = omega_similarity(means, [pool[i] for i in idx], pool, "cls", 400.0)
+    assert omega_of(geo, idx) == pytest.approx(expected)
+
+
 def test_farthest_first_adds_farthest_patient():
     """Farthest-first adds the patient farthest from the selected set."""
     pool = ["a", "b", "c", "d"]
