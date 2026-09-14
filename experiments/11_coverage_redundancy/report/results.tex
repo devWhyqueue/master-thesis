@@ -1,0 +1,100 @@
+\section{Results}
+\label{sec:results}
+Adding coverage distance to effective support lowers the residual breadth benefit from 2.62 to 0.79 percentage points per doubling of patients, but its 95\% interval, $-1.25$ to 2.82 points, crosses both thresholds. The relation fitted to the random cohorts predicts a concentration damage of 6.80 points against the observed 8.30, a prediction error of $-1.50$ points ($-2.61$ to $-0.40$), and a selection gain of 2.10 points against the observed 1.04, an error of 1.06 points (0.23 to 1.88). Neither the residual nor the concentration error meets the conditions of any reading in Table~\ref{tab:readings}, so the outcome is inconclusive.
+
+\subsection{Cohort quantities}
+\label{sec:quantity-results}
+The two quantities behave as intended in the composition cohorts (Table~\ref{tab:cohort-quantities}). Clustered cohorts have a mean between-patient similarity of $\omega=0.241$, between 0.20 and 0.28 in every split and draw, which lowers similarity-adjusted effective support from 36.58 to 10.33, about the value of five random patients with eight patches each. Random and dispersed cohorts keep $\omega$ near zero and $\Neff^{\omega}$ near 53. Similarity varies strongly between cancer types: the clustered cohorts of uterine carcinosarcoma, adrenocortical carcinoma, pheochromocytoma and paraganglioma, mesothelioma, and uveal melanoma have $\omega$ below 0.07, and those of testicular germ cell tumours reach 0.63. The five types with the smallest $\omega$ include four of the five types in which clustering changed coverage least \citep{queisler2026cohortComposition}.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Cohorts & Cell or allocation & $A$ & $\Neff$ & $\Neff^{\omega}$ & $\omega$ & $r$ \\
+\midrule
+Random & $G=5$, $m=8$ & 61.97 & 9.15 & 10.59 & $-0.010$ & 0.386 \\
+ & $G=5$, $m=16$ & 62.13 & 9.74 & 11.53 & $-0.010$ & 0.386 \\
+ & $G=5$, $m=32$ & 62.25 & 10.06 & 12.10 & $-0.010$ & 0.386 \\
+\addlinespace
+ & $G=10$, $m=8$ & 67.04 & 18.29 & 22.88 & $-0.013$ & 0.333 \\
+ & $G=10$, $m=16$ & 67.28 & 19.47 & 25.09 & $-0.013$ & 0.333 \\
+ & $G=10$, $m=32$ & 67.39 & 20.12 & 26.50 & $-0.013$ & 0.333 \\
+\addlinespace
+ & $G=20$, $m=8$ & 71.76 & 36.58 & 52.37 & $-0.011$ & 0.293 \\
+ & $G=20$, $m=16$ & 72.02 & 38.94 & 58.61 & $-0.011$ & 0.293 \\
+ & $G=20$, $m=32$ & 72.08 & 40.25 & 62.61 & $-0.011$ & 0.293 \\
+\midrule
+Composition & Clustered & 62.99 & 36.58 & 10.33 & 0.241 & 0.352 \\
+ & Random & 71.29 & 36.58 & 53.36 & $-0.012$ & 0.294 \\
+ & Dispersed & 72.33 & 36.58 & 52.65 & $-0.001$ & 0.269 \\
+\bottomrule
+\end{tabular}
+\caption{Clustering lowers similarity-adjusted effective support to the level of five random patients, whereas in random cohorts it exceeds effective support. $A$ is patient-macro balanced accuracy in percent \citep{queisler2026effectiveSupport,queisler2026cohortComposition}. All other columns are means over three splits and five draws of the class-averaged quantities of Section~\ref{sec:design}. Within a patient count, the random cohorts share their patients across depths, so $\omega$ and $r$ do not change with $m$. Effective support $\Neff$ depends only on $G$, $m$, and the intraclass correlations, so it is equal for the three composition allocations.}
+\label{tab:cohort-quantities}
+\end{table}
+
+\noindent In random cohorts, $\omega$ is not zero but slightly negative, between $-0.034$ and $0.004$ across cancer types at twenty patients. This range is consistent with the expectation $-1/(|\mathcal E_{rc}|-1)$ for patients drawn without replacement from a pool of 30 to 514 patients whose mean defines the deviations in Equation~\eqref{eq:omega}. The term $m(G-1)\bar\rho_c\,\omega$ multiplies this small value, so $\Neff^{\omega}$ exceeds $\Neff$ by 16 percent for five patients with eight patches and by 56 percent for twenty patients with 32 patches.
+
+Coverage distance depends almost entirely on the patient count. Across the fifteen random cohorts of one patient count, $r$ ranges from 0.371 to 0.398 at five patients, from 0.329 to 0.338 at ten, and from 0.288 to 0.301 at twenty, whereas the means at five and twenty patients differ by 0.093. The composition cohorts partly leave this range. Clustered cohorts lie between the random cohorts of five and ten patients in coverage distance, but their similarity, at least 0.20, far exceeds the largest value in any random cohort, 0.016. Dispersed cohorts cover validation patients better than any random cohort does.
+
+\subsection{Residual breadth benefit}
+\label{sec:residual-results}
+Model (a) reproduces the residual breadth benefit of \citet{queisler2026multidirectionalRedundancy} at the cohort level, $b=2.62$ points per doubling (2.04 to 3.17; Table~\ref{tab:models}). Replacing $\Neff$ by $\Neff^{\omega}$ in model (b) raises the residual to 3.71 points. Because $\Neff^{\omega}$ grows more steeply with patient count than $\Neff$, the model attributes a smaller share of the accuracy gain to effective support, with $\beta=1.49$ against 3.32, and a larger share to patient count. Similarity between patients therefore absorbs nothing of the breadth benefit in random cohorts, as expected when $\omega$ is near zero.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Model & $\beta$ & $\delta$ & $b=\gamma\log 2$ & Residual SD \\
+\midrule
+(a) & 3.32 [2.56, 4.09] & & 2.62 [2.04, 3.17] & 1.11 \\
+(b) & 1.49 [0.14, 2.79] & & 3.71 [2.65, 4.83] & 1.11 \\
+(c) & 0.62 [$-0.66$, 1.88] & $-78.0$ [$-118.5$, $-39.3$] & 0.79 [$-1.25$, 2.82] & 1.02 \\
+(c) without $\log G$ & 1.10 & $-86.3$ & & 1.02 \\
+\bottomrule
+\end{tabular}
+\caption{Coverage distance lowers the residual breadth benefit to below one point, but with an interval that crosses both thresholds. Models are those of Equation~\eqref{eq:models}, fitted to the 135 random cohorts with split-specific intercepts. $\beta$ is the accuracy change per unit of $\log\Neff$ or $\log\Neff^{\omega}$, and $\delta$ the change per unit of coverage distance, both in percentage points. Brackets give test-patient 95\% intervals. The coefficients of model (c) without $\log G$ are recovered from its two predicted contrasts and carry no intervals. The residual standard deviation is in percentage points.}
+\label{tab:models}
+\end{table}
+
+\noindent Adding coverage distance in model (c) improves the fit, with the residual standard deviation falling from 1.11 to 1.02 points, and lowers the residual to $b=0.79$ points. Each 0.01 decrease in coverage distance adds 0.78 points. Over the 0.093 by which twenty random patients cover validation patients better than five, coverage accounts for 7.26 points; the residual adds 1.58 points over two doublings and similarity-adjusted effective support 0.98 points at eight patches. These parts sum to 9.82 points, close to the observed 9.80-point advantage of twenty over five patients at eight patches. Dropping $\log G$ leaves the residual standard deviation unchanged at 1.02 points.
+
+The interval of $b$, $-1.25$ to 2.82 points, is more than three times as wide as in model (a). It excludes neither a residual above the one-point threshold nor one below $-1$. The coefficient of coverage distance is also uncertain, with an interval from $-118.5$ to $-39.3$. Both follow from the near-collinearity of $r$ and $\log G$ described above: within one patient count, coverage distance varies over less than a third of the difference between five and twenty patients.
+
+\subsection{Prediction of cohort composition}
+\label{sec:prediction-results}
+Model (c) without $\log G$ is well calibrated for random cohorts of the composition experiment. It predicts 71.70 percent for the random allocation (70.36 to 72.92) against the observed 71.29 percent (69.93 to 72.51), a difference of 0.41 points.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrllrr@{}}
+\toprule
+ & & & & \multicolumn{2}{c}{Predicted part} \\
+\cmidrule(l){5-6}
+Contrast & Observed & Predicted & Prediction error & Similarity & Coverage \\
+\midrule
+Concentration damage & 8.30 & 6.80 [5.90, 7.71] & $-1.50$ [$-2.61$, $-0.40$] & 1.81 & 4.99 \\
+Selection gain & 1.04 & 2.10 [1.51, 2.72] & 1.06 [0.23, 1.88] & $-0.01$ & 2.12 \\
+\bottomrule
+\end{tabular}
+\caption{The relation fitted to random cohorts reproduces most of the concentration damage but overpredicts the selection gain. Predictions apply model (c) without $\log G$ to the 45 composition cohorts. Observed contrasts are those of \citet{queisler2026cohortComposition}. The prediction error is the predicted minus the observed contrast. Brackets give test-patient 95\% intervals. The predicted parts split each point prediction into the contributions of $\log\Neff^{\omega}$ and $r$; they are descriptive and carry no intervals. All values are in percentage points.}
+\label{tab:prediction}
+\end{table}
+
+\noindent The predicted concentration damage is 6.80 points (5.90 to 7.71), 82 percent of the observed damage (Table~\ref{tab:prediction}). The prediction error of $-1.50$ points has an interval of $-2.61$ to $-0.40$, which excludes zero and crosses the threshold of $-1$. Coverage contributes 4.99 points of the prediction and similarity 1.81 points. The predicted selection gain is 2.10 points (1.51 to 2.72), about twice the observed 1.04 points. It rests entirely on coverage, because random and dispersed cohorts differ little in similarity, and its error interval of 0.23 to 1.88 points also excludes zero and crosses the threshold.
+
+The two errors point in opposite directions. The relation predicts too little accuracy loss where coverage is poor and similarity high, and too much gain where coverage is better than in any random cohort. A single linear slope in coverage distance, estimated from random cohorts, therefore misses the shape of both composition effects, although it captures their order and most of the larger one.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Coverage and similarity between patients are compatible with the whole breadth benefit of TCGA-UT random cohorts and with most of the effect of cohort composition, but this analysis does not establish that they account for either. In random cohorts, coverage distance takes over most of the accuracy gain that effective support leaves to patient count. The point estimate of the residual falls from 2.62 to 0.79 points per doubling, the fit improves, and dropping patient count from the model does not worsen the fit. The random cohorts, however, cannot tell coverage and patient count apart precisely: coverage distance is nearly fixed by the number of patients, so an interval of four points around the residual remains.
+
+The prediction is the more demanding test, because the composition cohorts break the link between patient count and coverage. A relation that sees only random cohorts and no patient count predicts that twenty clustered patients lose 6.80 points against twenty random patients, and that coverage-maximizing selection gains 2.10. The observed contrasts are 8.30 and 1.04. Neither error is within the one-point threshold, and both deviate from linearity in a consistent way: accuracy falls faster than coverage predicts for the poorly covering and highly similar clustered cohort, and gains less than predicted for the dispersed cohort, which covers validation patients better than any random cohort. The second deviation fits diminishing returns from coverage once random sampling at twenty patients has covered most validation patients. The first may reflect a similarity effect larger than the relation assigns, since its coefficient for effective support is estimated from variation in patient and patch counts, in which similarity barely varies. It may also reflect the over-representation of one appearance of the cancer type, which neither quantity measures \citep{queisler2026cohortComposition}.
+
+The contributions of coverage and patient count separate only when coverage varies at a fixed patient count, and so far that holds only at twenty patients. Comparing coverage-maximizing selection with random sampling at five patients with 32 patches each would add a second patient count at which coverage varies independently of the number of patients, where random cohorts cover validation patients at 0.386 and have more coverage left to gain. Such a comparison would test the breadth benefit directly and the shape of the coverage relation beyond the range of random cohorts.

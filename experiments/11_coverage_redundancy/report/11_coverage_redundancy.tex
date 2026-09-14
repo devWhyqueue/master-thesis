@@ -17,7 +17,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and at a fixed patient count a cohort of mutually similar patients is 8.30 percentage points less accurate than a random cohort. That contrast confounds two properties of a cohort: how well its patients cover the class, and how similar they are to one another. This analysis separates the two without training new classifiers. Effective support is extended by a term for similarity between patients, and coverage is the distance from validation patients to their nearest training patient. On the 135 random cohorts of the breadth--depth grid, the analysis asks whether both quantities together absorb the benefit of additional patients. A relation fitted to these random cohorts is then applied to the 45 clustered, random, and dispersed cohorts of the cohort-composition experiment and must reproduce their accuracy contrasts. If both checks succeed, the relation provides a forecast for coverage-selected cohorts of five patients, fixed before any classifier is trained.
+\noindent TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and at a fixed patient count a cohort of mutually similar patients is 8.30 percentage points less accurate than a random cohort. Without training new classifiers, this analysis asks whether two cohort properties account for both findings: similarity between patients, added to effective support, and coverage, the distance from validation patients to their nearest training patient. On 135 random cohorts, adding coverage lowers the accuracy gained per doubling of patients beyond effective support from 2.62 to 0.79 points, but the 95\% interval of $-1.25$ to 2.82 points is wide because coverage and patient count change together. A relation fitted to these random cohorts predicts a concentration damage of 6.80 points against the observed 8.30, and a gain from coverage-maximizing selection of 2.10 points against the observed 1.04; both prediction errors exclude zero but cross the one-point threshold. The outcome is inconclusive. Coverage and similarity are compatible with the whole breadth benefit and with most of the concentration damage, but the random cohorts do not identify their contributions precisely.
 \end{abstract}
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -125,9 +125,11 @@ If both quantities absorb the breadth benefit but miss the concentration damage 
 \paragraph{Breadth beyond both.}
 If the residual stays above one point, additional patients contribute information that neither patient-mean coverage nor patient-mean similarity expresses. The next candidate would be a distance between the patch distributions of patients.
 
+\input{results}
+
 \section{Limitations}
 \label{sec:limitations}
-In random cohorts, patient count, effective support, and coverage distance change together, so model (c) separates their contributions only as far as draws of equal size differ, and $b$ may be imprecise. The logarithmic and linear terms are assumed rather than tested, and the prediction for the composition cohorts extrapolates beyond the similarity and coverage values of random cohorts. Both quantities summarize a patient by its mean embedding and a class by scalar correlations. The composition cohorts share test patients with the random cohorts, so the prediction step is out of sample for training cohorts, not for evaluation patients. All results are conditional on Virchow2 features, multinomial logistic regression, and the three overlapping splits.
+The logarithmic and linear terms of the models are assumed rather than tested, and a relation fitted to random cohorts carries no information about similarity values that random cohorts do not reach. Both quantities summarize a patient by its mean embedding and a class by scalar correlations. The composition cohorts share test patients with the random cohorts, so the prediction step is out of sample for training cohorts, not for evaluation patients. All results are conditional on Virchow2 features, multinomial logistic regression, and the three overlapping splits.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
