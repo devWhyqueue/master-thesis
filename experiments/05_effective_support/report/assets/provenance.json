@@ -33,7 +33,8 @@
     "Class-specific patient-macro recalls use the case-class divisor of the primary endpoint, so each cell's class mean equals its reported balanced accuracy.",
     "macro_nll and expected_calibration_error are temperature-scaled; raw_macro_nll and raw_expected_calibration_error keep the unscaled probabilities.",
     "Fitted temperatures: BRACS 0.103-12.88 (median 0.665), TCGA-UT 0.527-1.613 (median 0.852).",
-    "diagnostics.json site coverage uses the TCGA barcode tissue source site; its equal-budget decomposition sums to the reported X."
+    "diagnostics.json site coverage uses the TCGA barcode tissue source site; its equal-budget decomposition sums to the reported X.",
+    "Class-order fix (commit a77a38c): analyze reruns 4886171 (TCGA-UT) and 4886172 (BRACS) on 2026-09-14 resolve per-class recalls with each split's own frozen class order. BRACS analysis.json is byte-identical; TCGA-UT changes only secondary.class_recalls (Spearman class ICC vs class X: -0.31, p=0.10 -> -0.27, p=0.15). diagnostics.json was not rerun: its icc_sample is keyed by class name and unaffected, but its site_coverage block still uses split 0's class order for splits 1-2 and is not cited in the report."
   ],
   "sha256": {
     "bracs/analysis.json": "4ea0dc8c7012015973940f0d95b6800a15e41dbce2722299a4f8edf77a082896",
@@ -41,7 +42,7 @@
     "bracs/preflight.json": "40199b856114667742a31a94af908732c3c173c0bf9b0f76a6719347a7c0e633",
     "bracs/preflight.json.sha256": "44b4a293385fb6654a91f0828979bd6d3725d29471ac82a45eb869e05a7e0bde",
     "bracs/run_summary.json": "9458c4d0d599916ceacfb72d79243d9045782d07d41df28353238f0ce00a7b9f",
-    "tcga_ut/analysis.json": "712eab192bf8a0975259fc0bf22b214c43ff8603fe2f895accb16186e9ccc143",
+    "tcga_ut/analysis.json": "e5f246a807eed927e82989bed49b0668bd383a2bdc1d9f905d9c3f6e02b310b8",
     "tcga_ut/diagnostics.json": "6a67fc769d1dc764d9ebcb3bea0297ac637f38d8d1abb962f80cc0889ebbbf18",
     "tcga_ut/preflight.json": "a9ed34d18f326e6da969c9bcc3d314c592a1dcc99a223dc2ff7e39839372a667",
     "tcga_ut/preflight.json.sha256": "3d64f9d054f3fd4b6678b64d7a463b6aeb31686b57ab7f1087d966cfa8b6d22f",

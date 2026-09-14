@@ -3,7 +3,7 @@
 Thirteen of the 30 cancer types meet the site-pool requirement in all three splits, above the minimum of ten, and all 45 fits completed. The site classes are the larger TCGA-UT cancer types listed in Table~\ref{tab:strata}, including breast, lung, colon, and prostate carcinomas and both gliomas. Before accuracy is restricted to site classes, refitting the effective-support surface to all 30 classes reproduces the full-feature residual of 2.62 points per doubling reported by \citet{queisler2026multidirectionalRedundancy}.
 
 \subsection{Allocation accuracy}
-Most of the accuracy difference between allocations arises in the first step. Quadrupling patients within the same five sites raises site-class accuracy from 58.50 to 69.41 percent, a gain of 10.91 points (95\% interval: 10.46 to 11.36; Table~\ref{tab:allocation-accuracy}). Replacing ten of these twenty patients with patients from five further sites raises it by a further 0.84 points, to 70.25 percent. The deep allocation is also the most sensitive to which patients are drawn: its accuracy varies with a standard deviation of 2.88 points across split--draw combinations, compared with 1.55 and 1.29 points for the two broad allocations.
+Most of the accuracy difference between allocations arises in the first step. Quadrupling patients within the same five sites raises site-class accuracy from 56.36 to 69.88 percent, a gain of 13.52 points (95\% interval: 13.05 to 14.03; Table~\ref{tab:allocation-accuracy}). Replacing ten of these twenty patients with patients from five further sites raises it by a further 1.06 points, to 70.94 percent. The deep allocation is also the most sensitive to which patients are drawn: its accuracy varies with a standard deviation of 2.34 points across split--draw combinations, compared with 1.53 and 1.56 points for the two broad allocations.
 
 \begin{table}[htbp]
 \centering
@@ -15,19 +15,19 @@ Most of the accuracy difference between allocations arises in the first step. Qu
 \cmidrule(lr){5-6}\cmidrule(l){7-7}
 Allocation & $G$ & $m$ & $S$ & Accuracy [95\% interval] & SD & Accuracy [95\% interval] \\
 \midrule
-Deep & 5 & 32 & 5 & 58.50 [57.27, 59.68] & 2.88 & 65.01 [63.77, 66.22] \\
-Broad, five sites & 20 & 8 & 5 & 69.41 [68.16, 70.63] & 1.55 & 68.50 [67.19, 69.74] \\
-Broad, ten sites & 20 & 8 & 10 & 70.25 [68.95, 71.49] & 1.29 & 68.86 [67.54, 70.12] \\
+Deep & 5 & 32 & 5 & 56.36 [55.18, 57.57] & 2.34 & 65.01 [63.77, 66.22] \\
+Broad, five sites & 20 & 8 & 5 & 69.88 [68.62, 71.17] & 1.53 & 68.50 [67.19, 69.74] \\
+Broad, ten sites & 20 & 8 & 10 & 70.94 [69.71, 72.21] & 1.56 & 68.86 [67.54, 70.12] \\
 \bottomrule
 \end{tabular}
 \caption{Adding patients within fixed sites raises site-class accuracy far more than adding sites at a fixed patient count. $G$, $m$, and $S$ are patients per class, patches per patient, and sites per class for site classes. Accuracy is patient-macro balanced accuracy in percent, averaged over three splits and five draws, with test-patient 95\% intervals. SD is the population standard deviation of site-class accuracy across the fifteen split--draw combinations, in percentage points.}
 \label{tab:allocation-accuracy}
 \end{table}
 
-\noindent Accuracy over all 30 classes changes less, because the seventeen background classes receive identical training material in every allocation. Subtracting the site-class contribution from the all-class average gives a background-class accuracy of 69.98 percent for the deep allocation and of 67.80 and 67.79 percent for the two broad allocations. The 2.18-point decrease in the first step is consistent with site classes attracting more predictions once they are trained on more patients. The site step leaves background-class accuracy unchanged.
+\noindent Accuracy over all 30 classes changes less, because the seventeen background classes receive identical training material in every allocation. Subtracting the site-class contribution from the all-class average gives a background-class accuracy of 71.61 percent for the deep allocation and of 67.43 and 67.27 percent for the two broad allocations. The 4.18-point decrease in the first step is consistent with site classes attracting more predictions once they are trained on more patients. The site step changes background-class accuracy by only 0.16 points.
 
 \subsection{Site gain and within-site residual breadth}
-Neither contrast falls in the region that the interpretation criteria assign to a single account (Table~\ref{tab:contrasts}). The site gain is $\Delta_S=0.84$ points with a test-patient interval of 0.55 to 1.14. The interval excludes zero but crosses the one-point threshold, so under test-patient uncertainty the gain from five additional sites is positive but not established as practically relevant.
+Neither contrast falls in the region that the interpretation criteria assign to a single account (Table~\ref{tab:contrasts}). The site gain is $\Delta_S=1.06$ points with a test-patient interval of 0.74 to 1.37. The interval excludes zero but crosses the one-point threshold, so under test-patient uncertainty the gain from five additional sites is positive but not established as practically relevant.
 
 \begin{table}[htbp]
 \centering
@@ -37,32 +37,34 @@ Neither contrast falls in the region that the interpretation criteria assign to 
 \toprule
 Quantity & Symbol & Estimate & 95\% interval \\
 \midrule
-First step, raw & $A_5-A_{\mathrm D}$ & 10.91 & [10.46, 11.36] \\
-Effective-support slope & $\hat\beta$ & 5.70 & [4.92, 6.49] \\
-First step explained by effective support & $\hat\beta\log\bigl(\Neff(20,8)/\Neff(5,32)\bigr)$ & 7.32 & [6.32, 8.34] \\
-Within-site residual breadth & $b_W$ & 1.79 & [1.22, 2.34] \\
+First step, raw & $A_5-A_{\mathrm D}$ & 13.52 & [13.05, 14.03] \\
+Effective-support slope & $\hat\beta$ & 5.37 & [4.63, 6.14] \\
+First step explained by effective support & $\hat\beta\log\bigl(\Neff(20,8)/\Neff(5,32)\bigr)$ & 6.90 & [5.94, 7.89] \\
+Within-site residual breadth & $b_W$ & 3.31 & [2.71, 3.84] \\
 \midrule
-Patient-count slope & $\hat\gamma$ & 1.14 & [0.27, 1.99] \\
-Reference residual breadth & $b_{\mathrm{ref}}$ & 0.79 & [0.19, 1.38] \\
-Within-site minus reference & $b_W-b_{\mathrm{ref}}$ & 1.01 & [0.70, 1.31] \\
+Patient-count slope & $\hat\gamma$ & 1.75 & [0.91, 2.58] \\
+Reference residual breadth & $b_{\mathrm{ref}}$ & 1.21 & [0.63, 1.79] \\
+Within-site minus reference & $b_W-b_{\mathrm{ref}}$ & 2.10 & [1.77, 2.40] \\
 \midrule
-Site gain & $\Delta_S$ & 0.84 & [0.55, 1.14] \\
+Site gain & $\Delta_S$ & 1.06 & [0.74, 1.37] \\
 \bottomrule
 \end{tabular}
 \caption{The within-site residual lies above the one-point threshold, whereas the site gain interval crosses it. All quantities are restricted to the thirteen site classes. Accuracy differences and residuals are in percentage points, residuals per doubling of patients; slopes are in percentage points per unit of natural logarithm. Intervals are paired test-patient 95\% intervals.}
 \label{tab:contrasts}
 \end{table}
 
-\noindent For the within-site residual, effective support of the site classes rises from 10.36 to 37.44 per class between the deep and the broad five-site allocation. The refitted slope $\hat\beta=5.70$ attributes 7.32 of the 10.91-point first step to this increase. The remaining 3.59 points, spread over two doublings of patients, give $b_W=1.79$ points per doubling (1.22 to 2.34). This interval lies entirely above the threshold: additional patients from already represented sites retain a practically relevant benefit beyond effective support.
+\noindent For the within-site residual, effective support of the site classes rises from 10.36 to 37.44 per class between the deep and the broad five-site allocation. The refitted slope $\hat\beta=5.37$ attributes 6.90 of the 13.52-point first step to this increase. The remaining 6.62 points, spread over two doublings of patients, give $b_W=3.31$ points per doubling (2.71 to 3.84). This interval lies entirely above the threshold, although the comparison with the breadth--depth grid below attributes most of this value to the deep allocation.
 
-The reference residual for the same classes is smaller. With sites uncontrolled, the refitted surface gives $b_{\mathrm{ref}}=0.79$ points per doubling (0.19 to 1.38), well below the 2.62 points obtained over all 30 classes. The within-site residual exceeds it by 1.01 points (0.70 to 1.31). Equivalently, the surface predicts a first step of 8.90 points for randomly drawn allocations of the site classes, whereas the site-restricted allocations show 10.91 points. Holding sites fixed therefore removes none of the residual breadth benefit; the site-restricted first step even exceeds the prediction.
+The reference residual for the same classes is smaller. With sites uncontrolled, the refitted surface gives $b_{\mathrm{ref}}=1.21$ points per doubling (0.63 to 1.79), less than half of the 2.62 points obtained over all 30 classes. The within-site residual exceeds it by 2.10 points (1.77 to 2.40). Equivalently, the surface predicts a first step of 9.33 points for randomly drawn allocations of the site classes, whereas the site-restricted allocations show 13.52 points.
 
-The test-patient intervals hold the sampled sites and patients fixed. Across the fifteen split--draw combinations, the two steps differ in how consistently they help. The raw first step is positive in all fifteen, ranging from 4.64 to 15.32 points with a standard deviation of 2.90. The site gain ranges from $-1.72$ to 3.28 points with a standard deviation of 1.39 and is positive in eleven of fifteen combinations. Part of this spread lies between splits, whose mean site gains are 0.07, 0.72, and 1.74 points. Whether five additional sites help at all therefore depends on which sites and patients are drawn, whereas the benefit of additional patients within fixed sites does not.
+The excess lies in the deep allocation rather than in the within-site step. On the stored grid predictions restricted to the same site classes, the step from five patients with 32 patches to twenty patients with eight is 9.30 points (8.73 to 9.92), within 0.03 points of the surface prediction. The five-site allocation matches its grid counterpart within 0.52 points (0.02 to 1.03), whereas the deep allocation falls 3.70 points (3.11 to 4.27) below randomly drawn five-patient allocations, in 13 of the 15 split--draw combinations. With the grid step in place of the allocation step, the residual is 1.20 points per doubling, equal to $b_{\mathrm{ref}}$. Twenty patients from five sites are thus at least as accurate as twenty randomly drawn patients, and $b_W$ mainly reflects a weak deep allocation rather than a larger benefit of patients from already represented sites.
 
-Under Table~\ref{tab:accounts}, the within-site residual alone matches both the within-site variation and the combined account. The site gain matches neither, because its interval lies neither entirely above one point nor entirely within $[-1,1]$. The outcome is therefore inconclusive.
+The test-patient intervals hold the sampled sites and patients fixed. Across the fifteen split--draw combinations, the two steps differ in how consistently they help. The raw first step is positive in all fifteen, ranging from 7.13 to 17.12 points with a standard deviation of 2.45. The site gain ranges from $-1.86$ to 4.96 points with a standard deviation of 1.70 and is positive in eleven of fifteen combinations. Part of this spread lies between splits, whose mean site gains are 0.39, 0.72, and 2.06 points. Whether five additional sites help at all therefore depends on which sites and patients are drawn, whereas the benefit of additional patients within fixed sites does not.
+
+Under Table~\ref{tab:accounts}, the within-site residual alone matches both the within-site variation and the combined account. The site gain matches neither, because its interval lies neither entirely above one point nor entirely within $[-1,1]$. The outcome is therefore inconclusive. Because the deep allocation inflates $b_W$, its position above the threshold does not by itself establish a within-site benefit of that size.
 
 \subsection{Site strata}
-The site gain is concentrated on test patients whose sites enter only the ten-site allocation (Table~\ref{tab:strata}). Pooled with the patient weights of the primary endpoint, the gain for patients from added sites is 3.36 points and is positive in all thirteen classes, ranging from 0.26 to 8.88 points. Patients from core sites, whose sites lose two of their four training patients, lose 0.99 points; the change is negative in nine classes. Patients from sites drawn for neither allocation gain 0.57 points, with positive changes in nine classes. Added-site and core-site patients each make up about a quarter of the site-class test patients and patients from other sites about half. Weighted by these shares, added-site patients account for 0.82 of the pooled 0.87-point gain, core-site patients for $-0.24$, and other patients for 0.29.
+The site gain is concentrated on test patients whose sites enter only the ten-site allocation (Table~\ref{tab:strata}). Pooled with the patient weights of the primary endpoint, the gain for patients from added sites is 3.93 points and is positive in all thirteen classes, ranging from 0.26 to 10.09 points. Patients from core sites, whose sites lose two of their four training patients, lose 1.53 points; the change is negative in eleven classes. Patients from sites drawn for neither allocation gain 0.67 points, with positive changes in nine classes. Added-site and core-site patients each make up about a third of the site-class test patients, and patients from other sites slightly more. Weighted by these shares, added-site patients account for 1.26 of the pooled 1.04-point gain, core-site patients for $-0.48$, and other patients for 0.25.
 
 \begin{table}[htbp]
 \centering
@@ -74,37 +76,37 @@ The site gain is concentrated on test patients whose sites enter only the ten-si
 \cmidrule(lr){3-5}
 Site class & core / added / other & Core & Added & Other & Class \\
 \midrule
-Bladder urothelial carcinoma & 18 / 19 / 64 & $-3.61$ & 6.80 & $-0.53$ & 0.30 \\
-Brain lower grade glioma & 23 / 19 / 58 & $-2.45$ & 0.67 & $-1.41$ & $-1.25$ \\
-Breast invasive carcinoma & 16 / 17 / 66 & $-0.50$ & 0.42 & 0.95 & 0.62 \\
+Bladder urothelial carcinoma & 30 / 25 / 45 & $-4.18$ & 7.03 & $-1.00$ & 0.07 \\
+Brain lower grade glioma & 30 / 30 / 40 & $-2.57$ & 2.04 & $-1.72$ & $-0.85$ \\
+Breast invasive carcinoma & 25 / 26 / 49 & $-1.51$ & 0.53 & 0.54 & 0.02 \\
 Colon adenocarcinoma & 29 / 42 / 29 & $-0.46$ & 8.64 & 1.62 & 3.97 \\
 Glioblastoma multiforme & 48 / 46 / 6 & $-1.15$ & 2.02 & 2.31 & 0.51 \\
 Head and neck squamous cell carcinoma & 42 / 34 / 24 & $-1.38$ & 0.26 & 3.74 & 0.40 \\
 Kidney renal papillary cell carcinoma & 29 / 29 / 42 & 0.75 & 1.15 & $-0.42$ & 0.37 \\
-Lung adenocarcinoma & 12 / 20 / 68 & 0.45 & 6.00 & 1.58 & 2.34 \\
-Lung squamous cell carcinoma & 16 / 16 / 68 & 0.00 & 8.88 & 1.10 & 2.17 \\
-Prostate adenocarcinoma & 24 / 23 / 53 & 0.52 & 3.17 & 0.32 & 1.02 \\
-Skin cutaneous melanoma & 13 / 9 / 77 & $-1.70$ & 3.89 & 1.36 & 1.19 \\
+Lung adenocarcinoma & 19 / 27 / 54 & $-0.31$ & 5.27 & 0.81 & 1.80 \\
+Lung squamous cell carcinoma & 21 / 24 / 55 & $-3.86$ & 10.09 & 1.37 & 2.34 \\
+Prostate adenocarcinoma & 31 / 38 / 32 & 0.13 & 2.51 & 0.17 & 1.04 \\
+Skin cutaneous melanoma & 36 / 33 / 31 & $-2.16$ & 5.03 & $-0.01$ & 0.91 \\
 Thyroid carcinoma & 38 / 30 / 31 & $-1.03$ & 0.55 & 0.10 & $-0.19$ \\
-Uterine corpus endometrial carcinoma & 8 / 12 / 80 & $-4.92$ & 2.35 & $-0.06$ & $-0.14$ \\
+Uterine corpus endometrial carcinoma & 27 / 34 / 38 & $-2.71$ & 6.81 & 3.82 & 3.07 \\
 \midrule
-Pooled & 24 / 24 / 51 & $-0.99$ & 3.36 & 0.57 & 0.87 \\
+Pooled & 31 / 32 / 37 & $-1.53$ & 3.93 & 0.67 & 1.04 \\
 \bottomrule
 \end{tabular}
-\caption{Adding sites helps mainly test patients from the added sites. Shares give the percentage of a class's test patients from core, added, and other sites. Site gains are ten-site minus five-site recall in percentage points, averaged over the fifteen split--draw combinations. The class column combines the strata with their shares. Pooled rows weight classes equally, as in the primary endpoint. Because shares and recalls are averaged separately over split--draw combinations, the pooled class gain of 0.87 differs slightly from $\Delta_S=0.84$. Estimates are descriptive and carry no intervals.}
+\caption{Adding sites helps mainly test patients from the added sites. Shares give the percentage of a class's test patients from core, added, and other sites. Site gains are ten-site minus five-site recall in percentage points, averaged over the fifteen split--draw combinations. The class column combines the strata with their shares. Pooled rows weight classes equally, as in the primary endpoint. Because shares and recalls are averaged separately over split--draw combinations, the pooled class gain of 1.04 differs slightly from $\Delta_S=1.06$. Estimates are descriptive and carry no intervals.}
 \label{tab:strata}
 \end{table}
 
-\noindent The class-level gains follow the added-site gains. The largest occur in colon adenocarcinoma, lung adenocarcinoma, and lung squamous cell carcinoma, at 2.17 to 3.97 points, each with an added-site gain of at least 6.00 points. Lower-grade glioma, thyroid carcinoma, and uterine corpus endometrial carcinoma lose accuracy, because losses for core-site patients, and for lower-grade glioma also for patients from other sites, outweigh their added-site gains.
+\noindent The class-level gains follow the added-site gains. The largest occur in colon adenocarcinoma, uterine corpus endometrial carcinoma, and lung squamous cell carcinoma, at 2.34 to 3.97 points, each with an added-site gain of at least 6.81 points. Lower-grade glioma and thyroid carcinoma lose accuracy, because losses for core-site patients, and for lower-grade glioma also for patients from other sites, outweigh their added-site gains.
 
 \section{Discussion and conclusion}
 \label{sec:discussion}
-For the thirteen larger TCGA-UT cancer types, the residual breadth benefit is not primarily a site-coverage benefit. Doubling the number of sites at fixed patient count adds 0.84 points, whereas each doubling of patients within fixed sites adds 1.79 points beyond effective support. The upper bound of the site gain, 1.14, lies below the lower bound of the within-site residual, 1.22, although separate intervals do not constitute a formal test of their difference. The formal outcome remains inconclusive because the site-gain interval crosses the threshold. The pattern is closest to within-site patient variation, combined with a small contribution of sites that is positive on average but changes sign in four of fifteen training draws.
+For the thirteen larger TCGA-UT cancer types, holding sites fixed does not remove the benefit of additional patients. Twenty patients from five sites are at least as accurate as twenty randomly drawn patients, and on the breadth--depth grid the residual for these classes is 1.20 points per doubling of patients, close to the one-point threshold. The within-site residual of 3.31 points per doubling overstates this benefit, because most of it reflects a deep site allocation that is 3.70 points less accurate than randomly drawn five-patient allocations. Doubling the number of sites at a fixed patient count adds 1.06 points, about as much as a doubling of patients adds beyond effective support. This site gain changes sign in four of fifteen training draws, and its interval crosses the threshold, so the formal outcome remains inconclusive. Neither account dominates: additional sites and additional patients each contribute about one point, and neither contribution is established as practically relevant.
 
-The strata indicate what this site contribution consists of. The gain falls on test patients from sites that the ten-site allocation has seen, while patients from core sites lose part of the benefit of their four training patients per site. This is the pattern predicted by site matching. Patients from sites drawn for neither allocation, the stratum closest to deployment at an unseen institution, gain 0.57 points. Within the tested range, broader institutional coverage at a fixed patient count therefore offers limited robustness to new institutions. Site-aware sampling would be most useful when the deployment sites are known and can be represented in training.
+The strata indicate what this site contribution consists of. The gain falls on test patients from sites that the ten-site allocation has seen, while patients from core sites lose part of the benefit of their four training patients per site. This is the pattern predicted by site matching. Patients from sites drawn for neither allocation, the stratum closest to deployment at an unseen institution, gain 0.67 points. Within the tested range, broader institutional coverage at a fixed patient count therefore offers limited robustness to new institutions. Site-aware sampling would be most useful when the deployment sites are known and can be represented in training.
 
-The within-site residual exceeds the reference residual by about one point, whereas the interpretation criteria expected a value between zero and $b_{\mathrm{ref}}$. The experiment does not identify the cause, but three differences between the two estimates are relevant. First, the site pool admits only patients from institutions with at least four eligible patients, so site-restricted allocations draw from a narrower patient population than the random allocations of the breadth--depth grid. Second, $b_{\mathrm{ref}}$ summarizes the patient-count slope across nine allocations, whereas $b_W$ describes a single step from five patients with 32 patches to twenty patients with eight patches; curvature of the accuracy surface would separate the two. Third, the correlations ignore any similarity of patients from the same site. If such similarity exists, effective support of the broad five-site allocation, with four patients per site, is overstated relative to the deep allocation, with one patient per site. The explained part of the first step would then be too large, and $b_W$ would understate the within-site residual. This bias therefore cannot explain why $b_W$ exceeds $b_{\mathrm{ref}}$.
+The within-site residual exceeds the reference residual by about two points, whereas the interpretation criteria expected a value between zero and $b_{\mathrm{ref}}$. Three differences between the two estimates could produce such a gap, and the comparison with the grid narrows them. First, $b_{\mathrm{ref}}$ summarizes the patient-count slope across nine allocations, whereas $b_W$ describes a single step from five patients with 32 patches to twenty patients with eight patches; curvature of the accuracy surface would separate the two. The raw grid step matches the surface prediction within 0.03 points, which rules this out. Second, the correlations ignore any similarity of patients from the same site. If such similarity exists, effective support of the broad five-site allocation, with four patients per site, is overstated relative to the deep allocation, with one patient per site. The explained part of the first step would then be too large, and $b_W$ would understate the within-site residual, so this bias cannot explain the gap either. Third, the site pool admits only patients from institutions with at least four eligible patients, so site-restricted allocations draw from a narrower patient population than the random allocations of the grid. The gap arises entirely at the deep end: the five-site allocation matches its grid counterpart, whereas the deep allocation, one patient from each of five pool sites, does not. Drawing five patients from the site pool therefore lowers accuracy, whereas drawing twenty does not. The experiment does not identify which property of these patients or sites causes this.
 
-The site classes also carry much less residual breadth benefit than the full label space: 0.79 points per doubling, compared with 2.62 across all 30 classes. Most of the unexplained benefit of additional patients thus lies in the seventeen smaller cancer types, which lack enough patients per site for this intervention. Whether site coverage explains the residual for these types, which are most exposed to patient shortage, remains untested.
+The site classes also carry less residual breadth benefit than the full label space: 1.21 points per doubling, less than half of the 2.62 points across all 30 classes, and consistent with the grid-based residual of 1.20 points. Most of the unexplained benefit of additional patients thus lies in the seventeen smaller cancer types, which lack enough patients per site for this intervention. Whether site coverage explains the residual for these types, which are most exposed to patient shortage, remains untested.
 
-Within these limits, additional patients from the same institutions contribute information that neither effective support nor site count captures. A measurable shortage signal for these cancer types should therefore quantify how much of the within-class variation between patients the training cohort covers, rather than how many institutions it represents. Testing this requires a within-class measure of patient coverage that does not depend on site labels, together with a design that reaches the smaller cancer types in which most of the residual breadth benefit arises.
+Within these limits, restricting training patients to few institutions costs these cancer types little accuracy, and additional patients still contribute about one point per doubling that effective support does not capture. Because the site gain mainly reflects matching of represented sites rather than robustness to unseen ones, a measurable shortage signal for these cancer types should quantify how much of the within-class variation between patients the training cohort covers, rather than how many institutions it represents. Testing this requires a within-class measure of patient coverage that does not depend on site labels, together with a design that reaches the smaller cancer types in which most of the residual breadth benefit arises.
