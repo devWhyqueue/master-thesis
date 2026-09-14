@@ -86,7 +86,11 @@ In Python: `f"afterok:{':'.join(ids)}"` passed as `--dependency=...`.
 
 `apptainer` is **only on compute nodes** — the login node gives `command not found`. Use `srun --partition=cpu-test --pty bash` for an interactive shell, or submit via `sbatch`.
 
-Containers have no SLURM client — never call `sbatch`/`srun` from inside one. A project's `submit` CLI (the thing that calls `sbatch`) is login-node/orchestrator work; only the jobs it schedules run inside the container.
+Containers have no SLURM client — never call `sbatch`/`srun` from inside one, and don't bind `/opt/slurm`+`/etc/slurm`+`/run/munge` in to work around that (dead end: container `/etc/passwd` lacks the `slurm` user, auth fails). A project's `submit` CLI is login-node/orchestrator work; only the jobs it schedules run inside the container. If it needs numpy/pandas/etc. itself, use the project venv (`~/master-thesis/.venv`) on the login node, not system `python3`:
+
+```bash
+ssh hydra 'bash -lc "cd ~/master-thesis/experiments/<name> && ~/master-thesis/.venv/bin/python3 code --config configs/<x>.yaml submit"'
+```
 
 Pass Python paths into the container via `APPTAINERENV_PYTHONPATH` (Apptainer strips the prefix and sets `PYTHONPATH` inside):
 
