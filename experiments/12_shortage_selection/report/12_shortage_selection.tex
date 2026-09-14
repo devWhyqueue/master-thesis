@@ -1,0 +1,164 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\title{Patient Shortage in Histopathology:\\Does Coverage-Maximizing Selection\\Help Five-Patient Cohorts?}
+\author{Yannik Queisler}
+\date{September 14, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent TCGA-UT patch classifiers trained on five patients per class are 9.52 percentage points less accurate than classifiers trained on twenty patients with the same patch budget. Coverage, the distance from held-out patients to their nearest training patient, is a candidate explanation of the part of this gap that effective support leaves open, but in random cohorts it changes almost only with the patient count. This experiment varies coverage at a fixed count of five patients with 32 patches each. A cohort chosen by coverage-maximizing selection is compared with the randomly drawn cohort that shares its focal patient. A manipulation check computed before any classifier is trained shows that selection achieves 65 to 68 percent of the coverage gained when fifteen random patients join the five, above the prespecified threshold of one half in all three splits. The primary endpoint is the difference in patient-macro balanced accuracy between the selected and the random cohort.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+At 160 patches per TCGA-UT class, twenty patients contributing eight patches each outperform five patients contributing 32 patches each by 9.52 percentage points of patient-macro balanced accuracy \citep{queisler2026effectiveSupport}. Effective support, which discounts patches by their correlation within a patient, explains less than half of this gap: each doubling of patients still adds 2.62 points at equal effective support, about 5.2 points over the two doublings \citep{queisler2026multidirectionalRedundancy}. Doubling tissue source sites at a fixed patient count adds 1.06 points \citep{queisler2026siteCoverage}.
+
+At twenty patients, cohort composition matters. A cohort built from one patient and its nineteen nearest neighbours in the Virchow2 embedding is 8.30 points less accurate than a random cohort of the same size, and a cohort chosen by coverage-maximizing selection is 1.04 points more accurate (95\% interval: 0.44 to 1.66) \citep{queisler2026cohortComposition}. A relation fitted to random cohorts of five to twenty patients links accuracy to coverage distance and to similarity-adjusted effective support. With this relation, the residual benefit of additional patients falls from 2.62 to 0.79 points per doubling, but its interval of $-1.25$ to 2.82 points crosses both practical thresholds \citep{queisler2026coverageRedundancy}. In random cohorts, coverage distance is nearly fixed by the patient count, so coverage and patient count cannot be separated. The same relation predicts a selection gain of 2.10 points at twenty patients, about twice the observed gain, which fits diminishing returns once twenty random patients already cover most held-out patients.
+
+Five patients leave more coverage to gain. Five random patients cover validation patients at a mean distance of 0.385 to 0.387, twenty random patients at 0.292 to 0.296 \citep{queisler2026cohortComposition}. Five patients are also the allocation in which patient shortage was first observed. This report therefore asks: \emph{with five patients and 32 patches per class, does a cohort chosen by coverage-maximizing selection train a more accurate classifier than a randomly drawn cohort?} The comparison varies coverage at a patient count other than twenty and tests directly whether selection recovers part of the breadth benefit when patients are scarce.
+
+\section{Study design}
+\label{sec:design}
+Only the choice of five patients changes. The design inherits from \citet{queisler2026cohortComposition} the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits with their natural validation and test partitions, the nested round-robin patch order, and the readout: multinomial logistic regression with its regularization strength selected on the validation partition for every classifier. It also inherits the patient distance. For split $r$ and class $c$, $\bar{\mathbf x}_{irc}$ is the mean feature vector of patient $i$'s patches of the class, $\boldsymbol\mu_r$ the average of these means over all classes, and
+\begin{equation}
+ \mathbf e_{irc}=\frac{\bar{\mathbf x}_{irc}-\boldsymbol\mu_r}{\lVert\bar{\mathbf x}_{irc}-\boldsymbol\mu_r\rVert},
+ \qquad
+ d(i,j)=1-\mathbf e_{irc}^{\top}\mathbf e_{jrc}.
+ \label{eq:distance}
+\end{equation}
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+Allocation & $G$ & $m$ & Patients \\
+\midrule
+Random & 5 & 32 & five anchor patients, including the focal patient \\
+Dispersed & 5 & 32 & focal patient, 4 coverage-maximizing patients \\
+\bottomrule
+\end{tabular}
+\caption{The two allocations share the focal patient, the patient count $G$, the patches per patient $m$, the budget of 160 patches per class, and therefore the effective support. They differ only in how the other four patients are chosen.}
+\label{tab:allocations}
+\end{table}
+
+\noindent Table~\ref{tab:allocations} lists the allocations. Effective support depends only on $G$, $m$, and the intraclass correlations, so it is identical by construction.
+
+\subsection{Allocation rules}
+\label{sec:allocation}
+The pool $\mathcal E_{rc}$ contains the training patients with at least 32 patches of class $c$; pools hold between 30 and 514 patients. For each split, class, and draw $d\in\{1,\ldots,5\}$, the five \emph{anchor patients} are the patients of the stored five-patient draw of \citet{queisler2026effectiveSupport}. The random allocation consists of these anchors. It is therefore the cohort of the breadth--depth grid at five patients and 32 patches, and its stored classifiers are reused, because allocation, patches, and fitting settings match exactly.
+
+The \emph{focal patient} $f$ is the anchor drawn uniformly at random in \citet{queisler2026cohortComposition}. The dispersed allocation starts from $S_0=\{f\}$ and adds four patients greedily by \emph{coverage-maximizing selection}, known as facility location in operations research:
+\begin{equation}
+ S_{k+1}=S_k\cup\Bigl\{\operatorname*{arg\,min}_{j\in\mathcal E_{rc}\setminus S_k}\ \frac{1}{|\mathcal E_{rc}|}\sum_{i\in\mathcal E_{rc}}\ \min_{l\in S_k\cup\{j\}} d(i,l)\Bigr\},\qquad k=0,\ldots,3.
+ \label{eq:facility}
+\end{equation}
+\noindent Each step adds the pool patient that most shortens the mean distance from pool patients to their nearest selected patient. Because each step depends only on the patients already selected, the dispersed allocation equals the first five patients of the twenty-patient dispersed allocation of \citet{queisler2026cohortComposition}. The rule uses only unlabelled training embeddings, not tissue source sites, validation patients, or test patients. Ties are broken by patient identifier, and every patient contributes the first 32 patches of its round-robin order.
+
+\subsection{Manipulation check}
+\label{sec:manipulation}
+A prespecified manipulation check tests whether selection moves coverage by a substantial amount before any classifier is trained. The \emph{coverage distance} of a patient set is the mean distance from the class's validation patients $\mathcal V_{rc}$ to their nearest training patient,
+\begin{equation}
+ r_{rc}(\mathcal P)=\frac{1}{|\mathcal V_{rc}|}\sum_{i\in\mathcal V_{rc}}\min_{j\in\mathcal P}d(i,j).
+ \label{eq:coverage}
+\end{equation}
+\noindent Let $r_{5}$ be the coverage distance of the five anchors, $r_{\mathrm{dis}}$ that of the dispersed allocation, and $r_{20}$ that of the twenty-patient random allocation of \citet{queisler2026cohortComposition}, which adds fifteen random pool patients to the same anchors. Each is averaged over classes and draws within a split. The difference $r_{5}-r_{20}$ is the coverage gained when fifteen random patients join the five anchors. The \emph{selection ratio}
+\begin{equation}
+ \rho_{\mathrm{sel}}=\frac{r_{5}-r_{\mathrm{dis}}}{r_{5}-r_{20}}
+ \label{eq:ratio}
+\end{equation}
+\noindent expresses the coverage change of selection as a fraction of this gain. Fitting proceeds only if $\rho_{\mathrm{sel}}\ge 0.5$ in all three splits; this threshold was fixed before the ratio was computed. The class-level ratios, the mean pairwise distance within each cohort, and the share of non-focal patients from the focal patient's tissue source site are recorded without a threshold.
+
+The check passes (Table~\ref{tab:check}). Four selected patients shorten the coverage distance from about 0.386 to 0.324, which is below the 0.333 of ten random patients \citep{queisler2026coverageRedundancy}. The ratio lies between 0.65 and 0.68, and the class-level ratio reaches 0.5 in 77 of 90 class--split combinations. Selection does not favour the focal patient's tissue source site: 17 to 18 percent of the four added patients share it, against 15 to 17 percent of the four other anchors.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{Coverage distance} & & \\
+\cmidrule(lr){2-4}
+Split & $r_{5}$ & $r_{\mathrm{dis}}$ & $r_{20}$ & $\rho_{\mathrm{sel}}$ & Classes with ratio $\ge 0.5$ \\
+\midrule
+1 & 0.387 & 0.325 & 0.296 & 0.68 & 26 of 30 \\
+2 & 0.385 & 0.323 & 0.293 & 0.68 & 26 of 30 \\
+3 & 0.385 & 0.324 & 0.292 & 0.65 & 25 of 30 \\
+\bottomrule
+\end{tabular}
+\caption{Four coverage-maximizing patients achieve about two thirds of the coverage gained when fifteen random patients join five. Coverage distances are mean cosine distances from validation patients to their nearest training patient, averaged over the 30 classes and five draws. Mean pairwise distances within a cohort are 0.58 to 0.60 for the anchors and 0.60 to 0.63 for dispersed allocations. Selecting all five patients without a focal patient would raise $\rho_{\mathrm{sel}}$ to 0.73 to 0.75.}
+\label{tab:check}
+\end{table}
+
+\section{Evaluation}
+\label{sec:evaluation}
+The evaluation reads one primary contrast and describes where and how much of the breadth benefit it recovers.
+
+\subsection{Selection gain at five patients}
+\label{sec:contrast}
+Accuracy is patient-macro balanced accuracy over all 30 classes: patch recall is averaged within each test patient and true class, then across patients within each class, and finally across classes. Averaging three splits and five draws gives $A_{\mathrm{ran}}$ and $A_{\mathrm{dis}}$ in percent. The primary endpoint is the \emph{selection gain}
+\begin{equation}
+ \Delta_{\mathrm{sel}}=A_{\mathrm{dis}}-A_{\mathrm{ran}},
+ \label{eq:gain}
+\end{equation}
+\noindent the accuracy won when coverage-maximizing selection replaces random sampling of five patients. It holds patients, patches per patient, budget, and effective support fixed.
+
+Four secondary analyses carry no decision threshold. First, the \emph{recovered share} $\Delta_{\mathrm{sel}}/(A_{20,8}-A_{5,32})$ relates the gain to the accuracy difference between random cohorts of twenty patients with eight patches and five patients with 32 patches in the breadth--depth grid. Second, each test patient receives per draw its coverage improvement, the distance to its nearest random training patient minus the distance to its nearest dispersed training patient, and $\Delta_{\mathrm{sel}}$ is computed within tertiles of this improvement with the patient weights of the primary endpoint. Coverage predicts a gain that grows with the improvement. Third, all quantities are reported separately for the thirteen site classes of \citet{queisler2026siteCoverage} and the seventeen remaining classes. Fourth, the between-patient similarity $\omega$ and the similarity-adjusted effective support $\Neff^{\omega}$ of both allocations are computed as in \citet{queisler2026coverageRedundancy}, and the relation fitted there to random cohorts is applied to both allocations. With the coverage distances of Table~\ref{tab:check}, its coverage term alone amounts to about 5.3 points. This value is a descriptive benchmark, not a forecast: the relation overpredicted the selection gain at twenty patients and has not been validated outside the range of random cohorts.
+
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Uncertainty follows \citet{queisler2026effectiveSupport}. Each of 2,000 paired Bayesian bootstrap replicates assigns $\mathrm{Dirichlet}(1,\ldots,1)$ weights to the distinct test patients \citep{rubin1981bayesian}, shared across allocations, splits, draws, and classes. The 2.5th and 97.5th percentiles give exploratory 95\% intervals. Embeddings and allocations are held fixed. The standard deviation of each allocation's accuracy and of the contrast across the fifteen split--draw combinations is reported as a descriptive measure of sensitivity to the drawn patients.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the test-patient interval for $\Delta_{\mathrm{sel}}$ and on the practical threshold of one percentage point used in the preceding experiments (Table~\ref{tab:readings}). Because the manipulation check guarantees a coverage change of about two thirds of the coverage gained from five to twenty random patients, an interval within $[-1,1]$ counts as practical equivalence.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYY@{}}
+\toprule
+Reading & Claim & Selection gain $\Delta_{\mathrm{sel}}$ \\
+\midrule
+Selection mitigates shortage & Coverage-maximizing selection trains more accurate classifiers than random sampling of five patients & Interval above 1 \\
+\addlinespace
+No practical gain & A large coverage change leaves accuracy practically unchanged at five patients & Interval within $[-1,1]$ \\
+\addlinespace
+Selection harms & Coverage-maximizing selection trains less accurate classifiers than random sampling & Interval below $-1$ \\
+\bottomrule
+\end{tabularx}
+\caption{Each reading predicts a distinct range of the selection gain. Intervals are test-patient 95\% intervals in percentage points. All other intervals, including those that cross a threshold, are inconclusive.}
+\label{tab:readings}
+\end{table}
+
+\paragraph{Selection mitigates shortage.}
+If the gain exceeds the threshold, patient-mean coverage separates useful from less useful cohorts at a patient count other than twenty, and choosing patients by coverage recovers part of the breadth benefit when only five patients can be labelled. The recovered share and the tertile gradient would then show how much of the gap and which test patients the selection reaches. Before selection can be recommended, probability quality and the dependence on the size of the candidate pool would need to be examined.
+
+\paragraph{No practical gain.}
+If the gain is practically zero, a coverage change of about two thirds of the coverage gained from five to twenty random patients does not change accuracy. Together with the concentration damage at twenty patients, this would indicate that poor coverage hurts but that better-than-random coverage does not help, so patient-mean coverage would be weak as a selection signal. The next candidate would be a distance between the patch distributions of patients.
+
+\paragraph{Selection harms.}
+If selection lowers accuracy, the selected patients cover validation patients in the embedding but not the variation that matters for the classifier, for example because greedy selection favours atypical patients. Coverage distance would then be a misleading target for patient selection, whatever its association with accuracy in random cohorts.
+
+\section{Limitations}
+\label{sec:limitations}
+The two cohorts share the focal patient, so selection starts from a randomly drawn patient rather than from the best available one, and the gain is that of four selected patients. With five patients, a single atypical patient carries a fifth of the cohort, so the contrast may vary strongly between draws. The manipulation is uneven across cancer types. The class-level ratio stays below 0.5 in four or five classes per split, among them uveal melanoma, uterine carcinosarcoma, and adrenocortical carcinoma, in which the selected patients cover validation patients little better or even worse than the anchors; these classes contribute little contrast to the class average.
+
+Selection requires a pool of unlabelled candidate patients with at least 32 patches, which the stored training partition provides but a real annotation project may not. Coverage is defined on patient means in one representation, so a null result excludes coverage only as measured here. All results are conditional on frozen Virchow2 features, multinomial logistic regression, and the three overlapping splits, which are not independent replications.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
