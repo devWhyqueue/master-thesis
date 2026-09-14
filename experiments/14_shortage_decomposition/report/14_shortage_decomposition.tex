@@ -1,0 +1,178 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\title{Patient Shortage in Histopathology:\\How Much Do Coverage, Similarity,\\and Patient Count Explain?}
+\author{Yannik Queisler}
+\date{September 14, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, ten random patients per cancer type train a classifier 5.03 percentage points more accurate than five random patients with the same budget of 160 patches per class. Two measured cohort properties are candidate causes: coverage, the distance from held-out patients to their nearest training patient, and between-patient similarity. In random cohorts both change together with the patient count, so their contributions cannot be told apart. This protocol varies coverage and similarity by design on a three-by-three grid of target levels at five and ten patients, alongside random cohorts of both sizes. A regression of class recall on the achieved coverage, similarity, and patient count splits the five-to-ten-patient gap into a coverage part, a similarity part, and a remaining patient-count part. Each part is read against a one-point threshold: an interval above one point marks a contribution, an upper bound below one point a small part at most. A manipulation check and a precision simulation, both without classifier training, decide whether training proceeds.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+At 160 patches per TCGA-UT class, twenty patients with eight patches each outperform five patients with 32 patches each by 9.52 percentage points of patient-macro balanced accuracy; ten patients with sixteen patches each lie in between, at 67.28 against 62.25 percent \citep{queisler2026effectiveSupport}. Effective support, which discounts patches by their correlation within a patient, explains less than half of this benefit: each doubling of patients still adds 2.62 points at equal effective support \citep{queisler2026multidirectionalRedundancy}.
+
+Two cohort properties are candidate explanations for the rest. \emph{Coverage} describes how close held-out patients lie to their nearest training patient; additional patients may supply appearances of a cancer type that a small cohort misses. \emph{Between-patient similarity} describes whether training patients deviate from their class mean in the same feature directions; similar patients add fewer independent observations. In random cohorts, both properties are nearly fixed by the patient count. A relation fitted to such cohorts lowers the residual benefit of additional patients from 2.62 to 0.79 points per doubling, but with an interval of $-1.25$ to 2.82 points \citep{queisler2026coverageRedundancy}.
+
+Changing cohort composition at a fixed patient count separates the properties from the count. Five patients chosen by coverage-maximizing selection are 5.52 points more accurate than five random patients (95\% interval: 4.83 to 6.23), about as accurate as ten random patients \citep{queisler2026shortageSelection}. Selection, however, changes both properties at once: the mean coverage distance to validation patients falls from 0.386 to 0.324, and between-patient similarity from $-0.011$ to $-0.094$. Matched comparisons that hold one property fixed while varying the other cannot be built for these cohorts. Cohorts matched on training patients drift apart on validation patients draw by draw, and ten patients cannot reproduce the coverage and effective support of five at the same time \citep{queisler2026coverageSimilarity}. The same assessment shows that test-patient uncertainty alone leaves every contrast with a standard error of at least 0.38 points, so practical equivalence at a one-point margin is out of reach.
+
+This report therefore varies both properties by design instead of matching them, and asks: \emph{how many of the 5.03 points gained from five to ten random patients does coverage explain, how many does similarity explain, and how many remain for the patient count itself?} The comparison stops at ten patients. Twenty-patient cohorts cannot be made to cover held-out patients as poorly as five random patients, so the step from ten to twenty patients cannot be varied in the same way \citep{queisler2026coverageSimilarity}.
+
+\section{Study design}
+\label{sec:design}
+Only the composition of the training cohorts changes. The design inherits the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits with their natural validation and test partitions, and multinomial logistic regression with its regularization strength selected on the validation partition. Every class receives 160 patches. The eligible pool $\mathcal E_{sc}$ of split $s$ and class $c$ contains the training patients with at least 32 patches of the class, and every cohort patient contributes the first 32 or 16 patches of the established round-robin patch order.
+
+\subsection{Two measured properties}
+\label{sec:quantities}
+Both properties follow \citet{queisler2026coverageRedundancy}. For split $s$ and class $c$, let $\bar{\mathbf x}_{i}$ be patient $i$'s mean feature vector, $\boldsymbol\mu_s$ the average of these means over all classes, and $\mathbf e_i$ the normalized vector $(\bar{\mathbf x}_i-\boldsymbol\mu_s)/\lVert\bar{\mathbf x}_i-\boldsymbol\mu_s\rVert$. The distance between two patients is $d(i,j)=1-\mathbf e_i^{\top}\mathbf e_j$. The \emph{coverage distance} of a cohort $S$ is the mean distance from a reference set $\mathcal R$ of patients to their nearest cohort patient,
+\begin{equation}
+ r(S;\mathcal R)=\frac{1}{|\mathcal R|}\sum_{i\in\mathcal R}\min_{j\in S}d(i,j).
+ \label{eq:coverage}
+\end{equation}
+\noindent Smaller values mean better coverage. Cohort search uses the eligible pool as reference set; analysis uses the class's validation patients. Test patients enter only accuracy.
+
+Let $\boldsymbol\mu_{sc}$ be the average patient mean over the eligible pool and $\tau^2_{sc}$ the between-patient variance of the class. The \emph{between-patient similarity} of a cohort $S$ with $G$ patients is
+\begin{equation}
+ \omega(S)=\frac{1}{G(G-1)\,\tau^2_{sc}}\sum_{i\in S}\sum_{j\in S\setminus\{i\}}(\bar{\mathbf x}_i-\boldsymbol\mu_{sc})^{\top}(\bar{\mathbf x}_j-\boldsymbol\mu_{sc}),
+ \label{eq:omega}
+\end{equation}
+\noindent the mean correlation between the deviations of two cohort patients from their class mean. Random cohorts have $\omega$ slightly below zero, between $-0.013$ and $-0.010$; positive values indicate aligned deviations and negative values patients that deviate in opposite directions.
+
+\subsection{Designed and random cohorts}
+\label{sec:cohorts}
+Coverage and similarity are varied on a grid of target levels that is placed where both patient counts can reach it (Table~\ref{tab:cells}). For each split, class, and draw, $\bar r_G$ denotes the mean coverage distance of 2,000 random cohorts of $G$ pool patients, measured on the eligible pool, and $\Delta'=\bar r_5-\bar r_{10}$ the coverage gained from five to ten random patients. The coverage targets are $\bar r_{10}$, $\bar r_{10}+\Delta'/2$, and $\bar r_{10}+\Delta'$, so they span the range from random ten to random five patients. The similarity targets are $\tilde\omega_{10}-0.04$, $\tilde\omega_{10}$, and $\tilde\omega_{10}+0.04$, where $\tilde\omega_{10}$ is the median similarity of the random ten-patient cohorts. Crossing the three levels of each property gives nine designed cells, which are built at five patients with 32 patches and at ten patients with 16 patches. Two random cells, five and ten uniformly drawn pool patients, anchor the design to ordinary sampling.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lrrYYr@{}}
+\toprule
+Cohort & $G$ & $m$ & Coverage targets & Similarity targets & Cells \\
+\midrule
+Designed & 5 & 32 & $\bar r_{10}$, $\bar r_{10}+\Delta'/2$, $\bar r_{10}+\Delta'$ & $\tilde\omega_{10}-0.04$, $\tilde\omega_{10}$, $\tilde\omega_{10}+0.04$ & 9 \\
+Designed & 10 & 16 & $\bar r_{10}$, $\bar r_{10}+\Delta'/2$, $\bar r_{10}+\Delta'$ & $\tilde\omega_{10}-0.04$, $\tilde\omega_{10}$, $\tilde\omega_{10}+0.04$ & 9 \\
+Random & 5 & 32 & -- & -- & 1 \\
+Random & 10 & 16 & -- & -- & 1 \\
+\bottomrule
+\end{tabularx}
+\caption{The twenty cells vary coverage and similarity independently at both patient counts. $G$ is the number of patients and $m$ the patches per patient, so every cell uses 160 patches per class. Targets are computed per split, class, and draw from random cohorts of the eligible pool.}
+\label{tab:cells}
+\end{table}
+
+\noindent Every classifier is trained on one split and one draw, with each of the 30 classes assigned to one cell. Class $c$ receives cell $(o_{sc}+d)\bmod 20$ in draw $d$, where the offsets $o_{sc}\in\{0,\ldots,19\}$ are drawn once per split so that each offset occurs once or twice. Over every twenty draws, each class therefore passes through all twenty cells once, and each classifier mixes cells across classes. The number of draws per split is 20, 40, or 60, fixed by the precision simulation of Section~\ref{sec:precision}.
+
+A designed cohort is found by searching the eligible pool for the patient set closest to its two targets. Candidates combine random cohorts, prefixes of coverage-maximizing selection, and farthest-first selection from random anchor patients; swaps of single patients then minimize $|r-t_r|/0.005+|\omega-t_\omega|/0.01$, where $t_r$ and $t_\omega$ are the cell's targets \citep{queisler2026coverageSimilarity}. The search uses training geometry only and fresh random seeds. Because the analysis uses achieved rather than targeted values, cohorts that miss their targets remain in the analysis.
+
+\subsection{Manipulation check before training}
+\label{sec:check}
+The cohorts of all planned draws are built and checked before any classifier is trained. The check passes only if all four conditions hold in each of the three splits; the first, second, and fourth hold separately for five and ten patients.
+\begin{enumerate}
+ \item \emph{Spread.} Averaged over classes and draws, the achieved coverage distance on the eligible pool differs between the poorest and best coverage level by at least $0.9\,\Delta'$, and similarity differs between the highest and lowest level by at least 0.072.
+ \item \emph{Separation.} Across all designed cohorts, the correlation between class-centred coverage distance and class-centred similarity lies within $[-0.3,0.3]$.
+ \item \emph{Overlap.} A cell is on target when coverage lies within $\Delta'/4$ and similarity within 0.02 of the targets. On average over classes and draws, at least half of the nine cells are on target at both patient counts.
+ \item \emph{Transfer.} The coverage difference between the poorest and best level, measured on validation patients, is at least 0.7 times the same difference on the eligible pool.
+\end{enumerate}
+\noindent A search with the same grid, five draws per split, and other seeds met all conditions except the five-patient spread, which reached 0.89 of $\Delta'$ in each split \citep{queisler2026coverageSimilarity}. In that search, 94 to 96 percent of cohorts reached their targets, the absolute correlation between coverage and similarity was at most 0.06, and the transfer ratio lay between 0.87 and 1.00. If the check fails in any split, the experiment stops before training with its thresholds unchanged.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The evaluation estimates how strongly class recall responds to coverage, similarity, and patient count, and then translates these responses into parts of the five-to-ten-patient gap.
+
+\subsection{Class-recall model}
+\label{sec:model}
+Let $y_{fc}$ be the patient-macro recall of class $c$ in fit $f$, in percent: patch recall is averaged within each test patient of the class and then over these patients. Averaging $y_{fc}$ over classes gives patient-macro balanced accuracy, the endpoint of the preceding experiments. The model
+\begin{equation}
+ y_{fc}=\alpha_{sc}+\alpha_f+\delta\,r_{fc}+\lambda\,\omega_{fc}+\gamma\,z_{fc}+\varepsilon_{fc}
+ \label{eq:model}
+\end{equation}
+\noindent is fitted by least squares to all cohorts of all twenty cells. Here $r_{fc}$ is the validation coverage distance and $\omega_{fc}$ the similarity of the cohort, $z_{fc}$ equals one for ten patients with sixteen patches and zero for five patients with 32 patches, $\alpha_{sc}$ is an intercept per split and class, and $\alpha_f$ an intercept per fit. The coefficient $\delta$ is the change in recall per unit of coverage distance, $\lambda$ per unit of similarity, and $\gamma$ the effect of ten instead of five patients at equal coverage and similarity. Class intercepts remove differences in difficulty between cancer types, and fit intercepts remove shared effects of a split and draw.
+
+\subsection{Parts of the five-to-ten-patient gap}
+\label{sec:decomposition}
+Let $\bar r_{\mathrm{ran}5}$, $\bar r_{\mathrm{ran}10}$, $\bar\omega_{\mathrm{ran}5}$, and $\bar\omega_{\mathrm{ran}10}$ be the mean validation coverage distance and similarity of the two random cells. The gap between ten and five random patients splits into three parts:
+\begin{equation}
+ C=\delta\,(\bar r_{\mathrm{ran}10}-\bar r_{\mathrm{ran}5}),\qquad
+ S=\lambda\,(\bar\omega_{\mathrm{ran}10}-\bar\omega_{\mathrm{ran}5}),\qquad
+ P=\gamma.
+ \label{eq:parts}
+\end{equation}
+\noindent The \emph{coverage part} $C$ is the recall gained because ten random patients cover held-out patients better, the \emph{similarity part} $S$ the recall gained because their similarity differs, and the \emph{patient-count part} $P$ the recall that remains for more patients at equal coverage and similarity. All three are in percentage points, and positive values favour ten patients. As a calibration check, $C+S+P$ is compared with the observed difference between the random cells, $\Delta_{5\to10}$, the mean recall of the ten-patient random cell minus that of the five-patient random cell. On the breadth--depth grid, this difference is 5.03 points.
+
+A secondary, descriptive analysis applies $\delta$ and $\lambda$ to the stored coverage distances and similarities of the random and selected five-patient cohorts of \citet{queisler2026shortageSelection}. It splits their predicted accuracy difference into a coverage and a similarity part and compares the sum with the observed selection gain of 5.52 points. The selected cohorts' similarity of $-0.094$ lies below the targeted similarity levels, so this analysis extrapolates beyond the design.
+
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Each of 2,000 paired bootstrap replicates assigns $\mathrm{Dirichlet}(1,\ldots,1)$ weights to the distinct test patients \citep{rubin1981bayesian}, shared across cells, fits, and classes, and resamples draws with replacement within each split, jointly for all classes of a draw. Recall, the model of Equation~\eqref{eq:model}, and the parts of Equation~\eqref{eq:parts} are recomputed in every replicate, and the 2.5th and 97.5th percentiles give 95\% intervals. Coverage distances and similarities are held fixed. The three splits share patients and are not independent replications.
+
+\subsection{Precision before training}
+\label{sec:precision}
+A simulation based on stored predictions of random and selected cohorts fixes the number of draws before any classifier of this experiment is trained (Appendix~\ref{app:precision}). It selects the smallest of 20, 40, or 60 draws per split for which the median 95\% interval half-width of each of $C$, $S$, and $P$ is at most one point. If no draw count reaches this precision, the experiment stops before training.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the 95\% intervals of the three parts and on the practical threshold of one percentage point used in the preceding experiments. Each part receives one of four readings (Table~\ref{tab:readings}). Practical equivalence is not claimed, because the test-patient uncertainty does not allow intervals within $[-1,1]$ to be expected.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYl@{}}
+\toprule
+Reading & Claim for the part & 95\% interval \\
+\midrule
+Contributes & The property explains more than one point of the gap & Lower bound above 1 \\
+\addlinespace
+At most small & The property explains less than one point of the gap & Upper bound below 1 \\
+\addlinespace
+Counteracts & The property narrows the gap by more than one point & Upper bound below $-1$ \\
+\addlinespace
+Unresolved & Neither a contribution nor a small part is established & All other intervals \\
+\bottomrule
+\end{tabularx}
+\caption{Each of the coverage part $C$, the similarity part $S$, and the patient-count part $P$ receives one reading. Intervals are in percentage points. A part that counteracts is also at most small.}
+\label{tab:readings}
+\end{table}
+
+\noindent The cause of the five-to-ten-patient gap counts as settled when every part is either a contribution or at most small, and the calibration interval for $C+S+P-\Delta_{5\to10}$ does not lie entirely outside $[-1,1]$. If it does, the linear model misdescribes the random cohorts and the parts are not interpreted.
+
+\paragraph{Coverage explains the gap.}
+If $C$ contributes while $S$ and $P$ are at most small, patients help mainly by covering held-out patients. Coverage distance would then be a label-free signal of patient shortage, and coverage-maximizing selection would address its cause rather than one of its correlates.
+
+\paragraph{Similarity contributes.}
+If $S$ contributes, similar training patients add fewer independent observations beyond what within-patient correlation accounts for. A mitigation would then need to favour patients that deviate from the class mean in different directions, and similarity-adjusted effective support would be the corresponding signal.
+
+\paragraph{Patient count remains.}
+If $P$ contributes, additional patients help beyond both patient-mean properties. Selection among available patients could then not replace acquiring patients, and the next candidate signal would compare the patch distributions of patients rather than their means. Contributions of several parts, for example of both $C$ and $P$, are read jointly as a shared explanation.
+
+\section{Limitations}
+\label{sec:limitations}
+Both properties summarize a patient by its mean embedding in one representation, so variation within a patient's patches enters neither. Their effects are assumed to be linear and additive over the targeted range, and the model carries no information about coverage or similarity outside it. Similarity measures aligned deviations in feature space rather than statistical dependence between patients.
+
+At a fixed budget, ten patients receive sixteen instead of 32 patches, so $P$ combines patient count with patch depth; on TCGA-UT, depth adds 0.3 points from eight to 32 patches at twenty patients \citep{queisler2026effectiveSupport}. Classes share one classifier, so the cohort of one class can affect the recall of another. The rotating assignment balances this influence over cells but does not remove it. All results are conditional on frozen Virchow2 features, multinomial logistic regression, and the three overlapping splits. Probability quality is outside this study.
+
+\appendix
+\section{Precision simulation}
+\label{app:precision}
+The simulation uses stored patient-level predictions of four cohorts with the same features, splits, and classifier: random cohorts of five patients with 32 patches and ten patients with sixteen patches from the breadth--depth grid \citep{queisler2026effectiveSupport}, and random and selected five-patient cohorts \citep{queisler2026shortageSelection}. Each contributes fifteen split--draw fits. From these fits it takes two sources of variability for class recall: the deviation of a fit from the class's mean recall, which represents variation over training draws, and test-patient Dirichlet weights, shared across classes and cells, which represent variation over evaluation patients.
+
+A simulated study follows the design of Section~\ref{sec:cohorts} for a candidate draw count. It uses the achieved coverage distances and similarities of the manipulation check, extended to further draws by resampling the checked draws within split. Class recall is generated as the stored class mean plus the imposed effects of Equation~\eqref{eq:model} plus a training-draw deviation resampled from the stored fits of the same class, split, and patient count. The study then applies the model, the parts, and the bootstrap of Section~\ref{sec:uncertainty} with 200 replicates. Two scenarios impose the effects: all parts equal to zero, and a coverage-dominant split of the 5.03-point gap into $C=4$, $S=0.5$, and $P=0.5$.
+
+Each scenario and draw count uses 2,000 simulated studies. A draw count qualifies when the median half-width of each part is at most one point in both scenarios. A sensitivity condition with training-draw deviations enlarged by 50 percent is reported but does not affect the choice.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
