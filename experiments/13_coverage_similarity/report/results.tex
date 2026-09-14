@@ -1,6 +1,6 @@
 \section{Results}
 \label{sec:results}
-The precision simulation of Appendix~\ref{app:precision} found no draw count that meets the prespecified criterion. With 60 fresh draws per split, the largest candidate, a two-point primary benefit is detected in 59 percent of simulated studies and practical equivalence is established in 19 to 21 percent, against the required 80 percent in both scenarios. As Section~\ref{sec:evaluation} specifies, the experiment therefore stops with a precision limitation. Cohort search depends on the selected draw count, so the manipulation check was not run and no classifier was trained. The four primary contrasts, their interaction, and the breadth contrast $\Delta_G$ remain unmeasured, and so does the feasibility of the matching tolerances.
+The precision simulation of Appendix~\ref{app:precision} found no draw count that meets the prespecified criterion. With 60 fresh draws per split, the largest candidate, a two-point primary benefit is detected in 59 percent of simulated studies and practical equivalence is established in 19 to 21 percent, against the required 80 percent in both scenarios. As Section~\ref{sec:evaluation} specifies, the experiment therefore stops with a precision limitation. No classifier was trained, so the four primary contrasts, their interaction, and the breadth contrast $\Delta_G$ remain unmeasured. A supplementary manipulation check with a fixed draw count (Section~\ref{sec:check-results}) shows that the matching tolerances cannot be met either.
 
 \subsection{Simulated success by draw count}
 \label{sec:precision-results}
@@ -38,8 +38,43 @@ The limit lies in the fixed evaluation sample. With training draws held fixed, t
 
 Both decision rules then depend on how far the estimate falls from the true contrast. Across simulated studies at 60 draws, this estimation error has a standard deviation of 0.41 points. Equivalence requires the whole interval within $[-1,1]$, which a zero contrast achieves only when its estimate lies within 0.11 points of zero. Detecting a two-point benefit requires the estimate to fall short of the true value by at most 0.11 points. Under a normal approximation, these conditions hold with probabilities of about 21 and 61 percent, close to the simulated rates. Even with unlimited draws, the test-patient standard error of 0.38 points and a critical value near 2.2 would leave a half-width of about 0.85 points. Equivalence would then remain below one third and benefit detection below two thirds. Under the same approximation, 60 draws would detect a benefit with 80 percent success from a true primary contrast of about 2.2 points; establishing equivalence would require a half-width of about 0.47 points, which this evaluation sample cannot provide.
 
+\subsection{Supplementary manipulation check}
+\label{sec:check-results}
+The cohort search requires no classifier fits, so the manipulation check of Section~\ref{sec:check} was also run with 20 draws per split, the smallest candidate draw count, for all 30 classes. The search reaches both manipulated differences. Averaged over classes and draws, poor minus good coverage distance is 0.039 to 0.042 at both similarity levels, against the required 0.03, and high minus low similarity is 0.070, against the required 0.05. Matching fails: in every split, none of the 600 class--draw combinations meets all tolerances (Table~\ref{tab:check-results}).
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{Coverage distance} & & \\
+\cmidrule(lr){2-3}
+Cohort & Training & Validation & $\omega$ & $\Neff^{\omega}$ \\
+\midrule
+Good coverage, low similarity & 0.345 & 0.363 & $-0.060$ & 13.11 \\
+Poor coverage, low similarity & 0.385 & 0.403 & $-0.060$ & 13.11 \\
+Good coverage, high similarity & 0.345 & 0.361 & 0.010 & 9.69 \\
+Poor coverage, high similarity & 0.385 & 0.402 & 0.010 & 9.69 \\
+\addlinespace
+Ten-patient match & 0.345 & 0.371 & 0.093 & 10.97 \\
+\bottomrule
+\end{tabular}
+\caption{The search sets coverage and similarity independently on the training pool, but the ten-patient match cannot reproduce the effective support of the good-coverage, low-similarity cohort. Values are means over the 30 classes, three splits, and 20 draws. Training coverage distance uses eligible training patients as the reference set, validation coverage distance uses validation patients, and $\Neff^{\omega}$ is the class-specific similarity-adjusted effective support of Equation~\eqref{eq:support}.}
+\label{tab:check-results}
+\end{table}
+
+\noindent Two tolerances fail. First, cohorts matched on training coverage drift apart on validation patients. The two cohorts at one coverage level differ by more than 0.005 in validation coverage distance in 78 to 85 percent of class--draw combinations, and the ten-patient match misses the validation coverage of the good-coverage, low-similarity cohort in 84 to 86 percent. On average the cohorts at one coverage level differ by at most 0.002 in validation coverage distance, so the drift reflects individual draws rather than a systematic offset.
+
+Second, the ten-patient match comes within 5 percent of the effective support of the good-coverage, low-similarity cohort in no combination, reaching 10.97 against 13.11. The good-coverage level lies at a training coverage distance of 0.345, which is poorer than the 0.302 of ten random patients. Ten patients reproduce this coverage only when their deviations from the class mean align, which raises their similarity to 0.093 and lowers their effective support.
+
 \section{Discussion and conclusion}
 \label{sec:discussion}
-Whether the gain from coverage-maximizing selection arises from better coverage or from lower between-patient similarity remains open. The precision simulation, run before cohort search and training, shows that the planned comparison cannot deliver the prespecified conclusions on the TCGA-UT evaluation sample. Detecting a two-point benefit narrowly misses the required success rate. Practical equivalence at the one-point margin, which the interpretation of Section~\ref{sec:interpretation} needs to call either property negligible, is out of reach at any number of training draws.
+Whether the gain from coverage-maximizing selection arises from better coverage or from lower between-patient similarity remains open, and both preliminary assessments of this protocol fail. On the TCGA-UT evaluation sample, practical equivalence at the one-point margin, which the interpretation of Section~\ref{sec:interpretation} needs to call either property negligible, is out of reach at any number of training draws. Coverage and similarity can be set independently on the training pool, but cohorts cannot be matched draw by draw on validation patients, and ten patients cannot match five on coverage and effective support at the same time.
 
-The result constrains any redesign more than the number of fits does. Every contrast evaluated on these test patients carries a standard error of at least 0.38 points, so simultaneous 95\% intervals cannot be narrower than about 0.85 points on each side. A redesign that keeps the evaluation sample would have to change what it asks: a wider equivalence margin, fewer contrasts under simultaneous inference, or one-sided tests for benefits only, which would leave small effects of either property inconclusive rather than negligible. Each option would require a separately declared protocol. Alternatively, additional evaluation patients would shrink the test-patient floor directly. Whether cohorts matching the proposed tolerances exist at all can be assessed independently, because the manipulation check requires no classifier fits.
+These results constrain a follow-up in three ways. Every contrast evaluated on these test patients carries a standard error of at least 0.38 points, so questions should be framed as estimates with intervals and bounds rather than as equivalence. Coverage and similarity should enter the analysis as measured quantities rather than as matching constraints, because their averages transfer to validation patients while individual draws do not. Finally, coverage is tied to patient count beyond random sampling: selection cannot make five patients cover held-out patients as well as twenty, nor twenty as poorly as five.
+
+\subsection{Outline of a follow-up experiment}
+\label{sec:follow-up}
+A follow-up experiment would estimate how much of the accuracy difference between five and ten random patients, 62.25 against 67.28 percent \citep{queisler2026effectiveSupport}, and of the 5.52-point selection gain \citep{queisler2026shortageSelection} coverage, similarity, and patient count each explain. Instead of matching cohorts, it would vary coverage and similarity on a three-by-three grid of target levels in five- and ten-patient cohorts, with coverage spanning the difference between random ten- and five-patient cohorts. Each class would receive a random grid cell within each fit, and class recall would be regressed on the achieved values with class and fit fixed effects. Conclusions would rest on intervals and upper bounds rather than on equivalence.
+
+A search without classifier fits shows that this grid is attainable: 94 to 96 percent of cohorts reach their targets, 90 to 91 percent of grid cells are reached at both patient counts, and coverage and similarity are nearly uncorrelated. A grid extending to twenty patients fails for the reason given above, so the design leaves out the 4.48-point step from ten to twenty patients. Its main open risk is precision, because class recall is noisier than cohort accuracy. A separate protocol would assess precision and fix all criteria before any classifier is trained.
