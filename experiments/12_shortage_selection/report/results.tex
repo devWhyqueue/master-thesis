@@ -1,0 +1,107 @@
+\section{Results}
+\label{sec:results}
+Coverage-maximizing selection trains a more accurate classifier than random sampling of five patients. The selected cohort reaches 67.87 percent patient-macro balanced accuracy against 62.35 percent for the random cohort, a selection gain of $\Delta_{\mathrm{sel}}=5.52$ percentage points (95\% interval: 4.83 to 6.23). The interval lies above the one-point threshold, so the outcome is the reading \emph{selection mitigates shortage} of Table~\ref{tab:readings}. The manipulation check computed alongside the classifiers reproduces Table~\ref{tab:check} exactly.
+
+\subsection{Selection gain at five patients}
+\label{sec:gain-results}
+The dispersed cohort is more accurate than the random cohort in both class groups and less sensitive to which patients are drawn (Table~\ref{tab:allocation-accuracy}). Across the fifteen split--draw combinations, its accuracy varies with a standard deviation of 1.14 points, against 1.40 points for the random cohort. The random cohort matches its counterpart on the breadth--depth grid, five random patients with 32 patches each at 62.25 percent, to 0.10 points \citep{queisler2026effectiveSupport}. Five selected patients are about as accurate as ten random patients with sixteen patches each, which reach 67.28 percent at the same budget of 160 patches per class; their coverage distance of 0.324 is also slightly shorter than the 0.333 of ten random patients \citep{queisler2026coverageRedundancy}.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{All classes} & \multicolumn{2}{c}{Multi-site classes} & \multicolumn{2}{c}{Other classes} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
+Allocation & Accuracy [95\% interval] & SD & Accuracy & SD & Accuracy & SD \\
+\midrule
+Random & 62.35 [61.15, 63.44] & 1.40 & 60.19 & 2.10 & 64.01 & 1.75 \\
+Dispersed & 67.87 [66.53, 69.13] & 1.14 & 66.71 & 1.12 & 68.76 & 2.28 \\
+\bottomrule
+\end{tabular}
+\caption{At five patients with 32 patches each, the dispersed cohort is about five and a half points more accurate than the random cohort. Accuracy is patient-macro balanced accuracy in percent, averaged over three splits and five draws, with test-patient 95\% intervals. Multi-site classes are the thirteen cancer types with at least ten tissue source sites of at least four eligible patients each \citep{queisler2026siteCoverage}; other classes are the remaining seventeen. SD is the population standard deviation across the fifteen split--draw combinations, in percentage points.}
+\label{tab:allocation-accuracy}
+\end{table}
+
+\noindent The selection gain is positive in all fifteen split--draw combinations, ranging from 2.20 to 7.94 points with a standard deviation of 1.62 points (Table~\ref{tab:contrasts}). Averaged over draws, it is 4.80, 4.79, and 6.97 points in the three splits. Even the smallest gain of a single combination exceeds the threshold.
+
+The gain recovers 0.58 of the accuracy difference between random cohorts of twenty patients with eight patches and five patients with 32 patches on the breadth--depth grid, 71.76 against 62.25 percent (95\% interval: 0.51 to 0.65). Selection therefore closes more than half of the breadth advantage without adding a patient. At twenty patients, the same selection rule added 1.04 points over random sampling, with a coverage change of about a quarter of the coverage gained from five to twenty random patients \citep{queisler2026cohortComposition}. At five patients, the coverage change is about two thirds of that gain and the accuracy gain five times as large.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrcr@{}}
+\toprule
+Classes & $\rho_{\mathrm{sel}}$ & $\Delta_{\mathrm{sel}}$ & 95\% interval & SD & Positive & Recovered share \\
+\midrule
+All & 0.67 & 5.52 & [4.83, 6.23] & 1.62 & 15 of 15 & 0.58 [0.51, 0.65] \\
+Multi-site & 0.74 & 6.52 & [5.85, 7.23] & 2.15 & 15 of 15 & 0.70 [0.64, 0.77] \\
+Other & 0.62 & 4.75 & [3.61, 5.86] & 2.58 & 15 of 15 & 0.49 [0.38, 0.59] \\
+\bottomrule
+\end{tabular}
+\caption{The selection gain lies above the one-point threshold in both class groups. $\rho_{\mathrm{sel}}$ is the selection ratio of Equation~\eqref{eq:ratio}, computed from coverage distances averaged over the group's classes, splits, and draws. Estimates and paired test-patient intervals are in percentage points. SD and the positive count describe the gain across the fifteen split--draw combinations. The recovered share divides the gain by the grid difference between twenty patients with eight patches and five patients with 32 patches within the same group, with its test-patient 95\% interval.}
+\label{tab:contrasts}
+\end{table}
+
+\subsection{Where the gain arises}
+\label{sec:gain-location}
+Selection gains more in the multi-site classes, 6.52 points, than in the seventeen other classes, 4.75 points, and it recovers 0.70 against 0.49 of the grid difference (Table~\ref{tab:contrasts}). The multi-site classes also have the larger coverage change, with a selection ratio of 0.74 against 0.62, and their random cohorts are the least accurate, at 60.19 percent. Tissue source sites do not account for the difference. In the multi-site classes, 7.7 percent of the four selected patients share the focal patient's site, against 8.3 percent of the four other anchors; in the other classes, the shares are 25.1 and 22.6 percent.
+
+Within classes, the gain falls on test patients whose coverage selection improves most (Table~\ref{tab:tertiles}). In the tertile with the largest coverage improvement, recall rises from 54.25 percent under random training to 69.68 percent under dispersed training, a gain of 15.43 points. In the middle tertile, the gain is 5.33 points. In the tertile with the smallest improvement, dispersed training is 3.34 points less accurate than random training, so selection trades a small loss for patients whose coverage it improves least against a large gain for patients that the random cohort covers poorly. After selection, recall differs by less than seven points between the three tertiles, whereas under random training the tertile with the largest improvement trails the others by eleven to thirteen points. The gradient appears in both class groups.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{All classes} & \multicolumn{2}{c}{Gain by class group} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-6}
+Coverage-improvement tertile & Random & Dispersed & Gain & Multi-site & Other \\
+\midrule
+Low & 67.07 & 63.74 & $-3.34$ & $-2.36$ & $-4.09$ \\
+Middle & 65.28 & 70.61 & 5.33 & 6.13 & 4.72 \\
+High & 54.25 & 69.68 & 15.43 & 16.07 & 14.93 \\
+\bottomrule
+\end{tabular}
+\caption{The selection gain grows with the coverage that selection adds for a test patient. Tertiles split each class's test patients per draw by their coverage improvement, the distance to the nearest random minus the distance to the nearest dispersed training patient. Recalls and gains are in percentage points, with the patient weights of the primary endpoint within a tertile and equal weight for each class, split, and draw. Estimates are descriptive and carry no intervals.}
+\label{tab:tertiles}
+\end{table}
+
+\subsection{Relation fitted to random cohorts}
+\label{sec:relation-results}
+The selected patients differ from one another more than random patients do (Table~\ref{tab:relation}). Their mean between-patient similarity is $\omega=-0.094$, against $-0.011$ for the random cohort, so similarity-adjusted effective support rises from 12.13 to 17.88 while effective support stays at 10.06 for both cohorts. Averaged within each cell of the breadth--depth grid, random cohorts have a similarity between $-0.013$ and $-0.010$ \citep{queisler2026coverageRedundancy}.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrlrrr@{}}
+\toprule
+Allocation & Observed $A$ & Predicted $A$ & $\Neff^{\omega}$ & $\omega$ & $r$ \\
+\midrule
+Random & 62.35 & 62.12 [60.91, 63.23] & 12.13 & $-0.011$ & 0.386 \\
+Dispersed & 67.87 & 67.89 [66.31, 69.41] & 17.88 & $-0.094$ & 0.324 \\
+\addlinespace
+Selection gain & 5.52 & 5.77 [4.80, 6.78] & & & \\
+\bottomrule
+\end{tabular}
+\caption{The relation fitted to random cohorts reproduces both allocations and the selection gain. The relation is model (c) without $\log G$ of \citet{queisler2026coverageRedundancy}, fitted to the 135 random cohorts of the breadth--depth grid and applied to the 30 cohorts of this experiment. $A$ is patient-macro balanced accuracy in percent, with test-patient 95\% intervals for predictions. $\Neff^{\omega}$, $\omega$, and $r$ are means over three splits and five draws of the class-averaged similarity-adjusted effective support, between-patient similarity, and coverage distance.}
+\label{tab:relation}
+\end{table}
+
+\noindent The relation predicts a selection gain of 5.77 points (4.80 to 6.78), and its prediction error of 0.25 points has an interval of $-0.87$ to 1.43. Coverage distance contributes 5.34 points of the prediction and similarity 0.43 points. The coverage part agrees with the descriptive benchmark of Section~\ref{sec:contrast}, which was fixed before any classifier was trained but not as a forecast.
+
+At twenty patients, the same relation predicted 2.10 points against an observed 1.04 \citep{queisler2026coverageRedundancy}. The two settings differ in where the dispersed cohort's coverage distance lies. Random cohorts of five to twenty patients span coverage distances from 0.288 to 0.398. Five selected patients, at 0.324, lie inside this span, whereas twenty selected patients, at 0.269, lie beyond it. The relation therefore interpolates at five patients and extrapolates at twenty.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+When only five patients per cancer type can be labelled, which five matters. At the same patient count, patches per patient, budget, and effective support, five patients chosen by coverage-maximizing selection train a classifier 5.52 points more accurate than five randomly drawn patients. The gain appears in every split--draw combination and in both class groups, recovers 58 percent of the advantage of twenty over five random patients, and makes five selected patients about as accurate as ten random ones.
+
+Three observations tie the gain to coverage. First, it concentrates on test patients whose distance to the nearest training patient shrinks most under selection, while patients already close to the random cohort lose a little. This is the mirror image of the concentration damage at twenty patients, which fell on test patients that a clustered cohort left uncovered \citep{queisler2026cohortComposition}. Second, a relation fitted only to random cohorts, in which coverage distance is nearly fixed by patient count, predicts the gain with an error interval that includes zero and attributes almost all of it to coverage. Third, the gain is large where random sampling leaves much to cover, at five patients, and small where it does not, at twenty. Together with the overprediction at twenty patients, this pattern suggests that accuracy responds to coverage distance roughly linearly over the range of random cohorts and flattens once coverage exceeds what random cohorts reach.
+
+Coverage is not the only property that selection changes. Selected patients are mutually dissimilar, so they are less redundant with one another than random patients, and similarity-adjusted effective support rises by nearly half. The relation assigns only 0.43 points to this change, but its similarity coefficient is estimated from random cohorts, in which similarity barely varies and stays far above the value of selected cohorts. The tertile gradient favours coverage over redundancy, because a reduction of redundancy alone would not be expected to lower recall for the best-covered test patients, but it does not separate the two.
+
+For patient shortage, the result shifts the question from how many patients to label to which patients to label. Selection needs only unlabelled embeddings of candidate patients, and at five patients it reaches accuracy that random sampling attains only with twice as many patients. Before it can be recommended, the criteria of Section~\ref{sec:interpretation} require a further check: probability quality, measured by negative log-likelihood and calibration error, must not deteriorate under selection.
