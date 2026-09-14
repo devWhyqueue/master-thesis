@@ -53,6 +53,30 @@ def build_templates(
     return out
 
 
+def _study_contrast(
+    template: np.ndarray, counts: list[np.ndarray], draws: int, world_column: int
+) -> np.ndarray:
+    """Center replicate fluctuations on one sampled study's patient-and-draw mean."""
+    world = float(
+        np.mean(
+            [
+                (count[0] / draws) @ template[s, :, world_column]
+                for s, count in enumerate(counts)
+            ]
+        )
+    )
+    contrast = np.mean(
+        [
+            np.einsum("rh,hr->r", count, template[s]) / draws
+            for s, count in enumerate(counts)
+        ],
+        axis=0,
+    )
+    # The world already contains the observed training-draw fluctuation.
+    # Shift only the centered replicate errors; retain the fixed test-patient noise.
+    return world + (contrast - contrast[0])
+
+
 def _one_study(
     rng: np.random.Generator,
     templates: dict[str, np.ndarray],
@@ -71,20 +95,10 @@ def _one_study(
         for s in range(n_splits)
     ]  # each (R, H); row 0 is the fixed observed composition
 
-    out: dict[str, np.ndarray] = {}
-    for name, template in templates.items():
-        world = float(
-            np.mean([(n_h[s] / draws) @ template[s, :, r_w] for s in range(n_splits)])
-        )
-        contrast = np.mean(
-            [
-                np.einsum("rh,hr->r", counts[s], template[s]) / draws
-                for s in range(n_splits)
-            ],
-            axis=0,
-        )
-        out[name] = contrast + world
-    return out
+    return {
+        name: _study_contrast(template, counts, draws, r_w)
+        for name, template in templates.items()
+    }
 
 
 def _max_t_critical(base: dict[str, np.ndarray]) -> float:
