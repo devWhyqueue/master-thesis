@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from imbalance_benchmark.common import ensure_dirs, output_root, split_paths, write_json
 
-from breadth import BOOTSTRAP_SEED, N_REPLICATES, N_SPLITS
+from breadth import BOOTSTRAP_SEED, N_SPLITS
 from breadth.analyze.canonical import canonical_class_names, canonical_permutation
 from breadth.analyze.secondary import pack_estimate
 
@@ -102,7 +102,7 @@ def _model_fit(
     }
 
     rng = np.random.default_rng(BOOTSTRAP_SEED)
-    w = draw_weights(fit_split, n_draws, N_REPLICATES, rng)
+    w = draw_weights(fit_split, n_draws, y.shape[-1], rng)
     beta = estimate(y, x, fit_split, w)
     pts = parts(beta, *means.values())
     delta_dist = _pooled_gap(y, mask5, mask10)
