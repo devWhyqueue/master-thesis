@@ -1,0 +1,24 @@
+\section{Results}
+\label{sec:results}
+The manipulation check ran for all 30 cancer types, three splits, and 20 draws per class, and it stopped the experiment before any classifier was trained. In every split, the check fails on a single condition: the five-patient coverage-distance spread of Section~\ref{sec:check} reaches only 0.889, 0.893, and 0.899 of the mean $\Delta'$ in splits 0 through 2, short of the required 0.9 (Table~\ref{tab:results-check}). Every other condition passes with margin, in every split and at both patient counts: the ten-patient spread reaches 0.92 to 0.94 of $\Delta'$; both patient counts' similarity spread exceeds the required 0.072; the separation between class-centred coverage distance and similarity stays within $|r|\le0.06$ of zero, well inside the permitted $[-0.3,0.3]$; between 93 and 96 percent of designed cells land on target, against the required 50 percent; and the validation-patient transfer ratio lies between 0.87 and 1.03, above the required 0.7.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lrrrrrr@{}}
+\toprule
+Split & \multicolumn{2}{c}{Coverage spread / $\Delta'$} & \multicolumn{2}{c}{Similarity spread} & \multicolumn{2}{c}{Transfer ratio} \\
+ & $G=5$ & $G=10$ & $G=5$ & $G=10$ & $G=5$ & $G=10$ \\
+\midrule
+0 & 0.889 & 0.924 & 0.080 & 0.078 & 0.950 & 0.962 \\
+1 & 0.893 & 0.942 & 0.080 & 0.078 & 0.945 & 1.031 \\
+2 & 0.899 & 0.926 & 0.080 & 0.078 & 0.873 & 0.959 \\
+\bottomrule
+\end{tabularx}
+\caption{The only failing condition is the five-patient coverage spread, which falls just short of the required 0.9 of $\Delta'$ in every split; the same condition at ten patients, the similarity spread (required $\ge0.072$), and the transfer ratio (required $\ge0.7$) all pass with margin. Separation and overlap, omitted here, also pass in every split (Section~\ref{sec:results}).}
+\label{tab:results-check}
+\end{table}
+
+\noindent This reproduces, at four times the draws, the near-miss already reported for a five-draw pilot check on the same grid: a five-patient spread of 0.89 of $\Delta'$ in every split \citep{queisler2026coverageSimilarity}. The consistency across two independent draw counts and three splits indicates a structural shortfall of the five-patient designed grid, rather than a threshold narrowly missed by chance: searching toward the corner targets $\bar r_{10}$ and $\bar r_{10}+\Delta'$ of Table~\ref{tab:cells} does not, at five patients, realize the full $\Delta'$ of separation between them.
+
+Because the check fails, the class-recall model of Equation~\eqref{eq:model}, the parts of Equation~\eqref{eq:parts}, and the precision simulation of Appendix~\ref{app:precision} do not run, and the accounts of Section~\ref{sec:interpretation} remain untested. Per Section~\ref{sec:check}, the experiment stops here, with the original tolerances and cell grid retained.

@@ -17,7 +17,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent On TCGA-UT, ten random patients per cancer type train a classifier 5.03 percentage points more accurate than five random patients with the same budget of 160 patches per class. Two measured cohort properties are candidate causes: coverage, the distance from held-out patients to their nearest training patient, and between-patient similarity. In random cohorts both change together with the patient count, so their contributions cannot be told apart. This protocol varies coverage and similarity by design on a three-by-three grid of target levels at five and ten patients, alongside random cohorts of both sizes. A regression of class recall on the achieved coverage, similarity, and patient count splits the five-to-ten-patient gap into a coverage part, a similarity part, and a remaining patient-count part. Each part is read against a one-point threshold: an interval above one point marks a contribution, an upper bound below one point a small part at most. A manipulation check and a precision simulation, both without classifier training, decide whether training proceeds.
+\noindent On TCGA-UT, ten random patients per cancer type train a classifier 5.03 percentage points more accurate than five random patients with the same budget of 160 patches per class. Two measured cohort properties are candidate causes: coverage, the distance from held-out patients to their nearest training patient, and between-patient similarity. In random cohorts both change together with the patient count, so their contributions cannot be told apart. This protocol varies coverage and similarity by design on a three-by-three grid of target levels at five and ten patients, alongside random cohorts of both sizes. A regression of class recall on the achieved coverage, similarity, and patient count splits the five-to-ten-patient gap into a coverage part, a similarity part, and a remaining patient-count part. Each part is read against a one-point threshold: an interval above one point marks a contribution, an upper bound below one point a small part at most. A manipulation check and a precision simulation, both without classifier training, decide whether training proceeds. The manipulation check fails in all three splits, on a single condition: the five-patient coverage-distance spread reaches 0.89 to 0.90 of the required gap against a threshold of 0.9, while every other condition, including the same spread at ten patients, passes with margin. The precision simulation and the class-recall model are therefore not run, and training does not proceed.
 \end{abstract}
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -157,6 +157,8 @@ If $S$ contributes, similar training patients add fewer independent observations
 
 \paragraph{Patient count remains.}
 If $P$ contributes, additional patients help beyond both patient-mean properties. Selection among available patients could then not replace acquiring patients, and the next candidate signal would compare the patch distributions of patients rather than their means. Contributions of several parts, for example of both $C$ and $P$, are read jointly as a shared explanation.
+
+\input{results}
 
 \section{Limitations}
 \label{sec:limitations}
