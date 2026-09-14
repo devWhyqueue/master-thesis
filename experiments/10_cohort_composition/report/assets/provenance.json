@@ -1,0 +1,35 @@
+{
+  "retrieved": "2026-09-14",
+  "source_host": "hydra",
+  "source_root": "/home/yannik.qu/master-thesis/experiments/10_cohort_composition/outputs/tcga_ut/patch/data",
+  "source_commit": "a77a38c",
+  "jobs": {
+    "tcga_ut": {
+      "census_failed": "4885734 (FAILED 1:0, 00:00:25, no log), 4885744 (FAILED 1:0, 00:00:21, unsigned manifest_freeze.json lock)",
+      "census": 4885767,
+      "fit": "4885768_[0-8]",
+      "analyze_failed": "4885769 (FAILED 1:0, KeyError on a test case id; per-split class-order bug fixed in a77a38c)",
+      "analyze": 4886178
+    }
+  },
+  "verification": "Census 4885767 (COMPLETED 0:0, 00:05:56, commit b1e9e63) wrote and signed data/census.json and data/allocations.json, then passed the gate rho_con >= 0.5 in all three splits (0.626/0.678/0.582). Fit array 4885768_0..8 COMPLETED 0:0 (45 fits = 3 allocations x 3 splits x 5 draws, trained at b1e9e63; a77a38c changed no fit-time code). The first analyze 4885769 failed; analyze 4886178 (COMPLETED 0:0, 00:06:37) re-ran at a77a38c, which canonicalizes the per-split class order, and wrote analysis.json and distributions.npz at 2026-09-14 00:14:04. The job log reports the exp-10 analysis.json path, distinguishing it from the concurrent exp-5 (4886171, 4886172) and exp-7 (4886173) analyze re-runs.",
+  "reporting_notes": [
+    "Split-level coverage (census): r_5 0.387/0.385/0.385, r_clustered 0.353/0.356/0.346, r_random 0.296/0.293/0.292, r_dispersed 0.271/0.268/0.268; rho_con 0.626/0.678/0.582; rho_sel 0.272/0.270/0.258; classes with rho_con >= 0.5: 19/19/14 (52 of 90). Identical to exp-9 diagnostic_fixed_count.json.",
+    "Class-level ratios in the report table are computed from coverage distances averaged over splits (median rho_con 0.58, rho_sel 0.26); testicular germ cell tumours rho_con 2.87 because r_clustered 0.418 exceeds r_5 0.274.",
+    "Accuracy (all 30 classes, %, patient-macro balanced): clustered 62.99 [61.68, 64.17] SD 1.36; random 71.29 [69.93, 72.51] SD 0.66; dispersed 72.33 [70.98, 73.57] SD 0.66.",
+    "Delta_con = 8.30 [7.66, 8.95], 15/15 positive, split-draw SD 1.29, range 5.23 to 10.12. Delta_sel = 1.04 [0.44, 1.66], 15/15 positive, SD 0.71, range 0.06 to 2.74.",
+    "Site classes (13): accuracy 57.61/69.11/70.40; Delta_con 11.50 [10.77, 12.17]; Delta_sel 1.29 [0.66, 1.96], 13/15 positive; rho_con 0.66, rho_sel 0.38. Other classes (17): 67.10/72.96/73.82; Delta_con 5.86 [4.89, 6.84]; Delta_sel 0.86 [-0.07, 1.75], 12/15 positive; rho_con 0.60, rho_sel 0.18.",
+    "Coverage-improvement tertiles (all classes; recall clustered/random, damage): low 74.57/72.29/-2.28, middle 66.73/74.38/7.65, high 46.53/66.96/20.44. Site damage -1.33/11.07/25.32; other -3.01/5.04/16.70.",
+    "Unpaired grid reference from exp-5 grid_accuracies.tex (TCGA-UT): G5_m32 62.25, G20_m8 71.76.",
+    "Interpretation label: concentration_damage (Delta_con interval above 1pp, Delta_sel interval not above 1pp)."
+  ],
+  "sha256": {
+    "tcga_ut/analysis.json": "f9c4f02a5918ae275888e87ae551523952cd99dbbac1a5df8358f1a880129df0",
+    "tcga_ut/census.json": "b565dacbbabc0e48a64572d61785edae7fd6486fd6925381a16a6f728e48169d",
+    "tcga_ut/distributions.npz": "f57ae872aa07e5b17fb6a6758dc934a0740392182f10a486e9cbb86bbfb1b16c"
+  },
+  "checks": [
+    "Local analysis.json, census.json, and distributions.npz SHA-256 match the live Hydra artifacts; census.json matches its sidecar signature.",
+    "distributions.npz holds 2,001 entries per array (entry 0 observed, 2,000 resampled); percentiles of entries 1 onward reproduce the analysis.json intervals."
+  ]
+}

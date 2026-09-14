@@ -1,0 +1,52 @@
+\section{Coverage by cancer type}
+\label{app:class-coverage}
+Table~\ref{tab:class-check} lists the manipulation check for each cancer type, averaged over the three splits and five draws.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}lrrrrrrc@{}}
+\toprule
+ & \multicolumn{4}{c}{Coverage distance} & & & Focal-site share, \% \\
+\cmidrule(lr){2-5}
+Cancer type & $r_{5}$ & $r_{\mathrm{clu}}$ & $r_{\mathrm{ran}}$ & $r_{\mathrm{dis}}$ & $\rho_{\mathrm{con}}$ & $\rho_{\mathrm{sel}}$ & clu / ran / dis \\
+\midrule
+Adrenocortical carcinoma & 0.309 & 0.259 & 0.246 & 0.246 & 0.21 & 0.01 & 72 / 72 / 70 \\
+Bladder urothelial carcinoma & 0.573 & 0.555 & 0.430 & 0.394 & 0.87 & 0.25 & 12 / 6 / 6 \\
+Brain lower grade glioma & 0.261 & 0.228 & 0.196 & 0.167 & 0.49 & 0.45 & 22 / 8 / 6 \\
+Breast invasive carcinoma & 0.541 & 0.508 & 0.430 & 0.373 & 0.70 & 0.51 & 17 / 11 / 7 \\
+Cervical squamous and endocervical carcinoma & 0.521 & 0.491 & 0.383 & 0.344 & 0.78 & 0.28 & 11 / 9 / 8 \\
+Colon adenocarcinoma & 0.310 & 0.286 & 0.245 & 0.222 & 0.62 & 0.36 & 20 / 5 / 8 \\
+Esophageal carcinoma & 0.560 & 0.508 & 0.410 & 0.370 & 0.66 & 0.27 & 21 / 7 / 11 \\
+Glioblastoma multiforme & 0.324 & 0.281 & 0.245 & 0.212 & 0.45 & 0.42 & 43 / 14 / 14 \\
+Head and neck squamous cell carcinoma & 0.359 & 0.324 & 0.274 & 0.253 & 0.58 & 0.25 & 20 / 11 / 11 \\
+Kidney chromophobe & 0.203 & 0.167 & 0.153 & 0.141 & 0.28 & 0.23 & 16 / 15 / 18 \\
+Kidney renal clear cell carcinoma & 0.256 & 0.254 & 0.191 & 0.164 & 0.96 & 0.43 & 34 / 18 / 14 \\
+Kidney renal papillary cell carcinoma & 0.355 & 0.318 & 0.276 & 0.252 & 0.53 & 0.30 & 9 / 4 / 5 \\
+Liver hepatocellular carcinoma & 0.368 & 0.333 & 0.285 & 0.253 & 0.57 & 0.39 & 32 / 19 / 19 \\
+Lung adenocarcinoma & 0.500 & 0.469 & 0.385 & 0.341 & 0.73 & 0.38 & 20 / 8 / 7 \\
+Lung squamous cell carcinoma & 0.499 & 0.448 & 0.394 & 0.358 & 0.51 & 0.35 & 15 / 6 / 6 \\
+Mesothelioma & 0.512 & 0.421 & 0.398 & 0.391 & 0.21 & 0.06 & 7 / 5 / 6 \\
+Ovarian serous cystadenocarcinoma & 0.441 & 0.366 & 0.341 & 0.326 & 0.25 & 0.14 & 55 / 46 / 48 \\
+Pancreatic adenocarcinoma & 0.438 & 0.362 & 0.344 & 0.322 & 0.19 & 0.24 & 11 / 6 / 9 \\
+Pheochromocytoma and paraganglioma & 0.249 & 0.186 & 0.161 & 0.153 & 0.28 & 0.09 & 68 / 68 / 70 \\
+Prostate adenocarcinoma & 0.189 & 0.176 & 0.153 & 0.117 & 0.65 & 0.98 & 15 / 8 / 10 \\
+Rectum adenocarcinoma & 0.272 & 0.229 & 0.199 & 0.192 & 0.40 & 0.10 & 18 / 12 / 7 \\
+Sarcoma & 0.379 & 0.369 & 0.287 & 0.268 & 0.89 & 0.21 & 38 / 26 / 20 \\
+Skin cutaneous melanoma & 0.493 & 0.444 & 0.396 & 0.354 & 0.49 & 0.43 & 18 / 10 / 10 \\
+Stomach adenocarcinoma & 0.564 & 0.541 & 0.416 & 0.378 & 0.84 & 0.26 & 25 / 16 / 18 \\
+Testicular germ cell tumours & 0.274 & 0.418 & 0.198 & 0.181 & 2.87 & 0.21 & 47 / 39 / 46 \\
+Thymoma & 0.318 & 0.278 & 0.223 & 0.211 & 0.58 & 0.13 & 12 / 8 / 8 \\
+Thyroid carcinoma & 0.341 & 0.340 & 0.237 & 0.199 & 0.99 & 0.36 & 19 / 16 / 13 \\
+Uterine carcinosarcoma & 0.483 & 0.397 & 0.395 & 0.403 & 0.03 & $-0.09$ & 14 / 12 / 11 \\
+Uterine corpus endometrial carcinoma & 0.439 & 0.411 & 0.339 & 0.309 & 0.72 & 0.31 & 15 / 4 / 7 \\
+Uveal melanoma & 0.239 & 0.183 & 0.182 & 0.183 & 0.02 & $-0.02$ & 32 / 24 / 22 \\
+\midrule
+Mean over classes & 0.386 & 0.352 & 0.294 & 0.269 & 0.63 & 0.27 & 25 / 17 / 17 \\
+\bottomrule
+\end{tabular}
+\caption{The concentration contrast varies widely between cancer types, and five types receive almost none of it. Coverage distances are averaged over the three splits and five draws, and the class-level ratios $\rho_{\mathrm{con}}$ and $\rho_{\mathrm{sel}}$ are computed from these averages. Focal-site shares give the percentage of the nineteen non-focal patients that come from the focal patient's tissue source site in the clustered, random, and dispersed allocation.}
+\label{tab:class-check}
+\end{table}

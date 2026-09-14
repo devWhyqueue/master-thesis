@@ -1,0 +1,94 @@
+\section{Results}
+\label{sec:results}
+The manipulation check passed in all three splits. The coverage ratio of the concentration contrast is $\rho_{\mathrm{con}}=0.63$, $0.68$, and $0.58$, as anticipated in Table~\ref{tab:preview}. Concentrating the cohort around one patient lowers patient-macro balanced accuracy by 8.30 percentage points (95\% interval: 7.66 to 8.95), whereas coverage-maximizing selection raises it over random sampling by 1.04 points (0.44 to 1.66). The first interval lies above the one-point threshold and the second crosses it, so the outcome is the concentration-damage reading of Table~\ref{tab:readings}.
+
+\subsection{Manipulation check}
+\label{sec:check-results}
+The split-level coverage distances match Table~\ref{tab:preview} to the third decimal. Averaged over splits, the clustered allocation covers validation patients at 0.352, the random allocation at 0.294, and the dispersed allocation at 0.269, against 0.386 for the five anchors. Mean pairwise distances within a cohort are 0.36, 0.59, and 0.67. Clustering thus removes about two thirds of the coverage that fifteen random additions contribute, and coverage-maximizing selection adds about a quarter of it. In 52 of the 90 class--split combinations, the class-level concentration ratio reaches 0.5: 19, 19, and 14 classes in the three splits.
+
+The manipulation is uneven across cancer types (Table~\ref{tab:class-check} in Appendix~\ref{app:class-coverage}). Class-level concentration ratios have a median of 0.58. Adrenocortical carcinoma, mesothelioma, pancreatic adenocarcinoma, uterine carcinosarcoma, and uveal melanoma stay below 0.25, and for uterine carcinosarcoma and uveal melanoma all three allocations cover validation patients equally well. At the other extreme, the clustered allocation of testicular germ cell tumours covers validation patients worse than the five anchors do, because the clustered cohort drops the other four anchors and the neighbours of the focal patient lie far from the validation patients those anchors cover. The selection ratio exceeds 0.5 only for breast invasive carcinoma and prostate adenocarcinoma. The focal patient's site contributes 25 percent of the clustered patients and 17 percent of the random and dispersed patients; the two classes with few contributing sites, adrenocortical carcinoma and pheochromocytoma and paraganglioma, reach about 70 percent under every rule.
+
+\subsection{Concentration damage and selection gain}
+\label{sec:contrast-results}
+The clustered cohort is far less accurate than the other two (Table~\ref{tab:allocation-accuracy}). Over all 30 classes, it reaches 62.99 percent, against 71.29 percent for the random and 72.33 percent for the dispersed cohort. It is also the most sensitive to which patients are drawn, with a standard deviation of 1.36 points across split--draw combinations against 0.66 points for both other cohorts.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{All classes} & \multicolumn{2}{c}{Site classes} & \multicolumn{2}{c}{Other classes} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
+Allocation & Accuracy [95\% interval] & SD & Accuracy & SD & Accuracy & SD \\
+\midrule
+Clustered & 62.99 [61.68, 64.17] & 1.36 & 57.61 & 2.53 & 67.10 & 2.06 \\
+Random & 71.29 [69.93, 72.51] & 0.66 & 69.11 & 1.24 & 72.96 & 1.56 \\
+Dispersed & 72.33 [70.98, 73.57] & 0.66 & 70.40 & 1.14 & 73.82 & 1.83 \\
+\bottomrule
+\end{tabular}
+\caption{At twenty patients with eight patches each, a clustered cohort is about eight points less accurate than a random one, and a dispersed cohort about one point more accurate. Accuracy is patient-macro balanced accuracy in percent, averaged over three splits and five draws, with test-patient 95\% intervals. Site classes are the thirteen cancer types of \citet{queisler2026siteCoverage}; other classes are the remaining seventeen. SD is the population standard deviation across the fifteen split--draw combinations, in percentage points.}
+\label{tab:allocation-accuracy}
+\end{table}
+
+\noindent The concentration damage is $\Delta_{\mathrm{con}}=8.30$ points with a test-patient interval of 7.66 to 8.95 (Table~\ref{tab:contrasts}). It is positive in all fifteen split--draw combinations, ranging from 5.23 to 10.12 points. The interval lies entirely above the threshold, so a cohort concentrated around one patient trains a practically worse classifier than a random cohort of the same size, depth, and effective support.
+
+The selection gain is $\Delta_{\mathrm{sel}}=1.04$ points (0.44 to 1.66). It is positive in all fifteen combinations, but ranges from 0.06 to 2.74 points. The interval excludes zero and crosses the threshold, so coverage-maximizing selection improves on random sampling without an established practically relevant gain. Section~\ref{sec:interpretation} rules out reading this interval as equivalence, because the underlying coverage change is only about a quarter of the coverage gained from five to twenty random patients.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrrrc@{}}
+\toprule
+Contrast & Classes & $\rho$ & Estimate & 95\% interval & SD & Positive \\
+\midrule
+Concentration damage $\Delta_{\mathrm{con}}$ & All & 0.63 & 8.30 & [7.66, 8.95] & 1.29 & 15 of 15 \\
+ & Site & 0.66 & 11.50 & [10.77, 12.17] & 2.07 & 15 of 15 \\
+ & Other & 0.60 & 5.86 & [4.89, 6.84] & 2.13 & 15 of 15 \\
+\addlinespace
+Selection gain $\Delta_{\mathrm{sel}}$ & All & 0.27 & 1.04 & [0.44, 1.66] & 0.71 & 15 of 15 \\
+ & Site & 0.38 & 1.29 & [0.66, 1.96] & 0.85 & 13 of 15 \\
+ & Other & 0.18 & 0.86 & [$-0.07$, 1.75] & 1.19 & 12 of 15 \\
+\bottomrule
+\end{tabular}
+\caption{The concentration damage lies above the one-point threshold in every class group, whereas every selection-gain interval crosses it. $\rho$ is the coverage ratio of the contrast, $\rho_{\mathrm{con}}$ or $\rho_{\mathrm{sel}}$, computed from coverage distances averaged over the group's classes, splits, and draws. Estimates and paired test-patient intervals are in percentage points. SD and the positive count describe the contrast across the fifteen split--draw combinations.}
+\label{tab:contrasts}
+\end{table}
+
+The damage is larger than the descriptive scale of Section~\ref{sec:contrasts} anticipates. That scale, $\rho_{\mathrm{con}}\times 5.2\approx 3.3$ points, assumed that coverage carries the whole residual beyond effective support and that accuracy changes linearly with coverage distance. The observed damage is about two and a half times as large. It amounts to 87 percent of the 9.52-point advantage of twenty over five patients at the same budget \citep{queisler2026effectiveSupport}. On the breadth--depth grid of that experiment, which uses other draws and is not paired with the present classifiers, five random patients with 32 patches reach 62.25 percent and twenty with eight patches 71.76 percent. Twenty patients concentrated around one patient are therefore about as accurate as five randomly drawn patients, whereas the random cohort of this experiment matches its grid counterpart within half a point. The selection gain, by contrast, stays below its linear scale of $0.27\times 5.2\approx 1.4$ points.
+
+\subsection{Where the damage arises}
+\label{sec:damage-location}
+Both class groups show a concentration damage above the threshold, but it is twice as large in the site classes, at 11.50 points, as in the seventeen other classes, at 5.86 points (Table~\ref{tab:contrasts}). The coverage ratios of the two groups differ much less, 0.66 against 0.60. The clustered cohort loses most in the site classes, at 57.61 percent, and the other classes include the five types that receive almost no concentration contrast. The selection gain follows the size of its coverage change: 1.29 points at a ratio of 0.38 for site classes and 0.86 points at 0.18 for the other classes, whose interval includes zero.
+
+Within classes, the damage falls on test patients whom the clustered cohort covers worse (Table~\ref{tab:tertiles}). In the tertile with the smallest coverage improvement, clustered training is 2.28 points more accurate than random training. In the middle tertile, the damage is 7.65 points, and in the tertile with the largest coverage improvement, 20.44 points, where recall under clustered training drops to 46.53 percent. The gradient appears in both class groups, most steeply in the site classes.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{All classes} & \multicolumn{2}{c}{Damage by class group} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-6}
+Coverage-improvement tertile & Clustered & Random & Damage & Site & Other \\
+\midrule
+Low & 74.57 & 72.29 & $-2.28$ & $-1.33$ & $-3.01$ \\
+Middle & 66.73 & 74.38 & 7.65 & 11.07 & 5.04 \\
+High & 46.53 & 66.96 & 20.44 & 25.32 & 16.70 \\
+\bottomrule
+\end{tabular}
+\caption{The concentration damage grows with the coverage that the clustered cohort withholds from a test patient. Tertiles split each class's test patients per draw by their coverage improvement, the distance to the nearest clustered minus the distance to the nearest random training patient. Recalls and damages are in percentage points, with the patient weights of the primary endpoint within a tertile and equal weight for each class, split, and draw. Estimates are descriptive and carry no intervals.}
+\label{tab:tertiles}
+\end{table}
+
+\noindent Site composition changes too little to account for most of this damage. Site signatures are visible in deep features of TCGA slides \citep{howard2021impact}, so neighbours of one patient may share its site. The focal patient's site contributes eight percentage points more of the clustered than of the random cohort, and eleven points more in the site classes, 19 against 8 percent. For these classes, doubling the number of sites at a fixed patient count changed accuracy by only 1.06 points \citep{queisler2026siteCoverage}, an order of magnitude less than their concentration damage.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+At a fixed number of patients, patches, and effective support, which patients form a TCGA-UT training cohort matters. A cohort of twenty patients that resemble one patient in the Virchow2 embedding is 8.30 points less accurate than a random cohort, nearly the full advantage of twenty over five patients at the same budget, and this damage appears in every split--draw combination and in both class groups. Replacing random sampling by coverage-maximizing selection adds 1.04 points, a gain that is consistently positive but not established as practically relevant.
+
+Two properties of the damage bear on its cause. First, it concentrates on test patients far from the clustered cohort, while patients near it are classified slightly better than under random training. This pattern is what missing coverage predicts, and a loss of independent observations alone would not be expected to raise recall for the patients the cohort covers well. Second, the damage is about two and a half times the linear coverage scale and nearly erases the breadth advantage. Accuracy may therefore respond non-linearly to coverage distance, with the clustered cohort crossing a region in which whole appearances of a cancer type go unrepresented. The limitations of Section~\ref{sec:limitations} also apply in full: the clustered patients are redundant with one another beyond what effective support counts, and they over-represent one appearance, towards which the class boundary may shift. The tertile gradient favours coverage and appearance imbalance over redundancy alone but does not separate them, and the experiment does not show that patient-mean coverage carries the residual breadth benefit of random cohorts.
+
+The asymmetry between the two contrasts matters for patient shortage. Random sampling at twenty patients already attains most of the coverage that coverage-maximizing selection can reach, and it attains most of the accuracy too. Cohort composition therefore protects mainly against a poorly covering cohort, such as one drawn from a single clinic's typical cases, and offers at most a small gain when a random cohort of twenty patients is available. Under the concentration-damage reading, the value of coverage-guided selection remains open where random cohorts cover a class less well. The next step is the comparison of Section~\ref{sec:interpretation}: coverage-selected against random cohorts of five patients with 32 patches each, the allocation in which patient shortage was first observed. An estimate of between-patient correlation within clustered and random cohorts would, in addition, show how much of the concentration damage effective support would attribute to redundancy once patient similarity is counted.

@@ -8,7 +8,7 @@
 \newcommand{\Neff}{N_{\mathrm{eff}}}
 \title{Patient Shortage in Histopathology:\\Does Cohort Composition Matter\\at a Fixed Patient Count?}
 \author{Yannik Queisler}
-\date{September 13, 2026}
+\date{September 14, 2026}
 
 \begin{document}
 \raggedbottom
@@ -17,7 +17,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and tissue source sites explain little of this residual. Two tests of patient coverage stopped at their manipulation checks, because a twenty-patient allocation nested around five seed patients covers held-out patients almost as well as a random one, whichever patients are added. This experiment therefore holds the patient count fixed and varies only which patients form the cohort. Three allocations of twenty patients with eight patches each share a randomly drawn focal patient: its nineteen nearest neighbours in the patient-mean Virchow2 embedding (\emph{clustered}), nineteen randomly drawn patients (\emph{random}), and nineteen patients chosen by facility location on the training pool (\emph{dispersed}). Patients, patches, and effective support are equal across the three allocations. The primary contrast, \emph{concentration damage}, is the accuracy of the random minus the clustered allocation; the secondary contrast, \emph{selection gain}, is the accuracy of the dispersed minus the random allocation. A manipulation check, run before any classifier is trained, requires the clustered-to-random coverage change to reach at least half of the coverage change from five to twenty random patients in every split. Embeddings from a preceding diagnostic give 0.58 to 0.68 for this ratio but only 0.26 to 0.27 for the random-to-dispersed change, so the selection gain is interpreted only as a gain, never as evidence of equivalence. Concentration damage above one percentage point would show that cohort composition matters at a fixed patient count; an additional selection gain above one point would support coverage-guided patient selection; practical equivalence for concentration damage would weaken patient-mean coverage as the missing source of information.
+\noindent TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and tissue source sites explain little of this residual. This experiment asks whether the composition of a patient cohort matters when its size is fixed. Three cohorts of twenty patients with eight patches each share one randomly drawn focal patient. The remaining patients are its nearest neighbours in the patient-mean Virchow2 embedding (\emph{clustered}), randomly drawn patients (\emph{random}), or patients selected to cover the class's training patients as evenly as possible (\emph{dispersed}). Patients, patches, and effective support are equal across the cohorts. The clustered cohort reaches 62.99 percent patient-macro balanced accuracy, 8.30 percentage points below the random cohort (test-patient 95\% interval: 7.66 to 8.95), nearly the full advantage of twenty over five patients at the same budget. This damage falls on test patients far from the clustered cohort. The dispersed cohort improves on the random cohort by 1.04 points (0.44 to 1.66), an interval that crosses the one-point practical threshold. Cohort composition therefore matters at a fixed patient count, mainly as protection against a poorly covering cohort, although redundancy between similar patients may contribute to the size of the damage.
 \end{abstract}
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -27,13 +27,13 @@
 \label{sec:motivation}
 Spreading a labelling budget over more patients improves TCGA-UT patch classification beyond what redundancy explains. At 160 patches per class, twenty patients contributing eight patches each outperform five patients contributing 32 patches each by 9.52 percentage points of patient-macro balanced accuracy \citep{queisler2026effectiveSupport}. At equal effective support, each doubling of patients still adds 2.62 points \citep{queisler2026multidirectionalRedundancy}, about 5.2 points over the two doublings of this comparison. Doubling tissue source sites at a fixed patient count adds 1.06 points, mostly for test patients from the added sites, and twenty patients from five sites are at least as accurate as twenty randomly drawn patients \citep{queisler2026siteCoverage}.
 
-\emph{Patient coverage}, the share of a cancer type's between-patient variation that the training patients represent, remains the leading label-free candidate. Its two tests compared a low-coverage and a random twenty-patient allocation that both contained the same five seed patients \citep{queisler2026patientCoverage,queisler2026concentratedCoverage}. Both stopped at the manipulation check: the low-coverage allocation attained 84 to 88 percent, and after concentration around a single seed still 67 to 73 percent, of the random allocation's coverage improvement. A diagnostic of seven nested rules reached no leakage below 0.53 \citep{queisler2026concentratedCoverage}. Quadrupling the patient count shortens the distance from most held-out patients to their nearest training patient, whichever patients are added, so a step that raises patient count at nearly constant coverage is out of reach for this coverage measure.
+\emph{Patient coverage}, the share of a cancer type's between-patient variation that the training patients represent, remains the leading label-free candidate. Two preceding experiments built twenty-patient cohorts around the same five patients and added either patients similar to them or randomly drawn patients \citep{queisler2026patientCoverage,queisler2026concentratedCoverage}. The similar additions covered held-out patients almost as well as the random ones: they attained 84 to 88 percent of the coverage improvement of random additions, and still 67 to 73 percent when all additions resembled a single patient. Quadrupling the patient count shortens the distance from most held-out patients to their nearest training patient, whichever patients are added, so with this coverage measure patient count and coverage cannot be varied independently.
 
-The same diagnostic shows that coverage varies strongly between cohorts of equal size. Twenty patients forming one neighbourhood cover validation patients at a mean distance of 0.346 to 0.356, twenty random patients at 0.292 to 0.296, and twenty patients selected by facility location at 0.268 to 0.271; five random patients cover them at 0.385 to 0.387. This report therefore replaces the question whether similar patients help beyond effective support with a question that the measure can address: \emph{at a fixed patient count, does a cohort that covers the class's patients poorly train a worse classifier, and does one that covers them well train a better classifier than random sampling?}
+Coverage does, however, vary strongly between cohorts of equal size. Twenty patients forming one neighbourhood cover validation patients at a mean distance of 0.346 to 0.356, twenty random patients at 0.292 to 0.296, and twenty patients selected to cover the training pool as evenly as possible at 0.268 to 0.271; five random patients cover them at 0.385 to 0.387 \citep{queisler2026concentratedCoverage}. This report therefore replaces the question whether similar patients help beyond effective support with a question that the measure can address: \emph{at a fixed patient count, does a cohort that covers the class's patients poorly train a worse classifier, and does one that covers them well train a better classifier than random sampling?}
 
 \section{Study design}
 \label{sec:design}
-Only the composition of a twenty-patient cohort changes. The design inherits from \citet{queisler2026concentratedCoverage} the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits with their natural validation and test partitions, the nested round-robin patch order, and the readout: multinomial logistic regression with its regularization strength selected on the validation partition for every fit. It also inherits the patient distance. For split $r$ and class $c$, $\bar{\mathbf x}_{irc}$ is the mean feature vector of patient $i$'s patches of the class, $\boldsymbol\mu_r$ the average of these means over all classes, and
+Only the composition of a twenty-patient cohort changes. The design inherits from \citet{queisler2026concentratedCoverage} the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits with their natural validation and test partitions, the nested round-robin patch order, and the readout: multinomial logistic regression with its regularization strength selected on the validation partition for every classifier. It also inherits the patient distance. For split $r$ and class $c$, $\bar{\mathbf x}_{irc}$ is the mean feature vector of patient $i$'s patches of the class, $\boldsymbol\mu_r$ the average of these means over all classes, and
 \begin{equation}
  \mathbf e_{irc}=\frac{\bar{\mathbf x}_{irc}-\boldsymbol\mu_r}{\lVert\bar{\mathbf x}_{irc}-\boldsymbol\mu_r\rVert},
  \qquad
@@ -46,14 +46,14 @@ Only the composition of a twenty-patient cohort changes. The design inherits fro
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lrrl@{}}
 \toprule
-Allocation & Patients $G$ & Patches per patient $m$ & Patients \\
+Allocation & $G$ & $m$ & Patients \\
 \midrule
 Clustered & 20 & 8 & focal patient, its 19 nearest neighbours \\
-Random & 20 & 8 & focal patient, 19 random patients \\
-Dispersed & 20 & 8 & focal patient, 19 facility-location patients \\
+Random & 20 & 8 & focal patient, 4 other anchors, 15 random patients \\
+Dispersed & 20 & 8 & focal patient, 19 coverage-maximizing patients \\
 \bottomrule
 \end{tabular}
-\caption{The three allocations share the focal patient, the patient count, the budget of 160 patches per class, and therefore the effective support. They differ only in how the remaining nineteen patients are chosen, which moves coverage from low to high.}
+\caption{The three allocations share the focal patient, the patient count $G$, the patches per patient $m$, the budget of 160 patches per class, and therefore the effective support. They differ only in how the remaining nineteen patients are chosen, which moves coverage from low to high.}
 \label{tab:allocations}
 \end{table}
 
@@ -63,28 +63,28 @@ Dispersed & 20 & 8 & focal patient, 19 facility-location patients \\
 \label{sec:allocation}
 Three rules define the training sets and check the manipulation before any classifier is trained. First, every class is admitted. The pool $\mathcal E_{rc}$ contains the training patients with at least 32 patches of class $c$; pools hold between 30 and 514 patients, so every class can supply twenty.
 
-Second, the allocations share a draw structure. For each split, class, and draw $d\in\{1,\ldots,5\}$, the five \emph{seed} patients are those of the stored five-patient draw of \citet{queisler2026effectiveSupport}, and the \emph{focal patient} $f$ is the seed drawn uniformly at random in \citet{queisler2026concentratedCoverage}. The random allocation is the random allocation of \citet{queisler2026concentratedCoverage}: the five seeds and fifteen randomly drawn pool patients. It contains $f$ and is distributed like a twenty-patient random draw. The clustered allocation contains $f$ and the nineteen patients of $\mathcal E_{rc}\setminus\{f\}$ closest to it under Equation~\eqref{eq:distance}. The dispersed allocation starts from $S_0=\{f\}$ and adds nineteen patients greedily by \emph{facility location},
+Second, the allocations share a draw structure. For each split, class, and draw $d\in\{1,\ldots,5\}$, the five \emph{anchor patients} are the patients of the stored five-patient draw of \citet{queisler2026effectiveSupport}. The \emph{focal patient} $f$ is one of these five anchors, drawn uniformly at random as in \citet{queisler2026concentratedCoverage}, and it is the only patient that every allocation contains by construction. The random allocation adds fifteen randomly drawn pool patients to the five anchors, as in \citet{queisler2026concentratedCoverage}, so it contains $f$ and is distributed like a twenty-patient random draw. The clustered allocation contains $f$ and the nineteen patients of $\mathcal E_{rc}\setminus\{f\}$ closest to it under Equation~\eqref{eq:distance}. The dispersed allocation starts from $S_0=\{f\}$ and adds nineteen patients greedily by \emph{coverage-maximizing selection}, known as facility location in operations research:
 \begin{equation}
- S_{k+1}=S_k\cup\Bigl\{\operatorname*{arg\,min}_{j\in\mathcal E_{rc}\setminus S_k}\ \frac{1}{|\mathcal E_{rc}|}\sum_{i\in\mathcal E_{rc}}\ \min_{l\in S_k\cup\{j\}} d(i,l)\Bigr\},
+ S_{k+1}=S_k\cup\Bigl\{\operatorname*{arg\,min}_{j\in\mathcal E_{rc}\setminus S_k}\ \frac{1}{|\mathcal E_{rc}|}\sum_{i\in\mathcal E_{rc}}\ \min_{l\in S_k\cup\{j\}} d(i,l)\Bigr\}.
  \label{eq:facility}
 \end{equation}
-\noindent so each step adds the pool patient that most shortens the mean distance from pool patients to their nearest selected patient. Ties in both rules are broken by patient identifier, and neither rule uses validation or test patients. Every patient contributes the first eight patches of its round-robin order. The design requires 45 fits, one per allocation, split, and draw.
+\noindent Each step adds the pool patient that most shortens the mean distance from pool patients to their nearest selected patient. The rule uses only distances in the embedding, not tissue source sites. Ties in both rules are broken by patient identifier, and neither rule uses validation or test patients. Every patient contributes the first eight patches of its round-robin order.
 
 Third, a manipulation check compares how well the allocations cover held-out patients. The \emph{coverage distance} of a patient set is the mean distance from the class's validation patients $\mathcal V_{rc}$ to their nearest training patient,
 \begin{equation}
  r_{rc}(\mathcal P)=\frac{1}{|\mathcal V_{rc}|}\sum_{i\in\mathcal V_{rc}}\min_{j\in\mathcal P}d(i,j).
  \label{eq:coverage}
 \end{equation}
-\noindent With $r_{\mathrm{clu}}$, $r_{\mathrm{ran}}$, and $r_{\mathrm{dis}}$ the coverage distances of the three allocations and $r_{5}$ that of the five seeds, each averaged over classes and draws within a split, the coverage change from five to twenty random patients serves as the reference scale. The two \emph{coverage ratios}
+\noindent Let $r_{\mathrm{clu}}$, $r_{\mathrm{ran}}$, and $r_{\mathrm{dis}}$ be the coverage distances of the three allocations and $r_{5}$ that of the five anchors, each averaged over classes and draws within a split. The difference $r_{5}-r_{\mathrm{ran}}$ is the coverage gained when fifteen random patients join the five anchors, and it serves as the yardstick for both contrasts. The two \emph{coverage ratios}
 \begin{equation}
  \rho_{\mathrm{con}}=\frac{r_{\mathrm{clu}}-r_{\mathrm{ran}}}{r_{5}-r_{\mathrm{ran}}},
  \qquad
  \rho_{\mathrm{sel}}=\frac{r_{\mathrm{ran}}-r_{\mathrm{dis}}}{r_{5}-r_{\mathrm{ran}}}
  \label{eq:ratios}
 \end{equation}
-\noindent express the coverage change behind each contrast in units of this scale. Fitting proceeds only if $\rho_{\mathrm{con}}\ge 0.5$ in all three splits. The ratio $\rho_{\mathrm{sel}}$, the class-level ratios, the mean pairwise distance within each cohort, and the share of patients from the focal patient's tissue source site are recorded without a threshold.
+\noindent express the coverage change behind each contrast as a fraction of this gain. Fitting proceeds only if $\rho_{\mathrm{con}}\ge 0.5$ in all three splits. The ratio $\rho_{\mathrm{sel}}$, the class-level ratios, the mean pairwise distance within each cohort, and the share of patients from the focal patient's tissue source site are recorded without a threshold.
 
-Table~\ref{tab:preview} reports these quantities from the diagnostic of \citet{queisler2026concentratedCoverage}, which used the same embeddings, draws, and selection rules. The check is expected to pass: $\rho_{\mathrm{con}}$ lies between 0.58 and 0.68, and the class-level ratio reaches 0.5 in 52 of 90 class--split combinations. The secondary contrast rests on a much smaller manipulation, a quarter of the reference scale, which constrains its interpretation in Section~\ref{sec:interpretation}.
+Table~\ref{tab:preview} reports these quantities as computed by \citet{queisler2026concentratedCoverage} from the same embeddings, draws, and selection rules, before any classifier of this experiment was trained. The check is expected to pass: $\rho_{\mathrm{con}}$ lies between 0.58 and 0.68, and the class-level ratio reaches 0.5 in 52 of 90 class--split combinations. The secondary contrast rests on a much smaller manipulation, about a quarter of the coverage gained from five to twenty random patients, which constrains its interpretation in Section~\ref{sec:interpretation}.
 
 \begin{table}[htbp]
 \centering
@@ -100,7 +100,7 @@ Split & $r_{5}$ & $r_{\mathrm{clu}}$ & $r_{\mathrm{ran}}$ & $r_{\mathrm{dis}}$ &
 3 & 0.385 & 0.346 & 0.292 & 0.268 & 0.58 & 0.26 \\
 \bottomrule
 \end{tabular}
-\caption{Clustering moves coverage far more than facility location does. Coverage distances are mean cosine distances from validation patients to their nearest training patient, averaged over the 30 classes and five draws, from the diagnostic of \citet{queisler2026concentratedCoverage}. Mean pairwise distances within a cohort are 0.35 to 0.37 for clustered, 0.59 to 0.60 for random, and 0.67 for dispersed allocations.}
+\caption{Clustering moves coverage far more than coverage-maximizing selection does. Coverage distances are mean cosine distances from validation patients to their nearest training patient, averaged over the 30 classes and five draws, as computed by \citet{queisler2026concentratedCoverage}. Mean pairwise distances within a cohort are 0.35 to 0.37 for clustered, 0.59 to 0.60 for random, and 0.67 for dispersed allocations.}
 \label{tab:preview}
 \end{table}
 
@@ -132,7 +132,7 @@ Uncertainty follows \citet{queisler2026effectiveSupport}. Each of 2,000 paired B
 
 \section{Interpretation criteria}
 \label{sec:interpretation}
-Conclusions rest on the test-patient intervals for $\Delta_{\mathrm{con}}$ and $\Delta_{\mathrm{sel}}$ and on the practical threshold of one percentage point used in the preceding experiments (Table~\ref{tab:readings}). The two contrasts are not treated symmetrically. Concentration damage rests on a coverage change of more than half the reference scale, so an interval within $[-1,1]$ counts as practical equivalence. Selection gain rests on a quarter of that scale, so only an interval above one point is informative; an interval within $[-1,1]$ does not show that coverage-guided selection is useless.
+Conclusions rest on the test-patient intervals for $\Delta_{\mathrm{con}}$ and $\Delta_{\mathrm{sel}}$ and on the practical threshold of one percentage point used in the preceding experiments (Table~\ref{tab:readings}). The two contrasts are not treated symmetrically. Concentration damage rests on a coverage change of more than half the coverage gained from five to twenty random patients, so an interval within $[-1,1]$ counts as practical equivalence. Selection gain rests on about a quarter of that gain, so only an interval above one point is informative; an interval within $[-1,1]$ does not show that coverage-guided selection is useless.
 
 \begin{table}[htbp]
 \centering
@@ -159,16 +159,19 @@ If both contrasts exceed the threshold, patient-mean coverage separates useful f
 If only the concentration damage exceeds the threshold, a cohort that misses most of the class's between-patient variation trains a worse classifier, but random sampling may already capture most of the attainable coverage at twenty patients. Coverage would remain a plausible explanation of the breadth benefit; its value for patient selection would still be open and would again be tested first at five patients, where random cohorts cover the class less well.
 
 \paragraph{No composition effect.}
-If the concentration damage is practically zero, a coverage change of more than half the reference scale leaves accuracy unchanged, and patient-mean coverage is unlikely to carry the residual breadth benefit. The missing information would then lie in properties that a patient mean does not express, and the next candidate would be a distance between the patch distributions of patients.
+If the concentration damage is practically zero, a coverage change of more than half the coverage gained from five to twenty random patients leaves accuracy unchanged, and patient-mean coverage is unlikely to carry the residual breadth benefit. The missing information would then lie in properties that a patient mean does not express, and the next candidate would be a distance between the patch distributions of patients.
+
+\input{results}
 
 \section{Limitations}
 \label{sec:limitations}
 The clustered allocation does more than withhold coverage. Its patients resemble each other, so they are more redundant with one another than effective support, which assumes independent patients, counts them; and they over-represent one appearance of the cancer type, towards which a classifier may shift its class boundary. A concentration damage therefore reflects between-patient redundancy, within-class imbalance of appearances, and missing coverage together, and the coverage-improvement tertiles separate these only partly.
 
-Neighbours of one patient may share its tissue source site, because site signatures are visible in deep features of TCGA slides \citep{howard2021impact}. In the diagnostic, 24 to 27 percent of clustered and 16 to 18 percent of dispersed patients share the focal patient's site, and the site gain of 1.06 points \citep{queisler2026siteCoverage} gives a reference scale for how much of a concentration damage sites alone could explain.
-
 The manipulation is uneven across cancer types. In small or homogeneous classes such as adrenocortical carcinoma, pancreatic adenocarcinoma, uterine carcinosarcoma, and uveal melanoma, the class-level ratio of the concentration contrast stays below 0.25 in most splits, so these classes contribute little contrast to the class average. Coverage is defined on patient means in one representation and a single cohort size, so a null result excludes coverage only as measured here. All results are conditional on frozen Virchow2 features, multinomial logistic regression, and the three overlapping splits, which are not independent replications.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
+
+\appendix
+\input{class_coverage}
 \end{document}
