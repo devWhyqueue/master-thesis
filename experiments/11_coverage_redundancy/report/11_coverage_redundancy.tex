@@ -1,0 +1,134 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+\title{Patient Shortage in Histopathology:\\Do Coverage and Patient Similarity\\Explain the Breadth Benefit?}
+\author{Yannik Queisler}
+\date{September 14, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent TCGA-UT patch classifiers trained on more patients are more accurate than redundancy-adjusted effective support predicts, and at a fixed patient count a cohort of mutually similar patients is 8.30 percentage points less accurate than a random cohort. That contrast confounds two properties of a cohort: how well its patients cover the class, and how similar they are to one another. This analysis separates the two without training new classifiers. Effective support is extended by a term for similarity between patients, and coverage is the distance from validation patients to their nearest training patient. On the 135 random cohorts of the breadth--depth grid, the analysis asks whether both quantities together absorb the benefit of additional patients. A relation fitted to these random cohorts is then applied to the 45 clustered, random, and dispersed cohorts of the cohort-composition experiment and must reproduce their accuracy contrasts. If both checks succeed, the relation provides a forecast for coverage-selected cohorts of five patients, fixed before any classifier is trained.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+At 160 patches per TCGA-UT class, twenty patients contributing eight patches each outperform five patients contributing 32 patches each by 9.52 percentage points of patient-macro balanced accuracy \citep{queisler2026effectiveSupport}. Effective support, which discounts patches by their correlation within a patient, explains less than half of this gap: each doubling of patients still adds 2.62 points at equal effective support, about 5.2 points over the two doublings \citep{queisler2026multidirectionalRedundancy}. Doubling tissue source sites at a fixed patient count adds 1.06 points \citep{queisler2026siteCoverage}.
+
+Cohort composition matters more. Among cohorts of twenty patients with eight patches each, a cohort built from one patient and its nineteen nearest neighbours in the Virchow2 embedding is 8.30 points less accurate than a random cohort (95\% interval: 7.66 to 8.95), and a cohort chosen by coverage-maximizing selection is 1.04 points more accurate (0.44 to 1.66) \citep{queisler2026cohortComposition}. The damage falls on test patients far from the clustered cohort. Two properties change together in that experiment, however. The clustered cohort covers the class's between-patient variation poorly, and its patients resemble one another, so they carry fewer independent observations than effective support counts. This report asks: \emph{do coverage and similarity between patients together account for the benefit of additional patients in random cohorts, and does the relation that describes random cohorts also predict the effect of cohort composition?}
+
+\section{Study design}
+\label{sec:design}
+No classifier is trained. The analysis uses the stored predictions of two experiments that share the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits with their natural validation and test partitions, and multinomial logistic regression with validation-selected regularization. The \emph{random cohorts} are the nine cells of the breadth--depth grid, $G\in\{5,10,20\}$ patients per class with $m\in\{8,16,32\}$ patches each, in three splits and five draws: 135 cohorts \citep{queisler2026effectiveSupport}. The \emph{composition cohorts} are the clustered, random, and dispersed allocations of \citet{queisler2026cohortComposition} at $G=20$ and $m=8$, again in three splits and five draws: 45 cohorts. A cohort is one split, allocation, and draw, and its accuracy $A$ is patient-macro balanced accuracy in percent over all 30 classes.
+
+Two quantities describe each cohort (Table~\ref{tab:quantities}). Both use training and validation patients only, and both are computed per class and split and then averaged over classes.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYY@{}}
+\toprule
+Quantity & What it measures & Random against clustered cohort \\
+\midrule
+Similarity-adjusted effective support $\Neff^{\omega}$ & Independent observations, counting correlation within and between patients & Equal to effective support on average; lower for similar patients \\
+Coverage distance $r$ & Distance from validation patients to their nearest training patient & Small; large when patients form one neighbourhood \\
+\bottomrule
+\end{tabularx}
+\caption{The two cohort quantities separate redundancy from coverage. In random cohorts both change mainly with the patient count; at a fixed patient count, cohort composition moves both.}
+\label{tab:quantities}
+\end{table}
+
+\subsection{Similarity-adjusted effective support}
+\label{sec:similarity}
+Effective support of class $c$ uses the full-feature intraclass correlation $\bar\rho_c$ of \citet{queisler2026multidirectionalRedundancy}, the share of feature variance that lies between patients. For split $r$, let $\bar{\mathbf x}_i$ be the mean training feature vector of patient $i$ for class $c$, $\boldsymbol\mu_{rc}$ the average of these means over the class's eligible training patients, and $\tau^2_{rc}$ the between-patient variance of the class, estimated as $(B-W)/\widetilde m$ from the mean squares of that report. The \emph{between-patient similarity} of a cohort $S$ with $G$ patients is
+\begin{equation}
+ \omega_{rc}(S)=\frac{1}{G(G-1)\,\tau^2_{rc}}\sum_{i\in S}\sum_{j\in S\setminus\{i\}}(\bar{\mathbf x}_i-\boldsymbol\mu_{rc})^{\top}(\bar{\mathbf x}_j-\boldsymbol\mu_{rc}),
+ \label{eq:omega}
+\end{equation}
+\noindent the mean correlation between the deviations of two cohort patients from their class mean. Because the two patients in each term differ, sampling noise of the patient means does not enter the numerator in expectation. If patches of the same patient correlate at $\bar\rho_c$ and patches of two cohort patients at $\bar\rho_c\,\omega$, the variance of a class mean over $Gm$ patches yields
+\begin{equation}
+ \Neff^{\omega}=\frac{1}{30}\sum_{c}\frac{Gm}{1+(m-1)\bar\rho_c+m(G-1)\bar\rho_c\,\omega_{rc}(S)}.
+ \label{eq:neff}
+\end{equation}
+\noindent For randomly drawn patients, $\omega$ is close to zero and Equation~\eqref{eq:neff} reduces to the effective support of \citet{queisler2026multidirectionalRedundancy}. For patients drawn from one neighbourhood, $\omega$ is positive and the added term grows with both $G$ and $m$.
+
+\subsection{Coverage distance}
+\label{sec:coverage}
+Coverage follows \citet{queisler2026cohortComposition}. The distance $d(i,j)$ between two patients is the cosine distance between their patient-mean embeddings after subtracting the average over classes. The coverage distance of cohort $S$ is the mean distance from the class's validation patients $\mathcal V_{rc}$ to their nearest cohort patient, averaged over classes,
+\begin{equation}
+ r(S)=\frac{1}{30}\sum_{c}\frac{1}{|\mathcal V_{rc}|}\sum_{i\in\mathcal V_{rc}}\min_{j\in S}d(i,j).
+ \label{eq:coverage}
+\end{equation}
+
+\section{Evaluation}
+\label{sec:evaluation}
+The evaluation poses the two questions of Section~\ref{sec:motivation} in turn: first on the random cohorts alone, then as a prediction for the composition cohorts.
+
+\subsection{Residual breadth benefit}
+\label{sec:residual}
+Three linear regression models are fitted by least squares to the 135 random cohorts, each with split-specific intercepts $\alpha_r$:
+\begin{align}
+ \text{(a)}\quad A&=\alpha_r+\beta\log\Neff+\gamma\log G,\nonumber\\
+ \text{(b)}\quad A&=\alpha_r+\beta\log\Neff^{\omega}+\gamma\log G,\label{eq:models}\\
+ \text{(c)}\quad A&=\alpha_r+\beta\log\Neff^{\omega}+\delta\,r+\gamma\log G.\nonumber
+\end{align}
+\noindent Model (a) repeats the analysis of \citet{queisler2026multidirectionalRedundancy} at the cohort level, model (b) adds similarity between patients, and model (c) adds coverage. In each, the \emph{residual breadth benefit} $b=\gamma\log 2$ is the accuracy gained per doubling of patients beyond the other terms. The primary estimate is $b$ of model (c). The residual standard deviation of each model, and of model (c) without $\log G$, is reported alongside.
+
+\subsection{Prediction of cohort composition}
+\label{sec:prediction}
+Model (c) without $\log G$ is fitted to the 135 random cohorts only and applied to the 45 composition cohorts, whose $\Neff^{\omega}$ and $r$ are computed in the same way. Averaging predicted accuracies over splits and draws gives the \emph{predicted concentration damage} $\widehat\Delta_{\mathrm{con}}=\widehat A_{\mathrm{ran}}-\widehat A_{\mathrm{clu}}$ and the \emph{predicted selection gain} $\widehat\Delta_{\mathrm{sel}}=\widehat A_{\mathrm{dis}}-\widehat A_{\mathrm{ran}}$. Their \emph{prediction errors} are the differences from the observed contrasts, 8.30 and 1.04 points. The composition cohorts break the link between patient count and cohort quantities that holds in random cohorts, so this step tests whether the relation describes the quantities or only the patient count. The predicted accuracy of the random composition allocation, set against its observed 71.29 percent, checks the calibration of the relation at the same cohort size.
+
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Each of 2,000 paired Bayesian bootstrap replicates assigns $\mathrm{Dirichlet}(1,\ldots,1)$ weights to the distinct test patients \citep{rubin1981bayesian}, shared across both experiments, all cohorts, and all classes. Accuracies, models, predictions, and prediction errors are recomputed per replicate, and the 2.5th and 97.5th percentiles give exploratory 95\% intervals. Correlations, similarities, and coverage distances are held fixed. The three splits overlap and are not independent replications.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the test-patient intervals for $b$ of model (c) and for both prediction errors, with the practical threshold of one percentage point used in the preceding experiments (Table~\ref{tab:readings}). The two prediction errors carry unequal weight. The observed selection gain is itself close to one point, so a prediction within one point of it is weak evidence; the concentration damage carries the test.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYYY@{}}
+\toprule
+Reading & Claim & Residual $b$, model (c) & Prediction errors \\
+\midrule
+Coverage and similarity & Both quantities account for the breadth benefit and for cohort composition & Interval within $[-1,1]$ & Both intervals within $[-1,1]$ \\
+\addlinespace
+Random cohorts only & Both quantities describe random cohorts but not the effect of composition & Interval within $[-1,1]$ & Concentration interval entirely outside $[-1,1]$ \\
+\addlinespace
+Breadth beyond both & Additional patients help beyond coverage and similarity & Interval above 1 & Not required \\
+\bottomrule
+\end{tabularx}
+\caption{Each reading predicts a distinct combination of the residual breadth benefit and the prediction errors. Intervals are test-patient 95\% intervals in percentage points. All other combinations, including intervals that cross a threshold, are inconclusive.}
+\label{tab:readings}
+\end{table}
+
+\paragraph{Coverage and similarity.}
+If patient count adds nothing beyond both quantities and the relation reproduces the concentration damage, coverage and similarity between patients are candidate label-free signals of patient shortage. The relation then yields a forecast for coverage-maximizing selection against random sampling at five patients with 32 patches each, the allocation in which patient shortage was first observed. The forecast and its interval are recorded before any classifier of that experiment is trained.
+
+\paragraph{Random cohorts only.}
+If both quantities absorb the breadth benefit but miss the concentration damage by more than one point, they covary with patient count in random cohorts without capturing what makes a cohort informative. A forecast for selected cohorts would not be justified.
+
+\paragraph{Breadth beyond both.}
+If the residual stays above one point, additional patients contribute information that neither patient-mean coverage nor patient-mean similarity expresses. The next candidate would be a distance between the patch distributions of patients.
+
+\section{Limitations}
+\label{sec:limitations}
+In random cohorts, patient count, effective support, and coverage distance change together, so model (c) separates their contributions only as far as draws of equal size differ, and $b$ may be imprecise. The logarithmic and linear terms are assumed rather than tested, and the prediction for the composition cohorts extrapolates beyond the similarity and coverage values of random cohorts. Both quantities summarize a patient by its mean embedding and a class by scalar correlations. The composition cohorts share test patients with the random cohorts, so the prediction step is out of sample for training cohorts, not for evaluation patients. All results are conditional on Virchow2 features, multinomial logistic regression, and the three overlapping splits.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
