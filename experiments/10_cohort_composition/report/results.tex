@@ -18,7 +18,7 @@ The clustered cohort is far less accurate than the other two (Table~\ref{tab:all
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
- & \multicolumn{2}{c}{All classes} & \multicolumn{2}{c}{Site classes} & \multicolumn{2}{c}{Other classes} \\
+ & \multicolumn{2}{c}{All classes} & \multicolumn{2}{c}{Multi-site classes} & \multicolumn{2}{c}{Other classes} \\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
 Allocation & Accuracy [95\% interval] & SD & Accuracy & SD & Accuracy & SD \\
 \midrule
@@ -27,7 +27,7 @@ Random & 71.29 [69.93, 72.51] & 0.66 & 69.11 & 1.24 & 72.96 & 1.56 \\
 Dispersed & 72.33 [70.98, 73.57] & 0.66 & 70.40 & 1.14 & 73.82 & 1.83 \\
 \bottomrule
 \end{tabular}
-\caption{At twenty patients with eight patches each, a clustered cohort is about eight points less accurate than a random one, and a dispersed cohort about one point more accurate. Accuracy is patient-macro balanced accuracy in percent, averaged over three splits and five draws, with test-patient 95\% intervals. Site classes are the thirteen cancer types of \citet{queisler2026siteCoverage}; other classes are the remaining seventeen. SD is the population standard deviation across the fifteen split--draw combinations, in percentage points.}
+\caption{At twenty patients with eight patches each, a clustered cohort is about eight points less accurate than a random one, and a dispersed cohort about one point more accurate. Accuracy is patient-macro balanced accuracy in percent, averaged over three splits and five draws, with test-patient 95\% intervals. Multi-site classes are the thirteen cancer types with at least ten tissue source sites of at least four eligible patients each \citep{queisler2026siteCoverage}; other classes are the remaining seventeen. SD is the population standard deviation across the fifteen split--draw combinations, in percentage points.}
 \label{tab:allocation-accuracy}
 \end{table}
 
@@ -44,11 +44,11 @@ The selection gain is $\Delta_{\mathrm{sel}}=1.04$ points (0.44 to 1.66). It is 
 Contrast & Classes & $\rho$ & Estimate & 95\% interval & SD & Positive \\
 \midrule
 Concentration damage $\Delta_{\mathrm{con}}$ & All & 0.63 & 8.30 & [7.66, 8.95] & 1.29 & 15 of 15 \\
- & Site & 0.66 & 11.50 & [10.77, 12.17] & 2.07 & 15 of 15 \\
+ & Multi-site & 0.66 & 11.50 & [10.77, 12.17] & 2.07 & 15 of 15 \\
  & Other & 0.60 & 5.86 & [4.89, 6.84] & 2.13 & 15 of 15 \\
 \addlinespace
 Selection gain $\Delta_{\mathrm{sel}}$ & All & 0.27 & 1.04 & [0.44, 1.66] & 0.71 & 15 of 15 \\
- & Site & 0.38 & 1.29 & [0.66, 1.96] & 0.85 & 13 of 15 \\
+ & Multi-site & 0.38 & 1.29 & [0.66, 1.96] & 0.85 & 13 of 15 \\
  & Other & 0.18 & 0.86 & [$-0.07$, 1.75] & 1.19 & 12 of 15 \\
 \bottomrule
 \end{tabular}
@@ -60,9 +60,9 @@ The damage is larger than the descriptive scale of Section~\ref{sec:contrasts} a
 
 \subsection{Where the damage arises}
 \label{sec:damage-location}
-Both class groups show a concentration damage above the threshold, but it is twice as large in the site classes, at 11.50 points, as in the seventeen other classes, at 5.86 points (Table~\ref{tab:contrasts}). The coverage ratios of the two groups differ much less, 0.66 against 0.60. The clustered cohort loses most in the site classes, at 57.61 percent, and the other classes include the five types that receive almost no concentration contrast. The selection gain follows the size of its coverage change: 1.29 points at a ratio of 0.38 for site classes and 0.86 points at 0.18 for the other classes, whose interval includes zero.
+Both class groups show a concentration damage above the threshold, but it is twice as large in the multi-site classes, at 11.50 points, as in the seventeen other classes, at 5.86 points (Table~\ref{tab:contrasts}). The coverage ratios of the two groups differ much less, 0.66 against 0.60. The clustered cohort loses most in the multi-site classes, at 57.61 percent, and the other classes include the five types that receive almost no concentration contrast. The selection gain follows the size of its coverage change: 1.29 points at a ratio of 0.38 for multi-site classes and 0.86 points at 0.18 for the other classes, whose interval includes zero.
 
-Within classes, the damage falls on test patients whom the clustered cohort covers worse (Table~\ref{tab:tertiles}). In the tertile with the smallest coverage improvement, clustered training is 2.28 points more accurate than random training. In the middle tertile, the damage is 7.65 points, and in the tertile with the largest coverage improvement, 20.44 points, where recall under clustered training drops to 46.53 percent. The gradient appears in both class groups, most steeply in the site classes.
+Within classes, the damage falls on test patients whom the clustered cohort covers worse (Table~\ref{tab:tertiles}). In the tertile with the smallest coverage improvement, clustered training is 2.28 points more accurate than random training. In the middle tertile, the damage is 7.65 points, and in the tertile with the largest coverage improvement, 20.44 points, where recall under clustered training drops to 46.53 percent. The gradient appears in both class groups, most steeply in the multi-site classes.
 
 \begin{table}[htbp]
 \centering
@@ -72,7 +72,7 @@ Within classes, the damage falls on test patients whom the clustered cohort cove
 \toprule
  & \multicolumn{3}{c}{All classes} & \multicolumn{2}{c}{Damage by class group} \\
 \cmidrule(lr){2-4}\cmidrule(l){5-6}
-Coverage-improvement tertile & Clustered & Random & Damage & Site & Other \\
+Coverage-improvement tertile & Clustered & Random & Damage & Multi-site & Other \\
 \midrule
 Low & 74.57 & 72.29 & $-2.28$ & $-1.33$ & $-3.01$ \\
 Middle & 66.73 & 74.38 & 7.65 & 11.07 & 5.04 \\
@@ -83,7 +83,7 @@ High & 46.53 & 66.96 & 20.44 & 25.32 & 16.70 \\
 \label{tab:tertiles}
 \end{table}
 
-\noindent Site composition changes too little to account for most of this damage. Site signatures are visible in deep features of TCGA slides \citep{howard2021impact}, so neighbours of one patient may share its site. The focal patient's site contributes eight percentage points more of the clustered than of the random cohort, and eleven points more in the site classes, 19 against 8 percent. For these classes, doubling the number of sites at a fixed patient count changed accuracy by only 1.06 points \citep{queisler2026siteCoverage}, an order of magnitude less than their concentration damage.
+\noindent Site composition changes too little to account for most of this damage. Site signatures are visible in deep features of TCGA slides \citep{howard2021impact}, so neighbours of one patient may share its site. The focal patient's site contributes eight percentage points more of the clustered than of the random cohort, and eleven points more in the multi-site classes, 19 against 8 percent. For these classes, doubling the number of sites at a fixed patient count changed accuracy by only 1.06 points \citep{queisler2026siteCoverage}, an order of magnitude less than their concentration damage.
 
 \section{Discussion and conclusion}
 \label{sec:discussion}
