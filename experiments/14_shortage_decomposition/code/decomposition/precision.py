@@ -92,11 +92,16 @@ def _load_templates(
     paths12 = {
         s: split_paths(ensure_dirs(exp12_config(config)), s) for s in range(N_SPLITS)
     }
-    g5_m32 = recall_stack(grid_dirs(paths5, 5, 32), ctx_l, perms, n_classes)
-    g10_m16 = recall_stack(grid_dirs(paths5, 10, 16), ctx_l, perms, n_classes)
-    random_ = recall_stack(allocation_dirs(paths12, "random"), ctx_l, perms, n_classes)
-    dispersed = recall_stack(
-        allocation_dirs(paths12, "dispersed"), ctx_l, perms, n_classes
+    # In percent, to match analyze.py's model scale and exp-5/exp-12's own stored accuracies.
+    g5_m32 = recall_stack(grid_dirs(paths5, 5, 32), ctx_l, perms, n_classes) * 100.0
+    g10_m16 = recall_stack(grid_dirs(paths5, 10, 16), ctx_l, perms, n_classes) * 100.0
+    random_ = (
+        recall_stack(allocation_dirs(paths12, "random"), ctx_l, perms, n_classes)
+        * 100.0
+    )
+    dispersed = (
+        recall_stack(allocation_dirs(paths12, "dispersed"), ctx_l, perms, n_classes)
+        * 100.0
     )
     _guard_templates(config, g5_m32, g10_m16, random_, dispersed)
 
