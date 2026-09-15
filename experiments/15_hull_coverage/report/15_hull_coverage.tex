@@ -1,0 +1,207 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Does Hull Coverage Explain the Benefit\\of Additional Patients?}
+\author{Yannik Queisler}
+\date{September 15, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, ten random patients per cancer type train a classifier 5.03 percentage points more accurate than five random patients with the same budget of 160 patches per class. Coverage of held-out patients by their nearest training patient explains only part of this gap: at equal coverage and between-patient similarity, ten patients remain about eight points ahead. This protocol tests a further cohort property, \emph{hull coverage}: how much of a held-out patient's deviation from the cohort mean lies outside the span of the training patients' deviations. A linear classifier can combine training patients, so a held-out patient need not resemble any single one of them to be classified correctly. Screening without classifier fits shows that hull coverage, unlike patch-level alternatives, differs between five and ten random patients beyond what nearest-patient coverage predicts and is insensitive to patch depth. Coverage and hull coverage are varied by design at five and ten patients, with every classifier trained at a single patient count. A regression of class recall on the achieved coverage, hull coverage, similarity, and patient count splits the five-to-ten-patient gap into four parts, each read against a one-point threshold. A random twenty-patient arm tests whether the fitted slopes also predict the gain from ten to twenty patients. Before training, both the manipulation check and a precision simulation passed, the latter selecting 35 draws per split.
+\end{abstract}
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+
+\section{Motivation}
+\label{sec:motivation}
+At 160 patches per TCGA-UT class, ten patients with sixteen patches each outperform five patients with 32 patches each by 5.03 percentage points of patient-macro balanced accuracy, 67.28 against 62.25 percent, and twenty patients with eight patches each reach 71.76 percent \citep{queisler2026effectiveSupport}. Neither redundancy between patches of one patient \citep{queisler2026multidirectionalRedundancy} nor the two patient-mean properties examined by \citet{queisler2026shortageDecomposition} account for most of this benefit. In that study, coverage, the distance from held-out patients to their nearest training patient, explained 2.23 points of the gap between ten and five random patients, between-patient similarity explained none, and 8.08 points remained for the patient count at equal coverage and similarity. Ten patients that covered held-out patients more poorly than five random patients were still more accurate than five patients that covered them as well as ten random patients.
+
+Two features of that design limit its reading. Classes with five and ten patients shared one classifier, which widened the gap between the random cohorts from 5.03 to 9.97 points, and nearest-patient coverage treats a cohort as a set of separate reference points. A linear classifier, however, does not require a held-out patient to resemble one training patient; it generalises along combinations of them. A cohort of ten patients spans up to nine directions of between-patient variation, a cohort of five only four, and this difference exists even when the nearest training patient is equally close. The property that captures it is the share of a held-out patient's deviation from the cohort mean that lies outside the span of the cohort's deviations, termed \emph{hull coverage} below.
+
+Screening without classifier fits compared hull coverage with signals that summarise patients by their patch distributions (Appendix~\ref{app:screen}). Nearest-patch coverage and a kernel distance between patch distributions differed between five and ten random patients almost only through nearest-patient coverage, and nearest-patch coverage depended strongly on patch depth, which barely affects accuracy on TCGA-UT \citep{queisler2026effectiveSupport}. Hull coverage kept 40 percent of its five-to-ten-patient difference beyond nearest-patient coverage and did not change with depth.
+
+This report therefore asks: \emph{how many of the points gained from five to ten random patients does hull coverage explain when every classifier is trained at one patient count, how many do nearest-patient coverage, similarity, and the patient count explain, and do the fitted relations also predict the gain from ten to twenty patients?}
+
+\section{Study design}
+\label{sec:design}
+Only the composition of the training cohorts and the assignment of patient counts to classifiers change relative to \citet{queisler2026shortageDecomposition}. The design inherits the 30 eligible TCGA-UT cancer types, the frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits with their natural validation and test partitions, and multinomial logistic regression with its regularization strength selected on the validation partition. Every class receives 160 patches. The eligible pool $\mathcal E_{sc}$ of split $s$ and class $c$ contains the training patients with at least 32 patches of the class, and every cohort patient contributes the first 32, 16, or 8 patches of the established round-robin patch order.
+
+\subsection{Three measured properties}
+\label{sec:quantities}
+All three properties summarise patient $i$ by its mean feature vector $\bar{\mathbf x}_i$ over all of its patches of the class. \emph{Coverage distance} $r(S;\mathcal R)$ and \emph{between-patient similarity} $\omega(S)$ follow \citet{queisler2026shortageDecomposition}: $r$ is the mean cosine distance from each reference patient to its nearest cohort patient after centring and normalising patient means, and $\omega$ is the mean correlation between the deviations of two cohort patients from their class mean.
+
+For a cohort $S$, let $\mathbf m_S$ be the mean of its patient means and $\Pi_S$ the orthogonal projection onto the span of $\{\bar{\mathbf x}_j-\mathbf m_S : j\in S\}$. The \emph{hull residual} of a cohort with respect to a reference set $\mathcal R$ is
+\begin{equation}
+ h(S;\mathcal R)=\frac{1}{|\mathcal R|}\sum_{i\in\mathcal R}\frac{\lVert(\mathbf I-\Pi_S)(\bar{\mathbf x}_i-\mathbf m_S)\rVert^2}{\lVert\bar{\mathbf x}_i-\mathbf m_S\rVert^2},
+ \label{eq:hull}
+\end{equation}
+\noindent the average share of a reference patient's deviation from the cohort mean that the cohort's deviations cannot reproduce. It ranges from zero to one, and smaller values mean better hull coverage. Projections are computed from inner products of raw patient means, with eigenvalues below $10^{-9}$ of the largest treated as zero. Cohort search uses the eligible pool without the cohort's own patients as reference set, for both $r$ and $h$; analysis uses the class's validation patients. Test patients enter only accuracy.
+
+\subsection{One patient count per classifier}
+\label{sec:counts}
+Every classifier is trained with the same patient count for all 30 classes. For each split and draw, three classifiers are trained: one with five patients and 32 patches per class, one with ten patients and sixteen patches, and one with twenty patients and eight patches. A class with five patients therefore never competes with a class with ten patients, which removes the source of the widened gap in \citet{queisler2026shortageDecomposition}. The five- and ten-patient classifiers of one draw form a \emph{block}; the twenty-patient classifier enters only the prediction test of Section~\ref{sec:prediction}.
+
+\subsection{Designed and random cohorts}
+\label{sec:cohorts}
+Coverage and hull coverage are varied on levels defined per split, class, and draw from 2,000 random cohorts of each size. With $\bar r_G$ and $\bar h_G$ the mean pool coverage distance and hull residual of random $G$-patient cohorts, $\Delta'_r=\bar r_5-\bar r_{10}$ and $\Delta'_h=\bar h_5-\bar h_{10}$ denote the random five-to-ten-patient differences. A coverage level $a$ targets $\bar r_{10}+a\,\Delta'_r$ and a hull level $b$ targets $\bar h_{10}+b\,\Delta'_h$; the similarity target is the median similarity $\tilde\omega_{10}$ of the random ten-patient cohorts. Level zero thus corresponds to ten random patients and level one to five random patients.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lrrYYrr@{}}
+\toprule
+Classifier & $G$ & $m$ & Coverage levels & Hull levels & Designed & Random \\
+\midrule
+Five patients & 5 & 32 & 0, 1 & 0, $\tfrac12$, 1 & 6 & 1 \\
+Ten patients & 10 & 16 & 0, 1 & 0, $\tfrac12$ & 4 & 1 \\
+Twenty patients & 20 & 8 & -- & -- & 0 & 1 \\
+\bottomrule
+\end{tabularx}
+\caption{Coverage and hull coverage are crossed at five and ten patients, and the hull levels shared by both patient counts identify the patient-count effect without extrapolation. $G$ is the number of patients and $m$ the patches per patient, so every cell uses 160 patches per class. Levels are in units of the random five-to-ten-patient differences, with zero at the value of ten random patients.}
+\label{tab:cells}
+\end{table}
+
+\noindent Ten patients cannot be made to span held-out patients as poorly as five random patients while covering them as closely as ten random patients: in screening, such cohorts reached only 0.55 of $\Delta'_h$. The ten-patient hull levels therefore stop at one half, whereas five patients additionally receive hull level one, which extends the range of the hull slope and checks its linearity (Table~\ref{tab:cells}). Within each of the five- and ten-patient classifiers, classes rotate through the cells: class $c$ receives cell $(o_{sc}+d)\bmod n_G$ in draw $d$, where $n_G$ is the number of cells at patient count $G$ and the offsets $o_{sc}$ are drawn once per split so that every cell occurs about equally often. The number of draws is a multiple of 35, so both rotations complete.
+
+A designed cohort is found by searching the eligible pool for the patient set closest to its three targets. Candidates combine random cohorts, prefixes of coverage-maximizing selection, and farthest-first selection from random anchor patients \citep{queisler2026coverageSimilarity}; exchanges of single patients then minimise
+\begin{equation}
+ \frac{|r-t_r|}{0.005}+\frac{|h-t_h|}{0.005\,\Delta'_h/\Delta'_r}+\frac{|\omega-t_\omega|}{0.01},
+ \label{eq:loss}
+\end{equation}
+\noindent where $t_r$, $t_h$, and $t_\omega$ are the cell's targets. The search uses training geometry only and fresh random seeds. Because the analysis uses achieved rather than targeted values, cohorts that miss their targets remain in the analysis. Random cells and the twenty-patient cohorts are uniform draws from the eligible pool.
+
+\subsection{Manipulation check before training}
+\label{sec:check}
+All cohorts of all draws are built and checked before any classifier is trained. The check passes only if all four conditions hold in each split, separately for five and ten patients.
+\begin{enumerate}
+ \item \emph{Spread.} Averaged over designed cohorts, the pool coverage distance at coverage level one exceeds that at level zero by at least $0.8\,\Delta'_r$, the pool hull residual at hull level one half exceeds that at level zero by at least $0.35\,\Delta'_h$, and at five patients the hull residual at level one exceeds that at level zero by at least $0.8\,\Delta'_h$.
+ \item \emph{Separation.} Across designed cohorts, the class-centred hull residual correlates with the class-centred coverage distance and with similarity within $[-0.3,0.3]$.
+ \item \emph{Overlap.} At least half of the cohorts in the cells shared by both patient counts lie on target: coverage distance within $\Delta'_r/4$, hull residual within $\Delta'_h/8$, and similarity within 0.02 of the targets.
+ \item \emph{Transfer.} The coverage and hull gaps of the spread condition, measured on validation patients, are each at least 0.7 times the same gaps on the pool.
+\end{enumerate}
+\noindent The shared hull spread threshold was fixed at $0.4\,\Delta'_h$, eight tenths of the half-level step, before the first check. That check reached 0.93, 0.97, and 0.99 of this threshold at five patients in splits 0 through 2, while every other condition passed with margin. Because no classifier had been trained, the threshold was lowered to $0.35\,\Delta'_h$ and the stored cohorts were checked again, which they passed in every split. This deviation is reported with the results.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The evaluation estimates how class recall responds to coverage, hull coverage, similarity, and patient count, translates these responses into parts of the five-to-ten-patient gap, and tests whether the same responses predict the gain from ten to twenty patients.
+
+\subsection{Class-recall model}
+\label{sec:model}
+Let $y_{fc}$ be the patient-macro recall of class $c$ in classifier $f$, in percent: patch recall is averaged within each test patient of the class and then over these patients. The model
+\begin{equation}
+ y_{fc}=\alpha_{sc}+\alpha_{b}+\delta\,r_{fc}+\eta\,h_{fc}+\lambda\,\omega_{fc}+\gamma\,z_{f}+\varepsilon_{fc}
+ \label{eq:model}
+\end{equation}
+\noindent is fitted by least squares to the cohorts of all cells of the five- and ten-patient classifiers. Here $r_{fc}$ and $h_{fc}$ are the validation coverage distance and hull residual of the cohort, $\omega_{fc}$ its similarity, and $z_f$ equals one for the ten-patient classifier and zero for the five-patient classifier. The intercept $\alpha_{sc}$ is specific to split and class, and $\alpha_b$ to the block of split and draw that holds both classifiers. A separate intercept per classifier would absorb $z_f$, which is constant within a classifier. The coefficients $\delta$, $\eta$, and $\lambda$ are the changes in recall per unit of coverage distance, hull residual, and similarity, and $\gamma$ is the effect of ten instead of five patients at equal values of all three properties.
+
+\subsection{Parts of the five-to-ten-patient gap}
+\label{sec:decomposition}
+Let $\bar r_{G}$, $\bar h_{G}$, and $\bar\omega_{G}$ now denote the mean validation coverage distance, hull residual, and similarity of the random cell at patient count $G$. The gap between ten and five random patients splits into four parts:
+\begin{equation}
+ C=\delta\,(\bar r_{10}-\bar r_{5}),\qquad
+ H=\eta\,(\bar h_{10}-\bar h_{5}),\qquad
+ S=\lambda\,(\bar\omega_{10}-\bar\omega_{5}),\qquad
+ P=\gamma.
+ \label{eq:parts}
+\end{equation}
+\noindent The \emph{coverage part} $C$, the \emph{hull part} $H$, and the \emph{similarity part} $S$ are the recall gained because ten random patients differ from five in the respective property; the \emph{patient-count part} $P$ is the recall that remains at equal values. All parts are in percentage points, and positive values favour ten patients. As a calibration check, $C+H+S+P$ is compared with the observed difference $\Delta_{5\to10}$ between the mean recall of the random ten- and five-patient cells. The \emph{hull absorption} $\gamma_{-h}-\gamma$, where $\gamma_{-h}$ is the patient-count coefficient of the model without $h$, states how much of the patient-count effect hull coverage takes over.
+
+\subsection{Prediction of the ten-to-twenty-patient gain}
+\label{sec:prediction}
+The twenty-patient cohorts cannot be varied by design, but their achieved properties can be measured. With $\bar r_{20}$, $\bar h_{20}$, and $\bar\omega_{20}$ their mean validation values, the model predicts a ten-to-twenty-patient gain of
+\begin{equation}
+ \hat\Delta_{10\to20}=\delta\,(\bar r_{20}-\bar r_{10})+\eta\,(\bar h_{20}-\bar h_{10})+\lambda\,(\bar\omega_{20}-\bar\omega_{10}),
+ \label{eq:prediction}
+\end{equation}
+\noindent which contains no patient-count term. It is compared with the observed difference $\Delta_{10\to20}$ between the mean recall of the twenty-patient classifiers and the random ten-patient cell. A prediction error $\hat\Delta_{10\to20}-\Delta_{10\to20}$ near zero means that the three properties carry the benefit of further patients; a large negative error bounds how much of it they explain.
+
+\subsection{Uncertainty}
+\label{sec:uncertainty}
+Each of 2,000 paired bootstrap replicates assigns $\mathrm{Dirichlet}(1,\ldots,1)$ weights to the distinct test patients \citep{rubin1981bayesian}, shared across cells, classifiers, and classes, and resamples blocks with replacement within each split, jointly for all classifiers and classes of a draw. Recall, the model of Equation~\eqref{eq:model}, the parts, the observed gaps, the absorption, and the prediction error are recomputed in every replicate, and the 2.5th and 97.5th percentiles give 95\% intervals. Coverage distances, hull residuals, and similarities are held fixed. The three splits share patients and are not independent replications.
+
+\subsection{Precision before training}
+\label{sec:precision}
+A simulation based on stored predictions of random five- and ten-patient classifiers with a single patient count \citep{queisler2026effectiveSupport} fixed the number of draws before any classifier of this study was trained (Appendix~\ref{app:precision}). It selected the smallest of 35 or 70 draws per split for which the median half-width of the 95\% interval of each of $C$, $H$, $S$, and $P$ is at most one point; the half-width is half the distance between the upper and lower interval bound. At 35 draws, the median half-widths were 0.39 points for $C$, 0.69 for $H$, 0.03 for $S$, and 0.72 for $P$, so 35 draws were selected.
+
+\section{Interpretation criteria}
+\label{sec:interpretation}
+Conclusions rest on the 95\% intervals of the four parts, of the calibration difference, and of the prediction error, read against the practical threshold of one percentage point used in the preceding studies. Each part receives one of four readings (Table~\ref{tab:readings}). Practical equivalence is not claimed for a single part, because test-patient uncertainty alone leaves every contrast with a standard error of at least 0.38 points \citep{queisler2026coverageSimilarity}.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYl@{}}
+\toprule
+Reading & Claim for the part & 95\% interval \\
+\midrule
+Contributes & The property explains more than one point of the gap & Lower bound above 1 \\
+\addlinespace
+At most small & The property explains less than one point of the gap & Upper bound below 1 \\
+\addlinespace
+Counteracts & The property narrows the gap by more than one point & Upper bound below $-1$ \\
+\addlinespace
+Unresolved & Neither a contribution nor a small part is established & All other intervals \\
+\bottomrule
+\end{tabularx}
+\caption{Each of the coverage part $C$, the hull part $H$, the similarity part $S$, and the patient-count part $P$ receives one reading. Intervals are in percentage points. A part that counteracts is also at most small.}
+\label{tab:readings}
+\end{table}
+
+\noindent Hull coverage counts as an \emph{operational signal of patient shortage} on TCGA-UT when four conditions hold: $H$ contributes, $P$ is at most small, the calibration interval for $C+H+S+P-\Delta_{5\to10}$ lies within $[-1,1]$, and the interval of the prediction error lies within $[-1,1]$. The first three conditions concern the five-to-ten-patient gap; the fourth extends the claim to the gain from ten to twenty patients.
+
+\paragraph{Hull coverage explains the benefit.}
+If all four conditions hold, additional patients help mainly by spanning directions of between-patient variation that held-out patients occupy. Hull coverage would then be a label-free measure of patient shortage, and mitigation would target span: selecting patients that maximise hull coverage when patients can be chosen, or supplying between-patient variation when they cannot.
+
+\paragraph{Hull coverage explains part of the benefit.}
+If $H$ and $P$ both contribute, or if the five-to-ten-patient conditions hold but the prediction error exceeds one point, hull coverage is a real but incomplete account. The size of $H$, the absorption, and the prediction error together bound its share.
+
+\paragraph{Hull coverage explains little.}
+If $H$ is at most small, patient-mean geometry, whether measured by nearest patients, similarity, or span, does not carry the benefit of additional patients. The next candidate signal would then use information from the classifier, such as cross-fitted predictions on held-out patients, rather than cohort geometry alone.
+
+\section{Limitations}
+\label{sec:limitations}
+All three properties summarise a patient by its mean embedding in one representation, so variation within a patient's patches enters none of them. Hull coverage is motivated by a linear readout and may not describe classifiers that combine training patients differently. Its effect is assumed to be linear and additive over the targeted range; ten-patient cohorts do not reach hull level one, so the hull slope at poor hull coverage rests on five-patient cohorts. At a fixed budget, ten patients receive sixteen instead of 32 patches, so $P$ combines patient count with patch depth; on TCGA-UT, depth adds at most 0.3 points \citep{queisler2026effectiveSupport}. Classes still share a classifier with other classes whose cohorts differ in coverage and hull coverage, which the rotation balances but does not remove. The prediction test assumes that the relations estimated between five and ten patients hold between ten and twenty. The threshold of the shared hull spread was lowered after the first manipulation check (Section~\ref{sec:check}). All results are conditional on frozen Virchow2 features, multinomial logistic regression, and three overlapping splits, and probability quality is outside this study.
+
+\appendix
+\section{Screening of candidate signals}
+\label{app:screen}
+Candidate signals were screened on split 0 for all 30 classes without training any classifier. For each class, random cohorts of five patients with 32 patches and ten patients with sixteen patches were drawn, and three quantities were computed for each signal. The \emph{share beyond coverage} is the part of the random five-to-ten-patient difference in the signal that a linear relation to nearest-patient coverage, fitted across both patient counts, does not predict. \emph{Depth sensitivity} is the difference between five patients with sixteen and with 32 patches, relative to the five-to-ten-patient difference. A signal that explains the patient-count effect needs a large share beyond coverage; a signal with large depth sensitivity would wrongly predict a strong depth effect.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}Yrrl@{}}
+\toprule
+Signal & Share beyond coverage & Depth sensitivity & Assessment \\
+\midrule
+Nearest-patch coverage & 0.08 & 0.32 & Redundant, depth-driven \\
+Kernel distance of patch distributions & 0.13 & 0.1 & Mostly redundant \\
+Patch-span coverage & 0.3 & 3.5 to 6 & Depth-driven \\
+Hull coverage of patient means & 0.40 & 0.01 & Candidate \\
+\bottomrule
+\end{tabularx}
+\caption{Only hull coverage differs between five and ten random patients well beyond nearest-patient coverage without responding to patch depth. Nearest-patch coverage uses the validation patients and 400 random cohorts per patient count and class; the kernel distance, patch-span coverage, and the depth sensitivity of hull coverage use 150 random cohorts on 13 classes; the share beyond coverage of hull coverage uses 500 random cohorts and validation patients. Values are averages over classes.}
+\label{tab:screen}
+\end{table}
+
+\noindent For nearest-patch coverage, the share beyond coverage of 0.08 implies that ten patients at equal nearest-patient coverage are closer at the patch level by less than a tenth of the random difference. Explaining several points of patient-count effect would require a slope that predicts a depth effect of more than ten points, whereas depth changes accuracy by less than one point \citep{queisler2026effectiveSupport}. A search on the same split reached corners of coverage and hull levels at both patient counts, correlated with similarity at 0.14 on average, and transferred to validation patients, except that ten-patient cohorts at the best coverage level reached only 0.55 of the hull difference.
+
+\section{Precision simulation}
+\label{app:precision}
+The simulation uses stored patient-level predictions of random classifiers with five patients and 32 patches and with ten patients and sixteen patches per class, fifteen split--draw fits each \citep{queisler2026effectiveSupport}. From these fits it takes two sources of variability for class recall: the deviation of a fit from the class's mean recall, representing variation over training draws, and test-patient Dirichlet weights, shared across classes and cells, representing variation over evaluation patients.
+
+A simulated study resamples checked draws within split, uses their achieved validation coverage distances, hull residuals, and similarities, and generates class recall as the stored class mean for the patient count, plus the imposed effects of Equation~\eqref{eq:model}, plus a training-draw deviation from a stored fit of the same split, class, and patient count, plus that fit's test-patient noise. It then applies the model, the parts, and the bootstrap of Section~\ref{sec:uncertainty} with 200 replicates. Two scenarios impose the effects: all parts equal to zero, and a hull-dominant split with $C=1.5$, $H=3$, $S=0$, and $P=0.5$ points. Each scenario and draw count uses 2,000 simulated studies. A draw count qualifies when the median half-width of each part is at most one point in both scenarios. A sensitivity condition with training-draw deviations enlarged by 50 percent is reported but does not affect the choice; at 35 draws it gave median half-widths of 0.51, 0.92, 0.04, and 0.84 points for $C$, $H$, $S$, and $P$.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
