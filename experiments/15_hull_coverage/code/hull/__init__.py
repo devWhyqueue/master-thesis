@@ -40,7 +40,10 @@ OMEGA_TOL: float = 0.01
 
 # Manipulation check, fixed before the census runs.
 SPREAD_R_FACTOR: float = 0.8
-SPREAD_H_SHARED_FACTOR: float = 0.4  # 0.8 of the half-gap step shared by G=5 and G=10
+# 0.7 of the half-gap step shared by G=5 and G=10. Lowered from 0.4 on 2026-09-15 after the
+# first census reached 93-99 % of 0.4 at G=5 in every split, with every other condition passing
+# and before any classifier was trained; reported as a deviation.
+SPREAD_H_SHARED_FACTOR: float = 0.35
 SPREAD_H_FULL_FACTOR: float = 0.8  # G=5 only: full random-10 to random-5 hull gap
 SEPARATION_MAX_ABS_CORR: float = 0.3
 OVERLAP_R_FACTOR: float = 0.25

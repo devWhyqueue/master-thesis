@@ -15,7 +15,7 @@ from breadth.slurm import _job, submit_workflow
 from decomposition.precision import load_precision
 
 from hull import N_SPLITS
-from hull.census import run_census_shard
+from hull.census import run_census_shard, run_recheck
 from hull.fit import run_fit_shard, shard_count
 from hull.inference.analyze import run_analyze
 from hull.inference.precision import run_precision
@@ -35,6 +35,7 @@ def _parser() -> argparse.ArgumentParser:
     census.add_argument(
         "--shard-index", type=int, choices=range(N_SPLITS), required=True
     )
+    sub.add_parser("recheck")
     sub.add_parser("precision")
     fit = sub.add_parser("fit")
     fit.add_argument("--shard-index", type=int, required=True)
@@ -56,6 +57,11 @@ def _selected_draws(config: dict) -> int:
 def cmd_census(args: argparse.Namespace) -> None:
     """Search one split's cohorts and run its manipulation check."""
     run_census_shard(load_config(args.config), args.shard_index)
+
+
+def cmd_recheck(args: argparse.Namespace) -> None:
+    """Re-evaluate the manipulation check on the stored census cohorts."""
+    run_recheck(load_config(args.config))
 
 
 def cmd_precision(args: argparse.Namespace) -> None:
@@ -91,6 +97,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
     """Return CLI dispatch table."""
     return {
         "census": cmd_census,
+        "recheck": cmd_recheck,
         "precision": cmd_precision,
         "fit": cmd_fit,
         "analyze": cmd_analyze,

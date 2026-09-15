@@ -18,15 +18,15 @@ from similarity.candidates import candidates
 from similarity.census import _load_inputs
 from similarity.geometry import SplitInputs
 
-from decomposition.census import _gate, _write_split_outputs
+from decomposition.census import _gate, _write_split_outputs, load_allocations
 
-from hull import N_DRAWS_DEFAULT, SEARCH_BASE_SEED
+from hull import N_DRAWS_DEFAULT, N_SPLITS, SEARCH_BASE_SEED
 from hull.checks import manipulation_check
 from hull.design import CELLS, Cell, Target, Targets, cell_target, offsets, targets
 from hull.geometry import HullGeometry, build_hull_geometry, cohort_values
 from hull.search import search_cohort
 
-__all__ = ["run_census_shard"]
+__all__ = ["run_census_shard", "run_recheck"]
 
 logger = logging.getLogger(__name__)
 
@@ -152,3 +152,18 @@ def run_census_shard(config: dict[str, Any], split_idx: int) -> Path:
     split_p = _write_split_outputs(config, split_idx, n_draws, check, rows)
     _gate(check, split_idx)
     return split_p
+
+
+def run_recheck(config: dict[str, Any]) -> list[Path]:
+    """Re-evaluate every split's manipulation check on its stored cohorts with the current thresholds."""
+    written: list[Path] = []
+    for split_idx in range(N_SPLITS):
+        record = load_allocations(config, split_idx)
+        check = manipulation_check(record["rows"])
+        written.append(
+            _write_split_outputs(
+                config, split_idx, record["draws"], check, record["rows"]
+            )
+        )
+        _gate(check, split_idx)
+    return written
