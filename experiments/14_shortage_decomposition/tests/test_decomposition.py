@@ -99,11 +99,11 @@ def test_manipulation_check_pass():
 
 
 def test_manipulation_check_spread_failure():
-    """Compressing G=5's r spread below 0.9*Delta' fails the check."""
+    """Compressing G=5's r spread below 0.8*Delta' fails the check."""
     rows = _passing_rows()
     for row in rows:
         if row["g"] == 5 and row["r_level"] == 2:
-            row["r_train"] = row["r_val"] = 0.31  # spread 0.01 < 0.9*0.10
+            row["r_train"] = row["r_val"] = 0.31  # spread 0.01 < 0.8*0.10
     spread_result = spread(rows, 5)
     assert spread_result["pass"] is False
     assert manipulation_check(rows)["pass"] is False

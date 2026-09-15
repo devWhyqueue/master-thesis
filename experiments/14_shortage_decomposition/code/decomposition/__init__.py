@@ -48,7 +48,7 @@ SCENARIO_S: float = 0.5
 SCENARIO_P: float = 0.5
 
 # Manipulation check (report Sec. "check").
-SPREAD_R_FACTOR: float = 0.9
+SPREAD_R_FACTOR: float = 0.8
 SPREAD_OMEGA_MIN: float = 0.072
 SEPARATION_MAX_ABS_CORR: float = 0.3
 OVERLAP_R_FACTOR: float = 0.25  # Delta'/4

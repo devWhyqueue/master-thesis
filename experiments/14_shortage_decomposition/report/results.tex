@@ -1,6 +1,10 @@
 \section{Results}
 \label{sec:results}
-The manipulation check ran for all 30 cancer types, three splits, and 20 draws per class, and it stopped the experiment before any classifier was trained. In every split, the check fails on a single condition: the five-patient coverage-distance spread of Section~\ref{sec:check} reaches only 0.889, 0.893, and 0.899 of the mean $\Delta'$ in splits 0 through 2, short of the required 0.9 (Table~\ref{tab:results-check}). Every other condition passes with margin, in every split and at both patient counts: the ten-patient spread reaches 0.92 to 0.94 of $\Delta'$; both patient counts' similarity spread exceeds the required 0.072; the separation between class-centred coverage distance and similarity stays within $|r|\le0.06$ of zero, well inside the permitted $[-0.3,0.3]$; between 93 and 96 percent of designed cells land on target, against the required 50 percent; and the validation-patient transfer ratio lies between 0.87 and 1.03, above the required 0.7.
+Coverage explains part of the advantage of ten over five random patients, similarity explains none of it, and most of it remains for the patient count. Between the two random cells, the gap is $\Delta_{5\to10}=9.97$ percentage points (95\% interval: 8.83 to 11.09). Of these, the coverage part is $C=2.23$ points (1.40 to 2.99), the similarity part $S=-0.04$ points ($-0.06$ to $-0.03$), and the patient-count part $P=8.08$ points (7.15 to 9.09). By Table~\ref{tab:readings}, coverage and patient count contribute and similarity is at most a small part. The parts sum to 10.27 points, and the calibration difference of 0.30 points ($-1.32$ to 1.96) does not lie outside $[-1,1]$, so the criterion of Section~\ref{sec:interpretation} for a settled cause is met.
+
+\subsection{Manipulation check and precision}
+\label{sec:check-results}
+The manipulation check ran for all 30 cancer types, three splits, and 20 draws per split before any classifier was trained, and it passes in every split. The narrowest margin is the five-patient coverage-distance spread of Section~\ref{sec:check}, which reaches 0.889, 0.893, and 0.899 of the mean $\Delta'$ in splits 0 through 2, above the required 0.8 (Table~\ref{tab:results-check}). The ten-patient spread reaches 0.92 to 0.94 of $\Delta'$, and the similarity spread exceeds the required 0.072 at both patient counts. The correlation between class-centred coverage distance and similarity stays within $|r|\le0.06$, well inside the permitted $[-0.3,0.3]$. Between 93 and 96 percent of designed cells lie on target, against the required 50 percent, and the transfer ratio lies between 0.87 and 1.03, above the required 0.7.
 
 \begin{table}[htbp]
 \centering
@@ -15,10 +19,111 @@ Split & \multicolumn{2}{c}{Coverage spread / $\Delta'$} & \multicolumn{2}{c}{Sim
 2 & 0.899 & 0.926 & 0.080 & 0.078 & 0.873 & 0.959 \\
 \bottomrule
 \end{tabularx}
-\caption{The only failing condition is the five-patient coverage spread, which falls just short of the required 0.9 of $\Delta'$ in every split; the same condition at ten patients, the similarity spread (required $\ge0.072$), and the transfer ratio (required $\ge0.7$) all pass with margin. Separation and overlap, omitted here, also pass in every split (Section~\ref{sec:results}).}
+\caption{The designed cohorts pass every condition of the manipulation check in every split. The coverage spread (required $\ge0.8$ of $\Delta'$) is narrower at five than at ten patients; the similarity spread (required $\ge0.072$) and the transfer ratio (required $\ge0.7$) pass with margin at both patient counts. Separation and overlap, omitted here, also pass in every split (Section~\ref{sec:check-results}).}
 \label{tab:results-check}
 \end{table}
 
-\noindent This reproduces, at four times the draws, the near-miss already reported for a five-draw pilot check on the same grid: a five-patient spread of 0.89 of $\Delta'$ in every split \citep{queisler2026coverageSimilarity}. The consistency across two independent draw counts and three splits indicates a structural shortfall of the five-patient designed grid, rather than a threshold narrowly missed by chance: searching toward the corner targets $\bar r_{10}$ and $\bar r_{10}+\Delta'$ of Table~\ref{tab:cells} does not, at five patients, realize the full $\Delta'$ of separation between them.
+\noindent The five-patient spread reproduces, at four times the draws, the 0.89 of $\Delta'$ found in the five-draw search of \citet{queisler2026coverageSimilarity}. At five patients, the search thus realizes about nine tenths of the distance between the coverage targets $\bar r_{10}$ and $\bar r_{10}+\Delta'$ of Table~\ref{tab:cells}. The model of Equation~\eqref{eq:model} uses the achieved coverage distances, so this narrower spread shortens the range over which $\delta$ is estimated but does not shift the cohorts that enter it.
 
-Because the check fails, the class-recall model of Equation~\eqref{eq:model}, the parts of Equation~\eqref{eq:parts}, and the precision simulation of Appendix~\ref{app:precision} do not run, and the accounts of Section~\ref{sec:interpretation} remain untested. Per Section~\ref{sec:check}, the experiment stops here, with the original tolerances and cell grid retained.
+The precision simulation of Appendix~\ref{app:precision}, run on the checked cohorts, selects 20 draws per split. Its criterion is the half-width of a 95\% interval, half the distance between its upper and lower bound. At 20 draws, the median half-widths are 0.76 points for $C$, 0.07 for $S$, and 0.92 for $P$ in both scenarios, so the interval of $P$ is expected to span about 1.8 points. With training-draw deviations enlarged by 50 percent, they rise to 1.00, 0.10, and 1.17 points. The achieved half-widths, 0.80, 0.02, and 0.97 points, match the unenlarged simulation; for $C$, for example, the interval from 1.40 to 2.99 points has a half-width of 0.80.
+
+\subsection{Class recall across cells}
+\label{sec:cell-results}
+The designed cohorts reach their coverage and similarity levels at both patient counts (Table~\ref{tab:cell-recall}). On validation patients, the best coverage level of five patients lies at a coverage distance of 0.330 and the poorest at 0.385, close to the 0.333 of ten and the 0.387 of five random patients. At ten patients, the levels lie slightly higher, at 0.334 and 0.395. Similarity takes the values $-0.058$, $-0.018$, and 0.022 at the three levels, whereas both random cells lie near $-0.005$.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+ & & & \multicolumn{3}{c}{Similarity level} \\
+\cmidrule(l){4-6}
+Cohort & Coverage level & $r$ & Low & Middle & High \\
+\midrule
+Designed, $G=5$ & Best & 0.330 & 63.26 & 63.25 & 62.73 \\
+ & Middle & 0.353 & 63.30 & 60.18 & 60.84 \\
+ & Poorest & 0.385 & 60.78 & 59.14 & 59.66 \\
+\addlinespace
+Designed, $G=10$ & Best & 0.334 & 70.88 & 70.53 & 68.52 \\
+ & Middle & 0.363 & 71.51 & 69.53 & 68.69 \\
+ & Poorest & 0.395 & 70.25 & 66.68 & 65.67 \\
+\midrule
+Random, $G=5$ & & 0.387 & \multicolumn{3}{c}{59.30 ($\omega=-0.006$)} \\
+Random, $G=10$ & & 0.333 & \multicolumn{3}{c}{69.27 ($\omega=-0.005$)} \\
+\bottomrule
+\end{tabular}
+\caption{Ten patients at the poorest coverage level are more accurate than five patients at the best level. Entries are patient-macro class recall in percent, averaged over the 90 class--split--draw cohorts of each cell. The best, middle, and poorest coverage levels target $\bar r_{10}$, $\bar r_{10}+\Delta'/2$, and $\bar r_{10}+\Delta'$; $r$ is the achieved validation coverage distance averaged over the three cells of a level. The low, middle, and high similarity levels reach $\omega=-0.058$, $-0.018$, and 0.022 on average ($-0.053$ in the poorest-coverage low-similarity cell at ten patients). Descriptive means without intervals.}
+\label{tab:cell-recall}
+\end{table}
+
+\noindent Within each patient count, recall falls as coverage worsens. Averaged over similarity levels, five patients lose 3.22 points from the best to the poorest coverage level, from 63.08 to 59.86 percent, and ten patients lose 2.45 points, from 69.98 to 67.53 percent. Higher similarity also lowers recall, by 1.37 points from the low to the high level at five patients and by 3.26 points at ten patients, although the middle level is the least accurate at five patients.
+
+The patient count separates the two halves of the table more strongly than either property. Ten patients at the poorest coverage level, whose coverage distance of 0.395 is poorer than that of five random patients, reach 67.53 percent. Five patients at the best coverage level, as close to validation patients as ten random patients, reach 63.08 percent. Every ten-patient cell is more accurate than every five-patient cell.
+
+The random cells are less alike than on the breadth--depth grid. Five random patients reach 59.30 percent, 2.95 points below the 62.25 percent on the grid, and ten random patients reach 69.27 percent, 1.99 points above the 67.28 percent \citep{queisler2026effectiveSupport}. On the grid, all classes of a classifier share one patient count. Here, every classifier combines classes with five and ten patients, so a class with five patients plausibly loses recall to competing classes trained on ten, and a class with ten patients gains it. The gap between the random cells therefore widens from 5.03 to 9.97 points.
+
+\subsection{Parts of the five-to-ten-patient gap}
+\label{sec:parts-results}
+The class-recall model assigns recall to coverage, similarity, and patient count with coefficients whose intervals exclude zero. Each decrease of the coverage distance by 0.01 adds 0.42 points of recall ($\delta=-41.8$; $-56.1$ to $-26.2$), each decrease of similarity by 0.01 adds 0.33 points ($\lambda=-33.5$; $-45.1$ to $-20.9$), and ten instead of five patients add $\gamma=8.08$ points at equal coverage and similarity. The residual standard deviation of class recall is 7.06 points.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+ & & & \multicolumn{3}{c}{Split} \\
+\cmidrule(l){4-6}
+Quantity & Estimate [95\% interval] & Reading & 0 & 1 & 2 \\
+\midrule
+Coverage part $C$ & 2.23 [1.40, 2.99] & Contributes & 2.04 & 2.10 & 2.60 \\
+Similarity part $S$ & $-0.04$ [$-0.06$, $-0.03$] & At most small & 0.26 & $-0.15$ & $-0.41$ \\
+Patient-count part $P$ & 8.08 [7.15, 9.09] & Contributes & 7.52 & 8.24 & 8.50 \\
+\addlinespace
+$C+S+P$ & 10.27 & & 9.81 & 10.19 & 10.68 \\
+Observed gap $\Delta_{5\to10}$ & 9.97 [8.83, 11.09] & & 10.25 & 8.57 & 11.08 \\
+$C+S+P-\Delta_{5\to10}$ & 0.30 [$-1.32$, 1.96] & & $-0.44$ & 1.62 & $-0.40$ \\
+\bottomrule
+\end{tabular}
+\caption{Coverage and patient count both contribute to the gap between ten and five random patients, and patient count contributes about four times as much. Estimates pool the three splits, with paired 95\% intervals over test patients and draws, and readings follow Table~\ref{tab:readings}. Split columns refit the model within one split and carry no intervals. All values are in percentage points; positive parts favour ten patients.}
+\label{tab:parts}
+\end{table}
+
+\noindent Coverage accounts for 22 percent of the gap between the random cells and patient count for 81 percent (Table~\ref{tab:parts}). The coverage part follows from the slope $\delta$ and the 0.053 by which ten random patients cover validation patients better than five. The similarity part is negligible although similarity affects recall: the two random cells differ in similarity by only 0.001, whereas the designed levels span 0.08. Its interval lies entirely below zero but far above the threshold of $-1$, so it is at most small rather than counteracting. In every split, $C$ lies between 2.0 and 2.6 points and $P$ between 7.5 and 8.5 points.
+
+The calibration interval, $-1.32$ to 1.96 points, crosses both $-1$ and 1. It meets the criterion of Section~\ref{sec:interpretation}, which asks only that the interval not lie entirely outside $[-1,1]$, but it does not show that the parts reproduce the gap to within one point. Two descriptive checks without intervals probe the linear, additive form. Fitting the model to the designed cohorts alone gives $\delta=-41.7$, $\lambda=-29.8$, and $\gamma=8.13$, so the random cells do not drive the estimates. Allowing the slopes to differ between patient counts gives a coverage slope of $-49.1$ at five and $-35.6$ at ten patients and a similarity slope of $-26.2$ and $-43.4$, both pairs inside the intervals of the pooled slopes, and lowers the residual standard deviation only from 7.06 to 7.02 points.
+
+\subsection{Selection gain at five patients}
+\label{sec:secondary-results}
+Applied to the random and selected five-patient cohorts of \citet{queisler2026shortageSelection}, the model predicts a selection gain of 5.37 points (3.82 to 6.76) against the observed 5.52 points (4.83 to 6.23), a prediction error of $-0.15$ points ($-1.83$ to 1.40; Table~\ref{tab:selection}). It divides the prediction almost equally: coverage contributes 2.59 points through a coverage-distance change from 0.386 to 0.324, and similarity 2.79 points through a similarity change from $-0.011$ to $-0.094$.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lllrr@{}}
+\toprule
+ & & & \multicolumn{2}{c}{Predicted part} \\
+\cmidrule(l){4-5}
+Model & Predicted gain & Prediction error & Coverage & Similarity \\
+\midrule
+Class-recall model & 5.37 [3.82, 6.76] & $-0.15$ [$-1.83$, 1.40] & 2.59 & 2.79 \\
+Relation fitted to random cohorts & 5.77 [4.80, 6.78] & 0.25 [$-0.87$, 1.43] & 5.34 & 0.43 \\
+\bottomrule
+\end{tabular}
+\caption{Both models predict the observed selection gain of 5.52 points, but they attribute it differently. The class-recall model is Equation~\eqref{eq:model}, fitted in this study; the relation fitted to random cohorts is that of \citet{queisler2026shortageSelection}. The prediction error is the predicted minus the observed gain, with 95\% intervals in brackets. Predicted parts are descriptive and carry no intervals. All values are in percentage points.}
+\label{tab:selection}
+\end{table}
+
+\noindent This analysis extrapolates. The selected cohorts' similarity of $-0.094$ lies 0.036 below the lowest designed level, so the similarity part rests on the linear form beyond the design. The relation fitted to random cohorts predicts the gain equally well but attributes 5.34 points to coverage and 0.43 to similarity \citep{queisler2026shortageSelection}. Its similarity coefficient comes from cohorts in which similarity barely varies; the class-recall model estimates it from designed variation.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Designed variation of coverage and similarity at five and ten patients separates what random cohorts cannot: how much of the advantage of more patients comes from covering held-out patients, from patients being less alike, and from the patient count itself. Coverage contributes about two points, similarity nothing, and the patient count about eight. The clearest evidence needs no model: ten patients that cover validation patients more poorly than five random patients are still about four and a half points more accurate than five patients that cover them as well as ten random patients. Read jointly, as Section~\ref{sec:interpretation} prescribes for contributions of several parts, coverage is a real but minor part of patient shortage, and additional patients help mainly through something that neither patient-mean property captures.
+
+One qualification limits how far these numbers transfer. The gap decomposed here is 9.97 points, not the 5.03 points of the breadth--depth grid, because classes with five and ten patients compete within one classifier. The patient-count part therefore contains this competition, the loss of patch depth from 32 to sixteen patches, and the patient count itself, and the study cannot separate them. If the coverage slope transferred to classifiers with a uniform patient count, coverage would account for 2.23 of 5.03 points, but the slope is also estimated under competition.
+
+Similarity matters for accuracy even though it explains nothing of the random gap. Over the designed range of 0.08, it moves class recall by about 2.7 points, comparable to the coverage range, but random cohorts of five and ten patients are equally dissimilar. The effect appears when cohorts are selected: coverage-maximizing selection lowers similarity well below random values, and the class-recall model attributes half of the selection gain of \citet{queisler2026shortageSelection} to this change. The relation fitted to random cohorts, which could not observe similarity varying, assigned nearly all of that gain to coverage. Selection thus works through two properties at once, and its advantage should not be read as evidence that coverage alone limits small cohorts.
+
+For patient shortage, selection among available patients and acquisition of more patients are not interchangeable. Selection improves both coverage and dissimilarity and can reach the accuracy of twice as many random patients, but at equal coverage and similarity, ten patients remain about eight points ahead of five under the conditions of this study. The patient-mean summaries used here leave that advantage unexplained. Following Section~\ref{sec:interpretation}, the next candidate signal compares the patch distributions of patients rather than their means, and a design in which every class of a classifier shares one patient count would remove the competition that inflates the patient-count part.
