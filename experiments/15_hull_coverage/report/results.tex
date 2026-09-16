@@ -1,0 +1,83 @@
+\section{Results}
+\label{sec:results}
+Hull coverage does not explain the benefit of additional patients. Between the random cells, the gap is $\Delta_{5\to10}=4.20$ percentage points (95\% interval: 1.63 to 6.67). Of these, the coverage part is $C=1.82$ points (1.35 to 2.32), the hull part $H=-0.67$ points ($-1.47$ to 0.18), the similarity part $S=-0.04$ points ($-0.06$ to $-0.02$), and the patient-count part $P=2.98$ points (2.35 to 3.58). By Table~\ref{tab:readings}, coverage and patient count contribute, while hull coverage and similarity are at most small. The parts sum to 4.09 points, and the calibration difference of $-0.11$ points ($-2.46$ to 2.33) does not lie outside $[-1,1]$. Of the four conditions of Section~\ref{sec:interpretation}, only the calibration condition is met, so hull coverage is not an operational signal of patient shortage on TCGA-UT.
+
+\subsection{Manipulation check and precision}
+\label{sec:check-results}
+The manipulation check ran for all 30 cancer types, three splits, and 35 draws per split before any classifier was trained. With the shared hull spread threshold of Section~\ref{sec:check}, it passes in every split. The gap between hull levels zero and one half reaches 0.0583, 0.0604, and 0.0620 in splits 0 through 2 at five patients, against the required $0.35\,\Delta'_h$ of about 0.055, and 0.077 at ten patients. Under the threshold of $0.4\,\Delta'_h$ fixed before the first check, the five-patient gaps reached 0.93, 0.97, and 0.99 of the requirement; the threshold was lowered before any classifier was trained, and every other condition passed with margin in both checks.
+
+The coverage gap between mean levels is 0.051 at both patient counts, above the required 0.042, and the five-patient hull gap between levels zero and one reaches 0.135 to 0.137, above the required 0.125. Between 80 and 82 percent of five-patient cohorts and 99 percent of ten-patient cohorts in the shared cells lie on target, against the required 50 percent. The class-centred correlation of hull residual with coverage distance stays at most 0.08 and with similarity at most 0.14, inside the permitted $[-0.3,0.3]$, and transfer ratios to validation patients lie between 0.83 and 0.99, above the required 0.7. The precision simulation selected 35 draws per split, with median interval half-widths of 0.39 points for $C$, 0.69 for $H$, 0.03 for $S$, and 0.72 for $P$.
+
+\subsection{Class recall across cells}
+\label{sec:cell-results}
+The designed cohorts reach their coverage and hull levels at both patient counts, and recall responds to coverage but not to hull coverage (Table~\ref{tab:cell-recall}). At five patients, moving from the best to the poorest coverage level lowers recall by 2.6 to 3.9 points, depending on the hull level. Moving from the best to the poorest hull level, in contrast, lowers recall by at most 0.7 points at the best coverage level and raises it by 1.1 points at the poorest. At ten patients, coverage costs 0.7 to 1.0 points, and the half step in hull coverage costs 0.3 to 0.7 points.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+ & & & \multicolumn{3}{c}{Hull level} \\
+\cmidrule(l){4-6}
+Cohort & Coverage level & $r$ & 0 & $\tfrac12$ & 1 \\
+\midrule
+Designed, $G=5$ & 0 & 0.340 & 66.06 & 65.40 & 65.82 \\
+ & 1 & 0.387 & 62.12 & 61.82 & 63.18 \\
+\addlinespace
+Designed, $G=10$ & 0 & 0.334 & 67.66 & 67.33 & -- \\
+ & 1 & 0.378 & 67.00 & 66.35 & -- \\
+\midrule
+Random, $G=5$ & & 0.385 & \multicolumn{3}{c}{62.98 ($h=0.751$)} \\
+Random, $G=10$ & & 0.335 & \multicolumn{3}{c}{67.18 ($h=0.596$)} \\
+Random, $G=20$ & & 0.293 & \multicolumn{3}{c}{71.56 ($h=0.430$)} \\
+\bottomrule
+\end{tabular}
+\caption{Recall falls with poorer coverage but not with poorer hull coverage. Entries are patient-macro class recall in percent, averaged over the class--split--draw cohorts of each cell. Coverage levels 0 and 1 target the coverage distance of ten and of five random patients; hull levels do the same for the hull residual. The column $r$ is the achieved validation coverage distance, averaged over the hull levels of a coverage level. Ten-patient cohorts have no hull level 1 (Section~\ref{sec:cohorts}). Descriptive means without intervals.}
+\label{tab:cell-recall}
+\end{table}
+
+\noindent Every ten-patient cell remains more accurate than every five-patient cell, including the comparison that was decisive in \citet{queisler2026shortageDecomposition}: ten patients at the poorest coverage level reach 66.7 percent, above the 65.8 percent of five patients at the best coverage level. The gap between the random cells, 4.20 points, is close to the 5.03 points of the breadth--depth grid \citep{queisler2026effectiveSupport} and far below the 9.97 points measured when classes with five and ten patients shared one classifier \citep{queisler2026shortageDecomposition}. Training every classifier at a single patient count therefore removes the inflation, as that report suspected.
+
+\subsection{Parts of the five-to-ten-patient gap}
+\label{sec:parts-results}
+The class-recall model reproduces the coverage and similarity effects of \citet{queisler2026shortageDecomposition} but finds no hull effect. Each decrease of the coverage distance by 0.01 adds 0.37 points of recall ($\delta=-36.6$; $-46.7$ to $-27.1$) and each decrease of similarity by 0.01 adds 0.24 points ($\lambda=-24.1$; $-34.9$ to $-13.6$). The hull coefficient is $\eta=4.35$ ($-1.14$ to 9.46): its point estimate has the opposite of the expected sign, and its interval contains zero. Ten instead of five patients add $\gamma=2.98$ points at equal coverage, hull coverage, and similarity.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llr@{}}
+\toprule
+Quantity & Estimate [95\% interval] & Reading \\
+\midrule
+Coverage part $C$ & 1.82 [1.35, 2.32] & Contributes \\
+Hull part $H$ & $-0.67$ [$-1.47$, 0.18] & At most small \\
+Similarity part $S$ & $-0.04$ [$-0.06$, $-0.02$] & At most small \\
+Patient-count part $P$ & 2.98 [2.35, 3.58] & Contributes \\
+\addlinespace
+$C+H+S+P$ & 4.09 & \\
+Observed gap $\Delta_{5\to10}$ & 4.20 [1.63, 6.67] & \\
+$C+H+S+P-\Delta_{5\to10}$ & $-0.11$ [$-2.46$, 2.33] & \\
+Hull absorption $\gamma_{-h}-\gamma$ & $-0.27$ [$-0.58$, 0.07] & \\
+\bottomrule
+\end{tabular}
+\caption{Coverage and patient count carry the gap between ten and five random patients; hull coverage carries none of it. Estimates pool the three splits, with paired 95\% intervals over test patients and draws, and readings follow Table~\ref{tab:readings}. All values are in percentage points; positive parts favour ten patients.}
+\label{tab:parts}
+\end{table}
+
+\noindent Coverage accounts for 43 percent of the gap and the patient count for 71 percent, while hull coverage and similarity offset 17 percent between them (Table~\ref{tab:parts}). Removing the hull residual from the model changes the patient-count coefficient by $-0.27$ points ($-0.58$ to 0.07), so hull coverage takes over none of the patient-count effect. Its interval excludes a transfer of even half a point.
+
+\subsection{Prediction of the ten-to-twenty-patient gain}
+\label{sec:prediction-results}
+Twenty random patients cover held-out patients more closely than ten (coverage distance 0.293 against 0.335), span them better (hull residual 0.430 against 0.596), and are about as dissimilar ($-0.011$ against $-0.009$). Applying the fitted slopes to these differences predicts a gain of 0.86 points (0.12 to 1.69) from ten to twenty patients, against an observed 4.38 points (3.08 to 5.71). The prediction error is $-3.52$ points ($-5.16$ to $-1.94$), so the three measured properties account for about a fifth of the further benefit. Because the coverage slope is estimated between five and ten patients, this error also bounds how far that slope transfers.
+
+\section{Discussion and conclusion}
+\label{sec:discussion}
+Spanning held-out patients is not what additional patients supply. Hull coverage was chosen because a linear classifier generalises along combinations of training patients, and because screening showed it to be the only candidate that separates from nearest-patient coverage without following patch depth. Varied by design over the range that separates five from ten random patients, it moves class recall by at most 0.7 points, with an interval that contains zero and a point estimate of the wrong sign. The patient-count part survives it unchanged: hull absorption is $-0.27$ points.
+
+Two results nevertheless sharpen the picture. First, the inflation of the gap in \citet{queisler2026shortageDecomposition} was indeed an artefact of mixing patient counts inside one classifier. At a single patient count per classifier, the gap is 4.20 points, the patient-count part falls from 8.08 to 2.98 points, and coverage now accounts for 43 percent rather than 22 percent of it. Coverage is thus a larger share of a smaller gap, and coverage-maximizing selection \citep{queisler2026shortageSelection} addresses a real part of the shortage.
+
+Second, the bound from the twenty-patient arm is the strongest evidence against patient-mean geometry as a complete account. Coverage, hull coverage, and similarity together predict 0.86 of the 4.38 points that twenty patients gain over ten. Three summaries of the same object, the patient mean, thus leave about four fifths of that benefit unexplained, and adding a third summary did not help. Following Section~\ref{sec:interpretation}, the next candidate signal should not be another geometric property of patient means. A measure built from classifier behaviour, such as the disagreement of cross-fitted predictions on held-out patients, remains untested and would capture what a cohort teaches rather than how its patients are arranged.
+
+For practice, the recommendation of the preceding studies stands and narrows. Under a fixed labelling budget, more patients remain the better investment, and where patients can be chosen, coverage-maximizing selection captures the part of the benefit that is measurable today. What the remaining part is, and whether it can be measured before training a classifier, is still open.

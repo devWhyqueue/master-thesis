@@ -168,6 +168,8 @@ If $H$ and $P$ both contribute, or if the five-to-ten-patient conditions hold bu
 \paragraph{Hull coverage explains little.}
 If $H$ is at most small, patient-mean geometry, whether measured by nearest patients, similarity, or span, does not carry the benefit of additional patients. The next candidate signal would then use information from the classifier, such as cross-fitted predictions on held-out patients, rather than cohort geometry alone.
 
+\input{results}
+
 \section{Limitations}
 \label{sec:limitations}
 All three properties summarise a patient by its mean embedding in one representation, so variation within a patient's patches enters none of them. Hull coverage is motivated by a linear readout and may not describe classifiers that combine training patients differently. Its effect is assumed to be linear and additive over the targeted range; ten-patient cohorts do not reach hull level one, so the hull slope at poor hull coverage rests on five-patient cohorts. At a fixed budget, ten patients receive sixteen instead of 32 patches, so $P$ combines patient count with patch depth; on TCGA-UT, depth adds at most 0.3 points \citep{queisler2026effectiveSupport}. Classes still share a classifier with other classes whose cohorts differ in coverage and hull coverage, which the rotation balances but does not remove. The prediction test assumes that the relations estimated between five and ten patients hold between ten and twenty. The threshold of the shared hull spread was lowered after the first manipulation check (Section~\ref{sec:check}). All results are conditional on frozen Virchow2 features, multinomial logistic regression, and three overlapping splits, and probability quality is outside this study.

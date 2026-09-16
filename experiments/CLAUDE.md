@@ -29,7 +29,8 @@ Controlled patch-classification studies on frozen Virchow2 features. Each study 
 | 12 | shortage_selection | Coverage-maximizing vs random selection at 5×32 | Selection gain 5.52 pp [4.83, 6.23]. Recovers 58% of the 5→20 gap; 5 selected ≈ 10 random. |
 | 13 | coverage_similarity | Matched cohorts to separate coverage from similarity | Precision gate failed (SE floor 0.38 pp). Matching infeasible. Redesign became exp-14. |
 | 14 | shortage_decomposition | Designed coverage × similarity grid at 5/10 patients: decompose the gap | Gap 9.97 pp: coverage 2.23, similarity ≈0, patient count 8.08. Similarity drives half of the exp-12 selection gain. |
+| 15 | hull_coverage | Does hull coverage (span of patient deviations) explain the gap, at one patient count per classifier? | No. Gap 4.20 pp: coverage 1.82, hull −0.67, similarity ≈0, patient count 2.98. Hull absorption −0.27. The 10→20 gain is predicted at 0.86 pp against 4.38 observed. |
 
 ## Open thread
 
-Patient-mean coverage and similarity leave most of the patient-count advantage unexplained. Next candidate signal: distances between patch distributions. Use a design where every class shares one patient count.
+Patient-mean geometry is exhausted: nearest-patient coverage, similarity, and hull coverage together predict only a fifth of the 10→20 benefit. Patch-level signals were ruled out before fitting (exp-15 appendix). Next candidate signal: classifier behaviour, e.g. cross-fitted predictions on held-out patients, rather than cohort geometry. One patient count per classifier is now the standard design; it removes the gap inflation seen in exp-14.
