@@ -33,4 +33,4 @@ Controlled patch-classification studies on frozen Virchow2 features. Each study 
 
 ## Open thread
 
-Patient-mean geometry is exhausted: nearest-patient coverage, similarity, and hull coverage together predict only a fifth of the 10→20 benefit. Patch-level signals were ruled out before fitting (exp-15 appendix). Next candidate signal: classifier behaviour, e.g. cross-fitted predictions on held-out patients, rather than cohort geometry. One patient count per classifier is now the standard design; it removes the gap inflation seen in exp-14.
+Three patient-mean summaries tested so far — nearest-patient coverage, similarity, and hull coverage — together predict only a fifth of the 10→20 benefit. Patch-level signals did not pass the no-fit screen before exp-15 (appendix). Next candidate signal: classifier behaviour, e.g. cross-fitted predictions on held-out patients, rather than cohort geometry. One patient count per classifier is now the standard design; it removes the gap inflation seen in exp-14.
