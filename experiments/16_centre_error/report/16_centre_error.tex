@@ -1,0 +1,184 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Class-Centre Error Explains Most of\\the Benefit of Additional Patients}
+\author{Yannik Queisler}
+\date{September 16, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, a classifier trained on twenty patients per cancer type is 9.41 percentage points more accurate than one trained on five patients with the same 160 patches per class. This report tests a simple explanation: a few patients place the centre of each class in the wrong position of feature space. Training cohorts are left unchanged except that every class is shifted so that its mean equals the mean of all eligible training patients of that class. With correct centres, the gap from five to twenty patients shrinks to 2.42 points, so centre error accounts for 74 percent of it (95\% interval: 70 to 78 percent), and the same share holds for each doubling of the patient count. Five patients with correct centres are 1.25 points more accurate than twenty real patients. Shifting centres to those of another five-patient cohort does not help, and the harmful error is specific to each class rather than a shift shared by all classes. Centre errors drawn at random with the size that $G$ patients produce reproduce 88 percent of the real gap. When, in addition, features are whitened along the directions in which patients of the training population differ, patient count adds only 0.40 points from five to twenty patients, and the two population quantities together account for 96 percent of the gap.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+At a fixed budget of 160 patches per class, TCGA-UT classifiers gain about five points of patient-macro balanced accuracy from five to ten patients and another four points from ten to twenty \citep{queisler2026effectiveSupport,queisler2026hullCoverage}. Patch depth, in contrast, hardly matters on TCGA-UT: 32 patches from one patient add little over eight \citep{queisler2026effectiveSupport}. Earlier studies explained parts of the patient benefit through the arrangement of patients in feature space. Concentrating a cohort around one patient costs 8.30 points \citep{queisler2026cohortComposition}, coverage-maximizing selection recovers 58 percent of the gap between five and twenty random patients \citep{queisler2026shortageSelection}, and nearest-patient coverage accounts for 43 percent of the five-to-ten-patient gap when every classifier is trained at one patient count \citep{queisler2026hullCoverage}. Coverage, similarity, and hull coverage together, however, predicted less than a quarter of the gain from ten to twenty patients.
+
+All of these properties describe how the patients of a cohort are spread. A linear classifier, however, depends first on where each class lies, and a cohort of five patients estimates that location with error. This report therefore asks a narrower question than the geometry studies: \emph{which part of the patient benefit disappears when the class centres of a small cohort are corrected, and does the remaining part follow from how patients vary?}
+
+\section{Idea}
+\label{sec:idea}
+A patch feature vector of class $c$ can be written as
+\begin{equation}
+  \mathbf x_{ik}=\boldsymbol\mu_c+\mathbf u_i+\mathbf e_{ik},\qquad
+  \operatorname{Cov}(\mathbf u_i)=\boldsymbol\Sigma_{B,c},\quad
+  \operatorname{Cov}(\mathbf e_{ik})=\boldsymbol\Sigma_{W,c},
+  \label{eq:model}
+\end{equation}
+\noindent with class centre $\boldsymbol\mu_c$, patient offset $\mathbf u_i$ of patient $i$, and within-patient residual $\mathbf e_{ik}$ of patch $k$. A cohort of $G$ patients with $m$ patches each estimates the centre with error covariance $\boldsymbol\Sigma_{B,c}/G+\boldsymbol\Sigma_{W,c}/(Gm)$. At a fixed budget $Gm=160$, the second term is constant, so only additional patients reduce centre error; additional patches from the same patients do not. On TCGA-UT, patches of one patient are strongly alike, with a mean intraclass correlation of 0.457 against 0.130 on BRACS \citep{queisler2026effectiveSupport}, so the between-patient term dominates. If centre error drives accuracy, this model explains both the patient benefit and the absence of a depth benefit on TCGA-UT.
+
+\section{Design}
+\label{sec:design}
+The study keeps the setting of \citet{queisler2026hullCoverage}: 30 TCGA-UT cancer types, frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three fixed patient-disjoint splits with their validation and test partitions, and multinomial logistic regression with regularization strength selected on validation patient-macro balanced accuracy. Each classifier is trained with one patient count for all classes and 160 patches per class. The \emph{eligible pool} of a class contains the training patients with at least 32 patches of that class, between 30 and 514 patients depending on class and split.
+
+For each split and each of ten draws, twenty eligible patients per class are sampled at random. The first five patients with 32 patches each form the five-patient cohort, the first ten with sixteen patches the ten-patient cohort, and all twenty with eight patches the twenty-patient cohort, so the cohorts are nested and patches follow the established round-robin order across slides. The \emph{pool centre} $\bar{\mathbf x}_c$ is the mean over all eligible patients of their first 32 patches, and the deviations of these patient means from $\bar{\mathbf x}_c$ estimate $\boldsymbol\Sigma_c=\boldsymbol\Sigma_{B,c}+\boldsymbol\Sigma_{W,c}/32$.
+
+Every arm changes only the features of the training cohort; validation and test patients are unchanged except for the whitening arm (Table~\ref{tab:arms}). A \emph{centre shift} adds one vector per class to every training patch, so that the class mean reaches a target while each patch keeps its offset from the class mean. Every shift was checked during fitting: class means matched their targets and offsets stayed unchanged within $10^{-6}$ in every shifted classifier.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lY@{}}
+\toprule
+Arm & Training features \\
+\midrule
+R$G$ & Real cohort of $G\in\{5,10,20\}$ patients \\
+C$G$ & Real cohort with class centres shifted to the pool centres \\
+N$G$ & C$G$ with a random centre error $\boldsymbol\delta_c\sim\mathcal N(\mathbf 0,\hat{\boldsymbol\Sigma}_c/G)$ added per class \\
+CW$G$ & C$G$ whitened along between-patient directions (Equation~\ref{eq:whiten}); validation and test features receive the same transform \\
+Swap5 & R5 with class centres shifted to those of an independent five-patient cohort drawn from the remaining eligible patients \\
+Glob5 & R5 shifted by the part of the centre error shared by all classes \\
+Disc5 & R5 shifted by the class-specific part of the centre error inside the span of the pool centres \\
+Off5 & R5 shifted by the class-specific part of the centre error outside that span \\
+\bottomrule
+\end{tabularx}
+\caption{Sixteen arms separate the location of the classes from everything else a cohort supplies. The centre error of a five-patient cohort is the pool centre minus the cohort's class mean. Its shared part is the mean over classes; the class-specific remainder is projected onto the 29-dimensional span of the centred pool centres (Disc5) and its orthogonal complement (Off5). Each classifier is trained with one patient count for all classes.}
+\label{tab:arms}
+\end{table}
+
+\noindent The noise arm N$G$ asks whether random centre error of the size that $G$ patients produce is enough to reproduce the real cohort's accuracy. The whitening arm asks whether the part left after correcting centres follows from how patients vary. With $\hat{\mathbf B}$ the covariance of patient deviations from their pool centre, pooled over classes, CW$G$ transforms every feature vector as
+\begin{equation}
+  \mathbf x\mapsto\bigl(\mathbf I+\kappa\hat{\mathbf B}\bigr)^{-1/2}\mathbf x,\qquad \kappa\in\{1,10,100\}/\bar\lambda,
+  \label{eq:whiten}
+\end{equation}
+\noindent where $\bar\lambda$ is the mean eigenvalue of $\hat{\mathbf B}$. The transform shrinks directions in which patients of the training population differ strongly, so that a readout relies less on them. The strength $\kappa$ is selected jointly with the regularization strength on validation data; the middle value was chosen in 74 of 90 classifiers and the largest never. The arms thus yield 16 classifiers per draw, 480 in total.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, computed as the mean of per-class recalls averaged over patients. Accuracy is pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split, over 2,000 replicates; intervals are 95 percent percentile intervals. All contrasts are paired: they use the same replicates for every arm.
+
+For each step $G\to G'$ of the patient count and each arm family $X\in\{\mathrm R,\mathrm C,\mathrm N,\mathrm{CW}\}$, the gap is $\Delta^X_{G\to G'}=X G'-X G$. The \emph{centre share} $S_C=1-\Delta^{\mathrm C}/\Delta^{\mathrm R}$ is the fraction of the real gap that disappears when centres are corrected, and the \emph{combined share} $S_{CW}=1-\Delta^{\mathrm{CW}}/\Delta^{\mathrm R}$ the fraction that disappears with correct centres and whitening. The \emph{noise ratio} $\Delta^{\mathrm N}/\Delta^{\mathrm R}$ is the fraction of the real gap that random centre error reproduces. Shares are computed per replicate. Contrasts between arms are read against a practical threshold of one percentage point.
+
+\section{Results}
+\label{sec:results}
+Correcting class centres removes about three quarters of the patient benefit at every step, and whitening along between-patient directions removes nearly all of the rest. Accuracy of the real cohorts rises from 62.48 percent with five patients to 71.89 percent with twenty (Table~\ref{tab:accuracy}), close to earlier estimates \citep{queisler2026effectiveSupport,queisler2026hullCoverage}. With correct centres, it rises only from 73.14 to 75.55 percent.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Arm family & $G=5$ & $G=10$ & $G=20$ \\
+\midrule
+Real (R) & 62.48 [61.24, 63.65] & 67.79 [66.47, 69.00] & 71.89 [70.55, 73.06] \\
+Correct centres (C) & 73.14 [71.62, 74.50] & 74.47 [73.01, 75.78] & 75.55 [74.11, 76.85] \\
+Random centre error (N) & 63.25 [61.95, 64.44] & 68.03 [66.73, 69.23] & 71.48 [70.15, 72.69] \\
+Correct centres, whitened (CW) & 77.63 [76.23, 78.88] & 77.82 [76.43, 79.06] & 78.03 [76.63, 79.26] \\
+\bottomrule
+\end{tabular}
+\caption{Correct centres lift five patients above twenty real patients, and random centre error of the matching size brings accuracy back to that of real cohorts. Entries are test patient-macro balanced accuracy in percent with 95\% intervals, pooled over three splits and ten draws.}
+\label{tab:accuracy}
+\end{table}
+
+\subsection{How much centre error explains}
+\label{sec:share-results}
+Each doubling of the patient count gains 5.31 and 4.10 points with real cohorts but only 1.33 and 1.08 points with correct centres (Table~\ref{tab:shares}). The centre share is 0.75 from five to ten patients, 0.74 from ten to twenty, and 0.74 over the whole range, with all intervals between 0.68 and 0.81. Centre error thus accounts for a stable fraction of the benefit, independent of the starting patient count.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & $5\to10$ & $10\to20$ & $5\to20$ \\
+\midrule
+Gap, real $\Delta^{\mathrm R}$ & 5.31 [4.79, 5.86] & 4.10 [3.64, 4.55] & 9.41 [8.71, 10.12] \\
+Gap, correct centres $\Delta^{\mathrm C}$ & 1.33 [1.07, 1.62] & 1.08 [0.85, 1.31] & 2.42 [2.08, 2.76] \\
+Gap, whitened $\Delta^{\mathrm{CW}}$ & 0.19 [0.05, 0.31] & 0.21 [0.06, 0.37] & 0.40 [0.23, 0.57] \\
+Gap, random error $\Delta^{\mathrm N}$ & 4.78 [3.91, 5.66] & 3.45 [2.88, 4.00] & 8.23 [7.37, 9.00] \\
+\addlinespace
+Centre share $S_C$ & 0.75 [0.68, 0.81] & 0.74 [0.68, 0.79] & 0.74 [0.70, 0.78] \\
+Combined share $S_{CW}$ & 0.97 [0.94, 0.99] & 0.95 [0.91, 0.98] & 0.96 [0.94, 0.98] \\
+Noise ratio $\Delta^{\mathrm N}/\Delta^{\mathrm R}$ & 0.90 [0.74, 1.09] & 0.84 [0.71, 0.99] & 0.88 [0.79, 0.97] \\
+\bottomrule
+\end{tabular}
+\caption{Correct centres remove three quarters of every patient-count gap, and correct centres with whitening remove almost all of it. Gaps are in percentage points; shares and ratios are fractions of the real gap. Intervals are paired 95\% bootstrap intervals over test patients and draws.}
+\label{tab:shares}
+\end{table}
+
+\noindent Five patients with correct centres are 1.25 points (0.73 to 1.73) more accurate than twenty real patients, and 10.66 points (9.78 to 11.47) more accurate than the same five patients with their own centres. The gain comes from accurate centres, not from shifting as such. Moving the five-patient centres to those of an independent five-patient cohort changes accuracy by 0.21 points ($-0.62$ to 1.17), because the target centres carry an error of the same size.
+
+\subsection{Which part of the centre error matters}
+\label{sec:parts-results}
+The damaging error is specific to each class. Correcting only the part of the error shared by all classes, such as a common stain or scanner offset, raises five-patient accuracy by 0.14 points (0.03 to 0.23), well below the one-point threshold (Table~\ref{tab:parts}). Correcting the class-specific part inside the span of the pool centres raises it by 4.64 points, and correcting the class-specific part outside that span by 6.62 points.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Corrected part of the five-patient centre error & Accuracy & Gain over R5 \\
+\midrule
+None (R5) & 62.48 & -- \\
+Shared by all classes (Glob5) & 62.62 & 0.14 [0.03, 0.23] \\
+Class-specific, inside the span of pool centres (Disc5) & 67.12 & 4.64 [4.19, 5.12] \\
+Class-specific, outside that span (Off5) & 69.10 & 6.62 [6.06, 7.14] \\
+All (C5) & 73.14 & 10.66 [9.78, 11.47] \\
+\addlinespace
+Replaced by another cohort's error (Swap5) & 62.69 & 0.21 [$-0.62$, 1.17] \\
+\bottomrule
+\end{tabular}
+\caption{Only class-specific centre error costs accuracy, and most of the cost lies outside the directions that separate the pool centres. Accuracy is test patient-macro balanced accuracy in percent; gains are paired contrasts in percentage points with 95\% intervals.}
+\label{tab:parts}
+\end{table}
+
+\noindent The error outside the span of the pool centres matters more than the error inside it, although the span contains the directions that separate classes on average. One likely reason is that an error in a direction that no pair of pool centres differs in still moves the class towards the patients of other classes in that direction, and a 2,560-dimensional space offers far more such directions than the 29 of the span. The two class-specific corrections gain 11.26 points together, slightly more than the 10.66 points of correcting both at once, so the parts do not add exactly.
+
+\subsection{Random centre error and whitening}
+\label{sec:noise-results}
+Random centre error of the size that $G$ patients produce reproduces the accuracy of real cohorts. The noise arms differ from the real cohorts by 0.77 points ($-0.07$ to 1.62) at five patients, 0.24 points ($-0.33$ to 0.81) at ten, and $-0.41$ points ($-0.90$ to 0.07) at twenty, all intervals containing zero. Across the whole range, the noise arms reproduce 88 percent of the real gap (79 to 97 percent). The model of Equation~\ref{eq:model} with the patient covariance estimated from the training population thus accounts for most of the real patient benefit without any fitted slope, although a small part, about one point from five to twenty patients, remains beyond it.
+
+Whitening along the between-patient directions of the population raises accuracy at every patient count, by 4.50 points at five patients, 3.35 at ten, and 2.48 at twenty (paired intervals from 3.99 to 5.00, 2.92 to 3.81, and 2.08 to 2.90). The gain is largest where fewest patients show the classifier how patients vary. With correct centres and whitening, five patients reach 77.63 percent and twenty patients 78.03 percent, a gap of 0.40 points (0.23 to 0.57), and the combined share is 0.96 (0.94 to 0.98).
+
+\section{Discussion}
+\label{sec:discussion}
+Two population quantities that a small cohort estimates poorly carry almost all of the benefit of additional patients on TCGA-UT. The first moment, the class centre, accounts for about three quarters of each doubling. The second moment, the directions along which patients differ, accounts for most of the remaining quarter: with both supplied from the training population, the patient count adds less than half a point from five to twenty patients. The whitening arm does not separate the second moment as an additive part, because it is applied on top of corrected centres, but it shows that correct centres and population patient-variation directions together explain more than 90 percent of each doubling: the lower interval bounds of the combined share are 0.94, 0.91, and 0.94.
+
+Centre error also unifies earlier observations. Depth saturates on TCGA-UT because additional patches of one patient do not reduce the between-patient term of the centre error, and depth helps on BRACS, whose patches are much less alike within a patient, so that the within-patient term is larger \citep{queisler2026effectiveSupport}. This is also why effective support explained BRACS but left a residual on TCGA-UT \citep{queisler2026effectiveSupport,queisler2026multidirectionalRedundancy}: effective support counts independent observations but not their location error. A cohort concentrated around one patient estimates centres from nearly one patient and loses 8.30 points \citep{queisler2026cohortComposition}, whereas dispersed cohorts and coverage-maximizing selection place patients on several sides of the class centre and so average its error away \citep{queisler2026cohortComposition,queisler2026shortageSelection}. The coverage part of \citet{queisler2026hullCoverage} is therefore likely not separate from centre error, since a cohort that covers held-out patients well also has a representative mean.
+
+The noise arm points to a single quantity that could predict accuracy without training classifiers. The expected centre risk
+\begin{equation}
+  \rho_G=\frac1G\sum_c\sum_{k\neq c}(\mathbf w_c-\mathbf w_k)^{\top}\boldsymbol\Sigma_c(\mathbf w_c-\mathbf w_k),
+  \label{eq:risk}
+\end{equation}
+\noindent with class weight vectors $\mathbf w_c$ of a reference readout and $\boldsymbol\Sigma_c$ estimated once from many patients, measures how much random centre error of $G$ patients moves decision scores between classes. Because error of this size reproduces 88 percent of the real gap, accuracy at an untested patient count, such as forty patients, or on another dataset such as BRACS should follow from $\rho_G$ alone. This prediction has not been tested.
+
+The results also name a target for mitigation that does not require more labelled patients. Class centres can be shrunk towards better estimates, for example towards a centre pooled over related classes or estimated from unlabelled slides; directions of patient variation can be estimated across classes or datasets and whitened out; and a fixed labelling budget is better spent on many patients with few patches each, because slide labels rather than patch annotations limit the centre estimate. Which of these recovers the gain in practice, without access to the full pool, is open.
+
+\section{Limitations}
+\label{sec:limitations}
+Pool centres and between-patient directions are computed from all eligible training patients, including the cohort's own, so the arms identify a mechanism, not a usable remedy. The whitening arm transforms validation and test features and tunes its strength on validation data, and no arm whitens real cohorts, so the second moment's contribution is not measured on its own. The noise arm uses a patient covariance that includes within-patient variation divided by 32, which matches the five-patient cohort exactly and understates it slightly for ten and twenty patients. All results are conditional on frozen Virchow2 features, multinomial logistic regression, TCGA-UT, and three overlapping splits, and probability quality is outside this study.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
