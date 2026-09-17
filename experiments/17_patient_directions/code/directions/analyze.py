@@ -9,13 +9,13 @@ from typing import Any, cast
 import numpy as np
 from imbalance_benchmark.common import output_root, write_json
 
-from breadth import BOOTSTRAP_SEED, N_DRAWS, N_SPLITS
+from breadth import BOOTSTRAP_SEED
 from breadth.analyze.canonical import canonical_class_names
 from breadth.analyze.secondary import pack_estimate
 
 from decomposition.model import draw_weights
 
-from centre import PATIENT_COUNTS
+from centre import N_DRAWS, N_SPLITS, PATIENT_COUNTS
 from centre.analyze import _per_split, arm_accuracy, pooled
 
 from directions import ARMS, REUSED_ARMS, exp16_config
