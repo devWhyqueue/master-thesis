@@ -1,0 +1,147 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Whitening Along Between-Patient Directions\\Is a Separate, Additive Channel}
+\author{Yannik Queisler}
+\date{September 17, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, correcting the class centres of small training cohorts removes 74 percent of the accuracy gap between five and twenty patients, and additionally whitening features along the directions in which training patients differ removes 96 percent. Because the whitening was only applied on top of corrected centres, its own contribution and a possible accuracy ceiling were not separated. This report whitens the real, uncorrected cohorts along the same population directions. Whitening alone removes 25 percent of the five-to-twenty-patient gap (95\% interval: 21 to 29 percent) and raises accuracy by 2.57 to 4.94 percentage points. Its gain on real cohorts differs from its gain on corrected cohorts by at most 0.52 points at every patient count, and the centre share and the whitening share sum to within 0.04 of the combined share, so the two channels are close to additive. Whitening along directions estimated from the cohort's own patients raises accuracy by 1.27 to 2.26 points without any additional patient, about half of the population-direction gain, but removes only 11 percent of the gap.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+At a fixed budget of 160 patches per class, a TCGA-UT classifier trained on twenty patients per cancer type is 9.41 points more accurate than one trained on five \citep{queisler2026centreError}. Most of this benefit comes from the location of the classes: when each class of a small cohort is shifted so that its mean equals the mean of all eligible training patients, three quarters of the gap disappear at every doubling of the patient count. When the corrected cohorts are also whitened along the between-patient directions of the training population, the remaining gap from five to twenty patients is 0.39 points, and the combined share of the gap is 0.96 \citep{queisler2026centreError}.
+
+The combined share does not isolate a second channel. The whitening arm acts only on cohorts whose centres are already corrected, so its effect could depend on correct centres. It also raises accuracy by 2.5 to 4.5 points and places every patient count near 78 percent, so a shared accuracy ceiling could close the gap without any patient-specific information. And no arm tested whether a cohort can estimate the useful directions itself. This report adds two whitened arms on real cohorts and asks three questions: \emph{does whitening reduce the patient gap of uncorrected cohorts, does it add to centre correction, and does it work with directions estimated from the cohort's own patients?}
+
+\section{Design}
+\label{sec:design}
+The study keeps every element of \citet{queisler2026centreError}: 30 TCGA-UT cancer types, frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three patient-disjoint splits with fixed validation and test partitions, and multinomial logistic regression with regularization strength selected on validation patient-macro balanced accuracy. For each split and each of ten draws, the same nested cohorts of five patients with 32 patches, ten with sixteen, and twenty with eight patches per class are drawn with the same seeds. Every classifier uses one patient count for all classes.
+
+The real (R), centre-corrected (C), and centre-corrected whitened (CW) arms are taken from that study without refitting (Table~\ref{tab:arms}); their accuracies agree with the reported values exactly. Two families are new. Both transform every feature vector, including validation and test features, as
+\begin{equation}
+  \mathbf x\mapsto\bigl(\mathbf I+\kappa\hat{\mathbf B}\bigr)^{-1/2}\mathbf x,\qquad \kappa\in\{1,10,100\}/\bar\lambda,
+  \label{eq:whiten}
+\end{equation}
+\noindent where $\hat{\mathbf B}$ is a between-patient covariance and $\bar\lambda$ the mean of its non-zero eigenvalues. The transform shrinks directions in which patients differ strongly, and $\kappa$ is selected jointly with the regularization strength on validation data. The families differ only in $\hat{\mathbf B}$. The \emph{pool basis} is the covariance of patient-mean deviations from the pool centres over all eligible training patients, pooled over classes; it is the basis of CW and has rank 2,558. The \emph{cohort basis} uses only the $G$ patients per class of the training cohort,
+\begin{equation}
+  \hat{\mathbf B}_{\mathrm{coh}}=\frac{1}{30(G-1)}\sum_{c}\sum_{i=1}^{G}(\bar{\mathbf x}_{ci}-\bar{\mathbf x}_c)(\bar{\mathbf x}_{ci}-\bar{\mathbf x}_c)^{\top},
+  \label{eq:cohort}
+\end{equation}
+\noindent with patient mean $\bar{\mathbf x}_{ci}$ and cohort class mean $\bar{\mathbf x}_c$; it has rank 120, 270, and 570 for five, ten, and twenty patients. The cohort basis needs no information beyond the training cohort, so RWc$G$ is a candidate remedy, whereas RW$G$, like CW$G$, identifies a mechanism.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}llY@{}}
+\toprule
+Arm & Source & Training features \\
+\midrule
+R$G$ & reused & Real cohort of $G\in\{5,10,20\}$ patients \\
+C$G$ & reused & Real cohort with class centres shifted to the pool centres \\
+CW$G$ & reused & C$G$ whitened along the pool basis \\
+RW$G$ & new & Real cohort whitened along the pool basis \\
+RWc$G$ & new & Real cohort whitened along the cohort basis (Equation~\ref{eq:cohort}) \\
+\bottomrule
+\end{tabularx}
+\caption{The arms form a two-by-two design of centre correction and pool-basis whitening at each patient count, plus a whitening arm that uses only the cohort's own patients. Whitened arms apply the transform of Equation~\ref{eq:whiten} to training, validation, and test features.}
+\label{tab:arms}
+\end{table}
+
+\noindent The new families add 6 classifiers per draw, 180 in total. The whitening strength differs from the corrected arms: the smallest factor was selected in all 90 pool-basis classifiers and in 84 of 90 cohort-basis classifiers, whereas CW selected the middle factor in 74 of 90.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition. Accuracy is pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates, and all arms share the same replicates, so every contrast is paired. Intervals are 95 percent percentile intervals, and contrasts are read against a practical threshold of one percentage point.
+
+For each step $G\to G'$ and arm family $X$, the gap is $\Delta^X=XG'-XG$. The \emph{centre share} is $S_C=1-\Delta^{\mathrm C}/\Delta^{\mathrm R}$ and the \emph{combined share} $S_{CW}=1-\Delta^{\mathrm{CW}}/\Delta^{\mathrm R}$, as in \citet{queisler2026centreError}. The \emph{whitening share} $S_W=1-\Delta^{\mathrm{RW}}/\Delta^{\mathrm R}$ and the \emph{cohort whitening share} $S_{Wc}=1-\Delta^{\mathrm{RWc}}/\Delta^{\mathrm R}$ are the fractions of the real gap that disappear when real cohorts are whitened. Additivity is tested in two forms. At each patient count, the \emph{interaction} $(\mathrm{CW}G-\mathrm CG)-(\mathrm{RW}G-\mathrm RG)$ compares the whitening gain with and without corrected centres. For each step, the \emph{share interaction} $S_{CW}-S_C-S_W$ compares the combined share with the sum of the two single shares. Shares are computed per replicate.
+
+\section{Results}
+\label{sec:results}
+Whitening real cohorts along the pool basis raises accuracy at every patient count and narrows the patient gap, although less than centre correction does. RW5 reaches 67.42 percent, 4.94 points above R5, and RW20 reaches 74.46 percent, 2.57 points above R20 (Table~\ref{tab:accuracy}). Ten whitened patients (71.66 percent) are about as accurate as twenty real patients (71.89 percent). The cohort basis raises accuracy by less: RWc5 reaches 64.74 percent and RWc20 73.16 percent.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Arm family & $G=5$ & $G=10$ & $G=20$ \\
+\midrule
+Real (R) & 62.48 [61.24, 63.65] & 67.79 [66.47, 69.00] & 71.89 [70.55, 73.06] \\
+Correct centres (C) & 73.14 [71.62, 74.50] & 74.47 [73.01, 75.78] & 75.55 [74.11, 76.85] \\
+Correct centres, whitened (CW) & 77.63 [76.23, 78.88] & 77.82 [76.43, 79.06] & 78.03 [76.63, 79.26] \\
+Real, pool basis (RW) & 67.42 [66.16, 68.52] & 71.66 [70.39, 72.84] & 74.46 [73.15, 75.61] \\
+Real, cohort basis (RWc) & 64.74 [63.52, 65.90] & 69.64 [68.34, 70.84] & 73.16 [71.86, 74.34] \\
+\addlinespace
+Gain RW $-$ R & 4.94 [4.45, 5.38] & 3.87 [3.47, 4.25] & 2.57 [2.19, 2.95] \\
+Gain CW $-$ C & 4.49 [3.99, 5.00] & 3.35 [2.91, 3.81] & 2.48 [2.08, 2.90] \\
+Interaction & $-0.44$ [$-0.96$, 0.10] & $-0.52$ [$-0.94$, $-0.09$] & $-0.09$ [$-0.40$, 0.22] \\
+Gain RWc $-$ R & 2.26 [1.97, 2.54] & 1.85 [1.54, 2.14] & 1.27 [1.04, 1.50] \\
+\bottomrule
+\end{tabular}
+\caption{Whitening along the pool basis gains almost the same on real and on corrected cohorts, and its gain shrinks as patients are added. Accuracy entries are test patient-macro balanced accuracy in percent; gains and the interaction $(\mathrm{CW}-\mathrm C)-(\mathrm{RW}-\mathrm R)$ are paired contrasts in percentage points. All intervals are 95\% bootstrap intervals over test patients and draws.}
+\label{tab:accuracy}
+\end{table}
+
+\subsection{Whitening share and additivity}
+\label{sec:additivity}
+Because the whitening gain falls from 4.94 points at five patients to 2.57 points at twenty, whitening removes part of the patient gap: 0.20 of the step from five to ten patients, 0.32 of the step from ten to twenty, and 0.25 of the whole range (Table~\ref{tab:shares}). Every interval lies well above zero. The per-split point estimates of the five-to-twenty share range from 0.22 to 0.30. The whitened real cohorts are far below the 78 percent that the corrected whitened cohorts reach, so this share cannot come from an accuracy ceiling.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & $5\to10$ & $10\to20$ & $5\to20$ \\
+\midrule
+Gap, real $\Delta^{\mathrm R}$ & 5.31 [4.79, 5.86] & 4.10 [3.64, 4.55] & 9.41 [8.71, 10.12] \\
+Gap, correct centres $\Delta^{\mathrm C}$ & 1.33 [1.07, 1.62] & 1.08 [0.85, 1.31] & 2.41 [2.08, 2.76] \\
+Gap, correct centres, whitened $\Delta^{\mathrm{CW}}$ & 0.19 [0.05, 0.31] & 0.21 [0.06, 0.37] & 0.39 [0.23, 0.57] \\
+Gap, pool basis $\Delta^{\mathrm{RW}}$ & 4.24 [3.75, 4.76] & 2.80 [2.44, 3.15] & 7.04 [6.48, 7.60] \\
+Gap, cohort basis $\Delta^{\mathrm{RWc}}$ & 4.90 [4.40, 5.43] & 3.51 [3.07, 3.97] & 8.42 [7.77, 9.09] \\
+\addlinespace
+Centre share $S_C$ & 0.75 [0.68, 0.81] & 0.74 [0.68, 0.79] & 0.74 [0.70, 0.78] \\
+Whitening share $S_W$ & 0.20 [0.13, 0.26] & 0.32 [0.25, 0.38] & 0.25 [0.21, 0.29] \\
+Combined share $S_{CW}$ & 0.97 [0.94, 0.99] & 0.95 [0.91, 0.98] & 0.96 [0.94, 0.97] \\
+Share interaction $S_{CW}-S_C-S_W$ & 0.02 [$-0.06$, 0.11] & $-0.10$ [$-0.18$, $-0.03$] & $-0.04$ [$-0.09$, 0.02] \\
+Cohort whitening share $S_{Wc}$ & 0.08 [0.02, 0.12] & 0.14 [0.08, 0.20] & 0.11 [0.07, 0.14] \\
+\bottomrule
+\end{tabular}
+\caption{Centre correction and pool-basis whitening remove separate parts of the patient-count gap, and their shares nearly add up to the combined share. Gaps are in percentage points; shares are fractions of the real gap. Intervals are paired 95\% bootstrap intervals.}
+\label{tab:shares}
+\end{table}
+
+\noindent The two channels are close to additive. Whitening gains 4.94 points on real and 4.49 points on corrected five-patient cohorts, and the interaction lies between $-0.52$ and $-0.09$ points at all three patient counts, with every interval inside the one-point threshold (Table~\ref{tab:accuracy}). Only at ten patients does the interval exclude zero, and there the gain is slightly smaller on corrected cohorts. In share terms, the centre share and the whitening share sum to 1.00 over the whole range against a combined share of 0.96, a share interaction of $-0.04$ ($-0.09$ to 0.02). The step from ten to twenty patients shows the largest overlap: the single shares sum to 1.05, the combined share is 0.95, and the interval of the share interaction excludes zero. The combined share of 0.96 therefore follows almost entirely from the sum of two separately measurable channels.
+
+\subsection{Directions from the cohort's own patients}
+\label{sec:remedy}
+Directions estimated from the cohort's own patients raise accuracy by more than the one-point threshold at every patient count: by 2.26 points (1.97 to 2.54) at five patients, 1.85 at ten, and 1.27 at twenty (Table~\ref{tab:accuracy}). By point estimates, this is 46, 48, and 49 percent of the gain with the pool basis. The gain again falls with the patient count, but by less than the gap itself, so the cohort basis removes only 0.11 of the five-to-twenty gap (0.07 to 0.14; Table~\ref{tab:shares}), and ten patients whitened along their own directions remain 2.24 points below twenty real patients by point estimates. Cohort whitening is therefore a remedy that improves every small cohort without additional labels, but it does not substitute for additional patients.
+
+\section{Discussion}
+\label{sec:discussion}
+The benefit of additional patients on TCGA-UT decomposes into two channels that can be measured one at a time. Correct class centres remove three quarters of the gap, whitening along the population's between-patient directions removes a quarter, and applying both removes what the sum predicts, within 0.04 of the gap over the whole range. The near closure of the gap by corrected, whitened cohorts is therefore not an artefact of an accuracy ceiling: whitening removes a quarter of the gap also on real cohorts that are 3.6 to 10.2 points below that level, and its gain barely depends on whether centres are corrected.
+
+The additivity also constrains how whitening works. The centre error of a cohort of $G$ patients has covariance proportional to the between-patient covariance \citep{queisler2026centreError}, so shrinking between-patient directions could have helped simply by shrinking centre error. If that were the main route, the whitening gain would largely vanish once centres are correct. It shrinks only by 0.09 to 0.52 points, so whitening acts mostly through a different route. A plausible one is that the readout weights directions in which patients vary strongly less after whitening, so that a test patient's own offset moves its scores less; a cohort of five patients shows this variation poorly and cannot learn to ignore it. The slightly negative interaction at ten patients leaves room for a small overlap between the two routes.
+
+For mitigation, the cohort basis shows that part of this second channel is available without additional patients. Whitening along directions estimated from a cohort's own 120 to 570 patient deviations recovers about half of the gain of the population directions, at every patient count. Because the gain shrinks as patients are added, it acts as a correction for small cohorts rather than as a replacement for patients. Better direction estimates from the same labels, for example pooled across datasets or estimated from unlabelled slides of the same cancer types, would move the cohort basis towards the pool basis and are the natural next step, together with estimating class centres without the full pool.
+
+\section{Limitations}
+\label{sec:limitations}
+The pool basis and the pool centres are computed from all eligible training patients, including the cohort's own, so RW and CW identify a mechanism, not a usable remedy; only RWc uses no information beyond the cohort. All whitened arms transform validation and test features and select the whitening strength on validation data. The smallest strength factor was selected in 174 of the 180 new classifiers, so the grid did not bracket the optimum for real cohorts, and the gains of RW and RWc may be slightly larger with a finer grid below that factor. The shares are ratios of differences and reflect the patient counts five, ten, and twenty at 160 patches per class. All results are conditional on frozen Virchow2 features, multinomial logistic regression, TCGA-UT, and three overlapping splits, and probability quality is outside this study.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
