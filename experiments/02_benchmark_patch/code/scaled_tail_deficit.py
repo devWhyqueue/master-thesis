@@ -16,8 +16,14 @@ Both use the deprived condition's own tail classes and the frozen crossed
 patient bootstrap, and are averaged over the three locked splits exactly as
 `aggregate.py` does (mean of the bootstrap-effect arrays, then percentiles).
 
+Every roster method is evaluated; each effect is also emitted as a recovery
+ratio R = effect / deficit per replicate of the split-pooled arrays.
+
+`--classes all` swaps the tail group for every class, giving the case-macro
+NLL over all classes (no gate: the calibration thresholds are tail-specific).
+
 Raw columns are recomputed alongside so the output can be checked against the
-pipeline's own `cross_split_gates_and_recovery.json` (`--check`).
+pipeline's own `cross_split_gates_and_recovery.json` (`--check`, tail only).
 
 No permutation p-values: the crossed permutation is the expensive part and the
 scaled contrast is reported as an interval-only diagnostic.
@@ -26,6 +32,7 @@ Read-only over `results/`; writes one CSV per dataset root.
 
     python3 scaled_tail_deficit.py --config ../configs/bracs_patch.yaml
     python3 scaled_tail_deficit.py --config ../configs/bracs_patch.yaml --check
+    python3 scaled_tail_deficit.py --config ../configs/bracs_patch.yaml --classes all
 """
 
 from __future__ import annotations
@@ -39,7 +46,6 @@ from typing import Any
 
 import numpy as np
 
-from imbalance_benchmark.analysis.inference.confirmatory.holm import PRIMARY_METHODS
 from imbalance_benchmark.analysis.inference.context import (
     CONDITION_REFERENCE,
     BootstrapContext,
@@ -52,23 +58,24 @@ from imbalance_benchmark.analysis.inference.gates import (
 from imbalance_benchmark.analysis.query import load_seed_predictions
 from imbalance_benchmark.common import ensure_dirs, load_config, split_paths
 from imbalance_benchmark.manifest.seeds import derive_seed
+from imbalance_benchmark.modeling.context import roster_for_regime
 
 logger = logging.getLogger(__name__)
 
-METHODS = ("ce", *sorted(PRIMARY_METHODS))
 PROBS = {"raw": "probs", "scaled": "temperature_scaled_probs"}
+OUTPUTS = {"tail": "scaled_tail_deficit.csv", "all": "nll_recovery_all_classes.csv"}
 
 
 def _predictions(
     paths: dict[str, Path], condition: str, method: str, assignment: str
 ) -> dict[str, Any] | None:
-    """Load one confirmation block, or None when this dataset never realized it.
+    """Load one confirmation block, or None for a unit the pipeline also skips.
 
-    A frozen condition without confirmation runs (TCGA-UT has no
-    `balanced_spread`) is a unit the pipeline also skips, not an error here.
-    """
+    Example: TCGA-UT never realized `balanced_spread`."""
     try:
-        return load_seed_predictions(paths, condition, method, assignment)
+        return load_seed_predictions(
+            paths, condition, method, assignment, fields=tuple(PROBS.values())
+        )
     except RuntimeError:
         logger.info(
             "scaled-tail: skipping absent %s/%s/%s", assignment, condition, method
@@ -81,11 +88,13 @@ def _split_contrasts(
     config: dict[str, Any],
     n_replicates: int,
     seed: int,
+    classes: str,
 ) -> dict[tuple[str, str, str, str, str], np.ndarray]:
     """One split's bootstrap contrast arrays, keyed by unit/method/scale/kind."""
     freeze = json.loads((paths["data"] / "manifest_freeze.json").read_text())
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     context = BootstrapContext(paths, is_mil, n_replicates, seed)
+    methods_roster = [m for m in roster_for_regime(is_mil) if m != "ce"]
     contrasts: dict[tuple[str, str, str, str, str], np.ndarray] = {}
     for assignment, conditions in freeze.get("assignment_conditions", {}).items():
         for severity in conditions:
@@ -96,15 +105,17 @@ def _split_contrasts(
             deprived = _predictions(paths, severity, "ce", assignment)
             if balanced is None or deprived is None:
                 continue
-            tail = _tail_classes(
-                freeze, list(balanced["class_names"]), assignment, severity
+            class_names = list(balanced["class_names"])
+            tail = (
+                list(range(len(class_names)))
+                if classes == "all"
+                else _tail_classes(freeze, class_names, assignment, severity)
             )
             if not tail:
                 continue
             methods = {
                 method: _predictions(paths, severity, method, assignment)
-                for method in METHODS
-                if method != "ce"
+                for method in methods_roster
             }
             for scale, key in PROBS.items():
                 base = context.tail_nll_distribution(
@@ -134,18 +145,34 @@ def _rows(
     config: dict[str, Any],
     n_replicates: int,
     seed: int,
+    classes: str,
 ) -> list[dict[str, Any]]:
     """Equal-split contrasts: mean the per-split bootstrap arrays, then take percentiles."""
     per_split = [
-        _split_contrasts(split_paths(base_paths, index), config, n_replicates, seed)
+        _split_contrasts(
+            split_paths(base_paths, index), config, n_replicates, seed, classes
+        )
         for index in range(3)
     ]
     shared = set.intersection(*(set(split) for split in per_split))
     dataset = config.get("dataset", {}).get("name", "")
-    rows = []
-    for key in sorted(shared):
+    pooled_arrays = {
+        key: np.mean(np.stack([split[key] for split in per_split]), axis=0)
+        for key in shared
+    }
+    for key, effect in list(pooled_arrays.items()):
         assignment, severity, method, scale, kind = key
-        pooled = np.mean(np.stack([split[key] for split in per_split]), axis=0)
+        deficit_key = (assignment, severity, "ce", scale, "deficit")
+        if kind == "effect" and deficit_key in pooled_arrays:
+            deficit = pooled_arrays[deficit_key]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                pooled_arrays[(assignment, severity, method, scale, "recovery")] = (
+                    np.where(deficit != 0, effect / deficit, np.nan)
+                )
+    rows = []
+    for key in sorted(pooled_arrays):
+        assignment, severity, method, scale, kind = key
+        pooled = pooled_arrays[key]
         low, high = confidence_interval(pooled)
         rows.append(
             {
@@ -160,7 +187,8 @@ def _rows(
                 "ci_high": high,
                 # Only a deficit is gated; the gate reads the (deprived - balanced)
                 # magnitude against this dataset's prespecified threshold.
-                "gate_passed": kind == "deficit"
+                "gate_passed": classes == "tail"
+                and kind == "deficit"
                 and calibration_gate(float(pooled[0]), (low, high), dataset),
             }
         )
@@ -199,15 +227,18 @@ def main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--classes", choices=sorted(OUTPUTS), default="tail")
     args = parser.parse_args()
+    assert not args.check or args.classes == "tail", "--check is tail-only"
 
     config = load_config(args.config)
     base_paths = ensure_dirs(config)
     n_replicates = int(config.get("analysis", {}).get("bootstrap_replicates", 10_000))
-    rows = _rows(base_paths, config, n_replicates, derive_seed(args.seed, "resampling"))
+    seed = derive_seed(args.seed, "resampling")
+    rows = _rows(base_paths, config, n_replicates, seed, args.classes)
     if args.check:
         _check(base_paths, rows)
-    destination = base_paths["data"] / "scaled_tail_deficit.csv"
+    destination = base_paths["data"] / OUTPUTS[args.classes]
     with open(destination, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
