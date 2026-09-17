@@ -12,7 +12,10 @@
     "experiments/11_coverage_redundancy/code",
     "experiments/12_shortage_selection/code",
     "experiments/13_coverage_similarity/code",
-    "experiments/14_shortage_decomposition/code"
+    "experiments/14_shortage_decomposition/code",
+    "experiments/15_hull_coverage/code",
+    "experiments/16_centre_error/code",
+    "experiments/17_patient_directions/code"
   ],
   "extraPaths": [
     "experiments/02_benchmark_patch/code",
@@ -27,7 +30,10 @@
     "experiments/11_coverage_redundancy/code",
     "experiments/12_shortage_selection/code",
     "experiments/13_coverage_similarity/code",
-    "experiments/14_shortage_decomposition/code"
+    "experiments/14_shortage_decomposition/code",
+    "experiments/15_hull_coverage/code",
+    "experiments/16_centre_error/code",
+    "experiments/17_patient_directions/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"

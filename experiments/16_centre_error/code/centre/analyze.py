@@ -27,7 +27,9 @@ __all__ = ["arm_accuracy", "pooled", "derived", "run_analyze"]
 _GAP_FAMILIES = ("R", "C", "N", "CW")
 
 
-def arm_accuracy(config: dict[str, Any], names: list[str]) -> dict[str, np.ndarray]:
+def arm_accuracy(
+    config: dict[str, Any], names: list[str], arms: tuple[str, ...] = ARMS
+) -> dict[str, np.ndarray]:
     """Per arm, (F, R) class-mean patient-macro recall in percent, one row per (split, draw) fit."""
     ctxs = contexts(config)
     keys = [(s, d) for s in range(N_SPLITS) for d in range(N_DRAWS)]
@@ -41,7 +43,7 @@ def arm_accuracy(config: dict[str, Any], names: list[str]) -> dict[str, np.ndarr
             len(names),
         ).mean(axis=1)
         * 100.0
-        for arm in ARMS
+        for arm in arms
     }
 
 
