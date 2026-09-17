@@ -1,0 +1,176 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Centre Error Carries the Patient Benefit on BRACS,\\but the Whitening Channel Does Not Separate}
+\author{Yannik Queisler}
+\date{September 17, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, the accuracy benefit of additional training patients decomposes into two population quantities: correct class centres remove 74 percent of the gap between five and twenty patients, whitening along between-patient directions removes a further 25 percent, and the two channels are close to additive. This report repeats the same arms on BRACS, a seven-class single-institution cohort whose patches within a patient are far less alike. The first moment transfers. The gap between five and twenty patients is 4.80 percentage points, correcting class centres removes 0.82 of it (95\% interval: 0.59 to 1.02), correct centres with whitening remove 1.00 (0.94 to 1.10), and random centre error of the size that $G$ patients produce reproduces 0.99 of the gap (0.53 to 1.82). Five patients with correct centres are 3.66 points more accurate than twenty real patients. The second moment behaves differently. Whitening real cohorts along the population directions removes 0.64 of the gap (0.37 to 0.97), but the centre share and the whitening share sum to 1.46 against a combined share of 1.00, and the whitening gain is 1.78 points smaller on corrected than on real five-patient cohorts, so the two channels overlap instead of adding. Directions estimated from the cohort's own patients gain at most 0.32 points, against 1.27 to 2.26 points on TCGA-UT. The centre-error account therefore holds on BRACS; the separate, additive whitening channel does not.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Two studies on TCGA-UT explain almost all of the benefit that additional training patients bring at a fixed patch budget. Correcting the class centres of a small cohort to the centres of the full training pool removes 74 percent of the accuracy gap between five and twenty patients, random centre error of the matching size reproduces 88 percent of that gap, and correct centres together with whitening along the between-patient directions of the population remove 96 percent \citep{queisler2026centreError}. Whitening real, uncorrected cohorts along the same directions removes a further 25 percent on its own, and its gain barely depends on whether centres are correct, so the two channels are nearly additive \citep{queisler2026patientDirections}.
+
+Both studies used one cohort. TCGA-UT patches are repeated crops of a few pathologist-selected tumour regions per slide, with a mean intraclass correlation of 0.457, whereas BRACS patches are non-overlapping tiles of annotated regions of interest with a mean correlation of 0.130 \citep{queisler2026effectiveSupport}. This difference matters for the mechanism directly: a cohort of $G$ patients with $m$ patches each estimates a class centre with error covariance $\boldsymbol\Sigma_{B,c}/G+\boldsymbol\Sigma_{W,c}/(Gm)$, so the between-patient term dominates on TCGA-UT but not necessarily on BRACS. It also matters for the earlier evidence: on BRACS the breadth effect is smaller, 3.71 points from five to twenty patients at 160 patches per class, and redundancy-adjusted effective support absorbs nearly all of it, whereas on TCGA-UT a substantial residual remains \citep{queisler2026effectiveSupport,queisler2026multidirectionalRedundancy}. An explanation calibrated on TCGA-UT may therefore describe a cohort-specific regime. This report runs the same arms on BRACS and asks: \emph{does centre error carry the patient benefit there as well, and do the two channels separate in the same way?}
+
+\section{Design}
+\label{sec:design}
+The study keeps every element of \citet{queisler2026centreError} and \citet{queisler2026patientDirections} and changes only the cohort. BRACS contributes its seven lesion classes in the official order, frozen 2,560-dimensional Virchow2 features of non-overlapping 256-pixel tiles \citep{zimmermann2024virchow2}, and the three fixed patient-disjoint splits of the benchmark, each with 103 training, 24 validation, and 24 test patients. The downstream model is multinomial logistic regression with its regularization strength selected on validation patient-macro balanced accuracy.
+
+The \emph{eligible pool} of a class contains the training patients with at least 32 patches of that class. Every class in every split provides between 26 and 56 eligible patients, so the full patient range is attainable; the smallest pool, atypical ductal hyperplasia in the third split with 26 patients, sets the upper limit of twenty patients per class. For each split and each of ten draws, twenty eligible patients per class are sampled with the same anchors as the TCGA-UT studies, and nested cohorts of five patients with 32 patches, ten with sixteen, and twenty with eight are formed, so every classifier trains on 160 patches per class with one patient count for all classes.
+
+Six arm families are fitted at each patient count $G\in\{5,10,20\}$, giving 18 arms and 540 classifiers (Table~\ref{tab:arms}). The four centre families reproduce the design of \citet{queisler2026centreError} and the two whitened real families that of \citet{queisler2026patientDirections}; the arms that dissect the centre error into shared and class-specific parts are not repeated here. Whitened arms transform every feature vector, including validation and test features, as
+\begin{equation}
+  \mathbf x\mapsto\bigl(\mathbf I+\kappa\hat{\mathbf B}\bigr)^{-1/2}\mathbf x,
+  \label{eq:whiten}
+\end{equation}
+\noindent where $\hat{\mathbf B}$ is a between-patient covariance and $\kappa$ is a grid factor divided by the mean of its non-zero eigenvalues, selected jointly with the regularization strength on validation data. The \emph{pool basis} is the covariance of patient-mean deviations from the pool centres over all eligible training patients, pooled over classes; on BRACS it has rank 253 to 258, against 2,558 on TCGA-UT, because BRACS offers far fewer training patients. The \emph{cohort basis} uses only the cohort's own $7(G-1)$ patient deviations, of rank 28, 63, and 133.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}llY@{}}
+\toprule
+Arm & Grid for $\kappa$ & Training features \\
+\midrule
+R$G$ & --- & Real cohort of $G\in\{5,10,20\}$ patients \\
+C$G$ & --- & Real cohort with class centres shifted to the pool centres \\
+N$G$ & --- & C$G$ with a random centre error $\boldsymbol\delta_c\sim\mathcal N(\mathbf 0,\hat{\boldsymbol\Sigma}_c/G)$ per class \\
+CW$G$ & $\{1,10,100\}$ & C$G$ whitened along the pool basis \\
+RW$G$ & $\{0.1,1,10,100\}$ & Real cohort whitened along the pool basis \\
+RWc$G$ & $\{0.1,1,10,100\}$ & Real cohort whitened along the cohort basis \\
+\bottomrule
+\end{tabularx}
+\caption{The arms separate the location of the classes (C, N) from the directions in which patients differ (CW, RW, RWc) at each patient count. The grids for $\kappa$ are those of the two source studies and are kept unchanged so that the arms remain comparable. Whitened arms apply the transform of Equation~\ref{eq:whiten} to training, validation, and test features.}
+\label{tab:arms}
+\end{table}
+
+\noindent The selected whitening strength differs from TCGA-UT. On corrected cohorts, the smallest factor of the CW grid was selected in all 90 classifiers, whereas on TCGA-UT the middle factor was selected in 74 of 90. On real cohorts, the pool basis selected the factor 0.1 in 34 of 90 classifiers, 1 in 43, 10 in 11, and 100 in 2; the cohort basis selected 0.1 in 51, 1 in 31, 10 in 6, and 100 in 2. BRACS thus calls for weaker whitening throughout.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on the 24 test patients of each split \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals. Contrasts between arms are read against a practical threshold of one percentage point.
+
+For each step $G\to G'$ and family $X$, the gap is $\Delta^X=XG'-XG$. The \emph{centre share} is $S_C=1-\Delta^{\mathrm C}/\Delta^{\mathrm R}$, the \emph{combined share} $S_{CW}=1-\Delta^{\mathrm{CW}}/\Delta^{\mathrm R}$, the \emph{whitening share} $S_W=1-\Delta^{\mathrm{RW}}/\Delta^{\mathrm R}$, and the \emph{cohort whitening share} $S_{Wc}=1-\Delta^{\mathrm{RWc}}/\Delta^{\mathrm R}$. The \emph{noise ratio} is $\Delta^{\mathrm N}/\Delta^{\mathrm R}$. Additivity is read in two forms: the \emph{interaction} $(\mathrm{CW}G-\mathrm CG)-(\mathrm{RW}G-\mathrm RG)$ at each patient count, and the \emph{share interaction} $S_{CW}-S_C-S_W$ for each step. Shares are computed per replicate.
+
+Five criteria were fixed before the fits, all on the step from five to twenty patients, together with the label they imply (Table~\ref{tab:criteria}). The label is \emph{holds} if all five pass, \emph{partially holds} if the gap and the centre criteria pass while others fail, and \emph{does not hold} if the centre criterion fails. Per-doubling shares, the contrast between corrected five-patient and real twenty-patient cohorts, and the cohort-basis gains are descriptive.
+
+\section{Results}
+\label{sec:results}
+The BRACS patient benefit is of the expected size. Real cohorts reach 36.18 percent with five patients and 40.97 percent with twenty (Table~\ref{tab:accuracy}), close to the 37.13 and 40.84 percent of the corresponding cells of \citet{queisler2026effectiveSupport}, and the gap of 4.80 points (2.88 to 6.75) covers the 3.71 points reported there. Absolute accuracy is far below TCGA-UT because seven lesion classes at 160 patches per class are a harder problem than 30 cancer types at the same budget, but the object of interest is the gap.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Arm family & $G=5$ & $G=10$ & $G=20$ \\
+\midrule
+Real (R) & 36.18 [33.46, 38.80] & 38.49 [35.87, 41.22] & 40.97 [38.50, 43.62] \\
+Correct centres (C) & 44.63 [41.33, 48.05] & 45.11 [41.85, 48.51] & 45.50 [42.20, 48.76] \\
+Random centre error (N) & 36.27 [33.49, 39.21] & 40.00 [36.98, 42.94] & 41.02 [38.08, 43.86] \\
+Correct centres, whitened (CW) & 46.18 [42.73, 49.60] & 46.25 [42.75, 49.67] & 46.15 [42.52, 49.62] \\
+Real, pool basis (RW) & 39.50 [36.82, 41.98] & 40.13 [37.39, 42.77] & 41.25 [38.79, 43.76] \\
+Real, cohort basis (RWc) & 36.49 [33.87, 39.24] & 38.61 [35.94, 41.34] & 41.28 [38.70, 43.88] \\
+\addlinespace
+Gain C $-$ R & 8.45 [6.31, 10.84] & 6.61 [4.85, 8.58] & 4.53 [2.77, 6.37] \\
+Gain CW $-$ C & 1.55 [0.35, 3.07] & 1.14 [0.01, 2.63] & 0.65 [$-0.36$, 1.82] \\
+Gain RW $-$ R & 3.33 [1.65, 5.27] & 1.63 [0.51, 2.87] & 0.27 [$-0.51$, 1.12] \\
+Gain RWc $-$ R & 0.32 [$-0.36$, 1.22] & 0.11 [$-0.49$, 0.72] & 0.31 [$-0.44$, 1.12] \\
+Interaction & $-1.78$ [$-3.49$, $-0.12$] & $-0.49$ [$-1.54$, 0.68] & 0.38 [$-0.65$, 1.47] \\
+\bottomrule
+\end{tabular}
+\caption{Correct centres lift five BRACS patients above twenty real patients, whereas whitening gains much more on real than on corrected cohorts at five patients. Accuracy entries are test patient-macro balanced accuracy in percent; gains and the interaction $(\mathrm{CW}-\mathrm C)-(\mathrm{RW}-\mathrm R)$ are paired contrasts in percentage points. All intervals are 95\% bootstrap intervals over test patients and draws.}
+\label{tab:accuracy}
+\end{table}
+
+\subsection{The centre channel transfers}
+\label{sec:centre-results}
+Correcting class centres removes most of the BRACS patient benefit, as it does on TCGA-UT. With correct centres, accuracy rises only from 44.63 to 45.50 percent over the whole patient range, a gap of 0.87 points ($-0.09$ to 1.87) against 4.80 points for real cohorts, so the centre share is 0.82 (0.59 to 1.02; Table~\ref{tab:shares}). The share is 0.79 for the first doubling and 0.84 for the second, so it does not depend on the starting patient count, although the per-doubling intervals are wide. Correcting centres gains 8.45 points at five patients, and five patients with correct centres are 3.66 points (1.83 to 5.54) more accurate than twenty real patients, nearly three times the corresponding TCGA-UT contrast of 1.25 points.
+
+Random centre error of the size that $G$ patients produce reproduces the real cohorts closely: the noise arms differ from the real arms by 0.10, 1.50, and 0.05 points at five, ten, and twenty patients, and all three intervals contain zero. Over the whole range the noise ratio is 0.99 (0.53 to 1.82), so the centre-error model with a patient covariance estimated from the training population reproduces the BRACS patient benefit without any fitted slope. The per-doubling ratios, 1.61 and 0.41, are too unstable to read, because they divide two noisy differences estimated on 24 test patients per split.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & $5\to10$ & $10\to20$ & $5\to20$ \\
+\midrule
+Gap, real $\Delta^{\mathrm R}$ & 2.32 [0.77, 3.92] & 2.48 [1.09, 3.92] & 4.80 [2.88, 6.75] \\
+Gap, correct centres $\Delta^{\mathrm C}$ & 0.48 [$-0.15$, 1.15] & 0.39 [$-0.39$, 1.19] & 0.87 [$-0.09$, 1.87] \\
+Gap, correct centres, whitened $\Delta^{\mathrm{CW}}$ & 0.07 [$-0.29$, 0.48] & $-0.10$ [$-0.51$, 0.23] & $-0.03$ [$-0.42$, 0.27] \\
+Gap, random error $\Delta^{\mathrm N}$ & 3.72 [1.75, 5.69] & 1.02 [$-0.46$, 2.52] & 4.75 [2.72, 6.77] \\
+Gap, pool basis $\Delta^{\mathrm{RW}}$ & 0.62 [$-0.63$, 1.86] & 1.12 [$-0.13$, 2.42] & 1.74 [0.13, 3.30] \\
+Gap, cohort basis $\Delta^{\mathrm{RWc}}$ & 2.11 [0.60, 3.67] & 2.68 [1.37, 4.01] & 4.79 [2.92, 6.73] \\
+\addlinespace
+Centre share $S_C$ & 0.79 [0.23, 1.07] & 0.84 [0.47, 1.21] & 0.82 [0.59, 1.02] \\
+Whitening share $S_W$ & 0.73 [0.27, 1.54] & 0.55 [0.19, 1.10] & 0.64 [0.37, 0.97] \\
+Combined share $S_{CW}$ & 0.97 [0.73, 1.15] & 1.04 [0.90, 1.29] & 1.00 [0.94, 1.10] \\
+Share interaction $S_{CW}-S_C-S_W$ & $-0.56$ [$-1.22$, 0.05] & $-0.35$ [$-0.91$, 0.11] & $-0.45$ [$-0.82$, $-0.08$] \\
+Cohort whitening share $S_{Wc}$ & 0.09 [$-0.42$, 0.53] & $-0.08$ [$-0.67$, 0.22] & 0.00 [$-0.24$, 0.21] \\
+Noise ratio $\Delta^{\mathrm N}/\Delta^{\mathrm R}$ & 1.61 [0.69, 4.58] & 0.41 [$-0.24$, 1.36] & 0.99 [0.53, 1.82] \\
+\bottomrule
+\end{tabular}
+\caption{Correct centres and whitening each remove a large part of the BRACS patient gap, but their shares sum to far more than the combined share. Gaps are in percentage points; shares and ratios are fractions of the real gap. Intervals are paired 95\% bootstrap intervals over test patients and draws.}
+\label{tab:shares}
+\end{table}
+
+\subsection{The whitening channel does not separate}
+\label{sec:whitening-results}
+Correct centres together with pool-basis whitening close the BRACS gap completely: CW accuracy is 46.18 percent at five patients and 46.15 at twenty, a gap of $-0.03$ points ($-0.42$ to 0.27) and a combined share of 1.00 (0.94 to 1.10). Whitening real cohorts also narrows the gap, removing 0.64 of it (0.37 to 0.97), with an interval well above zero.
+
+The two channels do not add up, however. Their shares sum to 1.46 against a combined share of 1.00, a share interaction of $-0.45$ ($-0.82$ to $-0.08$) whose interval excludes zero, where the corresponding TCGA-UT value is $-0.04$ ($-0.09$ to 0.02). The accuracy contrasts show the same overlap at its source: whitening gains 3.33 points on real five-patient cohorts but only 1.55 points once their centres are correct, an interaction of $-1.78$ points ($-3.49$ to $-0.12$) that exceeds the one-point threshold. The interaction shrinks with the patient count to $-0.49$ and 0.38 points, both within the threshold. On BRACS, therefore, a large part of what whitening achieves on real cohorts is a reduction of centre error rather than a separate second channel, which is the route that the TCGA-UT data ruled out.
+
+Directions estimated from the cohort's own patients gain nothing of practical size. The cohort basis raises accuracy by 0.32, 0.11, and 0.31 points at five, ten, and twenty patients, all below the one-point threshold with intervals containing zero, and its share of the gap is 0.00 ($-0.24$ to 0.21). On TCGA-UT the same arm gained 2.26, 1.85, and 1.27 points and removed 0.11 of the gap. A cohort of five BRACS patients supplies 28 patient deviations in 2,560 dimensions, against 120 on TCGA-UT, and the population basis itself is estimated from 103 training patients rather than several hundred, so both the cohort and the pool estimate of the second moment are weaker here.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lYrrl@{}}
+\toprule
+ & Criterion ($5\to20$) & BRACS & TCGA-UT & Verdict \\
+\midrule
+H1 & Patient gap $\Delta^{\mathrm R}$ above zero & 4.80 [2.88, 6.75] & 9.41 & pass \\
+H2 & Centre share $\ge0.5$, interval above zero & 0.82 [0.59, 1.02] & 0.74 & pass \\
+H3 & Combined share reaches 0.9, $\Delta^{\mathrm{CW}}<1$ point & 1.00 [0.94, 1.10] & 0.96 & pass \\
+H4 & Noise ratio overlaps $[0.75,1.25]$ & 0.99 [0.53, 1.82] & 0.88 & pass \\
+H5 & Whitening share above zero and additive & 0.64 [0.37, 0.97] & 0.25 & fail \\
+\bottomrule
+\end{tabularx}
+\caption{Four of the five criteria fixed before the fits are met on BRACS, so the outcome is labelled \emph{partially holds}. H5 fails on its additivity part only: the whitening share is clearly above zero, but the interaction of $-1.78$ points at five patients exceeds the one-point threshold. TCGA-UT values are the point estimates of \citet{queisler2026centreError} and \citet{queisler2026patientDirections}.}
+\label{tab:criteria}
+\end{table}
+
+\section{Discussion}
+\label{sec:discussion}
+The centre-error account is not specific to TCGA-UT. On a cohort with a quarter of its within-patient similarity, a different organ, a different class definition, and a tenth of its training patients, correcting class centres still removes four fifths of the benefit of additional patients, random centre error of the matching size still reproduces the benefit, and correct centres with population whitening still close the gap. The one moment that a small cohort estimates badly, the class centre, thus carries the patient effect in both cohorts, and the practical consequence stated in \citet{queisler2026centreError} transfers: the value of a patient lies mostly in where it places the class, so a labelling budget spent on many patients with few patches each buys a better centre than deep annotation of few patients.
+
+The second moment behaves as a cohort-dependent quantity. On TCGA-UT, whitening gains the same amount whether or not centres are corrected, which is what identifies it as a separate channel; on BRACS, half of its gain at five patients disappears once centres are correct. The natural reading is that BRACS whitening works mostly through the route that additivity excluded on TCGA-UT: shrinking the between-patient directions shrinks centre error, whose covariance is proportional to the between-patient covariance, and once centres are supplied there is less left for it to do. Two properties of BRACS support this reading. Its between-patient covariance is a smaller part of the total, with a mean intraclass correlation of 0.130 against 0.457 \citep{queisler2026effectiveSupport}, so a test patient's own offset moves scores less and the direction-reweighting route has less to gain. And its pool basis is estimated from 103 training patients, giving rank 253 rather than 2,558, so the directions are known less precisely. The selected whitening strengths agree: every corrected-cohort classifier chose the weakest factor of its grid, and most real-cohort classifiers chose the two weakest.
+
+This also sharpens how the account relates to effective support. On BRACS, redundancy-adjusted effective support absorbed nearly all of the breadth effect, whereas on TCGA-UT it left a residual \citep{queisler2026effectiveSupport,queisler2026multidirectionalRedundancy}. The centre-error account is consistent with both: a BRACS patient's 32 patches count as roughly six independent observations instead of two, so patches and patients reduce the within-patient term of the centre error in more comparable proportions, and a count of independent observations tracks the centre error better there than on TCGA-UT. The residual on TCGA-UT is then the part that only patients can reduce. Under this reading, the two accounts describe the same quantity from different sides, and the expected centre risk of \citet{queisler2026centreError} remains the candidate that would predict both cohorts from one formula; the BRACS arms here neither test nor refute it.
+
+For mitigation, the BRACS result is a warning. The one remedy in this design that uses no information beyond the training cohort, whitening along directions estimated from the cohort's own patients, gains 1.27 to 2.26 points on TCGA-UT and nothing measurable on BRACS. A remedy that targets the second moment therefore cannot be assumed to transfer, and the more promising direction remains the first moment: shrinking class centres towards estimates that do not need additional labelled patients, for example centres pooled over related classes or estimated from unlabelled slides of the same lesions.
+
+\section{Limitations}
+\label{sec:limitations}
+The BRACS test partitions contain 24 patients per split, so every interval here is wide: the patient gap itself spans 2.88 to 6.75 points, and ratios of two such differences, in particular the per-doubling shares and noise ratios, are too unstable to interpret individually. Only the estimates over the whole patient range support the conclusions, and the centre share's interval reaches 1.02, so a complete removal of the gap by centre correction is not excluded. Pool centres and the pool basis are computed from all eligible training patients, including the cohort's own, so C, N, CW, and RW identify a mechanism rather than a usable remedy; only RWc uses no information beyond the cohort. The whitened arms transform validation and test features and select their strength on validation data, and the grids are inherited from the two source studies: the corrected-cohort grid starts at the factor 1, which every classifier selected, so its interval towards weaker whitening is not resolved and the CW gain on BRACS may be understated. The arms that dissect centre error into its shared and class-specific parts were not repeated, so the finding that only class-specific error costs accuracy is untested on BRACS. All results are conditional on frozen Virchow2 features, multinomial logistic regression, three overlapping splits, patient counts five, ten, and twenty at 160 patches per class, and probability quality is outside this study.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
