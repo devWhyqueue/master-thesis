@@ -118,12 +118,16 @@ def arm_target(arm: str, inputs: DrawInputs) -> np.ndarray | None:
 
 
 def _tune_whitened(
-    x: np.ndarray, y: np.ndarray, evals: EvalPartition, pool: Pool
+    x: np.ndarray,
+    y: np.ndarray,
+    evals: EvalPartition,
+    pool: Pool,
+    factors: tuple[float, ...] = KAPPA_FACTORS,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
     """Tune (kappa, lambda) on validation; ties go to the larger kappa, as for lambda."""
     best: tuple[Any, ...] | None = None
     best_score, best_kappa, scores = -1.0, 0.0, {}
-    for factor in KAPPA_FACTORS:
+    for factor in factors:
         kappa = factor / float(pool.b_eigvals.mean())
         w_evals = replace(
             evals,

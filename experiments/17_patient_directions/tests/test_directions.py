@@ -12,6 +12,7 @@ from centre.fit import split_arm
 from directions import ARMS, REUSED_ARMS
 from directions.analyze import derived
 from directions.basis import cohort_eigenbasis
+from directions.fit import select_kappa
 
 
 def test_cohort_eigenbasis_diagonalizes_explicit_pooled_covariance():
@@ -69,3 +70,10 @@ def test_arm_names_parse():
         assert g in PATIENT_COUNTS
         assert arm == f"{family}{g}"
     assert split_arm("RWc10") == ("RWc", 10)
+
+
+def test_select_kappa_prefers_larger_factor_within_tolerance():
+    """select_kappa picks the best validation score and breaks ties towards the larger kappa."""
+    assert select_kappa({"1.0": 0.7, "10.0": 0.6, "100.0": 0.5, "0.1": 0.8}) == "0.1"
+    assert select_kappa({"0.1": 0.7, "1.0": 0.7, "10.0": 0.6}) == "1.0"
+    assert select_kappa({"1.0": 0.6, "0.1": 0.5, "10.0": 0.65}) == "10.0"

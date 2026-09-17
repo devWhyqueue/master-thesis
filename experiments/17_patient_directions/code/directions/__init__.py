@@ -6,11 +6,13 @@ from typing import Any
 
 from centre import PATIENT_COUNTS
 
-__all__ = ["ARMS", "REUSED_ARMS", "exp16_config"]
+__all__ = ["ARMS", "KAPPA_FACTORS", "REUSED_ARMS", "exp16_config"]
 
 ARMS: tuple[str, ...] = tuple(
     f"{family}{g}" for family in ("RW", "RWc") for g in PATIENT_COUNTS
 )
+# exp-16's grid plus 0.1: the smallest exp-16 factor won in 174/180 RW/RWc fits.
+KAPPA_FACTORS: tuple[float, ...] = (0.1, 1.0, 10.0, 100.0)
 REUSED_ARMS: tuple[str, ...] = tuple(
     f"{family}{g}" for family in ("R", "C", "CW") for g in PATIENT_COUNTS
 )
