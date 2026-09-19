@@ -1,0 +1,90 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Directional Shrinkage of Class Centres Gains About One Point\\on TCGA-UT and Nothing Measurable on BRACS}
+\author{Yannik Queisler}
+\date{September 19, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Correcting the class centres of a five-patient cohort to the centres of the full training pool is worth 10.66 percentage points on TCGA-UT and 8.45 on BRACS, but James-Stein shrinkage toward the cohort's grand mean recovers almost none of that headroom, because it moves each centre along its own discriminative axis only. This report tests the alternative that diagnosis suggests. Directional shrinkage pulls the class centres toward the grand mean along the eigen-directions of the cohort's pooled between-patient covariance, strongly where the spread of the centres is no larger than the noise of a $G$-patient mean and weakly where it reflects class separation. It uses only the drawn patients, in closed form and with a validation-tuned strength. On TCGA-UT the tuned arm gains 1.29 points at five patients (95\% interval: 0.99 to 1.57), meeting the prespecified criterion of at least one point with an interval above zero, and recovers 12 percent of the headroom; the gain falls to 0.41 points at twenty patients. On BRACS it gains 0.36 points ($-0.31$ to 1.11), which is inconclusive, and it trails radial shrinkage. A geometric diagnostic on the fitted cohorts shows that the gain does not come from better centres: the closed-form arm removes only 4 percent of the squared centre error, the strengths that validation selects on TCGA-UT increase it by 33 to 62 percent, and per-draw gains are uncorrelated with error reduction. The remedy behaves instead like a first-moment form of cohort whitening, which it trails by about one point on TCGA-UT and matches at zero on BRACS. The centre-error headroom remains essentially unrecovered from the cohort alone.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Class-centre error carries most of the accuracy benefit of additional training patients. Shifting the class centres of a five-patient cohort to the centres of the full training pool gains 10.66 percentage points on TCGA-UT and 8.45 on BRACS \citep{queisler2026centreError,queisler2026bracsMechanism}. That shift needs the pool, so it measures headroom rather than offering a remedy. The obvious remedy that uses only the drawn patients, James-Stein shrinkage of every class centre toward the cohort's grand mean, recovers $-0.028$ of that headroom on TCGA-UT and 0.131 on BRACS \citep{queisler2026centreShrinkage}.
+
+The diagnosis of that failure points to a specific alternative. Radial shrinkage moves each class centre along a single direction, the ray from the grand mean to the centre. Only a third of the squared centre error lies along that ray, and the ray is also the class's own discriminative axis, so the estimator removes true separation together with error \citep{queisler2026centreShrinkage}. A better estimator would act on many directions at once and would treat them differently: it would shrink strongly where the spread of the class centres is no larger than the noise a $G$-patient mean carries, and weakly where the spread is mostly real class separation. The cohort's own patients supply both quantities, because the pooled within-class covariance of the patient means estimates the noise along every direction it spans.
+
+This report asks one question: \emph{does shrinking class centres along the cohort's own between-patient directions, with a per-direction strength set by a signal-to-noise estimate, recover part of the pool-centre headroom that radial shrinkage misses?} The answer is judged at five patients per class, separately on each dataset, against a practical threshold of one percentage point that was fixed before fitting.
+
+\section{Idea}
+\label{sec:idea}
+Write the patch features of class $c$ as $\mathbf x_{ik}=\boldsymbol\mu_c+\mathbf u_i+\mathbf e_{ik}$, with class centre $\boldsymbol\mu_c$, patient offset $\mathbf u_i$, and within-patient residual $\mathbf e_{ik}$ \citep{queisler2026centreError}. A cohort of $G$ patients per class estimates $\boldsymbol\mu_c$ by the mean $\hat{\boldsymbol\mu}_c$ of its $G$ patient means $\mathbf m_{ci}$. Pooling the deviations $\mathbf m_{ci}-\hat{\boldsymbol\mu}_c$ over all $C$ classes at $C(G-1)$ degrees of freedom gives a between-patient covariance with orthonormal eigenvectors $\mathbf u_j$ and eigenvalues $\lambda_j$, truncated at a relative tolerance of $10^{-9}$ exactly as in the cohort-basis whitening arm of \citet{queisler2026patientDirections}. Its rank is at most $C(G-1)$.
+
+Let $\bar{\boldsymbol\mu}=C^{-1}\sum_c\hat{\boldsymbol\mu}_c$ be the cohort's grand mean. Along eigen-direction $j$, the centred class centres have coordinates $z_{cj}=\mathbf u_j^\top(\hat{\boldsymbol\mu}_c-\bar{\boldsymbol\mu})$. Their spread across classes mixes true separation with the noise of a $G$-patient mean, whose variance along $\mathbf u_j$ is $n_j=\lambda_j/G$. A method-of-moments estimate of the separation is
+\begin{equation}
+  s_j=\max\!\left(0,\ \frac{1}{C-1}\sum_{c=1}^{C}z_{cj}^{2}-n_j\right),
+  \qquad
+  a_j(\alpha)=\min\!\left(1,\ \alpha\,\frac{n_j}{s_j+n_j}\right),
+  \label{eq:weight}
+\end{equation}
+\noindent with $a_j=0$ when $s_j+n_j=0$. The shrunk centres are
+\begin{equation}
+  \tilde{\boldsymbol\mu}_c(\alpha)=\hat{\boldsymbol\mu}_c-\sum_{j}a_j(\alpha)\,z_{cj}\,\mathbf u_j .
+  \label{eq:shrink}
+\end{equation}
+\noindent At $\alpha=1$ each coordinate is pulled toward the grand mean by the empirical-Bayes fraction $n_j/(s_j+n_j)$: completely where the cohort sees no separation beyond noise, barely where separation dominates. Because $\sum_c z_{cj}=0$, the grand mean is preserved, and components of $\hat{\boldsymbol\mu}_c-\bar{\boldsymbol\mu}$ outside the span of the eigenbasis are left untouched. Every ingredient is computed from the drawn patients alone.
+
+Equation~\ref{eq:shrink} differs from radial shrinkage in two ways that the diagnosis of \citet{queisler2026centreShrinkage} asks for. It uses one weight per direction rather than one per class, so it can suppress error along noisy directions while leaving discriminative ones intact. And it uses a covariance pooled across classes, so its directions are not confined to the $C-1$ dimensional span of the centred class centres. Neither property guarantees lower risk: the pooled covariance assumes all classes share their patient-level noise, the eigenbasis is itself estimated from $C(G-1)$ deviations in 2,560 dimensions, and the separation estimate $s_j$ uses only $C-1$ degrees of freedom per direction.
+
+\section{Design}
+\label{sec:design}
+The study keeps the setting of \citet{queisler2026centreError} on TCGA-UT and of \citet{queisler2026bracsMechanism} on BRACS. TCGA-UT contributes 30 cancer types and BRACS its seven lesion classes, both with frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three fixed patient-disjoint splits, and multinomial logistic regression whose regularization strength is selected on validation patient-macro balanced accuracy. For each split and each of ten draws, twenty eligible patients per class are sampled, and nested cohorts of five patients with 32 patches, ten with sixteen, and twenty with eight are formed, so every classifier trains on 160 patches per class at a single patient count for all classes.
+
+Two new arm families enter at each $G\in\{5,10,20\}$ (Table~\ref{tab:arms}). Both apply Equation~\ref{eq:shrink} to the training features only, by the centre shift of the pool-centre arm: one vector per class is added to every training patch, so the class mean reaches its target while each patch keeps its offset from the class mean. Validation and test features are untouched. The reused arms are the exact fits of the source studies on the same cohorts, so every contrast is paired draw by draw.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}llY@{}}
+\toprule
+Arm & Source & Training features \\
+\midrule
+R$G$ & reused & Real cohort of $G\in\{5,10,20\}$ patients \\
+C$G$ & reused & Real cohort with class centres shifted to the pool centres \\
+S$G$, St$G$ & reused & Radial shrinkage toward the grand mean, closed form and tuned \citep{queisler2026centreShrinkage} \\
+RWc$G$ & reused & Real cohort whitened along the cohort's own between-patient basis \citep{queisler2026patientDirections,queisler2026bracsMechanism} \\
+A$G$ & new & Directional shrinkage at $\alpha=1$ (Equation~\ref{eq:shrink}) \\
+At$G$ & new & A$G$ with $\alpha$ selected on validation from $\{0,0.5,1,2,4\}$ \\
+\bottomrule
+\end{tabularx}
+\caption{The two new families use only the drawn patients. R$G$ and C$G$ bracket the available headroom; S$G$, St$G$, and RWc$G$ are the cohort-only remedies already tested. At$G$ includes $\alpha=0$, so its grid contains the unshrunk cohort.}
+\label{tab:arms}
+\end{table}
+
+\noindent The tuned family selects $\alpha$ jointly with the regularization strength on validation patient-macro balanced accuracy, with ties resolved toward the larger $\alpha$. The $\alpha=0$ candidate is the R$G$ fit itself and the $\alpha=1$ candidate is the A$G$ fit, so only the three remaining strengths are fit anew. The study adds 180 classifiers per dataset, 360 in total. Test accuracy never entered selection, and the grid was not extended after test results were inspected.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals.
+
+The primary contrast is At5$-$R5, read separately on each dataset. The remedy counts as a practical success on a dataset if the estimated gain is at least one percentage point and its paired interval lies entirely above zero. A claim across both cohorts requires success on both. Secondary quantities are the gain of the fixed arm, gains at ten and twenty patients, the contrasts against radial shrinkage and cohort whitening, the \emph{recovery} $\rho_G=(\mathrm{At}G-\mathrm RG)/(\mathrm CG-\mathrm RG)$ of the pool-centre headroom, and the \emph{shrinkage share} $1-\Delta^{\mathrm{At}}/\Delta^{\mathrm R}$ of the patient-count gap $\Delta^X=XG'-XG$. Recovery and shares are computed per replicate.
+
+After fitting, the pool centres serve a diagnostic that explains rather than tunes: on the exact fitted cohorts, it measures how much of the squared centre error $\sum_c\lVert\hat{\boldsymbol\mu}_c-\boldsymbol\mu_c^{\mathrm{pool}}\rVert^2$ each estimator removes, where the removal falls relative to the discriminant subspace spanned by the centred pool centres, and how much of the correction leaves the span of the cohort's own centred class centres.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
