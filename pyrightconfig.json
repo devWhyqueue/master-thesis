@@ -18,7 +18,8 @@
     "experiments/17_patient_directions/code",
     "experiments/18_bracs_mechanism/code",
     "experiments/19_centre_shrinkage/code",
-    "experiments/20_directional_shrinkage/code"
+    "experiments/20_directional_shrinkage/code",
+    "experiments/22_spectrum_regularization/code"
   ],
   "extraPaths": [
     "experiments/02_benchmark_patch/code",
@@ -39,7 +40,8 @@
     "experiments/17_patient_directions/code",
     "experiments/18_bracs_mechanism/code",
     "experiments/19_centre_shrinkage/code",
-    "experiments/20_directional_shrinkage/code"
+    "experiments/20_directional_shrinkage/code",
+    "experiments/22_spectrum_regularization/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
