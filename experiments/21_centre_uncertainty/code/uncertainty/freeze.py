@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import Any, Callable, NamedTuple, cast
 
 import numpy as np
 from centre.cohort import TrainingTable
@@ -17,7 +17,6 @@ from uncertainty import (
     FIXED_T,
     LAMBDAS,
     MAX_ITER,
-    T_FACTORS,
     TIE_TOLERANCE,
     TOLERANCE,
 )
@@ -34,6 +33,7 @@ __all__ = [
     "select_candidates",
     "write_selection",
     "read_selection",
+    "t_grid",
 ]
 
 logger = logging.getLogger(__name__)
@@ -71,14 +71,18 @@ def select_candidates(
 
 
 def fingerprint(
-    config: dict[str, Any], table: TrainingTable, g: int, source: dict[str, Any]
+    config: dict[str, Any],
+    table: TrainingTable,
+    g: int,
+    source: dict[str, Any],
+    t_grid: tuple[float, ...],
 ) -> str:
     """Hash of everything a frozen selection depends on: config, cohort features, grids, source records."""
     meta = {
         "dataset": config.get("dataset", {}),
         "feature_extraction": config.get("feature_extraction", {}),
         "g": g,
-        "t": T_FACTORS,
+        "t": t_grid,
         "lambdas": LAMBDAS,
         "tol": TOLERANCE,
         "max_iter": MAX_ITER,
@@ -142,14 +146,21 @@ def write_selection(
     os.replace(tmp, out_dir / SELECTION_NAME)
 
 
-def read_selection(out_dir: Path, fp: str) -> dict[str, Any] | None:
-    """Frozen selection matching ``fp``; ``None`` if absent. Raises on a stale or damaged one."""
+def t_grid(record: dict[str, Any]) -> tuple[float, ...]:
+    """Strengths a frozen selection covers: t = 0 (the baseline) plus every fitted candidate's t."""
+    return tuple(sorted({0.0} | {c["t"] for c in record["candidates"]}))
+
+
+def read_selection(
+    out_dir: Path, fp_for: Callable[[tuple[float, ...]], str]
+) -> dict[str, Any] | None:
+    """Frozen selection matching ``fp_for(its own t grid)``; ``None`` if absent. Raises on a stale or damaged one."""
     path = out_dir / SELECTION_NAME
     if not path.exists():
         return None
     record = json.loads(path.read_text(encoding="utf-8"))
     winners = out_dir / WINNERS_NAME
-    if record.get("fingerprint") != fp or not winners.exists():
+    if record.get("fingerprint") != fp_for(t_grid(record)) or not winners.exists():
         raise RuntimeError(
             f"Stale or incomplete selection in {out_dir}; delete to refit"
         )

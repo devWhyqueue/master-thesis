@@ -16,12 +16,13 @@ from centre.fit import split_arm
 import uncertainty.fit as fit_mod
 from uncertainty import ARMS, NONZERO_T_FACTORS, REUSED_ARM_FAMILIES
 from uncertainty.analyze import derived
-from uncertainty.fit import _fit_grid
+from uncertainty.fit import _extend_selection, _fit_grid
 from uncertainty.freeze import (
     Candidate,
     fingerprint,
     read_selection,
     select_candidates,
+    t_grid,
     write_selection,
 )
 from uncertainty.loss import (
@@ -34,6 +35,7 @@ from uncertainty.loss import (
 )
 
 K, D, N = 3, 6, 40
+GRID = (0.0, 1.0)
 
 
 def _data(seed: int = 0):
@@ -175,20 +177,20 @@ def test_covariance_geometry_uses_training_features_only(monkeypatch):
 def test_frozen_selection_round_trips_and_rejects_stale_evidence(tmp_path):
     """A matching fingerprint reads back; a changed cohort or a missing winners file is rejected."""
     table = TrainingTable(np.ones((4, 2)), np.array([0, 0, 1, 1]))
-    fp = fingerprint({}, table, 5, {"r": 0.5})
-    assert fp != fingerprint({}, TrainingTable(table.x + 1, table.y), 5, {"r": 0.5})
-    assert fp != fingerprint({}, table, 5, {"r": 0.6})
-    assert read_selection(tmp_path, fp) is None
+    fp = fingerprint({}, table, 5, {"r": 0.5}, GRID)
+    assert fp != fingerprint({}, TrainingTable(table.x + 1, table.y), 5, {"r": 0.5}, GRID)
+    assert fp != fingerprint({}, table, 5, {"r": 0.6}, GRID)
+    assert read_selection(tmp_path, lambda _: fp) is None
     fit = UncertainFit(np.zeros((2, 2)), np.zeros(2), 0.0, 0.0, 1, True)
     cand = _cand("patient", 1.0, 0.1, 0.8)
     selected = {"U": {"kind": "patient", "t": 1.0, "lam": 0.1}, "Ut": None, "It": None}
     write_selection(tmp_path, fp, [cand], selected, {}, 0.5, {("patient", 1.0, 0.1): fit})
-    assert read_selection(tmp_path, fp)["selected"] == selected
+    assert read_selection(tmp_path, lambda _: fp)["selected"] == selected
     with pytest.raises(RuntimeError):
-        read_selection(tmp_path, "other")
+        read_selection(tmp_path, lambda _: "other")
     (tmp_path / "winners.npz").unlink()
     with pytest.raises(RuntimeError):
-        read_selection(tmp_path, fp)
+        read_selection(tmp_path, lambda _: fp)
 
 
 def test_arm_names_round_trip_through_split_arm():
@@ -232,3 +234,29 @@ def test_derived_contrasts_and_gap_reduction_on_toy_distributions():
     assert out["gap_Ut_5_to_20"][0] == pytest.approx(6.5)
     assert out["gap_reduction_Ut_5_to_20"][0] == pytest.approx(3.5)
     assert out["share_Ut_5_to_20"][0] == pytest.approx(0.35)
+
+
+def test_extension_fits_only_new_strengths_and_reselects_over_the_merged_grid(
+    tmp_path, monkeypatch
+):
+    """A frozen t = 1 winner is kept unless a newly fitted t = 16 candidate beats it strictly."""
+    fit = UncertainFit(np.zeros((2, 2)), np.zeros(2), 0.0, 0.0, 1, True)
+    old_cand = _cand("patient", 1.0, 0.1, 0.8)
+    sel = {"U": {"kind": "patient", "t": 1.0, "lam": 0.1}, "Ut": None, "It": None}
+    sel["Ut"] = sel["U"]
+    key = ("patient", 1.0, 0.1)
+    write_selection(tmp_path, "fp", [old_cand], sel, {}, 0.5, {key: fit})
+    old = read_selection(tmp_path, lambda _: "fp")
+    assert t_grid(old) == (0.0, 1.0)
+    calls = []
+    for score, expected_t in ((0.9, 16.0), (0.8, 1.0)):
+        new_key = ("patient", 16.0, 0.1)
+        new = _cand("patient", 16.0, 0.1, score)
+        monkeypatch.setattr(
+            fit_mod,
+            "_fit_grid",
+            lambda *a, _n=new, _k=new_key: calls.append(a[-1]) or ([_n], {_k: fit}, {}),
+        )
+        chosen = _extend_selection(None, 3, None, old, (16.0,), (tmp_path, "fp2", 5, 0.5))
+        assert chosen["Ut"]["t"] == expected_t and chosen["U"]["t"] == 1.0
+    assert calls == [(16.0,), (16.0,)]

@@ -8,6 +8,7 @@ The selection is frozen to ``selection.json`` (fingerprinted, with the winning c
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,35 +16,26 @@ import numpy as np
 from decodability.linear import predict_logreg
 from imbalance_benchmark.analysis.aggregation.parallel_cache import worker_count
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
-    _cluster_discrimination,
     _macro_recall_mean,
-    clustered_endpoints,
-)
-from imbalance_benchmark.common import (
-    RUN_RECORD_NAME,
-    read_run_record,
-    write_run_record,
 )
 from joblib import Parallel, delayed, parallel_config
 
-from breadth.fit import EvalPartition, _build_draw_record, init_shard
+from breadth.fit import EvalPartition, init_shard
 
 from sites import allocation_dir
 
-from centre import PATIENT_COUNTS, patches_per_patient
+from centre import PATIENT_COUNTS
 from centre.cohort import TrainingTable, draw_cohorts, training_table
 from centre.fit import decode_shard_index, shard_count
 
 from directions.basis import cohort_eigenbasis
 
 from uncertainty import (
-    ARMS,
     COVARIANCE_KINDS,
     LAMBDAS,
     MAX_ITER,
     NONZERO_T_FACTORS,
     TOLERANCE,
-    baseline_arm_dir,
     baseline_arm_score,
 )
 from uncertainty.freeze import (
@@ -51,13 +43,14 @@ from uncertainty.freeze import (
     Candidate,
     fingerprint,
     read_selection,
+    t_grid,
     select_arms,
     write_selection,
 )
+from uncertainty.records import write_arm_records
 from uncertainty.loss import (
     Covariance,
     UncertainFit,
-    as_linear_result,
     covariance_for,
     fit_uncertain_logistic,
 )
@@ -79,7 +72,11 @@ def _score(fit: UncertainFit, evals: EvalPartition) -> float:
 
 
 def _fit_grid(
-    table: TrainingTable, n_classes: int, g: int, evals: EvalPartition
+    table: TrainingTable,
+    n_classes: int,
+    g: int,
+    evals: EvalPartition,
+    t_values: tuple[float, ...] = NONZERO_T_FACTORS,
 ) -> tuple[
     list[Candidate], dict[tuple[str, float, float], UncertainFit], dict[str, Any]
 ]:
@@ -88,12 +85,7 @@ def _fit_grid(
     covs: dict[str, Covariance] = {
         k: covariance_for(k, basis, eigvals, g) for k in COVARIANCE_KINDS
     }
-    grid = [
-        (k, t, lam)
-        for k in COVARIANCE_KINDS
-        for t in NONZERO_T_FACTORS
-        for lam in LAMBDAS
-    ]
+    grid = [(k, t, lam) for k in COVARIANCE_KINDS for t in t_values for lam in LAMBDAS]
     with parallel_config(backend="loky", inner_max_num_threads=2):
         fits = cast(
             list[UncertainFit],
@@ -122,73 +114,28 @@ def _fit_grid(
     return candidates, by_key, geometry
 
 
-def _evaluate(
-    config: dict[str, Any],
-    out_dir: Path,
-    arm: str,
-    meta: tuple[int, int, int],
-    lam: float,
-    fit: UncertainFit,
+def _extend_selection(
+    table: TrainingTable,
+    n_classes: int,
     evals: EvalPartition,
-    extra: dict[str, Any],
-) -> None:
-    """Score a frozen winner on validation and test and write its run record."""
-    g, n, draw_idx = meta
-    result = as_linear_result(fit, lam, n, TOLERANCE, MAX_ITER)
-    cases = evals.val_id["case_id"].astype(str).to_numpy()
-    slides = evals.val_id["slide_id"].astype(str).to_numpy()
-    v_preds, _ = predict_logreg(evals.val_x, fit.coef, fit.intercept)
-    val_end = _cluster_discrimination(evals.val_y, v_preds, cases, slides, is_mil=False)
-    preds, probs = predict_logreg(evals.test_x, fit.coef, fit.intercept)
-    test_end = clustered_endpoints(
-        evals.test_y, preds, probs, evals.test_id, is_mil=False
-    )
-    rec = _build_draw_record(
-        config,
-        (g, patches_per_patient(g), draw_idx),
-        lam,
-        result,
-        (preds, probs, val_end, test_end),
-        evals.test_y,
-    )
-    write_run_record(out_dir, {**rec, "arm": arm, **extra}, keep_arrays=True)
-
-
-def _write_arm_records(
-    config: dict[str, Any],
-    paths: dict[str, Path],
-    record: dict[str, Any],
-    sel_dir: Path,
-    evals: EvalPartition,
-    n: int,
-    where: tuple[int, int, int],
-) -> None:
-    """Write every missing arm run record of one patient count from the frozen selection."""
-    split_idx, draw_idx, g = where
+    old: dict[str, Any],
+    missing: tuple[float, ...],
+    where: tuple[Path, str, int, float],
+) -> dict[str, dict[str, Any] | None]:
+    """Fit only the ``missing`` strengths, merge with the frozen candidates, and refreeze the selection."""
+    sel_dir, fp, g, r_score = where
+    new, by_key, geometry = _fit_grid(table, n_classes, g, evals, missing)
     with np.load(sel_dir / WINNERS_NAME) as npz:
-        winners = {k: npz[k] for k in npz.files}
-    for family, sel in record["selected"].items():
-        arm = f"{family}{g}"
-        out_dir = allocation_dir(paths, arm, draw_idx)
-        if (out_dir / RUN_RECORD_NAME).exists():
-            continue
-        if sel is None:  # t = 0 wins: R's record is this arm's record.
-            base = read_run_record(
-                baseline_arm_dir(config, split_idx, draw_idx, f"R{g}")
-            )
-            assert base is not None
-            extra = {"arm": arm, "t": 0.0, "covariance": None}
-            write_run_record(out_dir, {**base, **extra}, keep_arrays=True)
-            continue
-        fit = UncertainFit(
-            winners[f"{family}_coef"], winners[f"{family}_intercept"], 0.0, 0.0, 0, True
-        )
-        extra = {
-            "t": sel["t"],
-            "covariance": sel["kind"],
-            "selection_fingerprint": record["fingerprint"],
-        }
-        _evaluate(config, out_dir, arm, (g, n, draw_idx), sel["lam"], fit, evals, extra)
+        for fam, sel in old["selected"].items():
+            if sel is not None:
+                key = (sel["kind"], sel["t"], sel["lam"])
+                by_key[key] = UncertainFit(
+                    npz[f"{fam}_coef"], npz[f"{fam}_intercept"], 0.0, 0.0, 0, True
+                )
+    merged = [Candidate(**c) for c in old["candidates"]] + new
+    selected = select_arms(merged, r_score)
+    write_selection(sel_dir, fp, merged, selected, geometry, r_score, by_key)
+    return selected
 
 
 def _fit_patient_count(
@@ -199,29 +146,41 @@ def _fit_patient_count(
     evals: EvalPartition,
     where: tuple[int, int, int],
 ) -> None:
-    """Freeze (or verify) the selection of one patient count, then write its arm records."""
+    """Freeze (or extend, or verify) the selection of one patient count, then write its arm records."""
     split_idx, draw_idx, g = where
     r_score = baseline_arm_score(config, split_idx, draw_idx, f"R{g}")
-    fp = fingerprint(config, table, g, {"r_validation_score": r_score})
+    source = {"r_validation_score": r_score}
+    fp_for = lambda grid: fingerprint(config, table, g, source, grid)  # noqa: E731
     sel_dir = allocation_dir(paths, f"Sel{g}", draw_idx)
-    record = read_selection(sel_dir, fp)
+    record = read_selection(sel_dir, fp_for)
+    full_grid = (0.0, *NONZERO_T_FACTORS)
     if record is None:
         candidates, by_key, geometry = _fit_grid(table, n_classes, g, evals)
         selected = select_arms(candidates, r_score)
+        fp = fp_for(full_grid)
         write_selection(sel_dir, fp, candidates, selected, geometry, r_score, by_key)
-        record = read_selection(sel_dir, fp)
-        assert record is not None
-    _write_arm_records(config, paths, record, sel_dir, evals, len(table.y), where)
+    elif t_grid(record) != full_grid:
+        missing = tuple(t for t in NONZERO_T_FACTORS if t not in t_grid(record))
+        selected = _extend_selection(
+            table,
+            n_classes,
+            evals,
+            record,
+            missing,
+            (sel_dir, fp_for(full_grid), g, r_score),
+        )
+        for fam in selected:  # a changed winner invalidates its scored run record
+            if selected[fam] != record["selected"][fam]:
+                shutil.rmtree(allocation_dir(paths, f"{fam}{g}", draw_idx), True)
+    record = read_selection(sel_dir, fp_for)
+    assert record is not None
+    write_arm_records(config, paths, record, sel_dir, evals, len(table.y), where)
 
 
 def run_fit_shard(config: dict[str, Any], shard_index: int) -> None:
     """Fit and freeze selections, then write every missing U/Ut/It record of one (split, draw) shard."""
     split_idx, draw_idx = decode_shard_index(shard_index)
     train_df, names, evals, paths = init_shard(config, split_idx)
-    if all(
-        (allocation_dir(paths, a, draw_idx) / RUN_RECORD_NAME).exists() for a in ARMS
-    ):
-        return
     cohorts = draw_cohorts(train_df, names, split_idx, draw_idx)
     for g in PATIENT_COUNTS:
         table = training_table(train_df, names, cohorts.nested, g)
