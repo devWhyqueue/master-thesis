@@ -8,7 +8,7 @@ from sklearn.metrics import f1_score
 
 from imbalance_benchmark.analysis.metrics import expected_calibration_error
 
-__all__ = ["clustered_endpoints", "_cluster_discrimination"]
+__all__ = ["clustered_endpoints", "_cluster_discrimination", "_macro_recall_mean"]
 
 
 def _macro_accuracy(
@@ -64,10 +64,10 @@ def _macro_f1_scores(
     ]
 
 
-def _macro_classification(
+def _macro_recall_mean(
     labels: np.ndarray, predictions: np.ndarray, groups: np.ndarray
-) -> tuple[float, float]:
-    """Equal-weight balanced accuracy and macro F1 after cluster aggregation."""
+) -> float:
+    """Equal-weight balanced accuracy after cluster aggregation (cheap tuning metric)."""
     recalls = []
     for label in np.unique(labels):
         class_rows = labels == label
@@ -77,8 +77,16 @@ def _macro_classification(
                 pd.Series(correct).groupby(groups[class_rows], sort=False).mean().mean()
             )
         )
+    return float(np.mean(recalls))
+
+
+def _macro_classification(
+    labels: np.ndarray, predictions: np.ndarray, groups: np.ndarray
+) -> tuple[float, float]:
+    """Equal-weight balanced accuracy and macro F1 after cluster aggregation."""
+    recall_mean = _macro_recall_mean(labels, predictions, groups)
     scores = _macro_f1_scores(labels, predictions, groups)
-    return float(np.mean(recalls)), float(np.mean(scores))
+    return recall_mean, float(np.mean(scores))
 
 
 def clustered_endpoints(

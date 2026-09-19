@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -15,8 +15,11 @@ from decodability.linear import (
     fit_multinomial_logistic,
     predict_logreg,
 )
+from joblib import Parallel, delayed, parallel_config
+from imbalance_benchmark.analysis.aggregation.parallel_cache import worker_count
 from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     _cluster_discrimination,
+    _macro_recall_mean,
     clustered_endpoints,
 )
 from imbalance_benchmark.common import (
@@ -82,25 +85,35 @@ def _select_best_lambda(
     """Grid-search lambda on validation, breaking ties toward larger lambda."""
     v_cases = val_id["case_id"].astype(str).to_numpy()
     v_slides = val_id["slide_id"].astype(str).to_numpy()
+    with parallel_config(backend="loky", inner_max_num_threads=2):
+        fits = cast(
+            list[LinearFitResult],
+            Parallel(n_jobs=min(worker_count(), len(LAMBDAS)))(
+                delayed(fit_multinomial_logistic)(
+                    train_x, train_y, lambda_val=lam, tol=TOLERANCE, max_iter=MAX_ITER
+                )
+                for lam in LAMBDAS
+            ),
+        )
+
     best_score, best_lam = -1.0, LAMBDAS[0]
     best_fit: LinearFitResult | None = None
-    best_end: dict[str, Any] = {}
+    best_preds: np.ndarray | None = None
 
-    for lam in LAMBDAS:
-        fit = fit_multinomial_logistic(
-            train_x, train_y, lambda_val=lam, tol=TOLERANCE, max_iter=MAX_ITER
-        )
+    for lam, fit in zip(LAMBDAS, fits):
         if not fit.converged:
             continue
         preds, _ = predict_logreg(val_x, fit.coef, fit.intercept)
-        end = _cluster_discrimination(val_y, preds, v_cases, v_slides, is_mil=False)
-        score = float(end["patient_macro_balanced_accuracy"])
+        score = _macro_recall_mean(val_y, preds, v_cases)
         diff = score - best_score
         if best_fit is None or diff > TIE_TOLERANCE or abs(diff) <= TIE_TOLERANCE:
-            best_score, best_lam, best_fit, best_end = score, lam, fit, end
+            best_score, best_lam, best_fit, best_preds = score, lam, fit, preds
 
-    if best_fit is None:
+    if best_fit is None or best_preds is None:
         raise RuntimeError("No candidate converged during validation tuning")
+    best_end = _cluster_discrimination(
+        val_y, best_preds, v_cases, v_slides, is_mil=False
+    )
     return best_fit, best_lam, best_end
 
 

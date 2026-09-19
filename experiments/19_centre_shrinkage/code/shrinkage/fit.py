@@ -52,14 +52,23 @@ def _tune_alpha(
     y: Any,
     evals: EvalPartition,
     factors: tuple[float, ...],
+    prefilled: dict[float, tuple[tuple[Any, ...], float]] | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
-    """Tune alpha on validation, moving only the training centres; ties go to the larger alpha."""
+    """Tune alpha on validation, moving only the training centres; ties go to the larger alpha.
+
+    ``prefilled`` supplies factors already fit elsewhere this shard (the S arm's alpha=1.0
+    fit), so the identical matrix is not refit.
+    """
+    prefilled = prefilled or {}
     best: tuple[Any, ...] | None = None
     best_score, best_alpha, scores = -1.0, 0.0, {}
     for factor in factors:
-        moved = move_centres(x, y, shrunk_centres(means, factor))
-        out = tune_and_fit_draw(moved, y, evals)
-        score = float(out[4]["patient_macro_balanced_accuracy"])
+        if factor in prefilled:
+            out, score = prefilled[factor]
+        else:
+            moved = move_centres(x, y, shrunk_centres(means, factor))
+            out = tune_and_fit_draw(moved, y, evals)
+            score = float(out[4]["patient_macro_balanced_accuracy"])
         scores[str(factor)] = score
         if best is None or score >= best_score - TIE_TOLERANCE:
             best, best_score, best_alpha = out, score, factor
@@ -76,12 +85,11 @@ def _fit_s(
     evals: EvalPartition,
     draw_idx: int,
     g: int,
-) -> None:
-    """Fit the closed-form S arm (alpha = 1, no tuning)."""
+) -> tuple[tuple[Any, ...], float]:
+    """Fit the closed-form S arm (alpha = 1, no tuning); return the fit and its validation score."""
     moved = move_centres(table.x, table.y, shrunk_centres(means, 1.0))
-    fit, lam, test_preds, test_probs, val_end, test_end = tune_and_fit_draw(
-        moved, table.y, evals
-    )
+    out = tune_and_fit_draw(moved, table.y, evals)
+    fit, lam, test_preds, test_probs, val_end, test_end = out
     meta = (g, patches_per_patient(g), draw_idx)
     rec = _build_draw_record(
         config,
@@ -92,6 +100,7 @@ def _fit_s(
         evals.test_y,
     )
     write_run_record(out_dir, {**rec, "arm": arm}, keep_arrays=True)
+    return out, float(val_end["patient_macro_balanced_accuracy"])
 
 
 def _fit_st(
@@ -103,12 +112,13 @@ def _fit_st(
     evals: EvalPartition,
     draw_idx: int,
     g: int,
+    prefilled: dict[float, tuple[tuple[Any, ...], float]] | None = None,
 ) -> None:
     """Fit the tuned St arm, extending a partial alpha grid in place."""
     old = read_run_record(out_dir, array_fields=())
     done = _done_scores(out_dir)
     missing = tuple(f for f in ALPHA_FACTORS if str(f) not in done)
-    out, extra = _tune_alpha(means, table.x, table.y, evals, missing)
+    out, extra = _tune_alpha(means, table.x, table.y, evals, missing, prefilled)
     scores = {**done, **extra["alpha_validation_scores"]}
     if old is not None and select_alpha(scores) in done:
         write_json(
@@ -150,6 +160,27 @@ def _arm_pending(paths: dict[str, Path], arm: str, draw_idx: int) -> bool:
     return not (out_dir / RUN_RECORD_NAME).exists()
 
 
+def _fit_pending_arm(
+    config: dict[str, Any],
+    paths: dict[str, Path],
+    tables: dict[int, TrainingTable],
+    names: list[str],
+    evals: EvalPartition,
+    draw_idx: int,
+    arm: str,
+    s_cache: dict[int, tuple[tuple[Any, ...], float]],
+) -> None:
+    """Fit one pending arm; S{g}'s fit is cached so a same-shard St{g} reuses its alpha=1.0 fit."""
+    family, g = split_arm(arm)
+    out_dir = allocation_dir(paths, arm, draw_idx)
+    means = patient_means(tables[g], len(names), g)
+    if family == "S":
+        s_cache[g] = _fit_s(config, out_dir, arm, tables[g], means, evals, draw_idx, g)
+    else:
+        prefilled = {1.0: s_cache[g]} if g in s_cache else None
+        _fit_st(config, out_dir, arm, tables[g], means, evals, draw_idx, g, prefilled)
+
+
 def run_fit_shard(config: dict[str, Any], shard_index: int) -> None:
     """Fit every pending S/St arm of one (split, draw) shard, extending partial St grids."""
     split_idx, draw_idx = decode_shard_index(shard_index)
@@ -161,11 +192,6 @@ def run_fit_shard(config: dict[str, Any], shard_index: int) -> None:
     tables = {
         g: training_table(train_df, names, cohorts.nested, g) for g in PATIENT_COUNTS
     }
+    s_cache: dict[int, tuple[tuple[Any, ...], float]] = {}
     for arm in pending:
-        family, g = split_arm(arm)
-        out_dir = allocation_dir(paths, arm, draw_idx)
-        means = patient_means(tables[g], len(names), g)
-        if family == "S":
-            _fit_s(config, out_dir, arm, tables[g], means, evals, draw_idx, g)
-        else:
-            _fit_st(config, out_dir, arm, tables[g], means, evals, draw_idx, g)
+        _fit_pending_arm(config, paths, tables, names, evals, draw_idx, arm, s_cache)
