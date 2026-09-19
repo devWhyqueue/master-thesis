@@ -15,7 +15,10 @@
     "experiments/14_shortage_decomposition/code",
     "experiments/15_hull_coverage/code",
     "experiments/16_centre_error/code",
-    "experiments/17_patient_directions/code"
+    "experiments/17_patient_directions/code",
+    "experiments/18_bracs_mechanism/code",
+    "experiments/19_centre_shrinkage/code",
+    "experiments/20_directional_shrinkage/code"
   ],
   "extraPaths": [
     "experiments/02_benchmark_patch/code",
@@ -33,7 +36,10 @@
     "experiments/14_shortage_decomposition/code",
     "experiments/15_hull_coverage/code",
     "experiments/16_centre_error/code",
-    "experiments/17_patient_directions/code"
+    "experiments/17_patient_directions/code",
+    "experiments/18_bracs_mechanism/code",
+    "experiments/19_centre_shrinkage/code",
+    "experiments/20_directional_shrinkage/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
