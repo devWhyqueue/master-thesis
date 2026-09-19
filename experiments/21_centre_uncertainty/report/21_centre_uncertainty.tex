@@ -1,0 +1,88 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Training Against Class-Centre Uncertainty Gains 1.3 Points\\on TCGA-UT and Nothing Measurable on BRACS}
+\author{Yannik Queisler}
+\date{September 19, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent A five-patient cohort estimates its class centres with an error whose covariance is the between-patient covariance divided by the patient count. Two attempts to estimate better centres from the cohort alone have not recovered the resulting headroom of 10.66 percentage points on TCGA-UT and 8.45 on BRACS. This report tests the complementary strategy: leave the centres as they are and train the classifier to be insensitive to their uncertainty. The loss is the implicit semantic data augmentation bound on the expected cross-entropy under Gaussian centre perturbations, with a perturbation covariance estimated from the cohort's own patient means. On TCGA-UT, the arm with validation-tuned perturbation strength gains 1.28 points at five patients (95\% interval: 1.13 to 1.44), meets the prespecified success criterion, recovers 12 percent of the pool-centre headroom, and narrows the five-to-twenty patient gap by 0.85 points (0.70 to 1.01). A trace-matched isotropic control gains nothing, so the gain depends on the patient directions. At five patients, the tuned arm matches directional shrinkage of the class centres to within 0.01 points and trails cohort whitening by 0.98 points. Every TCGA-UT selection chose the largest strength in the grid, so the grid bounds the gain there. On BRACS, the tuned arm gains 0.25 points ($-0.05$ to 0.59), which fails the criterion. Three different cohort-only remedies built on the same patient covariance thus converge on the same TCGA-UT gain, below cohort whitening, and none recovers the BRACS headroom.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Class-centre error carries most of the accuracy benefit of additional training patients. Shifting the class centres of a five-patient cohort to the centres of the full training pool gains 10.66 percentage points on TCGA-UT and 8.45 on BRACS \citep{queisler2026centreError,queisler2026bracsMechanism}. The shift needs the pool, so it measures headroom rather than offering a remedy. Two remedies that use only the drawn patients have tried to estimate better centres. Radial James-Stein shrinkage toward the grand mean recovers none of the TCGA-UT headroom \citep{queisler2026centreShrinkage}. Directional shrinkage along the eigen-directions of the cohort's pooled between-patient covariance gains 1.29 points on TCGA-UT and nothing measurable on BRACS, but it barely reduces centre error; its gain behaves like a first-moment form of cohort whitening \citep{queisler2026directionalShrinkage}.
+
+These results suggest a change of target. A cohort cannot locate its class centres much better from its own patients, but it can estimate how uncertain they are. Under the patient model of \citet{queisler2026centreError}, the mean of $G$ patient means deviates from the class centre with covariance $\boldsymbol\Sigma/G$, where $\boldsymbol\Sigma$ is the between-patient covariance. A classifier whose decisions change little when every class centre moves by such an error should lose less to the error it cannot remove. This report asks: \emph{does training a linear classifier against the estimated class-centre uncertainty of its own cohort recover part of the pool-centre headroom?} The answer is judged at five patients per class, separately on each dataset, against a practical threshold of one percentage point that was fixed before fitting.
+
+Three strands of prior work supply the ingredients. Implicit semantic data augmentation \citep{wang2019isda} perturbs deep features along class-conditional covariance directions and shows that the expected cross-entropy under Gaussian perturbations has a closed-form upper bound, so the augmentation never has to be sampled. Learning with marginalized corrupted features \citep{vandermaaten2013mcf} makes the same move for linear models: it replaces explicit corrupted copies of the training data by the expected loss under the corruption distribution, which keeps fitting deterministic and cheap. MetaSAug \citep{li2021metasaug} observes that class covariances estimated from few samples are unreliable in long-tailed recognition, which motivates pooling the patient deviations across classes here and testing the covariance against a direction-free control. None of these works addresses patient shortage in histopathology; the adaptation below is proposed in this report.
+
+\section{Uncertainty model}
+\label{sec:model}
+Write the patch features of class $c$ as $\mathbf x_{ik}=\boldsymbol\mu_c+\mathbf u_i+\mathbf e_{ik}$, with class centre $\boldsymbol\mu_c$, patient offset $\mathbf u_i$, and within-patient residual $\mathbf e_{ik}$ \citep{queisler2026centreError}. A cohort of $G$ patients per class estimates $\boldsymbol\mu_c$ by the mean $\hat{\boldsymbol\mu}_c$ of its patient means $\mathbf m_{ci}$. Pooling the deviations $\mathbf m_{ci}-\hat{\boldsymbol\mu}_c$ over all $C$ classes at $C(G-1)$ degrees of freedom gives the cohort's between-patient covariance $\hat{\boldsymbol\Sigma}$, the same cohort basis used by cohort whitening \citep{queisler2026patientDirections} and directional shrinkage \citep{queisler2026directionalShrinkage}. Its rank is at most $C(G-1)$. The \emph{centre uncertainty} is $\mathbf V_G=\hat{\boldsymbol\Sigma}/G$.
+
+Suppose every training feature of class $y$ is displaced by a random centre error $\boldsymbol\delta\sim\mathcal N(\mathbf 0,t\mathbf V_G)$. For a multinomial logistic model with logits $z_{ik}=\mathbf w_k^\top\mathbf x_i+b_k$, Jensen's inequality bounds the expected cross-entropy of a patch by the loss inside the sum below \citep{wang2019isda}. The classifier minimizes
+\begin{equation}
+  \frac1N\sum_{i=1}^{N}
+  \log\sum_{k=1}^{C}\exp\!\Bigl[
+  z_{ik}-z_{iy_i}
+  +\frac{t}{2}(\mathbf w_k-\mathbf w_{y_i})^\top\mathbf V_G(\mathbf w_k-\mathbf w_{y_i})
+  \Bigr]
+  +\frac{\lambda}{2}\lVert\mathbf W\rVert_F^2 .
+  \label{eq:loss}
+\end{equation}
+\noindent The quadratic term raises the loss of every competing class $k$ in proportion to how much the score difference between $k$ and the true class varies when the class centre moves along the patient directions. The classifier can lower it by relying less on those directions for the separation of $k$ from $y_i$. At $t=0$, Equation~\ref{eq:loss} is ordinary multinomial logistic regression. The bound holds in expectation under the Gaussian model; it is not a worst-case guarantee, and it does not claim that the perturbation scale $1/G$ is correct for the test population. Prediction uses the ordinary logits on unchanged features.
+
+The penalty is related to cohort whitening. Whitening all features by $(\mathbf I+\kappa\hat{\boldsymbol\Sigma})^{-1/2}$ and fitting a ridge penalty $\lambda\lVert\mathbf W'\rVert_F^2$ on the whitened features is the same as fitting the original features with the penalty $\lambda\sum_k\mathbf w_k^\top(\mathbf I+\kappa\hat{\boldsymbol\Sigma})\mathbf w_k$. Both remedies therefore discourage weight along the cohort's patient directions. They differ in where the penalty acts: whitening adds it once to the regularizer, whereas Equation~\ref{eq:loss} adds it to each training patch inside the softmax, where it matters most for patches whose competing classes are close.
+
+\section{Design}
+\label{sec:design}
+The study keeps the setting of \citet{queisler2026centreError} on TCGA-UT and of \citet{queisler2026bracsMechanism} on BRACS. TCGA-UT contributes 30 cancer types and BRACS its seven lesion classes, both with frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three fixed patient-disjoint splits, and multinomial logistic regression whose regularization strength is selected on validation patient-macro balanced accuracy. For each split and each of ten draws, twenty eligible patients per class are sampled, and nested cohorts of five patients with 32 patches, ten with sixteen, and twenty with eight are formed, so every classifier trains on 160 patches per class at a single patient count for all classes. No additional patients, labels, features, or foundation models enter.
+
+Three new arm families enter at each $G\in\{5,10,20\}$ (Table~\ref{tab:arms}). All three minimize Equation~\ref{eq:loss} on the unchanged training features and differ only in the covariance and in how $t$ is set. The isotropic control replaces $\mathbf V_G$ by $\operatorname{tr}(\mathbf V_G)\,\mathbf I/2{,}560$: it keeps the total perturbation variance but spreads it evenly over all feature dimensions, so it tests whether the patient directions matter or only the amount of perturbation. The covariance is estimated from the training cohort alone; validation and test features never enter it. The reused arms are the exact fits of the source studies on the same cohorts, so every contrast is paired draw by draw.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}llY@{}}
+\toprule
+Arm & Source & Training objective \\
+\midrule
+R$G$ & reused & Ordinary logistic regression on the real cohort of $G$ patients \\
+C$G$ & reused & Real cohort with class centres shifted to the pool centres (oracle reference) \\
+S$G$, St$G$ & reused & Radial centre shrinkage, closed form and tuned \citep{queisler2026centreShrinkage} \\
+A$G$, At$G$ & reused & Directional centre shrinkage, closed form and tuned \citep{queisler2026directionalShrinkage} \\
+RWc$G$ & reused & Cohort-basis whitening \citep{queisler2026patientDirections,queisler2026bracsMechanism} \\
+U$G$ & new & Equation~\ref{eq:loss} with patient covariance $\mathbf V_G$ at $t=1$ \\
+Ut$G$ & new & Equation~\ref{eq:loss} with patient covariance, $t$ selected from $\{0,0.25,1,4\}$ \\
+It$G$ & new & Equation~\ref{eq:loss} with isotropic covariance $\operatorname{tr}(\mathbf V_G)\mathbf I/2{,}560$, same grid \\
+\bottomrule
+\end{tabularx}
+\caption{The three new families use only the drawn patients and change the loss, not the features. R$G$ and C$G$ bracket the available headroom; S, St, A, At, and RWc are the cohort-only remedies already tested. The $t=0$ candidate of Ut and It is the R$G$ fit itself.}
+\label{tab:arms}
+\end{table}
+
+\noindent Each new candidate is fitted with L-BFGS-B in double precision with an analytic gradient, the unpenalized intercepts, tolerance, and iteration limit of the ordinary logistic fits, and the regularization grid $\lambda\in\{10^{-6},\dots,10^{2}\}$ of nine values. The quadratic forms are evaluated through the low-rank eigenbasis of $\hat{\boldsymbol\Sigma}$, so no $2{,}560\times2{,}560$ covariance is formed. The tuned families select $t$ jointly with $\lambda$ on validation patient-macro balanced accuracy, with ties resolved toward the smaller $t$ and then the larger $\lambda$; the fixed family U selects only $\lambda$ among the $t=1$ candidates. Selections were written to disk before any test prediction, and test accuracy never entered selection. Per dataset, the study fits $2\times3\times9$ candidates for each of three patient counts and 30 split-draw pairs, 4,860 candidates and 9,720 in total. The grid was frozen before fitting and was not extended after test results were inspected.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals.
+
+The primary contrast is Ut5$-$R5, read separately on each dataset. The remedy counts as a practical success on a dataset if the estimated gain is at least one percentage point and its paired interval lies entirely above zero; a claim across both cohorts requires success on both. Two further outcomes are distinguished. A \emph{patient-direction benefit} requires Ut to exceed the isotropic control It. A \emph{stronger existing remedy} requires Ut to exceed cohort whitening RWc; otherwise whitening is reported as competitive or stronger. Secondary quantities are the gains at ten and twenty patients, the contrasts Ut$-$At and Ut$-$St, the \emph{recovery} $\rho_G=(\mathrm{Ut}G-\mathrm RG)/(\mathrm CG-\mathrm RG)$ of the pool-centre headroom, and the \emph{gap reduction} $\Delta^{\mathrm R}-\Delta^{\mathrm{Ut}}$ of the patient-count gap $\Delta^X=XG'-XG$ together with its share of $\Delta^{\mathrm R}$. A gap reduction is claimed only when its paired interval excludes zero. Recovery and shares are computed per replicate. The headroom intervals exclude zero on both datasets at every patient count, so no recovery ratio has a denominator whose interval includes zero.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
