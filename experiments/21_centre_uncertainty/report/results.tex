@@ -1,6 +1,6 @@
 \section{Results}
 \label{sec:results}
-Training against centre uncertainty meets the prespecified success criterion on TCGA-UT and fails it on BRACS. On TCGA-UT, the tuned arm gains 1.28 points at five patients (95\% interval: 1.13 to 1.44), the fixed arm 0.52 points (0.44 to 0.59), and both gains shrink with the patient count, to 0.43 and 0.13 points at twenty (Table~\ref{tab:accuracy}). On BRACS, the tuned arm gains 0.25 points at five patients ($-0.05$ to 0.59) and the fixed arm 0.20 ($-0.12$ to 0.70). The primary contrast therefore succeeds on one dataset only, and no claim across both cohorts is supported. The isotropic control reproduces the real cohort to within 0.01 points at every patient count on both datasets.
+Training against centre uncertainty meets the prespecified success criterion on TCGA-UT and fails it on BRACS. On TCGA-UT, the tuned arm gains 2.34 points at five patients (95\% interval: 2.03 to 2.63), the fixed arm 0.52 points (0.44 to 0.59), and both gains shrink with the patient count, to 1.32 and 0.13 points at twenty (Table~\ref{tab:accuracy}). On BRACS, the tuned arm gains 0.25 points ($-0.37$ to 0.97) and the fixed arm 0.20 ($-0.12$ to 0.70). The primary contrast therefore succeeds on one dataset only, and no claim across both cohorts is supported. The isotropic control stays below 0.25 points on both datasets at every patient count, so it accounts for at most a tenth of the tuned gain on TCGA-UT.
 
 \begin{table}[htbp]
 \centering
@@ -12,38 +12,38 @@ Arm family & $G=5$ & $G=10$ & $G=20$ \\
 \midrule
 \multicolumn{4}{@{}l}{\emph{TCGA-UT}}\\
 Real (R) & 62.48 [61.24, 63.65] & 67.79 [66.47, 69.00] & 71.89 [70.55, 73.06] \\
-Patient covariance, $t=1$ (U) & 63.00 [61.77, 64.17] & 68.04 [66.72, 69.24] & 72.02 [70.69, 73.20] \\
-Patient covariance, tuned (Ut) & 63.76 [62.53, 64.95] & 68.58 [67.27, 69.78] & 72.32 [71.00, 73.51] \\
-Isotropic control (It) & 62.48 [61.24, 63.65] & 67.79 [66.47, 69.00] & 71.89 [70.55, 73.06] \\
+Patient covariance, $t=1$ (U) & 63.00 [61.77, 64.17] & 68.04 [66.73, 69.24] & 72.02 [70.69, 73.20] \\
+Patient covariance, tuned (Ut) & 64.82 [63.60, 66.00] & 69.56 [68.24, 70.75] & 73.21 [71.93, 74.36] \\
+Isotropic control (It) & 62.64 [61.39, 63.82] & 68.00 [66.69, 69.20] & 71.98 [70.63, 73.17] \\
 Pool centres (C) & 73.14 [71.62, 74.50] & 74.47 [73.01, 75.78] & 75.55 [74.11, 76.85] \\
 \addlinespace
 Gain U $-$ R & 0.52 [0.44, 0.59] & 0.25 [0.19, 0.31] & 0.13 [0.12, 0.15] \\
-Gain Ut $-$ R & \textbf{1.28} [1.13, 1.44] & 0.78 [0.68, 0.88] & 0.43 [0.37, 0.49] \\
-Gain It $-$ R & 0.00 [$-0.01$, 0.01] & 0.00 [$-0.00$, 0.01] & 0.00 [$-0.00$, 0.01] \\
+Gain Ut $-$ R & \textbf{2.34} [2.03, 2.63] & 1.77 [1.48, 2.05] & 1.32 [1.08, 1.55] \\
+Gain It $-$ R & 0.16 [$-0.01$, 0.31] & 0.21 [0.11, 0.32] & 0.09 [0.01, 0.17] \\
 Headroom C $-$ R & 10.66 [9.78, 11.47] & 6.68 [6.07, 7.28] & 3.66 [3.27, 4.06] \\
 \addlinespace
 \multicolumn{4}{@{}l}{\emph{BRACS}}\\
-Real (R) & 36.18 [33.46, 38.80] & 38.49 [35.87, 41.22] & 40.97 [38.50, 43.62] \\
+Real (R) & 36.18 [33.46, 38.79] & 38.49 [35.87, 41.22] & 40.97 [38.50, 43.62] \\
 Patient covariance, $t=1$ (U) & 36.38 [33.55, 39.13] & 38.46 [35.79, 41.18] & 40.96 [38.51, 43.59] \\
-Patient covariance, tuned (Ut) & 36.42 [33.69, 39.10] & 38.51 [35.83, 41.25] & 41.12 [38.65, 43.73] \\
-Isotropic control (It) & 36.18 [33.46, 38.79] & 38.49 [35.87, 41.22] & 40.97 [38.50, 43.61] \\
+Patient covariance, tuned (Ut) & 36.43 [33.83, 39.04] & 38.72 [36.06, 41.48] & 41.31 [38.88, 43.91] \\
+Isotropic control (It) & 36.27 [33.55, 38.94] & 38.48 [35.79, 41.26] & 40.83 [38.41, 43.45] \\
 Pool centres (C) & 44.63 [41.33, 48.05] & 45.11 [41.85, 48.51] & 45.50 [42.20, 48.76] \\
 \addlinespace
 Gain U $-$ R & 0.20 [$-0.12$, 0.70] & $-0.04$ [$-0.42$, 0.20] & $-0.01$ [$-0.37$, 0.17] \\
-Gain Ut $-$ R & \textbf{0.25} [$-0.05$, 0.59] & 0.02 [$-0.35$, 0.28] & 0.15 [0.03, 0.28] \\
-Gain It $-$ R & $-0.00$ [$-0.01$, 0.01] & $-0.00$ [$-0.01$, 0.00] & $-0.00$ [$-0.02$, 0.01] \\
+Gain Ut $-$ R & \textbf{0.25} [$-0.37$, 0.97] & 0.23 [$-0.30$, 0.76] & 0.34 [$-0.14$, 0.91] \\
+Gain It $-$ R & 0.10 [$-0.20$, 0.39] & $-0.02$ [$-0.41$, 0.28] & $-0.14$ [$-0.61$, 0.12] \\
 Headroom C $-$ R & 8.45 [6.31, 10.84] & 6.61 [4.85, 8.58] & 4.53 [2.77, 6.37] \\
 \bottomrule
 \end{tabular}
-\caption{The patient-covariance loss gains about 1.3 points at five TCGA-UT patients and nothing distinguishable from the threshold on BRACS; the isotropic control changes nothing. Accuracy entries are test patient-macro balanced accuracy in percent; gains and headroom are paired contrasts in percentage points; bold entries are the primary contrast. Intervals are 95\% bootstrap intervals over test patients and draws. The R and C rows are those of \citet{queisler2026centreError} and \citet{queisler2026bracsMechanism}.}
+\caption{The patient-covariance loss gains about 2.3 points at five TCGA-UT patients and nothing distinguishable from zero on BRACS; the trace-matched isotropic control gains a fraction of that on either dataset. Accuracy entries are test patient-macro balanced accuracy in percent; gains and headroom are paired contrasts in percentage points; bold entries are the primary contrast. Intervals are 95\% bootstrap intervals over test patients and draws. The R and C rows are those of \citet{queisler2026centreError} and \citet{queisler2026bracsMechanism}.}
 \label{tab:accuracy}
 \end{table}
 
-\noindent Unlike the directional-shrinkage result \citep{queisler2026directionalShrinkage}, the TCGA-UT success does not hinge on the interval bound: the lower bound of 1.13 points lies above the one-point threshold. The gain is nonetheless small against the headroom. The only BRACS interval that excludes zero, 0.15 points at twenty patients, lies far below the threshold.
+\noindent Unlike the directional-shrinkage result \citep{queisler2026directionalShrinkage}, the TCGA-UT success does not hinge on the interval bound: the lower bound of 2.03 points lies twice the threshold above zero. The gain is nonetheless small against the headroom of 10.66 points. No BRACS interval excludes zero at any patient count, so that dataset supports neither a gain nor a loss.
 
 \subsection{Headroom recovery and the patient-count gap}
 \label{sec:recovery-results}
-On TCGA-UT, the tuned arm recovers 0.120 (0.105 to 0.138) of the pool-centre headroom at five patients and 0.117 (0.101 to 0.136) at ten; the fixed arm recovers 0.048 and 0.037 (Table~\ref{tab:shares}). Because the gain falls with the patient count, the tuned arm narrows the five-to-twenty gap from 9.41 to 8.55 points, a paired reduction of 0.85 points (0.70 to 1.01) and a share of 0.09 (0.07 to 0.11). Both single steps show reductions with intervals above zero (Figure~\ref{fig:gap}). On BRACS, recovery is 0.029 ($-0.006$ to 0.070) at five patients and 0.003 at ten, and the gap reduction of 0.10 points ($-0.23$ to 0.46) is indistinguishable from zero. The isotropic control changes no gap by more than 0.01 points.
+On TCGA-UT, the tuned arm recovers 0.220 (0.191 to 0.251) of the pool-centre headroom at five patients and 0.265 (0.222 to 0.313) at ten; the fixed arm recovers 0.048 and 0.037 (Table~\ref{tab:shares}). Because the gain falls with the patient count, the tuned arm narrows the five-to-twenty gap from 9.41 to 8.39 points, a paired reduction of 1.02 points (0.71 to 1.34) and a share of 0.109 (0.077 to 0.140). Both single steps show reductions with intervals above zero (Figure~\ref{fig:gap}). On BRACS, recovery is 0.030 ($-0.050$ to 0.106) at five patients and 0.034 at ten, and the gap reduction of $-0.09$ points ($-0.84$ to 0.70) is indistinguishable from zero. The isotropic control reduces no TCGA-UT gap by more than 0.12 points and no BRACS gap by more than 0.24 points, with intervals that include zero except for the ten-to-twenty step on TCGA-UT.
 
 \begin{table}[htbp]
 \centering
@@ -54,20 +54,20 @@ On TCGA-UT, the tuned arm recovers 0.120 (0.105 to 0.138) of the pool-centre hea
  & TCGA-UT & BRACS \\
 \midrule
 Recovery $\rho_5$, U & 0.048 [0.041, 0.057] & 0.024 [$-0.013$, 0.082] \\
-Recovery $\rho_5$, Ut & 0.120 [0.105, 0.138] & 0.029 [$-0.006$, 0.070] \\
+Recovery $\rho_5$, Ut & 0.220 [0.191, 0.251] & 0.030 [$-0.050$, 0.106] \\
 Recovery $\rho_{10}$, U & 0.037 [0.027, 0.047] & $-0.006$ [$-0.069$, 0.029] \\
-Recovery $\rho_{10}$, Ut & 0.117 [0.101, 0.136] & 0.003 [$-0.061$, 0.042] \\
+Recovery $\rho_{10}$, Ut & 0.265 [0.222, 0.313] & 0.034 [$-0.049$, 0.116] \\
 \addlinespace
 Gap, real $\Delta^{\mathrm R}_{5\to20}$ & 9.41 [8.71, 10.12] & 4.80 [2.88, 6.75] \\
-Gap, tuned $\Delta^{\mathrm{Ut}}_{5\to20}$ & 8.55 [7.87, 9.26] & 4.70 [2.74, 6.67] \\
+Gap, tuned $\Delta^{\mathrm{Ut}}_{5\to20}$ & 8.39 [7.73, 9.05] & 4.88 [3.01, 6.74] \\
 Gap reduction, U, $5\to20$ & 0.38 [0.30, 0.46] & 0.21 [$-0.16$, 0.75] \\
-Gap reduction, Ut, $5\to10$ & 0.50 [0.35, 0.66] & 0.23 [$-0.17$, 0.70] \\
-Gap reduction, Ut, $10\to20$ & 0.36 [0.26, 0.44] & $-0.13$ [$-0.51$, 0.13] \\
-Gap reduction, Ut, $5\to20$ & 0.85 [0.70, 1.01] & 0.10 [$-0.23$, 0.46] \\
-Share, Ut, $5\to20$ & 0.09 [0.07, 0.11] & 0.02 [$-0.05$, 0.10] \\
+Gap reduction, Ut, $5\to10$ & 0.57 [0.30, 0.85] & 0.02 [$-0.71$, 0.84] \\
+Gap reduction, Ut, $10\to20$ & 0.45 [0.21, 0.68] & $-0.11$ [$-0.80$, 0.54] \\
+Gap reduction, Ut, $5\to20$ & 1.02 [0.71, 1.34] & $-0.09$ [$-0.84$, 0.70] \\
+Share, Ut, $5\to20$ & 0.109 [0.077, 0.140] & $-0.018$ [$-0.213$, 0.131] \\
 \bottomrule
 \end{tabular}
-\caption{On TCGA-UT the tuned uncertainty loss captures an eighth of the pool-centre headroom and removes a tenth of the patient-count gap; on BRACS neither quantity is distinguishable from zero. Recovery is the gain divided by the headroom at the same patient count; the gap reduction is the paired difference of the real and the trained patient-count gaps, in percentage points, and the share divides it by the real gap.}
+\caption{On TCGA-UT the tuned uncertainty loss captures a fifth of the pool-centre headroom and removes a ninth of the patient-count gap; on BRACS neither quantity is distinguishable from zero. Recovery is the gain divided by the headroom at the same patient count; the gap reduction is the paired difference of the real and the trained patient-count gaps, in percentage points, and the share divides it by the real gap.}
 \label{tab:shares}
 \end{table}
 
@@ -80,64 +80,70 @@ Share, Ut, $5\to20$ & 0.09 [0.07, 0.11] & 0.02 [$-0.05$, 0.10] \\
 
 \subsection{Comparison with the control and the other cohort-only remedies}
 \label{sec:comparison-results}
-On TCGA-UT, the patient directions carry the entire gain. Ut exceeds the isotropic control by 1.28 points at five patients (1.13 to 1.44), 0.78 at ten, and 0.43 at twenty, all with intervals above zero. On BRACS the same contrast is 0.25 points ($-0.05$ to 0.59) at five patients and 0.15 (0.03 to 0.29) at twenty, so a patient-direction benefit is supported only at twenty patients and there it is negligible in size.
+On TCGA-UT, the patient directions carry almost the entire gain. Ut exceeds the isotropic control by 2.18 points at five patients (1.89 to 2.49), 1.56 at ten, and 1.23 at twenty, all with intervals above zero. On BRACS the same contrast is 0.16 points ($-0.56$ to 0.98) at five patients and 0.48 ($-0.06$ to 1.12) at twenty, so no patient-direction benefit is supported there.
 
-The ranking against the reused remedies repeats the pattern of the directional-shrinkage study (Figure~\ref{fig:gains}). On TCGA-UT, Ut and At are indistinguishable at every patient count: the contrast Ut$-$At is 0.00 points at five patients ($-0.25$ to 0.27), 0.08 at ten, and 0.02 at twenty. Ut exceeds tuned radial shrinkage by 1.14 (0.95 to 1.33), 0.65, and 0.29 points. Cohort whitening remains stronger: Ut trails RWc by 0.98 ($-1.18$ to $-0.78$), 1.07, and 0.84 points. On BRACS, Ut is indistinguishable from At and RWc at every patient count, with point contrasts between $-0.33$ and 0.27 points, and trails tuned radial shrinkage by 0.73 points at five patients ($-1.56$ to 0.00) and 0.76 at ten ($-1.71$ to 0.11).
+The ranking against the reused remedies separates the two families of cohort-only remedy (Figure~\ref{fig:gains}). On TCGA-UT, Ut exceeds both centre-shrinkage arms at every patient count: the contrast Ut$-$At is 1.06 points at five patients (0.81 to 1.30), 1.07 at ten, and 0.91 at twenty, and Ut$-$St is 2.20 (1.91 to 2.49), 1.64, and 1.18 points. Against cohort whitening the two arms coincide: Ut$-$RWc is 0.08 points at five patients ($-0.01$ to 0.18), $-0.08$ at ten, and 0.05 at twenty, so every interval includes zero and none reaches a tenth of a point in either direction. On BRACS, Ut is indistinguishable from At, RWc, and St at every patient count, with point contrasts between $-0.73$ and 0.48 points; the widest of them, $-0.73$ against tuned radial shrinkage at five patients, has an interval from $-1.64$ to 0.17.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{gains_by_patient_count.pdf}
-\caption{Centre-uncertainty training coincides with directional shrinkage on TCGA-UT and stays below cohort whitening; on BRACS all cohort-only remedies are indistinguishable from zero except radial shrinkage. Paired gains over the real cohort in percentage points; error bars show the paired 95\% bootstrap intervals. The dotted line marks the one-point threshold.}
+\caption{Centre-uncertainty training matches cohort whitening on TCGA-UT and exceeds both centre-shrinkage remedies; on BRACS all cohort-only remedies are indistinguishable from zero except radial shrinkage at five patients. Paired gains over the real cohort in percentage points; error bars show the paired 95\% bootstrap intervals. The dotted line marks the one-point threshold.}
 \label{fig:gains}
 \end{figure}
 
 \subsection{Selected strengths and solver behaviour}
 \label{sec:selection-results}
-Validation selection behaves differently on the two datasets (Table~\ref{tab:selection}). On TCGA-UT, the tuned patient arm selected the largest strength $t=4$ in all 90 fits, so the selection sits on the upper grid boundary everywhere, including the primary contrast. The fixed arm at $t=1$ gains less than half as much as the tuned arm at five patients (Ut$-$U: 0.77 points, 0.67 to 0.87), so the gain still grows at the boundary and a larger $t$ could gain more. The grid was not extended after test inspection. On BRACS, the tuned patient arm chose $t=0$, the ordinary fit, in 5 to 7 of 30 fits per patient count, and $t=4$ in 14 to 18. The isotropic control chose $t=0$ in 7 to 13 of 30 fits and $t=4$ in 12 to 16 on both datasets, yet its accuracy never moved from R by more than 0.01 points.
+Validation selection behaves differently on the two datasets (Table~\ref{tab:selection}). On TCGA-UT, the tuned patient arm selected $t=16$ or $t=64$ in every one of the 90 fits and never reached the largest grid value, so the selection lies inside the grid at 16 to 64 times the modelled centre variance. The fixed arm at $t=1$ gains less than a quarter as much as the tuned arm at five patients (Ut$-$U: 1.83 points, 1.55 to 2.09), so the modelled scale $\mathbf V_G$ is far below the strength that validation prefers. On BRACS, the tuned patient arm chose $t=0$, the ordinary fit, in 2 to 6 of 30 fits per patient count and spread the remaining selections over the whole grid. The isotropic control chose the largest value $t=256$ in 13 to 27 of 30 fits on both datasets, yet its accuracy never moved from R by more than 0.21 points.
 
 \begin{table}[htbp]
 \centering
 \small
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}llrrrrrrrrr@{}}
+\begin{tabular}{@{}llrlrrrrrrr@{}}
 \toprule
- & & & \multicolumn{4}{c}{Ut: $t$} & \multicolumn{4}{c}{It: $t$} \\
-\cmidrule(lr){4-7}\cmidrule(lr){8-11}
-Dataset & $G$ & Rank & 0 & 0.25 & 1 & 4 & 0 & 0.25 & 1 & 4 \\
+ & & & & \multicolumn{7}{c}{Selected $t$} \\
+\cmidrule(lr){5-11}
+Dataset & $G$ & Rank & Arm & 0 & 0.25 & 1 & 4 & 16 & 64 & 256 \\
 \midrule
-TCGA-UT & 5 & 120 & 0 & 0 & 0 & 30 & 13 & 2 & 3 & 12 \\
-        & 10 & 270 & 0 & 0 & 0 & 30 & 10 & 5 & 1 & 14 \\
-        & 20 & 570 & 0 & 0 & 0 & 30 & 9 & 4 & 1 & 16 \\
+TCGA-UT & 5 & 120 & Ut & 0 & 0 & 0 & 0 & 10 & 20 & 0 \\
+        &   &     & It & 2 & 0 & 1 & 0 & 1 & 8 & 18 \\
+        & 10 & 270 & Ut & 0 & 0 & 0 & 0 & 10 & 20 & 0 \\
+        &   &     & It & 2 & 1 & 0 & 0 & 2 & 2 & 23 \\
+        & 20 & 570 & Ut & 0 & 0 & 0 & 0 & 0 & 30 & 0 \\
+        &   &     & It & 0 & 0 & 0 & 0 & 0 & 3 & 27 \\
 \addlinespace
-BRACS & 5 & 28 & 7 & 6 & 3 & 14 & 7 & 1 & 9 & 13 \\
-      & 10 & 63 & 5 & 6 & 5 & 14 & 10 & 4 & 4 & 12 \\
-      & 20 & 133 & 5 & 4 & 3 & 18 & 11 & 0 & 7 & 12 \\
+BRACS & 5 & 28 & Ut & 6 & 6 & 3 & 2 & 3 & 4 & 6 \\
+      &   &    & It & 3 & 0 & 4 & 2 & 4 & 4 & 13 \\
+      & 10 & 63 & Ut & 4 & 4 & 4 & 2 & 11 & 4 & 1 \\
+      &   &     & It & 3 & 1 & 0 & 3 & 6 & 4 & 13 \\
+      & 20 & 133 & Ut & 2 & 2 & 2 & 7 & 4 & 8 & 5 \\
+      &   &      & It & 1 & 0 & 0 & 0 & 4 & 8 & 17 \\
 \bottomrule
 \end{tabular}
-\caption{TCGA-UT validation data always favour the strongest patient-covariance perturbation in the grid; BRACS validation data are divided. Counts are tuned classifiers out of 30 per dataset and patient count (three splits, ten draws). The rank is that of the cohort's pooled between-patient covariance, which equals its maximum $C(G-1)$ in every draw.}
+\caption{TCGA-UT validation data favour a perturbation 16 to 64 times the modelled centre variance and never the largest grid value; BRACS validation data are divided, and the direction-free control drifts to the largest value on both datasets. Counts are tuned classifiers out of 30 per dataset and patient count (three splits, ten draws). The rank is that of the cohort's pooled between-patient covariance, which equals its maximum $C(G-1)$ in every draw.}
 \label{tab:selection}
 \end{table}
 
-\noindent The regularization strength reached a grid boundary in a minority of fits. On TCGA-UT, the fixed arm chose the smallest value $\lambda=10^{-6}$ in 3 of 30 fits at five patients and 1 at ten; no tuned fit chose a boundary value. On BRACS, the largest value $\lambda=100$ was chosen by the fixed arm in 4 and 3 of 30 fits at five and ten patients, by the tuned patient arm in 3 and 2, and by the isotropic control in 2 fits at ten patients.
+\noindent The regularization strength reached a grid boundary in a minority of fits. On TCGA-UT, the fixed arm chose the smallest value $\lambda=10^{-6}$ in 3 of 30 fits at five patients and 1 at ten, and the isotropic control chose it once at five patients; no tuned patient fit chose a boundary value, all of them selecting $\lambda\in\{0.1,1\}$. On BRACS, the largest value $\lambda=100$ was chosen by the fixed arm in 4 and 3 of 30 fits at five and ten patients, by the tuned patient arm in 8, 3, and 3 fits across the three patient counts, and by the isotropic control in 1 and 2 fits at five and ten patients.
 
-All 4,860 TCGA-UT candidates converged. On BRACS, 3 of 4,860 candidates stopped at the iteration limit of 10,000 with gradient norms between $3.5\times10^{-7}$ and $1.2\times10^{-6}$; all three were isotropic candidates at $t=4$ and $\lambda=10^{-6}$ with five patients, and the selection rule excluded them. No cohort produced a zero covariance.
+Solver behaviour separates the two covariances. Every patient-covariance candidate converged on both datasets. Among the 9,720 candidates per dataset, 538 isotropic TCGA-UT candidates and 256 isotropic BRACS candidates stopped at the iteration limit of 10,000, all of them at $t\geq16$ on TCGA-UT (61 at $t=16$, 271 at $t=64$, 206 at $t=256$) and at $t\in\{4,16,64\}$ on BRACS (3, 239, and 14 candidates). Their gradient norms are small, between $2.4\times10^{-8}$ and $1.6\times10^{-4}$ on TCGA-UT and between $8.7\times10^{-8}$ and $5.4\times10^{-5}$ on BRACS, but the selection rule excludes every candidate that did not converge, so no arm reports one. No cohort produced a zero covariance.
 
-\subsection{Why the isotropic control changes nothing}
+\subsection{Why the isotropic control gains little}
 \label{sec:isotropic-results}
-The isotropic control has the same total perturbation variance as the patient covariance, but it spreads that variance over 2,560 dimensions instead of the 28 to 570 dimensions the cohort covariance spans. Its variance per dimension is therefore $r/2{,}560$ times the mean eigenvalue of $\mathbf V_G$, where $r$ is the rank: 4.7 percent at five TCGA-UT patients and 1.1 percent at five BRACS patients. With $\mathbf V_G$ replaced by $\sigma^2\mathbf I$, the quadratic term in Equation~\ref{eq:loss} becomes $\tfrac{t\sigma^2}{2}\lVert\mathbf w_k-\mathbf w_{y_i}\rVert^2$, a uniform penalty on weight differences that acts much like additional ridge regularization. The regularization grid can absorb such a penalty, which is consistent with the control matching R to within 0.01 points although it often selects $t=4$. The control thus shows that uncertainty of the same total size, without direction, has no effect on accuracy. It does not show that any directional perturbation would help: a control matched per direction, for example random directions of the same rank, was not run.
+The isotropic control has the same total perturbation variance as the patient covariance, but it spreads that variance over 2,560 dimensions instead of the 28 to 570 dimensions the cohort covariance spans. Its variance per dimension is therefore $r/2{,}560$ times the mean eigenvalue of $\mathbf V_G$, where $r$ is the rank: 4.7 percent at five TCGA-UT patients and 1.1 percent at five BRACS patients. With $\mathbf V_G$ replaced by $\sigma^2\mathbf I$, the quadratic term in Equation~\ref{eq:loss} becomes $\tfrac{t\sigma^2}{2}\lVert\mathbf w_k-\mathbf w_{y_i}\rVert^2$, a uniform penalty on weight differences that acts much like additional ridge regularization. The regularization grid can absorb such a penalty, which is consistent with the control gaining at most 0.21 points although it usually selects the largest strength in the grid, where its total perturbation variance is 256 times the modelled one. The control thus shows that uncertainty of the same total size, without direction, buys at most a tenth of what the patient directions buy on TCGA-UT. It does not show that any directional perturbation would help: a control matched per direction, for example random directions of the same rank, was not run.
 
 \section{Discussion}
 \label{sec:discussion}
-Training against the estimated uncertainty of the class centres clears the practical threshold on TCGA-UT: 1.28 points at five patients, with an interval from 1.13 to 1.44, a recovery of 12 percent of the pool-centre headroom, and a paired reduction of the five-to-twenty patient gap by 0.85 points. The gain depends on the patient directions, since a trace-matched isotropic perturbation changes nothing. On BRACS the remedy recovers nothing measurable at five patients and is weaker than radial shrinkage. Of the three outcomes defined in Section~\ref{sec:evaluation}, TCGA-UT shows a practical remedy and a patient-direction benefit but no stronger existing remedy, and BRACS shows none of the three at the primary patient count.
+Training against the estimated uncertainty of the class centres clears the practical threshold on TCGA-UT: 2.34 points at five patients, with an interval from 2.03 to 2.63, a recovery of 22 percent of the pool-centre headroom, and a paired reduction of the five-to-twenty patient gap by 1.02 points. The gain depends on the patient directions, since a trace-matched isotropic perturbation recovers at most a tenth of it. On BRACS the remedy recovers nothing measurable at any patient count. Of the three outcomes defined in Section~\ref{sec:evaluation}, TCGA-UT shows a practical remedy and a patient-direction benefit but no remedy stronger than cohort whitening, and BRACS shows none of the three.
 
-The most informative result is the coincidence with directional shrinkage. On TCGA-UT, the two arms differ by at most 0.08 points at every patient count, although one moves the class centres before an ordinary fit and the other leaves the features untouched and changes the loss. Both use the same cohort covariance, and both trail cohort whitening, which uses it too, by about one point. Together with the finding that directional shrinkage does not reduce centre error \citep{queisler2026directionalShrinkage}, this points to a common mechanism: each remedy makes the classifier rely less on the directions in which the cohort's patients vary, and the correspondence in Section~\ref{sec:model} shows that whitening is a penalty of the same form. On this reading, what the cohort contributes is information about which directions not to trust, not a better estimate of where its classes are. The fits do not test this reading directly; three remedies agreeing on a gain is consistent with a shared mechanism but does not measure one.
+The most informative result is the coincidence with cohort whitening. On TCGA-UT the two arms differ by at most 0.08 points at every patient count, although whitening transforms the features before an ordinary fit and the uncertainty loss leaves the features untouched and changes the objective. Section~\ref{sec:model} shows why: whitening by $(\mathbf I+\kappa\hat{\boldsymbol\Sigma})^{-1/2}$ with a ridge penalty is the same as an unwhitened fit whose penalty grows along the cohort's patient directions, and Equation~\ref{eq:loss} adds a penalty of that form inside the softmax. The two remedies are therefore two implementations of the same second-moment correction, and they reach the same accuracy. Both exceed directional shrinkage by about one point at five patients and radial shrinkage by more than two, and shrinkage of the centres is a first-moment correction that leaves the cohort's patient directions as trusted as before. On this reading, what a small cohort contributes is information about which directions not to trust rather than a better estimate of where its classes are, and acting on that information through the loss or through the features makes no measurable difference.
 
-The gap to cohort whitening has at least two candidate explanations. Whitening also transforms validation and test features, whereas Equation~\ref{eq:loss} acts only through the fitted weights. And the selected TCGA-UT strength sits at the edge of the grid, so the uncertainty loss may be under-regularized along the patient directions compared with what validation would choose. Neither explanation was tested. Whether a larger $t$ would close the gap to whitening, or whether the two remedies add up, remains open; the shared mechanism makes a large combined gain unlikely.
+The strength that validation selects is the second informative result. Every TCGA-UT selection sits at 16 or 64 times $\mathbf V_G$, and the arm fixed at the modelled scale $t=1$ gains 0.52 points against the tuned arm's 2.34. The Gaussian model of Section~\ref{sec:model} therefore gets the useful direction structure right and the useful scale wrong by more than an order of magnitude. Two mechanisms are consistent with this. The cohort covariance is estimated from $C(G-1)$ deviations and is zero outside its span, so a large $t$ compensates for the directions it misses; and the bound in Equation~\ref{eq:loss} is loose, so the penalty it imposes at the modelled scale is weaker than the expected loss it stands in for. The fits do not separate these, and the selected strength has no interpretation as a calibrated variance.
 
-All three cohort-only remedies built on the same patient covariance leave most of the headroom unrecovered. On TCGA-UT, directional shrinkage and the uncertainty loss recover about an eighth of it at five patients and cohort whitening about a fifth; on BRACS none recovers a measurable part. The remaining eight to nine and a half points at five patients are not reached by estimating centres better from the cohort, nor by training against their uncertainty. This strengthens the conclusion of the preceding reports that the missing centre information must come from outside the labelled cohort.
+All cohort-only remedies built on the same patient covariance leave most of the headroom unrecovered. On TCGA-UT, the uncertainty loss and cohort whitening recover about a fifth of it at five patients, directional shrinkage about an eighth, and radial shrinkage nothing measurable; on BRACS none recovers a measurable part. The remaining eight to nine points at five patients are not reached by estimating centres better from the cohort, nor by training against their uncertainty. This strengthens the conclusion of the preceding reports that the missing centre information must come from outside the labelled cohort.
 
 \section{Limitations}
 \label{sec:limitations}
-The uncertainty model makes three assumptions that the study does not verify. It pools the between-patient covariance across classes, so all classes are assumed to share the same patient-level noise. It uses the covariance of the cohort's own patient means, which includes the finite-patch noise of each patient mean, so $\mathbf V_G$ slightly overstates the between-patient part. And it scales that covariance by $1/G$ and treats the centre error as Gaussian. The covariance is estimated from $C(G-1)$ deviations in 2,560 dimensions, only 28 for BRACS at five patients, and is zero outside its span, so most of the feature space receives no perturbation. The accuracy gain does not show that the perturbation matches the true centre error, and it does not validate the $1/G$ scaling: on TCGA-UT, validation always preferred four times the modelled variance.
+The uncertainty model makes three assumptions that the study does not verify. It pools the between-patient covariance across classes, so all classes are assumed to share the same patient-level noise. It uses the covariance of the cohort's own patient means, which includes the finite-patch noise of each patient mean, so $\mathbf V_G$ slightly overstates the between-patient part. And it scales that covariance by $1/G$ and treats the centre error as Gaussian. The covariance is estimated from $C(G-1)$ deviations in 2,560 dimensions, only 28 for BRACS at five patients, and is zero outside its span, so most of the feature space receives no perturbation. The accuracy gain does not show that the perturbation matches the true centre error, and the selected strengths of 16 to 64 times the modelled variance show that the $1/G$ scaling does not predict what validation prefers.
 
-The strength grid stops at $t=4$, which every tuned TCGA-UT fit selected, so the tuned arm is limited by the grid on that dataset and the gain there is a lower bound on what the grid family could reach. The grid was fixed in advance and was not extended after test results were inspected. The isotropic control matches only the total variance; it does not separate the effect of the specific patient directions from that of any low-rank perturbation of the same size. All arms reuse the three evaluation splits of the source studies, so they share test patients with every earlier comparison in this series, and repeated use of these partitions across studies inflates the chance that some remedy appears to work by selection alone. The results are conditional on frozen Virchow2 features, multinomial logistic regression, 160 patches per class, and the two cohorts studied; transfer to other cohorts, feature extractors, or class counts is untested.
+The strength grid spans $t\leq256$, which the tuned patient arm never selected on TCGA-UT and selected in 6, 1, and 5 of 30 fits on BRACS, so the reported gains are not bounded by the grid on TCGA-UT. The direction-free control does drift to the largest value, so its reported effect is a grid-bounded one. The isotropic control matches only the total variance; it does not separate the effect of the specific patient directions from that of any low-rank perturbation of the same size. All arms reuse the three evaluation splits of the source studies, so they share test patients with every earlier comparison in this series, and repeated use of these partitions across studies inflates the chance that some remedy appears to work by selection alone. The results are conditional on frozen Virchow2 features, multinomial logistic regression, 160 patches per class, and the two cohorts studied; transfer to other cohorts, feature extractors, or class counts is untested.

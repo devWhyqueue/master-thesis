@@ -6,9 +6,9 @@
 \usepackage[authoryear,round]{natbib}
 \usepackage[hidelinks]{hyperref}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
-\title{Patient Shortage in Histopathology:\\Training Against Class-Centre Uncertainty Gains 1.3 Points\\on TCGA-UT and Nothing Measurable on BRACS}
+\title{Patient Shortage in Histopathology:\\Training Against Class-Centre Uncertainty Gains 2.3 Points\\on TCGA-UT and Nothing Measurable on BRACS}
 \author{Yannik Queisler}
-\date{September 19, 2026}
+\date{September 21, 2026}
 
 \begin{document}
 \raggedbottom
@@ -17,7 +17,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent A five-patient cohort estimates its class centres with an error whose covariance is the between-patient covariance divided by the patient count. Two attempts to estimate better centres from the cohort alone have not recovered the resulting headroom of 10.66 percentage points on TCGA-UT and 8.45 on BRACS. This report tests the complementary strategy: leave the centres as they are and train the classifier to be insensitive to their uncertainty. The loss is the implicit semantic data augmentation bound on the expected cross-entropy under Gaussian centre perturbations, with a perturbation covariance estimated from the cohort's own patient means. On TCGA-UT, the arm with validation-tuned perturbation strength gains 1.28 points at five patients (95\% interval: 1.13 to 1.44), meets the prespecified success criterion, recovers 12 percent of the pool-centre headroom, and narrows the five-to-twenty patient gap by 0.85 points (0.70 to 1.01). A trace-matched isotropic control gains nothing, so the gain depends on the patient directions. At five patients, the tuned arm matches directional shrinkage of the class centres to within 0.01 points and trails cohort whitening by 0.98 points. Every TCGA-UT selection chose the largest strength in the grid, so the grid bounds the gain there. On BRACS, the tuned arm gains 0.25 points ($-0.05$ to 0.59), which fails the criterion. Three different cohort-only remedies built on the same patient covariance thus converge on the same TCGA-UT gain, below cohort whitening, and none recovers the BRACS headroom.
+\noindent A five-patient cohort estimates its class centres with an error whose covariance is the between-patient covariance divided by the patient count. Two attempts to estimate better centres from the cohort alone have not recovered the resulting headroom of 10.66 percentage points on TCGA-UT and 8.45 on BRACS. This report tests the complementary strategy: leave the centres as they are and train the classifier to be insensitive to their uncertainty. The loss is the implicit semantic data augmentation bound on the expected cross-entropy under Gaussian centre perturbations, with a perturbation covariance estimated from the cohort's own patient means. On TCGA-UT, the arm with validation-tuned perturbation strength gains 2.34 points at five patients (95\% interval: 2.03 to 2.63), meets the prespecified success criterion, recovers 22 percent of the pool-centre headroom, and narrows the five-to-twenty patient gap by 1.02 points (0.71 to 1.34). A trace-matched isotropic control gains 0.16 points ($-0.01$ to 0.31), so the gain depends on the patient directions. At five patients, the tuned arm exceeds directional shrinkage of the class centres by 1.06 points (0.81 to 1.30) and matches cohort whitening to within 0.08 points. Validation selects a perturbation 16 to 64 times the modelled centre variance in every TCGA-UT fit, inside the grid. On BRACS, the tuned arm gains 0.25 points ($-0.37$ to 0.97), which fails the criterion. The uncertainty loss and cohort whitening, two implementations of the same second-moment correction, thus reach the same TCGA-UT gain, above both centre-shrinkage remedies, and none recovers the BRACS headroom.
 \end{abstract}
 
 \section{Motivation}
@@ -65,7 +65,7 @@ S$G$, St$G$ & reused & Radial centre shrinkage, closed form and tuned \citep{que
 A$G$, At$G$ & reused & Directional centre shrinkage, closed form and tuned \citep{queisler2026directionalShrinkage} \\
 RWc$G$ & reused & Cohort-basis whitening \citep{queisler2026patientDirections,queisler2026bracsMechanism} \\
 U$G$ & new & Equation~\ref{eq:loss} with patient covariance $\mathbf V_G$ at $t=1$ \\
-Ut$G$ & new & Equation~\ref{eq:loss} with patient covariance, $t$ selected from $\{0,0.25,1,4\}$ \\
+Ut$G$ & new & Equation~\ref{eq:loss} with patient covariance, $t$ selected from $\{0,0.25,1,4,16,64,256\}$ \\
 It$G$ & new & Equation~\ref{eq:loss} with isotropic covariance $\operatorname{tr}(\mathbf V_G)\mathbf I/2{,}560$, same grid \\
 \bottomrule
 \end{tabularx}
@@ -73,7 +73,7 @@ It$G$ & new & Equation~\ref{eq:loss} with isotropic covariance $\operatorname{tr
 \label{tab:arms}
 \end{table}
 
-\noindent Each new candidate is fitted with L-BFGS-B in double precision with an analytic gradient, the unpenalized intercepts, tolerance, and iteration limit of the ordinary logistic fits, and the regularization grid $\lambda\in\{10^{-6},\dots,10^{2}\}$ of nine values. The quadratic forms are evaluated through the low-rank eigenbasis of $\hat{\boldsymbol\Sigma}$, so no $2{,}560\times2{,}560$ covariance is formed. The tuned families select $t$ jointly with $\lambda$ on validation patient-macro balanced accuracy, with ties resolved toward the smaller $t$ and then the larger $\lambda$; the fixed family U selects only $\lambda$ among the $t=1$ candidates. Selections were written to disk before any test prediction, and test accuracy never entered selection. Per dataset, the study fits $2\times3\times9$ candidates for each of three patient counts and 30 split-draw pairs, 4,860 candidates and 9,720 in total. The grid was frozen before fitting and was not extended after test results were inspected.
+\noindent Each new candidate is fitted with L-BFGS-B in double precision with an analytic gradient, the unpenalized intercepts, tolerance, and iteration limit of the ordinary logistic fits, and the regularization grid $\lambda\in\{10^{-6},\dots,10^{2}\}$ of nine values. The quadratic forms are evaluated through the low-rank eigenbasis of $\hat{\boldsymbol\Sigma}$, so no $2{,}560\times2{,}560$ covariance is formed. The tuned families select $t$ jointly with $\lambda$ on validation patient-macro balanced accuracy, with ties resolved toward the smaller $t$ and then the larger $\lambda$; the fixed family U selects only $\lambda$ among the $t=1$ candidates. Selections were written to disk before any test prediction, and test accuracy never entered selection. Per dataset, the study fits $2\times6\times9$ candidates for each of three patient counts and 30 split-draw pairs, 9,720 candidates and 19,440 in total. The grid was frozen before fitting, and test results never informed it.
 
 \section{Evaluation}
 \label{sec:evaluation}
