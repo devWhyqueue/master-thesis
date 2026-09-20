@@ -29,7 +29,7 @@ ARMS: tuple[str, ...] = tuple(
 )
 # Covariance behind each tuned arm; the fixed-strength arm U reads the patient candidates.
 COVARIANCE_KINDS: tuple[str, ...] = ("patient", "isotropic")
-T_FACTORS: tuple[float, ...] = (0.0, 0.25, 1.0, 4.0, 16.0)
+T_FACTORS: tuple[float, ...] = (0.0, 0.25, 1.0, 4.0, 16.0, 64.0, 256.0)
 # t = 0 is never fit: it is ordinary logistic regression on unchanged features, i.e. the R arm.
 NONZERO_T_FACTORS: tuple[float, ...] = tuple(t for t in T_FACTORS if t)
 FIXED_T: float = 1.0
