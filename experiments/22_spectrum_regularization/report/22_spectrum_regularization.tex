@@ -1,0 +1,97 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\The Cohort's Between-Patient Spectrum Is Not the\\Bottleneck of Cohort Whitening}
+\author{Yannik Queisler}
+\date{September 21, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Three cohort-only remedies for patient shortage --- whitening along the cohort's between-patient eigenbasis, directional shrinkage of the class centres, and training against class-centre uncertainty --- all build on the same estimate, the between-patient covariance of five patients per class, and all stop at about 2.3 points or below on TCGA-UT. That covariance is a rank-120 estimate in 2,560 dimensions, and sample spectra at such ratios are known to be over-dispersed. This report asks whether the cohort's eigen\emph{directions} are useful while its eigen\emph{values} are too noisy to whiten with. The cohort basis is kept and its eigenvalues $\lambda_j$ are replaced by $\lambda_j^\beta$ for $\beta\in\{0,0.25,0.5,0.75\}$, with $\beta=1$ being cohort whitening itself, and a validation-tuned arm selects $\beta$ per fit. Two further arms separate the mechanism: an oracle arm keeps the cohort basis and sets each eigenvalue to the training pool's between-patient variance along that direction, and a control replaces the basis by the top within-patient principal components of the same rank. On TCGA-UT the tuned arm gains $-0.00$ points over cohort whitening at five patients (95\% interval: $-0.01$ to 0.00) and fails the prespecified one-point criterion; validation keeps $\beta=1$ in 29 of 30 fits. Compression is monotonically harmful: $\beta=0$ costs 0.92 points (0.72 to 1.11). The oracle spectrum gains 0.08 points (0.03 to 0.13), which is 2.8 percent of the 2.66-point gap between cohort-basis and pool-basis whitening, while the missing directions account for 2.58 points (2.25 to 2.89). The empirical exponent relating pool variance to cohort eigenvalue is 0.82, so the cohort spectrum is over-dispersed as expected, but correcting it buys almost nothing. The rank-matched within-patient control matches cohort whitening to within 0.17 points on either dataset, so the specific between-patient directions are not required either. On BRACS no contrast is distinguishable from zero. Second-moment remedies estimated from the cohort alone are therefore limited by which directions the cohort can see, not by how well it scales them.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Cohort-only remedies for patient shortage have converged on the same ceiling. Whitening the features along the eigen-directions of the cohort's own pooled between-patient covariance gains 2.26 percentage points at five patients per class on TCGA-UT \citep{queisler2026patientDirections}; directional shrinkage of the class centres along the same directions gains 1.29 points \citep{queisler2026directionalShrinkage}; training against the class-centre uncertainty built from the same covariance gains 2.34 points \citep{queisler2026centreUncertainty}. An isotropic perturbation of matched total size gains nothing \citep{queisler2026centreUncertainty}, so the direction structure of that covariance carries the effect. All three remedies stay far below the 10.66 points of pool-centre headroom \citep{queisler2026centreError} and far below whitening along the training pool's between-patient basis, which gains 4.92 points at the same patient count but needs all training patients and is therefore a mechanism reference rather than a remedy.
+
+The estimate these remedies share is extreme in shape. Pooling the deviations of patient means from their class mean over $C$ classes at $C(G-1)$ degrees of freedom gives a covariance of rank at most 120 on TCGA-UT and 28 on BRACS at $G=5$ patients, inside a 2,560-dimensional feature space. Sample covariance spectra in this regime are not merely noisy but systematically spread: the sample eigenvalues of a population with equal variances follow the Mar\v{c}enko--Pastur law rather than concentrating at the population value \citep{marchenko1967}, and the largest ones are biased upward \citep{johnstone2001}. Covariance estimation for high-dimensional problems responds by shrinking the spectrum while keeping the eigenvectors: linear shrinkage pulls all eigenvalues toward their mean \citep{ledoit2004wellconditioned}, and nonlinear shrinkage moves each eigenvalue by an amount that depends on its position in the spectrum \citep{ledoit2020analytical}. Both corrections leave the eigenvectors of the sample covariance untouched, which is exactly the split this report needs.
+
+The question is therefore: \emph{are the cohort's patient directions useful while its eigenvalues are too dispersed to whiten with, so that compressing the spectrum recovers further headroom?} Cohort whitening hosts the test, because it is the strongest cohort-only remedy and, unlike the centre-uncertainty loss, carries no open grid boundary. The answer is judged at five patients per class, separately on each dataset, against the one-point practical threshold used throughout this series. Two further arms make a negative answer interpretable: an oracle arm that replaces the cohort's eigenvalues by the quantity they estimate, and a control that replaces the cohort's directions while keeping everything else.
+
+\section{Spectrum model}
+\label{sec:model}
+Write the patch features of class $c$ as $\mathbf x_{ik}=\boldsymbol\mu_c+\mathbf u_i+\mathbf e_{ik}$, with class centre $\boldsymbol\mu_c$, patient offset $\mathbf u_i$, and within-patient residual $\mathbf e_{ik}$ \citep{queisler2026centreError}. A cohort of $G$ patients per class estimates the between-patient covariance of the offsets by pooling the deviations of its patient means from their class means over all $C$ classes,
+\begin{equation}
+  \hat{\boldsymbol\Sigma}_B=\frac{1}{C(G-1)}\sum_{c=1}^{C}\sum_{i=1}^{G}(\mathbf m_{ci}-\hat{\boldsymbol\mu}_c)(\mathbf m_{ci}-\hat{\boldsymbol\mu}_c)^\top
+  =\mathbf U^\top\operatorname{diag}(\boldsymbol\lambda)\,\mathbf U ,
+  \label{eq:cov}
+\end{equation}
+\noindent where the rows $\mathbf u_j$ of $\mathbf U$ are the eigenvectors with non-negligible eigenvalues $\lambda_1\geq\dots\geq\lambda_r>0$ and $r\leq C(G-1)$. Cohort whitening transforms every feature vector by
+\begin{equation}
+  \mathbf x\mapsto\mathbf x\bigl(\mathbf I+\kappa\,\mathbf U^\top\operatorname{diag}(\boldsymbol\nu)\,\mathbf U\bigr)^{-1/2},
+  \qquad
+  \kappa=\frac{\text{factor}}{\overline{\nu}},
+  \label{eq:whiten}
+\end{equation}
+\noindent which multiplies the component along $\mathbf u_j$ by $(1+\kappa\nu_j)^{-1/2}$ and leaves the orthogonal complement unchanged. The spectrum $\boldsymbol\nu$ is the object under study. Cohort whitening uses $\boldsymbol\nu=\boldsymbol\lambda$; pool-basis whitening uses the pool's eigenbasis and eigenvalues in place of $\mathbf U$ and $\boldsymbol\lambda$ \citep{queisler2026patientDirections}. Dividing by the mean $\overline{\nu}$ makes $\kappa$ scale-free, so any spectrum is comparable to any other at the same grid factor, and a change that rescales all eigenvalues by a constant has no effect.
+
+Three modifications of $\boldsymbol\nu$ are tested, all with $\mathbf U$ fixed. The \emph{power family} sets $\nu_j=\lambda_j^\beta$. With $\beta=1$ it is cohort whitening; with $\beta=0$ it makes the shrinkage factor equal on all $r$ directions, so the transform becomes a uniform contraction of the cohort's patient subspace and keeps only the subspace, not its internal structure; intermediate $\beta$ interpolate, in the same spirit as the shrinkage estimators cited above, though as a one-parameter family rather than an optimal rule. The \emph{oracle spectrum} sets
+\begin{equation}
+  \nu_j=v_j=\mathbf u_j^\top\boldsymbol\Sigma_{\text{pool}}\,\mathbf u_j ,
+  \label{eq:oracle}
+\end{equation}
+\noindent the training pool's between-patient variance along the cohort's own direction $\mathbf u_j$, which is the population quantity $\lambda_j$ estimates. This arm is a mechanism reference, not a remedy, because it reads the pool. It bounds what a correction of the spectrum alone can achieve within this family, and together with pool-basis whitening it splits the gap between cohort-basis and pool-basis whitening into a spectrum part and a direction part. The relation between the two spectra is summarized by the \emph{oracle exponent}, the ordinary least-squares slope of $\log v_j$ on $\log\lambda_j$ across the $r$ directions of one fit: a slope below one means the cohort spectrum is more dispersed than the pool variances it estimates, which is the condition that motivates $\beta<1$.
+
+The final modification changes the directions instead. The \emph{within-patient control} replaces $\mathbf U$ by the top $r$ eigenvectors $\mathbf V$ of the cohort's pooled within-patient patch covariance, computed from patch deviations around each patient's own mean, and keeps the cohort eigenvalues $\boldsymbol\lambda$ in rank order. It is a cohort-only construction of the same rank that whitens high-variance directions of the same data without using the between-patient structure. A random subspace of rank 120 in 2,560 dimensions would overlap the cohort basis only negligibly and would reproduce the untransformed fit, so it would not test anything; the within-patient control instead asks whether the specific between-patient directions matter or whether any high-variance directions of matched rank would do. Its agreement with the cohort basis is measured by the subspace overlap $\lVert\mathbf U\mathbf V^\top\rVert_F^2/r$, which is one for identical subspaces and about $r/2{,}560$ for unrelated ones.
+
+\section{Design}
+\label{sec:design}
+The study keeps the setting of \citet{queisler2026centreError} on TCGA-UT and of \citet{queisler2026bracsMechanism} on BRACS. TCGA-UT contributes 30 cancer types and BRACS its seven lesion classes, both with frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three fixed patient-disjoint splits, and multinomial logistic regression whose regularization strength is selected on validation patient-macro balanced accuracy. For each split and each of ten draws, twenty eligible patients per class are sampled, and nested cohorts of five patients with 32 patches, ten with sixteen, and twenty with eight are formed, so every classifier trains on 160 patches per class at a single patient count for all classes. No additional patients, labels, features, or foundation models enter, and the reused arms are the exact fits of the source studies on the same cohorts, so every contrast is paired draw by draw.
+
+Six new arm families enter at each $G\in\{5,10,20\}$ (Table~\ref{tab:arms}). Each of them whitens by Equation~\ref{eq:whiten} with its own spectrum or basis and then fits an ordinary multinomial logistic classifier on the transformed features, so the arms differ from cohort whitening in the whitening spectrum alone, except for the control, which differs in the basis. Every new arm tunes the scale factor $\kappa\in\{0.1,1,10,100\}/\overline{\nu}$ jointly with the regularization strength on validation patient-macro balanced accuracy, the grid and the tie rules of \citet{queisler2026patientDirections}. The tuned family Bt fits nothing of its own: for each fit it reads the validation score of the $\kappa$ that each power arm selected, adds the score of the reused cohort-whitening fit as the $\beta=1$ candidate, and copies the winning record wholesale, with ties resolved toward the larger $\beta$ so that a departure from $\beta=1$ requires a strict validation improvement. The $\beta$ grid was fixed before fitting and was not extended after test results were seen; whether values above one would be worth testing is addressed by the oracle exponent rather than by a test-set search.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+Arm & Basis & Spectrum & Role \\
+\midrule
+R$G$ & --- & --- & Ordinary fit on the real cohort (reused) \\
+C$G$ & --- & --- & Cohort with pool class centres (reused headroom reference) \\
+RWc$G$ & cohort $\mathbf U$ & $\lambda_j$ & Cohort whitening, the host remedy (reused) \\
+RW$G$ & pool & pool & Pool-basis whitening (reused mechanism reference) \\
+F$G$ & cohort $\mathbf U$ & $\lambda_j^0$ & Flat spectrum: subspace only \\
+Ba$G$, Bb$G$, Bc$G$ & cohort $\mathbf U$ & $\lambda_j^{0.25},\lambda_j^{0.5},\lambda_j^{0.75}$ & Power compression \\
+Bt$G$ & cohort $\mathbf U$ & $\lambda_j^{\beta}$ & $\beta$ selected on validation from $\{0,0.25,0.5,0.75,1\}$ \\
+O$G$ & cohort $\mathbf U$ & $v_j$ & Oracle spectrum, Equation~\ref{eq:oracle} (mechanism) \\
+P$G$ & within-patient $\mathbf V$ & $\lambda_j$ & Rank-matched direction control \\
+\bottomrule
+\end{tabularx}
+\caption{All new families whiten by Equation~\ref{eq:whiten} and differ from cohort whitening only in the spectrum, except P, which differs only in the basis. R$G$ and C$G$ bracket the pool-centre headroom; RWc$G$ and RW$G$ bracket what whitening achieves from the cohort and from all training patients. O$G$ and RW$G$ read the training pool and are not remedies.}
+\label{tab:arms}
+\end{table}
+
+\noindent The eigen-decompositions are computed once per cohort and patient count and are shared by the arms that use them, and the whitening is applied through the low-rank basis, so no $2{,}560\times2{,}560$ matrix is formed. Per dataset, the study fits six families at four scale factors for each of three patient counts and 30 split-draw pairs, that is 2,160 whitened fits, each tuning nine regularization values; the tuned family adds no fit. Selections were written to disk before any test prediction, and test accuracy never entered selection.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals.
+
+The primary contrast is Bt5$-$RWc5, read separately on each dataset. Spectrum regularization counts as a practical success on a dataset if the estimated gain over cohort whitening is at least one percentage point and its paired interval lies entirely above zero; a claim across both cohorts requires success on both. Secondary quantities are the direction-only comparison F5$-$RWc5, the spectrum headroom O5$-$RWc5, the missing-direction headroom RW5$-$O5, the subspace specificity RWc5$-$P5, the $\beta$ profile at every patient count, and the recovery $(\mathrm{Bt}G-\mathrm RG)/(\mathrm CG-\mathrm RG)$ of the pool-centre headroom at five and ten patients. Four readings were fixed in advance. A large Bt$-$RWc would mean that the cohort locates its patient subspace but not the strengths along it, which is the case nonlinear shrinkage is designed for. Bt$\approx$RWc together with O$\approx$RWc would mean that the spectrum is not the bottleneck and that moment-based cohort-only remedies are exhausted. O$\gg$RWc with Bt$\approx$RWc would mean that the spectrum matters but that power compression is the wrong family. RWc$\approx$P would mean that the between-patient directions are not specific, and that any high-variance subspace of the same rank whitens as well.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
