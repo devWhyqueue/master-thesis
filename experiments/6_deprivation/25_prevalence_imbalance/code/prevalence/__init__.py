@@ -10,7 +10,17 @@ class's available budget is G x DEPTH regardless of arm.
 
 from __future__ import annotations
 
-__all__ = ["ARMS", "BALANCED", "DEPTH", "G", "PREVALENCE_SEED", "RATIOS"]
+from typing import Any
+
+__all__ = [
+    "ARMS",
+    "BALANCED",
+    "DEPTH",
+    "G",
+    "PREVALENCE_SEED",
+    "RATIOS",
+    "patients_per_class",
+]
 
 G = 20
 BALANCED = 32
@@ -19,3 +29,8 @@ RATIOS: tuple[int, ...] = (1, 2, 5, 10, 20, 50, 100)
 ARMS: tuple[str, ...] = tuple(f"r{r}" for r in RATIOS) + ("N",)
 # Fresh seed for this experiment's own patient draws and class-rank permutations.
 PREVALENCE_SEED: int = 20260921
+
+
+def patients_per_class(config: dict[str, Any]) -> int:
+    """G for this dataset: config override (BRACS has too few deep patients for 20), else 20."""
+    return int(config.get("prevalence", {}).get("patients_per_class", G))

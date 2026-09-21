@@ -3,6 +3,11 @@
 # permuted class rank with exp-02's exponential-profile allocator; N keeps native class shares.
 # Every arm is fit fresh (no reuse). CPU-only.
 
+# BRACS deviates from G = 20: at DEPTH = 160 only 10-13 ADH train patients per split qualify, so
+# G = 10 (T = 10 x 32 x 7); the full ratio grid up to r = 100 stays feasible (head 1206 <= 1600).
+prevalence:
+  patients_per_class: 10
+
 paths:
   outputs: experiments/6_deprivation/25_prevalence_imbalance/outputs/bracs/patch
 

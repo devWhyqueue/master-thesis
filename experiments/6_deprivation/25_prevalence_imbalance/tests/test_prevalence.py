@@ -108,3 +108,12 @@ def test_slope_and_native_gap_recover_log_linear_curve() -> None:
     ba["N"] = np.full(3, float(np.interp(20.0, RATIOS, [b[0] for b in ba.values()])))
     np.testing.assert_allclose(_slope(ba, RATIOS), -0.5)
     np.testing.assert_allclose(_native_gap(ba, rho), 0.0, atol=1e-12)
+
+
+@pytest.mark.parametrize("rho", RATIOS)
+def test_bracs_g10_grid_is_feasible(rho: int) -> None:
+    """G = 10 (BRACS override) reaches every ratio at the exact budget without clamping the head."""
+    g = 10
+    counts = class_counts(f"r{rho}", _PERM, [g * DEPTH] * N_CLASSES, _POOL_COUNTS, g)
+    assert sum(counts) == g * BALANCED * N_CLASSES
+    assert achieved_rho(dict(enumerate(counts))) == pytest.approx(rho, rel=0.05)

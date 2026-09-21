@@ -1,6 +1,6 @@
 """Fit stage: prevalence-imbalance arms (r1..r100, N) of one (split, draw) shard.
 
-Draws G = 20 eligible patients per class at depth DEPTH = 160, fixed across every arm of a draw.
+Draws G eligible patients per class (20; config ``prevalence.patients_per_class`` overrides) at depth DEPTH = 160, fixed across every arm of a draw.
 Ratio arms ``r{rho}`` reallocate the shared budget T = G x BALANCED x num_classes across classes with
 exp-02's exponential-profile allocator, class order permuted per draw; ``N`` keeps native class
 shares. Patients take a nested round-robin patch prefix (``centre.cohort.patient_rows``), so a
@@ -36,7 +36,7 @@ from centre.fit import decode_shard_index, shard_count
 
 from sites import allocation_dir
 
-from prevalence import ARMS, BALANCED, DEPTH, G, PREVALENCE_SEED
+from prevalence import ARMS, BALANCED, DEPTH, G, PREVALENCE_SEED, patients_per_class
 
 __all__ = [
     "decode_shard_index",
@@ -54,41 +54,45 @@ def class_permutation(split_idx: int, draw_idx: int, num_classes: int) -> np.nda
 
 
 def _draw_patients(
-    train_df: pd.DataFrame, names: list[str], split_idx: int, draw_idx: int
+    train_df: pd.DataFrame, names: list[str], split_idx: int, draw_idx: int, g: int
 ) -> list[list[str]]:
-    """G eligible patients per class, fixed across every arm of this draw."""
+    """g eligible patients per class, fixed across every arm of this draw."""
     chosen = []
     for ci, name in enumerate(names):
         eligible = eligible_patients_by_class(train_df, name, DEPTH)
-        seed = derive_draw_seed(PREVALENCE_SEED, split_idx, G, DEPTH, draw_idx, ci)
+        seed = derive_draw_seed(PREVALENCE_SEED, split_idx, g, DEPTH, draw_idx, ci)
         rng = np.random.default_rng(seed)
-        chosen.append([str(p) for p in rng.choice(eligible, size=G, replace=False)])
+        chosen.append([str(p) for p in rng.choice(eligible, size=g, replace=False)])
     return chosen
 
 
 def class_counts(
-    arm: str, perm: np.ndarray, available: list[int], pool_counts: list[int]
+    arm: str,
+    perm: np.ndarray,
+    available: list[int],
+    pool_counts: list[int],
+    g: int = G,
 ) -> list[int]:
-    """Per-class total patch counts for one arm at the shared budget T = G x BALANCED x K."""
+    """Per-class total patch counts for one arm at the shared budget T = g x BALANCED x K."""
     num_classes = len(available)
-    total = G * BALANCED * num_classes
+    total = g * BALANCED * num_classes
     if arm == "N":
         share = sum(pool_counts)
         target = [total * c / share for c in pool_counts]
-        allocated = [min(max(round(t), G), a) for t, a in zip(target, available)]
-        _adjust_alloc(allocated, available, target, total - sum(allocated), G)
+        allocated = [min(max(round(t), g), a) for t, a in zip(target, available)]
+        _adjust_alloc(allocated, available, target, total - sum(allocated), g)
         return allocated
-    ranked = allocate_counts(available, total, float(arm[1:]), G)
+    ranked = allocate_counts(available, total, float(arm[1:]), g)
     counts = [0] * num_classes
     for rank, cls_idx in enumerate(perm):
         counts[cls_idx] = ranked[rank]
     return counts
 
 
-def _patient_counts(total: int) -> list[int]:
-    """Split one class's total across its G patients; nesting is per-patient (patient_rows), not here."""
-    base, remainder = divmod(total, G)
-    return [base + 1] * remainder + [base] * (G - remainder)
+def _patient_counts(total: int, g: int = G) -> list[int]:
+    """Split one class's total across its g patients; nesting is per-patient (patient_rows), not here."""
+    base, remainder = divmod(total, g)
+    return [base + 1] * remainder + [base] * (g - remainder)
 
 
 def _arm_rows(
@@ -103,7 +107,9 @@ def _arm_rows(
     for ci, name in enumerate(names):
         class_df = cast(pd.DataFrame, train_df[train_df["cancer_type"] == name])
         class_rows: list[int] = []
-        for patient, m in zip(patients[ci], _patient_counts(counts[ci])):
+        for patient, m in zip(
+            patients[ci], _patient_counts(counts[ci], len(patients[ci]))
+        ):
             if m:
                 class_rows.extend(patient_rows(class_df, [patient], m))
         rows.extend(class_rows)
@@ -139,19 +145,21 @@ class _Shard(NamedTuple):
     perm: np.ndarray
     available: list[int]
     pool_counts: list[int]
+    g: int
 
 
 def _shard_context(
-    train_df: pd.DataFrame, names: list[str], split_idx: int, draw_idx: int
+    train_df: pd.DataFrame, names: list[str], split_idx: int, draw_idx: int, g: int
 ) -> _Shard:
     """Patient draws, class permutation, per-class availability cap, and native pool counts."""
     return _Shard(
         train_df,
         names,
-        _draw_patients(train_df, names, split_idx, draw_idx),
+        _draw_patients(train_df, names, split_idx, draw_idx, g),
         class_permutation(split_idx, draw_idx, len(names)),
-        [G * DEPTH] * len(names),
+        [g * DEPTH] * len(names),
         [int((train_df["cancer_type"] == name).sum()) for name in names],
+        g,
     )
 
 
@@ -164,12 +172,12 @@ def _fit_arm(
     draw_idx: int,
 ) -> None:
     """Allocate one arm's patch counts, fit it, and write its run record and temperature."""
-    counts = class_counts(arm, shard.perm, shard.available, shard.pool_counts)
+    counts = class_counts(arm, shard.perm, shard.available, shard.pool_counts, shard.g)
     x, y = _arm_rows(shard.train_df, shard.names, shard.patients, counts)
     fit, lam, test_preds, test_probs, val_end, test_end = tune_and_fit_draw(x, y, evals)
     rec = _build_draw_record(
         config,
-        (G, DEPTH, draw_idx),
+        (shard.g, DEPTH, draw_idx),
         lam,
         fit,
         (test_preds, test_probs, val_end, test_end),
@@ -196,7 +204,9 @@ def run_fit_shard(config: dict[str, Any], shard_index: int) -> None:
     ]
     if not pending:
         return
-    shard = _shard_context(train_df, names, split_idx, draw_idx)
+    shard = _shard_context(
+        train_df, names, split_idx, draw_idx, patients_per_class(config)
+    )
     for arm in pending:
         _fit_arm(
             config, allocation_dir(paths, arm, draw_idx), arm, shard, evals, draw_idx
