@@ -85,7 +85,7 @@ def _fit_grid(
     """Fit every nonzero-t candidate of the given covariance kinds; return scores, fits, and cohort geometry."""
     basis, eigvals = cohort_eigenbasis(table, n_classes, g)
     covs: dict[str, Covariance] = {
-        k: covariance_for(k, basis, eigvals, g) for k in kinds
+        k: covariance_for(k, basis, eigvals, g) for k in COVARIANCE_KINDS
     }
     grid = [(k, t, lam) for k in kinds for t in t_values for lam in LAMBDAS]
     with parallel_config(backend="loky", inner_max_num_threads=2):

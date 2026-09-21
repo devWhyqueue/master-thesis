@@ -172,6 +172,8 @@ def test_covariance_geometry_uses_training_features_only(monkeypatch):
     assert len(cand_b) == 2 * len(NONZERO_T_FACTORS) * 2
     key = ("patient", 1.0, 0.1)
     np.testing.assert_allclose(fits_a[key].coef, fits_b[key].coef)
+    only_iso, _, geo_iso = _fit_grid(table, 3, g, _evals(0), (16.0,), ("isotropic",))
+    assert {c.kind for c in only_iso} == {"isotropic"} and geo_iso == geo_a
 
 
 def test_frozen_selection_round_trips_and_rejects_stale_evidence(tmp_path):
