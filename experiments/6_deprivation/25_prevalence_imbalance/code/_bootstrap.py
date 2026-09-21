@@ -10,6 +10,7 @@ _CODE_DIRS = (
     "02_benchmark_patch",
     "03_classifier_limitation",
     "05_effective_support",
+    "06_multidirectional_redundancy",  # redundancy.exp5_config, used by neighbours.accuracy
     "07_site_coverage",
     "08_patient_coverage",  # neighbours.accuracy.recall_stack, used by centre.analyze.arm_accuracy
     "14_shortage_decomposition",
