@@ -12,6 +12,7 @@ __all__ = [
     "ARMS",
     "COVARIANCE_KINDS",
     "FIXED_T",
+    "ISOTROPIC_EXTRA_T",
     "LAMBDAS",
     "MAX_ITER",
     "NONZERO_T_FACTORS",
@@ -33,6 +34,8 @@ T_FACTORS: tuple[float, ...] = (0.0, 0.25, 1.0, 4.0, 16.0, 64.0, 256.0)
 # t = 0 is never fit: it is ordinary logistic regression on unchanged features, i.e. the R arm.
 NONZERO_T_FACTORS: tuple[float, ...] = tuple(t for t in T_FACTORS if t)
 FIXED_T: float = 1.0
+# The isotropic control kept choosing the grid's top value, so only its grid extends further.
+ISOTROPIC_EXTRA_T: tuple[float, ...] = (1024.0, 4096.0)
 
 # Reused arm families keyed by the config path pointing at their source experiment's outputs.
 REUSED_ARM_FAMILIES: dict[str, tuple[str, ...]] = {

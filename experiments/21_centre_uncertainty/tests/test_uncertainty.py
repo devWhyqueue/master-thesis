@@ -255,7 +255,7 @@ def test_extension_fits_only_new_strengths_and_reselects_over_the_merged_grid(
         monkeypatch.setattr(
             fit_mod,
             "_fit_grid",
-            lambda *a, _n=new, _k=new_key: calls.append(a[-1]) or ([_n], {_k: fit}, {}),
+            lambda *a, _n=new, _k=new_key: calls.append(a[-2]) or ([_n], {_k: fit}, {}),
         )
         chosen = _extend_selection(None, 3, None, old, (16.0,), (tmp_path, "fp2", 5, 0.5))
         assert chosen["Ut"]["t"] == expected_t and chosen["U"]["t"] == 1.0

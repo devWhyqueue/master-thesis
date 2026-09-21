@@ -32,6 +32,7 @@ from directions.basis import cohort_eigenbasis
 
 from uncertainty import (
     COVARIANCE_KINDS,
+    ISOTROPIC_EXTRA_T,
     LAMBDAS,
     MAX_ITER,
     NONZERO_T_FACTORS,
@@ -77,15 +78,16 @@ def _fit_grid(
     g: int,
     evals: EvalPartition,
     t_values: tuple[float, ...] = NONZERO_T_FACTORS,
+    kinds: tuple[str, ...] = COVARIANCE_KINDS,
 ) -> tuple[
     list[Candidate], dict[tuple[str, float, float], UncertainFit], dict[str, Any]
 ]:
-    """Fit every nonzero-t candidate of both covariance kinds; return scores, fits, and cohort geometry."""
+    """Fit every nonzero-t candidate of the given covariance kinds; return scores, fits, and cohort geometry."""
     basis, eigvals = cohort_eigenbasis(table, n_classes, g)
     covs: dict[str, Covariance] = {
-        k: covariance_for(k, basis, eigvals, g) for k in COVARIANCE_KINDS
+        k: covariance_for(k, basis, eigvals, g) for k in kinds
     }
-    grid = [(k, t, lam) for k in COVARIANCE_KINDS for t in t_values for lam in LAMBDAS]
+    grid = [(k, t, lam) for k in kinds for t in t_values for lam in LAMBDAS]
     with parallel_config(backend="loky", inner_max_num_threads=2):
         fits = cast(
             list[UncertainFit],
@@ -122,9 +124,11 @@ def _extend_selection(
     missing: tuple[float, ...],
     where: tuple[Path, str, int, float],
 ) -> dict[str, dict[str, Any] | None]:
-    """Fit only the ``missing`` strengths, merge with the frozen candidates, and refreeze the selection."""
+    """Fit only the isotropic ``missing`` strengths, merge with the frozen candidates, and refreeze the selection."""
     sel_dir, fp, g, r_score = where
-    new, by_key, geometry = _fit_grid(table, n_classes, g, evals, missing)
+    new, by_key, geometry = _fit_grid(
+        table, n_classes, g, evals, missing, ("isotropic",)
+    )
     with np.load(sel_dir / WINNERS_NAME) as npz:
         for fam, sel in old["selected"].items():
             if sel is not None:
@@ -153,14 +157,16 @@ def _fit_patient_count(
     fp_for = lambda grid: fingerprint(config, table, g, source, grid)  # noqa: E731
     sel_dir = allocation_dir(paths, f"Sel{g}", draw_idx)
     record = read_selection(sel_dir, fp_for)
-    full_grid = (0.0, *NONZERO_T_FACTORS)
     if record is None:
         candidates, by_key, geometry = _fit_grid(table, n_classes, g, evals)
         selected = select_arms(candidates, r_score)
-        fp = fp_for(full_grid)
+        fp = fp_for((0.0, *NONZERO_T_FACTORS))
         write_selection(sel_dir, fp, candidates, selected, geometry, r_score, by_key)
-    elif t_grid(record) != full_grid:
-        missing = tuple(t for t in NONZERO_T_FACTORS if t not in t_grid(record))
+        record = read_selection(sel_dir, fp_for)
+        assert record is not None
+    full_grid = (0.0, *NONZERO_T_FACTORS, *ISOTROPIC_EXTRA_T)
+    if t_grid(record) != full_grid:
+        missing = tuple(t for t in ISOTROPIC_EXTRA_T if t not in t_grid(record))
         selected = _extend_selection(
             table,
             n_classes,
