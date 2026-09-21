@@ -4,8 +4,16 @@ Controlled patch-classification studies on frozen Virchow2 features. Each study 
 
 ## Layout
 
-- `NN_name/code/`: CLI (`__main__.py`) + study package. `configs/`: run configs. `tests/`: unit tests.
-- `NN_name/report/`: `N_name.tex` (protocol), `results.tex` (results, discussion), compiled PDF.
+| Group | Experiments |
+|---|---|
+| `1_survey/` | 00_datasets, 01_methods |
+| `2_benchmark/` | 02_benchmark_patch, 03_classifier_limitation, 04_patient_influence |
+| `3_isolation/` | 05_effective_support – 15_hull_coverage |
+| `4_explanation/` | 16_centre_error, 17_patient_directions, 18_bracs_mechanism |
+| `5_hard_limit/` | 19_centre_shrinkage – 24_oracle_weighting |
+
+- `<group>/NN_name/code/`: CLI (`__main__.py`) + study package. `configs/`: run configs. `tests/`: unit tests.
+- `<group>/NN_name/report/`: `N_name.tex` (protocol), `results.tex` (results, discussion), compiled PDF.
 - `environment.def`, `requirements-experiment.txt`: shared Apptainer image for Hydra runs (see `CLUSTER.md`).
 - Datasets: BRACS + TCGA-UT (02–05, 18); TCGA-UT only (06–17). Readout: logistic regression unless noted.
 - Effects = patient-macro balanced accuracy, percentage points. Intervals from paired test-patient bootstrap. Practical threshold: 1 pp.

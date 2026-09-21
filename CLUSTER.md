@@ -237,7 +237,7 @@ Open `127.0.0.1:8888` URL with token from job log.
 
 ## Git On Hydra
 
-Repo at `~/master-thesis` (clone: `git clone --depth 1 https://github.com/devWhyqueue/master-thesis.git ~/master-thesis`). Sync with `git pull --ff-only`; gitignored artifacts under `experiments/<name>/` stay on disk. Run Hydra jobs from relevant `experiments/<name>/` directory (see that experiment's README).
+Repo at `~/master-thesis` (clone: `git clone --depth 1 https://github.com/devWhyqueue/master-thesis.git ~/master-thesis`). Sync with `git pull --ff-only`; gitignored artifacts under `experiments/<group>/<name>/` stay on disk. Run Hydra jobs from relevant `experiments/<group>/<name>/` directory (see that experiment's README).
 
 ## Agent Safety Checklist
 

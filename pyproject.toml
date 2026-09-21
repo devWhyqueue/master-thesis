@@ -50,12 +50,12 @@ include-package-data = false
 [tool.setuptools.packages.find]
 where = [
     ".agents/skills/bib/src",
-    "experiments/02_benchmark_patch/code",
-    "experiments/03_classifier_limitation/code",
-    "experiments/04_patient_influence/code",
-    "experiments/05_effective_support/code",
-    "experiments/06_multidirectional_redundancy/code",
-    "experiments/07_site_coverage/code",
+    "experiments/2_benchmark/02_benchmark_patch/code",
+    "experiments/2_benchmark/03_classifier_limitation/code",
+    "experiments/2_benchmark/04_patient_influence/code",
+    "experiments/3_isolation/05_effective_support/code",
+    "experiments/3_isolation/06_multidirectional_redundancy/code",
+    "experiments/3_isolation/07_site_coverage/code",
 ]
 exclude = ["tests*"]
 
@@ -66,12 +66,12 @@ ignore_names = ["forward", "MAX_TEXT_CHUNK"]
 addopts = "-s --import-mode=importlib"
 testpaths = [
     ".agents/skills/bib/tests",
-    "experiments/02_benchmark_patch/code/tests",
-    "experiments/03_classifier_limitation/tests",
-    "experiments/04_patient_influence/tests",
-    "experiments/05_effective_support/tests",
-    "experiments/06_multidirectional_redundancy/tests",
-    "experiments/07_site_coverage/tests",
+    "experiments/2_benchmark/02_benchmark_patch/code/tests",
+    "experiments/2_benchmark/03_classifier_limitation/tests",
+    "experiments/2_benchmark/04_patient_influence/tests",
+    "experiments/3_isolation/05_effective_support/tests",
+    "experiments/3_isolation/06_multidirectional_redundancy/tests",
+    "experiments/3_isolation/07_site_coverage/tests",
 ]
 
 [tool.uv.sources]

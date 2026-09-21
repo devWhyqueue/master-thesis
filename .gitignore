@@ -35,11 +35,11 @@ experiments/class_imbalance/**/*.npy
 experiments/class_imbalance/outputs/**/run.json
 experiments/class_imbalance/outputs/**/progress.json
 experiments/environment.sif
-experiments/02_benchmark_patch/environment.sif
-experiments/02_benchmark_patch/outputs/
-experiments/02_benchmark_patch/**/*.npy
-experiments/02_benchmark_patch/data/
-experiments/02_benchmark_patch/logs/
+experiments/2_benchmark/02_benchmark_patch/environment.sif
+experiments/2_benchmark/02_benchmark_patch/outputs/
+experiments/2_benchmark/02_benchmark_patch/**/*.npy
+experiments/2_benchmark/02_benchmark_patch/data/
+experiments/2_benchmark/02_benchmark_patch/logs/
 
 # Design dataset: large generated artifacts, machine-specific config
 experiments/design_dataset/data/

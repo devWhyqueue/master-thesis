@@ -44,8 +44,8 @@ import subprocess, shlex
 from pathlib import Path
 
 SIF = "/home/yannik.qu/master-thesis/experiments/environment.sif"
-PYPATH = "/home/yannik.qu/master-thesis/experiments/02_benchmark_patch/code"
-RESULTS = "/home/yannik.qu/master-thesis/experiments/02_benchmark_patch/outputs"
+PYPATH = "/home/yannik.qu/master-thesis/experiments/2_benchmark/02_benchmark_patch/code"
+RESULTS = "/home/yannik.qu/master-thesis/experiments/2_benchmark/02_benchmark_patch/outputs"
 
 # Verify paths before submitting — a missing path gives an immediate failure
 for p in [SIF, RESULTS]:
@@ -89,7 +89,7 @@ In Python: `f"afterok:{':'.join(ids)}"` passed as `--dependency=...`.
 Containers have no SLURM client — never call `sbatch`/`srun` from inside one, and don't bind `/opt/slurm`+`/etc/slurm`+`/run/munge` in to work around that (dead end: container `/etc/passwd` lacks the `slurm` user, auth fails). A project's `submit` CLI is login-node/orchestrator work; only the jobs it schedules run inside the container. If it needs numpy/pandas/etc. itself, use the project venv (`~/master-thesis/.venv`) on the login node, not system `python3`:
 
 ```bash
-ssh hydra 'bash -lc "cd ~/master-thesis/experiments/<name> && ~/master-thesis/.venv/bin/python3 code --config configs/<x>.yaml submit"'
+ssh hydra 'bash -lc "cd ~/master-thesis/experiments/<group>/<name> && ~/master-thesis/.venv/bin/python3 code --config configs/<x>.yaml submit"'
 ```
 
 Pass Python paths into the container via `APPTAINERENV_PYTHONPATH` (Apptainer strips the prefix and sets `PYTHONPATH` inside):
