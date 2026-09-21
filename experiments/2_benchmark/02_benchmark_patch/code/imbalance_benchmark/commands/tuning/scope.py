@@ -13,6 +13,7 @@ from imbalance_benchmark.common import (
     ensure_dirs,
     load_config,
     split_paths,
+    verify_signed_file,
 )
 from imbalance_benchmark.datasets.data import load_training_dataset
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
@@ -50,6 +51,7 @@ def _tuning_inputs(
     """Load config, the natural-validation loader, and the regime for the tuning sweep."""
     freeze_path = paths["data"] / "manifest_freeze.json"
     freeze = json.loads(freeze_path.read_text())
+    verify_signed_file(freeze_path)
     verify_manifest_freeze(freeze)
     config = freeze["runtime_config"]
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
@@ -91,7 +93,8 @@ def _frozen_shard_context(
         split_paths(base, index)["data"] / "manifest_freeze.json" for index in range(3)
     ]
     freezes = [json.loads(path.read_text()) for path in paths]
-    for freeze in freezes:
+    for path, freeze in zip(paths, freezes):
+        verify_signed_file(path)
         verify_manifest_freeze(freeze)
     scopes = (
         [_tuning_inputs(args, split_paths(base, index)) for index in range(3)]

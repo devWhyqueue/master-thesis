@@ -19,6 +19,7 @@ from imbalance_benchmark.common import (
     load_config,
     sign_file,
     split_paths,
+    verify_signed_file,
     write_json,
 )
 from imbalance_benchmark.manifest.freeze import (
@@ -89,6 +90,14 @@ def _amended_freeze_meta(meta: dict, is_mil: bool, old_file_hash: str) -> dict:
     return amended
 
 
+def _load_verified_freeze(freeze_path) -> dict:
+    """Read a frozen manifest and verify its signature and content lock."""
+    meta = json.loads(freeze_path.read_text())
+    verify_signed_file(freeze_path)
+    verify_manifest_freeze(meta)
+    return meta
+
+
 def cmd_amend_grids(args: argparse.Namespace) -> None:
     """Add newly rostered methods' grids to a frozen manifest without a full re-freeze.
 
@@ -104,8 +113,7 @@ def cmd_amend_grids(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
     freeze_path = paths["data"] / "manifest_freeze.json"
-    meta = json.loads(freeze_path.read_text())
-    verify_manifest_freeze(meta)
+    meta = _load_verified_freeze(freeze_path)
     is_mil = config.get("dataset", {}).get("regime", "patch") == "wsi"
     amended = _amended_freeze_meta(meta, is_mil, compute_sha256(freeze_path))
     write_json(freeze_path, lock_manifest_freeze(amended))
@@ -142,8 +150,7 @@ def cmd_refreeze_preflight(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     paths = split_paths(ensure_dirs(config), args.split_index)
     freeze_path = paths["data"] / "manifest_freeze.json"
-    meta = json.loads(freeze_path.read_text())
-    verify_manifest_freeze(meta)
+    meta = _load_verified_freeze(freeze_path)
     old_file_hash = compute_sha256(freeze_path)
     _attach_preflight(meta, paths, config, args.seed)
     _chain_supersession(meta, meta["content_sha256"], old_file_hash)

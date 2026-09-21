@@ -5,7 +5,12 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from imbalance_benchmark.common import compute_sha256, ensure_dirs, split_paths
+from imbalance_benchmark.common import (
+    compute_sha256,
+    ensure_dirs,
+    split_paths,
+    verify_signed_file,
+)
 from imbalance_benchmark.manifest.freeze import verify_manifest_freeze
 from imbalance_benchmark.modeling.context import CONTROLLED_CONDITIONS
 from imbalance_benchmark.modeling.workflows.tuning.tuning_artifacts import (
@@ -41,6 +46,7 @@ def verify_resume_freezes(config: dict[str, Any]) -> None:
         path = split_paths(base, index)["data"] / "manifest_freeze.json"
         if not path.exists():
             raise FileNotFoundError(f"Cannot resume tuning without {path}")
+        verify_signed_file(path)
         verify_manifest_freeze(json.loads(path.read_text()))
 
 

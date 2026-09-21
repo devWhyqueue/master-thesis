@@ -92,6 +92,7 @@ def _confirm_run_data(paths: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
     freeze_path = paths["data"] / "manifest_freeze.json"
     if not freeze_path.exists():
         raise FileNotFoundError("Run freeze successfully before confirmation")
+    verify_signed_file(freeze_path)
     verify_manifest_freeze(json.loads(freeze_path.read_text()))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     freeze = json.loads(freeze_path.read_text())

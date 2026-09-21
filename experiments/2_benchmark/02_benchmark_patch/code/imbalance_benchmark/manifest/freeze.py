@@ -185,8 +185,6 @@ def verify_manifest_freeze(meta: dict[str, Any]) -> None:
     actual = compute_data_hash({k: v for k, v in meta.items() if k != "content_sha256"})
     if ("shared_T" in meta or expected) and expected != actual:
         raise RuntimeError("Frozen manifest content no longer matches its lock.")
-    if p := meta.get("path"):
-        verify_signed_file(Path(p))
     for path_str, sha, name in _collect_artifacts_to_verify(meta):
         p = Path(path_str)
         if not p.exists() or compute_sha256(p) != sha:

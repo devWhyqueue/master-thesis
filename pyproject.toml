@@ -47,32 +47,11 @@ dev = [
 [tool.setuptools]
 include-package-data = false
 
-[tool.setuptools.packages.find]
-where = [
-    ".agents/skills/bib/src",
-    "experiments/2_benchmark/02_benchmark_patch/code",
-    "experiments/2_benchmark/03_classifier_limitation/code",
-    "experiments/2_benchmark/04_patient_influence/code",
-    "experiments/3_isolation/05_effective_support/code",
-    "experiments/3_isolation/06_multidirectional_redundancy/code",
-    "experiments/3_isolation/07_site_coverage/code",
-]
-exclude = ["tests*"]
-
 [tool.vulture]
 ignore_names = ["forward", "MAX_TEXT_CHUNK"]
 
 [tool.pytest.ini_options]
-addopts = "-s --import-mode=importlib"
-testpaths = [
-    ".agents/skills/bib/tests",
-    "experiments/2_benchmark/02_benchmark_patch/code/tests",
-    "experiments/2_benchmark/03_classifier_limitation/tests",
-    "experiments/2_benchmark/04_patient_influence/tests",
-    "experiments/3_isolation/05_effective_support/tests",
-    "experiments/3_isolation/06_multidirectional_redundancy/tests",
-    "experiments/3_isolation/07_site_coverage/tests",
-]
+addopts = "--import-mode=importlib"
 
 [tool.uv.sources]
 torch = [
