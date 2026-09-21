@@ -1,0 +1,77 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Prevalence Alone Costs Little Accuracy on TCGA-UT}
+\author{Yannik Queisler}
+\date{September 21, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent The benchmark of this series changed class prevalence, patient pool, and mitigation method together and measured the damage of class imbalance at three allocations only. This report isolates prevalence. On TCGA-UT, a multinomial logistic classifier on frozen Virchow2 features is trained on the same twenty patients per cancer type and the same total of 19,200 patches in every arm; only the share of the budget that each of the 30 classes receives changes, following an exponential long-tail profile with imbalance ratio $\rho$ from 1 to 100 and a random class order per draw. A further arm uses the classes' native training shares, which realize $\rho=18.1$. Balanced accuracy degrades slowly and with increasing speed: it falls by 0.57 percentage points at $\rho=10$ (95\% interval: 0.30 to 0.84), by 1.01 points at $\rho=20$ (0.67 to 1.36), the first ratio at which the damage reaches the one-point threshold, and by 2.91 points at $\rho=100$ (2.48 to 3.34). The loss per doubling of $\rho$ is 0.18 points up to $\rho=10$ and 0.70 points beyond. Damage concentrates on the tail third of the classes, whose recall drops by 11.8 points at $\rho=100$ while the head third gains 5.4. The native allocation costs 1.18 points (0.85 to 1.48) and lies on the ratio curve at its realized ratio. Probability quality deteriorates much more than accuracy: at $\rho=100$ the expected calibration error rises from 5.5 to 17.8 points. A single validation temperature removes 95 percent of that increase and 81 percent of the increase in macro negative log-likelihood. On TCGA-UT, prevalence at fixed patient support is therefore a moderate source of discrimination loss, and its calibration damage is mostly a matter of scale.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The benchmark of this series found that severe class imbalance damages balanced accuracy on BRACS by 4.30 to 13.23 percentage points and on TCGA-UT by only 1.33 to 1.79 points, and that validation temperature scaling removes most of the accompanying differences in probability quality \citep{queisler2026benchmarkResults,queisler2026benchmarkProtocol}. These numbers bundle several factors. Each imbalanced condition changed the prevalence of the classes and the patients available to them at the same time, it was measured at three allocations only (balanced, moderate, and severe, $\rho\approx100$), and the classifier was a two-layer perceptron trained alongside five mitigation methods. A later comparison showed that multinomial logistic regression on the same features differs from that perceptron by at most half a point \citep{queisler2026patientShortage}, and all subsequent studies of this series use it.
+
+This report begins a set of small studies that separate the deprivations of the benchmark, one factor at a time and with the plain cross-entropy baseline only. It isolates class prevalence. The question is: \emph{how fast do balanced accuracy, negative log-likelihood, and calibration error degrade as the training class distribution moves from balanced to long-tailed, when the patients of every class and the total patch budget stay fixed, and where does the dataset's native distribution lie on that curve?} Patient shortage and patch shortage per class are held out of this design and left to their own studies. The report covers TCGA-UT; BRACS, with seven classes and a native imbalance of about six, is reported separately.
+
+\section{Design}
+\label{sec:design}
+The study uses the 30 TCGA-UT cancer types with frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, the three fixed patient-disjoint splits of the benchmark, and ten draws per split. Validation and test partitions keep their natural class distribution. In each draw, twenty patients per class are sampled from those with at least $D=160$ training patches, and the same patients enter every arm of the draw. Each patient's patches follow one fixed round-robin order over slides, and an arm that assigns $m$ patches to a patient takes the first $m$ of them. Arms of the same draw therefore differ only in how deep into each patient's ordering they read, and a class's smaller allocation is always contained in its larger one.
+
+Every arm trains on the same total budget $T=K\cdot G\cdot 32=19{,}200$ patches for $K=30$ classes and $G=20$ patients, which is 32 patches per patient in the balanced arm. A ratio arm with imbalance ratio $\rho$ assigns the class at rank $k\in\{0,\dots,K-1\}$ the count
+\begin{equation}
+  N_k = N_0\,\rho^{-k/(K-1)},
+  \label{eq:profile}
+\end{equation}
+\noindent with $N_0$ chosen so that the counts sum to $T$, rounded to integers that keep the sum, at least one patch per patient, and at most $D$ per patient. This exponential profile is the allocator of the benchmark \citep{queisler2026benchmarkProtocol}. It moves the class prior and the tail support together: at $\rho=100$ the head class receives 2,843 patches, about 142 per patient, and the tail class 28, between one and two per patient. The assignment of classes to ranks is a random permutation drawn per split and draw, so each cancer type visits head, body, and tail across the 30 draws, and class difficulty averages out of the curve. Within a class, the count is spread as evenly as possible over its twenty patients.
+
+The native arm N gives each class its share of all training patches of the split, scaled to $T$, in the classes' own order and with the same twenty patients. Its counts range from about 95 to about 1,700 patches per class, and its realized ratio, the largest over the smallest class count, averages 18.1 over the 30 draws. Table~\ref{tab:arms} lists the arms.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Arm & Realized $\rho$ & Head class & Tail class & Tail per patient \\
+\midrule
+r1 & 1.0 & 640 & 640 & 32 \\
+r2 & 2.0 & 886 & 443 & 22.1 \\
+r5 & 5.0 & 1,278 & 256 & 12.8 \\
+r10 & 10.0 & 1,615 & 161 & 8.1 \\
+r20 & 19.9 & 1,973 & 99 & 5.0 \\
+r50 & 50.3 & 2,466 & 49 & 2.5 \\
+r100 & 101.5 & 2,843 & 28 & 1.4 \\
+N & 18.1 & $\approx$1,700 & $\approx$95 & $\approx$4.8 \\
+\bottomrule
+\end{tabular}
+\caption{All arms train on the same twenty patients per class and the same 19,200 patches; only the per-class share changes. Head and tail are the largest and smallest class counts in patches. The realized ratio is averaged over 30 split-draw pairs and departs from the nominal ratio only through integer rounding. The native arm N uses the training split's own class shares, so its extreme counts vary slightly between splits.}
+\label{tab:arms}
+\end{table}
+
+\noindent Each arm fits a multinomial logistic classifier whose regularization strength is selected from nine values between $10^{-6}$ and 100 by validation patient-macro balanced accuracy \citep{queisler2026patientShortage}. After selection, one temperature is fitted on the validation logits by minimizing their negative log-likelihood and applied to the test logits \citep{guo2017calibration}; it rescales confidence and leaves predictions unchanged. The study fits eight arms for each of 30 split-draw pairs, 240 classifiers in total, and every fit converged. Test data never entered selection or temperature fitting.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The primary endpoint is the \emph{damage} $\Delta(\rho)=\mathrm{BA}(1)-\mathrm{BA}(\rho)$, where BA is patient-macro balanced accuracy on the test partition, computed as the mean of per-class patch recalls in which every test patient of a class carries equal weight. Estimates are pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals. Prevalence counts as damaging at ratio $\rho$ if $\Delta(\rho)$ is at least one percentage point and its interval lies entirely above zero; the \emph{onset} is the smallest ratio of the grid that meets this criterion. The \emph{slope} is the least-squares slope of BA on $\log_2\rho$ per replicate, in points per doubling of $\rho$, computed over the whole grid and separately over $\rho\leq10$ and $\rho\geq10$.
+
+Probability quality is measured by two secondary endpoints, both with and without temperature scaling. The macro negative log-likelihood (NLL) averages the log-loss of the true class so that every test patient and every class carry equal weight; it depends on discrimination as well as calibration. The expected calibration error (ECE) compares top-label confidence with accuracy in ten fixed confidence bins, with patient weights. Both metrics are known to depend on the class distribution of the evaluation data \citep{mosquera2024classImbalance}; here that distribution is the same for all arms. Two diagnostics complete the evaluation. The recall of the head, body, and tail thirds of the classes, by their assigned rank, shows where the damage lands. The native arm is compared both with the balanced arm and with the ratio curve, interpolated linearly in $\rho$ at N's realized ratio.
+
+Three readings were fixed in advance. If $\Delta$ stays below one point up to $\rho=100$, prevalence alone is not a material deficit on this dataset at fixed patient support, and the imbalance damage of the benchmark must come from the factors bundled with it. If $\Delta$ crosses the threshold within the grid, the onset and slope locate the ratio from which a prevalence correction is worthwhile. If the native arm lies below the curve, the native order of the classes, which ties prevalence to specific cancer types, costs more than a random order.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}

@@ -105,18 +105,20 @@ def _realized_rho(config: dict[str, Any], arms: tuple[str, ...]) -> dict[str, fl
     }
 
 
-def _native_placement(
-    ba: dict[str, np.ndarray], rho: dict[str, float]
-) -> dict[str, float]:
-    """BA(N) - BA(r1), and the gap to the ratio curve interpolated at N's realized rho."""
+def _slope(ba: dict[str, np.ndarray], ratios: tuple[int, ...]) -> np.ndarray:
+    """OLS slope of BA on log2(r) per replicate, in pp per doubling of the nominal ratio."""
+    x = np.log2(ratios) - np.log2(ratios).mean()
+    y = np.stack([ba[f"r{r}"] for r in ratios])
+    return (x[:, None] * (y - y.mean(0))).sum(0) / (x**2).sum()
+
+
+def _native_gap(ba: dict[str, np.ndarray], rho: dict[str, float]) -> np.ndarray:
+    """BA(N) minus the ratio curve linearly interpolated at N's realized rho, per replicate."""
     xs = np.array([rho[f"r{r}"] for r in RATIOS])
-    ys = np.array([float(ba[f"r{r}"][0]) for r in RATIOS])
+    ys = np.stack([ba[f"r{r}"] for r in RATIOS])
     order = np.argsort(xs)
-    interpolated = float(np.interp(rho["N"], xs[order], ys[order]))
-    return {
-        "ba_N_minus_r1": float(ba["N"][0] - ba["r1"][0]),
-        "ba_N_minus_interpolated_curve": float(ba["N"][0]) - interpolated,
-    }
+    curve = np.array([np.interp(rho["N"], xs[order], col) for col in ys[order].T])
+    return ba["N"] - curve
 
 
 def _thirds(
@@ -149,67 +151,65 @@ def _thirds(
     return out
 
 
+def _band(ax: Any, xs: list[float], d: list[np.ndarray], fmt: str, **kw: Any) -> None:
+    """Point estimates joined by a line, with a shaded 95% percentile band over replicates."""
+    lo, hi = zip(*(np.percentile(v[1:], [2.5, 97.5]) for v in d))
+    ax.plot(xs, [v[0] for v in d], fmt, color="tab:blue", **kw)
+    ax.fill_between(xs, lo, hi, color="tab:blue", alpha=0.15, linewidth=0)
+
+
 def _figure(dists: dict[str, np.ndarray], rho: dict[str, float], dest: Path) -> None:
-    """3-panel BA/NLL/ECE vs log2(rho) curve; native arm as an off-axis marker, raw solid / TS dashed."""
+    """3-panel BA damage/NLL/ECE vs realized rho (log2 axis), 95% bands, native at its realized rho."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    xs = [np.log2(r) for r in RATIOS]
-    native_x = xs[-1] + 1.5
+    dists = dists | {f"ba_{a}": dists[f"arm_{a}"] - dists["arm_r1"] for a in ARMS}
+    xs = [float(np.log2(rho[f"r{r}"])) for r in RATIOS]
+    native_x = float(np.log2(rho["N"]))
     panels = (
-        ("BA (%)", "arm", None),
+        (r"BA change vs. $\rho$ = 1 (pp)", "ba", None),
         ("Macro NLL (nats)", "nll", "nll_ts"),
         ("ECE (pp)", "ece", "ece_ts"),
     )
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4), dpi=200)
+    fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), dpi=200)
     for ax, (label, raw_key, ts_key) in zip(axes, panels):
-        ax.plot(
-            xs,
-            [dists[f"{raw_key}_r{r}"][0] for r in RATIOS],
-            "o-",
-            color="tab:blue",
-            label="raw",
-        )
-        ax.scatter(
-            [native_x],
-            [dists[f"{raw_key}_N"][0]],
-            color="tab:red",
-            marker="D",
-            zorder=5,
-            label="N",
-        )
-        if ts_key is not None:
-            ax.plot(
-                xs,
-                [dists[f"{ts_key}_r{r}"][0] for r in RATIOS],
-                "o--",
-                color="tab:blue",
-                alpha=0.6,
-                label="TS",
-            )
-            ax.scatter(
+        keys = (raw_key,) if ts_key is None else (raw_key, ts_key)
+        for key, fmt, fill in zip(keys, ("o-", "o--"), ("tab:red", "none")):
+            name = "raw" if key == raw_key else "temperature-scaled"
+            _band(ax, xs, [dists[f"{key}_r{r}"] for r in RATIOS], fmt, label=name)
+            native = dists[f"{key}_N"]
+            ax.errorbar(
                 [native_x],
-                [dists[f"{ts_key}_N"][0]],
-                facecolors="none",
-                edgecolors="tab:red",
-                marker="D",
+                [native[0]],
+                yerr=[
+                    [native[0] - np.percentile(native[1:], 2.5)],
+                    [np.percentile(native[1:], 97.5) - native[0]],
+                ],
+                fmt="D",
+                color="tab:red",
+                mfc=fill,
+                zorder=5,
+                label=f"native ({name})" if ts_key else "native",
             )
-        ax.axvline(native_x - 0.75, linestyle=":", color="gray", linewidth=0.8)
-        ax.set_xlabel(r"$\log_2(\rho)$")
+        ax.set_xticks(xs, [str(r) for r in RATIOS])
+        ax.set_xlabel(r"Imbalance ratio $\rho$ (log scale)")
         ax.set_ylabel(label)
-        ax.legend(fontsize=8)
-    fig.suptitle(f"Prevalence curve (realized $\\rho_N$ = {rho['N']:.1f})")
+        ax.legend(fontsize=7)
     fig.tight_layout()
     fig.savefig(dest)
     plt.close(fig)
 
 
 def _combine(
-    ba: dict[str, np.ndarray], secondary: dict[str, np.ndarray]
+    ba: dict[str, np.ndarray], secondary: dict[str, np.ndarray], rho: dict[str, float]
 ) -> dict[str, np.ndarray]:
-    """Arm-prefixed BA distributions, secondary metrics, and r-vs-r1 contrasts."""
+    """Arm-prefixed BA, secondary metrics, r-vs-r1 contrasts, curve slopes, native gap."""
     dists = {f"arm_{arm}": d for arm, d in ba.items()} | secondary
     for r in RATIOS[1:]:
         dists[f"arm_r{r}_minus_r1"] = ba[f"r{r}"] - ba["r1"]
     dists["arm_N_minus_r1"] = ba["N"] - ba["r1"]
+    dists["arm_N_minus_curve"] = _native_gap(ba, rho)
+    dists["slope_all"] = _slope(ba, RATIOS)
+    dists["slope_r1_r10"] = _slope(ba, RATIOS[:4])
+    dists["slope_r10_r100"] = _slope(ba, RATIOS[3:])
     return dists
 
 
@@ -224,16 +224,12 @@ def run_analyze(config: dict[str, Any]) -> Path:
         fit_split, N_DRAWS, n_replicates, np.random.default_rng(BOOTSTRAP_SEED)
     )
     ba = {arm: pooled(a, w) for arm, a in acc.items()}
-    dists = _combine(ba, {key: pooled(a, w) for key, a in dist.items()})
-    path = _write_analysis(config, acc, fit_split, dists)
     rho = _realized_rho(config, ARMS)
+    dists = _combine(ba, {key: pooled(a, w) for key, a in dist.items()}, rho)
+    path = _write_analysis(config, acc, fit_split, dists)
     write_json(
         path.with_name("diagnostics.json"),
-        {
-            "realized_rho": rho,
-            **_native_placement(ba, rho),
-            "rank_recall": _thirds(config, ARMS, names),
-        },
+        {"realized_rho": rho, "rank_recall": _thirds(config, ARMS, names)},
     )
     _figure(dists, rho, output_root(config) / "figures" / "prevalence_curve.pdf")
     return path

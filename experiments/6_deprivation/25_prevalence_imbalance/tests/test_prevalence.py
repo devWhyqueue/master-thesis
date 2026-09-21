@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -10,6 +11,7 @@ from centre.cohort import patient_rows
 from imbalance_benchmark.manifest.statistics import achieved_rho
 
 from prevalence import ARMS, BALANCED, DEPTH, G, RATIOS
+from prevalence.analyze import _native_gap, _slope
 from prevalence.fit import class_counts, class_permutation, _patient_counts
 
 N_CLASSES = 7  # BRACS-sized
@@ -97,3 +99,12 @@ def test_per_patient_split_sums_to_class_total_for_every_arm() -> None:
             per_patient = _patient_counts(total)
             assert sum(per_patient) == total
             assert all(0 <= m <= DEPTH for m in per_patient)
+
+
+def test_slope_and_native_gap_recover_log_linear_curve() -> None:
+    """A curve exactly linear in log2(r) gives its slope, and N on that curve gives zero gap."""
+    ba = {f"r{r}": np.full(3, 70.0 - 0.5 * np.log2(r)) for r in RATIOS}
+    rho = {f"r{r}": float(r) for r in RATIOS} | {"N": 20.0}
+    ba["N"] = np.full(3, float(np.interp(20.0, RATIOS, [b[0] for b in ba.values()])))
+    np.testing.assert_allclose(_slope(ba, RATIOS), -0.5)
+    np.testing.assert_allclose(_native_gap(ba, rho), 0.0, atol=1e-12)
