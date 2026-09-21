@@ -1,0 +1,77 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Prevalence Alone Costs Several Points on BRACS}
+\author{Yannik Queisler}
+\date{September 22, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent In a long-tailed training set, the rare classes usually receive both a smaller share of the patches and fewer patients. This report isolates the first factor, class prevalence, at fixed patient support on BRACS, a seven-class breast-lesion task, and repeats the design of the TCGA-UT study of this series. A multinomial logistic classifier on frozen Virchow2 features is trained on the same ten patients per lesion class and the same total of 2,240 patches in every arm; only the share of the budget that each class receives changes, following an exponential long-tail profile with imbalance ratio $\rho$ from 1 to 100 and a random class order per draw. A further arm uses the classes' native training shares, which realize $\rho=6.7$. On BRACS, prevalence damages balanced accuracy early and steadily: the loss is 1.15 percentage points already at $\rho=2$ (95\% interval: 0.14 to 2.35), which meets the one-point threshold, 4.02 points at $\rho=10$ (2.50 to 5.66), and 7.65 points at $\rho=100$ (5.77 to 9.78), from a balanced level of 39.57 percent. The loss per doubling of $\rho$ is about 1.15 points over the whole grid and does not accelerate. At $\rho=100$ the two tail classes fall from 38.7 to 7.3 percent recall. The native allocation costs 4.05 points (2.69 to 5.57), as much as the patient-count gap between five and twenty patients on this dataset, and lies on the ratio curve. Raw probability quality collapses, with macro negative log-likelihood rising from 1.56 to 7.01 nats at $\rho=100$, but a single validation temperature removes 96 percent of that increase and 92 percent of the increase in expected calibration error. On BRACS, prevalence at fixed patient support is therefore a material source of discrimination loss from the mildest imbalance on, whereas its calibration damage is again mostly a matter of scale.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The benchmark of this series found that severe class imbalance damages balanced accuracy on BRACS by 4.30 to 13.23 percentage points, depending on which classes form the tail, and that validation temperature scaling removes most of the accompanying differences in probability quality \citep{queisler2026benchmarkResults,queisler2026benchmarkProtocol}. As on TCGA-UT, these numbers bundle several factors: each imbalanced condition changed class prevalence and the patients behind each class at the same time, only three allocations were measured, and the classifier was a two-layer perceptron. The TCGA-UT study of this series separated prevalence from those factors and found a slow, accelerating loss that reaches one point only at $\rho\approx20$ and stays below three points at $\rho=100$ \citep{queisler2026prevalenceTcga}. That result does not transfer automatically. BRACS has seven lesion classes instead of 30 cancer types, several of them lie on a morphological continuum from benign to malignant, and balanced accuracy on the same features is about 40 instead of 72 percent \citep{queisler2026bracsMechanism}. Heavily overlapping classes make the decision boundaries more sensitive to the class prior.
+
+This report therefore asks the TCGA-UT question on BRACS: \emph{how fast do balanced accuracy, negative log-likelihood, and calibration error degrade as the training class distribution moves from balanced to long-tailed, when the patients of every class and the total patch budget stay fixed, and where does the dataset's native distribution lie on that curve?} The design, endpoints, and pre-stated readings follow the TCGA-UT study, with one deviation in the number of patients per class that the BRACS patient pool forces. Patient shortage and patch shortage per class remain outside the design.
+
+\section{Design}
+\label{sec:design}
+The study uses the seven BRACS lesion subtypes, from normal tissue (N) through pathological benign (PB), usual ductal hyperplasia (UDH), flat epithelial atypia (FEA), atypical ductal hyperplasia (ADH), and ductal carcinoma in situ (DCIS) to invasive carcinoma (IC). Features are frozen 2,560-dimensional Virchow2 embeddings of $256\times256$ patches \citep{zimmermann2024virchow2}. The three fixed patient-disjoint splits of the benchmark each hold about 103 training, 24 validation, and 24 test patients, and each split is drawn ten times. Validation and test partitions keep their natural class distribution. In each draw, $G$ patients per class are sampled from those with at least $D=160$ training patches, and the same patients enter every arm of the draw. Each patient's patches follow one fixed round-robin order over slides, and an arm that assigns $m$ patches to a patient takes the first $m$ of them, so a class's smaller allocation is always contained in its larger one.
+
+The TCGA-UT study used $G=20$. On BRACS, only 10 to 13 ADH patients per training split reach the depth of 160 patches, so this study uses $G=10$ for every class and keeps the depth, which the most extreme head allocation needs. Every arm trains on the same total budget $T=K\cdot G\cdot 32=2{,}240$ patches for $K=7$ classes, which is 32 patches per patient in the balanced arm, as on TCGA-UT. A ratio arm with imbalance ratio $\rho$ assigns the class at rank $k\in\{0,\dots,K-1\}$ the count
+\begin{equation}
+  N_k = N_0\,\rho^{-k/(K-1)},
+  \label{eq:profile}
+\end{equation}
+\noindent with $N_0$ chosen so that the counts sum to $T$, rounded to integers that keep the sum, at least one patch per patient, and at most $D$ per patient. This exponential profile is the allocator of the benchmark \citep{queisler2026benchmarkProtocol}. It moves the class prior and the tail support together: at $\rho=100$ the head class receives 1,206 patches, about 121 per patient, and the tail class 12, between one and two per patient. With only seven classes, neighbouring ranks differ by a factor of $\rho^{1/6}$, which is 2.15 at $\rho=100$, against 1.17 for the 30 classes of TCGA-UT. The assignment of classes to ranks is a random permutation drawn per split and draw, so each lesion class visits head, body, and tail across the 30 draws. Within a class, the count is spread as evenly as possible over its ten patients.
+
+The native arm N gives each class its share of all training patches of the split, scaled to $T$, in the classes' own order and with the same ten patients. IC, PB, and DCIS receive between 431 and 750 patches, whereas N, ADH, FEA, and UDH receive between 90 and 188, and the realized ratio averages 6.7 over the 30 draws. Table~\ref{tab:arms} lists the arms.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Arm & Realized $\rho$ & Head class & Tail class & Tail per patient \\
+\midrule
+r1 & 1.0 & 320 & 320 & 32 \\
+r2 & 2.0 & 441 & 220 & 22.0 \\
+r5 & 5.0 & 622 & 124 & 12.4 \\
+r10 & 9.9 & 766 & 77 & 7.7 \\
+r20 & 20.2 & 908 & 45 & 4.5 \\
+r50 & 49.3 & 1,084 & 22 & 2.2 \\
+r100 & 100.5 & 1,206 & 12 & 1.2 \\
+N & 6.7 & 625--750 & 90--115 & 9.0--11.5 \\
+\bottomrule
+\end{tabular}
+\caption{All arms train on the same ten patients per class and the same 2,240 patches; only the per-class share changes. Head and tail are the largest and smallest class counts in patches. The realized ratio is averaged over 30 split-draw pairs and departs from the nominal ratio only through integer rounding. The native arm N uses the training split's own class shares, so its extreme counts differ between the three splits; the ranges span them.}
+\label{tab:arms}
+\end{table}
+
+\noindent Each arm fits a multinomial logistic classifier whose regularization strength is selected from nine values between $10^{-6}$ and 100 by validation patient-macro balanced accuracy \citep{queisler2026patientShortage}. After selection, one temperature is fitted on the validation logits by minimizing their negative log-likelihood and applied to the test logits \citep{guo2017calibration}; it rescales confidence and leaves predictions unchanged. The study fits eight arms for each of 30 split-draw pairs, 240 classifiers in total, and every fit converged. Test data never entered selection or temperature fitting.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoints are those of the TCGA-UT study \citep{queisler2026prevalenceTcga}. The primary endpoint is the \emph{damage} $\Delta(\rho)=\mathrm{BA}(1)-\mathrm{BA}(\rho)$, where BA is patient-macro balanced accuracy on the test partition, computed as the mean of per-class patch recalls in which every test patient of a class carries equal weight. Estimates are pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals. Prevalence counts as damaging at ratio $\rho$ if $\Delta(\rho)$ is at least one percentage point and its interval lies entirely above zero; the \emph{onset} is the smallest ratio of the grid that meets this criterion. The \emph{slope} is the least-squares slope of BA on $\log_2\rho$ per replicate, in points per doubling of $\rho$, over the whole grid and separately over $\rho\leq10$ and $\rho\geq10$.
+
+Probability quality is measured by the macro negative log-likelihood (NLL), which averages the log-loss of the true class with equal weight for every test patient and class, and by the expected calibration error (ECE) of the top-label confidence in ten fixed bins with patient weights, both with and without temperature scaling. Both depend on the class distribution of the evaluation data \citep{mosquera2024classImbalance}, which is the same for all arms. With about 24 test patients per split, the ECE of BRACS is estimated much less precisely than on TCGA-UT. Two diagnostics complete the evaluation. The recall of the head, body, and tail classes by assigned rank shows where the damage lands; with seven classes, these groups hold three, two, and two classes. The native arm is compared with the balanced arm and with the ratio curve, interpolated linearly in $\rho$ at N's realized ratio.
+
+The three readings fixed in advance are those of the TCGA-UT study. If $\Delta$ stays below one point up to $\rho=100$, prevalence alone is not a material deficit on BRACS at fixed patient support. If $\Delta$ crosses the threshold within the grid, the onset and slope locate the ratio from which a prevalence correction is worthwhile. If the native arm lies below the curve, the native order of the classes, which ties prevalence to specific lesion types, costs more than a random order.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}

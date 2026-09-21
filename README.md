@@ -13,8 +13,8 @@ flowchart TD
     S5["<b>5 · Explain the damage</b><br/>Few patients estimate the class<br/>distribution moments badly:<br/>centre error ~3/4, directions ~1/4<br/><i>exp. 16–18</i>"]
     S6["<b>6 · Confirm the hard limit</b><br/>Cohort-only moment repairs close<br/>at most ~15% of the 5→20 gap,<br/>none on BRACS; missing patient<br/>directions need more patients<br/><i>exp. 19–24</i>"]
 
-    S7["<b>7 · Split the deprivations: prevalence</b><br/>Fixed patients and budget: BA loses<br/>1 pp at ρ≈20, 2.9 pp at ρ=100 (TCGA-UT);<br/>temperature scaling repairs calibration<br/><i>exp. 25</i>"]
-    N1["<b>Next · Split the deprivations</b><br/>One small experiment per deprivation<br/>(patch / patient / difficulty shortage,<br/>BRACS prevalence),<br/>one factor varied at a time; measure<br/>damage to baseline CE only"]
+    S7["<b>7 · Split the deprivations: prevalence</b><br/>Fixed patients and budget: BA loses<br/>1 pp at ρ≈20, 2.9 pp at ρ=100 (TCGA-UT),<br/>1 pp at ρ=2, 7.7 pp at ρ=100 (BRACS);<br/>temperature scaling repairs calibration<br/><i>exp. 25–26</i>"]
+    N1["<b>Next · Split the deprivations</b><br/>One small experiment per deprivation<br/>(patch / patient / difficulty shortage),<br/>one factor varied at a time; measure<br/>damage to baseline CE only"]
 
     S1 --> S2 --> S3 --> S4 -- "residual gap" --> S5 --> S6
     S2 -. "refactor" .-> S7 --> N1
