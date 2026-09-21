@@ -13,10 +13,15 @@ flowchart TD
     S5["<b>5 · Explain the damage</b><br/>Few patients estimate the class<br/>distribution moments badly:<br/>centre error ~3/4, directions ~1/4<br/><i>exp. 16–18</i>"]
     S6["<b>6 · Confirm the hard limit</b><br/>Cohort-only moment repairs close<br/>at most ~15% of the 5→20 gap,<br/>none on BRACS; missing patient<br/>directions need more patients<br/><i>exp. 19–24</i>"]
 
+    N1["<b>Next · Split the deprivations</b><br/>One small experiment per deprivation<br/>(patch / patient / difficulty shortage),<br/>one factor varied at a time; measure<br/>damage to baseline CE only"]
+
     S1 --> S2 --> S3 --> S4 -- "residual gap" --> S5 --> S6
+    S2 -. "refactor" .-> N1
 
     classDef done fill:#e8f1fb,stroke:#3b6ea5,stroke-width:1px,color:#13293d;
+    classDef next fill:#fff6e0,stroke:#c08a1e,stroke-width:1px,stroke-dasharray:4 3,color:#3d2a06;
     class S1,S2,S3,S4,S5,S6 done;
+    class N1 next;
 ```
 
 Per-experiment questions and results: [`experiments/AGENTS.md`](experiments/AGENTS.md).
