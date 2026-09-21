@@ -1,0 +1,109 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Within-Patient Directions Locate the Missing Patient Span\\but Recover Only a Sixth of the Whitening Headroom}
+\author{Yannik Queisler}
+\date{September 21, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Whitening along the between-patient eigenbasis of a five-patient cohort recovers 2.26 points on TCGA-UT, while whitening along the training pool's basis recovers 4.92. The preceding study attributed almost all of this difference to directions the cohort cannot see: its rank-120 basis holds 70 percent of the pool's between-patient variance, and correcting the cohort's eigenvalues is worth only 0.08 points. This report asks whether the patch residuals of the same patients reveal the missing directions that their means cannot. The cohort's between-patient covariance is extended by its within-patient patch covariance projected off the cohort basis, with the added trace set to a fraction $s\in\{0.1,0.3,1,3\}$ of the between-patient trace and $s$ tuned on validation; a control keeps the same added eigenvalues but places them on random directions in the same complement. A pre-fit check confirms that the within-patient complement locates the missing span: its leading 120 directions hold 14.2 percent of the pool's between-patient variance, against 20.3 percent for the best 120-dimensional subspace of the complement and 1.5 percent for random directions. The accuracy gain is much smaller. On TCGA-UT the tuned arm gains 0.45 points over cohort whitening at five patients (95\% interval: 0.27 to 0.63), which is 17 percent of the 2.66-point gap to pool-basis whitening and fails the prespecified one-point criterion; the gain is direction-specific, since the random control gains 0.02 points, and it vanishes at ten and twenty patients. On BRACS the tuned arm gains 0.45 points ($-0.35$ to 1.21), not distinguishable from zero. Reaching the missing span is therefore not sufficient. The within-patient directions cover most of it, but they weight it by patch-level rather than patient-level variance, and the cohort offers no estimate of the latter along those directions.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Three cohort-only remedies for patient shortage stop near the same ceiling on TCGA-UT. Whitening the features along the eigenbasis of the cohort's own between-patient covariance gains 2.26 percentage points at five patients per class \citep{queisler2026patientDirections}, directional shrinkage of the class centres along the same basis gains 1.29 points \citep{queisler2026directionalShrinkage}, and training against the class-centre uncertainty built from that covariance gains 2.34 points \citep{queisler2026centreUncertainty}. Whitening along the between-patient basis of the full training pool gains 4.92 points at the same patient count, but it reads all training patients and is a mechanism reference rather than a remedy \citep{queisler2026patientDirections}.
+
+\citet{queisler2026spectrumRegularization} split the 2.66-point gap between cohort-basis and pool-basis whitening into two parts. Replacing the cohort's eigenvalues by the pool's between-patient variance along the same directions gains 0.08 points; the remaining 2.58 points belong to directions outside the cohort basis. That basis has rank at most $C(G-1)$, which is 120 on TCGA-UT at five patients, and it holds 70 percent of the pool's between-patient variance. The same study found that whitening along the top within-patient principal components of matched rank performs as well as cohort whitening, and that the two subspaces overlap by 0.45, ten times the random expectation. Patch-level variation within patients and the directions along which patient means differ are therefore partly the same directions.
+
+This observation suggests a cohort-only way to widen the basis. The cohort's patient means give only $C(G-1)$ degrees of freedom, but its patch residuals around those means give $CG(m-1)$, where $m$ is the number of patches per patient; at five patients with 32 patches this is 4,650 on TCGA-UT, more than the feature dimension. If the within-patient covariance has high variance along the between-patient directions that the cohort's means miss, it can supply those directions without any extra patient. Adding a second covariance to an unstable one follows the idea of regularized discriminant analysis, which blends class covariances with a pooled covariance through one mixing weight \citep{friedman1989rda}, and of linear shrinkage toward a structured target \citep{ledoit2004wellconditioned}. Here the target is not chosen for conditioning but because it may point along the missing patient directions.
+
+The question is therefore: \emph{do the patch residuals of the same $G$ patients reveal between-patient directions that their $G$ patient means cannot, so that adding them to the cohort basis recovers part of the pool-basis whitening headroom?} Cohort whitening hosts the test, as in \citet{queisler2026spectrumRegularization}. The answer is judged at five patients per class, separately on each dataset, against the one-point practical threshold of this series. A random-direction control with the same added eigenvalues separates a gain from the specific directions from a gain from contracting more of the feature space.
+
+\section{Estimator model}
+\label{sec:model}
+Write the patch features of class $c$ as $\mathbf x_{ik}=\boldsymbol\mu_c+\mathbf u_i+\mathbf e_{ik}$, with class centre $\boldsymbol\mu_c$, patient offset $\mathbf u_i$, and within-patient residual $\mathbf e_{ik}$ \citep{queisler2026centreError}. A cohort of $G$ patients per class estimates the between-patient covariance by pooling the deviations of its patient means $\mathbf m_{ci}$ from their class means over all $C$ classes,
+\begin{equation}
+  \hat{\boldsymbol\Sigma}_B=\frac{1}{C(G-1)}\sum_{c=1}^{C}\sum_{i=1}^{G}(\mathbf m_{ci}-\hat{\boldsymbol\mu}_c)(\mathbf m_{ci}-\hat{\boldsymbol\mu}_c)^\top
+  =\mathbf U^\top\operatorname{diag}(\boldsymbol\lambda)\,\mathbf U ,
+  \label{eq:cov}
+\end{equation}
+\noindent where the $r_B\leq C(G-1)$ rows of $\mathbf U$ are the eigenvectors with non-negligible eigenvalues $\boldsymbol\lambda$. Cohort whitening transforms every feature vector by
+\begin{equation}
+  \mathbf x\mapsto\mathbf x\bigl(\mathbf I+\kappa\,\mathbf B^\top\operatorname{diag}(\boldsymbol\nu)\,\mathbf B\bigr)^{-1/2},
+  \label{eq:whiten}
+\end{equation}
+\noindent with basis $\mathbf B=\mathbf U$ and spectrum $\boldsymbol\nu=\boldsymbol\lambda$; the transform shrinks the component along each basis row $\mathbf b_j$ by $(1+\kappa\nu_j)^{-1/2}$ and leaves the orthogonal complement unchanged \citep{queisler2026patientDirections}.
+
+The within-patient covariance is formed from the patch deviations around each patient's own mean, $\mathbf x_{ik}-\mathbf m_{ci}$, pooled over all patients and classes. Let $\mathbf P_\perp=\mathbf I-\mathbf U^\top\mathbf U$ project off the cohort basis. The eigen-decomposition of the projected within-patient covariance,
+\begin{equation}
+  \mathbf P_\perp\hat{\boldsymbol\Sigma}_W\mathbf P_\perp=\mathbf V^\top\operatorname{diag}(\boldsymbol\omega)\,\mathbf V ,
+  \label{eq:within}
+\end{equation}
+\noindent gives the \emph{within-patient complement}: orthonormal directions $\mathbf V$ that are orthogonal to $\mathbf U$ by construction, ordered by the patch-level variance $\boldsymbol\omega$ along them. Its rank is at most $\min\{d-r_B,\,CG(m-1)\}$, which fills the whole complement of the cohort basis on TCGA-UT and reaches about a thousand directions on BRACS. The expanded covariance adds this complement to the cohort's between-patient covariance at a controlled total size,
+\begin{equation}
+  \hat{\boldsymbol\Sigma}_s=\hat{\boldsymbol\Sigma}_B+s\,\tau\,\mathbf P_\perp\hat{\boldsymbol\Sigma}_W\mathbf P_\perp,
+  \qquad
+  \tau=\frac{\operatorname{tr}\hat{\boldsymbol\Sigma}_B}{\operatorname{tr}\bigl(\mathbf P_\perp\hat{\boldsymbol\Sigma}_W\mathbf P_\perp\bigr)} .
+  \label{eq:expanded}
+\end{equation}
+\noindent The normalization $\tau$ makes the added trace equal to $s\operatorname{tr}\hat{\boldsymbol\Sigma}_B$, so $s$ is the size of the added part relative to the between-patient part, independent of the scale of the patch residuals. The added directions keep their own relative eigenvalues $\boldsymbol\omega$, and the cohort block keeps the cohort spectrum $\boldsymbol\lambda$ unchanged, because \citet{queisler2026spectrumRegularization} found that flattening the cohort spectrum costs 0.92 points. The expanded arm whitens by Equation~\ref{eq:whiten} with $\mathbf B=[\mathbf U;\mathbf V]$ and $\boldsymbol\nu=[\boldsymbol\lambda;\,s\tau\boldsymbol\omega]$. With $s=0$ it reduces to cohort whitening.
+
+The \emph{random-complement control} replaces $\mathbf V$ by the same number of random orthonormal directions orthogonal to $\mathbf U$ and keeps the eigenvalues $s\tau\boldsymbol\omega$ in the same order. It contracts the same total amount of variance, spread with the same profile, in the same complement, but along directions that carry no information from the data. A gain of the within-patient arm over this control is therefore a gain from the specific directions, not from contracting more dimensions. On TCGA-UT the random directions span the same complement as $\mathbf V$ and differ only in which directions receive the large eigenvalues.
+
+One further detail keeps the comparison with cohort whitening fair. The scale $\kappa$ is tuned as a grid factor divided by the mean eigenvalue \citep{queisler2026patientDirections}. Appending many small eigenvalues lowers the mean and would therefore whiten the cohort block harder at the same factor. The grid factors are rescaled by the ratio of the expanded mean eigenvalue to the cohort mean eigenvalue, so that every factor applies the same $\kappa$ to the cohort block as it does in cohort whitening, and only the added block changes with $s$.
+
+\section{Design}
+\label{sec:design}
+The study keeps the setting of \citet{queisler2026centreError} on TCGA-UT and of \citet{queisler2026bracsMechanism} on BRACS. TCGA-UT contributes 30 cancer types and BRACS its seven lesion classes, both with frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three fixed patient-disjoint splits, and multinomial logistic regression whose regularization strength is selected on validation patient-macro balanced accuracy. For each split and each of ten draws, twenty eligible patients per class are sampled, and nested cohorts of five patients with 32 patches, ten with sixteen, and twenty with eight are formed, so every classifier trains on 160 patches per class at a single patient count for all classes. No additional patients, labels, features, or foundation models enter, and the reused arms are the exact fits of the source studies on the same cohorts, so every contrast is paired draw by draw.
+
+A pre-fit gate tested whether the within-patient complement locates the missing span at all, before any classifier was fitted. On split 0, for ten draws at five patients, it measured the share of the pool's between-patient variance that lies in the span of the first $k$ complement directions, for $k\in\{r_B,2r_B,4r_B,8r_B\}$, and compared it with $k$ random complement directions and with the best $k$-dimensional subspace of the complement, which consists of the leading eigenvectors of $\mathbf P_\perp\boldsymbol\Sigma_{\text{pool}}\mathbf P_\perp$. The gate fraction $f=(W-\text{random})/(\text{oracle}-\text{random})$ is zero for directions no better than random and one for the best possible directions. The rule fixed in advance was to skip all fits if $f<0.1$ at every $k$.
+
+Ten new arm families enter at each $G\in\{5,10,20\}$ (Table~\ref{tab:arms}). Every fitted arm whitens by Equation~\ref{eq:whiten} with its expanded basis and spectrum and then fits an ordinary multinomial logistic classifier on the transformed features. It tunes the scale factor $\kappa\in\{0.1,1,10,100\}$, rescaled as described in Section~\ref{sec:model}, jointly with the regularization strength on validation patient-macro balanced accuracy, with the grid and tie rules of \citet{queisler2026patientDirections}. The tuned families Wt and Rt fit nothing of their own. For each fit they read the validation score that each fixed-$s$ arm reached at its selected $\kappa$, add the score of the reused cohort-whitening fit as the $s=0$ candidate, and copy the winning record. Ties go to the larger $s$. The random directions are drawn from a generator seeded by split, draw, and patient count, so the control is reproducible and differs between cohorts.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+Arm & Added directions & Added trace & Role \\
+\midrule
+R$G$ & --- & --- & Ordinary fit on the real cohort (reused) \\
+C$G$ & --- & --- & Cohort with pool class centres (reused headroom reference) \\
+RWc$G$ & none & $0$ & Cohort whitening, the host remedy and $s=0$ (reused) \\
+RW$G$ & pool basis & pool & Pool-basis whitening (reused mechanism reference) \\
+Wa$G$--Wd$G$ & within-patient $\mathbf V$ & $s\in\{0.1,0.3,1,3\}$ & Expanded cohort whitening, Equation~\ref{eq:expanded} \\
+Wt$G$ & within-patient $\mathbf V$ & tuned & $s$ selected on validation from $\{0,0.1,0.3,1,3\}$ \\
+Ra$G$--Rd$G$ & random, $\perp\mathbf U$ & $s\in\{0.1,0.3,1,3\}$ & Direction-specificity control, same eigenvalues \\
+Rt$G$ & random, $\perp\mathbf U$ & tuned & Control with $s$ selected like Wt \\
+\bottomrule
+\end{tabularx}
+\caption{The W and R families keep the cohort basis and its spectrum and add directions orthogonal to it; they differ from each other only in which directions carry the added eigenvalues. R$G$ and C$G$ bracket the pool-centre headroom; RWc$G$ and RW$G$ bracket what whitening achieves from the cohort and from all training patients. RW$G$ reads the training pool and is not a remedy.}
+\label{tab:arms}
+\end{table}
+
+\noindent The eigen-decompositions are computed once per cohort and patient count and shared by the arms that use them. Per dataset, the study fits eight families at four scale factors for each of three patient counts and 30 split-draw pairs, that is 2,880 whitened fits, each tuning nine regularization values; the tuned families add no fit. Selections were written to disk before any test prediction, and test accuracy never entered selection.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates, so every contrast is paired, and intervals are 95 percent percentile intervals.
+
+The primary contrast is Wt5$-$RWc5, read separately on each dataset. The within-patient complement counts as a practical success on a dataset if the estimated gain over cohort whitening is at least one percentage point and its paired interval lies entirely above zero. The specificity contrast is Wt5$-$Rt5. The \emph{headroom share} $(\mathrm{Wt}G-\mathrm{RWc}G)/(\mathrm{RW}G-\mathrm{RWc}G)$ states how much of the gap between cohort-basis and pool-basis whitening the added directions close. As in the preceding reports, the recovery $(\mathrm{Wt}G-\mathrm RG)/(\mathrm CG-\mathrm RG)$ of the pool-centre headroom is reported at five and ten patients, and the \emph{gap share} $1-(\mathrm{Wt}20-\mathrm{Wt}5)/(\mathrm R20-\mathrm R5)$ states how much of the five-to-twenty patient gap the arm removes.
+
+Three diagnostics, computed after fitting, relate accuracy to the span. The \emph{captured share} is the fraction of the pool's between-patient variance in the span of the top $k$ eigenvectors of the selected $\hat{\boldsymbol\Sigma}_s$, for $k\in\{r_B,2r_B,4r_B,8r_B\}$; with $s=0$ it equals the cohort basis's share for every $k$. The \emph{added overlap} is the subspace overlap $\lVert\mathbf A\mathbf Q^\top\rVert_F^2/r_B$ between the first $r_B$ added directions $\mathbf A$ and the top $r_B$ pool directions $\mathbf Q$ \citep{queisler2026spectrumRegularization}. Finally, the per-draw correlation between the gain in captured share and the accuracy gain Wt$-$RWc asks whether draws that capture more of the pool also gain more. Three readings were fixed in advance. Wt$\gg$RWc together with Wt$\gg$Rt would mean that the patch residuals supply patient directions the means miss. Wt$\approx$Rt$\gg$RWc would mean that contracting more dimensions helps regardless of direction. Wt$\approx$RWc despite a passed gate would mean that locating the missing span is not sufficient.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
