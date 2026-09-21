@@ -1,0 +1,92 @@
+\section{Results}
+\label{sec:results}
+The results follow the argument: the accuracy ladder from cohort whitening to pool-basis whitening, the contrasts that separate weights from directions, and the diagnostics that explain them.
+
+\subsection{Accuracy ladder}
+\label{sec:ladder-results}
+Oracle weights do not lift the within-patient directions on either dataset (Table~\ref{tab:ladder}). On TCGA-UT the oracle-weighted arm Wo5 reaches 65.18 percent, 0.44 points above cohort whitening (0.27 to 0.61) and 0.01 points below the patch-weighted arm Wt5 of the preceding study ($-0.11$ to 0.10). The primary contrast is therefore zero to within 0.11 points, far from the one-point threshold. Wo5 closes a share of 0.166 (0.107 to 0.228) of the 2.66-point gap between cohort-basis and pool-basis whitening, the same as the 0.169 of Wt5. On BRACS the point estimates are the same order: Wo5 gains 0.32 points over cohort whitening ($-0.31$ to 0.94) and lies 0.13 points below Wt5 ($-0.73$ to 0.42), with a share of 0.106 ($-0.126$ to 0.324) of the 3.01-point gap.
+
+The pool's own complement directions behave entirely differently. Po5 reaches 66.86 percent on TCGA-UT, 2.12 points above cohort whitening (1.78 to 2.46) and 1.67 points above Wo5 (1.37 to 1.99), and closes a share of 0.796 (0.714 to 0.880) of the gap. On BRACS it gains 2.33 points over cohort whitening (0.97 to 3.88), 2.01 over Wo5 (0.74 to 3.38), with a share of 0.773 (0.482 to 1.031). Po5 stays below the full pool-basis whitening RW5 by 0.54 points on TCGA-UT (0.31 to 0.77) and by 0.68 on BRACS ($-0.08$ to 1.62), so the sign is the expected one and the cost of keeping the cohort block and spectrum is small.
+
+The random directions with oracle weights, Ro5, gain 0.02 points on TCGA-UT ($-0.00$ to 0.05) and 0.05 on BRACS ($-0.02$ to 0.21), the same as the random control of the preceding study. Oracle weighting alone therefore does nothing, and the 0.42-point advantage of the within-patient directions over random ones persists: Wo5$-$Ro5 is 0.42 points on TCGA-UT (0.26 to 0.59) and 0.27 on BRACS ($-0.35$ to 0.88).
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+ & TCGA-UT & BRACS \\
+\midrule
+Cohort whitening (RWc5) & 64.74 [63.52, 65.90] & 36.49 [33.87, 39.24] \\
+Patch-level weights (Wt5) & 65.19 [63.95, 66.34] & 36.94 [34.39, 39.48] \\
+Oracle weights, within-patient (Wo5) & 65.18 [63.94, 66.32] & 36.81 [34.18, 39.46] \\
+Oracle weights, random (Ro5) & 64.76 [63.53, 65.93] & 36.54 [33.89, 39.26] \\
+Best complement directions (Po5) & 66.86 [65.62, 67.99] & 38.82 [36.10, 41.27] \\
+Pool-basis whitening (RW5) & 67.40 [66.14, 68.52] & 39.50 [36.82, 41.98] \\
+\addlinespace
+Wo5 $-$ RWc5 & 0.44 [0.27, 0.61] & 0.32 [$-$0.31, 0.94] \\
+\textbf{Wo5 $-$ Wt5} & $\mathbf{-0.01}$ [$-$0.11, 0.10] & $\mathbf{-0.13}$ [$-$0.73, 0.42] \\
+Wo5 $-$ Ro5 & 0.42 [0.26, 0.59] & 0.27 [$-$0.35, 0.88] \\
+Po5 $-$ Wo5 & 1.67 [1.37, 1.99] & 2.01 [0.74, 3.38] \\
+Po5 $-$ RWc5 & 2.12 [1.78, 2.46] & 2.33 [0.97, 3.88] \\
+RW5 $-$ Po5 & 0.54 [0.31, 0.77] & 0.68 [$-$0.08, 1.62] \\
+\addlinespace
+Headroom share, Wt5 & 0.169 [0.105, 0.231] & 0.149 [$-$0.140, 0.391] \\
+Headroom share, Wo5 & 0.166 [0.107, 0.228] & 0.106 [$-$0.126, 0.324] \\
+Headroom share, Ro5 & 0.007 [$-$0.001, 0.018] & 0.015 [$-$0.009, 0.077] \\
+Headroom share, Po5 & 0.796 [0.714, 0.880] & 0.773 [0.482, 1.031] \\
+\bottomrule
+\end{tabular}
+\caption{Correct weights leave the within-patient directions where they were, while the pool's own complement directions recover about four fifths of the headroom. Accuracy entries are test patient-macro balanced accuracy in percent at five patients per class, contrasts are paired differences in percentage points, and the headroom share is $(x-\mathrm{RWc}5)/(\mathrm{RW}5-\mathrm{RWc}5)$. Intervals are 95\% bootstrap intervals over test patients and draws. The bold row is the primary contrast. RWc5, RW5, Wt5, and Rt5 are reused from the source studies.}
+\label{tab:ladder}
+\end{table}
+
+\subsection{Diagnostics}
+\label{sec:diagnostics-results}
+The patch-level variance already ranks the added directions as the pool does (Table~\ref{tab:diagnostics}). Across the directions of $\mathbf V$ on TCGA-UT, the Spearman correlation between $\omega_j$ and the oracle weight is 0.999 on average over the 30 fits, and 0.981 on BRACS. The total weight matches as well. The oracle-implied scale of Wo5 is 0.296 on TCGA-UT, equal to the preceding study's selected values $s=0.3$ (12 of 30 fits) and $s=1$ (13 of 30), and the added directions carry 30.2 percent of the pool's between-patient variance in Wo5 and Po5 alike, because on TCGA-UT both bases fill the complement of the cohort basis (rank 2,438 to 2,440). The oracle weights of Wo5 and Po5 thus have the same total, spread over different directions. On BRACS the implied scale is 0.412 for Wo5, near the selected values 0.3 to 3 of the preceding study.
+
+The random arm Ro5 has the same rank and total on TCGA-UT (0.296, 30.1 percent), but not the same weights within the complement, and it gains nothing. On BRACS, where $\mathbf V$ has rank 1,085 and does not fill the complement, the random directions carry only 18.1 percent of the pool variance against 40.1 for Wo5 and 42.3 for Po5, which needs 227 directions. Po5 reaches a comparable share with a fifth of the directions.
+
+The selected whitening scale reflects how much variance the arm adds. On TCGA-UT Po5 selects factor 100 in 29 of 30 fits, Wo5 factor 10 in 21 (1 in 5, 100 in 4), and Ro5 factor 1 in 23 (10 in 7). Since the factors are anchored to the cohort block, the classifier contracts more strongly the more of the added block lies along directions that matter. On BRACS the factors spread: Po5 selects 10 or 100 in 24 of 30 fits, Wo5 spreads over 0.1 to 10 (12, 7, 10) with one fit at 100, and Ro5 selects 0.1 in 18.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{TCGA-UT} & \multicolumn{3}{c}{BRACS} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+ & Wo5 & Ro5 & Po5 & Wo5 & Ro5 & Po5 \\
+\midrule
+Added rank & 2,438 & 2,438 & 2,440 & 1,085 & 1,085 & 227 \\
+Added share of pool variance & 0.302 & 0.301 & 0.302 & 0.401 & 0.181 & 0.423 \\
+Oracle-implied scale & 0.296 & 0.296 & 0.296 & 0.412 & 0.186 & 0.435 \\
+Spearman($\omega_j$, oracle weight) & 0.999 & --- & --- & 0.981 & --- & --- \\
+\addlinespace
+Selected $\kappa$ factor 0.1 & 0 & 0 & 0 & 12 & 18 & 4 \\
+Selected $\kappa$ factor 1 & 5 & 23 & 0 & 7 & 6 & 2 \\
+Selected $\kappa$ factor 10 & 21 & 7 & 1 & 10 & 4 & 10 \\
+Selected $\kappa$ factor 100 & 4 & 0 & 29 & 1 & 2 & 14 \\
+\bottomrule
+\end{tabular}
+\caption{The patch-level variance of the within-patient directions matches the oracle weights in rank and total, so reweighting cannot be what limits Wt5. Entries are means over 30 fits at five patients; the oracle-implied scale is the added weight relative to the cohort's between-patient trace, comparable to the selected $s$ of the preceding study; the $\kappa$ rows count fits.}
+\label{tab:diagnostics}
+\end{table}
+
+\section{Discussion}
+\label{sec:discussion}
+The prespecified readings select the second, with the third in mild form. Wo5 equals Wt5 to within 0.11 points on TCGA-UT, while Po5 exceeds Wo5 by 1.67 points, so the patient-level weights are not what limited the within-patient directions. The diagnostics agree: patch-level variance already ranks the directions almost exactly as the pool does, and its tuned total equals the oracle total. The first reading, that missing weights are the bottleneck, is rejected, and the explanation given by \citet{queisler2026withinPatientSpan} does not hold. The fourth reading is rejected as well: Ro5 gains nothing, and Wo5$-$Ro5 is 0.42 points on TCGA-UT, so the gain does not come from oracle weights alone.
+
+What limits the within-patient directions is their orientation. The complement they fill is the same as that of Po5 on TCGA-UT, and both add the same total weight, but Po5 aligns the added directions with the eigenvectors of the pool's between-patient covariance, and Wo5 does not. The span measure of the preceding study, the share of pool variance in the span of the added directions, cannot detect this. On TCGA-UT it is saturated for any basis that fills the complement, and whitening acts on the eigenstructure within the span. A direction $\mathbf v_j$ can carry a large diagonal weight $\mathbf v_j^\top\boldsymbol\Sigma_{\text{pool}}\mathbf v_j$ and still mix several pool eigenvectors; the whitening then contracts a mixture of directions that are not separately worth contracting by that amount. The construction of Po5, which places the eigenvectors themselves, avoids this. This is an interpretation of the contrast between Wo5 and Po5, not a separate measurement, but it is the only difference between the two arms.
+
+Two consequences follow for cohort-only remedies. The within-patient covariance identifies the right subspace and a suitable scale, but its eigenvectors do not diagonalize the patient-level covariance, and no reweighting repairs that. And the ceiling of the construction is high: Po5 recovers 0.80 of the gap on TCGA-UT while keeping the cohort's own block and spectrum, so most of the headroom lies in the orientation of the complement, not in the cohort block. Any cohort-only estimate of that orientation would need patient-level information about the complement that the cohort's $C(G-1)$ patient deviations do not contain. Unlabelled slides from further patients, related cohorts, or a population covariance carried by the feature extractor are candidate sources, as before.
+
+\section{Limitations}
+\label{sec:limitations}
+All new arms read the training pool, so the results are a mechanism and upper bound, not evidence of a usable estimator. Po5 in particular uses the pool's eigenvectors and cannot be computed from a cohort.
+
+The oracle weight is the diagonal entry $\mathbf v_j^\top\boldsymbol\Sigma_{\text{pool}}\mathbf v_j$. It ignores off-diagonal pool covariance between the directions of $\mathbf V$, and that is exactly what the contrast with Po5 measures; an arm that rotates $\mathbf V$ toward the pool eigenbasis in stages would show how much orientation is needed, but was not run. The study fixes the cohort block and its spectrum and keeps the cohort spectrum on the block, so Po5 and RW5 differ by the block only; the 0.54-point difference on TCGA-UT is therefore the cost of that choice and not of the added directions.
+
+Only five patients per class were fitted, since the gain of the preceding study was gone at ten and twenty patients. On BRACS the complement has about a thousand directions instead of filling the space, so Wo5 and Po5 differ in span as well as in orientation there, and the intervals of the BRACS contrasts are wide: Wo5$-$Wt5 cannot exclude effects of about half a point in either direction, and the Po5 headroom share has an interval reaching above one. The hypotheses were fixed before the fits, but all arms reuse the three evaluation splits of the source studies. The results are conditional on frozen Virchow2 features, multinomial logistic regression, 160 patches per class, and the two cohorts studied.
