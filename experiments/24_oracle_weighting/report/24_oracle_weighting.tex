@@ -1,0 +1,96 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Patient Shortage in Histopathology:\\Within-Patient Directions Fail by Orientation, Not by Weight}
+\author{Yannik Queisler}
+\date{September 21, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Adding the within-patient complement of a five-patient cohort to cohort whitening recovers only 17 percent of the 2.66-point gap between cohort-basis and pool-basis whitening on TCGA-UT, although the added directions span almost all of the pool's missing between-patient variance. The preceding study attributed this shortfall to the weights: the added directions carry patch-level variance, not patient-level variance. This report tests that explanation with oracle information, as a mechanism study rather than a remedy. Each within-patient direction receives the between-patient variance of the full training pool along it; two brackets place the same oracle weights on random complement directions and replace the within-patient directions by the eigenbasis of the pool's own between-patient covariance outside the cohort basis. The explanation fails. At five patients per class, oracle weights on the within-patient directions reach the same accuracy as the tuned patch-level weights, $-0.01$ points on TCGA-UT (95\% interval: $-0.11$ to 0.10) and $-0.13$ on BRACS ($-0.73$ to 0.42), because the patch-level ranking of these directions already matches their patient-level ranking (Spearman 0.999 and 0.98) and the oracle trace on TCGA-UT, 0.30 times the cohort trace, equals the best fixed added trace of the source study. The pool's own complement eigenbasis, which spans the same subspace on TCGA-UT, gains 1.67 points more (1.37 to 1.99) and closes 80 percent of the gap; on BRACS it gains 2.01 points more (0.74 to 3.38) and closes 77 percent. The within-patient directions therefore reach the right subspace but are oriented wrongly within it: attaching the correct variance to each of them cannot recover the pool's concentration of between-patient variance on few directions, and the cohort has no patient-level information that could.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Cohort whitening contracts the features along the eigenbasis of the between-patient covariance of the labelled cohort and gains 2.26 percentage points over the ordinary classifier at five patients per class on TCGA-UT \citep{queisler2026patientDirections}. The same whitening along the between-patient basis of the full training pool gains 4.92 points, but it reads every training patient and serves as a mechanism reference. \citet{queisler2026spectrumRegularization} traced almost all of the 2.66-point difference to directions outside the cohort basis: correcting the cohort's eigenvalues within its basis is worth only 0.08 points.
+
+\citet{queisler2026withinPatientSpan} tried to reach those directions from the cohort's own patches. It added the within-patient covariance, projected off the cohort basis, to the cohort's between-patient covariance at a tuned total size. The added directions located the missing span well: at five TCGA-UT patients the leading eight times $r_B$ eigenvectors of the expanded covariance held 98 percent of the pool's between-patient variance. Accuracy followed only weakly, with a gain of 0.45 points, a sixth of the gap. That report offered an explanation it could not test: the added directions carry patch-level variances, whereas whitening needs the patient-level variance along each direction, which the cohort's few patient means do not estimate outside their own basis.
+
+This report tests that explanation directly by giving the within-patient directions the weights they lack. The weights come from the training pool, so the study measures a mechanism and is not a remedy. The question is: \emph{if every within-patient direction carries the pool's between-patient variance along it, does cohort whitening with the added directions close the gap to pool-basis whitening?} A positive answer would locate the bottleneck in the weights and motivate cohort-only estimates of patient-level strength. A negative answer, together with a bracket that also corrects the directions, would locate it in the directions themselves.
+
+\section{Estimator model}
+\label{sec:model}
+Write the patch features of class $c$ as $\mathbf x_{ik}=\boldsymbol\mu_c+\mathbf u_i+\mathbf e_{ik}$, with class centre $\boldsymbol\mu_c$, patient offset $\mathbf u_i$, and within-patient residual $\mathbf e_{ik}$ \citep{queisler2026centreError}. A cohort of $G$ patients per class estimates the between-patient covariance from the deviations of its patient means from their class means, pooled over all $C$ classes, $\hat{\boldsymbol\Sigma}_B=\mathbf U^\top\operatorname{diag}(\boldsymbol\lambda)\,\mathbf U$, where the $r_B\leq C(G-1)$ rows of $\mathbf U$ are its eigenvectors with non-negligible eigenvalues $\boldsymbol\lambda$. Every arm of this study whitens by
+\begin{equation}
+  \mathbf x\mapsto\mathbf x\bigl(\mathbf I+\kappa\,\mathbf B^\top\operatorname{diag}(\boldsymbol\nu)\,\mathbf B\bigr)^{-1/2},
+  \label{eq:whiten}
+\end{equation}
+\noindent which shrinks the component along each basis row $\mathbf b_j$ by $(1+\kappa\nu_j)^{-1/2}$ and leaves the orthogonal complement of the basis unchanged \citep{queisler2026patientDirections}. Cohort whitening uses $\mathbf B=\mathbf U$ and $\boldsymbol\nu=\boldsymbol\lambda$; pool-basis whitening uses the eigen-decomposition of $\boldsymbol\Sigma_{\text{pool}}$, the between-patient covariance of all training patients of the split.
+
+Let $\mathbf P_\perp=\mathbf I-\mathbf U^\top\mathbf U$ project off the cohort basis. \citet{queisler2026withinPatientSpan} formed the within-patient complement from the eigen-decomposition $\mathbf P_\perp\hat{\boldsymbol\Sigma}_W\mathbf P_\perp=\mathbf V^\top\operatorname{diag}(\boldsymbol\omega)\,\mathbf V$ of the cohort's pooled within-patient covariance, and whitened with $\mathbf B=[\mathbf U;\mathbf V]$ and $\boldsymbol\nu=[\boldsymbol\lambda;\,s\tau\boldsymbol\omega]$, where $\tau$ scales the added trace to $s\operatorname{tr}\hat{\boldsymbol\Sigma}_B$ and $s$ is tuned on validation. The rows of $\mathbf V$ fill the whole complement of the cohort basis on TCGA-UT, 2,438 directions at five patients, and about 1,085 directions on BRACS, where the number of patch residuals is smaller than the feature dimension.
+
+The \emph{oracle weight} of a unit direction $\mathbf v$ is the pool's between-patient variance along it, $\mathbf v^\top\boldsymbol\Sigma_{\text{pool}}\mathbf v$, as in the oracle spectrum of \citet{queisler2026spectrumRegularization}. Three arms keep the cohort block $(\mathbf U,\boldsymbol\lambda)$ unchanged and add a complement block with oracle weights:
+\begin{align}
+  \text{Wo:}\quad & \mathbf B=[\mathbf U;\mathbf V], && \nu_{r_B+j}=\mathbf v_j^\top\boldsymbol\Sigma_{\text{pool}}\mathbf v_j, \label{eq:wo}\\
+  \text{Ro:}\quad & \mathbf B=[\mathbf U;\mathbf R], && \nu_{r_B+j}=\mathbf r_j^\top\boldsymbol\Sigma_{\text{pool}}\mathbf r_j, \label{eq:ro}\\
+  \text{Po:}\quad & \mathbf B=[\mathbf U;\mathbf Q_\perp], && \mathbf P_\perp\boldsymbol\Sigma_{\text{pool}}\mathbf P_\perp=\mathbf Q_\perp^\top\operatorname{diag}(\boldsymbol\nu_\perp)\,\mathbf Q_\perp . \label{eq:po}
+\end{align}
+\noindent Wo is the arm the explanation of \citet{queisler2026withinPatientSpan} calls for: its directions are those of the tuned arm Wt, and only the weights change from patch-level to patient-level variance. Ro uses the random orthonormal complement directions $\mathbf R$ of the same source study, with the same number of rows as $\mathbf V$, and gives them oracle weights; the contrast Wo$-$Ro measures what the within-patient directions contribute once the weights are correct. Po replaces the added directions by the eigenvectors $\mathbf Q_\perp$ of the pool's between-patient covariance projected off the cohort basis, with their own eigenvalues. It is the best that any complement block can do in the sense that its whitening matrix contains $\mathbf P_\perp\boldsymbol\Sigma_{\text{pool}}\mathbf P_\perp$ exactly, and so it is the ceiling of the construction ``cohort block plus complement block''. Its rank equals that of the projected pool covariance, which is the full complement on TCGA-UT and 227 directions on average on BRACS.
+
+The three arms differ in a way that a span measure cannot see. On TCGA-UT, $\mathbf V$, $\mathbf R$, and $\mathbf Q_\perp$ all span essentially the same subspace, the complement of $\mathbf U$, and their oracle weights sum to the same trace, the pool variance outside the cohort basis. Wo and Ro nonetheless differ from Po. Their whitening matrices contain only the diagonal of $\mathbf P_\perp\boldsymbol\Sigma_{\text{pool}}\mathbf P_\perp$ in the basis $\mathbf V$ or $\mathbf R$; the off-diagonal terms in that basis are dropped. By the Schur--Horn theorem, the diagonal of a symmetric matrix in any orthonormal basis is majorized by its eigenvalues \citep{horn1954doubly}, so any basis other than the eigenbasis spreads the same variance more evenly over more directions. The contrast Po$-$Wo therefore measures the cost of the orientation of $\mathbf V$ within the complement, and Wo$-$Wt the cost of its weights.
+
+The remaining gap RW$-$Po measures what the block construction itself gives up relative to pool-basis whitening. Po keeps the cohort's eigenvalues on $\mathbf U$, which \citet{queisler2026spectrumRegularization} found to cost only 0.08 points, and drops the covariance between the cohort basis and its complement, $\mathbf U\boldsymbol\Sigma_{\text{pool}}\mathbf P_\perp$. The scale $\kappa$ is tuned as a grid factor divided by the mean eigenvalue \citep{queisler2026patientDirections}. As in \citet{queisler2026withinPatientSpan}, the grid factors are multiplied by the ratio of the arm's mean eigenvalue to the cohort's mean eigenvalue, so that every factor applies the same $\kappa$ to the cohort block as in cohort whitening. No trace parameter $s$ is tuned: the oracle weights fix the size of the added block.
+
+\section{Design}
+\label{sec:design}
+The study keeps the setting of \citet{queisler2026centreError} on TCGA-UT and of \citet{queisler2026bracsMechanism} on BRACS. TCGA-UT contributes 30 cancer types and BRACS its seven lesion classes, both with frozen 2,560-dimensional Virchow2 features \citep{zimmermann2024virchow2}, three fixed patient-disjoint splits, and multinomial logistic regression whose regularization strength is selected on validation patient-macro balanced accuracy. For each split and each of ten draws, the cohort of five patients per class with 32 patches each is the one used by all preceding studies of this series, so every classifier trains on 160 patches per class. The study runs at five patients only, where \citet{queisler2026withinPatientSpan} found its only resolved gain; at ten and twenty patients that gain had already vanished.
+
+The cohort basis, its eigenvalues, the within-patient complement, and the random complement directions are recomputed from the same cohort with the same seeds as in the source study, so Wo shares its directions with Wt and Ro with Rt. Table~\ref{tab:arms} lists the arms. Each fitted arm whitens by Equation~\ref{eq:whiten} and fits an ordinary multinomial logistic classifier on the transformed features; it tunes the scale factor $\kappa\in\{0.1,1,10,100\}$, rescaled as described in Section~\ref{sec:model}, jointly with the regularization strength on validation patient-macro balanced accuracy, with the grid and tie rules of \citet{queisler2026patientDirections}. The reused arms are the exact fits of the source studies on the same cohorts, so every contrast is paired draw by draw.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}lllY@{}}
+\toprule
+Arm & Added directions & Added weights & Role \\
+\midrule
+R5 & --- & --- & Ordinary fit on the real cohort (reused) \\
+C5 & --- & --- & Cohort with pool class centres (reused headroom reference) \\
+RWc5 & none & --- & Cohort whitening, the host (reused) \\
+Wt5 & within-patient $\mathbf V$ & patch-level, tuned $s$ & Expanded cohort whitening (reused) \\
+Rt5 & random $\mathbf R\perp\mathbf U$ & patch-level, tuned $s$ & Random-direction control of Wt (reused) \\
+Wo5 & within-patient $\mathbf V$ & oracle, Equation~\ref{eq:wo} & Tests the weight explanation \\
+Ro5 & random $\mathbf R\perp\mathbf U$ & oracle, Equation~\ref{eq:ro} & Value of the directions under correct weights \\
+Po5 & pool complement $\mathbf Q_\perp$ & oracle eigenvalues & Ceiling of the block construction \\
+RW5 & pool basis & pool eigenvalues & Pool-basis whitening (reused mechanism reference) \\
+\bottomrule
+\end{tabularx}
+\caption{All fitted arms keep the cohort basis and its eigenvalues and add a complement block weighted by the pool's between-patient variance; they differ only in the orientation of the added directions. Wo, Ro, Po, and RW read the training pool and are mechanism references, not remedies. The reused arms come from \citet{queisler2026centreError}, \citet{queisler2026patientDirections}, \citet{queisler2026bracsMechanism}, and \citet{queisler2026withinPatientSpan}.}
+\label{tab:arms}
+\end{table}
+
+\noindent Per dataset the study fits three arms for each of 30 split-draw pairs, that is 90 whitened fits, each tuning four scale factors and nine regularization values. Selections were written to disk before any test prediction, and test accuracy never entered selection.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is patient-macro balanced accuracy on the test partition, pooled over splits and draws with equal weight per split. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates; all arms share the replicates with the source studies, so every contrast is paired, and intervals are 95 percent percentile intervals.
+
+The primary contrast is Wo5$-$Wt5, read separately on each dataset. The weight explanation counts as supported on a dataset if oracle weights gain at least one percentage point over the tuned patch-level weights and the paired interval lies entirely above zero. Three bracketing contrasts complete the ladder RWc $\to$ Wt $\to$ Wo $\to$ Po $\to$ RW: Wo5$-$Ro5, Po5$-$Wo5, and RW5$-$Po5. The \emph{headroom share} $(x-\mathrm{RWc5})/(\mathrm{RW5}-\mathrm{RWc5})$ states for each arm $x$ how much of the gap between cohort-basis and pool-basis whitening it closes.
+
+Three diagnostics explain the weights. The Spearman correlation between the within-patient eigenvalues $\omega_j$ and the oracle weights of the same directions asks whether the patch-level ranking already tracks patient-level strength. The \emph{oracle-implied added trace} $\sum_j\nu_{r_B+j}/\sum_j\lambda_j$ is the value of $s$ at which the added block of Wt would carry the oracle trace, and it can be compared with the $s$ selected by Wt. The added pool share $\sum_j\nu_{r_B+j}/\operatorname{tr}\boldsymbol\Sigma_{\text{pool}}$ states how much pool variance the added block carries. Four readings were fixed in advance. Wo$\gg$Wt with Wo$\approx$Po would mean that the source study found usable directions and lacked only the weights. Wo$\approx$Wt with Po$\gg$Wo would mean that the within-patient directions are wrong at the resolution whitening needs, even when correctly weighted. Po$\ll$RW would mean that the block construction itself caps the gain. Ro$\approx$Wo would mean that the oracle weights alone carry any gain and the directions do not matter.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
