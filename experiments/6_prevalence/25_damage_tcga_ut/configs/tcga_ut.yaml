@@ -4,7 +4,7 @@
 # Every arm is fit fresh (no reuse). CPU-only.
 
 paths:
-  outputs: experiments/6_deprivation/25_prevalence_imbalance/outputs/tcga_ut/patch
+  outputs: experiments/6_prevalence/25_damage_tcga_ut/outputs/tcga_ut/patch
 
 dataset:
   name: tcga_ut
@@ -39,8 +39,8 @@ feature_extraction:
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
-  code_dir: /home/yannik.qu/master-thesis/experiments/6_deprivation/25_prevalence_imbalance/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/6_deprivation/25_prevalence_imbalance/outputs/tcga_ut/patch
+  code_dir: /home/yannik.qu/master-thesis/experiments/6_prevalence/25_damage_tcga_ut/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/6_prevalence/25_damage_tcga_ut/outputs/tcga_ut/patch
   container: /home/yannik.qu/master-thesis/experiments/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/2_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
   max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
