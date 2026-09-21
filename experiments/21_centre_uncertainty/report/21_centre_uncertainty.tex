@@ -66,14 +66,14 @@ A$G$, At$G$ & reused & Directional centre shrinkage, closed form and tuned \cite
 RWc$G$ & reused & Cohort-basis whitening \citep{queisler2026patientDirections,queisler2026bracsMechanism} \\
 U$G$ & new & Equation~\ref{eq:loss} with patient covariance $\mathbf V_G$ at $t=1$ \\
 Ut$G$ & new & Equation~\ref{eq:loss} with patient covariance, $t$ selected from $\{0,0.25,1,4,16,64,256\}$ \\
-It$G$ & new & Equation~\ref{eq:loss} with isotropic covariance $\operatorname{tr}(\mathbf V_G)\mathbf I/2{,}560$, same grid \\
+It$G$ & new & Equation~\ref{eq:loss} with isotropic covariance $\operatorname{tr}(\mathbf V_G)\mathbf I/2{,}560$, $t$ selected from $\{0,0.25,1,4,16,64,256,1024,4096\}$ \\
 \bottomrule
 \end{tabularx}
 \caption{The three new families use only the drawn patients and change the loss, not the features. R$G$ and C$G$ bracket the available headroom; S, St, A, At, and RWc are the cohort-only remedies already tested. The $t=0$ candidate of Ut and It is the R$G$ fit itself.}
 \label{tab:arms}
 \end{table}
 
-\noindent Each new candidate is fitted with L-BFGS-B in double precision with an analytic gradient, the unpenalized intercepts, tolerance, and iteration limit of the ordinary logistic fits, and the regularization grid $\lambda\in\{10^{-6},\dots,10^{2}\}$ of nine values. The quadratic forms are evaluated through the low-rank eigenbasis of $\hat{\boldsymbol\Sigma}$, so no $2{,}560\times2{,}560$ covariance is formed. The tuned families select $t$ jointly with $\lambda$ on validation patient-macro balanced accuracy, with ties resolved toward the smaller $t$ and then the larger $\lambda$; the fixed family U selects only $\lambda$ among the $t=1$ candidates. Selections were written to disk before any test prediction, and test accuracy never entered selection. Per dataset, the study fits $2\times6\times9$ candidates for each of three patient counts and 30 split-draw pairs, 9,720 candidates and 19,440 in total. The grid was frozen before fitting, and test results never informed it.
+\noindent Each new candidate is fitted with L-BFGS-B in double precision with an analytic gradient, the unpenalized intercepts, tolerance, and iteration limit of the ordinary logistic fits, and the regularization grid $\lambda\in\{10^{-6},\dots,10^{2}\}$ of nine values. The quadratic forms are evaluated through the low-rank eigenbasis of $\hat{\boldsymbol\Sigma}$, so no $2{,}560\times2{,}560$ covariance is formed. The tuned families select $t$ jointly with $\lambda$ on validation patient-macro balanced accuracy, with ties resolved toward the smaller $t$ and then the larger $\lambda$; the fixed family U selects only $\lambda$ among the $t=1$ candidates. Selections were written to disk before any test prediction, and test accuracy never entered selection. Per dataset, the study fits $(6+8)\times9$ candidates for each of three patient counts and 30 split-draw pairs (six strengths for the patient covariance, eight for the isotropic control, whose grid extends to $t=4096$), 11,340 candidates and 22,680 in total. The grid was frozen before fitting, and test results never informed it.
 
 \section{Evaluation}
 \label{sec:evaluation}
