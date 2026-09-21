@@ -11,16 +11,12 @@ flowchart TD
     S3["<b>3 · Measure mitigation success</b><br/>Discrimination and calibration of<br/>common learning methods<br/><i>exp. 02–04</i>"]
     S4["<b>4 · Isolate the hard case</b><br/>Patch shortage is repairable;<br/>patient shortage is not<br/><i>exp. 05–15</i>"]
     S5["<b>5 · Explain the damage</b><br/>Few patients estimate the class<br/>distribution moments badly:<br/>centre error ~3/4, directions ~1/4<br/><i>exp. 16–18</i>"]
-    S6["<b>6 · Repair part of it</b><br/>Moment correction without extra<br/>labelled patients<br/><i>next</i>"]
+    S6["<b>6 · Confirm the hard limit</b><br/>Cohort-only moment repairs close<br/>at most ~15% of the 5→20 gap,<br/>none on BRACS; missing patient<br/>directions need more patients<br/><i>exp. 19–24</i>"]
 
-    S1 --> S2 --> S3 --> S4 --> S5 --> S6
-    S4 -. "residual gap" .-> S5
-    S6 -. "re-measure" .-> S3
+    S1 --> S2 --> S3 --> S4 -- "residual gap" --> S5 --> S6
 
     classDef done fill:#e8f1fb,stroke:#3b6ea5,stroke-width:1px,color:#13293d;
-    classDef open fill:#fff3e0,stroke:#d98b30,stroke-width:1px,color:#3d2a13;
-    class S1,S2,S3,S4,S5 done;
-    class S6 open;
+    class S1,S2,S3,S4,S5,S6 done;
 ```
 
 Per-experiment questions and results: [`experiments/AGENTS.md`](experiments/AGENTS.md).
