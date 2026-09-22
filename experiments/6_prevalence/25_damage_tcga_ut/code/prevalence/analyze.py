@@ -1,11 +1,10 @@
-"""Analyze stage: BA/NLL/ECE per arm (raw + TS), rank diagnostics, and the discrimination and calibration curve figures."""
+"""Analyze stage: BA/NLL/ECE per arm (raw + TS), rank diagnostics, and the figures."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
 import numpy as np
 from imbalance_benchmark.common import (
     ensure_dirs,
@@ -31,6 +30,12 @@ from centre.analyze import arm_accuracy, pooled
 from directions.analyze import _write_analysis
 
 from prevalence import ARMS, RATIOS
+from prevalence.figures import (
+    CALIBRATION_PANELS,
+    DISCRIMINATION_PANELS,
+    distribution_figure,
+    metric_figure,
+)
 from prevalence.fit import class_permutation
 
 __all__ = ["run_analyze"]
@@ -151,61 +156,24 @@ def _thirds(
     return out
 
 
-def _band(ax: Any, xs: list[float], d: list[np.ndarray], fmt: str, **kw: Any) -> None:
-    """Point estimates joined by a line, with a shaded 95% percentile band over replicates."""
-    lo, hi = zip(*(np.percentile(v[1:], [2.5, 97.5]) for v in d))
-    ax.plot(xs, [v[0] for v in d], fmt, color="tab:blue", **kw)
-    ax.fill_between(xs, lo, hi, color="tab:blue", alpha=0.15, linewidth=0)
-
-
-DISCRIMINATION_PANELS = ((r"BA change vs. $\rho$ = 1 (pp)", "ba", None),)
-CALIBRATION_PANELS = (
-    ("Macro NLL (nats)", "nll", "nll_ts"),
-    ("ECE (pp)", "ece", "ece_ts"),
-)
-
-
-def _figure(
-    dists: dict[str, np.ndarray],
-    rho: dict[str, float],
-    dest: Path,
-    panels: tuple[tuple[str, str, str | None], ...],
-) -> None:
-    """One panel per metric vs realized rho (log2 axis), 95% bands, native at its realized rho."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dists = dists | {f"ba_{a}": dists[f"arm_{a}"] - dists["arm_r1"] for a in ARMS}
-    xs = [float(np.log2(rho[f"r{r}"])) for r in RATIOS]
-    native_x = float(np.log2(rho["N"]))
-    fig, axes = plt.subplots(
-        1, len(panels), figsize=(5 * len(panels), 3.6), dpi=200, squeeze=False
-    )
-    for ax, (label, raw_key, ts_key) in zip(axes[0], panels):
-        keys = (raw_key,) if ts_key is None else (raw_key, ts_key)
-        for key, fmt, fill in zip(keys, ("o-", "o--"), ("tab:red", "none")):
-            name = "raw" if key == raw_key else "temperature-scaled"
-            name = "ratio arms" if ts_key is None else name
-            _band(ax, xs, [dists[f"{key}_r{r}"] for r in RATIOS], fmt, label=name)
-            native = dists[f"{key}_N"]
-            ax.errorbar(
-                [native_x],
-                [native[0]],
-                yerr=[
-                    [native[0] - np.percentile(native[1:], 2.5)],
-                    [np.percentile(native[1:], 97.5) - native[0]],
-                ],
-                fmt="D",
-                color="tab:red",
-                mfc=fill,
-                zorder=5,
-                label=f"native ({name})" if ts_key else "native",
-            )
-        ax.set_xticks(xs, [str(r) for r in RATIOS])
-        ax.set_xlabel(r"Imbalance ratio $\rho$ (log scale)")
-        ax.set_ylabel(label)
-        ax.legend(fontsize=7)
-    fig.tight_layout()
-    fig.savefig(dest)
-    plt.close(fig)
+def _sorted_counts(config: dict[str, Any]) -> dict[str, np.ndarray]:
+    """Per-arm class counts sorted head to tail, stacked over every (split, draw) fit."""
+    paths = _paths(config)
+    return {
+        arm: np.stack(
+            [
+                sorted(
+                    _require_record(allocation_dir(paths[s], arm, d))[
+                        "class_counts"
+                    ].values(),
+                    reverse=True,
+                )
+                for s in range(N_SPLITS)
+                for d in range(N_DRAWS)
+            ]
+        )
+        for arm in ARMS
+    }
 
 
 def _combine(
@@ -224,7 +192,7 @@ def _combine(
 
 
 def run_analyze(config: dict[str, Any]) -> Path:
-    """Pool BA/NLL/ECE per arm, write analysis and rank diagnostics, and plot both curves."""
+    """Pool BA/NLL/ECE per arm, write analysis and rank diagnostics, and plot the figures."""
     names = canonical_class_names(config)
     acc = arm_accuracy(config, names, arms=ARMS)
     dist = _arm_dist(config, ARMS, len(names))
@@ -242,6 +210,9 @@ def run_analyze(config: dict[str, Any]) -> Path:
         {"realized_rho": rho, "rank_recall": _thirds(config, ARMS, names)},
     )
     figures = output_root(config) / "figures"
-    _figure(dists, rho, figures / "discrimination_curve.pdf", DISCRIMINATION_PANELS)
-    _figure(dists, rho, figures / "calibration_curve.pdf", CALIBRATION_PANELS)
+    metric_figure(
+        dists, rho, figures / "discrimination_curve.pdf", DISCRIMINATION_PANELS
+    )
+    metric_figure(dists, rho, figures / "calibration_curve.pdf", CALIBRATION_PANELS)
+    distribution_figure(_sorted_counts(config), figures / "class_distribution.pdf")
     return path

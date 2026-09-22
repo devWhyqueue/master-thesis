@@ -37,7 +37,7 @@ The TCGA-UT study used $G=20$. On BRACS, only 10 to 13 ADH patients per training
 \end{equation}
 \noindent with $N_0$ chosen so that the counts sum to $T$, rounded to integers that keep the sum, at least one patch per patient, and at most $D$ per patient. This exponential profile is the allocator of the benchmark \citep{queisler2026benchmarkProtocol}. It moves the class prior and the tail support together: at $\rho=100$ the head class receives 1,206 patches, about 121 per patient, and the tail class 12, between one and two per patient. With only seven classes, neighbouring ranks differ by a factor of $\rho^{1/6}$, which is 2.15 at $\rho=100$, against 1.17 for the 30 classes of TCGA-UT. The assignment of classes to ranks is a random permutation drawn per split and draw, so each lesion class visits head, body, and tail across the 30 draws. Within a class, the count is spread as evenly as possible over its ten patients.
 
-The native arm N gives each class its share of all training patches of the split, scaled to $T$, in the classes' own order and with the same ten patients. IC, PB, and DCIS receive between 431 and 750 patches, whereas N, ADH, FEA, and UDH receive between 90 and 188, and the realized ratio averages 6.7 over the 30 draws. Table~\ref{tab:arms} lists the arms.
+The native arm N gives each class its share of all training patches of the split, scaled to $T$, in the classes' own order and with the same ten patients. IC, PB, and DCIS receive between 431 and 750 patches, whereas N, ADH, FEA, and UDH receive between 90 and 188, and the realized ratio averages 6.7 over the 30 draws. Table~\ref{tab:arms} lists the arms, and Figure~\ref{fig:distribution} shows every realized class distribution.
 
 \begin{table}[htbp]
 \centering
@@ -59,6 +59,13 @@ N & 6.7 & 625--750 & 90--115 & 9.0--11.5 \\
 \caption{All arms train on the same ten patients per class and the same 2,240 patches; only the per-class share changes. Head and tail are the largest and smallest class counts in patches. The realized ratio is averaged over 30 split-draw pairs and departs from the nominal ratio only through integer rounding. The native arm N uses the training split's own class shares, so its extreme counts differ between the three splits; the ranges span them.}
 \label{tab:arms}
 \end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.6\textwidth]{class_distribution.pdf}
+\caption{The ratio arms tilt one fixed budget around the second and third classes, whereas the native allocation splits into three large and four small classes. Training patches per class, sorted from the largest to the smallest class, on a logarithmic axis, so an exponential profile is a straight line. Blue lines are the ratio arms, from light ($\rho=1$) to dark ($\rho=100$); their sorted counts are identical in every draw. The red dashed line is the native arm, averaged over the 30 split-draw pairs, with the shaded band spanning the smallest and largest count at each rank. All arms sum to 2,240 patches.}
+\label{fig:distribution}
+\end{figure}
 
 \noindent Each arm fits a multinomial logistic classifier whose regularization strength is selected from nine values between $10^{-6}$ and 100 by validation patient-macro balanced accuracy \citep{queisler2026patientShortage}. After selection, one temperature is fitted on the validation logits by minimizing their negative log-likelihood and applied to the test logits \citep{guo2017calibration}; it rescales confidence and leaves predictions unchanged. The study fits eight arms for each of 30 split-draw pairs, 240 classifiers in total, and every fit converged. Test data never entered selection or temperature fitting.
 

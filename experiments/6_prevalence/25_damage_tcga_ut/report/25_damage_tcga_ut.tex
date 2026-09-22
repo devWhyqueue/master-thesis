@@ -37,7 +37,7 @@ Every arm trains on the same total budget $T=K\cdot G\cdot 32=19{,}200$ patches 
 \end{equation}
 \noindent with $N_0$ chosen so that the counts sum to $T$, rounded to integers that keep the sum, at least one patch per patient, and at most $D$ per patient. This exponential profile is the allocator of the benchmark \citep{queisler2026benchmarkProtocol}. It moves the class prior and the tail support together: at $\rho=100$ the head class receives 2,843 patches, about 142 per patient, and the tail class 28, between one and two per patient. The assignment of classes to ranks is a random permutation drawn per split and draw, so each cancer type visits head, body, and tail across the 30 draws, and class difficulty averages out of the curve. Within a class, the count is spread as evenly as possible over its twenty patients.
 
-The native arm N gives each class its share of all training patches of the split, scaled to $T$, in the classes' own order and with the same twenty patients. Its counts range from about 95 to about 1,700 patches per class, and its realized ratio, the largest over the smallest class count, averages 18.1 over the 30 draws. Table~\ref{tab:arms} lists the arms.
+The native arm N gives each class its share of all training patches of the split, scaled to $T$, in the classes' own order and with the same twenty patients. Its counts range from about 95 to about 1,700 patches per class, and its realized ratio, the largest over the smallest class count, averages 18.1 over the 30 draws. Table~\ref{tab:arms} lists the arms, and Figure~\ref{fig:distribution} shows every realized class distribution.
 
 \begin{table}[htbp]
 \centering
@@ -59,6 +59,13 @@ N & 18.1 & $\approx$1,700 & $\approx$95 & $\approx$4.8 \\
 \caption{All arms train on the same twenty patients per class and the same 19,200 patches; only the per-class share changes. Head and tail are the largest and smallest class counts in patches. The realized ratio is averaged over 30 split-draw pairs and departs from the nominal ratio only through integer rounding. The native arm N uses the training split's own class shares, so its extreme counts vary slightly between splits.}
 \label{tab:arms}
 \end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.6\textwidth]{class_distribution.pdf}
+\caption{The ratio arms tilt one fixed budget around the middle classes, and the native allocation follows no single exponential profile. Training patches per class, sorted from the largest to the smallest class, on a logarithmic axis, so an exponential profile is a straight line. Blue lines are the ratio arms, from light ($\rho=1$) to dark ($\rho=100$); their sorted counts are identical in every draw. The red dashed line is the native arm, averaged over the 30 split-draw pairs, with the shaded band spanning the smallest and largest count at each rank. All arms sum to 19,200 patches.}
+\label{fig:distribution}
+\end{figure}
 
 \noindent Each arm fits a multinomial logistic classifier whose regularization strength is selected from nine values between $10^{-6}$ and 100 by validation patient-macro balanced accuracy \citep{queisler2026patientShortage}. After selection, one temperature is fitted on the validation logits by minimizing their negative log-likelihood and applied to the test logits \citep{guo2017calibration}; it rescales confidence and leaves predictions unchanged. The study fits eight arms for each of 30 split-draw pairs, 240 classifiers in total, and every fit converged. Test data never entered selection or temperature fitting.
 
