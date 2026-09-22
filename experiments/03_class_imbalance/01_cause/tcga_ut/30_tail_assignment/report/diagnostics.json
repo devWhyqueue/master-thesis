@@ -1,0 +1,515 @@
+{
+  "class_properties": {
+    "Adrenocortical_carcinoma": {
+      "confusability": 0.013561434466660183,
+      "r1_recall": 72.85158124673981
+    },
+    "Bladder_Urothelial_Carcinoma": {
+      "confusability": 0.0382447096747301,
+      "r1_recall": 47.16101009889242
+    },
+    "Brain_Lower_Grade_Glioma": {
+      "confusability": 0.026582095566269746,
+      "r1_recall": 78.76012877691484
+    },
+    "Breast_invasive_carcinoma": {
+      "confusability": 0.03438773950618999,
+      "r1_recall": 70.44344373735636
+    },
+    "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+      "confusability": 0.02883022328437843,
+      "r1_recall": 46.67145736072208
+    },
+    "Colon_adenocarcinoma": {
+      "confusability": 0.022524350085451086,
+      "r1_recall": 51.51138632872508
+    },
+    "Esophageal_carcinoma": {
+      "confusability": 0.02363590890775451,
+      "r1_recall": 28.221592511038896
+    },
+    "Glioblastoma_multiforme": {
+      "confusability": 0.03176140389879257,
+      "r1_recall": 77.01324978717612
+    },
+    "Head_and_Neck_squamous_cell_carcinoma": {
+      "confusability": 0.029442136416056468,
+      "r1_recall": 69.04239864608043
+    },
+    "Kidney_Chromophobe": {
+      "confusability": 0.0030558141473649107,
+      "r1_recall": 93.05416073124408
+    },
+    "Kidney_renal_clear_cell_carcinoma": {
+      "confusability": 0.008654458045601702,
+      "r1_recall": 86.88203428242306
+    },
+    "Kidney_renal_papillary_cell_carcinoma": {
+      "confusability": 0.008975003820983452,
+      "r1_recall": 80.11233478871347
+    },
+    "Liver_hepatocellular_carcinoma": {
+      "confusability": 0.008390879659863,
+      "r1_recall": 85.47888437217706
+    },
+    "Lung_adenocarcinoma": {
+      "confusability": 0.028818412971891458,
+      "r1_recall": 65.27010040241542
+    },
+    "Lung_squamous_cell_carcinoma": {
+      "confusability": 0.05145572522265913,
+      "r1_recall": 54.537242336609204
+    },
+    "Mesothelioma": {
+      "confusability": 0.01227244306734657,
+      "r1_recall": 74.884397586195
+    },
+    "Ovarian_serous_cystadenocarcinoma": {
+      "confusability": 0.014414277973072487,
+      "r1_recall": 75.72278783308197
+    },
+    "Pancreatic_adenocarcinoma": {
+      "confusability": 0.013395117477873033,
+      "r1_recall": 70.75284842006981
+    },
+    "Pheochromocytoma_and_Paraganglioma": {
+      "confusability": 0.0019499520640257882,
+      "r1_recall": 94.25132275132276
+    },
+    "Prostate_adenocarcinoma": {
+      "confusability": 0.0024305623098192326,
+      "r1_recall": 94.8461238484783
+    },
+    "Rectum_adenocarcinoma": {
+      "confusability": 0.017207625293521,
+      "r1_recall": 60.55132448040947
+    },
+    "Sarcoma": {
+      "confusability": 0.014743577274179877,
+      "r1_recall": 80.33108342332447
+    },
+    "Skin_Cutaneous_Melanoma": {
+      "confusability": 0.022209778938739214,
+      "r1_recall": 62.582238800672236
+    },
+    "Stomach_adenocarcinoma": {
+      "confusability": 0.03384265884870295,
+      "r1_recall": 47.22185058042904
+    },
+    "Testicular_Germ_Cell_Tumors": {
+      "confusability": 0.004457489822289534,
+      "r1_recall": 88.23519866934082
+    },
+    "Thymoma": {
+      "confusability": 0.0040895638521070985,
+      "r1_recall": 93.9947386857223
+    },
+    "Thyroid_carcinoma": {
+      "confusability": 0.0028259993608536773,
+      "r1_recall": 95.11120642701526
+    },
+    "Uterine_Carcinosarcoma": {
+      "confusability": 0.01749871476011171,
+      "r1_recall": 68.3572595704949
+    },
+    "Uterine_Corpus_Endometrial_Carcinoma": {
+      "confusability": 0.028662238957357825,
+      "r1_recall": 63.15638062567458
+    },
+    "Uveal_Melanoma": {
+      "confusability": 0.00518681135457337,
+      "r1_recall": 84.69267429193903
+    }
+  },
+  "correlations": {
+    "10": {
+      "confusability_vs_predicted_tail_own_loss": {
+        "ci_2_5": 0.6173303670745273,
+        "ci_97_5": 0.7993659621802001,
+        "point": 0.7397107897664071
+      },
+      "r1_recall_vs_predicted_tail_own_loss": {
+        "ci_2_5": -0.825139043381535,
+        "ci_97_5": -0.665828698553949,
+        "point": -0.7766407119021135
+      }
+    },
+    "100": {
+      "confusability_vs_predicted_tail_own_loss": {
+        "ci_2_5": 0.6030812013348165,
+        "ci_97_5": 0.7860066740823136,
+        "point": 0.7072302558398219
+      },
+      "r1_recall_vs_predicted_tail_own_loss": {
+        "ci_2_5": -0.8487430478309232,
+        "ci_97_5": -0.6925472747497218,
+        "point": -0.7833147942157953
+      }
+    }
+  },
+  "leave_one_draw_out": {
+    "observed": [
+      2.9455154887498107,
+      1.5296180418795418,
+      2.131180833818901,
+      2.952765086578476,
+      3.3338616394297675,
+      3.9447846182540287,
+      3.0901192096957115,
+      4.686435233159792,
+      2.1971759378337974,
+      2.7639124217006743,
+      3.6761714785206183,
+      2.5100980037008624,
+      2.7321583880341413,
+      3.3904704336029767,
+      3.585921530720667,
+      2.4791532132678715,
+      3.4115138961023477,
+      2.522832876755155,
+      1.785097774576424,
+      2.948541210461848,
+      3.062753168156894,
+      3.840927213211818,
+      2.515131272489987,
+      2.770372131720771,
+      2.9156905165664617,
+      3.968778486511198,
+      1.8233013251448993,
+      2.7085379807402163,
+      2.499293767230631,
+      2.726834526271737
+    ],
+    "predicted": [
+      2.8946279461571294,
+      4.152515567892836,
+      3.7127596786020103,
+      3.6444582443467626,
+      3.4334835982456875,
+      2.650365012185605,
+      3.9701101450878253,
+      3.6035307138167196,
+      3.1435880912003955,
+      3.5353810380851036,
+      3.7636218038139897,
+      1.964014313564983,
+      2.822983236289873,
+      3.5842660218277316,
+      3.5856187607064425,
+      3.4649505163684116,
+      4.562462158947402,
+      3.5938819766132677,
+      3.749285856506639,
+      4.642553287110581,
+      3.7294310351513627,
+      3.0042652029612444,
+      3.4424296768928957,
+      3.2293550513096223,
+      3.043558483620227,
+      4.067149611260755,
+      4.429025459329258,
+      3.218191451969172,
+      2.8606344137920914,
+      3.760058378937406
+    ],
+    "spearman": {
+      "n": 30,
+      "spearman_p": 0.849120531663393,
+      "spearman_r": 0.03626251390433815
+    }
+  },
+  "model_coefficients": {
+    "Adrenocortical_carcinoma": {
+      "a": 2.3156746242398656,
+      "b_neg": 5.044024557397856,
+      "b_pos": 2.0708109965096066
+    },
+    "Bladder_Urothelial_Carcinoma": {
+      "a": -0.46659242585569083,
+      "b_neg": 5.060657616499578,
+      "b_pos": 5.458029849437823
+    },
+    "Brain_Lower_Grade_Glioma": {
+      "a": 1.0954215682293187,
+      "b_neg": 2.2046264034225524,
+      "b_pos": 1.164433535169088
+    },
+    "Breast_invasive_carcinoma": {
+      "a": -0.4722542267922192,
+      "b_neg": 4.5253802129714416,
+      "b_pos": 3.293222284428062
+    },
+    "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": {
+      "a": -0.15531208078767422,
+      "b_neg": 4.108725331882381,
+      "b_pos": 9.608074999087894
+    },
+    "Colon_adenocarcinoma": {
+      "a": 5.987588635127158,
+      "b_neg": 7.454461177519539,
+      "b_pos": 4.237889017142522
+    },
+    "Esophageal_carcinoma": {
+      "a": 1.3897708317936828,
+      "b_neg": 4.189502586060501,
+      "b_pos": 10.95744705578245
+    },
+    "Glioblastoma_multiforme": {
+      "a": 0.7277088338752642,
+      "b_neg": 3.398851071565331,
+      "b_pos": 2.3340138239312402
+    },
+    "Head_and_Neck_squamous_cell_carcinoma": {
+      "a": -0.6478740860520795,
+      "b_neg": 5.679509202722496,
+      "b_pos": 6.372845067358498
+    },
+    "Kidney_Chromophobe": {
+      "a": -0.5688556656533541,
+      "b_neg": 1.3478652940134228,
+      "b_pos": 3.0178111654137325
+    },
+    "Kidney_renal_clear_cell_carcinoma": {
+      "a": -0.11419331251345488,
+      "b_neg": 1.0271407483727815,
+      "b_pos": 1.780140338628459
+    },
+    "Kidney_renal_papillary_cell_carcinoma": {
+      "a": 0.1045540938489784,
+      "b_neg": 2.482272061413109,
+      "b_pos": 3.3908888799518526
+    },
+    "Liver_hepatocellular_carcinoma": {
+      "a": 0.5674234812327654,
+      "b_neg": 2.594232194922948,
+      "b_pos": 1.4626572084861196
+    },
+    "Lung_adenocarcinoma": {
+      "a": 0.01802024597875107,
+      "b_neg": 3.9930946079821705,
+      "b_pos": 4.585333624232757
+    },
+    "Lung_squamous_cell_carcinoma": {
+      "a": 0.05085684594416939,
+      "b_neg": 7.0191543340912546,
+      "b_pos": 8.516171099548131
+    },
+    "Mesothelioma": {
+      "a": 0.21569323542752628,
+      "b_neg": 3.4831819566155384,
+      "b_pos": 6.213848783992311
+    },
+    "Ovarian_serous_cystadenocarcinoma": {
+      "a": -1.4106591790673617,
+      "b_neg": 4.423296920178589,
+      "b_pos": 4.75870132655644
+    },
+    "Pancreatic_adenocarcinoma": {
+      "a": 0.9391719907924947,
+      "b_neg": 5.0234089008844105,
+      "b_pos": 1.2657532128477147
+    },
+    "Pheochromocytoma_and_Paraganglioma": {
+      "a": 0.30535847495712787,
+      "b_neg": 1.1407484603984333,
+      "b_pos": 0.884857377012098
+    },
+    "Prostate_adenocarcinoma": {
+      "a": 0.14166077061763396,
+      "b_neg": 0.5137854409694148,
+      "b_pos": 0.5426346800101962
+    },
+    "Rectum_adenocarcinoma": {
+      "a": -0.223346591791874,
+      "b_neg": 7.485997657998492,
+      "b_pos": 9.045484441982742
+    },
+    "Sarcoma": {
+      "a": -0.5656374953992548,
+      "b_neg": 4.125256750173184,
+      "b_pos": 1.1286278694618428
+    },
+    "Skin_Cutaneous_Melanoma": {
+      "a": 0.3600741688911526,
+      "b_neg": 4.60984586174993,
+      "b_pos": 5.238728216678137
+    },
+    "Stomach_adenocarcinoma": {
+      "a": 0.5039076229463477,
+      "b_neg": 4.186812273771615,
+      "b_pos": 7.82738671203079
+    },
+    "Testicular_Germ_Cell_Tumors": {
+      "a": 0.6799748168153723,
+      "b_neg": 1.2243343118312329,
+      "b_pos": 2.3185913189720373
+    },
+    "Thymoma": {
+      "a": 0.26606202771126314,
+      "b_neg": 1.5928489858052286,
+      "b_pos": 1.1220700052902086
+    },
+    "Thyroid_carcinoma": {
+      "a": 0.14543457799459186,
+      "b_neg": 0.886984488131277,
+      "b_pos": 0.9629715451927504
+    },
+    "Uterine_Carcinosarcoma": {
+      "a": 1.2741300645881233,
+      "b_neg": 3.823238562815243,
+      "b_pos": 6.335749428482162
+    },
+    "Uterine_Corpus_Endometrial_Carcinoma": {
+      "a": -0.30044296365897916,
+      "b_neg": 5.38581472981363,
+      "b_pos": 5.475430395005901
+    },
+    "Uveal_Melanoma": {
+      "a": 0.6868510179270113,
+      "b_neg": 2.128592370128002,
+      "b_pos": 3.4399411326296665
+    }
+  },
+  "native_draws_D": {
+    "10": [
+      0.7816209591898073,
+      -0.6046653047522416,
+      0.42674177588862666,
+      0.5571443973073694,
+      0.9561731022839145,
+      1.0339426772514235,
+      0.6547589678868918,
+      1.871411183407169,
+      0.566884980711086,
+      0.014142486257600595,
+      0.9981624050818806,
+      0.18781767767641805,
+      0.7481078566528742,
+      0.8888584097136392,
+      0.7977256581198708,
+      0.28125977139542646,
+      0.953575274544384,
+      0.5477600600956964,
+      -0.1588180867149641,
+      0.5659357408859234,
+      0.7416086191272059,
+      1.3093385684551597,
+      0.17569151449180823,
+      0.5403760489734972,
+      0.4959667748345791,
+      0.9767440871385892,
+      -0.04491395024766369,
+      0.4660565977348001,
+      0.236097666042352,
+      0.25668140855537375
+    ],
+    "100": [
+      2.9455154887498107,
+      1.5296180418795418,
+      2.131180833818901,
+      2.952765086578476,
+      3.3338616394297675,
+      3.9447846182540287,
+      3.0901192096957115,
+      4.686435233159792,
+      2.1971759378337974,
+      2.7639124217006743,
+      3.6761714785206183,
+      2.5100980037008624,
+      2.7321583880341413,
+      3.3904704336029767,
+      3.585921530720667,
+      2.4791532132678715,
+      3.4115138961023477,
+      2.522832876755155,
+      1.785097774576424,
+      2.948541210461848,
+      3.062753168156894,
+      3.840927213211818,
+      2.515131272489987,
+      2.770372131720771,
+      2.9156905165664617,
+      3.968778486511198,
+      1.8233013251448993,
+      2.7085379807402163,
+      2.499293767230631,
+      2.726834526271737
+    ]
+  },
+  "out_of_sample": {
+    "easy_r100": {
+      "observed": {
+        "ci_2_5": 1.9485465309361047,
+        "ci_97_5": 2.852011242716875,
+        "point": 2.4055105819927576
+      },
+      "predicted": {
+        "ci_2_5": -0.9327346495424023,
+        "ci_97_5": 0.5629601386057081,
+        "point": -0.25295770948046975
+      }
+    },
+    "hard_r100": {
+      "observed": {
+        "ci_2_5": 1.2162882781715538,
+        "ci_97_5": 1.9509921667610337,
+        "point": 1.5870901917353706
+      },
+      "predicted": {
+        "ci_2_5": 6.2396070780067605,
+        "ci_97_5": 7.492518147499477,
+        "point": 6.9049154480988095
+      }
+    }
+  },
+  "sampled_permutation_spread": {
+    "10": {
+      "ci_2_5": -0.13222237205192378,
+      "ci_97_5": 1.3855737845809433,
+      "max": 1.8554714456541335,
+      "mean": 0.6321119533731561,
+      "min": -0.7257421885837932,
+      "sd": 0.387492311578729
+    },
+    "100": {
+      "ci_2_5": 2.26157068293708,
+      "ci_97_5": 5.109008050631811,
+      "max": 6.17046827742878,
+      "mean": 3.6864291215165395,
+      "min": 1.2118807476439766,
+      "sd": 0.735582156952274
+    }
+  },
+  "tail_order": [
+    "Esophageal_carcinoma",
+    "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma",
+    "Bladder_Urothelial_Carcinoma",
+    "Stomach_adenocarcinoma",
+    "Colon_adenocarcinoma",
+    "Lung_squamous_cell_carcinoma",
+    "Rectum_adenocarcinoma",
+    "Skin_Cutaneous_Melanoma",
+    "Uterine_Corpus_Endometrial_Carcinoma",
+    "Lung_adenocarcinoma",
+    "Uterine_Carcinosarcoma",
+    "Head_and_Neck_squamous_cell_carcinoma",
+    "Breast_invasive_carcinoma",
+    "Pancreatic_adenocarcinoma",
+    "Adrenocortical_carcinoma",
+    "Mesothelioma",
+    "Ovarian_serous_cystadenocarcinoma",
+    "Glioblastoma_multiforme",
+    "Brain_Lower_Grade_Glioma",
+    "Kidney_renal_papillary_cell_carcinoma",
+    "Sarcoma",
+    "Uveal_Melanoma",
+    "Liver_hepatocellular_carcinoma",
+    "Kidney_renal_clear_cell_carcinoma",
+    "Testicular_Germ_Cell_Tumors",
+    "Kidney_Chromophobe",
+    "Thymoma",
+    "Pheochromocytoma_and_Paraganglioma",
+    "Prostate_adenocarcinoma",
+    "Thyroid_carcinoma"
+  ]
+}
