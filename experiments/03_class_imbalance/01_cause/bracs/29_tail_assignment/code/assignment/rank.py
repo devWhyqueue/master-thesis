@@ -121,7 +121,7 @@ def _class_tail_row(
         row[rank] = own_dist[0]
         if rank == n - 1:
             ba_dist = ba_r1 - pooled(_stack(class_acc, arm_map, None), w)
-            own_loss_dist = own_dist / float(n)
+            own_loss_dist = -own_dist / float(n)  # BA points lost via c's own recall
             tail = {
                 "D": ba_dist,
                 "own_loss": own_loss_dist,
