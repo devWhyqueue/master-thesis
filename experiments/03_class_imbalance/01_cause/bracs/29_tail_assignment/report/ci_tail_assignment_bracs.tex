@@ -1,0 +1,77 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Which Class Sits in the Tail Matters on BRACS, and Easy Classes Cost Most}
+\author{Yannik Queisler}
+\date{September 22, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On BRACS, a long-tailed training allocation at fixed patients and fixed patch budget costs 7.65 points of balanced accuracy at an imbalance ratio of $\rho=100$, and the prior-versus-support study found that the two tail classes then keep only 7 percent recall. One reading of this large damage is a difficulty-by-prevalence interaction: the overlapping atypical lesions FEA and ADH might collapse when they are rare. This report tests how much the damage depends on which class sits in the tail. Per draw, the class order of the prevalence study is rotated through all seven cyclic shifts, so every class takes every rank exactly once, with patients, patches, and profile held fixed; 360 additional classifiers were fitted. The class in the tail changes the damage by up to 4.3 points at $\rho=100$, from 5.73 points (95\% interval: 3.93 to 7.52) with UDH in the tail to 9.99 points (8.26 to 11.80) with IC, and by up to 2.9 points at $\rho=10$. The pre-specified contrast of the atypical classes against the other five is $-0.85$ points ($-2.11$ to 0.52) at $\rho=100$ and is not resolved; its sign is opposite to the overlap reading. Instead, damage rises with the recall a class has under balanced training (Spearman 0.96 at $\rho=100$, seven classes, descriptive). In the tail at $\rho=100$, six of seven classes keep at most 4 percent recall, so a class loses nearly all its balanced recall and easy classes lose the most. Only IC, the least confused class, keeps half of it. The class's own rank explains 73 to 79 percent of the variance of per-class recall changes, so the damage is largely a sum of per-class responses to rank. The BRACS damage is therefore not carried by the atypical classes; it arises because almost any BRACS class collapses once it is rare.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The BRACS prevalence study of this series measured how balanced accuracy on the seven BRACS lesion classes degrades when the training class distribution moves from balanced to long-tailed, with ten patients per class and a total of 2,240 patches held fixed \citep{queisler2026prevalenceBracs}. The damage reached 4.02 points at $\rho=10$ and 7.65 points at $\rho=100$, about seven times the damage of the same design on TCGA-UT \citep{queisler2026prevalenceTcga}. The prior-versus-support study split the BRACS damage at $\rho=100$ into 4.47 points from the skewed class prior and 3.29 points from thin tail support. It also found that the two tail classes of r100 keep only 7.31 percent recall, against 38.72 percent under balanced training, and that a skewed prior alone lowers them to about 21 percent already at $\rho=10$ \citep{queisler2026causeBracs}.
+
+In all of these studies the class order of the long-tail profile was drawn at random per draw, and the damage was averaged over the resulting assignments. That average hides a question the design did not answer: does the damage depend on \emph{which} class is rare? BRACS contains two atypical lesion classes, flat epithelial atypia (FEA) and atypical ductal hyperplasia (ADH), which lie morphologically between benign and malignant lesions and overlap with their neighbours. One reading of the large BRACS damage is therefore a difficulty-by-prevalence interaction: the damage would be large because overlapping classes collapse when they are rare, and it would be largest when FEA or ADH sits in the tail.
+
+Two mechanisms predict opposite orderings. Under the \emph{overlap} mechanism, a class with much overlap loses its decision region first when its prior share shrinks, so hard classes collapse faster and cost more in the tail. Under the \emph{headroom} mechanism, the loss of a class in the tail is bounded by the recall it has under balanced training; if every class in the tail falls close to zero recall, easy classes have the most to lose and cost the most. This report asks: \emph{how much does the damage at a fixed ratio depend on which class sits in the tail, and does the ordering follow overlap or headroom?}
+
+\section{Design}
+\label{sec:design}
+The study reuses the design of the BRACS prevalence curve \citep{queisler2026prevalenceBracs}: the seven BRACS lesion classes with frozen Virchow2 features \citep{zimmermann2024virchow2}, three patient-disjoint splits with ten draws each, $G=10$ patients per class, a total budget of $T=2{,}240$ training patches, and nested patch orderings within each patient. The balanced arm r1 gives each class 320 patches. The ratio arm r$\rho$ gives the class at rank $j$ a count proportional to $\rho^{-j/6}$, with rank 0 the head and rank 6 the tail; at $\rho=100$ the seven ranks receive 1,206, 560, 260, 120, 56, 26, and 12 patches. Each draw assigns classes to ranks by a random permutation $\pi$.
+
+Only the class-to-rank assignment varies here. For every split and draw, the shift-$k$ arm assigns rank $j$ to the class $\pi_{(j-k)\bmod 7}$, for $k=0,\dots,6$ (Table~\ref{tab:latin}). The seven shifts of one draw form a Latin square: every class takes every rank exactly once, and every class sits in the tail once per draw, 30 times per ratio. Patients, patch orderings, the per-rank counts, and the realized ratios (9.95 and 100.5) are identical across shifts. Shift 0 is the permutation of the prevalence study, so its fits and those of r1 are reused unchanged; the 6 other shifts at $\rho\in\{10,100\}$ require 6 $\times$ 2 $\times$ 30 = 360 fits, all of which converged. The reused shift-0 arms reproduce the stored balanced accuracies of the prevalence study exactly.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Rank $j$ & 0 & 1 & 2 & 3 & 4 & 5 & 6 \\
+Patches at $\rho=100$ & 1,206 & 560 & 260 & 120 & 56 & 26 & 12 \\
+\midrule
+Shift 0 (prevalence study) & $\pi_0$ & $\pi_1$ & $\pi_2$ & $\pi_3$ & $\pi_4$ & $\pi_5$ & $\pi_6$ \\
+Shift 1 & $\pi_6$ & $\pi_0$ & $\pi_1$ & $\pi_2$ & $\pi_3$ & $\pi_4$ & $\pi_5$ \\
+Shift 2 & $\pi_5$ & $\pi_6$ & $\pi_0$ & $\pi_1$ & $\pi_2$ & $\pi_3$ & $\pi_4$ \\
+\multicolumn{1}{c}{\vdots} & & & & & & & \\
+Shift 6 & $\pi_1$ & $\pi_2$ & $\pi_3$ & $\pi_4$ & $\pi_5$ & $\pi_6$ & $\pi_0$ \\
+\bottomrule
+\end{tabular}
+\caption{Cyclic shifts of a draw's class order place every class at every rank exactly once. $\pi$ is the random class permutation of one split and draw in the prevalence study; shift $k$ rotates this order by $k$ ranks. The per-rank patch counts, patients, and patch orderings stay fixed, so only the identity of the class at each rank changes.}
+\label{tab:latin}
+\end{table}
+
+\noindent Cyclic shifts replace the random permutations of the prevalence study for two reasons. Thirty random permutations would place each class in the tail only about four times, whereas the Latin square places it there 30 times per ratio. And because the shifts keep the rest of the order fixed within a draw, the damage attributed to a tail class does not depend on a different random arrangement of the other six classes. The price is that, within a draw, a tail class always has the same neighbours at ranks 4 and 5; these neighbours vary across the 30 draws. Every fit selects its regularization strength by validation patient-macro balanced accuracy \citep{queisler2026patientShortage}, as in the prevalence curve.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The primary endpoint is the \emph{tail damage} of class $c$ at ratio $\rho$,
+\begin{equation}
+  D_\rho(c) = \mathrm{BA}(\text{r1}) - \mathrm{BA}(\text{r}\rho \mid c \text{ at rank } 6),
+  \label{eq:tail-damage}
+\end{equation}
+\noindent where BA is test patient-macro balanced accuracy and the second term pools the 30 fits in which $c$ occupies the tail. The mean of $D_\rho(c)$ over the seven classes averages over all shifts and should match the prevalence damage up to the assignment noise of shift 0. Balanced accuracy is the mean of seven per-class recalls, so $D_\rho(c)$ splits exactly into the \emph{own loss} $-\Delta_c/7$, where $\Delta_c$ is the change of the tail class's own recall against r1, and the \emph{loss on the other classes}, $D_\rho(c)$ minus the own loss.
+
+To test the reading stated in Section~\ref{sec:motivation} without selecting the contrast after seeing the data, one contrast was fixed in advance: the mean tail damage of the atypical classes FEA and ADH minus the mean of the other five classes. The spread of $D_\rho(c)$ over all seven classes is reported descriptively; its maximum minus minimum is biased upward by selecting the extremes of seven noisy means. The \emph{rank response} $\Delta_\rho(c,j)$ is the change of the own recall of class $c$ against r1 when $c$ sits at rank $j$, a 7 $\times$ 7 matrix per ratio that the Latin square provides without additional fits. An \emph{own-rank model} predicts every per-fit, per-class recall change by the mean of its (class, rank) cell; its $R^2$ bounds how much the arrangement of the other classes adds beyond each class's own rank.
+
+Two class properties are computed from the balanced arm: the patient-macro recall of the class under r1, the \emph{headroom}, and its \emph{confusability}, the off-diagonal confusion mass into and out of the class as a share of all r1 test predictions, pooled over 30 fits. With seven classes, their Spearman correlations with $D_\rho(c)$ are descriptive, and no significance is claimed. The headroom mechanism predicts a positive correlation of $D_\rho(c)$ with r1 recall; the overlap mechanism predicts a positive correlation with confusability and a negative one with r1 recall.
+
+Pooling and uncertainty follow the prevalence curve: equal weight per split, Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} combined with resampling of draws within splits, 2,000 shared replicates, and 95 percent percentile intervals of every paired contrast. A difference counts as material if it exceeds one point of balanced accuracy, the threshold of the series. The ratios are $\rho=10$ and $\rho=100$, where the prevalence damage is 4.02 and 7.65 points.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}

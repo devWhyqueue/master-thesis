@@ -39,7 +39,7 @@
       "confusability_vs_own_loss": {
         "n": 7,
         "spearman_p": 0.38331687042697266,
-        "spearman_r": -0.39285714285714296
+        "spearman_r": 0.39285714285714296
       },
       "r1_recall_vs_D": {
         "n": 7,
@@ -49,7 +49,7 @@
       "r1_recall_vs_own_loss": {
         "n": 7,
         "spearman_p": 0.11939237342741094,
-        "spearman_r": -0.642857142857143
+        "spearman_r": 0.642857142857143
       }
     },
     "100": {
@@ -61,7 +61,7 @@
       "confusability_vs_own_loss": {
         "n": 7,
         "spearman_p": 0.8790481931481541,
-        "spearman_r": -0.07142857142857144
+        "spearman_r": 0.07142857142857144
       },
       "r1_recall_vs_D": {
         "n": 7,
@@ -71,7 +71,7 @@
       "r1_recall_vs_own_loss": {
         "n": 7,
         "spearman_p": 0.006807187408935392,
-        "spearman_r": -0.8928571428571429
+        "spearman_r": 0.8928571428571429
       }
     }
   },
