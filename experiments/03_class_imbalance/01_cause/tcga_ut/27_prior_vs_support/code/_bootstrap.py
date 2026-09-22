@@ -22,6 +22,14 @@ _CODE_DIRS = (
 )
 
 for _name in _CODE_DIRS:
-    _code_dir = str(next(chain(_EXPERIMENTS.glob(f"*/{_name}/code"), _EXPERIMENTS.glob(f"*/*/{_name}/code"))))
+    _code_dir = str(
+        next(
+            chain(
+                _EXPERIMENTS.glob(f"*/{_name}/code"),
+                _EXPERIMENTS.glob(f"*/*/{_name}/code"),
+                _EXPERIMENTS.glob(f"*/*/*/{_name}/code"),
+            )
+        )
+    )
     if _code_dir not in sys.path:
         sys.path.insert(0, _code_dir)

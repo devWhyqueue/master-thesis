@@ -7,7 +7,7 @@ prevalence:
   patients_per_class: 10
 
 paths:
-  outputs: experiments/03_class_imbalance/01_cause/28_cause_bracs/outputs/bracs/patch
+  outputs: experiments/03_class_imbalance/01_cause/bracs/28_prior_vs_support/outputs/bracs/patch
 
 dataset:
   name: bracs
@@ -36,8 +36,8 @@ feature_extraction:
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
-  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/27_cause_tcga_ut/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/28_cause_bracs/outputs/bracs/patch
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/tcga_ut/27_prior_vs_support/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/bracs/28_prior_vs_support/outputs/bracs/patch
   container: /home/yannik.qu/master-thesis/experiments/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/bracs/patch
   prevalence_outputs: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/00_damage/26_damage_bracs/outputs/bracs/patch

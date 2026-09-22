@@ -13,7 +13,7 @@ flowchart TD
     S5["<b>02_patient_shortage/02_mitigation</b><br/>Cohort-only moment repairs close<br/>at most ~15% of the 5→20 gap,<br/>none on BRACS; missing patient<br/>directions need more patients<br/><i>exp. 19–24</i>"]
 
     S7["<b>03_class_imbalance/00_damage</b><br/>Fixed patients and budget: BA loses<br/>1 pp at ρ≈20, 2.9 pp at ρ=100 (TCGA-UT),<br/>1 pp at ρ=2, 7.7 pp at ρ=100 (BRACS);<br/>temperature scaling repairs calibration<br/><i>exp. 25–26</i>"]
-    N1["<b>03_class_imbalance/01_cause</b><br/>Split the ratio arm into class-prior<br/>and patch-support components,<br/>one factor at a time<br/><i>exp. 27–28</i>"]
+    N1["<b>03_class_imbalance/01_cause</b><br/>Split the ratio arm into class-prior<br/>and patch-support components;<br/>test whether tail-class identity<br/>changes the damage<br/><i>exp. 27–29</i>"]
 
     S1 --> S2 --> S3 --> S4 --> S5
     S2 -.-> S7 --> N1
