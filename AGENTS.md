@@ -17,16 +17,10 @@
 
 # LaTeX
 
-- TeX Live is installed on Windows (`C:\texlive\2026\bin\windows\`). Use it via PowerShell — the WSL `/mnt/c/texlive` mount is not available.
-- Compile from the directory containing the `.tex` file:
-  ```powershell
-  $reportName = "report_name" # Replace with the report filename stem.
-  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "$reportName.tex"
-  & "C:\texlive\2026\bin\windows\bibtex.exe" $reportName
-  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "$reportName.tex"
-  & "C:\texlive\2026\bin\windows\pdflatex.exe" -interaction=nonstopmode -halt-on-error "$reportName.tex"
-  ```
-- Do not clean up LaTeX auxiliary files; Git ignores them.
+- TeX Live is installed on Windows (`C:\texlive\2026\bin\windows\`). Use it from Git Bash (`/c/texlive/...`).
+- Compile with `scripts/tex-build.sh path/to/report.tex` (Git Bash). It runs pdflatex, bibtex, pdflatex x2 in a temporary
+  `.latex-build` dir next to the `.tex`, copies out only the PDF, and prints overfull/underfull boxes and undefined references.
+  On a failed build it keeps `.latex-build` for the log; delete it once fixed.
 - When writing in academic reports, use the `/scientific-writing` skill.
 
 # NotebookLM
