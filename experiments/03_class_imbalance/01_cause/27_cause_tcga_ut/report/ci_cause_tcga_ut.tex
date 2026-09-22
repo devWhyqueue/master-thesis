@@ -1,0 +1,84 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Skewed Prior and Thin Tail Support Compound on TCGA-UT}
+\author{Yannik Queisler}
+\date{September 22, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, a long-tailed training allocation at fixed patients and fixed patch budget costs 2.91 points of balanced accuracy at an imbalance ratio of $\rho=100$. Each ratio changes two things at once: the class prior of the training objective, and the number of patches that represent each tail class. This report separates the two. For every $\rho$ from 2 to 100, a \emph{prior-only} arm trains on the balanced rows with class weights that impose the long-tailed prior, and a \emph{support-only} arm trains on the long-tailed rows with class weights that restore a balanced prior. All arms use the same patients, patches, and class order as the original curve, so every contrast is paired. At $\rho=100$ the prior alone costs 1.20 points (95\% interval: 0.87 to 1.53) and the thin support alone 0.53 points (0.36 to 0.70). Their sum falls short of the full damage by 1.18 points (1.00 to 1.37), so the two factors interact: the skewed prior hurts much more when the tail is also thinly sampled. Up to $\rho=20$ the prior carries most of the damage, and support alone costs nothing. The acceleration of the curve beyond $\rho=10$ comes from support and from the interaction; the prior-only curve stays linear in $\log\rho$. Subtracting the log prior from the logits recovers half of the full damage at $\rho=100$ but falls 0.92 points short of the support-only arm, and it lowers the accuracy of the prior-only arm. The skewed prior also drives the drop in selected regularization and the rise in fitted temperature that accompany imbalance.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The prevalence curve of this series measured how balanced accuracy on TCGA-UT degrades as the training class distribution moves from balanced to long-tailed, with twenty patients per class and a total of 19,200 patches held fixed \citep{queisler2026prevalenceTcga}. The damage was 0.57 points at $\rho=10$ and 2.91 points at $\rho=100$, and the loss per doubling of $\rho$ rose from 0.18 points below $\rho=10$ to 0.70 points above it. Because the budget is fixed, each ratio moves two factors together. The \emph{class prior}, the share of the training objective that each class contributes, tilts toward the head. The \emph{tail support}, the number of patches from which the classifier estimates each rare class, shrinks; at $\rho=100$ the smallest class keeps 28 patches, between one and two per patient. The curve could not say which factor causes the damage, and the companion BRACS study proposed, without testing it, that a shifted prior rather than thin support explains its much larger damage \citep{queisler2026prevalenceBracs}.
+
+This report separates the two factors on TCGA-UT. The question is: \emph{does the prevalence damage come from the skewed prior, from the thin tail support, or from their interaction, and which of them makes the curve accelerate beyond $\rho=10$?}
+
+\section{Design}
+\label{sec:design}
+The study reuses the full design of the prevalence curve \citep{queisler2026prevalenceTcga}: the 30 TCGA-UT cancer types with frozen Virchow2 features \citep{zimmermann2024virchow2}, three patient-disjoint splits with ten draws each, twenty patients per class, a total budget of $T=19{,}200$ training patches, the exponential long-tail profile with a random class order per draw, and nested patch orderings within each patient. The balanced arm r1 gives each class 640 patches; the ratio arm r$\rho$ gives the class at rank $k$ a count proportional to $\rho^{-k/29}$. Both are taken unchanged from the stored fits of that study.
+
+Each arm is now described by two allocations: the \emph{data allocation}, which rows enter training, and the \emph{prior allocation}, which class shares the loss is weighted toward. With $n_c$ training rows of class $c$ out of $N$ in the data allocation and $t_c$ rows out of $T$ in the prior allocation, every row of class $c$ receives the weight
+\begin{equation}
+  w_c = \frac{t_c/T}{n_c/N}.
+  \label{eq:weights}
+\end{equation}
+\noindent The weights sum to $N$, so the regularization strength keeps the same scale as in the unweighted fits, and the weighted loss gives class $c$ exactly the share $t_c/T$. Two arms are added per ratio (Table~\ref{tab:arms}). The \emph{prior-only} arm P$\rho$ trains on the rows of r1 and weights them toward the class shares of r$\rho$. Its objective has the same expectation as that of r$\rho$, but every class, including the tail, is estimated from 640 patches. The \emph{support-only} arm S$\rho$ trains on the rows of r$\rho$ and weights them back to balanced shares, so it sees the thin tail of r$\rho$ under a balanced objective. At $\rho=100$, P gives the head class a weight of 4.44 and the tail class 0.044, and S gives the head 0.23 and the tail 22.9.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Arm & Training rows & Prior of the loss & Source \\
+\midrule
+r1 & balanced, 640 per class & balanced & prevalence curve \\
+r$\rho$ & long-tailed, ratio $\rho$ & long-tailed (implicit) & prevalence curve \\
+P$\rho$ & balanced, 640 per class & long-tailed, via weights & fitted here \\
+S$\rho$ & long-tailed, ratio $\rho$ & balanced, via weights & fitted here \\
+LP$\rho$, Lr$\rho$ & as P$\rho$, r$\rho$ & logit-adjusted & no fit \\
+\bottomrule
+\end{tabular}
+\caption{The four fitted arms form a two-by-two design per ratio, crossing the data allocation with the prior of the loss. The prior-only arm P$\rho$ and the support-only arm S$\rho$ each change one factor relative to the balanced arm; the ratio arm r$\rho$ changes both. The logit-adjusted arms reuse the stored test probabilities of P$\rho$ and r$\rho$. All arms share patients, patch orderings, and class order per split and draw.}
+\label{tab:arms}
+\end{table}
+
+\noindent Two further arms need no fit. They apply post-hoc \emph{logit adjustment} \citep{menon2021longTail} to the uncalibrated test probabilities of P$\rho$ and r$\rho$, predicting $\arg\max_c\,(\log p_c - \log\pi_c)$ with $\pi_c$ the training prior share of class $c$. They show how much of each arm's damage a correction of the class intercepts alone removes.
+
+Every fitted arm selects its regularization strength from nine values between $10^{-6}$ and 100 by validation patient-macro balanced accuracy \citep{queisler2026patientShortage} and then fits one validation temperature \citep{guo2017calibration}, as in the prevalence curve. The ratios are $\rho\in\{2,5,10,20,50,100\}$. The study fits 2 arms $\times$ 6 ratios $\times$ 30 split-draw pairs, 360 classifiers, and all of them converged. The reused r arms reproduce the published damages exactly.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoint is the damage relative to the balanced arm, $\Delta_A(\rho)=\mathrm{BA}(\text{r1})-\mathrm{BA}(A\rho)$, for $A\in\{\text{r},\text{P},\text{S}\}$, where BA is test patient-macro balanced accuracy. The \emph{interaction} is the part of the full damage that the two single-factor damages do not add up to,
+\begin{equation}
+  I(\rho) = \Delta_\text{r}(\rho) - \Delta_\text{P}(\rho) - \Delta_\text{S}(\rho),
+  \label{eq:interaction}
+\end{equation}
+\noindent and the \emph{shares} $\Delta_\text{P}/\Delta_\text{r}$ and $\Delta_\text{S}/\Delta_\text{r}$ express the single-factor damages as fractions of the full damage. Shares are reported only where $\Delta_\text{r}\geq1$ point, that is from $\rho=20$ on; the primary ratio is $\rho=100$. \emph{Acceleration} is the least-squares slope of the damage on $\log_2\rho$ over $\rho\geq10$ minus the slope over $\rho\leq10$, per family, in points per doubling. For the r family the low segment spans $\rho=1$ to 10, as in the prevalence curve; for P and S it spans $\rho=2$ to 10.
+
+The first secondary endpoint is the fraction of the prior damage that logit adjustment recovers, the \emph{intercept share}
+\begin{equation}
+  \frac{\mathrm{BA}(\text{LP}\rho)-\mathrm{BA}(\text{P}\rho)}{\Delta_\text{P}(\rho)}.
+  \label{eq:intercept-share}
+\end{equation}
+\noindent The others are the difference $\mathrm{BA}(\text{Lr}\rho)-\mathrm{BA}(\text{S}\rho)$ between post-hoc and training-time correction of the same data; the recall of the head, body, and tail thirds of the classes by assigned rank; and the selected regularization strength and mean fitted temperature per arm. Pooling and uncertainty follow the prevalence curve: equal weight per split, Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} combined with resampling of draws within splits, 2,000 shared replicates, and 95 percent percentile intervals of every paired contrast.
+
+Four readings were fixed in advance, at the primary ratio. The \emph{prior carries} the damage if $\Delta_\text{P}\geq1$ point with a share of at least one half while $\Delta_\text{S}<1$ point; \emph{support carries} it under the mirror conditions. The factors are \emph{additive} if the interval of $I$ contains zero, and they \emph{interact} if $I$ is resolved above zero. The acceleration is attributed to the family whose slope difference is resolved above zero.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
