@@ -1,0 +1,52 @@
+# TCGA-UT tail-class assignment relevance experiment (exp-30). Part A (0 new fits) reanalyzes
+# exp-25's stored r1/r10/r100/N fits (30 independent random class orders, one per split x draw)
+# with a per-class piecewise own-recall-vs-allocation model. Part B (60 new fits) confirms it
+# with one easy-tail/hard-tail contrast at rho 100, ordered by exp-25's pooled r1 test recall.
+# Same G = 20 patients/class, class permutation, and patient draws as exp-25/27. CPU-only.
+
+paths:
+  outputs: experiments/03_class_imbalance/01_cause/tcga_ut/30_tail_assignment/outputs/tcga_ut/patch
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+  root: /mnt/tcga-ut
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
+  expected_slide_count: 8736
+  expected_class_count: 32
+  expected_patch_count: 1608060
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  weights_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/tcga_ut/30_tail_assignment/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/tcga_ut/30_tail_assignment/outputs/tcga_ut/patch
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
+  prevalence_outputs: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/outputs/tcga_ut/patch
+  max_array_concurrency: {cpu-5h: 40, cpu-2h: 40}
+  resources:
+    fit: {partition: cpu-5h, gpus: 0, cpus: 16, memory: 64G}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G}
+  squashfs: []
