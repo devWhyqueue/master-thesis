@@ -23,7 +23,9 @@
     "experiments/02_patient_shortage/02_mitigation/23_within_patient_span/code",
     "experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/code",
     "experiments/03_class_imbalance/01_cause/tcga_ut/27_prior_vs_support/code",
-    "experiments/03_class_imbalance/01_cause/bracs/29_tail_assignment/code"
+    "experiments/03_class_imbalance/01_cause/bracs/29_tail_assignment/code",
+    "experiments/03_class_imbalance/01_cause/tcga_ut/30_tail_assignment/code",
+    "experiments/03_class_imbalance/01_cause/tcga_ut/31_worst_assignment/code"
   ],
   "extraPaths": [
     "experiments/01_benchmark/02_benchmark_patch/code",
@@ -49,7 +51,9 @@
     "experiments/02_patient_shortage/02_mitigation/23_within_patient_span/code",
     "experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/code",
     "experiments/03_class_imbalance/01_cause/tcga_ut/27_prior_vs_support/code",
-    "experiments/03_class_imbalance/01_cause/bracs/29_tail_assignment/code"
+    "experiments/03_class_imbalance/01_cause/bracs/29_tail_assignment/code",
+    "experiments/03_class_imbalance/01_cause/tcga_ut/30_tail_assignment/code",
+    "experiments/03_class_imbalance/01_cause/tcga_ut/31_worst_assignment/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
