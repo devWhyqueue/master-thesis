@@ -78,23 +78,21 @@ class Coefficients(NamedTuple):
         return Coefficients(self.a[..., 0], self.b_pos[..., 0], self.b_neg[..., 0])
 
 
-def fit_piecewise(
-    z: np.ndarray, delta: np.ndarray, weight: np.ndarray, robust: bool = False
-) -> Coefficients:
+def fit_piecewise(z: np.ndarray, delta: np.ndarray, weight: np.ndarray) -> Coefficients:
     """Per-class weighted LS of own-delta on ``[1, z+, z-]``, batched over bootstrap replicates.
 
     ``z``/``delta``/``weight`` are (C, N, R): N stacked (arm, fit) observations per class, R
-    bootstrap replicate columns (column 0 is the observed point estimate). ``robust`` uses the
-    Moore-Penrose pseudo-inverse instead of ``solve`` (never raises on a rank-deficient design,
-    e.g. a leave-one-draw-out fold whose remaining rows happen to sit on one side of z = 0).
+    bootstrap replicate columns (column 0 is the observed point estimate). Solved via the
+    Moore-Penrose pseudo-inverse rather than ``solve``: some classes never see z on one side of
+    0 across the reused arms (e.g. a leave-one-draw-out fold, or a class too common to ever fall
+    below balance), leaving that side's column all zero and the 3x3 design singular; ``pinv``
+    matches ``solve`` when the design is full rank and degrades to the minimum-norm fit instead
+    of raising otherwise.
     """
     x = _design(z)  # (C, N, R, 3)
     a_mat = np.einsum("cnr,cnri,cnrj->crij", weight, x, x)
     b_vec = np.einsum("cnr,cnri,cnr->cri", weight, x, delta)
-    if robust:
-        beta = np.einsum("crij,crj->cri", np.linalg.pinv(a_mat), b_vec)
-    else:
-        beta = np.linalg.solve(a_mat, b_vec[..., None])[..., 0]
+    beta = np.einsum("crij,crj->cri", np.linalg.pinv(a_mat), b_vec)
     return Coefficients(beta[..., 0], beta[..., 1], beta[..., 2])
 
 
@@ -131,7 +129,7 @@ def leave_one_draw_out(
     for fold, col in enumerate(target_col):
         weight = (fit_index != fold).astype(np.float64)
         w3 = np.broadcast_to(weight[None, :, None], z3.shape)
-        coefs = fit_piecewise(z3, delta3, w3, robust=True)
+        coefs = fit_piecewise(z3, delta3, w3)
         predicted[fold] = predict_d(coefs, z[:, col])[0]
         observed[fold] = -delta_point[:, col].mean()
     return predicted, observed
