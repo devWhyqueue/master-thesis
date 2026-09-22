@@ -1,0 +1,143 @@
+\section{Results}
+\label{sec:results}
+The results follow the endpoints: first the decomposition of the damage per ratio, then the acceleration, the classes on which each factor's damage lands, the effect of logit adjustment, and finally the selected regularization and temperatures. The balanced arm reaches 39.57 percent balanced accuracy (36.70 to 42.53), as in the prevalence curve.
+
+\subsection{Decomposition of the damage}
+\label{sec:decomposition-results}
+Both factors cost accuracy on BRACS, and their damages add up to the full damage at every ratio (Table~\ref{tab:decomposition}, Figure~\ref{fig:component}). The prior alone accounts for the larger part: 0.98 of the 1.15 points at $\rho=2$, 2.77 of 4.02 points at $\rho=10$, and 4.47 of 7.65 points at $\rho=100$. Its intervals lie clearly above zero from $\rho=5$ on; at $\rho=2$ the lower bound touches zero. Unlike on TCGA-UT, where thin support alone cost nothing up to $\rho=20$ \citep{queisler2026causeTcga}, the support-only damage on BRACS is resolved from $\rho=10$ on, 0.87 points at $\rho=10$, where the tail class keeps 7.7 patches per patient, and it grows to 3.29 points at $\rho=100$, where the tail keeps 1.2. A balanced objective on the long-tailed rows thus does not protect the BRACS classifier once the tail falls below about eight patches per patient.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lllllrr@{}}
+\toprule
+$\rho$ & $\Delta_\text{r}$ (both) & $\Delta_\text{P}$ (prior) & $\Delta_\text{S}$ (support) & Interaction $I$ & Share P & Share S \\
+\midrule
+2 & 1.15 [0.14, 2.35] & 0.98 [0.00, 2.18] & 0.11 [$-$0.35, 0.58] & 0.06 [$-$0.53, 0.64] & 0.85 & 0.10 \\
+5 & 3.12 [1.72, 4.66] & 2.13 [0.89, 3.48] & 0.58 [$-$0.06, 1.32] & 0.40 [$-$0.34, 1.10] & 0.68 & 0.19 \\
+10 & 4.02 [2.50, 5.66] & 2.77 [1.39, 4.28] & 0.87 [0.08, 1.74] & 0.37 [$-$0.47, 1.18] & 0.69 & 0.22 \\
+20 & 5.04 [3.32, 6.87] & 3.68 [2.16, 5.34] & 1.44 [0.56, 2.42] & $-$0.09 [$-$1.34, 0.97] & 0.73 & 0.29 \\
+50 & 6.63 [4.76, 8.65] & 4.10 [2.57, 5.73] & 2.24 [1.19, 3.39] & 0.30 [$-$1.04, 1.50] & 0.62 & 0.34 \\
+100 & 7.65 [5.77, 9.78] & 4.47 [2.84, 6.30] & 3.29 [1.99, 4.67] & $-$0.11 [$-$1.74, 1.36] & 0.58 & 0.43 \\
+\bottomrule
+\end{tabular}
+\caption{On BRACS the prior carries the larger part of the damage, thin support the rest, and their sum matches the full damage at every ratio. Damages are balanced-accuracy losses against the balanced arm in percentage points, with paired 95\% bootstrap intervals; the interaction is $\Delta_\text{r}-\Delta_\text{P}-\Delta_\text{S}$. Shares are single-factor damages as fractions of $\Delta_\text{r}$. Their intervals at $\rho=100$ are 0.45 to 0.72 for P and 0.29 to 0.58 for S; at $\rho=2$ they span 0.15 to 1.53 and $-0.77$ to 0.58.}
+\label{tab:decomposition}
+\end{table}
+
+\noindent No interaction is detected. Its point estimates lie between $-0.11$ and 0.40 points at all six ratios, and $\Delta_\text{P}+\Delta_\text{S}$ at $\rho=100$ is 7.76 points against a full damage of 7.65. Every interval contains zero, but only the one at $\rho=2$ stays within $\pm1$ point; from $\rho=5$ on the intervals reach up to 1.10 to 1.50 points. By the criterion fixed in Section~\ref{sec:evaluation}, the factors are additive at $\rho=2$ and the interaction is unresolved at the larger ratios. The upper bound at $\rho=100$, 1.36 points, is 18 percent of the full damage, less than half of the 41 percent that the interaction contributes on TCGA-UT \citep{queisler2026causeTcga}. The shares move with $\rho$: the prior carries about 70 percent of the damage from $\rho=5$ to 20 and 58 percent at $\rho=100$, while the support share rises from 0.10 at $\rho=2$ to 0.43. The three splits agree on the absence of compounding; their interactions at $\rho=100$ are $-0.11$, $-0.43$, and 0.20 points.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.6\textwidth]{component.pdf}
+\caption{On BRACS the full damage equals the sum of its single-factor parts. Change in patient-macro balanced accuracy relative to the balanced arm for the ratio arm r (prior and support), the prior-only arm P, and the support-only arm S, each with a shaded paired 95\% bootstrap band; the dashed line is the sum of the P and S changes. All series are plotted at the realized ratio of r$\rho$.}
+\label{fig:component}
+\end{figure}
+
+\subsection{Acceleration}
+\label{sec:acceleration-results}
+No family accelerates, but the two factors change their rates in opposite directions (Table~\ref{tab:slopes}). The full damage grows by 1.25 points per doubling of $\rho$ up to $\rho=10$ and by 1.11 points beyond, so its acceleration of $-0.14$ points is not resolved, as in the prevalence curve. The prior-only damage grows faster at low ratios, 0.78 points per doubling, than at high ratios, 0.48 points. The support-only damage does the opposite, 0.33 points per doubling up to $\rho=10$ and 0.71 points beyond. Neither slope difference is resolved, although the support family comes close with an interval of $-0.04$ to 0.79 points. Below $\rho=10$ the prior thus contributes about 60 percent of the growth; above it, support contributes about 60 percent, and the two changes offset each other in the nearly linear full curve.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Family & Slope, $\rho\leq10$ & Slope, $\rho\geq10$ & Acceleration \\
+\midrule
+r (both) & 1.25 [0.80, 1.73] & 1.11 [0.78, 1.47] & $-$0.14 [$-$0.68, 0.40] \\
+P (prior) & 0.78 [0.36, 1.25] & 0.48 [0.28, 0.71] & $-$0.29 [$-$0.76, 0.18] \\
+S (support) & 0.33 [0.04, 0.65] & 0.71 [0.43, 1.03] & 0.38 [$-$0.04, 0.79] \\
+\bottomrule
+\end{tabular}
+\caption{The prior damage grows fastest at low ratios and the support damage at high ratios, while the full damage grows at a constant rate. Least-squares slopes of the damage on $\log_2\rho$ in points per doubling, with paired 95\% bootstrap intervals; acceleration is the high-segment slope minus the low-segment slope. None is resolved above zero. The low segment of r includes the balanced arm at $\rho=1$; those of P and S start at $\rho=2$.}
+\label{tab:slopes}
+\end{table}
+
+\subsection{Where the damage lands}
+\label{sec:rank-results}
+Both factors move recall from the tail and body classes to the head classes, and at $\rho=100$ they do so with similar strength (Table~\ref{tab:thirds}). The prior-only arm removes most of its tail recall at small ratios: tail recall falls from 38.72 percent in the balanced arm to 28.12 at $\rho=2$ and to 20.90 at $\rho=10$, and then stays between 20.9 and 22.1 percent up to $\rho=100$. Its head gain peaks at 9.4 points at $\rho=10$ and shrinks to 5.5 points at $\rho=100$. The support-only arm leaves the head within 4.5 points of the balanced arm up to $\rho=20$ but loses tail recall steadily, from 36.84 percent at $\rho=2$ to 19.36 at $\rho=100$. At $\rho=100$ it lowers the tail by 19.4 points and raises the head by 7.8, more than the prior-only arm does on either group, although its objective is balanced.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrrrrrr@{}}
+\toprule
+ & & \multicolumn{3}{c}{$\rho=10$} & \multicolumn{3}{c}{$\rho=20$} & \multicolumn{3}{c}{$\rho=100$} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-11}
+Group & r1 & r & P & S & r & P & S & r & P & S \\
+\midrule
+Head (3) & 37.41 & 48.94 & 46.80 & 40.96 & 50.10 & 44.46 & 41.90 & 51.18 & 42.87 & 45.22 \\
+Body (2) & 43.66 & 34.54 & 37.67 & 41.84 & 33.17 & 36.76 & 41.69 & 27.64 & 36.89 & 39.77 \\
+Tail (2) & 38.72 & 16.49 & 20.90 & 32.16 & 12.53 & 22.15 & 28.90 & 7.31 & 21.66 & 19.36 \\
+\bottomrule
+\end{tabular}
+\caption{At $\rho=100$ the thin support costs the tail as much as the skewed prior, and the ratio arm loses less tail recall than the two factors together but more body recall. Mean patient-macro recall in percent of the three head, two body, and two tail classes of each draw, by their assigned rank, averaged over 30 fits. The r columns are taken from the prevalence curve.}
+\label{tab:thirds}
+\end{table}
+
+\noindent Within the rank groups, the factors do not add up, even though they do in balanced accuracy. At $\rho=100$ the tail loss of the ratio arm, 31.4 points, is 5.0 points smaller than the sum of the single-factor tail losses, 36.4 points, which would leave the tail classes with only 2.3 percent recall. The body loss of the ratio arm, 16.0 points, exceeds the single-factor sum of 10.7 points by 5.4 points, and the head gains are close to additive, 13.8 against 13.3 points. Because two classes each form the body and the tail, the two deviations cancel almost exactly in balanced accuracy. A floor effect in the tail is the simplest explanation: once the tail classes are hardly predicted at all, a further push cannot remove more of their recall, and the combined push lands on the next ranks instead.
+
+\subsection{Logit adjustment}
+\label{sec:adjustment-results}
+Post-hoc logit adjustment repairs a quarter of the ratio arm's damage and leaves the prior-only arm unchanged (Table~\ref{tab:adjustment}). Applied to r100, it raises balanced accuracy from 31.92 to 33.80 percent, a recovery of 1.88 of the 7.65 points, and at $\rho=10$ it recovers 1.35 of 4.02 points. It falls 2.47 points (1.30 to 3.82) short of the support-only arm, which trains on the same rows with a balanced objective, and it falls short of it at every ratio from $\rho=5$ on, by 1.32 to 2.81 points. Applied to P$\rho$, the same correction changes balanced accuracy by between $-0.13$ and 0.68 points, and the intercept share of the prior damage is not resolved at any ratio: it is 0.24 ($-0.22$ to 0.54) at $\rho=10$ and $-0.03$ ($-0.34$ to 0.19) at $\rho=100$. On TCGA-UT, the same correction lowered the prior-only arm by 0.49 points at $\rho=100$ \citep{queisler2026causeTcga}; on BRACS it neither helps nor harms it. In both datasets the weighted fit has therefore not shifted its class intercepts by the log prior, and its damage lies elsewhere in the fitted scores.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrl@{}}
+\toprule
+$\rho$ & r & Lr & P & LP & S & Lr $-$ S \\
+\midrule
+10 & 35.55 & 36.91 & 36.79 & 37.47 & 38.70 & $-$1.79 [$-$2.97, $-$0.58] \\
+20 & 34.53 & 36.36 & 35.88 & 36.07 & 38.12 & $-$1.76 [$-$2.91, $-$0.70] \\
+50 & 32.94 & 34.53 & 35.47 & 35.35 & 37.33 & $-$2.81 [$-$4.01, $-$1.66] \\
+100 & 31.92 & 33.80 & 35.10 & 34.97 & 36.27 & $-$2.47 [$-$3.82, $-$1.30] \\
+\bottomrule
+\end{tabular}
+\caption{Logit adjustment helps the ratio arm but stays well below training-time rebalancing, and it leaves the prior-only arm unchanged. Test patient-macro balanced accuracy in percent; the balanced arm reaches 39.57. Lr and LP subtract the log training prior from the logits of r and P; the last column is the paired difference between post-hoc and training-time correction of the same rows, with its 95\% bootstrap interval.}
+\label{tab:adjustment}
+\end{table}
+
+\subsection{Regularization and temperature}
+\label{sec:selection-results}
+The prevalence curve found that stronger imbalance selects much weaker regularization and a much larger temperature on BRACS: the balanced arm selects $\lambda=1$ or 10 in all 30 fits with a mean temperature of 0.65, whereas r100 selects $\lambda\leq10^{-3}$ in 18 fits and reaches a temperature of 9.14 \citep{queisler2026prevalenceBracs}. As on TCGA-UT, the prior causes most of this shift. The support-only arms select $\lambda=1$ or 10 in 27 to 29 of 30 fits at every ratio, like the balanced arm, and their mean temperature rises only from 0.66 at $\rho=2$ to 0.91 at $\rho=100$. The prior-only arms move toward weaker regularization as $\rho$ grows: $\lambda=1$ in 24 of 30 fits at $\rho=2$, $\lambda=0.1$ in 20 at $\rho=10$, and $\lambda\leq10^{-2}$ in 24 at $\rho=100$, 17 of them at $\lambda\leq10^{-3}$. Their mean temperature rises from 0.90 at $\rho=2$ to 5.37 at $\rho=100$, well above the balanced arm but below the 9.14 of r100.
+
+The prior-only arms reach the smallest grid value, $10^{-6}$, in 3 fits at $\rho=20$, 3 at $\rho=50$, and 4 at $\rho=100$; the support-only arms never do. A diagnostic refit of one boundary fit each of P50 and P100 with $\lambda$ extended down to $10^{-10}$ found the best validation balanced accuracy at $10^{-6}$ in both cases, 36.70 percent against 35.2 to 35.8 below it for P50, and 36.15 against 35.6 to 36.0 for P100. As in the prevalence curve, the grid boundary did not constrain the selection in the fits that were checked.
+
+\section{Discussion}
+\label{sec:discussion}
+Of the readings fixed in Section~\ref{sec:evaluation}, none of the directional ones applies at $\rho=100$. The prior-only damage of 4.47 points exceeds one point and carries 58 percent of the full damage, but the support-only damage of 3.29 points also exceeds one point, so the prior does not carry the damage in the pre-stated sense, and support does not either. The interaction is not resolved above zero; its point estimate is essentially zero, and its interval is too wide to meet the additive criterion. No family shows a resolved acceleration, so none is attributed. The data thus describe two single factors of comparable order, the prior the larger one, whose damages add up in balanced accuracy to within the precision of the study.
+
+The explanation proposed by the prevalence study holds only in part. Its first half is supported: the skewed prior is the larger factor at every ratio, and on its own, with 320 patches in every class, it costs 4.47 points at $\rho=100$, 3.7 times the 1.20 points of the same arm on TCGA-UT \citep{queisler2026causeTcga}. A prior-only arm keeps the tail fully supported, so this damage cannot come from thin support, and its size fits the proposed mechanism that overlapping lesion classes let a skewed prior shift the decision boundaries far into the rare classes. The prior-only arm also removes most of its tail recall already at $\rho=2$ to 10, as the BRACS curve did. The second half, that thin tail support does not matter, is refuted. A balanced objective on the long-tailed rows costs 0.87 points at $\rho=10$ and 3.29 points at $\rho=100$, more than the whole prevalence damage on TCGA-UT. At $\rho=10$ the tail classes of both datasets keep about eight patches per patient, yet support alone costs 0.87 points on BRACS and nothing on TCGA-UT. BRACS classes are thus harder to estimate from few patches as well as more sensitive to the prior, which is consistent with overlap acting on both factors. The steeper profile of seven classes adds to the support effect, because the tail class receives 12 of 2,240 patches at $\rho=100$ and its weight in the support-only arm rises to 26.7.
+
+The comparison with TCGA-UT is summarized in Table~\ref{tab:cross}. The two datasets differ less in which factor dominates than in how the factors combine. On TCGA-UT, the prior dominates at moderate ratios and the two factors compound at large ratios, with an interaction as large as the prior damage. On BRACS, both factors cost accuracy from moderate ratios on and no compounding is detected. The rank-group recall suggests why: on BRACS the prior alone already reduces the tail classes to about 21 percent recall, and the combination cannot push them much further, so the extra loss appears in the body classes and cancels in balanced accuracy. On TCGA-UT the tail third keeps 60 percent recall even at $\rho=100$, so the combined push can still lower it. Whether the BRACS interaction is truly absent or only hidden by this floor cannot be decided from balanced accuracy alone.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Dataset, $\rho$ & $\Delta_\text{r}$ & $\Delta_\text{P}$ & $\Delta_\text{S}$ & $I$ & Share P & Share S & Lr $-$ S \\
+\midrule
+TCGA-UT, 10 & 0.57 & 0.49 & $-$0.06 & 0.14 & --- & --- & $-$0.30 \\
+BRACS, 10 & 4.02 & 2.77 & 0.87 & 0.37 & 0.69 & 0.22 & $-$1.79 \\
+\addlinespace
+TCGA-UT, 100 & 2.91 & 1.20 & 0.53 & \textbf{1.18} & 0.41 & 0.18 & $-$0.92 \\
+BRACS, 100 & 7.65 & 4.47 & 3.29 & $-$0.11 & 0.58 & 0.43 & $-$2.47 \\
+\bottomrule
+\end{tabular}
+\caption{Both factors are larger on BRACS, but only TCGA-UT shows a resolved interaction. Damages and interaction in percentage points against each dataset's balanced arm, in bold where the interaction is resolved above zero; the last column is the balanced-accuracy gap between logit-adjusted ratio arm and support-only arm. TCGA-UT values are taken from \citet{queisler2026causeTcga}; its shares at $\rho=10$ are omitted because its full damage lies below one point.}
+\label{tab:cross}
+\end{table}
+
+\noindent For mitigation, the decomposition points to training-time rebalancing, as on TCGA-UT, and it also shows its limit on BRACS. Restoring a balanced objective on the rows of r$\rho$ removes the prior damage and leaves the support-only damage, 3.29 points at $\rho=100$. Post-hoc logit adjustment of the same classifier recovers only a quarter of the full damage and stays 2.47 points below that level. The remaining support-only damage is not small on BRACS: it is of the size of the prevalence damage at $\rho=5$, so rebalancing alone cannot restore a long-tailed BRACS training set, and more tail patches or patients would be needed.
+
+\section{Limitations}
+\label{sec:limitations}
+The prior-only arm imposes the long-tailed prior by class weights, not by resampling, and the support-only arm restores the balanced prior the same way. The weighted objectives have the right expectation but are not the same estimators as sampled ones: at $\rho=100$ the support-only arm gives each of the twelve tail patches a weight of 26.7, which may let a regularized classifier overfit them, and the head rows of the prior-only arm number 320 rather than 1,206. The support-only damage therefore mixes the effect of thin support with any cost of extreme weights, and the interaction mixes compounding with any difference between weighting and sampling. Each fitted arm selects its own regularization, so the decomposition includes the effect of the prior on model selection, and three prior-only settings reached the lower end of the grid in three or four fits each, of which two fits were checked.
+
+The rank groups contain three, two, and two classes, so the body and tail recall of Table~\ref{tab:thirds} rest on two classes per draw and mix the imbalance effect with the difficulty of the classes that drew each rank; the floor argument for the missing interaction relies on these groups. With about 24 test patients per split, the intervals of the interaction are about three times wider than on TCGA-UT and cannot exclude an interaction of one point. The low-segment slopes of P and S are estimated from three ratios. All results are conditional on ten patients per class, frozen Virchow2 features, multinomial logistic regression, BRACS, and three overlapping splits.

@@ -1,0 +1,84 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Skewed Prior and Thin Tail Support Both Carry the Damage on BRACS}
+\author{Yannik Queisler}
+\date{September 22, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On BRACS, a long-tailed training allocation at fixed patients and fixed patch budget costs 7.65 points of balanced accuracy at an imbalance ratio of $\rho=100$, and the companion prevalence study attributed this damage, without testing it, to a skewed class prior acting on overlapping lesion classes rather than to thin tail support. This report tests that explanation with the decomposition design of the TCGA-UT study of this series. For every $\rho$ from 2 to 100, a \emph{prior-only} arm trains on the balanced rows with class weights that impose the long-tailed prior, and a \emph{support-only} arm trains on the long-tailed rows with class weights that restore a balanced prior. At $\rho=100$ the prior alone costs 4.47 points (95\% interval: 2.84 to 6.30) and the thin support alone 3.29 points (1.99 to 4.67). Their sum matches the full damage: the interaction is $-0.11$ points ($-1.74$ to 1.36), so no compounding of the kind found on TCGA-UT is detected, although the interval is too wide to exclude an interaction of one point. The prior carries 58 percent of the damage at $\rho=100$ and 68 to 73 percent from $\rho=5$ to 20; support carries the rest, and its share grows with $\rho$. The explanation of the prevalence study therefore holds only in part: the prior is the larger factor, but a balanced objective on twelve tail patches still loses more accuracy than the whole prevalence damage on TCGA-UT. Neither the full curve nor either factor accelerates. Post-hoc logit adjustment recovers a quarter of the full damage and stays 2.47 points below training-time rebalancing of the same rows; it leaves the prior-only arm unchanged. As on TCGA-UT, the prior drives the drop in selected regularization and most of the rise in fitted temperature.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The BRACS prevalence study of this series measured how balanced accuracy on the seven BRACS lesion classes degrades as the training class distribution moves from balanced to long-tailed, with ten patients per class and a total of 2,240 patches held fixed \citep{queisler2026prevalenceBracs}. The damage was 1.15 points already at $\rho=2$, 4.02 points at $\rho=10$, and 7.65 points at $\rho=100$, and it grew by about 1.15 points per doubling of $\rho$ without accelerating. On TCGA-UT, the same design produced only 2.91 points at $\rho=100$ \citep{queisler2026prevalenceTcga}. Because the budget is fixed, every ratio moves two factors together: the \emph{class prior}, the share of the training objective that each class contributes, and the \emph{tail support}, the number of patches from which the classifier estimates each rare class. The BRACS study observed that the damage was large even at ratios where the tail keeps many patches per patient, and it proposed that a shifted prior under strong class overlap, not thin tail support, explains the damage. It did not test this.
+
+The TCGA-UT decomposition study separated the two factors with prior-only and support-only arms and found that they interact: at $\rho=100$ the combination costs 1.18 points more than the prior and the support alone \citep{queisler2026causeTcga}. That study named the same design on BRACS as the test of the BRACS explanation. This report runs it and asks: \emph{does the prevalence damage on BRACS come from the skewed prior, from the thin tail support, or from their interaction, and does the answer differ from TCGA-UT?}
+
+\section{Design}
+\label{sec:design}
+The study reuses the full design of the BRACS prevalence curve \citep{queisler2026prevalenceBracs}: the seven BRACS lesion subtypes with frozen Virchow2 features \citep{zimmermann2024virchow2}, three patient-disjoint splits with ten draws each, $G=10$ patients per class, a total budget of $T=2{,}240$ training patches, the exponential long-tail profile with a random class order per draw, and nested patch orderings within each patient. The balanced arm r1 gives each class 320 patches; the ratio arm r$\rho$ gives the class at rank $k$ a count proportional to $\rho^{-k/6}$. At $\rho=100$ the seven ranks receive 1,206, 560, 260, 120, 56, 26, and 12 patches, so the tail class keeps 1.2 patches per patient. Both arms are taken unchanged from the stored fits of the prevalence study.
+
+Each arm is described by two allocations: the \emph{data allocation}, which rows enter training, and the \emph{prior allocation}, which class shares the loss is weighted toward. With $n_c$ training rows of class $c$ out of $N$ in the data allocation and $t_c$ rows out of $T$ in the prior allocation, every row of class $c$ receives the weight
+\begin{equation}
+  w_c = \frac{t_c/T}{n_c/N}.
+  \label{eq:weights}
+\end{equation}
+\noindent The weights sum to $N$, so the regularization strength keeps the same scale as in the unweighted fits, and the weighted loss gives class $c$ exactly the share $t_c/T$. Two arms are added per ratio (Table~\ref{tab:arms}). The \emph{prior-only} arm P$\rho$ trains on the rows of r1 and weights them toward the class shares of r$\rho$. Its objective has the same expectation as that of r$\rho$, but every class, including the tail, is estimated from 320 patches. The \emph{support-only} arm S$\rho$ trains on the rows of r$\rho$ and weights them back to balanced shares, so it sees the thin tail of r$\rho$ under a balanced objective. At $\rho=100$, P gives the head class a weight of 3.77 and the tail class 0.038, and S gives the head 0.27 and the tail 26.7. Because seven classes share the budget, these weights are more extreme at the tail than on TCGA-UT, where S gives the tail 22.9.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Arm & Training rows & Prior of the loss & Source \\
+\midrule
+r1 & balanced, 320 per class & balanced & prevalence curve \\
+r$\rho$ & long-tailed, ratio $\rho$ & long-tailed (implicit) & prevalence curve \\
+P$\rho$ & balanced, 320 per class & long-tailed, via weights & fitted here \\
+S$\rho$ & long-tailed, ratio $\rho$ & balanced, via weights & fitted here \\
+LP$\rho$, Lr$\rho$ & as P$\rho$, r$\rho$ & logit-adjusted & no fit \\
+\bottomrule
+\end{tabular}
+\caption{The four fitted arms form a two-by-two design per ratio, crossing the data allocation with the prior of the loss. The prior-only arm P$\rho$ and the support-only arm S$\rho$ each change one factor relative to the balanced arm; the ratio arm r$\rho$ changes both. The logit-adjusted arms reuse the stored test probabilities of P$\rho$ and r$\rho$. All arms share patients, patch orderings, and class order per split and draw.}
+\label{tab:arms}
+\end{table}
+
+\noindent Two further arms need no fit. They apply post-hoc \emph{logit adjustment} \citep{menon2021longTail} to the uncalibrated test probabilities of P$\rho$ and r$\rho$, predicting $\arg\max_c\,(\log p_c - \log\pi_c)$ with $\pi_c$ the training prior share of class $c$. They show how much of each arm's damage a correction of the class intercepts alone removes.
+
+Every fitted arm selects its regularization strength from nine values between $10^{-6}$ and 100 by validation patient-macro balanced accuracy \citep{queisler2026patientShortage} and then fits one validation temperature \citep{guo2017calibration}, as in the prevalence curve. The ratios are $\rho\in\{2,5,10,20,50,100\}$. The study fits 2 arms $\times$ 6 ratios $\times$ 30 split-draw pairs, 360 classifiers, and all of them converged. The reused r arms reproduce the published balanced accuracies and damages exactly, including the 7.65 points at $\rho=100$.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoints are those of the TCGA-UT decomposition \citep{queisler2026causeTcga}. The primary endpoint is the damage relative to the balanced arm, $\Delta_A(\rho)=\mathrm{BA}(\text{r1})-\mathrm{BA}(A\rho)$, for $A\in\{\text{r},\text{P},\text{S}\}$, where BA is test patient-macro balanced accuracy. The \emph{interaction} is the part of the full damage that the two single-factor damages do not add up to,
+\begin{equation}
+  I(\rho) = \Delta_\text{r}(\rho) - \Delta_\text{P}(\rho) - \Delta_\text{S}(\rho),
+  \label{eq:interaction}
+\end{equation}
+\noindent and the \emph{shares} $\Delta_\text{P}/\Delta_\text{r}$ and $\Delta_\text{S}/\Delta_\text{r}$ express the single-factor damages as fractions of the full damage. Shares are reported only where $\Delta_\text{r}\geq1$ point, which on BRACS holds from $\rho=2$ on; the primary ratio is $\rho=100$. \emph{Acceleration} is the least-squares slope of the damage on $\log_2\rho$ over $\rho\geq10$ minus the slope over $\rho\leq10$, per family, in points per doubling. For the r family the low segment spans $\rho=1$ to 10; for P and S it spans $\rho=2$ to 10.
+
+The first secondary endpoint is the fraction of the prior damage that logit adjustment recovers, the \emph{intercept share}
+\begin{equation}
+  \frac{\mathrm{BA}(\text{LP}\rho)-\mathrm{BA}(\text{P}\rho)}{\Delta_\text{P}(\rho)}.
+  \label{eq:intercept-share}
+\end{equation}
+\noindent The others are the difference $\mathrm{BA}(\text{Lr}\rho)-\mathrm{BA}(\text{S}\rho)$ between post-hoc and training-time correction of the same data; the recall of the head, body, and tail classes by assigned rank, which with seven classes form groups of three, two, and two; and the selected regularization strength and mean fitted temperature per arm. Pooling and uncertainty follow the prevalence curve: equal weight per split, Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} combined with resampling of draws within splits, 2,000 shared replicates, and 95 percent percentile intervals of every paired contrast.
+
+The readings of the TCGA-UT study are kept unchanged and apply at the primary ratio. The \emph{prior carries} the damage if $\Delta_\text{P}\geq1$ point with a share of at least one half while $\Delta_\text{S}<1$ point; \emph{support carries} it under the mirror conditions. The factors \emph{interact} if $I$ is resolved above zero. The acceleration is attributed to the family whose slope difference is resolved above zero. With only about 24 test patients per split, the BRACS intervals are about three times wider than those of TCGA-UT, so an interval of $I$ that contains zero no longer implies a small interaction. The factors therefore count as \emph{additive} only if the interval of $I$ contains zero and lies within $\pm1$ point, the materiality threshold of the series; an interval that contains zero but reaches beyond one point in either direction leaves the interaction \emph{unresolved}. One reading is specific to BRACS and tests the explanation of the prevalence study: that explanation holds if the prior carries the damage at $\rho=100$ in the sense above.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
