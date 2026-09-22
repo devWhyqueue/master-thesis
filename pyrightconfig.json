@@ -20,7 +20,9 @@
     "experiments/5_hard_limit/19_centre_shrinkage/code",
     "experiments/5_hard_limit/20_directional_shrinkage/code",
     "experiments/5_hard_limit/22_spectrum_regularization/code",
-    "experiments/5_hard_limit/23_within_patient_span/code"
+    "experiments/5_hard_limit/23_within_patient_span/code",
+    "experiments/6_prevalence/25_damage_tcga_ut/code",
+    "experiments/6_prevalence/27_cause_tcga_ut/code"
   ],
   "extraPaths": [
     "experiments/2_benchmark/02_benchmark_patch/code",
@@ -43,7 +45,9 @@
     "experiments/5_hard_limit/19_centre_shrinkage/code",
     "experiments/5_hard_limit/20_directional_shrinkage/code",
     "experiments/5_hard_limit/22_spectrum_regularization/code",
-    "experiments/5_hard_limit/23_within_patient_span/code"
+    "experiments/5_hard_limit/23_within_patient_span/code",
+    "experiments/6_prevalence/25_damage_tcga_ut/code",
+    "experiments/6_prevalence/27_cause_tcga_ut/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"

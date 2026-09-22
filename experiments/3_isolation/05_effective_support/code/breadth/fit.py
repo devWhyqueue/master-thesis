@@ -81,6 +81,7 @@ def _select_best_lambda(
     val_x: np.ndarray,
     val_y: np.ndarray,
     val_id: pd.DataFrame,
+    sample_weight: np.ndarray | None = None,
 ) -> tuple[LinearFitResult, float, dict[str, Any]]:
     """Grid-search lambda on validation, breaking ties toward larger lambda."""
     v_cases = val_id["case_id"].astype(str).to_numpy()
@@ -90,7 +91,12 @@ def _select_best_lambda(
             list[LinearFitResult],
             Parallel(n_jobs=min(worker_count(), len(LAMBDAS)))(
                 delayed(fit_multinomial_logistic)(
-                    train_x, train_y, lambda_val=lam, tol=TOLERANCE, max_iter=MAX_ITER
+                    train_x,
+                    train_y,
+                    lambda_val=lam,
+                    tol=TOLERANCE,
+                    max_iter=MAX_ITER,
+                    sample_weight=sample_weight,
                 )
                 for lam in LAMBDAS
             ),
@@ -121,12 +127,15 @@ def tune_and_fit_draw(
     train_x: np.ndarray,
     train_y: np.ndarray,
     evals: EvalPartition,
+    sample_weight: np.ndarray | None = None,
 ) -> tuple[
     LinearFitResult, float, np.ndarray, np.ndarray, dict[str, Any], dict[str, Any]
 ]:
-    """Select best lambda on validation and evaluate on test."""
+    """Select best lambda on validation and evaluate on test. ``sample_weight``, when given,
+    reweights the training risk only (validation tuning and test evaluation stay unweighted)
+    and must sum to ``len(train_y)`` (see ``fit_multinomial_logistic``)."""
     best_fit, best_lam, val_end = _select_best_lambda(
-        train_x, train_y, evals.val_x, evals.val_y, evals.val_id
+        train_x, train_y, evals.val_x, evals.val_y, evals.val_id, sample_weight
     )
     test_preds, test_probs = predict_logreg(
         evals.test_x, best_fit.coef, best_fit.intercept

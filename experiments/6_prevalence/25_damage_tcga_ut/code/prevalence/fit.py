@@ -163,6 +163,16 @@ def _shard_context(
     )
 
 
+def _prior_weights(counts: list[int], prior_counts: list[int]) -> np.ndarray:
+    """Per-row weights ``w_c = (t_c/T) / (n_c/N)`` broadcasting a prior arm's class shares onto a
+    data arm's realized rows; sums to ``N = sum(counts)`` (exp-27). ``min_support`` in
+    ``class_counts`` keeps every ``n_c`` positive.
+    """
+    n = np.asarray(counts, dtype=np.float64)
+    t = np.asarray(prior_counts, dtype=np.float64)
+    return np.repeat((t / t.sum()) / (n / n.sum()), counts)
+
+
 def _fit_arm(
     config: dict[str, Any],
     out_dir: Path,
@@ -170,11 +180,30 @@ def _fit_arm(
     shard: _Shard,
     evals: Any,
     draw_idx: int,
+    data_arm: str | None = None,
+    prior_arm: str | None = None,
 ) -> None:
-    """Allocate one arm's patch counts, fit it, and write its run record and temperature."""
-    counts = class_counts(arm, shard.perm, shard.available, shard.pool_counts, shard.g)
+    """Allocate one arm's patch counts, fit it, and write its run record and temperature.
+
+    ``data_arm`` (default ``arm``) picks the training rows; ``prior_arm`` (default None), when
+    given, reweights the training risk toward that arm's class shares instead (exp-27's
+    prior-only/support-only arms), leaving the unweighted ratio/native arms unchanged.
+    """
+    data_arm = data_arm or arm
+    counts = class_counts(
+        data_arm, shard.perm, shard.available, shard.pool_counts, shard.g
+    )
     x, y = _arm_rows(shard.train_df, shard.names, shard.patients, counts)
-    fit, lam, test_preds, test_probs, val_end, test_end = tune_and_fit_draw(x, y, evals)
+    prior_counts = None
+    weight = None
+    if prior_arm is not None:
+        prior_counts = class_counts(
+            prior_arm, shard.perm, shard.available, shard.pool_counts, shard.g
+        )
+        weight = _prior_weights(counts, prior_counts)
+    fit, lam, test_preds, test_probs, val_end, test_end = tune_and_fit_draw(
+        x, y, evals, weight
+    )
     rec = _build_draw_record(
         config,
         (shard.g, DEPTH, draw_idx),
@@ -184,11 +213,13 @@ def _fit_arm(
         evals.test_y,
     )
     named_counts = dict(zip(shard.names, (int(c) for c in counts)))
-    extra = {
+    extra: dict[str, Any] = {
         "arm": arm,
         "class_counts": named_counts,
         "realized_rho": achieved_rho(named_counts),
     }
+    if prior_counts is not None:
+        extra["prior_counts"] = dict(zip(shard.names, (int(c) for c in prior_counts)))
     write_run_record(out_dir, {**rec, **extra}, keep_arrays=True)
     _write_temperature(out_dir, evals, fit, test_preds, test_probs, lam)
 

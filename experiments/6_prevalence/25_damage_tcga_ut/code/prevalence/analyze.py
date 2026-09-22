@@ -110,10 +110,16 @@ def _realized_rho(config: dict[str, Any], arms: tuple[str, ...]) -> dict[str, fl
     }
 
 
-def _slope(ba: dict[str, np.ndarray], ratios: tuple[int, ...]) -> np.ndarray:
-    """OLS slope of BA on log2(r) per replicate, in pp per doubling of the nominal ratio."""
+def _slope(
+    ba: dict[str, np.ndarray], ratios: tuple[int, ...], family: str = "r"
+) -> np.ndarray:
+    """OLS slope of BA on log2(r) per replicate, in pp per doubling of the nominal ratio.
+
+    ``family`` selects the arm-name prefix (exp-27 reuses this for its ``P``/``S`` curves,
+    which have no ``rho = 1`` point).
+    """
     x = np.log2(ratios) - np.log2(ratios).mean()
-    y = np.stack([ba[f"r{r}"] for r in ratios])
+    y = np.stack([ba[f"{family}{r}"] for r in ratios])
     return (x[:, None] * (y - y.mean(0))).sum(0) / (x**2).sum()
 
 
