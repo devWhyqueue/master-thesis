@@ -1,0 +1,76 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Separated Confusion Partners, Not Tail Difficulty, Set the Damage on TCGA-UT}
+\author{Yannik Queisler}
+\date{September 22, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, a long-tailed training allocation at fixed patients and fixed patch budget costs 2.91 points of balanced accuracy at an imbalance ratio of $\rho=100$, averaged over random class orders. On BRACS, the same damage depended strongly on which class was rare, and easy classes cost the most because every class collapsed in the tail. This report tests whether the assignment of classes to ranks matters on the 30 cancer types of TCGA-UT. A per-class model of own recall against own allocation is fit to the stored random orders, and two new orders at $\rho=100$, sorted by balanced-arm recall with the easiest or the hardest classes in the tail, test it with patients, patches, and per-rank counts held fixed. The easy-tail order costs 2.41 points (95\% interval: 1.95 to 2.85) and the hard-tail order 1.59 points (1.22 to 1.95), a difference of 0.82 points (0.24 to 1.39) with the sign that headroom predicts but below the one-point threshold. Both sorted orders cost less than a random order, by 0.51 and 1.33 points. The easy classes do not collapse in the tail: thyroid carcinoma keeps 90 percent recall with 28 patches. Instead, a class's recall follows its allocation relative to the class it is most confused with: rectum adenocarcinoma loses 13 points of recall above balance when colon adenocarcinoma has more patches, and gains 7 points far below balance when colon has fewer. The per-class model, which ignores the other classes, does not predict held-out random orders (Spearman 0.04) and ranks the two sorted orders the wrong way round. On TCGA-UT, the damage of an assignment is thus set by how it separates confusion partners, not by the difficulty of the classes in the tail.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The TCGA-UT prevalence study of this series measured how balanced accuracy on 30 cancer types degrades when the training class distribution moves from balanced to long-tailed, with twenty patients per class and 19,200 patches held fixed \citep{queisler2026prevalenceTcga}. The damage was 0.57 points at $\rho=10$ and 2.91 points at $\rho=100$. The prior-versus-support study split the damage at $\rho=100$ into 1.20 points from the skewed class prior, 0.53 points from thin tail support, and 1.18 points from their interaction \citep{queisler2026causeTcga}. In both studies the class order of the long-tail profile was drawn at random per draw, so the reported damage is an average over class-to-rank assignments.
+
+On BRACS, the same average hides a large dependence on which class is rare. A Latin square over classes and ranks moved the damage at $\rho=100$ between 5.73 and 9.99 points depending on the tail class, and the ordering followed the \emph{headroom} of each class, its recall under balanced training: almost every BRACS class kept at most 4 percent recall in the tail, so the classes the balanced classifier recognized best cost the most \citep{queisler2026tailBracs}. The competing \emph{overlap} reading, under which hard, confusable classes collapse faster and cost more, was not supported there. Whether this transfers to TCGA-UT is open. Its classes are much easier on average, with a balanced accuracy of 72 percent against 40 percent on BRACS, and the tail third of TCGA-UT keeps about 60 percent recall at $\rho=100$ \citep{queisler2026prevalenceTcga}, so the collapse that drives the headroom ordering on BRACS may not occur.
+
+This report asks: \emph{how much does the TCGA-UT damage at a fixed ratio depend on which classes sit in the tail, and does the ordering follow headroom or overlap?} It also asks whether the damage of an arbitrary assignment can be predicted from each class's own response to its allocation, which would make the worst assignment computable without fitting it.
+
+\section{Design}
+\label{sec:design}
+The study reuses the design of the TCGA-UT prevalence curve \citep{queisler2026prevalenceTcga}: 30 cancer types with frozen Virchow2 features \citep{zimmermann2024virchow2}, three patient-disjoint splits with ten draws each, $G=20$ patients per class, a total budget of $T=19{,}200$ training patches, and nested patch orderings within each patient. The balanced arm r1 gives each class 640 patches. The ratio arm r$\rho$ gives the class at rank $j$ a count proportional to $\rho^{-j/29}$; at $\rho=100$ the counts fall from 2,843 patches at rank 0 through 681 at rank 9 to 28 patches at rank 29. The native arm N uses the class shares of the full cohort, with a realized ratio of 18.1.
+
+The Latin square of the BRACS study does not scale to 30 classes: every class at every rank would need 29 shifts per draw and ratio, 870 fits per ratio at 30 draws. The study therefore proceeds in two parts. Part A fits a per-class response model to the stored fits of the prevalence curve and uses it to predict the damage of arbitrary assignments. Part B tests the headroom ordering directly with two fixed class orders.
+
+\subsection{Part A: per-class allocation model}
+\label{sec:model}
+Each stored fit of the prevalence curve realizes, for every class $c$, a log-count deviation from balance,
+\begin{equation}
+  z_c = \log_2 \frac{n_c}{640},
+  \label{eq:z}
+\end{equation}
+\noindent where $n_c$ is the number of training patches of class $c$; $z_c$ ranges from $2.15$ at the head to $-4.51$ at the tail of r100. Because the class order is permuted per draw, the 30 fits of r10 and r100 place every class at many different ranks. The model describes the change $\Delta_c$ of the class's own patient-macro test recall against r1 as a piecewise-linear function of its own allocation,
+\begin{equation}
+  \Delta_c(z) = a_c + b^{+}_c \max(z, 0) + b^{-}_c \min(z, 0),
+  \label{eq:model}
+\end{equation}
+\noindent with a separate slope for gains above balance and losses below it, since the rank response on BRACS was asymmetric and saturating \citep{queisler2026tailBracs}. The three coefficients per class are fit by weighted least squares on 120 observations per class, the 30 fits each of r1, r10, r100, and N, and refit within every bootstrap replicate. The model has no term for the allocation of other classes. The predicted damage of an assignment is $\hat D = -\frac{1}{30}\sum_c \Delta_c(z_c)$, and the predicted \emph{tail own loss} of class $c$ is $-\Delta_c(z_{\text{tail}})/30$, the balanced accuracy the class would remove if it alone sat at rank 29.
+
+Three checks use the model. \emph{Leave-one-draw-out} prediction refits it without one split-draw pair and predicts that pair's observed r100 damage. The \emph{sampled-permutation spread} draws 10,000 random assignments at $\rho=10$ and $\rho=100$ and predicts the damage of each, which estimates how much the assignment alone could move the damage without new fits. Finally, the model predicts the two fixed orders of Part B before they enter any fit, which is its out-of-sample test.
+
+\subsection{Part B: easy-tail and hard-tail orders}
+\label{sec:orders}
+Part B fits two new arms at $\rho=100$. Classes are sorted by their pooled r1 test recall in the prevalence study, from esophageal carcinoma (28 percent) to thyroid carcinoma (95 percent). The \emph{easy-tail} order easy$_{100}$ assigns this sorted list to ranks 0 to 29, so the hardest class is the head and the easiest class the tail. The \emph{hard-tail} order hard$_{100}$ reverses it. Both orders are the same in every split and draw, while patients, patch orderings, and per-rank counts match r100 of the same draw. Only the class-to-rank assignment differs from r100. The two arms need 2 $\times$ 30 = 60 fits, all of which converged, and every fit selects its regularization strength by validation patient-macro balanced accuracy \citep{queisler2026patientShortage}, as in the prevalence curve. The r1, r10, r100, and N arms are reused unchanged; they reproduce the stored balanced accuracies of the prevalence study exactly.
+
+The two orders move every class, not only the tail class: easy$_{100}$ gives all hard classes large allocations and all easy classes small ones. They are the extreme contrast of the headroom ordering, chosen because a single tail class out of 30 contributes at most 1/30 of balanced accuracy, and one class alone could not move the damage by a detectable amount.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The primary endpoint is the difference of the two order damages,
+\begin{equation}
+  D_{\text{easy}} - D_{\text{hard}}, \qquad D_{\text{o}} = \mathrm{BA}(\text{r1}) - \mathrm{BA}(\text{o}_{100}),
+  \label{eq:contrast}
+\end{equation}
+\noindent where BA is test patient-macro balanced accuracy. The headroom mechanism predicts a positive difference, since easy$_{100}$ places the classes with the most recall to lose at the smallest allocations; the overlap mechanism predicts a negative one. The difference is judged against the one-point threshold of the series. Secondary endpoints are the damages of both orders against the random-order damage of r100, the leave-one-draw-out Spearman correlation between predicted and observed r100 damage, the model's predictions for the two orders, the sampled-permutation spread, and the Spearman correlations of the predicted tail own loss with r1 recall and with confusability, the off-diagonal confusion mass into and out of a class as a share of all r1 test predictions \citep{queisler2026tailBracs}.
+
+The per-class recall changes of both orders are also reported against the model's per-class predictions; this per-class breakdown and a model extension with the allocation of confusion partners were added after the Part B fits and are exploratory.
+
+Pooling and uncertainty follow the prevalence curve: equal weight per split, Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} combined with resampling of draws within splits, 2,000 shared replicates, and 95 percent percentile intervals of every paired contrast.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
