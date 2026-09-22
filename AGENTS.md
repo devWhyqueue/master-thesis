@@ -5,6 +5,7 @@
 # Git
 
 - When asked to commit changes, do not create a new branch — just commit to `main`.
+- Conventional commit, scope expNN, one commit per phase, push only when asked. Let /caveman-commit skill write the message.
 
 # Cluster
 
