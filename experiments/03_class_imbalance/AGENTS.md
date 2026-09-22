@@ -1,0 +1,17 @@
+# 03_class_imbalance
+
+Why class imbalance hurts accuracy, and what causes it. See `../AGENTS.md` for the shared code/configs/tests/report layout.
+
+## 00_damage
+
+| # | Study | Question | Result |
+|---|---|---|---|
+| 25 | damage_tcga_ut | How fast does BA/NLL/ECE degrade with class prevalence alone? Same G = 20 patients/class and total T = K·640 patches in every arm; exponential profile (exp-02 allocator), ρ ∈ {1, 2, 5, 10, 20, 50, 100}, class rank permuted per draw, plus native shares (N, realized ρ 18.1); logreg, raw + validation TS. TCGA-UT (BRACS: exp-26) | TCGA-UT: slow, accelerating damage. Δ = 0.11 [0.01, 0.21] (ρ 2), 0.57 [0.30, 0.84] (ρ 10), 1.01 [0.67, 1.36] (ρ 20, onset), 2.91 [2.48, 3.34] (ρ 100). Slope 0.18 pp/doubling up to ρ 10, 0.70 beyond. At ρ 100 tail third recall −11.8, head +5.4. N costs 1.18 [0.85, 1.48], on curve (gap −0.25 [−0.57, 0.07]). Raw ECE 5.5 → 17.8 at ρ 100; TS removes 95% of ECE, 81% of NLL increase; temperature 0.84 → 2.35, selected λ 0.1 → ≤1e-3. All 240 fits converged. |
+| 26 | damage_bracs | exp-25 prevalence curve on BRACS: same design (exp-25 code), G = 10 patients/class (only 10–13 ADH train patients per split reach depth 160), T = 7·320 = 2,240 patches; ρ ∈ {1, 2, 5, 10, 20, 50, 100}, class rank permuted per draw, plus native shares (N, realized ρ 6.7); logreg, raw + validation TS | BRACS: early, steady, large damage. Δ = 1.15 [0.14, 2.35] (ρ 2, onset), 4.02 [2.50, 5.66] (ρ 10), 7.65 [5.77, 9.78] (ρ 100) from BA(1) = 39.57. Slope 1.15 pp/doubling, no acceleration (1.25 up to ρ 10, 1.11 beyond). At ρ 100 tail recall 38.7 → 7.3, head +13.8. Same tail patches/patient as TCGA-UT at ρ 10 but 7× damage: prior shift under class overlap, not tail depth (untested). N costs 4.05 [2.69, 5.57] ≈ exp-18 5→20 patient gap (4.80), on curve (gap −0.64 [−1.95, 0.68]). Raw NLL 1.56 → 7.01, ECE 12.3 → 35.7 (r1 underconfident, T 0.65); TS removes 96% of NLL, 92% of ECE increase; T → 9.14, ρ 100 picks λ = 1e-6 (grid floor) in 12/30, extended-grid refit confirms. All 240 fits converged. |
+
+## 01_cause
+
+| # | Study | Question | Result |
+|---|---|---|---|
+| 27 | cause_tcga_ut | exp-25's ratio arm r{rho} moves the loss's class prior and the tail's patch support together. Separated per rho into P{rho} (prior only, r1's balanced rows reweighted toward r{rho}'s class shares), S{rho} (support only, r{rho}'s rows reweighted back to balanced), and post-hoc logit-adjusted LP{rho}/Lr{rho}; r1/r{rho} reused from exp-25's stored outputs. TCGA-UT (BRACS: exp-28) | No report yet (run in progress). |
+| 28 | cause_bracs | exp-27 design on BRACS: same P/S/LP/Lr split of exp-26's ratio arm, exp-27 code reused | No report yet (not started; awaits exp-27 code review). |
