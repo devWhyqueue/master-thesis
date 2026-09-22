@@ -108,6 +108,25 @@ seff <id>                                            # efficiency summary
 scontrol show jobid -dd <id>                         # full job details
 ```
 
+### Waiting For Jobs
+
+Use `scripts/hydra_wait.sh` (in this skill) instead of `sleep` loops or short `ScheduleWakeup` polls. Run it with `run_in_background`; the task notification fires when the jobs are done:
+
+```bash
+ssh hydra 'bash -l -s -- <fit_array_id> <analyze_id>' < .claude/skills/hydra-cluster/scripts/hydra_wait.sh
+```
+
+It polls every 30 s. It cancels jobs stuck on `DependencyNeverSatisfied`, prints `sacct` per task, and prints the stderr tail of up to 3 failed tasks. Exit 0 means every task `COMPLETED`. For runs longer than a few hours, add one long `ScheduleWakeup` (1200 s or more) as a fallback.
+
+### Known Failure Modes
+
+- **`DependencyNeverSatisfied` / "dep never satisfied"**: an `afterok` upstream failed. The downstream pends forever. Read the upstream `.err` logs, `scancel` the downstream, fix, then resubmit both.
+- **Analyze crashed after fits succeeded**: resubmit only the analyze stage. Fit shards skip records that already exist, so a full resubmit only wastes queue time.
+- **Manual `srun` smoke test**: `mkdir -p` the output and log dirs first (the sbatch template does this, a manual `srun` does not). `cpu-test` caps runtime at 15 min. A smoke test cut off by the cap without an error has passed the path and import stage. It is not a bug.
+- **Stray modules in login-node `/tmp`**: other users' files such as `/tmp/bisect.py` shadow the stdlib (`cannot import name 'bisect' from partially initialized module`). Run driver scripts with `python3 -P` from `~`, not with `cd /tmp`.
+- **Imports resolve to the wrong package**: stale `code/` dirs that hold only `__pycache__` can shadow shared packages through `_bootstrap.py`. Delete dirs with no `.py` files.
+- **Results files**: experiment outputs land in `<experiment>/outputs/<dataset>/patch/` on Hydra. `ls` that path before `scp`. Do not guess `~/<name>.json`.
+
 ### Git Sync
 
 `git pull --ff-only` fails if tracked files are modified on the cluster (e.g. a script overwrote a committed output). Inspect the diff, then discard:
