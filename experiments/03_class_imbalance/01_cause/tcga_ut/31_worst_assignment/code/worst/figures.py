@@ -11,7 +11,7 @@ from matplotlib.axes import Axes
 
 from prevalence.figures import _save
 
-__all__ = ["damage_vs_score_figure", "pair_gap_figure"]
+__all__ = ["damage_vs_score_figure", "gate_figure", "pair_gap_figure"]
 
 _MARKER_COLOR = {
     "easy": "tab:green",
@@ -58,6 +58,64 @@ def damage_vs_score_figure(
     )
     _plot_points(ax, points)
     ax.set_xlabel("S (directed pair-separation score)")
+    ax.set_ylabel("BA damage vs. r1 (pp)")
+    ax.legend(fontsize=7)
+    _save(fig, dest)
+
+
+def _plot_random_cloud(ax: Axes, s_random: np.ndarray, d_random: np.ndarray) -> None:
+    """The random orders' (S, damage) points and their mean damage."""
+    ax.scatter(
+        s_random,
+        d_random,
+        s=18,
+        color="tab:gray",
+        alpha=0.65,
+        label="random orders (one point per fit)",
+    )
+    ax.axhline(
+        float(np.mean(d_random)),
+        color="tab:gray",
+        lw=0.9,
+        ls="--",
+        alpha=0.8,
+        label="random-order mean damage",
+    )
+
+
+def _plot_named_orders(
+    ax: Axes, named: dict[str, tuple[float, float, float, float]]
+) -> None:
+    """One (S, damage) diamond with its 95% interval per named class order."""
+    for name, (s, point, lo, hi) in named.items():
+        ax.errorbar(
+            [s],
+            [point],
+            yerr=[[point - lo], [hi - point]],
+            fmt="D",
+            markersize=8,
+            capsize=3,
+            color=_MARKER_COLOR.get(name, "black"),
+            label=f"{name}-tail order",
+            zorder=5,
+        )
+
+
+def gate_figure(
+    s_random: np.ndarray,
+    d_random: np.ndarray,
+    named: dict[str, tuple[float, float, float, float]],
+    dest: Path,
+) -> None:
+    """Part A gate: observed damage against S for the random orders and the two sorted orders.
+
+    ``named`` maps a label to (S, D, lower, upper); the sorted orders' damages are pooled
+    estimates with bootstrap intervals, while each random point is one split-draw fit.
+    """
+    fig, ax = plt.subplots(figsize=(6, 4.2), dpi=200)
+    _plot_random_cloud(ax, s_random, d_random)
+    _plot_named_orders(ax, named)
+    ax.set_xlabel("Pair-separation score $S$")
     ax.set_ylabel("BA damage vs. r1 (pp)")
     ax.legend(fontsize=7)
     _save(fig, dest)

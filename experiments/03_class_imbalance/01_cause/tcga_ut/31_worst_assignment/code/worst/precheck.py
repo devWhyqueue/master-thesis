@@ -11,6 +11,7 @@ Pass = G1 and G2. No score tuning loop -- the score is fixed by the exp-31 plan 
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import numpy as np
@@ -28,10 +29,29 @@ from assignment.properties import _spearman
 from permutation.design import stored_counts
 from permutation.order import tail_order
 
+from worst.figures import gate_figure
 from worst.order import order_perm, score_inputs
 from worst.score import score
 
-__all__ = ["run_precheck"]
+__all__ = ["gate_markers", "run_precheck"]
+
+
+def gate_markers(
+    config: dict[str, Any], result: dict[str, Any]
+) -> dict[str, tuple[float, float, float, float]]:
+    """(S, D, lower, upper) per sorted order, reading exp-30's stored damage estimates."""
+    exp30_config = baseline_config(config, "tail_outputs")
+    path = output_root(exp30_config) / "data" / "analysis.json"
+    estimates = json.loads(path.read_text(encoding="utf-8"))["estimates"]
+    return {
+        name: (
+            result[f"s_{name}"],
+            estimates[f"D_{name}"]["point"],
+            estimates[f"D_{name}"]["ci_2_5"],
+            estimates[f"D_{name}"]["ci_97_5"],
+        )
+        for name in ("easy", "hard")
+    }
 
 
 def _random_s_and_d(
@@ -99,4 +119,10 @@ def run_precheck(config: dict[str, Any]) -> dict[str, Any]:
     result = _gate_result(s_easy, s_hard, s_random, d_random)
 
     write_json(output_root(config) / "data" / "precheck.json", result)
+    gate_figure(
+        s_random,
+        d_random,
+        gate_markers(config, result),
+        output_root(config) / "figures" / "gate_score_vs_damage.pdf",
+    )
     return result
