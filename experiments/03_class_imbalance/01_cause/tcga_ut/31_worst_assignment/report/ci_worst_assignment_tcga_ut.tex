@@ -1,0 +1,75 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\A Confusion-Separation Score Does Not Rank Class Orders by Damage on TCGA-UT}
+\author{Yannik Queisler}
+\date{September 22, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent On TCGA-UT, the damage a long-tailed training allocation does to balanced accuracy depends on which class sits at which rank, and the companion tail-assignment study traced that dependence to pairs of classes the balanced classifier confuses with each other: a class loses recall when a class it is confused with holds a larger allocation. That study named the natural worst case, an assignment that separates every strongly confused pair and places the member with more recall to lose underneath, but did not fit it. This report defines that assignment through a directed pair-separation score, which weights each ordered pair by the confusion mass flowing from one class to the other, by the first class's balanced-arm recall, and by the log-count gap between their ranks. Before spending any of the 120 fits that a search over class orders would require, the score is checked against three damages already observed: the easy-tail order, the hard-tail order, and the average over random orders. The score fails that check. It separates the two sorted orders in the observed direction, scoring the easy-tail order at 3,239 against 895 for the hard-tail order, but it places the easy-tail order above all 30 random orders, whose scores span 1,976 to 3,043, while the easy-tail order costs 2.41 points of balanced accuracy against 2.91 points for the random orders on average. The inversion has a structural cause: the sorted orders are, by construction, monotone in the recall term the score uses as a weight, so ordering the classes by difficulty raises the score whether or not it raises the damage. Within the random orders alone the score does correlate with damage, at a Spearman coefficient of 0.38, but that correlation does not extend to the orders a search would actually visit. The search was therefore not run, and the worst assignment on TCGA-UT remains unfitted.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The TCGA-UT prevalence study of this series measured how balanced accuracy on 30 cancer types degrades as the training class distribution moves from balanced to long-tailed, at twenty patients per class and 19,200 training patches held fixed \citep{queisler2026prevalenceTcga}. At an imbalance ratio of $\rho=100$ the damage was 2.91 points, averaged over class orders drawn at random per draw. The prior-versus-support study split that damage into a part from the skewed class prior, a part from thin tail support, and a sizeable interaction between them \citep{queisler2026causeTcga}.
+
+How much of the damage depends on \emph{which} class is rare was then tested directly. On BRACS the dependence was large and followed the \emph{headroom} of each class, its recall under balanced training, because nearly every BRACS class collapsed to almost no recall in the tail and therefore cost whatever it had to lose \citep{queisler2026tailBracs}. On TCGA-UT the picture was different \citep{queisler2026tailTcga}. Sorting the classes by balanced-arm recall and placing the easiest in the tail cost 2.41 points, against 1.59 points for the reverse order, a difference of 0.82 points that carries the sign headroom predicts but stays below the one-point threshold of this series. More striking, both sorted orders cost \emph{less} than a random order, by 0.51 and 1.33 points. No class collapsed: thyroid carcinoma kept 90 percent recall on 28 patches. What moved a class's recall was its allocation relative to the classes it is confused with. Rectum adenocarcinoma lost 13 points of recall while sitting just below colon adenocarcinoma, and gained 7 points while sitting above it far below balance; head and neck squamous cell carcinoma behaved the same way against lung squamous cell carcinoma, and the two gliomas, which stayed at adjacent ranks, barely moved.
+
+That study closed with an explicit open item. If damage is set by pairs rather than by single classes, then the worst assignment should be the one that separates strongly confused pairs as far as possible in rank, with the member that has more recall to lose placed at the smaller allocation. It named this candidate and stated that it did not fit it. This report asks whether that candidate can be made precise as a score over class orders and whether the order that maximizes it is, in fact, the most damaging one. The design of that test is the subject of Section~\ref{sec:design}; the answer turns on a check that runs before any new fit and is the subject of Section~\ref{sec:evaluation}.
+
+\section{Design}
+\label{sec:design}
+The study reuses the design of the TCGA-UT prevalence curve \citep{queisler2026prevalenceTcga}: 30 cancer types with frozen Virchow2 features \citep{zimmermann2024virchow2}, three patient-disjoint splits with ten draws each, $G=20$ patients per class, a total budget of $T=19{,}200$ training patches, and nested patch orderings within each patient. The balanced arm r1 gives each class 640 patches. The ratio arm r$\rho$ gives the class at rank $j$ a count proportional to $\rho^{-j/29}$, so at $\rho=100$ the counts fall from 2,843 patches at rank 0 to 28 patches at rank 29. Only the assignment of classes to ranks is varied; patients, patch orderings, and the per-rank counts are held fixed, which is what makes any difference in damage attributable to the assignment alone.
+
+\subsection{A directed pair-separation score}
+\label{sec:score}
+Each rank $r$ carries a log-count deviation from balance,
+\begin{equation}
+  z_r = \log_2 \frac{n_r}{640},
+  \label{eq:z}
+\end{equation}
+\noindent where $n_r$ is the patch count at rank $r$; at $\rho=100$ these run from $2.15$ at the head to $-4.51$ at the tail. An assignment $\pi$ places class $c$ at rank $r_c$. The score is
+\begin{equation}
+  S(\pi) = \sum_{c \neq d} w_{c \rightarrow d}\; h_c\; \max\!\left(z_{r_d} - z_{r_c},\, 0\right),
+  \label{eq:score}
+\end{equation}
+\noindent where $w_{c \rightarrow d}$ is the share of class $c$'s off-diagonal test predictions in the balanced arm that land on class $d$, so that each row sums to one over the other classes; $h_c$ is class $c$'s pooled balanced-arm recall, standing for the recall it has available to lose; and the final factor is the log-count advantage that $d$ holds over $c$, counted only when $d$ has the larger allocation. Each term thus reads as the exposure of class $c$ to a class it is confused with that sits above it in allocation, weighted by how much $c$ has to lose. Maximizing $S$ separates confused pairs and puts the member with more to lose underneath; minimizing it keeps confused pairs adjacent in rank.
+
+Two properties of Equation~\eqref{eq:score} shaped this form. First, the score must be \emph{directed}. Because the per-rank counts are log-linear in rank, the gap $|z_r - z_s|$ depends only on $|r-s|$, so any undirected measure of how far confused pairs are separated is unchanged when an order is reversed. The easy-tail and hard-tail orders are exact reversals of one another, so an undirected measure could not distinguish them and could not explain their observed 0.82-point difference. The one-sided $\max$ and the asymmetric weights $w_{c \rightarrow d} h_c$ supply that direction. Second, the score is rank-based, and rescaling $z$ by a constant rescales $S$ without changing which order maximizes it, so the same order is the maximizer at every ratio. This is what would have allowed a single search to serve both ratios.
+
+\subsection{The search and the arms it would have produced}
+\label{sec:arms}
+Maximizing and minimizing Equation~\eqref{eq:score} over the $30!$ possible assignments is done by pairwise-swap hill climbing from 50 seeded random starts, taking the best improving swap at each step until no swap improves. Any result of such a search is \emph{an} extreme assignment found by local search, not a proven optimum, and would have been reported as such.
+
+Three orders follow from it. The order \emph{sep} maximizes $S$ and is the worst-case candidate. The order \emph{tog} minimizes it and is the mildest candidate. The order \emph{flip} reverses \emph{sep}; because reversal preserves every pairwise rank gap, \emph{flip} separates confused pairs exactly as far as \emph{sep} does but exchanges the roles within each pair, which isolates the directional part of the claim from the separation itself. The planned fits were \emph{sep}, \emph{flip}, and \emph{tog} at $\rho=100$ and \emph{sep} again at $\rho=10$, at 30 fits each, for 120 fits in total. The r1, r10, r100, and N arms of the prevalence curve and the two sorted orders of the tail-assignment study would have been reused unchanged, as held-out points.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The endpoints of a fitted study would have been the damage of \emph{sep} against the random-order average and the full range spanned by \emph{sep} against \emph{tog}, both judged against the one-point threshold of the series, with pooling and uncertainty as in the prevalence curve: equal weight per split, Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} combined with resampling of draws within splits, and 95 percent percentile intervals of every paired contrast.
+
+Those endpoints are only worth fitting if the score ranks assignments by damage in the first place. Three damages are already known and cost nothing to check against: the easy-tail order at 2.41 points, the hard-tail order at 1.59 points, and the average over the 30 random orders at 2.91 points \citep{queisler2026tailTcga, queisler2026prevalenceTcga}. A gate over these three damages was fixed before the score was computed and before any fit was submitted:
+
+\begin{itemize}
+  \item \textbf{G1}: $S(\text{easy}) > S(\text{hard})$, matching the observed $2.41 > 1.59$.
+  \item \textbf{G2}: the mean of $S$ over the 30 random orders exceeds $S(\text{easy})$, which in turn exceeds $S(\text{hard})$, matching the observed $2.91 > 2.41 > 1.59$.
+  \item \textbf{G3}, descriptive and not binding: the Spearman correlation between $S$ and the observed damage across the 30 random orders is positive. Each random order's damage is a single-fit estimate and carries patient and test-set variation, with a standard deviation of 0.70 points across fits, so a weak value is expected either way.
+\end{itemize}
+
+\noindent The gate passes only if G1 and G2 both hold. On failure the search is not run, the 120 fits are not submitted, and the outcome is reported as a null. The score is fixed by Equation~\eqref{eq:score} before the gate runs, and no tuning loop against the gate is permitted: a score adjusted until it reproduces three known damages would no longer be a prediction about them.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
