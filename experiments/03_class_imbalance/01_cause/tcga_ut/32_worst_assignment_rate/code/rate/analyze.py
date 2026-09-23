@@ -113,7 +113,12 @@ def _write_figures(
         p["orders"], r["partner"], r["recall_change"], p["names"]
     )
     pair_gap_figure(
-        gap_worst, change_worst, gap_mild, change_mild, figures / "pair_gap_r100.pdf"
+        gap_worst,
+        change_worst,
+        gap_mild,
+        change_mild,
+        figures / "pair_gap_r100.pdf",
+        labels=("worst", "mild"),
     )
 
 

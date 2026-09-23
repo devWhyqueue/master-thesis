@@ -19,6 +19,8 @@ _MARKER_COLOR = {
     "sep": "tab:red",
     "flip": "tab:purple",
     "tog": "tab:blue",
+    "worst": "tab:red",
+    "mild": "tab:blue",
 }
 
 
@@ -127,11 +129,12 @@ def pair_gap_figure(
     gap_tog: list[float],
     change_tog: list[float],
     dest: Path,
+    labels: tuple[str, str] = ("sep", "tog"),
 ) -> None:
     """Per-class own-recall change vs. rank gap to its main confusion partner, sep vs tog."""
     fig, ax = plt.subplots(figsize=(5, 4), dpi=200)
-    ax.scatter(gap_sep, change_sep, s=14, color="tab:red", label="sep")
-    ax.scatter(gap_tog, change_tog, s=14, color="tab:blue", label="tog")
+    ax.scatter(gap_sep, change_sep, s=14, color="tab:red", label=labels[0])
+    ax.scatter(gap_tog, change_tog, s=14, color="tab:blue", label=labels[1])
     ax.axhline(0.0, color="black", lw=0.8, alpha=0.5)
     ax.set_xlabel("Rank gap to main confusion partner")
     ax.set_ylabel("Own recall change vs. r1 (pp)")
