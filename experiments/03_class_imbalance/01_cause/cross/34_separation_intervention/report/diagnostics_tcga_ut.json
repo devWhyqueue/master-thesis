@@ -1,0 +1,43 @@
+{
+  "gates": {
+    "manipulation": {
+      "consistent_direction": true,
+      "non_trivial": true,
+      "pass": true,
+      "per_split_diff_pp": [
+        -16.38327416787658,
+        -14.847297011813772,
+        -16.191196114316853
+      ],
+      "pooled_diff_pp": -15.807255764669067
+    },
+    "mechanism": {
+      "pass": false,
+      "pooled_change_pp": {
+        "D_P": 1.807123471428189,
+        "D_R": 1.513641512300988,
+        "D_S": -0.042741938844320204
+      }
+    },
+    "numerics": {
+      "boundary_hits": [],
+      "not_converged": [],
+      "pass": true
+    },
+    "precision": {
+      "pass": true,
+      "per_split_effect_pp": [
+        -3.4252872896059117,
+        0.09059082166224641,
+        -1.2062280689592981
+      ],
+      "projected_power": 1.0
+    },
+    "reproduction": {
+      "pass": true,
+      "reason": "no replay setting for this dataset",
+      "skipped": true
+    }
+  },
+  "overall_pass": false
+}

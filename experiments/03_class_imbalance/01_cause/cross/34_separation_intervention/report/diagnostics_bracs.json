@@ -1,0 +1,63 @@
+{
+  "gates": {
+    "manipulation": {
+      "consistent_direction": true,
+      "non_trivial": true,
+      "pass": true,
+      "per_split_diff_pp": [
+        26.9705130089554,
+        24.032169856403385,
+        23.16923166807394
+      ],
+      "pooled_diff_pp": 24.723971511144242
+    },
+    "mechanism": {
+      "pass": false,
+      "pooled_change_pp": {
+        "D_P": -3.7248549602325887,
+        "D_R": 2.953151014515563,
+        "D_S": 6.499228602579049
+      }
+    },
+    "numerics": {
+      "boundary_hits": [
+        {
+          "fit": "expanded_bracs_B split=1",
+          "lambda": 1e-06
+        },
+        {
+          "fit": "expanded_bracs_P split=0",
+          "lambda": 1e-06
+        },
+        {
+          "fit": "expanded_bracs_R split=1",
+          "lambda": 1e-06
+        },
+        {
+          "fit": "native_bracs_replay_R split=0",
+          "lambda": 1e-06
+        },
+        {
+          "fit": "native_bracs_replay_R split=1",
+          "lambda": 1e-06
+        }
+      ],
+      "not_converged": [],
+      "pass": true
+    },
+    "precision": {
+      "pass": true,
+      "per_split_effect_pp": [
+        5.700988368994729,
+        2.8115546431033636,
+        0.3469100314485942
+      ],
+      "projected_power": 0.9495
+    },
+    "reproduction": {
+      "max_abs_diff_pp": 0.0,
+      "pass": true
+    }
+  },
+  "overall_pass": false
+}
