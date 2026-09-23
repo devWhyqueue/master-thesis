@@ -1,0 +1,67 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\title{Class Imbalance in Histopathology:\\{BRACS}'s Classes Lie Outside {TCGA-UT}'s Class-Property Range,\\So Class Composition Cannot Be Separated from Dataset}
+\author{Yannik Queisler}
+\date{September 23, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At an imbalance ratio of $\rho=100$, class imbalance costs BRACS 7.65 points of patient-macro balanced accuracy and TCGA-UT 2.91 points. This report planned to test, without new model fits, whether the 4.74-point gap follows from the kind of classes BRACS has (little headroom, small decision margins) or from something specific to the dataset. The plan pooled stored per-class recall changes from both datasets and regressed them on class properties plus a dataset indicator. A pre-registered overlap check ran first: at least five of BRACS's seven classes had to fall inside the convex hull of TCGA-UT's thirty classes in the plane of headroom and margin. Only 2.7 of 7 did on average (fraction 0.38 against a threshold of 0.71). The regression would therefore have compared BRACS with TCGA-UT classes that do not exist, so it was not run. The outcome is labelled \emph{dataset-specific by support}: with these two datasets, class composition and dataset identity cannot be separated.
+\end{abstract}
+
+\section{Question and design}
+\label{sec:design}
+Earlier studies in this series narrowed the BRACS--TCGA-UT gap but did not explain it. The prior-only training arm carries most of it (4.47 against 1.20 points at $\rho=100$) \citep{queisler2026causeTcga, queisler2026causeBracs}. Injecting the realized class prior into stored balanced-model outputs overshot the fitted damage and failed its gate \citep{queisler2026marginTcgaBracs}. Moving BRACS's class centres apart changed prior-only damage in the predicted direction but not total damage \citep{queisler2026separationTcgaBracs}. Within each dataset, damage depends on which class sits in the tail: headroom dominates on BRACS \citep{queisler2026tailBracs}, and confusion partners matter on TCGA-UT \citep{queisler2026tailTcga, queisler2026worstRateTcga}. These results leave one question open: would a TCGA-UT class with BRACS-like properties lose as much as a BRACS class does?
+
+The planned analysis answered this question from stored runs only. Each observation is the change in one class's patient-macro recall between an imbalanced fit and its balanced reference fit (r1) on the same split and draw. The mean of these changes over classes reproduces the published damage of that fit exactly. The observations were to be regressed on the class's allocation, a dataset indicator, and two class properties:
+\begin{itemize}
+  \item \emph{headroom} $h_c$, the class's recall in the balanced fit;
+  \item \emph{margin} $m_c$, the median over the class's test patches of $\log p_{\text{true}} - \max_{d \neq c} \log p_d$ in the balanced fit, as defined in the prior-injection report.
+\end{itemize}
+\noindent Both properties are cross-fitted: a class's value on split $s$ comes from the balanced fits of the other two splits, so noise in the reference fit cannot correlate mechanically with the outcome. The answer would have been the share by which the dataset indicator shrinks once $h$ and $m$ enter the model.
+
+Such a regression can separate class properties from dataset only if both datasets have classes with similar properties. Otherwise the indicator and the properties are confounded, and the model extrapolates. An overlap check was therefore fixed before any outcome was read. For each split, the check forms the convex hull of the thirty TCGA-UT points $(h_c, m_c)$ and counts how many of the seven BRACS points fall inside. The check passes if the fraction inside, averaged over the three splits, is at least $5/7 \approx 0.71$. It reads only the balanced fits, so it uses no imbalance outcome. On failure the study stops with the label dataset-specific by support, and only this short report is written.
+
+\section{Overlap check outcome}
+\label{sec:results}
+The check failed (Table~\ref{tab:gate}). Four BRACS classes lay inside the TCGA-UT hull on split~0 and two on splits~1 and~2, for a mean fraction of 0.38. No split reached the threshold. The extraction and regression over the full pools were not submitted, and the threshold was not revisited after the outcome.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lrrrr@{}}
+    \toprule
+    & Split 0 & Split 1 & Split 2 & Mean \\
+    \midrule
+    BRACS classes inside TCGA-UT hull & 4 of 7 & 2 of 7 & 2 of 7 & 2.7 of 7 \\
+    Fraction inside                    & 0.57   & 0.29   & 0.29   & 0.38 \\
+    \midrule
+    Threshold                          &        &        &        & 0.71 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pre-registered overlap check in the plane of cross-fitted headroom and margin. Most BRACS classes lie outside the range covered by TCGA-UT's thirty classes, so the check fails on every split.}
+  \label{tab:gate}
+\end{table}
+
+\noindent The check stores only counts, not the positions of the BRACS classes outside the hull. It therefore does not show whether they fall outside through low headroom, low margin, or both. The prior-injection report points to the same region from another angle: BRACS's balanced accuracy (39.6\%) and pooled margin (0.27 nats) lie outside every seven-class subset of TCGA-UT tested there, including the most confused one \citep{queisler2026marginTcgaBracs}.
+
+\section{Interpretation}
+\label{sec:interpretation}
+With these two datasets, the question cannot be answered in the planned form. TCGA-UT offers too few classes with BRACS-like headroom and margin to act as a within-property comparison. Any dataset indicator estimated here would carry the property difference as well. The failure is itself informative: BRACS's classes are not a harder draw from the same class population as TCGA-UT's; they occupy a region that TCGA-UT does not reach.
+
+For the thesis, the gap is therefore reported as bounded, not explained, by three parts. First, the balanced support budget differs between the stored damage runs (BRACS 10 patients and 320 patches per class, TCGA-UT 20 patients and 640 patches), so part of the gap may reflect support rather than class content \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. Second, the prior channel carries most of the gap and reacts to class separation \citep{queisler2026separationTcgaBracs}. Third, the support channel does not follow separation and, on BRACS, rises when balanced accuracy rises, which fits the headroom effect found within BRACS \citep{queisler2026tailBracs}. Class count (seven against thirty) remains uncontrolled.
+
+A test of class composition would need a third dataset whose classes cover BRACS's property region, or a TCGA-UT subset engineered to reach it. Either would require its own pre-registered overlap check; the present check cannot be reused after seeing this outcome.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
