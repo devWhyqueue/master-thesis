@@ -1,0 +1,62 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Injecting the Observed Prior Shift\\Overstates the {TCGA-UT}--{BRACS} Gap}
+\author{Yannik Queisler}
+\date{September 23, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At an imbalance ratio of $\rho=100$, a skewed class prior alone costs 4.47 points of balanced accuracy on BRACS against 1.20 points on TCGA-UT, a gap of 3.27 points between two datasets fit under the same design, and the cause of that gap-within-a-gap is untested. This report tries to explain it with no new fits: for every stored balanced fit, it injects the paired long-tailed fit's own realized class prior directly into the balanced model's stored test probabilities, $\text{argmax}(\log p + \log \hat\pi)$, and measures the resulting drop in patient-macro balanced accuracy, $D_{\mathrm{sim}}$. Unlike a linear confusion-based score, this simulated damage automatically reflects each patch's decision margin, so it should approximate the damage a genuine prior-reweighted refit produces, provided the frozen decision surface it starts from is not moved too far. A pre-registered gate checks exactly that: whether $D_{\mathrm{sim}}(\rho=100)$ falls inside the 95 percent interval of the already-fitted prior-only damage. The gate fails on both datasets, and by a wide and dataset-dependent margin: $D_{\mathrm{sim}}=10.55$ points on TCGA-UT against a fitted interval of $[0.87, 1.53]$, and $D_{\mathrm{sim}}=14.43$ points on BRACS against $[2.84, 6.30]$. No mechanism claim is drawn from this proxy, even though the cross-dataset difference in $D_{\mathrm{sim}}$, 3.89 points with a 95 percent interval of $[1.12, 7.06]$, lands close to the 3.27-point target the two datasets' fitted models actually show. A descriptive check restricts TCGA-UT's balanced model to 500 random seven-class subsets and one subset chosen for maximal pairwise confusion, and finds a strong negative relationship between a subset's margin and its simulated damage ($\rho_s=-0.55$, $p<10^{-39}$); BRACS's own margin and balanced accuracy nonetheless fall outside the range covered by every one of those subsets, so a narrower class set alone does not obviously place it back on the trend. The gate's failure is traced to the injected decision rule itself: it moves a frozen decision surface rather than refitting one, so it overweights collateral confusion whenever within-dataset margins are moderate, and it does so more severely on TCGA-UT's thirty-class design than the dataset's own larger median margin would suggest.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Two studies in this series measured how much of a skewed training class distribution's damage to balanced accuracy comes from the shifted class prior alone, holding the classifier's frozen ViT features fixed and separating the prior from the tail's thin patch support \citep{queisler2026causeTcga, queisler2026causeBracs}. At the most severe ratio tested, $\rho=100$, the prior-only arm P100 costs 1.20 points of test patient-macro balanced accuracy on TCGA-UT, with a 95 percent interval of $[0.87, 1.53]$, and 4.47 points on BRACS, with an interval of $[2.84, 6.30]$ \citep{queisler2026causeTcga, queisler2026causeBracs}. The two studies share every other design choice: the same allocator, the same three patient-disjoint splits, the same ten draws per split, and the same class-rank permutation scheme \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. The 3.27-point difference between them is therefore a difference in what the prior shift costs on each dataset, not a difference in how the prior shift is constructed, and nothing in the series so far has tested why it is that large.
+
+A companion study on BRACS proposed an explanation and left it untested: that the damage of moving the class prior scales with how much the classes already overlap under balanced training, so a dataset whose classes are less separable pays more for the same nominal shift \citep{queisler2026prevalenceBracs}. The BRACS tail-assignment study lends this some support after the fact, since BRACS classes collapsed to almost no recall in the tail regardless of which class was rare, while TCGA-UT classes did not \citep{queisler2026tailBracs, queisler2026tailTcga}. Two candidate causes are confounded, however: BRACS also has far fewer classes than TCGA-UT, seven against thirty, and a smaller class count changes both the head-to-tail count ratio's effect on decision boundaries and the base rate of confusable pairs. This report isolates the class-prior channel with no new fits and asks two questions: does the size of the 3.27-point gap follow from how the shifted prior interacts with each dataset's own decision margins, and does that account survive a check restricted to seven classes on TCGA-UT, matching BRACS's own class count.
+
+\section{Why not a linear confusion score}
+\label{sec:why-not-score}
+A natural alternative is a scalar score over classes, along the lines of $S=\frac{1}{K}\sum_c q_{c\rightarrow d}\,|\log\pi_c-\log\pi_d|$ for some confusion measure $q$, evaluated once per dataset and compared across the two. This report does not use that form, for six reasons. First, $|\cdot|$ discards direction, while a companion study on TCGA-UT found that the direction of a rank swap costs 1.11 points on its own, holding the pairwise separation fixed \citep{queisler2026worstRateTcga}. Second, a companion tail-assignment study on BRACS found that headroom, a class's own recall under balanced training, dominates its tail damage there \citep{queisler2026tailBracs}, and a score built only from confusion mass $q$ drops that term entirely. Third, $q$ comes from balanced-arm argmax predictions and so discards the margin between the true class's log-probability and its nearest competitor, and a prior shift acts on exactly that margin: two pairs with the same confusion rate can respond very differently to the same log-prior shift depending on how close their logits already are. Fourth, a linear score scales with $\log\rho$, so it cannot reproduce both a roughly 7-fold BRACS-to-TCGA-UT damage ratio at $\rho=10$ and a roughly 2.6-fold ratio at $\rho=100$, since the two datasets' damage curves begin rising, or set in, at different ratios \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. Fifth, with only two datasets, a pooled regression of one dataset-level score on one dataset-level damage cannot separate the score's explanatory power from any other dataset-level difference between BRACS and TCGA-UT. Sixth, and most directly, the pairwise-confusion machinery this kind of score is built from was already checked against fitted damages on TCGA-UT and did not rank three known class orders correctly \citep{queisler2026worstTcga}, so reusing the same ingredients across datasets carries no presumption of working better here.
+
+The alternative pursued instead needs no calibration and no new fits: inject the prior directly into the balanced model's own stored decisions and measure what happens, so that margins, direction, headroom, class count, and the nonlinearity of when damage sets in all come through the classifier's actual output rather than through a hand-built summary.
+
+\section{Design}
+\label{sec:design}
+For a stored balanced fit r1 of one (split, draw) and its paired long-tailed fit r$\rho$ of the same split and draw, this report reuses r1's stored test probabilities $p$ unchanged and injects r$\rho$'s realized class counts $n_c$ as a log-prior shift,
+\begin{equation}
+  \hat\pi_c = \frac{n_c}{\sum_{c'} n_{c'}}, \qquad
+  \hat y = \operatorname*{argmax}_c \left(\log p_c + \log \hat\pi_c\right),
+  \label{eq:inject}
+\end{equation}
+\noindent and reports $D_{\mathrm{sim}}(\rho)$, the resulting drop in pooled test patient-macro balanced accuracy against r1's own predictions. Equation~\eqref{eq:inject} is the mirror image of the post-hoc logit adjustment a companion study already fits and validates, which subtracts a fit's own implicit prior from its logits to partially undo a prior shift \citep{queisler2026causeTcga, menon2021longTail}; here the same adjustment adds a prior shift to the balanced fit instead of removing one from the shifted fit, and the source of $p$ is always r1 rather than the arm being adjusted. No solver is refit: r1 and r$\rho$ are reused exactly as stored, addressed against the two datasets' own prevalence and prior-versus-support outputs \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs, queisler2026causeTcga, queisler2026causeBracs}. Arms Q$\rho$ are computed for $\rho\in\{2,5,10,20,50,100\}$ on both datasets, at three patient-disjoint splits and ten draws per split, matching the paired r1/r$\rho$ design of the prior-versus-support studies. A validation-temperature-scaled variant QT$\rho$, injecting the same prior into r1's calibrated rather than raw probabilities, is computed identically as a sensitivity check.
+
+\subsection{Pre-registered gate and hypotheses}
+\label{sec:gate}
+Before any injected arm is inspected, this report fixes a validity gate, a primary hypothesis, and two descriptive checks.
+
+\begin{itemize}
+  \item \textbf{Gate G} (validity, per dataset): $D_{\mathrm{sim}}(\rho=100)$'s point estimate falls inside the already-fitted P100 damage's 95 percent interval, $[0.87, 1.53]$ on TCGA-UT and $[2.84, 6.30]$ on BRACS \citep{queisler2026causeTcga, queisler2026causeBracs}. On failure, no further hypothesis is treated as a mechanism claim.
+  \item \textbf{H1} (primary): the cross-dataset gap $\Delta_{\mathrm{sim}} = D_{\mathrm{sim,BRACS}}(100) - D_{\mathrm{sim,TCGA\text{-}UT}}(100)$, with a 95 percent interval built by independently resampling each dataset's own bootstrap distribution, so that no shared random draw pairs the two datasets' replicates. H1 is read as support for the prior-channel account if $\Delta_{\mathrm{sim}}$ agrees with the fitted 3.27-point gap within 1 point.
+  \item \textbf{H2} (onset, descriptive): the $D_{\mathrm{sim}}(\rho)$ curve is plotted against the fitted P$(\rho)$ curve at every $\rho$, and the onset ratio, the first $\rho$ whose interval clears zero, is reported for each.
+  \item \textbf{H3} (class-count control, descriptive): TCGA-UT's r1 probabilities are restricted to seven-class subsets, renormalized over the subset, and injected with a synthetic $\rho=100$ profile under a random class-to-rank assignment, using only the subset's own test patches; 500 random subsets and one subset built by greedily growing the most pairwise-confused group of seven classes are scored this way and plotted against each subset's own balanced accuracy and median margin, with BRACS's own point placed on the same axes. A restricted softmax over a subset of an already-fit thirty-class model is not the same object as a model trained on those seven classes from scratch, so H3 is read qualitatively, not as a formal test.
+\end{itemize}
+
+\noindent Three outcome labels are fixed along with the gate: \emph{margin\_explains\_prior\_gap} if the gate passes and H1 supports the fitted gap, \emph{partial} if the gate passes but H1 misses by more than one point, and \emph{proxy\_invalid} if the gate fails on either dataset.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
