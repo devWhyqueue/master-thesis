@@ -1,0 +1,88 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Expanding {BRACS}'s Class Separation\\Does Not Reduce Its Imbalance Damage}
+\author{Yannik Queisler}
+\date{September 23, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At an imbalance ratio of $\rho=100$, class imbalance costs BRACS 7.65 points of patient-macro balanced accuracy and TCGA-UT 2.91 points. This report tests whether BRACS's poorer class separation causes part of that 4.74-point gap. A label-dependent feature intervention moves class centres apart on BRACS and together on TCGA-UT, and four refitted training arms separate prior-only, support-only, and total damage. A pre-registered pilot on one training draw per split passed the reproduction, manipulation, precision, and numerics gates, but failed the mechanism gate on both datasets. Expanding BRACS's separation raised balanced-arm validation accuracy by 24.7 points, yet total imbalance damage rose by 2.95 points instead of falling. Contracting TCGA-UT's separation raised total damage by only 1.51 points, below the 2-point threshold. The main experiment was therefore not submitted, and no causal claim about separation is made. One exploratory pattern is consistent across both datasets: prior-only damage moved in the predicted direction (BRACS $-3.72$, TCGA-UT $+1.81$ points), while support-only damage did not.
+\end{abstract}
+
+\section{Question and design}
+\label{sec:design}
+The damage studies in this series fit both datasets with the same allocator, splits, class-rank permutations, and logistic readout on frozen Virchow2 features \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs, zimmermann2024virchow2}. BRACS still loses far more balanced accuracy under imbalance. A companion report tried to explain the prior-channel part of this gap by injecting the realized class prior into stored balanced-model decisions; that proxy overshot fitted damage three- to ninefold, and its gate failed \citep{queisler2026marginTcgaBracs}. BRACS's seven lesion subtypes are related categories on one tissue axis \citep{brancati2022bracs}, so its classes may sit closer together in feature space than TCGA-UT's thirty tumour types. If so, the same prior shift and the same thin tail support would flip more decisions on BRACS.
+
+The intervention changes only the class locations:
+\begin{equation}
+  x^{(\alpha)} = x + (\alpha - 1)\left(\mu_y - \bar\mu\right),
+  \label{eq:intervention}
+\end{equation}
+\noindent where $\mu_y$ is the training-only, patient-balanced centre of class $y$ and $\bar\mu$ is the unweighted mean of the class centres. Labels, patients, patch allocations, class ranks, and within-class variation stay fixed. The same shift applies to training, validation, and test features. The intervention uses the true label at evaluation time, so it tests a mechanism inside the representation, not a deployable method.
+
+The strength $\alpha$ was fixed before any refit. The \emph{separation index} $J$ is the median nearest-class-centre distance divided by the pooled within-class RMS deviation. BRACS's expansion is $\alpha = J_{\text{TCGA-UT}}/J_{\text{BRACS}}$ per split, and TCGA-UT's contraction is its reciprocal. $J$ was 0.44--0.48 on BRACS and 0.68--0.71 on TCGA-UT, which gives $\alpha = 1.43$--$1.55$. This lies inside the pre-registered range $[1.25, 4]$ in every split, so the precheck passed.
+
+Both datasets use 10 patients per class and 32 balanced patches per patient. Each setting has four arms at $\rho=100$: balanced rows and prior (B), balanced rows with an imbalanced prior (P), imbalanced rows reweighted to a balanced prior (S), and imbalanced rows and prior (R) \citep{queisler2026causeTcga, queisler2026causeBracs}. Damage is $D_P = A_B - A_P$, $D_S = A_B - A_S$, and $D_R = A_B - A_R$ on patient-macro balanced accuracy. The pilot fit expanded BRACS, native TCGA-UT, and contracted TCGA-UT, plus a native BRACS replay, on draw 0 of all three frozen splits (48 fits).
+
+\section{Pilot outcome}
+\label{sec:results}
+Table~\ref{tab:gates} lists the five gates. The pre-registered rule stops the main experiment if any gate fails, so the 144 main-experiment fits were not submitted and no alternative strengths were searched.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{@{}lYYl@{}}
+    \toprule
+    Gate & BRACS (expanded) & TCGA-UT (contracted) & Result \\
+    \midrule
+    1 Reproduction & native replay matches stored test BA, max.\ difference 0.00 pp & not applicable & pass \\
+    2 Manipulation & B-arm validation BA $+24.7$ pp (splits $+27.0$, $+24.0$, $+23.2$) & B-arm validation BA $-15.8$ pp (splits $-16.4$, $-14.8$, $-16.2$) & pass \\
+    3 Mechanism & $\Delta D_R = +2.95$ pp; required $\le -2$ & $\Delta D_R = +1.51$ pp; required $\ge +2$ & \textbf{fail} \\
+    4 Precision & projected power 0.95 & projected power 1.00 & pass \\
+    5 Numerics & all converged; 5 fits at lower $\lambda$ bound & all converged & pass \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Pilot gates on validation data, draw 0, three splits. $\Delta$ is the treated setting minus its native control at 10 patients per class. Gate~3 fails on both datasets, so the main experiment stops.}
+  \label{tab:gates}
+\end{table}
+
+The manipulation worked as intended. Expansion made BRACS much easier and contraction made TCGA-UT harder, and all balanced accuracies stayed inside the non-trivial range of 25--90 percent. The failure is therefore not a weak intervention. The mechanism gate failed because damage did not follow the change in separation (Table~\ref{tab:channels}). On BRACS, total damage rose in every split ($+5.70$, $+2.81$, $+0.35$ points), which is the opposite of the predicted rescue. On TCGA-UT, total damage rose in two of three splits ($+3.43$, $-0.09$, $+1.21$ points), but the pooled change of 1.51 points missed the 2-point threshold.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lrrrr@{}}
+    \toprule
+    Setting & $\Delta D_P$ & $\Delta D_S$ & $\Delta D_R$ & Predicted sign \\
+    \midrule
+    BRACS, expanded vs.\ native     & $-3.72$ & $+6.50$ & $+2.95$ & $-$ \\
+    TCGA-UT, contracted vs.\ native & $+1.81$ & $-0.04$ & $+1.51$ & $+$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pooled change in validation damage (percentage points) between treated and native settings. Only the prior channel $D_P$ moves in the predicted direction on both datasets; the support channel $D_S$ does not.}
+  \label{tab:channels}
+\end{table}
+
+\noindent Two gates that passed need qualification. The precision gate simulates power at an assumed 2-point effect from the spread of only three split residuals, and it does not correct for the two primary comparisons as planned; its pass matters only if gate~3 had passed. The numerics gate flags five BRACS fits, three of them in the expanded setting, whose selected regularization sits at the weakest grid value $\lambda = 10^{-6}$. Expanded features may prefer weaker regularization than the grid allows.
+
+\section{Interpretation}
+\label{sec:interpretation}
+Under this operational definition of separation, the pilot does not support separation as a cause of BRACS's larger imbalance damage. Moving BRACS's class centres to TCGA-UT's relative spacing did not reduce total damage, even though it raised balanced accuracy by about 25 points.
+
+The channel split in Table~\ref{tab:channels} suggests why, but it comes from one draw on validation data with no uncertainty interval, so it is exploratory. Prior-only damage behaved as the separation hypothesis predicts on both datasets: it fell when BRACS classes moved apart and rose when TCGA-UT classes moved together. Support-only damage did not. On BRACS it rose by 6.50 points, more than enough to cancel the prior-channel gain. One candidate explanation is headroom: a better-separated balanced model classifies more tail patients correctly, so it has more to lose when tail support thins. The BRACS tail-assignment study found that headroom dominates tail damage \citep{queisler2026tailBracs}. This pilot did not test that explanation.
+
+Three limits apply. The intervention is an oracle that uses true labels, so it says nothing about tissue biology or a deployable remedy. $J$ is one summary of class geometry; another definition could give a different $\alpha$. The two datasets still differ in class count (seven against thirty), which support matching does not control. A follow-up that targets the prior channel alone would need its own pre-registered gate; the present gate cannot be reused after seeing these outcomes.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
