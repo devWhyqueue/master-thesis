@@ -55,11 +55,12 @@ def _boundary_check(config: dict[str, Any]) -> tuple[list[str], list[dict[str, A
 
 
 def _fixed_lambda_rescue(config: dict[str, Any]) -> float:
+    """native_B has no fixed-lambda variant: its own tuned lambda already is the fixed lambda."""
     gains = []
     for draw_idx in PILOT_DRAWS:
         for split_idx in range(N_SPLITS):
             native_r = test_ba(config, "native_R_fixedlambda", split_idx, draw_idx)
-            native_b = test_ba(config, "native_B_fixedlambda", split_idx, draw_idx)
+            native_b = test_ba(config, "native_B", split_idx, draw_idx)
             joint_r = test_ba(config, "joint_R_fixedlambda", split_idx, draw_idx)
             joint_b = test_ba(config, "joint_B_fixedlambda", split_idx, draw_idx)
             gains.append((native_b - native_r) - (joint_b - joint_r))
