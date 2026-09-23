@@ -133,7 +133,7 @@ def gate4_joint_rescue(config: dict[str, Any]) -> dict[str, Any]:
         return {"pass": True, "skipped": True, "reason": "gate 4 is BRACS-only"}
     per_draw, per_split = _pooled_rescue(config)
     both_draws_positive = all(v["damage_fall_pp"] > 0 for v in per_draw.values())
-    splits_positive = sum(np.mean(v) > 0 for v in per_split.values()) >= 2
+    splits_positive = bool(sum(np.mean(v) > 0 for v in per_split.values()) >= 2)
     pooled = {
         k: float(np.mean([v[k] for v in per_draw.values()]))
         for k in ("damage_fall_pp", "r_rise_pp", "b_drop_pp")
