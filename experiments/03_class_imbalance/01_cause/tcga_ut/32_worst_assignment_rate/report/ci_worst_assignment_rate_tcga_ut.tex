@@ -34,14 +34,30 @@ The study reuses the design of the TCGA-UT prevalence curve \citep{queisler2026p
 
 \subsection{A rate-weighted pair-separation score}
 \label{sec:score}
-Each rank $r$ carries a log-count deviation from balance, $z_r = \log_2(n_r/640)$, where $n_r$ is the patch count at rank $r$; at $\rho=100$ these run from $2.15$ at the head to $-4.51$ at the tail. An assignment $\pi$ places class $c$ at rank $r_c$. The score is
+Each rank $r$ holds $n_r$ training patches, and the score measures allocations on a logarithmic scale relative to the balanced arm, $z_r = \log_2(n_r/640)$. The quantity $z_r$ is not a patch count. It counts how many times the allocation at rank $r$ doubles or halves the balanced 640 patches, so it is positive for ranks that hold more than 640 patches and negative for ranks that hold fewer. At $\rho=100$, rank 0 holds 2,843 patches, $z_0 = \log_2(2843/640) = 2.15$, and rank 29 holds 28 patches, $z_{29} = \log_2(28/640) = -4.51$. A difference $z_{r_d} - z_{r_c}$ is therefore the number of doublings by which the allocation of class $d$ exceeds that of class $c$. An assignment $\pi$ places class $c$ at rank $r_c$. The score is
 \begin{equation}
-  S(\pi) = \sum_{c \neq d} w_{c \rightarrow d}\; h_c\; \max\!\left(z_{r_d} - z_{r_c},\, 0\right),
-  \qquad
+  \begin{gathered}
+  S(\pi) = \sum_{c \neq d}\;
+  \underbrace{w_{c \rightarrow d}}_{\substack{\text{how often } c\\ \text{is predicted as } d}}\;
+  \underbrace{h_c}_{\substack{\text{recall } c\\ \text{can lose}}}\;
+  \underbrace{\max\!\left(z_{r_d} - z_{r_c},\, 0\right)}_{\substack{\text{doublings by which } d\text{'s}\\ \text{allocation exceeds } c\text{'s}}},
+  \\[4pt]
   w_{c \rightarrow d} = \frac{N_{cd}}{\sum_{e} N_{ce}},
+  \end{gathered}
   \label{eq:score}
 \end{equation}
 \noindent where $N_{cd}$ counts the test patches of class $c$ that the balanced arm predicts as class $d$, pooled over all fits, and $h_c$ is class $c$'s pooled balanced-arm recall in percent. The weight $w_{c \rightarrow d}$ is thus the probability that the balanced classifier predicts $d$ for a patch of class $c$. Each term measures the exposure of class $c$ to a class $d$ it is mistaken for that holds a larger allocation, scaled by how much recall $c$ has to lose.
+
+Figure~\ref{fig:intuition} illustrates single terms with rectum adenocarcinoma (READ) as class $c$. READ is often predicted as colon adenocarcinoma (COAD). With READ at rank 27 and COAD at rank 2, COAD holds 5.73 doublings more patches, and the term is large (panel a). The term is small when the two classes sit at adjacent ranks (panel b). It is zero when READ sits above COAD, because the $\max$ keeps only the direction in which the confusion partner holds more patches (panel c); the reverse term, COAD predicted as READ, then becomes active instead, with its own weight and recall. The term is also near zero when READ sits far below a class it is almost never predicted as, such as thyroid carcinoma (THCA), because $w_{c \rightarrow d}$ is then close to zero (panel d). A high-scoring pair is thus a pair that the balanced classifier confuses often, placed far apart, with the more often confused member at the smaller allocation.
+
+The score of a whole assignment adds these terms over all 870 ordered pairs of classes. An assignment scores high when many strongly confused pairs are separated at the same time, each with the right direction; one assignment can satisfy many pairs at once because each pair constrains only the relative ranks of its two members. The bottom panels of Figure~\ref{fig:intuition} show the result for the two extreme orders of Section~\ref{sec:arms}. In the worst order, nearly every class sits far below the class it is most often predicted as. In the mild order, most confused classes sit next to their partner, and the remaining gaps are short.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{score_intuition_r100.pdf}
+\caption{A pair term is large only when a frequently confused class sits far below its confusion partner, and the worst order stacks many such terms. Grey bars: log allocation $z_r$ of each rank at $\rho=100$; positive $z_r$ means more than the balanced 640 patches, negative $z_r$ fewer. Top, (a) to (d) from left to right: one term $w_{c\rightarrow d}\,h_c\,\max(z_{r_d}-z_{r_c},0)$ of Equation~\eqref{eq:score}, with class $c$ in red and class $d$ in blue; the arrow points from $c$ to $d$. Bottom: the worst and mild orders, with class codes under their ranks. Each arc links a class to the class it is most often predicted as in the balanced arm and is drawn only when the class sits below that partner, that is, when its term is positive. Arcs show only the main partner of each class, whereas $S$ sums over all pairs.}
+\label{fig:intuition}
+\end{figure}
 
 The formula is that of the worst-assignment study; only the denominator of $w$ differs \citep{queisler2026worstTcga}. There it was the off-diagonal row sum $\sum_{e\neq c} N_{ce}$, so every class carried total weight one. With the full row sum in the denominator, a class's weights sum to its patch-level error rate, and a class that is rarely confused contributes little no matter where it sits. The score remains directed: because the per-rank counts are log-linear in rank, reversing an order preserves every pairwise rank gap, and only the one-sided $\max$ and the asymmetric weights $w_{c \rightarrow d} h_c$ distinguish an order from its reversal.
 

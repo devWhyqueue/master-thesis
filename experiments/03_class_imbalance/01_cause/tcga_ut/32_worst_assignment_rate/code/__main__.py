@@ -14,6 +14,7 @@ from breadth.slurm import _job, submit_workflow
 
 from rate.analyze import run_analyze
 from rate.fit import run_fit_shard, shard_count
+from rate.intuition import score_intuition_figure
 from rate.precheck import run_precheck
 
 __all__ = ["main"]
@@ -32,6 +33,7 @@ def _parser() -> argparse.ArgumentParser:
     fit = sub.add_parser("fit")
     fit.add_argument("--shard-index", type=int, required=True)
     sub.add_parser("analyze")
+    sub.add_parser("intuition")
     submit = sub.add_parser("submit")
     submit.add_argument("--stage", choices=_STAGES, required=True)
     submit.add_argument("--dry-run", action="store_true")
@@ -53,6 +55,15 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     run_analyze(load_config(args.config))
 
 
+def cmd_intuition(args: argparse.Namespace) -> None:
+    """Render the Design-section score-intuition figure from the committed diagnostics.json."""
+    del args
+    report_dir = Path(__file__).resolve().parents[1] / "report"
+    score_intuition_figure(
+        report_dir / "diagnostics.json", report_dir / "score_intuition_r100.pdf"
+    )
+
+
 def cmd_submit(args: argparse.Namespace) -> None:
     """Submit one stage, or fit -> analyze chained with afterok for ``all``."""
     config = load_config(args.config)
@@ -71,6 +82,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "precheck": cmd_precheck,
         "fit": cmd_fit,
         "analyze": cmd_analyze,
+        "intuition": cmd_intuition,
         "submit": cmd_submit,
     }
 

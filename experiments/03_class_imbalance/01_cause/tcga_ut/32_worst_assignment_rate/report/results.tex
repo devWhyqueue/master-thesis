@@ -69,35 +69,35 @@ Descriptive & $D_{\text{mild}} - D_{\text{hard}}$ & $-0.25$ & $-0.58$ to $0.09$ 
 
 \subsection{Recall moves with allocation relative to the confusion partner}
 \label{sec:recall}
-The damage of the worst order is concentrated. Nine classes lose more than ten points of recall under it, against two under the mild order, and the largest single loss is 42.8 points against 13.2 points. Table~\ref{tab:pairs} follows the main confused pairs through the three derived orders.
+The damage of the worst order is concentrated. Nine classes lose more than ten points of recall under it, against two under the mild order, and the largest single loss is 42.8 points against 13.2 points. Table~\ref{tab:pairs} follows the main confusion groups through the three derived orders. Three groups are mutual pairs, in which each class is the other's main confusion partner. The fourth is a cluster around lung squamous cell carcinoma (LUSC): head and neck squamous cell carcinoma (HNSC), cervical squamous cell carcinoma (CESC) and lung adenocarcinoma (LUAD) are each most often predicted as LUSC, so all three are paired with the same class and appear in one block.
 
 \begin{table}[htbp]
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
 \renewcommand{\arraystretch}{1.08}
-\begin{tabular}{@{}llrrrrrr@{}}
+\begin{tabular}{@{}lllrrrrrr@{}}
 \toprule
-& & \multicolumn{2}{c}{Worst} & \multicolumn{2}{c}{Flip} & \multicolumn{2}{c}{Mild} \\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}
-Class & $h_c$ (\%) & Rank & $\Delta$ & Rank & $\Delta$ & Rank & $\Delta$ \\
+& & & \multicolumn{2}{c}{Worst} & \multicolumn{2}{c}{Flip} & \multicolumn{2}{c}{Mild} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+Class & Partner & $h_c$ (\%) & Rank & $\Delta$ & Rank & $\Delta$ & Rank & $\Delta$ \\
 \midrule
-COAD & 51.5 & 2 & $+27.8$ & 27 & $-34.1$ & 28 & $-11.0$ \\
-READ & 60.6 & 27 & $-42.8$ & 2 & $+22.0$ & 29 & $-4.0$ \\
+COAD & READ & 51.5 & 2 & $+27.8$ & 27 & $-34.1$ & 28 & $-11.0$ \\
+READ & COAD & 60.6 & 27 & $-42.8$ & 2 & $+22.0$ & 29 & $-4.0$ \\
 \addlinespace
-LUSC & 54.5 & 0 & $+21.4$ & 29 & $-37.8$ & 23 & $-9.2$ \\
-HNSC & 69.0 & 19 & $-15.1$ & 10 & $+1.6$ & 24 & $-5.9$ \\
-CESC & 46.7 & 29 & $-27.2$ & 0 & $+17.3$ & 22 & $-0.9$ \\
-LUAD & 65.3 & 26 & $-19.2$ & 3 & $+11.0$ & 16 & $+2.5$ \\
+LUSC & HNSC & 54.5 & 0 & $+21.4$ & 29 & $-37.8$ & 23 & $-9.2$ \\
+HNSC & LUSC & 69.0 & 19 & $-15.1$ & 10 & $+1.6$ & 24 & $-5.9$ \\
+CESC & LUSC & 46.7 & 29 & $-27.2$ & 0 & $+17.3$ & 22 & $-0.9$ \\
+LUAD & LUSC & 65.3 & 26 & $-19.2$ & 3 & $+11.0$ & 16 & $+2.5$ \\
 \addlinespace
-LGG & 78.8 & 5 & $+8.7$ & 24 & $-12.7$ & 8 & $+1.0$ \\
-GBM & 77.0 & 24 & $-16.4$ & 5 & $+9.1$ & 9 & $+1.5$ \\
+LGG & GBM & 78.8 & 5 & $+8.7$ & 24 & $-12.7$ & 8 & $+1.0$ \\
+GBM & LGG & 77.0 & 24 & $-16.4$ & 5 & $+9.1$ & 9 & $+1.5$ \\
 \addlinespace
-LIHC & 85.5 & 8 & $+1.5$ & 21 & $-7.0$ & 5 & $+1.8$ \\
-ACC & 72.9 & 28 & $-26.3$ & 1 & $+7.0$ & 6 & $+3.4$ \\
+LIHC & ACC & 85.5 & 8 & $+1.5$ & 21 & $-7.0$ & 5 & $+1.8$ \\
+ACC & LIHC & 72.9 & 28 & $-26.3$ & 1 & $+7.0$ & 6 & $+3.4$ \\
 \bottomrule
 \end{tabular}
-\caption{Classes placed far below their main confusion partner lose large amounts of recall, and the loss is not symmetric within a pair. $h_c$ is balanced-arm recall; rank 0 holds 2,843 patches and rank 29 holds 28; $\Delta$ is the pooled change in own recall against r1, in points. Groups are confused pairs or clusters: colon and rectum adenocarcinoma; lung squamous cell, head and neck squamous cell, cervical squamous cell carcinoma and lung adenocarcinoma, all confused with lung squamous cell carcinoma; lower-grade glioma and glioblastoma; liver hepatocellular and adrenocortical carcinoma.}
+\caption{Classes placed far below their main confusion partner lose large amounts of recall, and the loss is not symmetric within a pair. Partner is the class that the balanced arm most often predicts for the row's class; $h_c$ is balanced-arm recall; rank 0 holds 2,843 patches and rank 29 holds 28; $\Delta$ is the pooled change in own recall against r1, in points. Blocks group classes by partner. Three blocks are mutual pairs: colon and rectum adenocarcinoma, lower-grade glioma (LGG) and glioblastoma (GBM), and liver hepatocellular (LIHC) and adrenocortical carcinoma (ACC). The second block is a cluster rather than a pair: HNSC, CESC and LUAD all have LUSC as their partner, and LUSC has HNSC.}
 \label{tab:pairs}
 \end{table}
 

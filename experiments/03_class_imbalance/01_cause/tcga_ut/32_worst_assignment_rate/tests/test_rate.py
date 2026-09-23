@@ -6,6 +6,7 @@ from itertools import permutations
 
 import numpy as np
 
+from rate.intuition import _active_arcs
 from rate.order import confusion_rates
 from worst.score import score, search
 
@@ -49,3 +50,10 @@ def test_search_matches_brute_force_over_all_permutations() -> None:
 
     assert score(found_max, w, h, z) == best_max
     assert score(found_min, w, h, z) == best_min
+
+
+def test_active_arcs_keep_only_classes_below_their_partner() -> None:
+    """An arc is drawn from a class's rank to its partner's rank only when the class sits lower."""
+    order = ["a", "b", "c"]
+    partner = {"a": "b", "b": "a", "c": "a"}
+    assert _active_arcs(order, partner) == [(1, 0), (2, 0)]
