@@ -1,0 +1,11 @@
+{
+  "fraction_inside": 0.38095238095238093,
+  "fraction_inside_by_split": [
+    0.5714285714285714,
+    0.2857142857142857,
+    0.2857142857142857
+  ],
+  "label": "dataset_specific_by_support",
+  "pass": false,
+  "threshold": 0.7142857142857143
+}
