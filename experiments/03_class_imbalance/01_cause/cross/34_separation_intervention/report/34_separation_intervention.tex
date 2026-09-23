@@ -1,0 +1,75 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class Imbalance in Histopathology:\\Does Class Separation Explain\\{BRACS}'s Greater Imbalance Damage?}
+\author{Yannik Queisler}
+\date{September 23, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At an imbalance ratio of $\rho=100$, class imbalance costs 7.65 points of patient-macro balanced accuracy on BRACS against 2.91 points on TCGA-UT, a 4.74-point gap between two datasets fit under the same design \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. A companion report tried to explain the prior channel's share of that gap by injecting each dataset's own fitted class-prior shift into its balanced model's stored decisions; the injected damage overshot the real fitted damage by three to nine times on both datasets, so no mechanism claim survived \citep{queisler2026marginTcgaBracs}. This report tests a different, feature-level candidate: that BRACS's classes sit closer together in representation space under balanced training than TCGA-UT's, so the same nominal prior shift and the same thin tail collide with less headroom before decisions flip. The test is a controlled, label-dependent feature intervention, $x^{(\alpha)}=x+(\alpha-1)(\mu_y-\bar\mu)$, that rescales every class's offset from the pooled grand mean of class centres by a factor $\alpha$ fixed before any refit: BRACS's classes are expanded toward TCGA-UT's own separation, and TCGA-UT's classes are contracted toward BRACS's, both at ten patients per class and matched patch depth so patient breadth cannot confound the comparison. Refitting four training arms per setting isolates how much of the resulting change in damage comes from the shifted prior, the thinned tail support, and their interaction. A pre-registered pilot on one draw per split checks that the intervention reproduces prior results, moves balanced accuracy by the intended amount, moves total imbalance damage in the predicted direction, and offers enough power for the pre-registered effects before any of the full draw grid is submitted. This document is the protocol; \S\ref{sec:results} reports the pilot and, if it passes every gate, the main experiment's outcome.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Two damage studies in this series measured how fast balanced accuracy degrades as a shared exponential-profile allocator moves a fixed patch budget away from a balanced class prior, holding a frozen ViT feature extractor constant \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. At $\rho=100$, the most severe ratio tested, BRACS's seven lesion classes lose 7.65 points against TCGA-UT's thirty cancer types losing 2.91, and the gap is not a difference in how the two curves are built: the same allocator, the same three patient-disjoint splits, the same class-rank permutation scheme, and the same logistic readout on frozen Virchow2 features underlie both \citep{zimmermann2024virchow2}. A follow-up pair of studies decomposed each dataset's own damage into a prior-only channel, a support-only channel, and their interaction, and found the prior channel alone costs 4.47 points on BRACS against 1.20 on TCGA-UT at $\rho=100$ \citep{queisler2026causeTcga, queisler2026causeBracs}. A companion report tried to explain that 3.27-point prior-channel gap with zero new fits, injecting each dataset's own realized class prior directly into its balanced model's stored test probabilities; the injected damage exceeded the real fitted damage by three to nine times on both datasets, so the gate built to validate that proxy failed on both, and no mechanism claim was drawn from it \citep{queisler2026marginTcgaBracs}.
+
+This report tests a different candidate mechanism, one that acts on the feature geometry rather than on a fixed decision rule: BRACS's seven lesion subtypes are related, overlapping categories along a single tissue axis, while TCGA-UT's thirty classes span unrelated organ sites and tumor types \citep{brancati2022bracs}, so BRACS's classes may simply sit closer together, relative to their own within-class spread, under balanced training. If that is so, the same nominal prior shift and the same thinned tail patch support would collide with less separation before a decision flips, and BRACS's much larger susceptibility would be, at least in part, a geometric property of the representation rather than a property of the prior or the tail mechanism alone. A companion patient-shortage report already establishes that training-only, patient-balanced class centres computed from a fixed pool of eligible patients are both a stable and a meaningful summary of a dataset's class geometry \citep{queisler2026centreError}; this report reuses that same centre construction, at the same patch depth, to build a scalar separation index and a controlled intervention on it.
+
+A read-only precheck, run before any code changed or job was submitted, found that 55 to 85 percent of BRACS's initially correct balanced-model decisions carry a log-probability margin below one nat across the three splits, against 19 to 20 percent on TCGA-UT, and that those low-margin decisions account for 86 to 100 percent of BRACS's prior-only losses and 74 to 100 percent of its support-only losses in the prior-versus-support studies. Raw margins depend on the fitted regularization strength, so this observation motivates testing separation as a cause; it does not establish it, which is why the intervention below is tested through an actual refit rather than through a margin-based proxy of the kind that failed in the companion report.
+
+\section{Controlled experiment}
+\label{sec:design}
+Within each dataset and each of the three frozen patient-disjoint splits, this experiment retains every class's labels, patient identities, patch allocations, class-rank assignment, feature dimension, and within-class variation, and changes only where each class's rows sit in feature space:
+\begin{equation}
+  x^{(\alpha)} = x + (\alpha - 1)\left(\mu_y - \bar\mu\right),
+  \label{eq:intervention}
+\end{equation}
+\noindent where $\mu_y$ is class $y$'s training-only, patient-balanced centre, computed once per split as the mean of per-patient mean feature vectors over every training patient eligible at the shared depth-160 patch pool used by the damage studies \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}, and $\bar\mu$ is the unweighted mean of those class centres. Every row of a given class is shifted by the same fixed vector, so within-class differences between patches or patients are preserved exactly, and $\alpha=1$ is the identity. The same $\alpha$-scaled shift, computed from training data alone, is applied identically to the training, validation, and test partitions of a split, and feature vectors are not subsequently renormalized. This is an oracle, label-dependent intervention, including at evaluation time: it tests a controlled mechanism inside the frozen representation, not a deployable training method or a claim about the underlying tissue biology.
+
+Separation is defined as
+\begin{equation}
+  J = \frac{\mathrm{median}_c \; \min_{c' \neq c} \lVert \mu_c - \mu_{c'} \rVert}{\mathrm{RMS}_{\text{within-class}}},
+  \label{eq:separation}
+\end{equation}
+\noindent the median nearest-class-centre distance divided by the pooled within-class root-mean-square deviation of per-patient means from their own class centre, computed once per split and per dataset from the same centres in Equation~\eqref{eq:intervention}. BRACS's expansion strength is fixed as $\alpha_{\text{BRACS}} = J_{\text{TCGA-UT}} / J_{\text{BRACS}}$, and TCGA-UT's contraction strength is fixed as its exact reciprocal, both computed separately per split before any pilot outcome is inspected. If that ratio falls outside $[1.25, 4]$ in any split, this operational definition of separation does not support the proposed manipulation and the experiment stops before submitting any fit.
+
+Patient breadth and patch depth are matched at ten patients per class and thirty-two balanced patches per patient on both datasets: BRACS already draws ten patients per class natively at this patch depth \citep{queisler2026prevalenceBracs}, and TCGA-UT's ten patients are the first ten of the same twenty-patient draw its own damage and prior-versus-support studies already use, preserving the same nested patch prefixes and class-rank permutation \citep{queisler2026prevalenceTcga, queisler2026causeTcga}. This controls patient breadth and balanced patch depth across datasets; it does not control every remaining cross-dataset difference, including the native class count (seven against thirty).
+
+For every experimental setting, four training arms reuse the prior-versus-support studies' own reweighting exactly \citep{queisler2026causeTcga, queisler2026causeBracs}: arm B trains on a balanced allocation with a balanced class prior; arm P trains on the same rows as B but with the training risk reweighted toward the imbalanced ($\rho=100$) class prior; arm S trains on an imbalanced allocation with the training risk reweighted back to a balanced prior; and arm R trains on an imbalanced allocation with the native imbalanced prior. Three new settings are fit this way: expanded BRACS ($\alpha_{\text{BRACS}}$ applied to BRACS's own ten-patient draw), native TCGA-UT at ten patients ($\alpha=1$, the ten-patient match-support control TCGA-UT's own studies never fit), and contracted TCGA-UT at ten patients (the reciprocal $\alpha$). Native BRACS and the original twenty-patient TCGA-UT controls are reused from the prior-versus-support studies' own stored fits rather than refit \citep{queisler2026causeTcga, queisler2026causeBracs}.
+
+\subsection{Execution and pre-registered stopping gates}
+\label{sec:gates}
+Three frozen patient-disjoint splits and five draws (0 through 4) are used throughout. A pilot uses draw 0 only: 36 new fitted conditions (three settings times four arms times three splits) plus 12 native-BRACS replay conditions (BRACS's own native setting, refit under this experiment's own code, at the same draw). The main experiment uses draws 1 through 4: 144 conditions (three settings times four arms times three splits times four draws). The pilot's own conditions are excluded from the primary intervention estimates reported in \S\ref{sec:results}; the total budget is 192 fitted conditions.
+
+The pilot must pass all five gates before the main draw grid is submitted:
+\begin{enumerate}
+  \item \textbf{Reproduction}: the native-BRACS replay reproduces the prior-versus-support study's own stored balanced accuracy within 0.01 points on every arm and split, confirming labels, patient identities, patch allocations, and source data agree.
+  \item \textbf{Manipulation}: the balanced arm's (B) validation balanced accuracy improves on expanded BRACS and falls on contracted TCGA-UT, by at least 3 points pooled across splits, with a consistent direction in at least two of the three splits; validation balanced accuracy on every arm stays between 25 and 90 percent, so neither task collapses to a trivial regime.
+  \item \textbf{Mechanism promise}: pooled validation total imbalance damage (arm B minus arm R) falls by at least 2 points on expanded BRACS and rises by at least 2 points on contracted TCGA-UT, relative to the matched native control, with the prior-only (B minus P) and support-only (B minus S) components each moving in the same predicted direction when pooled.
+  \item \textbf{Precision}: a patient-cluster simulation, resampling whole draws from the pilot's own centred validation contrasts rather than individual patches or patients, projects at least 80 percent power for both primary 2-point directional effects at the main experiment's draw grid, after accounting for testing two primary comparisons.
+  \item \textbf{Numerics}: every pilot fit converges under the shared nine-value regularization grid; fits whose selected regularization strength sits at either grid boundary are flagged for inspection, not treated as a gate failure on their own.
+\end{enumerate}
+\noindent Failing any gate stops the main submission; the failed criterion is recorded and no search over alternative intervention strengths follows, so an expensive, uninformative full run is never at risk even if the pilot fails.
+
+\section{Analysis plan}
+\label{sec:analysis}
+For every fitted setting, positive damage is $D_P = A_B - A_P$, $D_S = A_B - A_S$, $D_R = A_B - A_R$, with interaction $I = D_R - D_P - D_S$, all on patient-macro balanced accuracy. The two primary effects are BRACS rescue, native BRACS's $D_R$ minus expanded BRACS's $D_R$, and TCGA-UT susceptibility, contracted TCGA-UT's $D_R$ minus native TCGA-UT's $D_R$, both estimated from a paired patient bootstrap within each dataset and combined across datasets with independent resampling, since no patient is shared between BRACS and TCGA-UT. The two primary directional tests are Holm-corrected for multiplicity. Prior, support, and interaction contrasts are reported alongside the primary effects, together with the original 4.74-point gap partitioned into TCGA-UT's own support-budget contribution and the remaining gap once both datasets are compared at matched ten-patient support, correct-to-wrong losses and wrong-to-correct gains by class, and the BRACS gap reduction in points, with an explained fraction reported only when its denominator is reliably positive.
+
+A positive result is interpreted as class separation being a demonstrated contributor to BRACS's greater imbalance damage under this controlled feature intervention. A full explanation is claimed only if the residual gap once both datasets are compared at matched support has a 95 percent interval within $\pm 1$ point of zero and both the prior and support channels agree in direction; otherwise the result is reported as a partial explanation, quantified by the gap reduction achieved. Representation geometry, tissue biology, annotation quality, and deployable mitigation are kept distinct throughout: BRACS's related breast-lesion categories motivate the separation hypothesis but do not establish it as a biological fact \citep{brancati2022bracs}, the test patients reused from the prior-versus-support studies are not independent of that report's own findings, the two datasets' native class counts remain unequal, and Equation~\eqref{eq:intervention} is an oracle transformation evaluated with knowledge of the true label, not a method a deployed classifier could apply to new data.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
