@@ -1,0 +1,55 @@
+{
+  "gates": {
+    "integrity": {
+      "max_abs_diff_pp": 1.3788248699845695,
+      "pass": false
+    },
+    "joint_rescue": {
+      "both_draws_positive": true,
+      "pass": true,
+      "per_draw": {
+        "0": {
+          "b_drop_pp": -24.46095722299681,
+          "damage_fall_pp": 1.9090543088489085,
+          "r_rise_pp": 26.37001153184572
+        },
+        "1": {
+          "b_drop_pp": -22.809284472159003,
+          "damage_fall_pp": 6.9166168825568946,
+          "r_rise_pp": 29.725901354715898
+        }
+      },
+      "pooled": {
+        "b_drop_pp": -23.63512084757791,
+        "damage_fall_pp": 4.4128355957029015,
+        "r_rise_pp": 28.04795644328081
+      },
+      "splits_positive": true
+    },
+    "precision": {
+      "pass": false,
+      "projected_halfwidth_pp": 1.6130876483316121
+    },
+    "prior_mechanism": {
+      "pass": true,
+      "per_split_diff_pp": [
+        -3.9213597786100323,
+        -4.310299665465372,
+        -3.5573233372363227
+      ],
+      "pooled_diff_pp": -3.929660927103909
+    },
+    "robustness": {
+      "boundary_hits": [],
+      "fixed_lambda_bracs_rescue_pp": -9.401135185395498,
+      "not_converged": [],
+      "pass": false
+    },
+    "support_mechanism": {
+      "correction_gain_pp": 5.217910051916745,
+      "pass": true,
+      "wrong_direction_gain_pp": 15.83697203330382
+    }
+  },
+  "overall_pass": false
+}

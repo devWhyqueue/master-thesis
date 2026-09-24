@@ -1,0 +1,39 @@
+{
+  "gates": {
+    "integrity": {
+      "max_abs_diff_pp": 0.0,
+      "pass": true
+    },
+    "joint_rescue": {
+      "pass": true,
+      "reason": "gate 4 is BRACS-only",
+      "skipped": true
+    },
+    "precision": {
+      "pass": true,
+      "reason": "gate 6 is BRACS-only",
+      "skipped": true
+    },
+    "prior_mechanism": {
+      "pass": true,
+      "per_split_diff_pp": [
+        2.1125164209278395,
+        1.509616795839392,
+        1.012743128515467
+      ],
+      "pooled_diff_pp": 1.5449587817608996
+    },
+    "robustness": {
+      "boundary_hits": [],
+      "fixed_lambda_bracs_rescue_pp": null,
+      "not_converged": [],
+      "pass": true
+    },
+    "support_mechanism": {
+      "pass": true,
+      "reason": "gate 3 is BRACS-only",
+      "skipped": true
+    }
+  },
+  "overall_pass": true
+}
