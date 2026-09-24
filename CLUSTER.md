@@ -7,7 +7,7 @@ Hydra = HPC cluster of ML, MLSEC, UNIML, Cognition groups at TU Berlin. SLURM, s
 
 ## Access
 
-SSH shortcut from WSL or PowerShell:
+SSH shortcut:
 
 ```bash
 ssh hydra
