@@ -10,9 +10,38 @@ found; see ``configs/protocol_lock.json``). Draw 10000 is reserved for engineeri
 
 from __future__ import annotations
 
-__all__ = ["RATIOS_NEW", "ARMS", "FIT_SOURCE", "MAIN_DRAWS", "SMOKE_DRAW"]
+__all__ = [
+    "RATIOS_NEW",
+    "ARMS",
+    "FIT_SOURCE",
+    "MAIN_DRAWS",
+    "SMOKE_DRAW",
+    "ENCODERS",
+    "LAMBDAS",
+    "TOLERANCE",
+    "MAX_ITER",
+    "TIE_TOLERANCE",
+    "BOOTSTRAP_SEED",
+    "N_REPLICATES",
+]
 
 RATIOS_NEW: tuple[int, ...] = (10, 100)
+
+# Both frozen encoders every fit/analyze shard pairs, per protocol phase 01/04.
+ENCODERS: tuple[str, ...] = ("virchow2", "uni2h")
+
+# Frozen lambda grid (protocol_lock.json's readout.lambda_grid): 1e-8..1e2, decade steps, 11
+# candidates. Distinct from breadth/decodability's own grids, so the fit stage cannot reuse
+# breadth.fit.tune_and_fit_draw's module-level LAMBDAS unchanged (plans/04_implementation.md).
+LAMBDAS: tuple[float, ...] = tuple(10.0**p for p in range(-8, 3))
+# Solver tolerances: existing, unchanged (breadth's own values, protocol_lock.json).
+TOLERANCE: float = 1e-8
+MAX_ITER: int = 10000
+TIE_TOLERANCE: float = 1e-10
+
+# protocol_lock.json's inference block.
+BOOTSTRAP_SEED: int = 39000
+N_REPLICATES: int = 10000
 
 ARMS: tuple[str, ...] = (
     ("B",)

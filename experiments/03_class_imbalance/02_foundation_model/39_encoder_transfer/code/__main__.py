@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+from dataclasses import replace
+from pathlib import Path
 from typing import Callable
 
 import _bootstrap  # noqa: F401
@@ -15,15 +17,69 @@ from imbalance_benchmark.common import (
     sign_file,
     write_json,
 )
+from imbalance_benchmark.hydra.job_resources import build_job
+from imbalance_benchmark.hydra.rendering import SlurmJob
+
+from breadth.slurm import submit_workflow
 
 from prevalence import patients_per_class
 
 from transfer import MAIN_DRAWS, extract, manifest
+from transfer import analyze as analyze_stage
+from transfer import fit as fit_stage
+from transfer import preflight as preflight_stage
+from transfer.fit import shard_count
 from transfer.schedule import draw_schedule, load_train_identity
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["main"]
+
+_SUBMIT_STAGES = ("extract", "fit", "analyze", "all")
+
+
+def _extraction_jobs(config: dict) -> list[SlurmJob]:
+    """extract-features (GPU array) -> merge-features -> audit-features -> preflight."""
+    n = int(config.get("slurm", {}).get("extract_shards", 1))
+    extract_job = replace(
+        build_job(
+            config,
+            "extract-features",
+            f"extract-features --shards {n} --dtype float32",
+            True,
+        ),
+        array_size=n,
+    )
+    merge_job = build_job(
+        config, "merge-features", "merge-features", False, (extract_job.name,)
+    )
+    audit_job = build_job(
+        config, "audit-features", "audit-features", False, (merge_job.name,)
+    )
+    preflight_job = build_job(
+        config, "preflight", "preflight", False, (audit_job.name,)
+    )
+    return [extract_job, merge_job, audit_job, preflight_job]
+
+
+def _fit_job(config: dict, dependencies: tuple[str, ...]) -> SlurmJob:
+    return replace(
+        build_job(config, "fit", "fit", False, dependencies), array_size=shard_count()
+    )
+
+
+def _stage_jobs(config: dict, stage: str) -> list[SlurmJob]:
+    """Jobs for one submission stage: ``extract`` (through preflight), ``fit``, ``analyze``, or ``all``."""
+    if stage == "extract":
+        return _extraction_jobs(config)
+    if stage == "fit":
+        return [_fit_job(config, ())]
+    if stage == "analyze":
+        return [build_job(config, "analyze", "analyze", False, ())]
+    extraction = _extraction_jobs(config)
+    fit = _fit_job(config, (extraction[-1].name,))
+    analyze = build_job(config, "analyze", "analyze", False, (fit.name,))
+    return [*extraction, fit, analyze]
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -37,6 +93,15 @@ def _parser() -> argparse.ArgumentParser:
     p_extract.add_argument("--dtype", default="float32", choices=["float32", "float16"])
     sub.add_parser("merge-features")
     sub.add_parser("audit-features")
+    sub.add_parser("preflight")
+    p_fit = sub.add_parser("fit")
+    p_fit.add_argument(
+        "--shard-index", type=int, choices=range(shard_count()), required=True
+    )
+    sub.add_parser("analyze")
+    submit = sub.add_parser("submit")
+    submit.add_argument("--stage", choices=_SUBMIT_STAGES, required=True)
+    submit.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -79,17 +144,49 @@ def cmd_audit_features(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_preflight(args: argparse.Namespace) -> None:
+    """Verify frozen locks, the feature audit, and joined manifests; write preflight.json."""
+    preflight_stage.run_preflight(load_config(args.config))
+    logger.info("preflight passed")
+
+
+def cmd_fit(args: argparse.Namespace) -> None:
+    """Fit every pending arm of one (encoder, split, draw) shard."""
+    fit_stage.run_fit_shard(load_config(args.config), args.shard_index)
+
+
+def cmd_analyze(args: argparse.Namespace) -> None:
+    """Pool encoder/arm accuracy and probability quality, decompose, and write analysis.json."""
+    path = analyze_stage.run_analyze(load_config(args.config))
+    logger.info(f"wrote {path}")
+
+
+def cmd_submit(args: argparse.Namespace) -> None:
+    """Submit one stage of the extract -> fit -> analyze DAG, or the full chain."""
+    config = load_config(args.config)
+    jobs = _stage_jobs(config, args.stage)
+    submit_workflow(config, str(Path(args.config).resolve()), args.dry_run, jobs=jobs)
+
+
 def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
     return {
         "schedule": cmd_schedule,
         "extract-features": cmd_extract_features,
         "merge-features": cmd_merge_features,
         "audit-features": cmd_audit_features,
+        "preflight": cmd_preflight,
+        "fit": cmd_fit,
+        "analyze": cmd_analyze,
+        "submit": cmd_submit,
     }
 
 
 def main() -> None:
     """Parse command-line arguments and dispatch subcommand."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
     args = _parser().parse_args()
     _commands()[args.command](args)
 
