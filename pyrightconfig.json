@@ -28,7 +28,8 @@
     "experiments/03_class_imbalance/01_cause/tcga_ut/31_worst_assignment/code",
     "experiments/03_class_imbalance/01_cause/tcga_ut/32_worst_assignment_rate/code",
     "experiments/03_class_imbalance/01_cause/cross/34_separation_intervention/code",
-    "experiments/03_class_imbalance/01_cause/cross/36_joint_mechanism/code"
+    "experiments/03_class_imbalance/01_cause/cross/36_joint_mechanism/code",
+    "experiments/03_class_imbalance/01_cause/cross/37_support_coverage/code"
   ],
   "extraPaths": [
     "experiments/01_benchmark/02_benchmark_patch/code",
@@ -59,7 +60,8 @@
     "experiments/03_class_imbalance/01_cause/tcga_ut/31_worst_assignment/code",
     "experiments/03_class_imbalance/01_cause/tcga_ut/32_worst_assignment_rate/code",
     "experiments/03_class_imbalance/01_cause/cross/34_separation_intervention/code",
-    "experiments/03_class_imbalance/01_cause/cross/36_joint_mechanism/code"
+    "experiments/03_class_imbalance/01_cause/cross/36_joint_mechanism/code",
+    "experiments/03_class_imbalance/01_cause/cross/37_support_coverage/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
