@@ -1,0 +1,484 @@
+{
+  "bracs": {
+    "summary": {
+      "tuned": {
+        "mean": -3.510411912914646,
+        "per_split": [
+          -3.934845376714268,
+          -6.065174572902201,
+          -0.5312157891274687
+        ]
+      },
+      "fixed_native_B_lambda": {
+        "mean": 9.170228741271691,
+        "per_split": [
+          13.614203654459372,
+          6.670258833399778,
+          7.226223735955921
+        ]
+      },
+      "fixed_own_B_lambda": {
+        "mean": -10.138960760911674,
+        "per_split": [
+          -12.468002826271272,
+          -8.998366285954294,
+          -8.950513170509454
+        ]
+      }
+    },
+    "max_integrity_diff_pp": 0.0,
+    "rows": [
+      {
+        "split": 0,
+        "draw": 0,
+        "lambda": {
+          "native_B": 10.0,
+          "separation_only_B": 0.01,
+          "native_P": 1e-05,
+          "separation_only_P": 1e-06
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            6.200376021328665,
+            3.1528475692576308
+          ],
+          "fixed_native_B_lambda": [
+            12.41639712362089,
+            28.245547296321625
+          ],
+          "fixed_own_B_lambda": [
+            12.41639712362089,
+            6.550216727215343
+          ]
+        },
+        "delta_D_P": {
+          "tuned": -3.0475284520710346,
+          "fixed_native_B_lambda": 15.829150172700736,
+          "fixed_own_B_lambda": -5.866180396405547
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 0,
+        "draw": 1,
+        "lambda": {
+          "native_B": 10.0,
+          "separation_only_B": 1e-08,
+          "native_P": 1e-06,
+          "separation_only_P": 1e-05
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            3.662345775689282,
+            -1.1598165256682194
+          ],
+          "fixed_native_B_lambda": [
+            19.250731838979096,
+            30.649988975197104
+          ],
+          "fixed_own_B_lambda": [
+            19.250731838979096,
+            0.18090658284209837
+          ]
+        },
+        "delta_D_P": {
+          "tuned": -4.822162301357501,
+          "fixed_native_B_lambda": 11.399257136218008,
+          "fixed_own_B_lambda": -19.069825256136998
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 1,
+        "draw": 0,
+        "lambda": {
+          "native_B": 1.0,
+          "separation_only_B": 1e-06,
+          "native_P": 0.001,
+          "separation_only_P": 1e-05
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            7.305700194895294,
+            0.6566523247592073
+          ],
+          "fixed_native_B_lambda": [
+            12.018632386122128,
+            16.716776739378204
+          ],
+          "fixed_own_B_lambda": [
+            12.018632386122128,
+            1.202854815244443
+          ]
+        },
+        "delta_D_P": {
+          "tuned": -6.649047870136087,
+          "fixed_native_B_lambda": 4.698144353256076,
+          "fixed_own_B_lambda": -10.815777570877685
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 1,
+        "draw": 1,
+        "lambda": {
+          "native_B": 1.0,
+          "separation_only_B": 1e-05,
+          "native_P": 1e-06,
+          "separation_only_P": 0.001
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            4.952995081269435,
+            -0.5283061943988798
+          ],
+          "fixed_native_B_lambda": [
+            7.332528411333705,
+            15.974901724877185
+          ],
+          "fixed_own_B_lambda": [
+            7.332528411333705,
+            0.15157341030280236
+          ]
+        },
+        "delta_D_P": {
+          "tuned": -5.481301275668315,
+          "fixed_native_B_lambda": 8.64237331354348,
+          "fixed_own_B_lambda": -7.1809550010309025
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 2,
+        "draw": 0,
+        "lambda": {
+          "native_B": 10.0,
+          "separation_only_B": 1e-05,
+          "native_P": 0.1,
+          "separation_only_P": 1e-05
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            0.767669975308074,
+            -0.33110086692906293
+          ],
+          "fixed_native_B_lambda": [
+            13.655695124551332,
+            23.14226198771702
+          ],
+          "fixed_own_B_lambda": [
+            13.655695124551332,
+            -0.33110086692906293
+          ]
+        },
+        "delta_D_P": {
+          "tuned": -1.098770842237137,
+          "fixed_native_B_lambda": 9.486566863165688,
+          "fixed_own_B_lambda": -13.986795991480395
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 2,
+        "draw": 1,
+        "lambda": {
+          "native_B": 1.0,
+          "separation_only_B": 1e-06,
+          "native_P": 0.1,
+          "separation_only_P": 1e-06
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            2.358621077935588,
+            2.3949603419177876
+          ],
+          "fixed_native_B_lambda": [
+            6.309190691456301,
+            11.275071300202455
+          ],
+          "fixed_own_B_lambda": [
+            6.309190691456301,
+            2.3949603419177876
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 0.036339263982199554,
+          "fixed_native_B_lambda": 4.965880608746154,
+          "fixed_own_B_lambda": -3.9142303495385136
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      }
+    ]
+  },
+  "tcga_ut": {
+    "summary": {
+      "tuned": {
+        "mean": 1.8077215682628587,
+        "per_split": [
+          2.639813392346589,
+          1.715202893993112,
+          1.0681484184488745
+        ]
+      },
+      "fixed_native_B_lambda": {
+        "mean": -0.38806562329385724,
+        "per_split": [
+          -0.7423823721996037,
+          0.583726463373619,
+          -1.005540961055587
+        ]
+      },
+      "fixed_own_B_lambda": {
+        "mean": 8.080719112288065,
+        "per_split": [
+          -0.7423823721996037,
+          13.729955117906224,
+          11.254584591157576
+        ]
+      }
+    },
+    "max_integrity_diff_pp": 0.0,
+    "rows": [
+      {
+        "split": 0,
+        "draw": 0,
+        "lambda": {
+          "native_B": 1.0,
+          "separation_only_B": 1.0,
+          "native_P": 0.001,
+          "separation_only_P": 0.01
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            0.5641834880808005,
+            4.965216353982143
+          ],
+          "fixed_native_B_lambda": [
+            25.70184136438973,
+            24.539813815963655
+          ],
+          "fixed_own_B_lambda": [
+            25.70184136438973,
+            24.539813815963655
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 4.4010328659013425,
+          "fixed_native_B_lambda": -1.1620275484260745,
+          "fixed_own_B_lambda": -1.1620275484260745
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 0,
+        "draw": 1,
+        "lambda": {
+          "native_B": 0.1,
+          "separation_only_B": 0.1,
+          "native_P": 0.0001,
+          "separation_only_P": 0.001
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            1.0397515339536767,
+            1.9183454527455126
+          ],
+          "fixed_native_B_lambda": [
+            6.949493770849401,
+            6.626756574876268
+          ],
+          "fixed_own_B_lambda": [
+            6.949493770849401,
+            6.626756574876268
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 0.8785939187918359,
+          "fixed_native_B_lambda": -0.3227371959731329,
+          "fixed_own_B_lambda": -0.3227371959731329
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 1,
+        "draw": 0,
+        "lambda": {
+          "native_B": 0.1,
+          "separation_only_B": 1.0,
+          "native_P": 0.001,
+          "separation_only_P": 0.001
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            1.0184792181913878,
+            2.2094598516827872
+          ],
+          "fixed_native_B_lambda": [
+            7.471696281488057,
+            6.246712706585292
+          ],
+          "fixed_own_B_lambda": [
+            7.471696281488057,
+            19.49562139337366
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 1.1909806334913995,
+          "fixed_native_B_lambda": -1.2249835749027653,
+          "fixed_own_B_lambda": 12.023925111885603
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 1,
+        "draw": 1,
+        "lambda": {
+          "native_B": 0.1,
+          "separation_only_B": 1.0,
+          "native_P": 0.001,
+          "separation_only_P": 0.001
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            1.7940792776157366,
+            4.033504432110561
+          ],
+          "fixed_native_B_lambda": [
+            6.357500196106777,
+            8.74993669775678
+          ],
+          "fixed_own_B_lambda": [
+            6.357500196106777,
+            21.79348532003362
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 2.2394251544948247,
+          "fixed_native_B_lambda": 2.3924365016500033,
+          "fixed_own_B_lambda": 15.435985123926844
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 2,
+        "draw": 0,
+        "lambda": {
+          "native_B": 0.1,
+          "separation_only_B": 1.0,
+          "native_P": 0.001,
+          "separation_only_P": 0.001
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            1.1044908542280325,
+            2.4156296656219
+          ],
+          "fixed_native_B_lambda": [
+            8.154892862215753,
+            6.694450808951551
+          ],
+          "fixed_own_B_lambda": [
+            8.154892862215753,
+            16.656145909340708
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 1.3111388113938673,
+          "fixed_native_B_lambda": -1.4604420532642024,
+          "fixed_own_B_lambda": 8.501253047124955
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      },
+      {
+        "split": 2,
+        "draw": 1,
+        "lambda": {
+          "native_B": 0.1,
+          "separation_only_B": 1.0,
+          "native_P": 0.001,
+          "separation_only_P": 0.001
+        },
+        "D_P_native_sep": {
+          "tuned": [
+            1.881699803442899,
+            2.706857828946781
+          ],
+          "fixed_native_B_lambda": [
+            8.489418353191155,
+            7.9387784843441835
+          ],
+          "fixed_own_B_lambda": [
+            8.489418353191155,
+            22.49733448838135
+          ]
+        },
+        "delta_D_P": {
+          "tuned": 0.8251580255038817,
+          "fixed_native_B_lambda": -0.5506398688469716,
+          "fixed_own_B_lambda": 14.007916135190197
+        },
+        "integrity_diff_pp": {
+          "native_B_tuned": 0.0,
+          "native_P_tuned": 0.0,
+          "sep_P_tuned": 0.0,
+          "native_P_fixed": 0.0
+        }
+      }
+    ]
+  }
+}

@@ -15,7 +15,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent At an imbalance ratio of $\rho=100$, class imbalance costs BRACS 7.65 points of patient-macro balanced accuracy and TCGA-UT 2.91 points. This study planned to test whether two mechanisms together explain the gap: class separation, which acts on prior-only damage, and class-centre estimation error, which may act on support-only damage. A pilot crossed a frozen separation transform with an oracle centre correction on both datasets and checked six pre-registered gates. TCGA-UT passed all gates. BRACS passed the three mechanism gates but failed integrity, robustness and precision. On validation patients, the joint intervention lowered BRACS combined damage by 4.41 points. With the regularization strength held fixed, the same contrast on test patients was $-9.40$ points, a reversal of sign. The projected interval half-width for the main design was 1.61 points against a bound of 1 point. The main array was not submitted. The outcome is labelled \emph{rescue not established}: the BRACS rescue depends on regularization selection and cannot be attributed to separation and centre error.
+\noindent At an imbalance ratio of $\rho=100$, class imbalance costs BRACS 7.65 points of patient-macro balanced accuracy and TCGA-UT 2.91 points. This study planned to test whether two mechanisms together explain the gap: class separation, which acts on prior-only damage, and class-centre estimation error, which may act on support-only damage. A pilot crossed a frozen separation transform with an oracle centre correction on both datasets and checked six pre-registered gates. TCGA-UT passed all gates. BRACS passed the three mechanism gates but failed integrity, robustness and precision. On validation patients, the joint intervention lowered BRACS combined damage by 4.41 points. With the regularization strength held fixed, the same contrast on test patients was $-9.40$ points, a reversal of sign. The projected interval half-width for the main design was 1.61 points against a bound of 1 point. The main array was not submitted. The outcome is labelled \emph{rescue not established}: the BRACS rescue depends on regularization selection and cannot be attributed to separation and centre error. The separation effect on prior-only damage likewise holds under tuned regularization only.
 \end{abstract}
 
 \section{Question and design}
@@ -70,6 +70,26 @@ The main array was not submitted. The $\lambda$ grid, thresholds and interventio
 Both proposed mechanisms act as predicted when $\lambda$ is tuned: separation moves prior-only damage, and centre correction lowers support-only damage in the correct direction. Their combination does not give a rescue that holds at fixed regularization. The three failures point to one cause. On BRACS, the selected $\lambda$ changes with the intervention, and that change can account for the tuned rescue. The fixed-$\lambda$ control was designed to detect this confound, and it did. The study therefore cannot attribute any part of the BRACS--TCGA-UT gap to class separation and centre error combined.
 
 The result does not reject either mechanism. It shows that, at 10 patients per class, their joint effect on BRACS combined damage is smaller than its dependence on regularization. The oracle also raised balanced accuracy by about 24 points. Most of its effect is therefore a general accuracy gain, not a specific cure for imbalance.
+
+The same confound limits the prior channel. Gate 2 showed that separation moves prior-only damage in the predicted direction on fresh draws, in line with the separation study and BRACS's smaller class margin \citep{queisler2026separationTcgaBracs, queisler2026classProperties}. A follow-up check re-evaluated the stored $\lambda$ grids without new fits (Table~\ref{tab:fixedprior}). On test patients with tuned $\lambda$, the separation effect keeps its predicted sign on both datasets. With every arm at the native balanced arm's $\lambda$, the sign reverses on both. With each setting at its own balanced arm's $\lambda$, the effect is large and in the predicted direction on average, but TCGA-UT split~0 has the wrong sign. Separation rescales the features: on BRACS the separated balanced arm selects $\lambda$ between $10^{-8}$ and $10^{-2}$, the native one between 1 and 10. A shared $\lambda$ therefore does not mean the same regularization across settings. The prior-channel direction holds under tuned $\lambda$ only, so it is not robust to regularization.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    Regularization & BRACS (predicted $-$) & TCGA-UT (predicted $+$) \\
+    \midrule
+    tuned $\lambda$                      & $-3.51$  & $+1.81$ \\
+    native balanced arm's $\lambda$      & $+9.17$  & $-0.39$ \\
+    each setting's balanced arm's $\lambda$ & $-10.14$ & $+8.08$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Separation effect on prior-only damage, $D_P(\text{separation}) - D_P(\text{native})$, on test patients (percentage points; three splits, draws 0--1). The sign depends on which $\lambda$ is held fixed. The values are stored in \texttt{fixed\_lambda\_separation\_check.json}.}
+  \label{tab:fixedprior}
+\end{table}
+
+\noindent The support channel behaves differently. In the native setting, support-only damage at the balanced arm's $\lambda$ is 4.66 points on BRACS and 0.38 points on TCGA-UT, close to the tuned 4.52 and 0.30 points. A coverage-based explanation of this gap could not be tested, because patch reselection within fixed patient quotas did not change coverage enough \citep{queisler2026supportCoverage}.
 
 A retest would need a new design, not a relaxed gate. One option restricts the $\lambda$ grid to the separation study's range before any fit; another makes fixed $\lambda$ the primary analysis. Either needs fresh draws and its own pre-registered gates. The pilot draws were read here, so they cannot confirm a redesign. This follows the general caution about adaptive reuse of holdout data \citep{dwork2015reusable}. For the thesis, the gap remains bounded, not explained, as summarized in the class-property report \citep{queisler2026classProperties}.
 
