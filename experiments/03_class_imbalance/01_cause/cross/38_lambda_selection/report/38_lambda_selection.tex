@@ -1,0 +1,82 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\title{Class Imbalance in Histopathology:\\Better Regularization Selection Does Not Close\\{BRACS}'s Prior-Only Gap}
+\author{Yannik Queisler}
+\date{September 24, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent In the matched ten-patient regime at an imbalance ratio of $\rho=100$, prior-only damage with tuned regularization is 4.21 points of patient-macro balanced accuracy on BRACS and 1.23 points on TCGA-UT, a gap of 2.97 points. This study asked how much of that gap comes from how the regularization strength $\lambda$ is selected, rather than from the prior mechanism itself. The stored $\lambda$ grids of the joint-mechanism pilot were re-predicted under a cross-fit test-set oracle, a naive test-set oracle and a fixed-$\lambda$ control, without new fits. A pre-registered zero-fit gate required the cross-fit oracle to close at least half of the gap. It closed 0.35 of it; the reduction of 1.04 points has a 95\% interval of $-0.48$ to 2.93 points. The naive oracle closed 0.19. The outcome is labelled \emph{prior gap intrinsic}: even the best $\lambda$ chosen on test patients leaves most of the BRACS--TCGA-UT prior-only gap in place. No confirmatory fits were run.
+\end{abstract}
+
+\section{Question and design}
+\label{sec:design}
+The joint-mechanism study found that the prior-only gap between BRACS and TCGA-UT depends strongly on regularization \citep{queisler2026jointMechanism}. With each arm's $\lambda$ selected on validation patients, prior-only damage was 4.21 points on BRACS and 1.23 points on TCGA-UT. With every arm held at the balanced arm's $\lambda$, it rose to 11.83 and 10.52 points, and the gap shrank to 1.31 points. Tuning therefore rescues seven to nine points on both datasets, but more on TCGA-UT. This raises a narrower question: is the tuned BRACS gap an artefact of a poor validation choice of $\lambda$ on BRACS's small validation set, so that a better choice would remove it?
+
+The regime was the native setting of the joint-mechanism study: frozen Virchow2 features \citep{zimmermann2024virchow2}, logistic regression, 10 patients per class, $\rho=100$, three splits and pilot draws 0--1. Four arms were fitted per draw: balanced (B), prior-only (P), support-only (S) and combined (R). Damage is the drop from B, for example $D_P = B - P$. Every candidate on the $\lambda$ grid ($10^{-8}$ to $10^{2}$ in powers of ten) was stored, so each selection rule only re-predicts stored models. Four rules chose one $\lambda$ per arm and fit:
+\begin{itemize}
+  \item \emph{tuned}: the validation-selected $\lambda$ of the joint-mechanism study;
+  \item \emph{cross-fit oracle}: the test patients are split into two class-stratified halves with a fixed seed; $\lambda$ is picked on one half and scored on the other, then the halves swap and the predictions are pooled;
+  \item \emph{naive oracle}: $\lambda$ is picked and scored on the same test patients;
+  \item \emph{fixed}: every arm uses the balanced arm's tuned $\lambda$.
+\end{itemize}
+\noindent The naive oracle is optimistic by construction, because selection and evaluation share the same noise \citep{cawley2010overfitting}. The cross-fit oracle removes this winner's curse and was fixed as the primary rule. Both oracles are upper bounds on what $\lambda$ selection could achieve; neither is a deployable procedure. The oracle applies to both B and P, so each arm gets its best achievable $\lambda$.
+
+With $g_r = D_P^{\text{BRACS}} - D_P^{\text{TCGA-UT}}$ the prior-only gap under rule $r$, the quantities of interest are
+\begin{equation}
+  \Delta = g_{\text{tuned}} - g_{\text{oracle}},
+  \qquad
+  \text{closure} = \frac{\Delta}{g_{\text{tuned}}}.
+\end{equation}
+\noindent Inference is on $\Delta$, not on the ratio, because a per-replicate ratio is unstable when a split's tuned gap is near zero (split~2: 0.07 points). Intervals are 95\% percentile intervals over 2,000 bootstrap replicates of the joint-mechanism study's pooled accuracy. The label rules were fixed before any rule was evaluated: \emph{no prior gap} if the $g_{\text{tuned}}$ interval includes 0; otherwise \emph{prior gap intrinsic} if the $\Delta$ interval includes 0; otherwise \emph{selection explains} for closure $\ge 0.5$ and \emph{selection contributes} below it.
+
+Two zero-fit gates preceded a planned confirmatory run on draws 2--9. The \emph{integrity} gate required the re-derived tuned and fixed $D_P$ to reproduce the stored joint-mechanism values to $10^{-4}$ points. The \emph{closure} gate required cross-fit closure $\ge 0.5$ on draws 0--1. Any failure stops the study before the confirmatory fits.
+
+\section{Gate outcome}
+\label{sec:results}
+The integrity gate passed on both datasets: the re-derived tuned and fixed $D_P$ matched the stored values to within $10^{-14}$ points. The closure gate failed (Table~\ref{tab:rules}). The cross-fit oracle reduced the gap from 2.97 to 1.93 points, a closure of 0.35. The interval of $\Delta$, $-0.48$ to 2.93 points, includes zero, so the label is \emph{prior gap intrinsic}. The confirmatory array was not submitted, and no threshold was changed after the outcome.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lrrrrr@{}}
+    \toprule
+    Rule & $D_P$ BRACS & $D_P$ TCGA-UT & Gap $g_r$ & $\Delta$ & Closure \\
+    \midrule
+    tuned            & 4.21  & 1.23  & 2.97 [0.79, 5.39]  & --                  & -- \\
+    cross-fit oracle & 3.16  & 1.23  & 1.93 [0.12, 4.00]  & 1.04 [$-0.48$, 2.93] & 0.35 \\
+    naive oracle     & 3.63  & 1.22  & 2.40 [0.26, 4.60]  & 0.57 [$-0.57$, 1.83] & 0.19 \\
+    fixed            & 11.83 & 10.52 & 1.31 [$-5.32$, 8.28] & 1.66 [$-5.43$, 8.31] & 0.56 \\
+    \midrule
+    \multicolumn{6}{@{}l}{$D_S$ gap, tuned / cross-fit / naive / fixed: 4.22 / 3.73 / 3.92 / 4.27} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Prior-only damage and its BRACS--TCGA-UT gap under each $\lambda$ selection rule (percentage points of patient-macro balanced accuracy; three splits, draws 0--1, 95\% bootstrap intervals). The primary cross-fit oracle closes about a third of the tuned gap, and its interval includes zero. The fixed rule narrows the gap only by raising damage on both datasets by seven to nine points. The last row gives the support-only gap as a secondary, descriptive quantity. The gate outputs are stored in \texttt{gate\_bracs.json} and \texttt{gate\_tcga\_ut.json}.}
+  \label{tab:rules}
+\end{table}
+
+\noindent Three details qualify the headline number. First, the whole change occurs on BRACS: TCGA-UT prior-only damage is 1.23 points under tuning and under either oracle, so its validation-selected $\lambda$ is already near the best choice. Second, on BRACS the cross-fit reduction is not mainly a better prior-only model. Balanced accuracy of arm B fell from 39.21 to 38.55 points under the cross-fit oracle, while arm P rose from 35.01 to 35.39 points. About two thirds of the 1.05-point drop in BRACS $D_P$ therefore comes from a weaker balanced reference. Selecting $\lambda$ on half of BRACS's small test set is noisy, and that noise costs arm B more than arm P. Third, an oracle applied to P alone, with B kept at its tuned $\lambda$, reduced the gap by only 0.32 points [$-0.38$, 1.15], a closure of 0.11.
+
+The naive oracle closed less than the cross-fit oracle, although it can only raise accuracy. It raised both arms on BRACS (B by 0.24, P by 0.81 points), which lowers damage less than the cross-fit oracle's loss in B. This ordering is a further sign that the cross-fit reduction reflects noise in arm B rather than a recoverable gain in arm P.
+
+\section{Interpretation}
+\label{sec:interpretation}
+The BRACS--TCGA-UT prior-only gap is not a product of poor $\lambda$ selection on BRACS. Even when $\lambda$ is chosen with access to test labels, at most about a third of the gap disappears, and that third is not distinguishable from zero. The best-case reading for the selection explanation, the P-only oracle, closes about a tenth. Under tuned regularization, BRACS pays about three points more for class-prior imbalance than TCGA-UT, and the regularization path of the stored models cannot remove this difference.
+
+This result complements the joint-mechanism finding. At fixed $\lambda$ the gap is small, 1.31 points, but only because both datasets then suffer seven to nine points of prior-only damage. Tuning rescues more on TCGA-UT than on BRACS, and no rule within the stored grid gives BRACS the same rescue. The gap is thus a difference in how much regularization can compensate for a shifted class prior, not a difference in how well $\lambda$ is picked. This is consistent with BRACS's smaller class margin \citep{queisler2026classProperties}, although this study does not test that link.
+
+Two limits apply. The study re-used the pilot draws 0--1 of the joint-mechanism study; it adds no fresh data, and draws 2--9 remain untouched \citep{dwork2015reusable}. The oracle also searches only the stored grid of one model family, so a different regularizer or classifier could behave differently. The support-only gap (4.22 points tuned, 4.27 points fixed) was recorded but not analysed; it is out of scope and remains unexplained after the coverage study \citep{queisler2026supportCoverage}. For the thesis, the prior-only gap is best described as intrinsic to the prior channel under the logistic-regression regime.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}

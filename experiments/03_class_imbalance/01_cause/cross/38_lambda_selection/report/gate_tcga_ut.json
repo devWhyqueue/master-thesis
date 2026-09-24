@@ -1,0 +1,15 @@
+{
+  "gates": {
+    "closure": {
+      "pass": true,
+      "reason": "closure gate is BRACS-only",
+      "skipped": true
+    },
+    "integrity": {
+      "fixed_diff_pp": 1.7763568394002505e-15,
+      "pass": true,
+      "tuned_diff_pp": 1.176836406102666e-14
+    }
+  },
+  "overall_pass": true
+}
