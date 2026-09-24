@@ -1,0 +1,26 @@
+{
+  "gates": {
+    "closure": {
+      "closure": 0.3496441228834886,
+      "delta_pp": {
+        "ci_lower": -0.4806669445250858,
+        "ci_upper": 2.9318489511365873,
+        "point": 1.0399012911920096
+      },
+      "gap_tuned_pp": {
+        "ci_lower": 0.7895216088304279,
+        "ci_upper": 5.3905175478802505,
+        "point": 2.974170658485612
+      },
+      "label": "prior_gap_intrinsic",
+      "naive_closure": 0.19177281104991,
+      "pass": false
+    },
+    "integrity": {
+      "fixed_diff_pp": 8.881784197001252e-15,
+      "pass": true,
+      "tuned_diff_pp": 1.0658141036401503e-14
+    }
+  },
+  "overall_pass": false
+}
