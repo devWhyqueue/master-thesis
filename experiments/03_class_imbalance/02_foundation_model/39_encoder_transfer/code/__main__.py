@@ -1,4 +1,5 @@
-"""Command-line entry point for exp-39's encoder-transfer schedule (phase 01)."""
+"""Command-line entry point for exp-39's encoder-transfer schedule (phase 01) and
+UNI2-h feature extraction/audit (phase 03)."""
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from imbalance_benchmark.common import (
 
 from prevalence import patients_per_class
 
-from transfer import MAIN_DRAWS
+from transfer import MAIN_DRAWS, extract, manifest
 from transfer.schedule import draw_schedule, load_train_identity
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", required=True)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("schedule")
+    p_extract = sub.add_parser("extract-features")
+    p_extract.add_argument("--shard-index", type=int, required=True)
+    p_extract.add_argument("--shards", type=int, required=True)
+    p_extract.add_argument("--dtype", default="float32", choices=["float32", "float16"])
+    sub.add_parser("merge-features")
+    sub.add_parser("audit-features")
     return parser
 
 
@@ -48,8 +55,37 @@ def cmd_schedule(args: argparse.Namespace) -> None:
     logger.info(f"wrote {out_path}")
 
 
+def cmd_extract_features(args: argparse.Namespace) -> None:
+    """Extract this shard's assigned, not-yet-cached UNI2-h slide tensors."""
+    config = load_config(args.config)
+    extract.extract_shard(config, args.shard_index, args.shards, dtype=args.dtype)
+    logger.info(f"shard {args.shard_index}/{args.shards} done")
+
+
+def cmd_merge_features(args: argparse.Namespace) -> None:
+    """One-time merge of every completed shard's pending UNI2-h records."""
+    extract.merge_features(load_config(args.config))
+    logger.info("merge complete")
+
+
+def cmd_audit_features(args: argparse.Namespace) -> None:
+    """Verify both encoders' caches and publish feature_audit.json + manifests."""
+    audit = manifest.run_audit(load_config(args.config))
+    logger.info(
+        f"uni2h missing={audit['uni2h']['unresolved_missing']} "
+        f"corrupt={audit['uni2h']['unresolved_corrupt']}; "
+        f"virchow2 missing={audit['virchow2']['unresolved_missing']} "
+        f"corrupt={audit['virchow2']['unresolved_corrupt']}"
+    )
+
+
 def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
-    return {"schedule": cmd_schedule}
+    return {
+        "schedule": cmd_schedule,
+        "extract-features": cmd_extract_features,
+        "merge-features": cmd_merge_features,
+        "audit-features": cmd_audit_features,
+    }
 
 
 def main() -> None:
