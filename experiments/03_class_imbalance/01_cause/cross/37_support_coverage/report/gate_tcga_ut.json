@@ -1,0 +1,25 @@
+{
+  "gates": {
+    "coverage_gap": {
+      "pass": true,
+      "reason": "gate 1 is BRACS-only",
+      "skipped": true
+    },
+    "manipulation": {
+      "coverage_ratio_mean": 0.9453365319356747,
+      "epsilon_mean": {
+        "coverage": 0.025752623606403697,
+        "random": 0.011388138364651917,
+        "redundant": 0.020994414290890565
+      },
+      "pass": false,
+      "redundant_ratio_mean": 1.469369803423953
+    },
+    "support_gap": {
+      "pass": true,
+      "reason": "gate 0 is BRACS-only",
+      "skipped": true
+    }
+  },
+  "overall_pass": false
+}

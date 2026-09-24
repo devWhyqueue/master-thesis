@@ -1,0 +1,29 @@
+{
+  "gates": {
+    "coverage_gap": {
+      "pass": false,
+      "ratios": [
+        1.2420283082660588,
+        1.4246479026275345,
+        1.1863641400079639
+      ]
+    },
+    "manipulation": {
+      "coverage_ratio_mean": 0.8352008924232031,
+      "epsilon_mean": {
+        "coverage": 0.09404754966923923,
+        "random": 0.03923358993398286,
+        "redundant": 0.05939612535835068
+      },
+      "pass": false,
+      "redundant_ratio_mean": 1.5124103437653964
+    },
+    "support_gap": {
+      "d_s_bracs_pp": 4.6556348442002164,
+      "d_s_tcga_ut_pp": 0.3812236997595851,
+      "gap_pp": 4.274411144440632,
+      "pass": true
+    }
+  },
+  "overall_pass": false
+}

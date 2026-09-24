@@ -1,0 +1,100 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\title{Class Imbalance in Histopathology:\\Patch Reselection Within Fixed Patient Quotas\\Cannot Manipulate {BRACS}'s Support Coverage}
+\author{Yannik Queisler}
+\date{September 24, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent In the matched ten-patient regime at an imbalance ratio of $\rho=100$, support-only damage is 4.66 points of patient-macro balanced accuracy on BRACS and 0.38 points on TCGA-UT at fixed regularization. This study planned to test whether poor coverage of the class feature distribution by the few retained patches explains this gap. Three support-only arms would keep each patient's patch count and choose which patches to keep: the allocator's own rows, a coverage-maximizing selection and a redundant selection near the class centre. Three pre-registered zero-fit gates preceded the 192 planned fits. The support-gap premise held (4.27 points). The coverage gap between the datasets at BRACS's tail count missed its floor in one of three splits (ratio 1.19 against 1.2). The manipulation check failed on both datasets: coverage-maximizing selection reduced the coverage deficit to 0.84 (BRACS) and 0.95 (TCGA-UT) of the allocator's rows, against a bound of 0.75. No fits were run. The outcome is labelled \emph{manipulation failed}: at fixed patient quotas, the choice of patch changes coverage too little to test the mechanism.
+\end{abstract}
+
+\section{Question and design}
+\label{sec:design}
+The joint-mechanism study left two channels behind the BRACS--TCGA-UT gap \citep{queisler2026jointMechanism}. Class separation moved prior-only damage in the predicted direction on fresh draws, but the support-only channel had no candidate mechanism. Centre correction lowered BRACS support-only damage only as an oracle, and its effect depended on regularization selection. This study tested a second candidate: when a class keeps few patches, those patches may leave parts of the class distribution uncovered, and BRACS classes may be harder to cover than TCGA-UT classes.
+
+The regime was the native setting of the joint-mechanism study: frozen Virchow2 features \citep{zimmermann2024virchow2}, logistic regression, 10 patients and 320 balanced patches per class, and $\rho=100$. The balanced arm B supplies a 320-row pool per class. The support-only arm S keeps, for each class, the allocator's count and per-patient quota. A class is \emph{thinned} when its S count is below 320. Three S arms were planned, all drawn from the B pool with identical quotas and class weights:
+\begin{itemize}
+  \item \emph{random}: the allocator's own nested-prefix rows;
+  \item \emph{coverage}: greedy farthest-point selection over the whole class pool under the per-patient quotas, a coverage-maximizing selection in the sense of core-set methods \citep{sener2018coreset};
+  \item \emph{redundant}: for each patient, the rows nearest the patient-balanced class centre.
+\end{itemize}
+Two quantities describe a selection $S$ from a class pool $X$, both in cosine distance on L2-normalized features and divided by the pool's median pairwise distance $m_X$:
+\begin{equation}
+  c(S) = \frac{Q_{0.90}\bigl\{\min_{s\in S} d(x,s) : x \in X\bigr\}}{m_X},
+  \qquad
+  \varepsilon(S) = \frac{d\bigl(\bar{S}, \mu_X\bigr)}{m_X},
+\end{equation}
+\noindent where $Q_{0.90}$ is the 90th percentile, $\bar S$ is the mean of the selected rows and $\mu_X$ is the patient-balanced pool mean. The coverage deficit $c$ is the quantity to be manipulated. The centre error $\varepsilon$ was recorded to separate coverage from the centre-error channel of the patient-shortage studies \citep{queisler2026centreError}.
+
+Three zero-fit gates were fixed in the committed code before any gate was read:
+\begin{itemize}
+  \item \emph{Gate 0, support gap}: matched native $D_S(\text{BRACS}) - D_S(\text{TCGA-UT}) \ge 1$ point at the balanced arm's $\lambda$, read from the joint-mechanism pilot records (draws 0--1).
+  \item \emph{Gate 1, coverage gap}: $c(12)$ of random subsets from each dataset's tail class, BRACS over TCGA-UT, at least 1.2 in every split. Twelve is BRACS's tail count at $\rho=100$.
+  \item \emph{Gate 2, manipulation check}: over thinned classes, the mean ratio to the random arm is at most 0.75 for the coverage arm and at least 1.25 for the redundant arm, on both datasets.
+\end{itemize}
+Gates 1 and 2 used three splits and the untouched draws 2--9. Any failure stops the study before the 192 fits.
+
+\section{Gate outcome}
+\label{sec:results}
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}llrrl@{}}
+    \toprule
+    Gate & Criterion & BRACS & TCGA-UT & Result \\
+    \midrule
+    0 Support gap  & $D_S$ at fixed $\lambda$ (pp) & 4.66 & 0.38 & gap 4.27, pass \\
+    1 Coverage gap & $c(12)$ ratio $\ge 1.2$ per split & \multicolumn{2}{c}{1.24, 1.42, 1.19} & fails \\
+    2 Manipulation & coverage / random $\le 0.75$ & 0.84 & 0.95 & fails \\
+                   & redundant / random $\ge 1.25$ & 1.51 & 1.47 & pass \\
+    \midrule
+    -- & $\varepsilon$: random, coverage, redundant & 0.04, 0.09, 0.06 & 0.01, 0.03, 0.02 & recorded \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pre-registered precheck gates. Gate 0 uses test patients of the pilot draws 0--1; gates 1 and 2 use training pools only, three splits and draws 2--9. The raw outputs are stored in \texttt{gate\_bracs.json} and \texttt{gate\_tcga\_ut.json}.}
+  \label{tab:gate}
+\end{table}
+
+\paragraph{Support gap.} The premise held. At the balanced arm's $\lambda$, support-only damage was 4.66 points on BRACS and 0.38 points on TCGA-UT; with tuned $\lambda$ it was 4.52 and 0.30 points. The support gap is therefore not an artefact of the unmatched regimes of the cause studies \citep{queisler2026causeTcga, queisler2026causeBracs}. The same read gave prior-only damage at fixed $\lambda$ of 11.83 points on BRACS and 10.52 points on TCGA-UT, against 4.21 and 1.23 points with tuned $\lambda$. At fixed regularization the prior-only gap between the datasets is small.
+
+\paragraph{Coverage gap.} Table~\ref{tab:curve} shows that BRACS subsets cover their tail class less well than TCGA-UT subsets only from about twelve patches onward. At three and six patches the datasets do not differ. At twelve patches the ratio was 1.24, 1.42 and 1.19 across splits, so split~2 missed the floor by 0.01. From 26 patches the ratio exceeds 1.5 in every split.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lrrrrrr@{}}
+    \toprule
+    Patches $n$ & 3 & 6 & 12 & 26 & 56 & 120 \\
+    \midrule
+    BRACS $c(n)$   & 1.10 & 0.92 & 0.80 & 0.71 & 0.61 & 0.48 \\
+    TCGA-UT $c(n)$ & 1.17 & 0.95 & 0.62 & 0.43 & 0.32 & 0.23 \\
+    Ratio          & 0.94 & 0.98 & 1.28 & 1.64 & 1.91 & 2.05 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Coverage deficit of random quota subsets of each dataset's tail class, averaged over splits and draws 2--9. A higher value means worse coverage. The datasets separate only from about twelve patches.}
+  \label{tab:curve}
+\end{table}
+
+\paragraph{Manipulation check.} Both arms moved coverage in the intended direction on both datasets, but the coverage arm moved it too little. The redundant arm raised the coverage deficit by about half. The coverage arm lowered it by 16\% on BRACS and by 5\% on TCGA-UT, against the required 25\%. The coverage arm also had the largest centre error on both datasets, about twice that of the random arm. The main array was not submitted, and no threshold was changed after the outcome.
+
+\section{Interpretation}
+\label{sec:interpretation}
+The study does not test whether coverage explains the support gap. Its manipulation cannot lower the coverage deficit enough. With ten patients and a class count of about twelve, each patient contributes one or two patches. The quota fixes which patients are represented. Choosing a different patch within a patient then changes coverage little, because much of the spread in the class pool lies between patients. This reading is consistent with Table~\ref{tab:curve}: at the smallest counts the deficit is near or above the median pairwise distance on both datasets. The selection code was checked on synthetic two-cluster pools, where it behaved as intended, so the small effect is not a code error.
+
+Two further observations constrain a redesign. First, the coverage arm trades coverage for centre error: farthest-point selection picks outlying rows, whose mean lies further from the class centre. Even a passing manipulation would have confounded the two channels in the direction that favours the null. Second, the prior-only gap between the datasets largely vanishes at fixed $\lambda$, while the support-only gap persists. Support is thus the channel whose dataset difference does not depend on regularization.
+
+A retest would have to vary which patients a class keeps, not only which patches, and it would need a selection that holds centre error fixed while it changes coverage. It would need fresh gates and draws, because the draws 2--9 training pools were read here \citep{dwork2015reusable}. For the thesis, the support-only gap between BRACS and TCGA-UT remains established but unexplained.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
