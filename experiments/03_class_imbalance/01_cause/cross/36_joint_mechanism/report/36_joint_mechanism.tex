@@ -1,0 +1,78 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\title{Class Imbalance in Histopathology:\\A Joint Separation and Centre-Correction Rescue of {BRACS}\\Does Not Survive Fixed Regularization}
+\author{Yannik Queisler}
+\date{September 24, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent At an imbalance ratio of $\rho=100$, class imbalance costs BRACS 7.65 points of patient-macro balanced accuracy and TCGA-UT 2.91 points. This study planned to test whether two mechanisms together explain the gap: class separation, which acts on prior-only damage, and class-centre estimation error, which may act on support-only damage. A pilot crossed a frozen separation transform with an oracle centre correction on both datasets and checked six pre-registered gates. TCGA-UT passed all gates. BRACS passed the three mechanism gates but failed integrity, robustness and precision. On validation patients, the joint intervention lowered BRACS combined damage by 4.41 points. With the regularization strength held fixed, the same contrast on test patients was $-9.40$ points, a reversal of sign. The projected interval half-width for the main design was 1.61 points against a bound of 1 point. The main array was not submitted. The outcome is labelled \emph{rescue not established}: the BRACS rescue depends on regularization selection and cannot be attributed to separation and centre error.
+\end{abstract}
+
+\section{Question and design}
+\label{sec:design}
+Earlier studies narrowed the BRACS--TCGA-UT gap without explaining it. The prior-only arm carries most of the gap \citep{queisler2026causeTcga, queisler2026causeBracs}. Expanding BRACS's class separation reduced prior-only damage by 3.72 points but raised support-only damage by 6.50 points, so total damage did not fall \citep{queisler2026separationTcgaBracs}. BRACS's classes also lie outside TCGA-UT's range of headroom and margin \citep{queisler2026classProperties}. In the patient-shortage studies, class-centre error explained most of the benefit of additional patients \citep{queisler2026centreError}. Whether centre error also drives support-only damage was untested.
+
+The pilot kept frozen Virchow2 features, the logistic-regression classifier, the allocator, and patient-macro balanced accuracy. Both datasets used 10 patients and 320 balanced patches per class; TCGA-UT used the nested ten-patient cohorts of the separation study. Four settings crossed two interventions:
+\begin{itemize}
+  \item \emph{separation}: the separation study's frozen expansion (BRACS) or contraction (TCGA-UT) of class centres, applied to training and evaluation features;
+  \item \emph{centre correction}: each training class is translated to a patient-balanced reference centre estimated from all 160 eligible patches of each selected patient, keeping within-class residuals. This oracle adds information but no training rows, and it is applied to training features only.
+\end{itemize}
+Each setting was fitted in four arms: balanced (B), prior-only (P), support-only (S) and combined (R). Damage is the drop from B, for example $D_R = B - R$. Two controls were added: a wrong-direction correction (the negated correction vector, for S and R in the joint setting) and a fixed-$\lambda$ refit that uses the native balanced arm's selected $\lambda$ throughout. The pilot covered three splits and draws 0--1 on both datasets. The $\lambda$ grid was fixed at powers of ten from $10^{-8}$ to $10^{2}$.
+
+Six gates were fixed before any outcome was read (Table~\ref{tab:gate}). Gates 2--4 use validation patients. Gate 1 compares test accuracy with the separation study's stored native replay, and the fixed-$\lambda$ check in gate 5 also uses test accuracy. Gates 3, 4 and 6 and the fixed-$\lambda$ check apply to BRACS only. Any failure stops the study; thresholds and intervention strengths may not change after the outcome.
+
+\section{Gate outcome}
+\label{sec:results}
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}llrrl@{}}
+    \toprule
+    Gate & Criterion & BRACS & TCGA-UT & Result \\
+    \midrule
+    1 Integrity  & native replay $|\Delta| \le 0.01$ & 1.38 & 0.00 & BRACS fails \\
+    2 Prior      & $D_P$ change $\ge 1$ in predicted direction & $-3.93$ & $+1.54$ & pass \\
+    3 Support    & correction lowers $D_S$ by $\ge 1$ & 5.22 & -- & pass \\
+                 & beats wrong direction by $\ge 1$ & 15.84 & -- & pass \\
+    4 Rescue     & $D_R$ falls by $\ge 2$ & 4.41 & -- & pass \\
+                 & R rises by $\ge 2$ & 28.05 & -- & pass \\
+                 & B falls by $\le 1$ & $-23.64$ & -- & pass \\
+    5 Robustness & fixed-$\lambda$ rescue $> 0$ & $-9.40$ & -- & BRACS fails \\
+    6 Precision  & projected half-width $\le 1$ & 1.61 & -- & BRACS fails \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pre-registered pilot gates (percentage points; three splits, draws 0--1). A negative B fall means the balanced arm improved. All fits converged, and no boundary selection was unstable. The raw gate outputs are stored in \texttt{gate\_bracs.json} and \texttt{gate\_tcga\_ut.json}.}
+  \label{tab:gate}
+\end{table}
+
+\paragraph{Passed gates.} Separation moved prior-only damage in the predicted direction in every split: BRACS by $-3.92$, $-4.31$ and $-3.56$ points, TCGA-UT by $+2.11$, $+1.51$ and $+1.01$ points. This reproduces the separation study on fresh pilot draws. On expanded BRACS, centre correction lowered support-only damage by 5.22 points, and the wrong-direction correction left the S arm 15.84 points worse than the joint S arm. The joint setting lowered combined damage by 4.41 points (1.91 in draw~0, 6.92 in draw~1). The oracle also raised the balanced arm by 23.64 points. Most of the 28.05-point rise of the R arm therefore reflects the added centre information, not a smaller imbalance cost.
+
+\paragraph{Failed gates.} Three BRACS gates failed:
+\begin{itemize}
+  \item \emph{Integrity.} Eleven of the twelve split--arm cells reproduced the stored native replay exactly. The remaining cell (split~1, arm R) selected $\lambda = 10^{-8}$. That value lies outside the separation study's grid ($10^{-6}$ to $10^{2}$), which had selected $10^{-6}$. This single boundary flip produces the whole 1.38-point difference. It is a grid difference, not a code error.
+  \item \emph{Robustness.} With the native balanced arm's $\lambda$ held fixed, the joint rescue on test patients was $-9.40$ points: joint combined damage exceeded native damage. Under tuned $\lambda$ the rescue was $+4.41$ points on validation patients. The two contrasts use different patients, but their sign disagrees.
+  \item \emph{Precision.} Resampling the six pilot contrasts to the main design (three splits, draws 2--9) gave a median 95\% half-width of 1.61 points, above the 1-point bound. The per-draw spread (1.91 against 6.92 points) drives this width.
+\end{itemize}
+The main array was not submitted. The $\lambda$ grid, thresholds and intervention strengths were not changed after the outcome.
+
+\section{Interpretation}
+\label{sec:interpretation}
+Both proposed mechanisms act as predicted when $\lambda$ is tuned: separation moves prior-only damage, and centre correction lowers support-only damage in the correct direction. Their combination does not give a rescue that holds at fixed regularization. The three failures point to one cause. On BRACS, the selected $\lambda$ changes with the intervention, and that change can account for the tuned rescue. The fixed-$\lambda$ control was designed to detect this confound, and it did. The study therefore cannot attribute any part of the BRACS--TCGA-UT gap to class separation and centre error combined.
+
+The result does not reject either mechanism. It shows that, at 10 patients per class, their joint effect on BRACS combined damage is smaller than its dependence on regularization. The oracle also raised balanced accuracy by about 24 points. Most of its effect is therefore a general accuracy gain, not a specific cure for imbalance.
+
+A retest would need a new design, not a relaxed gate. One option restricts the $\lambda$ grid to the separation study's range before any fit; another makes fixed $\lambda$ the primary analysis. Either needs fresh draws and its own pre-registered gates. The pilot draws were read here, so they cannot confirm a redesign. This follows the general caution about adaptive reuse of holdout data \citep{dwork2015reusable}. For the thesis, the gap remains bounded, not explained, as summarized in the class-property report \citep{queisler2026classProperties}.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
