@@ -1,0 +1,30 @@
+# BRACS encoder-transfer schedule (exp-39, phase 01). Frozen patient cohort, class permutation, and
+# training-row identities for arms B/R10/R100/P10/P100/S10/S100 at draws 10-19 per split, generated
+# once from the shared exp-2 manifest without reference to either encoder. Same dataset identity,
+# eligibility, and G=10/DEPTH=160/BALANCED=32 budget as exp-26 (see plans/01_protocol.md).
+# feature_extraction (per encoder) is locked in phase 02, not here.
+
+prevalence:
+  patients_per_class: 10
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+  seed: 0
+  version: bracs-official-release
+  eligibility_rules:
+    metadata: official_BRACS_xlsx_rows_with_patient_slide_roi_and_subtype
+    images: roi_filename_stem_matches_released_image
+    labels: seven_class_official_roi_subtype
+    tiling: non_overlapping_full_256x256_tiles
+    split_unit: patient
+
+paths:
+  outputs: experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/bracs/patch
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/bracs/patch
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/bracs/patch

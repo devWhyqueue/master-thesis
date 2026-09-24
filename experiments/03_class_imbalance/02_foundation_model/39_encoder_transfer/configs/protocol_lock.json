@@ -1,0 +1,109 @@
+{
+  "experiment": "39_encoder_transfer",
+  "frozen_at": "2026-09-24",
+  "protocol_doc": {
+    "path": "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/plans/01_protocol.md",
+    "sha256": "a0fe8f582beea70a771563b443ecbae8f43da3245305b55ea5119f9c3c44e228"
+  },
+  "question": "On identical patients and image patches, does replacing frozen Virchow2 with frozen UNI2-h change the loss of balanced accuracy caused by class imbalance, and does that change arise in the prior-only channel, the support-only channel, or their interaction?",
+  "encoders": {
+    "baseline": "Virchow2",
+    "candidate": "UNI2-h",
+    "candidate_lock_pending": "checkpoint SHA-256, transform, and pooling frozen in phase 02 (encoder_lock.json), not here"
+  },
+  "datasets": {
+    "tcga_ut": {
+      "num_classes": 30,
+      "patients_per_class": 20,
+      "eligibility_depth": 160,
+      "balanced_patches_per_patient": 32,
+      "budget_formula": "G x BALANCED x num_classes = 20 x 32 x 30 = 19200"
+    },
+    "bracs": {
+      "num_classes": 7,
+      "patients_per_class": 10,
+      "eligibility_depth": 160,
+      "balanced_patches_per_patient": 32,
+      "budget_formula": "G x BALANCED x num_classes = 10 x 32 x 7 = 2240"
+    }
+  },
+  "splits": {
+    "count": 3,
+    "source": "existing patient-disjoint splits reused from exp-25/26, unchanged"
+  },
+  "draws": {
+    "main": [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+    "smoke": 10000,
+    "seed_source": "prevalence.PREVALENCE_SEED (reused as-is; not a fresh seed, per protocol line 11: fresh draws do not create a fresh test cohort)",
+    "collision_audit": {
+      "performed_at": "2026-09-24",
+      "method": "find <experiment>/outputs -type d -name draw_* on Hydra, unioned draw indices, for every 03_class_imbalance experiment (25-38)",
+      "checked_experiments": [
+        "25_damage_tcga_ut",
+        "26_damage_bracs",
+        "27_prior_vs_support_tcga_ut",
+        "28_prior_vs_support_bracs",
+        "29_tail_assignment_bracs",
+        "30_tail_assignment_tcga_ut",
+        "31_worst_assignment_tcga_ut",
+        "32_worst_assignment_rate_tcga_ut",
+        "33_prior_margin_cross",
+        "34_separation_intervention",
+        "35_class_properties",
+        "36_joint_mechanism",
+        "37_support_coverage",
+        "38_lambda_selection"
+      ],
+      "observed_draw_indices": "0-9 in 25/26/27/28/29/30/32/33; 0-1 in 34/36/38; none in 31/35/37",
+      "result": "draw indices 10-19 and 10000 unused everywhere; no collision, safe to freeze"
+    }
+  },
+  "arms": {
+    "B":    {"data_arm": "r1",   "prior_arm": null,  "training_rows": "balanced allocation", "target_loss_prior": "uniform"},
+    "R10":  {"data_arm": "r10",  "prior_arm": null,  "training_rows": "ratio-arm rows",       "target_loss_prior": "realized r10 class shares"},
+    "R100": {"data_arm": "r100", "prior_arm": null,  "training_rows": "ratio-arm rows",       "target_loss_prior": "realized r100 class shares"},
+    "P10":  {"data_arm": "r1",   "prior_arm": "r10", "training_rows": "B rows",               "target_loss_prior": "realized r10 class shares"},
+    "P100": {"data_arm": "r1",   "prior_arm": "r100","training_rows": "B rows",               "target_loss_prior": "realized r100 class shares"},
+    "S10":  {"data_arm": "r10",  "prior_arm": "r1",  "training_rows": "ratio-arm rows",       "target_loss_prior": "uniform"},
+    "S100": {"data_arm": "r100", "prior_arm": "r1",  "training_rows": "ratio-arm rows",       "target_loss_prior": "uniform"}
+  },
+  "row_weighting": "prevalence.fit._prior_weights: w_c = (target_share_c) / (observed_share_c), rows sum to N",
+  "allocator": "imbalance_benchmark.construction.allocate_counts (exp-02 exponential profile), reused unchanged; class rank permuted per draw via prevalence.fit.class_permutation",
+  "primary_contrast": "delta_R = D_R(UNI2-h, rho=100) - D_R(Virchow2, rho=100), one endpoint per dataset, where D_X(m,rho) = A(m,B) - A(m,Xrho)",
+  "decomposition_identity": "delta_R = delta_P + delta_S + delta_I (must hold numerically; I = D_R - D_P - D_S)",
+  "readout": {
+    "model": "existing multinomial logistic probe, native encoder outputs, no PCA/whitening/unit normalization",
+    "lambda_grid": {
+      "min": 1e-8,
+      "max": 1e2,
+      "step": "decade",
+      "candidates": 11,
+      "tie_rule": "strongest regularization",
+      "solver_tolerances": "existing, unchanged",
+      "boundary_expansion_rule": "if the engineering pilot selects an endpoint, expand that boundary one decade for both encoders and datasets, repeat until interior or declare feasibility unresolved; freeze the resulting common grid before the main run"
+    },
+    "b_selected_lambda_sensitivity": "re-evaluate each encoder's arms at that encoder's B-selected lambda as a secondary sensitivity; never impose one encoder's lambda on the other as proof of equal regularization"
+  },
+  "calibration": {
+    "method": "one positive scalar temperature per selected arm, fit on validation patients, existing calibration objective",
+    "preserves_argmax_and_ba": true,
+    "objective_frozen_in": "phase 04 (objective, weighting, bounds, ECE bins traced from the existing implementation)",
+    "metrics": "raw and scaled macro NLL and ECE"
+  },
+  "inference": {
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 39000,
+    "resampling": "paired training-draw resampling within split, identical weights across encoders/arms, independent of evaluation-patient-cluster resampling; patient multiplicity carried to every occurrence across arms/encoders/split test sets; class support preserved (BRACS multi-label patients not independently resampled per label)",
+    "undefined_recall_rule": "redraw the replicate and record the rejection count; never turn undefined recall into zero",
+    "primary_ci": "two-sided 97.5% percentile intervals (Bonferroni family coverage >= 95%) for the two primary dataset contrasts",
+    "secondary_ci": "paired 95% percentile intervals for all other estimates",
+    "decision_thresholds_pp": {
+      "direction": "excluding zero resolves direction",
+      "practical_change": "wholly below -1 or above +1 resolves a practically meaningful change",
+      "practical_similarity": "wholly inside [-1, 1] supports practical similarity",
+      "otherwise": "unresolved"
+    },
+    "stopping_rule": "no success-dependent stopping; complete the frozen main design even if the expected effect looks absent"
+  },
+  "exit_gate": "every arm, seed, input hash, lambda rule, metric definition, and decision rule is recorded before main test results are opened"
+}

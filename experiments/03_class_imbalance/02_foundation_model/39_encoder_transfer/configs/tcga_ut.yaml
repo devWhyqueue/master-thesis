@@ -1,0 +1,35 @@
+# TCGA-UT encoder-transfer schedule (exp-39, phase 01). Frozen patient cohort, class permutation,
+# and training-row identities for arms B/R10/R100/P10/P100/S10/S100 at draws 10-19 per split,
+# generated once from the shared exp-2 manifest without reference to either encoder. Same dataset
+# identity, eligibility, and G=20/DEPTH=160/BALANCED=32 budget as exp-25 (see plans/01_protocol.md).
+# feature_extraction (per encoder) is locked in phase 02, not here.
+
+prevalence:
+  patients_per_class: 20
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+
+paths:
+  outputs: experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/tcga_ut/patch
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/tcga_ut/patch
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
