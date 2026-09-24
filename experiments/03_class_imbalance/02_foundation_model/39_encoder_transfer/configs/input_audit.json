@@ -1,0 +1,138 @@
+{
+  "experiment": "39_encoder_transfer",
+  "phase": "02_inputs_and_model",
+  "audited_at": "2026-09-24",
+  "cluster_state_verified": true,
+  "repo_state": {
+    "hydra_head": "d1e999f feat(exp39): freeze phase-01 protocol lock and schedule generator",
+    "untracked_at_audit": [],
+    "compat_symlinks_confirmed_load_bearing": {
+      "experiments/2_benchmark_patch -> 01_benchmark/02_benchmark_patch": "feature_path column of the exp-2 tcga_ut manifest still points through this old prefix",
+      "experiments/2_cls_imb_benchmark -> 01_benchmark/02_benchmark_patch": "feature_path column of the exp-2 bracs manifest still points through this old prefix"
+    }
+  },
+  "source_manifests": {
+    "tcga_ut": {
+      "columns": ["dataset", "case_id", "slide_id", "cancer_type", "patch_id", "image_path", "split", "feature_path", "feature_index"],
+      "identity_cols": ["case_id", "slide_id", "patch_id"],
+      "manifest_sha256": {
+        "split=0": "4a9f4b536b2741a2698ace6dd037ef6773af2370aa1ebb36b95a552d5b2adb64",
+        "split=1": "8769ea1cd7a040152558074efc08f96d9218518c58b2ac4d02298bce31eedb6d",
+        "split=2": "e409946a168d8885955985d61672a8cf96499337bbcaefe0718cb0672fa753a5"
+      },
+      "row_counts": {"split=0": 1597650},
+      "image_source": {
+        "path_pattern": "/mnt/tcga-ut/<cancer_type>/<cancer_type>/<n>/<slide_id>/<patch_id>.jpg",
+        "sqfs": "/home/space/datasets-sqfs/tcga-ut/patch.sqfs",
+        "sqfs_provenance": "/home/space/datasets-sqfs/tcga-ut/patch.provenance.json (+.sha256)",
+        "mount_convention": "bind sqfs at /mnt/tcga-ut via apptainer -B <sqfs>:/mnt/tcga-ut:image-src=/, per CLUSTER.md",
+        "confirmed_readable": true
+      }
+    },
+    "bracs": {
+      "columns": ["dataset", "case_id", "slide_id", "roi_id", "cancer_type", "lesion_type", "patch_id", "image_path", "split", "patch_label", "slide_label", "feature_path", "feature_index"],
+      "identity_cols": ["case_id", "slide_id", "patch_id"],
+      "manifest_sha256": {
+        "split=0": "e9f09db49a5a16f843de0dae643b99bf65eaf7128cfe97686a3fca91698ce671",
+        "split=1": "99df90c4c964f41516a0f54d56e5ed1b402093ae0b3efece5817798a48889816",
+        "split=2": "504f67a736414b87202cf98dbfc08b4b3a85a75273225a7b47531edc5a8534e8"
+      },
+      "row_counts": {"split=0": 278028},
+      "image_source": {
+        "path_pattern": "/tmp/bracs_roi_tiles/<case_id>/<roi_id>/<patch_id>.jpg",
+        "sqfs": "/home/space/datasets-sqfs/bracs-roi-tiles.sqfs",
+        "mount_convention": "stage sqfs to job-local /tmp/bracs_roi_tiles via apptainer -B <sqfs>:/tmp/bracs_roi_tiles:image-src=/, per CLUSTER.md",
+        "confirmed_readable": true
+      }
+    }
+  },
+  "split_disjointness": {
+    "method": "within each split_idx, intersect the exp-39 schedule's training patch identities (all draws 10-19, all 7 arms) against that split's manifest val+test patch identities",
+    "result_per_split": {
+      "tcga_ut": {"split=0": {"train": 172498, "val_test": 238530, "overlap": 0}, "split=1": {"train": 175381, "val_test": 241220, "overlap": 0}, "split=2": {"train": 173175, "val_test": 239960, "overlap": 0}},
+      "bracs": {"split=0": {"train": 13428, "val_test": 22133, "overlap": 0}, "split=1": {"train": 12444, "val_test": 54552, "overlap": 0}, "split=2": {"train": 12740, "val_test": 31390, "overlap": 0}}
+    },
+    "note": "nonzero overlap appears only when patch identities are pooled ACROSS the three splits, because the three splits are different patient partitions of the same pool; that is expected, not a leakage bug"
+  },
+  "extraction_scope": {
+    "definition": "union of scheduled training rows (protocol_lock draws 10-19, all 7 arms, all 3 splits) plus every frozen val+test row (all 3 splits)",
+    "tcga_ut": {"unique_train_patches": 369462, "unique_val_test_patches": 624520, "union_patches": 871893, "union_unique_slides": 7808},
+    "bracs": {"unique_train_patches": 21907, "unique_val_test_patches": 97001, "union_patches": 111343, "union_unique_slides": 353},
+    "unit_for_extraction": "requested patches only (not full per-slide pools); phase-03 extraction stores one UNI2-h vector per requested patch, grouped into per-slide tensor files"
+  },
+  "virchow2_audit": {
+    "locked_provenance": {
+      "encoder_id": "hf-hub:paige-ai/Virchow2",
+      "encoder_revision": "3158645804b69e3f3bc4439d4116edddf0840a72",
+      "weights_sha256": "8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b",
+      "pooling": "cls_plus_mean_patch_tokens",
+      "feature_dim": 2560,
+      "source": "experiments/01_benchmark/02_benchmark_patch/code/imbalance_benchmark/datasets/feature_provenance.py"
+    },
+    "tcga_ut": {
+      "status": "reusable, verified",
+      "cache_path": "experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch/data/features/tcga_ut/*.pt",
+      "cached_tensor_files": 8736,
+      "manifest_unique_slides": 8678,
+      "cache_provenance_matches_lock": true,
+      "fresh_vs_cached_probe": {
+        "n_images_reextracted": 8,
+        "slide": "TCGA-OR-A5J1-01Z-00-DX1",
+        "cached_tensor_dtype": "float32",
+        "max_abs_diff_range": [0.01396, 0.04009],
+        "mean_abs_diff_range": [0.00185, 0.00304],
+        "cosine_similarity_range": [0.999987, 0.999996],
+        "reading": "differences consistent with float32 GPU inference run-to-run noise (kernel/algorithm selection), not an identity or provenance mismatch"
+      }
+    },
+    "bracs": {
+      "status": "reusable, verified",
+      "cache_path": "/home/space/datasets/bracs/features/virchow2/*.pt (shared project-level cache, NOT experiments/01_benchmark/02_benchmark_patch/outputs/bracs/patch/data/features/bracs/, which is empty and was a dead end)",
+      "cached_tensor_files": 387,
+      "manifest_unique_slides": 387,
+      "cache_provenance_matches_lock": true,
+      "correction": "an earlier pass of this audit wrongly reported BRACS Virchow2 features as unavailable, based only on the empty experiment-local outputs/bracs/.../features/bracs/ dir. The real cache lives at /home/space/datasets/bracs/ (README.md, bracs_prepare_report.json, features/virchow2/*.pt + feature_provenance.json + feature_cache_manifest.json, manifests/split={0,1,2}/manifest.csv), a shared BRACS staging area parallel to the datasets-sqfs convention. Verified: its manifests/split=N/manifest.csv is row-for-row identical to exp-2's outputs/bracs/patch/split=N/data/manifest.csv on every identity/split/label column and on feature_index, for all 3 splits (278,028 rows each); only feature_path differs (points at the shared cache instead of the empty experiment-local dir).",
+      "fresh_vs_cached_probe": {
+        "n_images_reextracted": 8,
+        "slide": "BRACS_1003658",
+        "cached_tensor_dtype": "float32",
+        "cached_tensor_shape": [2115, 2560],
+        "max_abs_diff_range": [0.01268, 0.07010],
+        "mean_abs_diff_range": [0.00137, 0.00237],
+        "cosine_similarity_range": [0.999993, 0.999998],
+        "reading": "same float32 GPU inference run-to-run noise level as the TCGA-UT probe above, not a mismatch"
+      },
+      "access_note": "requires an explicit apptainer bind (-B /home/space:/home/space); unlike experiments/<user's home>, /home/space is not auto-bound into the container"
+    }
+  },
+  "eligibility_pool": {
+    "depth": 160,
+    "note": "reused unchanged from exp-25/26/exp-2 patient-disjoint splits and eligibility rules (see configs/tcga_ut.yaml, configs/bracs.yaml eligibility_rules); exp-39's own schedule.json (phase 01, already generated on Hydra) draws only from this pool via prevalence.fit's existing shard/eligibility logic, so no separate re-verification was performed beyond the disjointness check above"
+  },
+  "environment": {
+    "reused_existing_sif": true,
+    "sif_path": "experiments/environment.sif",
+    "reason": "requirements-experiment.txt already pins timm==1.0.22 and huggingface-hub==1.15.0, both sufficient to load UNI2-h via its documented hf-hub timm recipe; no rebuild needed",
+    "gpu_tested_on": "gpu-test partition, NVIDIA GeForce RTX 4070 (24GB-class consumer card assigned to gpu-test; bulk extraction should target a stronger constraint, e.g. 80gb/h100, per CLUSTER.md)"
+  },
+  "storage_and_time_estimate": {
+    "uni2h_fp16_bytes_per_vector": 3072,
+    "tcga_ut_fp16_storage_gb": 2.68,
+    "bracs_fp16_storage_gb": 0.34,
+    "total_fp16_storage_gb": 3.02,
+    "measured_throughput_img_per_s_bs8_rtx4070": 38.57,
+    "measured_peak_cuda_mem_gb_bs8": 2.96,
+    "conservative_time_estimate_hours": {
+      "tcga_ut": 6.28,
+      "bracs": 0.80,
+      "basis": "union_patches / measured_throughput, single unoptimized worker on the weakest available GPU tier (gpu-test RTX 4070); the real extraction pipeline's DataLoader prefetch and a stronger GPU partition (80gb/h100/mig40) should reduce this substantially. UNI2-h only; Virchow2 needs no re-extraction on either dataset (both caches reusable, see virchow2_audit)"
+    }
+  },
+  "exit_gate": {
+    "source_identities_resolve": true,
+    "requested_rows_exist": true,
+    "authenticated_checkpoint_access_works": true,
+    "pinned_model_environment_passes_gpu_pilot": true,
+    "blocking_gaps": []
+  }
+}

@@ -1,6 +1,6 @@
 # Experiment 39: does imbalance damage transfer across foundation models?
 
-Status: prospective plans only. No model download, feature extraction, training, or cluster verification has been performed for this experiment. Repository evidence and the UNI2-h model card were inspected on 2026-09-24.
+Status: phases 01-02 complete (`configs/protocol_lock.json`, `configs/input_audit.json`, `configs/encoder_lock.json`). Schedule generated and GPU-pilot-verified on Hydra 2026-09-24; UNI2-h checkpoint pinned and gated access confirmed. Both datasets' Virchow2 features are reusable as-is: TCGA-UT from the exp-2 benchmark cache, BRACS from the shared `/home/space/datasets/bracs/features/virchow2/` cache (row-identical manifest to exp-2's, verified against a fresh re-embed). No UNI2-h feature extraction or training has been performed yet.
 
 **Question:** On identical patients and image patches, does replacing frozen Virchow2 with frozen UNI2-h change the loss of balanced accuracy caused by class imbalance, and does that change arise in the prior-only channel, the support-only channel, or their interaction?
 
@@ -36,8 +36,8 @@ No native-prevalence arm, tail-order search, synthetic separation intervention, 
 
 ## Completion checklist
 
-- [ ] Protocol and immutable inputs frozen before main outcomes.
-- [ ] UNI2-h access, exact checkpoint, transforms, and container verified.
+- [x] Protocol and immutable inputs frozen before main outcomes.
+- [x] UNI2-h access, exact checkpoint, transforms, and container verified.
 - [ ] Both datasets have complete, identity-matched feature caches.
 - [ ] Focused tests and scoped clean-code checks pass.
 - [ ] All planned main cells complete and pass provenance/convergence checks.
