@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["main"]
 
-_SUBMIT_STAGES = ("extract", "fit", "analyze", "all")
+_SUBMIT_STAGES = "extract audit-features preflight pilot fit analyze".split()
 
 
 def _extraction_jobs(config: dict) -> list[SlurmJob]:
@@ -72,14 +72,42 @@ def _stage_jobs(config: dict, stage: str) -> list[SlurmJob]:
     """Jobs for one submission stage: ``extract`` (through preflight), ``fit``, ``analyze``, or ``all``."""
     if stage == "extract":
         return _extraction_jobs(config)
+    if stage == "audit-features":
+        audit = build_job(config, "audit-features", "audit-features", False)
+        return [
+            audit,
+            build_job(config, "preflight", "preflight", False, (audit.name,)),
+        ]
+    if stage == "preflight":
+        return [build_job(config, "preflight", "preflight", False)]
+    if stage == "pilot":
+        extraction = build_job(
+            config, "extract-pilot", "extract-pilot", True, resource="extract-features"
+        )
+        return [
+            extraction,
+            build_job(
+                config,
+                "pilot-virchow2",
+                "pilot-fit --encoder virchow2",
+                False,
+                resource="pilot",
+            ),
+            build_job(
+                config,
+                "pilot-uni2h",
+                "pilot-fit --encoder uni2h",
+                False,
+                (extraction.name,),
+                resource="pilot",
+            ),
+        ]
     if stage == "fit":
         return [_fit_job(config, ())]
     if stage == "analyze":
-        return [build_job(config, "analyze", "analyze", False, ())]
-    extraction = _extraction_jobs(config)
-    fit = _fit_job(config, (extraction[-1].name,))
-    analyze = build_job(config, "analyze", "analyze", False, (fit.name,))
-    return [*extraction, fit, analyze]
+        audit = build_job(config, "audit-fits", "audit-fits", False, ())
+        return [audit, build_job(config, "analyze", "analyze", False, (audit.name,))]
+    raise ValueError(f"Unknown submission stage: {stage}")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -93,11 +121,15 @@ def _parser() -> argparse.ArgumentParser:
     p_extract.add_argument("--dtype", default="float32", choices=["float32", "float16"])
     sub.add_parser("merge-features")
     sub.add_parser("audit-features")
+    sub.add_parser("extract-pilot")
     sub.add_parser("preflight")
     p_fit = sub.add_parser("fit")
     p_fit.add_argument(
         "--shard-index", type=int, choices=range(shard_count()), required=True
     )
+    p_pilot = sub.add_parser("pilot-fit")
+    p_pilot.add_argument("--encoder", choices=("virchow2", "uni2h"), required=True)
+    sub.add_parser("audit-fits")
     sub.add_parser("analyze")
     submit = sub.add_parser("submit")
     submit.add_argument("--stage", choices=_SUBMIT_STAGES, required=True)
@@ -144,6 +176,12 @@ def cmd_audit_features(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_extract_pilot(args: argparse.Namespace) -> None:
+    """Extract the reserved draw into a separate cache for the engineering pilot."""
+    path = extract.extract_pilot(load_config(args.config))
+    logger.info(f"wrote {path}")
+
+
 def cmd_preflight(args: argparse.Namespace) -> None:
     """Verify frozen locks, the feature audit, and joined manifests; write preflight.json."""
     preflight_stage.run_preflight(load_config(args.config))
@@ -155,9 +193,22 @@ def cmd_fit(args: argparse.Namespace) -> None:
     fit_stage.run_fit_shard(load_config(args.config), args.shard_index)
 
 
+def cmd_pilot_fit(args: argparse.Namespace) -> None:
+    """Fit reserved draw 10000 for one encoder on split 0."""
+    fit_stage.run_pilot_fit(load_config(args.config), args.encoder)
+
+
 def cmd_analyze(args: argparse.Namespace) -> None:
     """Pool encoder/arm accuracy and probability quality, decompose, and write analysis.json."""
-    path = analyze_stage.run_analyze(load_config(args.config))
+    config = load_config(args.config)
+    fit_stage.audit_fits(config)
+    path = analyze_stage.run_analyze(config)
+    logger.info(f"wrote {path}")
+
+
+def cmd_audit_fits(args: argparse.Namespace) -> None:
+    """Write the selected-arm completeness report and reject missing evidence."""
+    path = fit_stage.audit_fits(load_config(args.config))
     logger.info(f"wrote {path}")
 
 
@@ -174,8 +225,11 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "extract-features": cmd_extract_features,
         "merge-features": cmd_merge_features,
         "audit-features": cmd_audit_features,
+        "extract-pilot": cmd_extract_pilot,
         "preflight": cmd_preflight,
         "fit": cmd_fit,
+        "pilot-fit": cmd_pilot_fit,
+        "audit-fits": cmd_audit_fits,
         "analyze": cmd_analyze,
         "submit": cmd_submit,
     }

@@ -7,6 +7,8 @@ stored coefficients without refitting (plans/04_implementation.md).
 
 from __future__ import annotations
 
+import os
+from tempfile import TemporaryDirectory
 from pathlib import Path
 from typing import Any, NamedTuple, cast
 
@@ -25,7 +27,7 @@ from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
     _macro_recall_mean,
     clustered_endpoints,
 )
-from imbalance_benchmark.common import write_json, write_run_record
+from imbalance_benchmark.common import RUN_RECORD_NAME, write_json, write_run_record
 from imbalance_benchmark.manifest.statistics import achieved_rho
 
 from breadth.calibrate import (
@@ -39,7 +41,7 @@ from breadth.fit import EvalPartition, _build_draw_record
 from prevalence import DEPTH
 from prevalence.fit import _arm_rows, _prior_weights, _Shard, class_counts
 
-from transfer import LAMBDAS, MAX_ITER, TIE_TOLERANCE, TOLERANCE
+from transfer import FIT_SOURCE, LAMBDAS, MAX_ITER, TIE_TOLERANCE, TOLERANCE
 
 __all__ = ["CANDIDATES_NAME", "tune_and_fit_draw", "fit_arm"]
 
@@ -54,14 +56,10 @@ def _select_best_lambda(
     val_id: pd.DataFrame,
     sample_weight: np.ndarray | None = None,
 ) -> tuple[LinearFitResult, float, dict[str, Any], list[dict[str, Any]]]:
-    """Grid-search exp-39's frozen lambda grid on validation; ties go to the larger lambda.
-
-    Returns the selected fit/lambda/validation-endpoints, plus every candidate's
-    (converged fit, validation score) for later provenance and sensitivity use.
-    """
+    """Select validation lambda; return all candidates for later sensitivity checks."""
     v_cases = val_id["case_id"].astype(str).to_numpy()
     v_slides = val_id["slide_id"].astype(str).to_numpy()
-    with parallel_config(backend="loky", inner_max_num_threads=2):
+    with parallel_config(backend="loky", inner_max_num_threads=1):
         fits = cast(
             list[LinearFitResult],
             Parallel(n_jobs=min(worker_count(), len(LAMBDAS)))(
@@ -135,13 +133,7 @@ def tune_and_fit_draw(
 
 
 def _save_candidates(out_dir: Path, candidates: list[dict[str, Any]]) -> None:
-    """Every candidate's coefficients/intercept, indexed to ``transfer.LAMBDAS`` order.
-
-    Kept out of the JSON run record (``write_run_record`` would inline them) since
-    even one arm's 11 candidates of (n_classes, feature_dim) coefficients are too
-    large for readable JSON; a compressed sidecar bounds this to coefficients and
-    validation scores only, never a candidate's full test probabilities.
-    """
+    """Store frozen-grid coefficients in a sidecar without full test probabilities."""
     coef = np.stack([c["fit"].coef for c in candidates])
     intercept = np.stack([c["fit"].intercept for c in candidates])
     np.savez_compressed(
@@ -214,9 +206,14 @@ def _evidence_fields(
     }
     if allocation.prior_counts is not None:
         extra["prior_counts"] = dict(
-            zip(shard.names, (int(c) for c in allocation.prior_counts))
+            zip(shard.names, map(int, allocation.prior_counts))
         )
     return extra
+
+
+def _publish_staged(staged: Path, out_dir: Path) -> None:
+    for path in sorted(staged.iterdir(), key=lambda item: item.name == RUN_RECORD_NAME):
+        os.replace(path, out_dir / path.name)
 
 
 def fit_arm(
@@ -226,10 +223,10 @@ def fit_arm(
     shard: _Shard,
     evals: EvalPartition,
     draw_idx: int,
-    fit_source: tuple[str, str | None],
+    lock: dict[str, Any],
 ) -> None:
     """Allocate one arm's patch counts, fit it on the frozen grid, and write its evidence."""
-    allocation = _allocate(shard, fit_source)
+    allocation = _allocate(shard, FIT_SOURCE[arm])
     fit, lam, test_preds, test_probs, val_end, test_end, candidates = tune_and_fit_draw(
         allocation.x, allocation.y, evals, allocation.weight
     )
@@ -242,6 +239,12 @@ def fit_arm(
         evals.test_y,
     )
     extra = _evidence_fields(arm, shard, allocation, candidates)
-    write_run_record(out_dir, {**rec, **extra}, keep_arrays=True)
-    _save_candidates(out_dir, candidates)
-    _write_temperature(out_dir, evals, fit, test_preds, test_probs, lam)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(
+        prefix=f".{out_dir.name}-", dir=out_dir.parent
+    ) as temporary:
+        staged = Path(temporary)
+        _save_candidates(staged, candidates)
+        _write_temperature(staged, evals, fit, test_preds, test_probs, lam)
+        write_run_record(staged, {**rec, **extra, "fit_lock": lock}, keep_arrays=True)
+        _publish_staged(staged, out_dir)

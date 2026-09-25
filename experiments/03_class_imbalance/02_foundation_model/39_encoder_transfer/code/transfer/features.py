@@ -21,7 +21,7 @@ from breadth import exp2_split_paths
 
 from prevalence import patients_per_class
 
-from transfer import MAIN_DRAWS
+from transfer import MAIN_DRAWS, SMOKE_DRAW
 from transfer.schedule import draw_schedule, load_train_identity
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "ordered_identity",
     "requested_mask",
     "requested_frame",
+    "pilot_requested_frame",
 ]
 
 IDENTITY_COLS = ("case_id", "slide_id", "patch_id")
@@ -55,10 +56,14 @@ def _full_manifest(config: dict[str, Any], split_idx: int) -> pd.DataFrame:
 
 
 def _train_union_identity(
-    train_df: pd.DataFrame, names: list[str], split_idx: int, g: int
+    train_df: pd.DataFrame,
+    names: list[str],
+    split_idx: int,
+    g: int,
+    draws: tuple[int, ...] = MAIN_DRAWS,
 ) -> set[tuple[str, str, str]]:
     identity: set[tuple[str, str, str]] = set()
-    for draw_idx in MAIN_DRAWS:
+    for draw_idx in draws:
         cell = draw_schedule(train_df, names, split_idx, draw_idx, g)
         for arm in cell["arms"].values():
             for row in arm["patch_identity"]:
@@ -115,3 +120,14 @@ def requested_frame(config: dict[str, Any]) -> pd.DataFrame:
             cols + ["image_path"]
         ],
     )
+
+
+def pilot_requested_frame(config: dict[str, Any]) -> pd.DataFrame:
+    """Reserved split-0 draw training images, isolated from the main cache."""
+    full = _full_manifest(config, 0)
+    train_df, names = load_train_identity(config, 0)
+    wanted = _train_union_identity(
+        train_df, names, 0, patients_per_class(config), (SMOKE_DRAW,)
+    )
+    mask = full["split"].eq("train") & requested_mask(full, wanted)
+    return cast(pd.DataFrame, full.loc[mask, [*IDENTITY_COLS, "image_path"]])

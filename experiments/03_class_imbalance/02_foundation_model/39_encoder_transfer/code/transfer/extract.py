@@ -13,7 +13,7 @@ from typing import Any, Callable
 import pandas as pd
 import torch
 
-from imbalance_benchmark.common import output_root
+from imbalance_benchmark.common import output_root, sign_file, write_json
 from imbalance_benchmark.datasets.features.cache import load_slide_features
 from imbalance_benchmark.datasets.features.cache_manifest import (
     cached_slide_ids,
@@ -24,7 +24,7 @@ from imbalance_benchmark.datasets.features.cache_manifest import (
 )
 
 from transfer import uni
-from transfer.features import ordered_identity, requested_frame
+from transfer.features import ordered_identity, pilot_requested_frame, requested_frame
 
 __all__ = [
     "uni2h_feature_root",
@@ -32,6 +32,8 @@ __all__ = [
     "extract_shard",
     "merge_features",
     "audit_uni2h",
+    "extract_pilot",
+    "pilot_feature_root",
 ]
 
 EmbedFn = Callable[[list[str], str, torch.device, dict[str, Any]], torch.Tensor]
@@ -40,6 +42,11 @@ EmbedFn = Callable[[list[str], str, torch.device, dict[str, Any]], torch.Tensor]
 def uni2h_feature_root(config: dict[str, Any]) -> Path:
     """Shared, per-dataset UNI2-h cache namespace, disjoint from Virchow2's."""
     return output_root(config) / "data" / "features" / "uni2h"
+
+
+def pilot_feature_root(config: dict[str, Any]) -> Path:
+    """Keep reserved-draw tensors separate from the audited main cache."""
+    return output_root(config) / "data" / "features" / "uni2h_pilot"
 
 
 def shard_slides(slide_ids: list[str], shard_index: int, shards: int) -> list[str]:
@@ -104,14 +111,14 @@ def extract_shard(
     dtype: str = "float32",
     device: torch.device | None = None,
     embed_fn: EmbedFn = uni.extract_slide_features,
+    cache: tuple[pd.DataFrame, Path] | None = None,
 ) -> None:
     """Extract this shard's assigned, not-yet-merged slides; write pending records only.
 
     Never merges: merging is one separate stage (``merge_features``), so
     concurrently running shards cannot race on the shared cache manifest.
     """
-    frame = requested_frame(config)
-    feature_root = uni2h_feature_root(config)
+    frame, feature_root = cache or (requested_frame(config), uni2h_feature_root(config))
     feature_root.mkdir(parents=True, exist_ok=True)
     uni.write_or_verify_provenance(feature_root, dtype)
     groups = _group_by_slide(frame)
@@ -125,12 +132,17 @@ def extract_shard(
     )
 
 
-def merge_features(config: dict[str, Any]) -> None:
+def merge_features(
+    config: dict[str, Any],
+    frame: pd.DataFrame | None = None,
+    feature_root: Path | None = None,
+) -> None:
     """One-time merge of every shard's completed pending records into the cache manifest."""
-    feature_root = uni2h_feature_root(config)
+    feature_root = uni2h_feature_root(config) if feature_root is None else feature_root
+    frame = requested_frame(config) if frame is None else frame
     expected = {
         slide_id: (feature_root / f"{slide_id}.pt", ordered_identity(group))
-        for slide_id, group in _group_by_slide(requested_frame(config)).items()
+        for slide_id, group in _group_by_slide(frame).items()
     }
     merge_pending_slides(feature_root, expected)
 
@@ -162,16 +174,19 @@ def _index_slide(
 
 def audit_uni2h(
     config: dict[str, Any],
+    frame: pd.DataFrame | None = None,
+    feature_root: Path | None = None,
 ) -> tuple[dict[str, Any], dict[tuple[str, str, str], tuple[str, int]]]:
     """Verify every requested UNI2-h slide's cache entry; return counts and an identity index."""
-    groups = _group_by_slide(requested_frame(config))
-    feature_root = uni2h_feature_root(config)
+    groups = _group_by_slide(requested_frame(config) if frame is None else frame)
+    feature_root = uni2h_feature_root(config) if feature_root is None else feature_root
     cached = cached_slide_ids(feature_root)
     missing = sorted(set(groups) - cached)
     corrupt: list[str] = []
     index: dict[tuple[str, str, str], tuple[str, int]] = {}
     for slide_id in sorted(set(groups) & cached):
         entries = _index_slide(feature_root, slide_id, groups[slide_id])
+        load_slide_features.cache_clear()
         if entries is None:
             corrupt.append(slide_id)
         else:
@@ -187,3 +202,18 @@ def audit_uni2h(
         "unresolved_corrupt": len(corrupt),
     }
     return audit, index
+
+
+def extract_pilot(config: dict[str, Any]) -> Path:
+    """Extract and audit reserved-draw training features without changing main tensors."""
+    frame = pilot_requested_frame(config)
+    root = pilot_feature_root(config)
+    extract_shard(config, 0, 1, cache=(frame, root))
+    merge_features(config, frame=frame, feature_root=root)
+    audit, _ = audit_uni2h(config, frame=frame, feature_root=root)
+    if audit["unresolved_missing"] or audit["unresolved_corrupt"]:
+        raise RuntimeError("Reserved-draw feature cache is incomplete")
+    out_path = output_root(config) / "data" / "pilot_feature_audit.json"
+    write_json(out_path, audit)
+    sign_file(out_path)
+    return out_path

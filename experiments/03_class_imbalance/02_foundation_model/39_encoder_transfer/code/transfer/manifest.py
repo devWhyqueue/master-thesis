@@ -99,12 +99,16 @@ def _audit_split(
 ) -> int:
     """Resolve one split's requested rows against its Virchow2 pointers; return its row count."""
     requested = _split_requested_rows(config, split_idx)
-    keyed = _virchow2_reference_frame(config, split_idx).set_index(list(IDENTITY_COLS))
-    for case, slide, patch in zip(
-        requested["case_id"].astype(str),
-        requested["slide_id"].astype(str),
-        requested["patch_id"].astype(str),
-    ):
+    refs = _virchow2_reference_frame(config, split_idx).copy()
+    refs[list(IDENTITY_COLS)] = refs[list(IDENTITY_COLS)].astype(str)
+    keyed = refs.set_index(list(IDENTITY_COLS))
+    rows = cast(pd.DataFrame, requested[list(IDENTITY_COLS)].astype(str))
+    rows = rows.sort_values("slide_id")
+    previous_slide = None
+    for case, slide, patch in rows.itertuples(index=False, name=None):
+        if slide != previous_slide:
+            load_slide_features.cache_clear()
+            previous_slide = slide
         key = (case, slide, patch)
         if key in index or key in missing or key in corrupt:
             continue

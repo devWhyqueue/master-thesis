@@ -243,3 +243,51 @@ def test_join_manifest_rejects_an_incomplete_identity_index(config) -> None:
     # join must refuse rather than silently leave a required row unmatched.
     with pytest.raises(ValueError):
         manifest.join_manifest(config["cfg"], 0, {}, "uni2h")
+
+
+def test_virchow2_audit_matches_numeric_case_ids(config, monkeypatch) -> None:
+    row = config["full"].iloc[[0]].copy()
+    row["case_id"] = 170
+    monkeypatch.setattr(manifest, "_split_requested_rows", lambda cfg, split_idx: row)
+    monkeypatch.setattr(manifest, "_virchow2_reference_frame", lambda cfg, split_idx: row)
+    index: dict = {}
+    missing: list = []
+    corrupt: list = []
+    assert manifest._audit_split(config["cfg"], 0, index, missing, corrupt) == 1
+    assert len(index) == 1
+    assert missing == corrupt == []
+
+
+def test_reserved_draw_uses_separate_feature_cache(config) -> None:
+    from imbalance_benchmark.common import output_root, sign_file, write_json
+    from transfer import fit
+
+    cfg = config["cfg"]
+    frame = features.pilot_requested_frame(cfg)
+    assert not frame.empty
+    root = extract.pilot_feature_root(cfg)
+    embed, _ = _calls_embed()
+    extract.extract_shard(cfg, 0, 1, embed_fn=embed, device=torch.device("cpu"), cache=(frame, root))
+    extract.merge_features(cfg, frame=frame, feature_root=root)
+    audit, _ = extract.audit_uni2h(cfg, frame=frame, feature_root=root)
+    audit_path = output_root(cfg) / "data" / "pilot_feature_audit.json"
+    write_json(audit_path, audit)
+    sign_file(audit_path)
+    train = config["full"].query("split == 'train'").reset_index(drop=True)
+    train["feature_path"] = pd.NA
+    train["feature_index"] = pd.NA
+    overlaid = fit._pilot_train_df(cfg, "uni2h", train)
+    selected = set(zip(frame["case_id"], frame["slide_id"], frame["patch_id"]))
+    keys = list(zip(overlaid["case_id"], overlaid["slide_id"], overlaid["patch_id"]))
+    assert all(pd.notna(overlaid.loc[i, "feature_path"]) for i, key in enumerate(keys) if key in selected)
+    assert not extract.uni2h_feature_root(cfg).exists()
+
+
+def test_reserved_draw_virchow2_uses_full_source_references(config) -> None:
+    from transfer import fit
+
+    train = config["full"].query("split == 'train'").reset_index(drop=True)
+    expected = train["feature_path"].copy()
+    train["feature_path"] = pd.NA
+    restored = fit._pilot_train_df(config["cfg"], "virchow2", train)
+    pd.testing.assert_series_equal(restored["feature_path"], expected)

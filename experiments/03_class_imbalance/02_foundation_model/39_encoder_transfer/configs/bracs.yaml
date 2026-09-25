@@ -28,3 +28,29 @@ slurm:
   code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/code
   output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/bracs/patch
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/bracs/patch
+  squashfs:
+    - source: /home/space/datasets-sqfs/bracs-roi-tiles.sqfs
+      mount: /tmp/bracs_roi_tiles
+      stages: [extract-features, extract-pilot]
+  resources:
+    audit-features:
+      partition: cpu-5h
+      memory: 32G
+    fit:
+      partition: cpu-2h
+      cpus: 4
+      memory: 16G
+    audit-fits:
+      partition: cpu-2h
+      cpus: 4
+      memory: 16G
+    analyze:
+      partition: cpu-5h
+      cpus: 16
+      memory: 64G
+    extract-features:
+      memory: 32G
+    pilot:
+      partition: cpu-5h
+      cpus: 16
+      memory: 64G

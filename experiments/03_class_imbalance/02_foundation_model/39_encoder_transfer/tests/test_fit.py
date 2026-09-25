@@ -7,6 +7,7 @@ datasets); mirrors ``test_schedule.py``'s synthetic manifest and
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -97,7 +98,7 @@ def test_fit_arm_dimension_agnostic_and_stores_every_candidate(tmp_path: Path, d
     shard = _shard(dim, tmp_path / "cache")
     evals = _evals(dim, len(_NAMES))
     out_dir = tmp_path / "out"
-    fit_arm(_CONFIG, out_dir, "B", shard, evals, draw_idx=10, fit_source=("r1", None))
+    fit_arm(_CONFIG, out_dir, "B", shard, evals, draw_idx=10, lock={"test": 1})
 
     from imbalance_benchmark.common import read_run_record
 
@@ -121,7 +122,7 @@ def test_p_arm_stores_prior_counts_and_positive_weights(tmp_path: Path) -> None:
     shard = _shard(dim, tmp_path / "cache")
     evals = _evals(dim, len(_NAMES))
     out_dir = tmp_path / "out"
-    fit_arm(_CONFIG, out_dir, "P100", shard, evals, draw_idx=10, fit_source=("r1", "r100"))
+    fit_arm(_CONFIG, out_dir, "P100", shard, evals, draw_idx=10, lock={"test": 1})
 
     from imbalance_benchmark.common import read_run_record
 
@@ -207,6 +208,7 @@ def test_run_fit_shard_skips_already_fit_arms(tmp_path: Path, monkeypatch) -> No
         return real_fit_arm(config, out_dir, arm, *rest, **kw)
 
     monkeypatch.setattr(fit_mod, "fit_arm", _tracking_fit_arm)
+    monkeypatch.setattr(fit_mod, "_fit_lock", lambda cfg, encoder, split_idx: {"test": 1})
     shard_index = next(
         i for i in range(shard_count()) if decode_shard_index(i)[:2] == ("uni2h", 0)
     )
@@ -216,6 +218,36 @@ def test_run_fit_shard_skips_already_fit_arms(tmp_path: Path, monkeypatch) -> No
     calls.clear()
     run_fit_shard(config, shard_index)
     assert calls == []
+
+    from sites import allocation_dir
+
+    result_dir = allocation_dir(
+        split_paths(ensure_dirs(config), 0), f"uni2h/{ARMS[0]}", 10
+    )
+    (result_dir / "candidates.npz").unlink()
+    with pytest.raises(RuntimeError, match="Incomplete or incompatible fit record"):
+        run_fit_shard(config, shard_index)
+
+
+def test_main_resume_rejects_changed_fit_lock(tmp_path: Path) -> None:
+    from transfer.fit import _completed_arm
+
+    result_dir = tmp_path / "arm"
+    result_dir.mkdir()
+    (result_dir / "run.json").write_text(
+        json.dumps(
+            {
+                "arm": "B",
+                "grid": {"draw": 10},
+                "solver": {"converged": True},
+                "candidates": [{"lambda": lam} for lam in LAMBDAS],
+                "selected_lambda": LAMBDAS[0],
+                "fit_lock": {"old": 1},
+            }
+        )
+    )
+    with pytest.raises(RuntimeError, match="Incomplete or incompatible fit record"):
+        _completed_arm(result_dir, "B", 10, {"new": 1})
 
 
 def test_decode_shard_index_covers_encoder_split_draw() -> None:
@@ -233,3 +265,25 @@ def test_decode_shard_index_covers_encoder_split_draw() -> None:
         decode_shard_index(-1)
     with pytest.raises(ValueError):
         decode_shard_index(shard_count())
+
+
+def test_fit_audit_rejects_missing_main_grid(tmp_path: Path) -> None:
+    from transfer.fit import audit_fits
+
+    config = {**_CONFIG, "paths": {"outputs": str(tmp_path / "outputs")}}
+    with pytest.raises(RuntimeError, match="selected arm records are missing"):
+        audit_fits(config)
+    report = json.loads((tmp_path / "outputs" / "data" / "fit_audit.json").read_text())
+    assert report["expected"] == 420
+    assert report["valid"] == 0
+
+
+def test_pilot_fit_uses_reserved_draw(monkeypatch) -> None:
+    import transfer.fit as fit_mod
+
+    cells = []
+    monkeypatch.setattr(fit_mod, "_fit_cell", lambda *args: cells.append(args[1:]))
+    fit_mod.run_pilot_fit(_CONFIG, "uni2h")
+    assert cells == [("uni2h", 0, 10000)]
+    with pytest.raises(ValueError, match="Unknown encoder"):
+        fit_mod.run_pilot_fit(_CONFIG, "other")
