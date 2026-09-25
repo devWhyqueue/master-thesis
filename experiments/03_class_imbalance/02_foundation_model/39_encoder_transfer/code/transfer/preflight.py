@@ -26,7 +26,12 @@ _LOCK_DIR = (
     find_repo_root()
     / "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/configs"
 )
-_LOCKS = ("protocol_lock.json", "encoder_lock.json", "input_audit.json")
+_LOCKS = (
+    "protocol_lock.json",
+    "encoder_lock.json",
+    "input_audit.json",
+    "phase05_scope_amendment.json",
+)
 
 
 def _verify_locks() -> list[str]:
@@ -49,6 +54,19 @@ def _verify_feature_audit(config: dict[str, Any]) -> dict[str, Any]:
         or audit["unresolved_mismatched"]
     ):
         raise RuntimeError(f"feature_audit.json reports unresolved rows: {audit_path}")
+    amendment = json.loads(
+        (_LOCK_DIR / "phase05_scope_amendment.json").read_text(encoding="utf-8")
+    )[config["dataset"]["name"]]
+    expected = amendment["union_patches"]
+    if (
+        audit["uni2h"]["requested_patches"] != expected
+        or audit["uni2h"]["matched_patches"] != expected
+        or audit["uni2h"]["requested_slides"] != amendment["union_unique_slides"]
+        or audit["virchow2"]["matched_patches"] != expected
+    ):
+        raise RuntimeError(
+            f"feature_audit.json does not match corrected scope: {audit_path}"
+        )
     return audit
 
 

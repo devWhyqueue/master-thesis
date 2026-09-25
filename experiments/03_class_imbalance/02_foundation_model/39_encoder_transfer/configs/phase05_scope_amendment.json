@@ -1,0 +1,26 @@
+{
+  "experiment": "39_encoder_transfer",
+  "phase": "05_execution",
+  "amends": "input_audit.json",
+  "original_input_audit_sha256": "fb117ade98b83cc105a6396c0a0a92e44b38b4d9041ce5c6d7c15a812cb3d278",
+  "reason": "The phase-02 extraction_scope.unique_val_test_patches counts included test rows only. Validation rows were omitted from its extraction estimate, although the locked protocol and phase-03 feature code require both validation and test rows. Independent enumeration of schedule.json training identities and the unchanged source manifests confirmed the corrected union on Hydra job 4923112.",
+  "bracs": {
+    "unique_train_patches": 21907,
+    "unique_validation_patches": 75399,
+    "unique_test_patches": 97001,
+    "unique_held_patches": 159628,
+    "union_patches": 168585,
+    "union_unique_slides": 376
+  },
+  "tcga_ut": {
+    "unique_train_patches": 369462,
+    "unique_validation_patches": 609960,
+    "unique_test_patches": 624520,
+    "unique_held_patches": 1045940,
+    "union_patches": 1201809,
+    "union_unique_slides": 8362
+  },
+  "scope_changed": false,
+  "fitting_or_inference_changed": false,
+  "evidence_job": "4923112"
+}
