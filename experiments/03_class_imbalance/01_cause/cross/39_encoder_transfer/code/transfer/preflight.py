@@ -23,7 +23,7 @@ __all__ = ["run_preflight"]
 
 _LOCK_DIR = (
     find_repo_root()
-    / "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/configs"
+    / "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/configs"
 )
 _LOCKS = (
     "protocol_lock.json",

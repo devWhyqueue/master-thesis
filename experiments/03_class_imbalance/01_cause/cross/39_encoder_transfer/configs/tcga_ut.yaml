@@ -26,12 +26,12 @@ dataset:
     - Cholangiocarcinoma
 
 paths:
-  outputs: experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/tcga_ut/patch
+  outputs: experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/outputs/tcga_ut/patch
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
-  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/tcga_ut/patch
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/outputs/tcga_ut/patch
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
   extract_shards: 8
   shared_squashfs:

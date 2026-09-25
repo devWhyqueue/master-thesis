@@ -35,7 +35,7 @@ __all__ = [
 
 _LOCK_PATH = (
     find_repo_root()
-    / "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer"
+    / "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer"
     / "configs/encoder_lock.json"
 )
 ENCODER_LOCK: dict[str, Any] = json.loads(_LOCK_PATH.read_text(encoding="utf-8"))

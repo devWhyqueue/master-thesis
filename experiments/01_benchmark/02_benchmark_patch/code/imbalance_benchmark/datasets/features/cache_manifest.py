@@ -22,7 +22,7 @@ def cache_records(feature_root: Path) -> dict[str, dict[str, object]]:
 
 def save_tensor_atomic(tensor: torch.Tensor, path: Path) -> None:
     """Publish a completed tensor only after its complete temporary write."""
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.partial")
+    temporary = path.with_name(f".{uuid4().hex}.partial")
     torch.save(tensor, temporary)
     os.replace(temporary, path)
 
@@ -136,7 +136,7 @@ def _write_json_atomic(
     path: Path, payload: dict[str, object] | dict[str, dict[str, object]]
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.partial")
+    temporary = path.with_name(f".{uuid4().hex}.partial")
     temporary.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

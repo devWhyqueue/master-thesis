@@ -45,7 +45,7 @@ def fit_lock(config: dict[str, Any], encoder: str, split_idx: int) -> dict[str, 
     """Bind a fit to the signed data and current experiment source."""
     exp_root = (
         find_repo_root()
-        / "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer"
+        / "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer"
     )
     signed = _signed_paths(config, encoder, split_idx, exp_root)
     for path in signed.values():

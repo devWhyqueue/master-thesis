@@ -2,7 +2,7 @@
   "experiment": "39_encoder_transfer",
   "frozen_at": "2026-09-24",
   "protocol_doc": {
-    "path": "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/plans/01_protocol.md",
+    "path": "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/plans/01_protocol.md",
     "sha256": "a0fe8f582beea70a771563b443ecbae8f43da3245305b55ea5119f9c3c44e228"
   },
   "question": "On identical patients and image patches, does replacing frozen Virchow2 with frozen UNI2-h change the loss of balanced accuracy caused by class imbalance, and does that change arise in the prior-only channel, the support-only channel, or their interaction?",

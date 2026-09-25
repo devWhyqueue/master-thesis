@@ -41,8 +41,8 @@ experiments/01_benchmark/02_benchmark_patch/**/*.npy
 experiments/01_benchmark/02_benchmark_patch/data/
 experiments/01_benchmark/02_benchmark_patch/logs/
 
-experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/outputs/
-experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/model_cache/
+experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/outputs/
+experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/model_cache/
 
 # Design dataset: large generated artifacts, machine-specific config
 experiments/design_dataset/data/

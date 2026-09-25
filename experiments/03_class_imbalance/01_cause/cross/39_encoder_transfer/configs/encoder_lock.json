@@ -9,7 +9,7 @@
     "checkpoint_file": "pytorch_model.bin",
     "checkpoint_sha256": "6e077eda234bebc595868d918d3458d9dd32a050199b0ff04443b2f46a0a3b1e",
     "checkpoint_bytes": 2725669217,
-    "local_pin": "experiments/03_class_imbalance/02_foundation_model/39_encoder_transfer/model_cache/models--MahmoodLab--UNI2-h/snapshots/d517a8dd47902dd7c308b3c36f63bce47e7b9a43/",
+    "local_pin": "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/model_cache/models--MahmoodLab--UNI2-h/snapshots/d517a8dd47902dd7c308b3c36f63bce47e7b9a43/",
     "license": "CC-BY-NC-ND-4.0 (academic, non-commercial; do not redistribute checkpoint files)",
     "gated_access_verified": true,
     "gated_access_check": "huggingface_hub.HfApi().model_info('MahmoodLab/UNI2-h') succeeded authenticated inside environment.sif on a Hydra compute node; gated='auto'"

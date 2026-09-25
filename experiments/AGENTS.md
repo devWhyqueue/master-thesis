@@ -9,7 +9,7 @@ Controlled patch-classification studies on frozen Virchow2 features. Each study 
 | `00_survey/` | 00_datasets, 01_methods |
 | `01_benchmark/` | 02_benchmark_patch |
 | `02_patient_shortage/` | `00_damage/`: 05_effective_support. `01_cause/`: 03_classifier_limitation, 04_patient_influence, 06_multidirectional_redundancy – 18_bracs_mechanism. `02_mitigation/`: 19_centre_shrinkage – 24_oracle_weighting |
-| `03_class_imbalance/` | `00_damage/`: 25_damage_tcga_ut, 26_damage_bracs. `01_cause/`: `tcga_ut/`: 27_prior_vs_support, 30_tail_assignment, 31_worst_assignment, 32_worst_assignment_rate. `bracs/`: 28_prior_vs_support, 29_tail_assignment. `cross/`: 33_prior_margin. `02_foundation_model/`: 39_encoder_transfer |
+| `03_class_imbalance/` | `00_damage/`: 25_damage_tcga_ut, 26_damage_bracs. `01_cause/`: `tcga_ut/`: 27_prior_vs_support, 30_tail_assignment, 31_worst_assignment, 32_worst_assignment_rate. `bracs/`: 28_prior_vs_support, 29_tail_assignment. `cross/`: 33_prior_margin – 39_encoder_transfer |
 
 - `<group>/[<subgroup>/]NN_name/code/`: CLI (`__main__.py`) + study package. `configs/`: run configs. `tests/`: unit tests.
 - `<group>/[<subgroup>/]NN_name/report/`: report `.tex` (protocol), `results.tex` (results, discussion), compiled PDF.
