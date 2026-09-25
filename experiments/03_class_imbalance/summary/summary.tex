@@ -8,11 +8,17 @@
 \usepackage{pgfplots}
 \usepgfplotslibrary{groupplots,fillbetween}
 \pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric}
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf}
+\setlength{\textfloatsep}{12pt plus 2pt minus 4pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
 \bibpunct{(}{)}{;}{a}{,}{,}
 
 % Colours: TCGA-UT blue, BRACS orange.
+\definecolor{cP}{HTML}{4575B4}
+\definecolor{cS}{HTML}{91BFDB}
+\definecolor{cI}{HTML}{FDAE61}
 \definecolor{tcga}{HTML}{2166AC}
 \definecolor{bracs}{HTML}{D6604D}
 
@@ -152,32 +158,81 @@ Imbalance damage differs strongly between the two tasks (Figure~\ref{fig:damage}
 \section{Class influence and tail support}
 \label{sec:cause}
 
-When a tail class receives fewer training patches, two things change. Its errors count less often in the training loss, so common classes have more influence on the fitted decision boundary. This is the \emph{prior} effect: it concerns how strongly the available examples of each class shape the classifier. The model also sees fewer distinct tail patches, at $\rho=100$ only one or two per patient, so it has less evidence about how that class varies. This is the \emph{support} effect: giving those few patches more weight cannot supply the missing examples. The conditions in Table~\ref{tab:conditions} separate these effects. P keeps all patches from the balanced condition but gives head classes more weight, isolating the prior effect. S keeps the sparse patches from the imbalanced condition but weights classes equally, isolating the support effect. The interaction $I=\Delta_\mathrm{r}-\Delta_\mathrm{P}-\Delta_\mathrm{S}$ measures any additional damage when both occur together.
+When a tail class receives fewer training patches, two things change. Its errors count less often in the training loss, so common classes have more influence on the fitted decision boundary. This is the \emph{frequency} effect: it concerns how strongly the available examples of each class shape the classifier. The model also sees fewer distinct tail patches, at $\rho=100$ only one or two per patient, so it has less evidence about how that class varies. This is the \emph{support} effect: giving those few patches more weight cannot supply the missing examples. The conditions in Table~\ref{tab:conditions} separate these effects. F keeps all patches from the balanced condition but gives head classes more weight, isolating the frequency effect. S keeps the sparse patches from the imbalanced condition but weights classes equally, isolating the support effect. The interaction $I=\Delta_\mathrm{r}-\Delta_\mathrm{F}-\Delta_\mathrm{S}$ measures any additional damage when both occur together.
 
-\begin{table}[!htb]
+\begin{figure}[!htb]
+\begin{minipage}[c]{0.48\textwidth}
 \centering\small
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lcc@{}}
 \toprule
- & Many tail patches & Few tail patches \\
+Class influence & Many tail patches & Few tail patches \\
 \midrule
-Equal class influence & balanced condition (reference) & S: support only \\
-Head-favoured influence & P: prior only & r: ratio condition (both) \\
+Equal & balanced (ref.) & S: support only \\
+Head-favoured & F: frequency only & r: ratio (both) \\
 \bottomrule
 \end{tabular}
-\caption{Four training conditions separate the effect of unequal class influence (prior) from the effect of fewer tail examples (support) at each $\rho$.}
+\captionof{table}{Four training conditions separate the effect of unequal class influence (frequency) from the effect of fewer tail examples (support) at each $\rho$.}
 \label{tab:conditions}
-\end{table}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[xbar stacked,width=0.92\linewidth,height=3.4cm,bar width=9pt,
+  xmin=0,xmax=10.5,xlabel={Damage at $\rho=100$ (pp)},
+  ytick={1,2},yticklabels={BRACS,TCGA-UT},ymin=0.4,ymax=2.6,
+  tick label style={font=\scriptsize},label style={font=\small},
+  legend style={font=\scriptsize,at={(0.5,1.03)},anchor=south,draw=none,fill=none,legend columns=4,column sep=3pt},
+  legend cell align=left]
+\addplot[fill=cP,draw=none] coordinates {(4.47,1) (1.20,2)};
+\addlegendentry{frequency}
+\addplot[fill=cS,draw=none] coordinates {(3.29,1) (0.53,2)};
+\addlegendentry{support}
+\addplot[fill=cI,draw=none] coordinates {(0,1) (1.18,2)};
+\addlegendentry{interaction}
+\addlegendimage{only marks,mark=diamond*,black}
+\addlegendentry{total}
+% Totals drawn outside the stack (an addplot here would stack onto the bars).
+\draw[black,thin] (axis cs:5.77,1) -- (axis cs:9.78,1);
+\draw[black,thin] ([yshift=-2pt]axis cs:5.77,1) -- ([yshift=2pt]axis cs:5.77,1);
+\draw[black,thin] ([yshift=-2pt]axis cs:9.78,1) -- ([yshift=2pt]axis cs:9.78,1);
+\node[diamond,fill=black,inner sep=1.6pt] at (axis cs:7.65,1) {};
+\draw[black,thin] (axis cs:2.48,2) -- (axis cs:3.34,2);
+\draw[black,thin] ([yshift=-2pt]axis cs:2.48,2) -- ([yshift=2pt]axis cs:2.48,2);
+\draw[black,thin] ([yshift=-2pt]axis cs:3.34,2) -- ([yshift=2pt]axis cs:3.34,2);
+\node[diamond,fill=black,inner sep=1.6pt] at (axis cs:2.91,2) {};
+\end{axis}
+\end{tikzpicture}
+\caption{Damage at $\rho=100$ by component; diamonds give the total with its 95\% interval.}
+\label{fig:decomp}
+\end{minipage}
+\end{figure}
 
-\noindent The two tasks break down differently. On TCGA-UT the prior carries the damage at moderate ratios (0.73 of 1.01 pp at $\rho=20$) while thin support alone costs nothing; at $\rho=100$ the two compound, with prior 1.20, support 0.53 and an interaction of 1.18 pp. On BRACS both factors are material and add up without resolved interaction: prior 4.47 pp and support 3.29 pp at $\rho=100$. Thin support alone thus costs BRACS more than the entire imbalance damage on TCGA-UT.
+\noindent The two tasks break down differently (Figure~\ref{fig:decomp}). On TCGA-UT the frequency effect carries the damage at moderate ratios (0.73 of 1.01 pp at $\rho=20$) while thin support alone costs nothing; at $\rho=100$ the two compound: frequency 1.20 pp [0.87, 1.53], support 0.53 pp [0.36, 0.70], and a clearly positive interaction of 1.18 pp [1.00, 1.37]. On BRACS both factors are material at $\rho=100$, frequency 4.47 pp [2.84, 6.30] and support 3.29 pp [1.99, 4.67], and their sum matches the total damage. The interaction is near zero, $-0.11$ pp, but its interval [$-1.74$, 1.36] cannot rule out compounding of up to 1.4 pp. Thin support alone thus costs BRACS more than the entire imbalance damage on TCGA-UT.
 
 \section{Dependence on tail-class identity}
 
-Damage depends on which classes end up in the tail, not only on $\rho$. On BRACS, rotating every class through every rank shows that easy classes cost most when rare: damage at $\rho=100$ ranges from 5.73 pp (UDH in the tail) to 9.99 pp (invasive carcinoma), because a class with high balanced recall has the most to lose. On TCGA-UT, a class is especially vulnerable when it receives few patches but a class it is often mistaken for receives many. A score fixed before testing new class orders used this pattern to predict their damage. The order ranked most damaging costs 4.51 pp, the least damaging 1.34 pp, and random orders 2.91 pp (Figure~\ref{fig:order}). Reversing the most damaging order keeps the same rank gaps between pairs of classes but lowers damage by 1.11 pp [0.47, 1.73]. Damage is therefore greatest when the class prone to being mistaken for another is the rarer one.
+On BRACS, rotating every class through every rank shows that easy classes cost most when rare: damage at $\rho=100$ ranges from 5.73 pp (UDH in the tail) to 9.99 pp (invasive carcinoma), because a class with high balanced recall has the most to lose (Figure~\ref{fig:order}a). On TCGA-UT, a class is especially vulnerable when it receives few patches but a class it is often mistaken for receives many. A score fixed before testing new class orders used this pattern to predict their damage. The order ranked most damaging costs 4.51 pp, the least damaging 1.34 pp, and random orders 2.91 pp (Figure~\ref{fig:order}b). Reversing the most damaging order keeps the same rank gaps between pairs of classes but lowers damage by 1.11 pp [0.47, 1.73]. Damage is therefore greatest when the class prone to being mistaken for another is the rarer one.
 
 \begin{figure}[!htb]
 \centering
 \begin{tikzpicture}
-\begin{axis}[width=0.6\textwidth,height=3.4cm,xmin=0.8,xmax=5.3,ymin=0.5,ymax=6.5,
+\begin{axis}[name=bracsorder,title={(a) BRACS: which class is rare},title style={font=\small},
+  width=0.44\textwidth,height=4cm,xmin=5,xmax=76,ymin=1.8,ymax=13,clip=false,
+  xlabel={Balanced recall of the tail class (\%)},ylabel={Damage at $\rho=100$ (pp)},
+  tick label style={font=\scriptsize},label style={font=\small}]
+\addplot[only marks,mark=*,bracs,mark size=1.8pt,error bars/.cd,y dir=both,y explicit]
+  coordinates {(12.23,5.77) -= (0,1.71) += (0,1.92) (22.98,5.73) -= (0,1.80) += (0,1.79) (31.42,7.25) -= (0,1.99) += (0,2.19) (36.19,8.23) -= (0,1.81) += (0,1.82) (44.62,8.76) -= (0,2.05) += (0,2.24) (60.47,9.37) -= (0,1.83) += (0,1.95) (69.07,9.99) -= (0,1.73) += (0,1.81)};
+\node[font=\scriptsize,below=1pt] at (axis cs:12.23,4.06) {ADH};
+\node[font=\scriptsize,above=1pt] at (axis cs:22.98,7.52) {UDH};
+\node[font=\scriptsize,below=1pt] at (axis cs:31.42,5.26) {PB};
+\node[font=\scriptsize,above=1pt] at (axis cs:36.19,10.05) {DCIS};
+\node[font=\scriptsize,below=1pt] at (axis cs:44.62,6.71) {FEA};
+\node[font=\scriptsize,below=1pt] at (axis cs:60.47,7.54) {N};
+\node[font=\scriptsize,below=1pt] at (axis cs:69.07,8.26) {IC};
+\end{axis}
+\begin{axis}[at={(bracsorder.east)},anchor=west,xshift=3.1cm,title={(b) TCGA-UT: class order},title style={font=\small},
+  width=0.28\textwidth,height=4cm,xmin=0.8,xmax=5.3,ymin=0.5,ymax=6.5,
   ytick={1,...,6},yticklabels={mild (min score),hard classes in tail,easy classes in tail,random (mean of 30),flip (worst reversed),worst (max score)},
   xlabel={Damage at $\rho=100$ (pp)},tick label style={font=\scriptsize},label style={font=\small}]
 \addplot[only marks,mark=*,tcga,mark size=1.8pt,error bars/.cd,x dir=both,x explicit]
@@ -189,18 +244,18 @@ Damage depends on which classes end up in the tail, not only on $\rho$. On BRACS
                (4.51,6) -= (0.58,0) += (0.57,0)};
 \end{axis}
 \end{tikzpicture}
-\caption{TCGA-UT damage at $\rho=100$ for different class-to-rank assignments, with 95\% intervals.}
+\caption{Damage at $\rho=100$ with 95\% intervals. (a) BRACS with each class in the tail in turn, against its balanced-condition recall (Spearman 0.96, $n=7$). (b) TCGA-UT class-to-rank assignments.}
 \label{fig:order}
 \end{figure}
 
 \section{Encoder comparison}
-Refitting the prior, support and ratio conditions on identical patients with UNI2-h \citep{chen2024uni} instead of Virchow2 leaves the picture intact. On TCGA-UT, UNI2-h starts 1.78 pp higher and loses 0.86 pp less at $\rho=100$ (97.5\% interval $-1.33$ to $-0.40$), a resolved but sub-1-pp difference driven by smaller support and interaction damage. On BRACS the difference is unresolved and the tail classes collapse to about 9\% recall with both encoders.
+Refitting all conditions on identical patients with UNI2-h \citep{chen2024uni} instead of Virchow2 leaves the picture intact. On TCGA-UT, UNI2-h starts 1.78 pp higher and loses 0.86 pp less at $\rho=100$ (97.5\% interval 0.40 to 1.33), a resolved but sub-1-pp difference. On BRACS the difference is unresolved and the tail classes collapse to about 9\% recall with both encoders.
 
 \section{Implications for mitigation}
 \begin{itemize}\setlength{\itemsep}{1pt}
-\item Rebalancing the training objective removes the prior damage but cannot restore thin support. On BRACS, 3.3 pp remain at $\rho=100$; recovering them needs more tail patches or patients, or methods that improve tail-class estimation.
-\item Most calibration damage is removed by the global confidence correction, so a mitigation method must beat a corrected baseline to add value in probability quality.
-\item Dataset and class order change the damage by a factor of 2--3 at the same $\rho$; evaluations should randomize class order and report both datasets.
+\item Rebalancing the training objective removes the frequency damage but cannot restore thin support. On BRACS, 3.3 pp remain at $\rho=100$; recovering them needs more tail patches or patients, or methods that improve tail-class estimation.
+\item Confidence correction removes most calibration damage; mitigation must beat that baseline.
+\item At the same $\rho$, damage varies 2--3-fold with dataset and class order; randomize class order.
 \end{itemize}
 
 \clearpage
@@ -211,7 +266,7 @@ The numbered folders below are under \path{experiments/03_class_imbalance/}. Eac
 \noindent\textbf{Headline results.}
 \begin{itemize}\setlength{\itemsep}{2pt}
 \item \textbf{Imbalance curves and probability quality:} Reports 25 and 26, in \path{00_damage/25_damage_tcga_ut/report/} and \path{00_damage/26_damage_bracs/report/}, give the balanced baselines, damage at every ratio, native allocations, head-to-tail recall, and calibration before and after temperature scaling.
-\item \textbf{Class influence versus tail support:} Reports 27 and 28, in \path{01_cause/tcga_ut/27_prior_vs_support/report/} and \path{01_cause/bracs/28_prior_vs_support/report/}, show the paired prior-only and support-only conditions, their interaction, and its uncertainty on each dataset.
+\item \textbf{Class influence versus tail support:} Reports 27 and 28, in \path{01_cause/tcga_ut/27_prior_vs_support/report/} and \path{01_cause/bracs/28_prior_vs_support/report/}, show the paired frequency-only (called prior-only, P, in the reports) and support-only conditions, their interaction, and its uncertainty on each dataset.
 \item \textbf{Which classes become rare:} Report 29, in \path{01_cause/bracs/29_tail_assignment/report/}, rotates every BRACS class through the tail. Report 32, in \path{01_cause/tcga_ut/32_worst_assignment_rate/report/}, tests predicted damaging and mild class orders on TCGA-UT, including reversal of the most damaging order.
 \item \textbf{Encoder comparison:} Report 39, in \path{01_cause/cross/39_encoder_transfer/report/}, compares Virchow2 and UNI2-h on matched patients and patches and examines sensitivity to regularization selection.
 \end{itemize}
