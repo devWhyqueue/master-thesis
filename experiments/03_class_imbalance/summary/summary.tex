@@ -1,0 +1,224 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype}
+\usepackage{amsmath,booktabs}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots,fillbetween}
+\pgfplotsset{compat=1.18}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf}
+\bibpunct{(}{)}{;}{a}{,}{,}
+
+% Colours: TCGA-UT blue, BRACS orange.
+\definecolor{tcga}{HTML}{2166AC}
+\definecolor{bracs}{HTML}{D6604D}
+
+% Realized training class counts, sorted head to tail (exp-02 allocator; N = native shares of split 0, draw 0).
+\pgfplotstableread{
+rank r1 r2 r5 r10 r20 r50 r100 N
+1 640 886 1278 1615 1973 2466 2843 1746
+2 640 865 1209 1491 1780 2155 2426 1684
+3 640 845 1144 1378 1605 1883 2070 1675
+4 640 825 1082 1272 1448 1645 1766 1206
+5 640 805 1024 1175 1305 1438 1506 1182
+6 640 786 969 1086 1177 1256 1285 897
+7 640 768 916 1003 1062 1098 1097 894
+8 640 750 867 926 958 959 936 841
+9 640 732 820 856 864 838 798 836
+10 640 715 776 790 779 732 681 807
+11 640 698 734 730 702 640 581 708
+12 640 681 694 674 634 559 496 703
+13 640 665 657 623 571 489 423 702
+14 640 649 621 575 515 427 361 665
+15 640 634 588 531 465 373 308 605
+16 640 619 556 491 419 326 263 596
+17 640 604 526 453 378 285 224 472
+18 640 590 498 419 341 249 191 445
+19 640 576 471 387 307 217 163 422
+20 640 563 445 357 277 190 139 337
+21 640 549 421 330 250 166 119 290
+22 640 536 399 305 226 145 101 247
+23 640 524 377 281 203 127 86 234
+24 640 511 357 260 183 111 74 179
+25 640 499 338 240 165 97 63 176
+26 640 487 319 222 149 85 54 161
+27 640 476 302 205 135 74 46 145
+28 640 465 286 189 121 65 39 130
+29 640 454 270 175 109 56 33 119
+30 640 443 256 161 99 49 28 96
+}\tcgacounts
+\pgfplotstableread{
+rank r1 r2 r5 r10 r20 r50 r100 N
+1 320 441 622 766 908 1084 1206 678
+2 320 392 476 522 551 565 560 556
+3 320 350 364 356 335 294 260 459
+4 320 312 278 242 203 153 120 176
+5 320 278 213 165 123 80 56 129
+6 320 247 163 112 75 42 26 127
+7 320 220 124 77 45 22 12 115
+}\bracscounts
+
+\newcommand{\countlines}[1]{%
+  \addplot[black,thick,mark=*,mark size=1pt] table[x=rank,y=r1]{#1};
+  \addplot[red!80!black,thick,dashed,mark=square*,mark size=1pt] table[x=rank,y=N]{#1};
+  \addplot[tcga,thick,mark=triangle*,mark size=1.4pt] table[x=rank,y=r100]{#1};}
+
+\title{\vspace{-1cm}\LARGE Class Imbalance in Histopathology\vspace{-0.5em}}
+\author{Yannik Queisler}
+\date{September 25, 2026}
+
+\begin{document}
+\maketitle
+
+\section{Motivation}
+Histopathology datasets are long-tailed almost by construction. Common cancers and benign tissue dominate archives, while rare subtypes and atypical lesions, often the diagnostically decisive ones, contribute few patients and patches. BRACS, for example, was released with explicitly unbalanced atypical classes \citep{brancati2022bracs}. In CNNs, imbalance biases predictions toward frequent classes and lowers minority recall \citep{buda2018classImbalance}; in medical imaging it also distorts calibration, and conclusions depend on whether evaluation uses balanced metrics \citep{mosquera2024classImbalance}. Long-tailed medical benchmarks show that no single remedy works across datasets \citep{ju2024monicaBenchmark}, and histopathology-specific models keep being proposed \citep{cong2022imbalancedHistopathology}. Frozen foundation-model features with a linear probe are now the standard baseline \citep{chen2024uni,zimmermann2024virchow2}, yet how much imbalance still costs such a probe, and why, has not been measured in isolation. This series answers both questions before mitigation methods are tested.
+
+\section{Setup}
+A multinomial logistic regression is trained on frozen Virchow2 patch features \citep{zimmermann2024virchow2} on two tasks: TCGA-UT, 30 cancer types \citep{komura2022universalEncoding}, and BRACS, 7 breast-lesion subtypes from normal tissue to invasive carcinoma \citep{brancati2022bracs}. Every condition uses the same patients per class (20 on TCGA-UT, 10 on BRACS) and the same total patch budget; only the share of that budget each class receives changes. An exponential profile sets the ratio $\rho$ between the largest and smallest class to 1--100 (Figure~\ref{fig:dist}), class-to-rank assignment is randomized over 30 draws (3 splits $\times$ 10), and a native condition keeps each dataset's own class shares. The outcome is the \emph{damage} $\Delta(\rho)=\mathrm{BA}(1)-\mathrm{BA}(\rho)$, the loss in test patient-macro balanced accuracy against the balanced condition, with paired bootstrap 95\% intervals; damage counts as material from 1 percentage point (pp).
+
+\begin{figure}[!htb]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.3cm},
+  width=0.5\textwidth,height=4.7cm,xlabel={Class rank (head $\to$ tail)},
+  ymin=0,scaled y ticks=false,
+  tick label style={font=\scriptsize},label style={font=\small},title style={font=\small},
+  enlarge x limits=0.03]
+\nextgroupplot[title={TCGA-UT (30 classes, $T=19{,}200$)},ylabel={Training patches},xmin=1,xmax=30,
+  legend style={font=\scriptsize,at={(0.98,0.97)},anchor=north east,draw=none,fill=none},
+  legend cell align=left]
+\countlines{\tcgacounts}
+\legend{balanced ($\rho=1$),native ($\rho=18.1$),$\rho=100$}
+\nextgroupplot[title={BRACS (7 classes, $T=2{,}240$)},xmin=1,xmax=7,xtick={1,...,7},
+  legend style={font=\scriptsize,at={(0.98,0.97)},anchor=north east,draw=none,fill=none},legend cell align=left]
+\countlines{\bracscounts}
+\legend{balanced ($\rho=1$),native ($\rho=6.7$),$\rho=100$}
+\end{groupplot}
+\end{tikzpicture}
+\caption{Training class distributions, classes sorted from head to tail: the balanced condition, the native class shares of one split, and the most imbalanced ratio condition. The tested ratios are $\rho\in\{1,2,5,10,20,50,100\}$; the profiles for $\rho=2$ to 50 lie between the balanced and the $\rho=100$ profile. Which class sits at which rank is randomized per draw.}
+\label{fig:dist}
+\end{figure}
+
+\section{Effects of class imbalance}
+The balanced conditions reach 72.1\% balanced accuracy on TCGA-UT and 39.6\% on BRACS. On TCGA-UT, published ROI-level linear evaluations of 32 classes score 0.60--0.68 for current encoders (Virchow2 0.62, UNI2-h 0.68; \citealp{mahmoodlab2025uniRepo}); the higher value here reflects 30 classes and aggregation over each patient's patches. For seven-class BRACS subtyping, the CNN baseline of \citet{brancati2022bracs} reaches 55.7\% ROI-level balanced accuracy, calculated as the mean of the seven class recalls in their Table~9. \citet{vaidya2025threads} report slide-level balanced accuracy of 34.8\% with mean-pooled Virchow features, 41.9\% with PRISM, and 48.1\% with THREADS, all using linear probes and five patient-disjoint splits of the 189-patient cohort. The 39.6\% here lies within the reported slide-level range, but this study computes patient-macro recall from patch predictions. Different training budgets and evaluation units make these results context for task difficulty, not matched performance benchmarks.
+
+Imbalance damage differs strongly between the two tasks (Figure~\ref{fig:damage}, left). On TCGA-UT it is small and accelerating: 0.57 pp at $\rho=10$, the 1-pp threshold only at $\rho=20$, and 2.91 pp [2.48, 3.34] at $\rho=100$. On BRACS it starts immediately and grows steadily by about 1.15 pp per doubling of $\rho$: 1.15 pp already at $\rho=2$, 4.02 pp at $\rho=10$, and 7.65 pp [5.77, 9.78] at $\rho=100$, a fifth of the balanced level. Both native allocations lie on their curves (1.18 and 4.05 pp). The aggregate hides a large shift of recall from tail to head: at $\rho=100$, the TCGA-UT tail third loses 11.8 pp while the head gains 5.4 pp; on BRACS the two tail classes drop from 38.7\% to 7.3\% recall. The predicted probabilities suffer far more than accuracy (Figure~\ref{fig:damage}, right). The expected calibration error (ECE), the average gap between the model's confidence and its accuracy, rises from 5.5 to 17.8 pp on TCGA-UT and from 12.3 to 35.7 pp on BRACS at $\rho=100$: the model becomes overconfident, but uniformly so. A global confidence correction that divides all logits by one scalar fitted on validation data (temperature scaling; \citealp{guo2017calibration}) removes 92--96\% of the increase.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[name=curve,width=0.47\textwidth,height=5cm,xmode=log,log basis x=10,
+  xtick={1,2,5,10,20,50,100},xticklabels={1,2,5,10,20,50,100},
+  xlabel={Imbalance ratio $\rho$},ylabel={Damage $\Delta$ (pp)},ymin=-0.3,ymax=10,
+  tick label style={font=\scriptsize},label style={font=\small},
+  legend style={font=\scriptsize,at={(0.03,0.97)},anchor=north west,draw=none,fill=none},legend cell align=left]
+\addplot[name path=tu,draw=none,forget plot] coordinates {(1,0)(2,0.21)(5,0.60)(10,0.84)(20,1.36)(50,2.24)(100,3.34)};
+\addplot[name path=tl,draw=none,forget plot] coordinates {(1,0)(2,0.01)(5,0.14)(10,0.30)(20,0.67)(50,1.47)(100,2.48)};
+\addplot[tcga,fill opacity=0.2,forget plot] fill between[of=tu and tl];
+\addplot[name path=bu,draw=none,forget plot] coordinates {(1,0)(2,2.35)(5,4.66)(10,5.66)(20,6.87)(50,8.65)(100,9.78)};
+\addplot[name path=bl,draw=none,forget plot] coordinates {(1,0)(2,0.14)(5,1.72)(10,2.50)(20,3.32)(50,4.76)(100,5.77)};
+\addplot[bracs,fill opacity=0.2,forget plot] fill between[of=bu and bl];
+\addplot[bracs,thick,mark=*,mark size=1.3pt] coordinates {(1,0)(2,1.15)(5,3.12)(10,4.02)(20,5.04)(50,6.63)(100,7.65)};
+\addlegendentry{BRACS}
+\addplot[tcga,thick,mark=*,mark size=1.3pt] coordinates {(1,0)(2,0.11)(5,0.37)(10,0.57)(20,1.01)(50,1.85)(100,2.91)};
+\addlegendentry{TCGA-UT}
+\addplot[only marks,mark=diamond*,mark size=2.6pt,black,error bars/.cd,y dir=both,y explicit]
+  coordinates {(18.1,1.18) +- (0,0.32) (6.7,4.05) +- (0,1.45)};
+\addlegendentry{native}
+\draw[densely dotted,gray] (axis cs:1,1) -- (axis cs:100,1);
+\end{axis}
+\begin{axis}[at={(curve.east)},anchor=west,xshift=1.2cm,width=0.48\textwidth,height=5cm,
+  xmode=log,log basis x=10,xtick={1,2,5,10,20,50,100},xticklabels={1,2,5,10,20,50,100},
+  xlabel={Imbalance ratio $\rho$},ylabel={ECE (pp)},ymin=0,ymax=40,
+  tick label style={font=\scriptsize},label style={font=\small},
+  legend style={font=\scriptsize,at={(0.03,0.97)},anchor=north west,draw=none,fill=none},legend cell align=left]
+\addplot[bracs,thick,mark=*,mark size=1.3pt] coordinates {(1,12.29)(2,8.31)(5,12.26)(10,17.19)(20,21.41)(50,28.28)(100,35.66)};
+\addlegendentry{BRACS, raw}
+\addplot[bracs,thick,dashed,mark=o,mark size=1.3pt] coordinates {(1,6.61)(2,6.59)(5,6.37)(10,6.28)(20,6.87)(50,7.86)(100,8.57)};
+\addlegendentry{BRACS, corrected}
+\addplot[tcga,thick,mark=*,mark size=1.3pt] coordinates {(1,5.50)(2,5.52)(5,6.06)(10,6.54)(20,10.45)(50,13.43)(100,17.80)};
+\addlegendentry{TCGA-UT, raw}
+\addplot[tcga,thick,dashed,mark=o,mark size=1.3pt] coordinates {(1,1.52)(2,1.56)(5,1.56)(10,1.65)(20,1.74)(50,1.96)(100,2.08)};
+\addlegendentry{TCGA-UT, corrected}
+\end{axis}
+\end{tikzpicture}
+\caption{Left: balanced-accuracy damage versus $\rho$ with 95\% bands; diamonds mark native class shares, dotted line the 1-pp threshold. Right: expected calibration error (ECE) of the raw predicted probabilities (solid) and after a single global confidence correction fitted on validation data (dashed).}
+\label{fig:damage}
+\end{figure}
+
+\section{Class influence and tail support}
+\label{sec:cause}
+
+When a tail class receives fewer training patches, two things change. Its errors count less often in the training loss, so common classes have more influence on the fitted decision boundary. This is the \emph{prior} effect: it concerns how strongly the available examples of each class shape the classifier. The model also sees fewer distinct tail patches, at $\rho=100$ only one or two per patient, so it has less evidence about how that class varies. This is the \emph{support} effect: giving those few patches more weight cannot supply the missing examples. The conditions in Table~\ref{tab:conditions} separate these effects. P keeps all patches from the balanced condition but gives head classes more weight, isolating the prior effect. S keeps the sparse patches from the imbalanced condition but weights classes equally, isolating the support effect. The interaction $I=\Delta_\mathrm{r}-\Delta_\mathrm{P}-\Delta_\mathrm{S}$ measures any additional damage when both occur together.
+
+\begin{table}[!htb]
+\centering\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+ & Many tail patches & Few tail patches \\
+\midrule
+Equal class influence & balanced condition (reference) & S: support only \\
+Head-favoured influence & P: prior only & r: ratio condition (both) \\
+\bottomrule
+\end{tabular}
+\caption{Four training conditions separate the effect of unequal class influence (prior) from the effect of fewer tail examples (support) at each $\rho$.}
+\label{tab:conditions}
+\end{table}
+
+\noindent The two tasks break down differently. On TCGA-UT the prior carries the damage at moderate ratios (0.73 of 1.01 pp at $\rho=20$) while thin support alone costs nothing; at $\rho=100$ the two compound, with prior 1.20, support 0.53 and an interaction of 1.18 pp. On BRACS both factors are material and add up without resolved interaction: prior 4.47 pp and support 3.29 pp at $\rho=100$. Thin support alone thus costs BRACS more than the entire imbalance damage on TCGA-UT.
+
+\section{Dependence on tail-class identity}
+
+Damage depends on which classes end up in the tail, not only on $\rho$. On BRACS, rotating every class through every rank shows that easy classes cost most when rare: damage at $\rho=100$ ranges from 5.73 pp (UDH in the tail) to 9.99 pp (invasive carcinoma), because a class with high balanced recall has the most to lose. On TCGA-UT, a class is especially vulnerable when it receives few patches but a class it is often mistaken for receives many. A score fixed before testing new class orders used this pattern to predict their damage. The order ranked most damaging costs 4.51 pp, the least damaging 1.34 pp, and random orders 2.91 pp (Figure~\ref{fig:order}). Reversing the most damaging order keeps the same rank gaps between pairs of classes but lowers damage by 1.11 pp [0.47, 1.73]. Damage is therefore greatest when the class prone to being mistaken for another is the rarer one.
+
+\begin{figure}[!htb]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.6\textwidth,height=3.4cm,xmin=0.8,xmax=5.3,ymin=0.5,ymax=6.5,
+  ytick={1,...,6},yticklabels={mild (min score),hard classes in tail,easy classes in tail,random (mean of 30),flip (worst reversed),worst (max score)},
+  xlabel={Damage at $\rho=100$ (pp)},tick label style={font=\scriptsize},label style={font=\small}]
+\addplot[only marks,mark=*,tcga,mark size=1.8pt,error bars/.cd,x dir=both,x explicit]
+  coordinates {(1.34,1) -= (0.34,0) += (0.35,0)
+               (1.59,2) -= (0.37,0) += (0.36,0)
+               (2.41,3) -= (0.46,0) += (0.44,0)
+               (2.91,4) -= (0.43,0) += (0.43,0)
+               (3.41,5) -= (0.43,0) += (0.43,0)
+               (4.51,6) -= (0.58,0) += (0.57,0)};
+\end{axis}
+\end{tikzpicture}
+\caption{TCGA-UT damage at $\rho=100$ for different class-to-rank assignments, with 95\% intervals.}
+\label{fig:order}
+\end{figure}
+
+\section{Encoder comparison}
+Refitting the prior, support and ratio conditions on identical patients with UNI2-h \citep{chen2024uni} instead of Virchow2 leaves the picture intact. On TCGA-UT, UNI2-h starts 1.78 pp higher and loses 0.86 pp less at $\rho=100$ (97.5\% interval $-1.33$ to $-0.40$), a resolved but sub-1-pp difference driven by smaller support and interaction damage. On BRACS the difference is unresolved and the tail classes collapse to about 9\% recall with both encoders.
+
+\section{Implications for mitigation}
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item Rebalancing the training objective removes the prior damage but cannot restore thin support. On BRACS, 3.3 pp remain at $\rho=100$; recovering them needs more tail patches or patients, or methods that improve tail-class estimation.
+\item Most calibration damage is removed by the global confidence correction, so a mitigation method must beat a corrected baseline to add value in probability quality.
+\item Dataset and class order change the damage by a factor of 2--3 at the same $\rho$; evaluations should randomize class order and report both datasets.
+\end{itemize}
+
+\clearpage
+\appendix
+\section{Guide to the supporting experiments}
+The numbered folders below are under \path{experiments/03_class_imbalance/}. Each folder's \path{report/} directory contains a PDF and its LaTeX source. The reports give the protocols, full tables, and uncertainty estimates behind the results condensed here.\\
+
+\noindent\textbf{Headline results.}
+\begin{itemize}\setlength{\itemsep}{2pt}
+\item \textbf{Imbalance curves and probability quality:} Reports 25 and 26, in \path{00_damage/25_damage_tcga_ut/report/} and \path{00_damage/26_damage_bracs/report/}, give the balanced baselines, damage at every ratio, native allocations, head-to-tail recall, and calibration before and after temperature scaling.
+\item \textbf{Class influence versus tail support:} Reports 27 and 28, in \path{01_cause/tcga_ut/27_prior_vs_support/report/} and \path{01_cause/bracs/28_prior_vs_support/report/}, show the paired prior-only and support-only conditions, their interaction, and its uncertainty on each dataset.
+\item \textbf{Which classes become rare:} Report 29, in \path{01_cause/bracs/29_tail_assignment/report/}, rotates every BRACS class through the tail. Report 32, in \path{01_cause/tcga_ut/32_worst_assignment_rate/report/}, tests predicted damaging and mild class orders on TCGA-UT, including reversal of the most damaging order.
+\item \textbf{Encoder comparison:} Report 39, in \path{01_cause/cross/39_encoder_transfer/report/}, compares Virchow2 and UNI2-h on matched patients and patches and examines sensitivity to regularization selection.
+\end{itemize}
+
+\noindent\textbf{Further reading.} Reports 25 and 26 also track negative log-likelihood and fitted confidence corrections across the full imbalance grid. Reports 29 and 32 give class-level recall and confusion analyses behind the aggregate class-order effects, useful when the identity of a rare class matters. Report 39 adds per-class encoder comparisons and a fixed-regularization analysis, showing how the probe-selection rule affects the encoder contrast.
+
+\clearpage
+\bibliographystyle{abbrvnat}
+\bibliography{references}
+\end{document}
