@@ -250,6 +250,25 @@ def test_main_resume_rejects_changed_fit_lock(tmp_path: Path) -> None:
         _completed_arm(result_dir, "B", 10, {"new": 1})
 
 
+def test_resume_ignores_source_hash_but_not_inputs() -> None:
+    from transfer.fit.lock import gated_fields
+
+    old = {"source_sha256": "a", "signed_sha256": {"schedule": "x"}}
+    assert gated_fields(old) == gated_fields({**old, "source_sha256": "b"})
+    assert gated_fields(old) != gated_fields({**old, "signed_sha256": {"schedule": "y"}})
+
+
+def test_boundary_selection_matches_frozen_rule() -> None:
+    from transfer.fit.boundary import select_lambda
+
+    scores = {lam: 0.5 for lam in LAMBDAS}
+    assert select_lambda(scores) == LAMBDAS[-1]
+    assert select_lambda({**scores, LAMBDAS[-1] * 10: 0.5}) == LAMBDAS[-1] * 10
+    lower = {**scores, LAMBDAS[0]: 0.9, LAMBDAS[0] / 10: 0.95}
+    assert select_lambda(lower) == LAMBDAS[0] / 10
+    assert select_lambda({**lower, LAMBDAS[0] / 10: None}) == LAMBDAS[0]
+
+
 def test_decode_shard_index_covers_encoder_split_draw() -> None:
     from transfer import ENCODERS, MAIN_DRAWS
     from imbalance_benchmark.common import N_PATIENT_SPLITS

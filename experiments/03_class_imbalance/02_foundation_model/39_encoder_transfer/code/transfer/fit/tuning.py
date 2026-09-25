@@ -2,7 +2,7 @@
 
 Every candidate lambda's coefficients and validation score are stored (not just the
 selected candidate's), so a later B-selected-lambda sensitivity can be generated from
-stored coefficients without refitting (plans/04_implementation.md).
+stored coefficients without refitting.
 """
 
 from __future__ import annotations

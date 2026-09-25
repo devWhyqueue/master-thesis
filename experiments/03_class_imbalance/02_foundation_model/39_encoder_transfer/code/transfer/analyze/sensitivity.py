@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 from imbalance_benchmark.analysis.inference.context import BootstrapContext
 from imbalance_benchmark.common import N_PATIENT_SPLITS
+from imbalance_benchmark.datasets.features.cache import reset_feature_bank
 
 from breadth.analyze.secondary import _patient_macro_recalls
 from breadth.calibrate import read_temperature
@@ -50,6 +51,8 @@ def _encoder_sensitivity(
     n_classes: int,
     encoder: str,
 ) -> dict[str, Any]:
+    # The process-wide feature bank keeps one width; clear it before loading this encoder.
+    reset_feature_bank()
     arm_ba: dict[str, list[float]] = {a: [] for a in _SENSITIVITY_ARMS}
     skipped = 0
     for s in range(N_PATIENT_SPLITS):

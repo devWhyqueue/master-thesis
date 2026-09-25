@@ -29,13 +29,16 @@ from transfer import analyze as analyze_stage
 from transfer import fit as fit_stage
 from transfer import preflight as preflight_stage
 from transfer.fit import shard_count
+from transfer.fit.boundary import run_boundary_refits
 from transfer.schedule import draw_schedule, load_train_identity
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["main"]
 
-_SUBMIT_STAGES = "extract audit-features preflight pilot fit analyze".split()
+_SUBMIT_STAGES = (
+    "extract audit-features preflight pilot fit analyze refit-boundary".split()
+)
 
 
 def _extraction_jobs(config: dict) -> list[SlurmJob]:
@@ -84,29 +87,25 @@ def _stage_jobs(config: dict, stage: str) -> list[SlurmJob]:
         extraction = build_job(
             config, "extract-pilot", "extract-pilot", True, resource="extract-features"
         )
-        return [
-            extraction,
+        pilots = [
             build_job(
                 config,
-                "pilot-virchow2",
-                "pilot-fit --encoder virchow2",
+                f"pilot-{m}",
+                f"pilot-fit --encoder {m}",
                 False,
+                (extraction.name,) if m == "uni2h" else (),
                 resource="pilot",
-            ),
-            build_job(
-                config,
-                "pilot-uni2h",
-                "pilot-fit --encoder uni2h",
-                False,
-                (extraction.name,),
-                resource="pilot",
-            ),
+            )
+            for m in ("virchow2", "uni2h")
         ]
+        return [extraction, *pilots]
     if stage == "fit":
         return [_fit_job(config, ())]
     if stage == "analyze":
         audit = build_job(config, "audit-fits", "audit-fits", False, ())
         return [audit, build_job(config, "analyze", "analyze", False, (audit.name,))]
+    if stage == "refit-boundary":
+        return [build_job(config, stage, stage, False, resource="analyze")]
     raise ValueError(f"Unknown submission stage: {stage}")
 
 
@@ -131,6 +130,7 @@ def _parser() -> argparse.ArgumentParser:
     p_pilot.add_argument("--encoder", choices=("virchow2", "uni2h"), required=True)
     sub.add_parser("audit-fits")
     sub.add_parser("analyze")
+    sub.add_parser("refit-boundary")
     submit = sub.add_parser("submit")
     submit.add_argument("--stage", choices=_SUBMIT_STAGES, required=True)
     submit.add_argument("--dry-run", action="store_true")
@@ -231,6 +231,7 @@ def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
         "pilot-fit": cmd_pilot_fit,
         "audit-fits": cmd_audit_fits,
         "analyze": cmd_analyze,
+        "refit-boundary": lambda args: run_boundary_refits(load_config(args.config)),
         "submit": cmd_submit,
     }
 

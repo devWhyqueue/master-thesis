@@ -2,7 +2,7 @@
 
 Experiment-local and opt-in: the shared benchmark's Virchow2-only feature
 pipeline (``imbalance_benchmark.datasets.features``) is never imported or
-modified here, per ``plans/03_feature_extraction.md``. Every constant below
+modified here. Every constant below
 is read from the frozen ``configs/encoder_lock.json`` rather than duplicated.
 """
 

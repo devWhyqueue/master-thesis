@@ -1,6 +1,6 @@
 """Phase-01 schedule: patient cohort, class permutation, and exact training-patch identities for
 exp-39's draws 10-19, generated once per dataset/split without loading either encoder's features
-(protocol phase 01, ``plans/01_protocol.md``). Each encoder's later fit consumes this same schedule
+(``configs/protocol_lock.json``). Each encoder's later fit consumes this same schedule
 by matching patch identity, not by re-deriving row order from its own feature cache.
 """
 

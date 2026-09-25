@@ -19,7 +19,7 @@ EXP = Path(__file__).resolve().parent
 REPORT = EXP / "report"
 DATASETS = {"tcga_ut": "TCGA-UT", "bracs": "BRACS"}
 ENCODERS = {"virchow2": "Virchow2", "uni2h": "UNI2-h"}
-SOURCES = ("analysis", "diagnostics", "report_diagnostics")
+SOURCES = ("analysis", "diagnostics", "report_diagnostics", "boundary_refits")
 COMPONENTS = (("DP", "$D_P$"), ("DS", "$D_S$"), ("I", "$I$"), ("DR", "$D_R$"))
 PROB_METRICS = (
     ("nll", "NLL raw"),

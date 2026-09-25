@@ -36,6 +36,7 @@ from prevalence.fit import _shard_context
 from transfer import ARMS, ENCODERS, LAMBDAS, MAIN_DRAWS, SMOKE_DRAW
 from transfer import extract, features, manifest
 from transfer.fit.lock import fit_lock as _fit_lock
+from transfer.fit.lock import gated_fields
 from transfer.fit.tuning import CANDIDATES_NAME, fit_arm, tune_and_fit_draw
 from transfer.schedule import load_train_identity
 
@@ -97,7 +98,10 @@ def _completed_arm(
             or not record["solver"]["converged"]
             or [c["lambda"] for c in candidates] != expected
             or record["selected_lambda"] not in expected
-            or (draw_idx in MAIN_DRAWS and record.get("fit_lock") != lock)
+            or (
+                draw_idx in MAIN_DRAWS
+                and gated_fields(record.get("fit_lock")) != gated_fields(lock)
+            )
         ):
             raise ValueError("run record does not match the frozen arm/grid")
         with np.load(result_dir / CANDIDATES_NAME, allow_pickle=False) as data:

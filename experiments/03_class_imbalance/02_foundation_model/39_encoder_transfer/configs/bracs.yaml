@@ -1,7 +1,7 @@
 # BRACS encoder-transfer schedule (exp-39, phase 01). Frozen patient cohort, class permutation, and
 # training-row identities for arms B/R10/R100/P10/P100/S10/S100 at draws 10-19 per split, generated
 # once from the shared exp-2 manifest without reference to either encoder. Same dataset identity,
-# eligibility, and G=10/DEPTH=160/BALANCED=32 budget as exp-26 (see plans/01_protocol.md).
+# eligibility, and G=10/DEPTH=160/BALANCED=32 budget as exp-26 (configs/protocol_lock.json).
 # feature_extraction (per encoder) is locked in phase 02, not here.
 
 prevalence:

@@ -32,7 +32,7 @@ ENCODERS: tuple[str, ...] = ("virchow2", "uni2h")
 
 # Frozen lambda grid (protocol_lock.json's readout.lambda_grid): 1e-8..1e2, decade steps, 11
 # candidates. Distinct from breadth/decodability's own grids, so the fit stage cannot reuse
-# breadth.fit.tune_and_fit_draw's module-level LAMBDAS unchanged (plans/04_implementation.md).
+# breadth.fit.tune_and_fit_draw's module-level LAMBDAS unchanged.
 LAMBDAS: tuple[float, ...] = tuple(10.0**p for p in range(-8, 3))
 # Solver tolerances: existing, unchanged (breadth's own values, protocol_lock.json).
 TOLERANCE: float = 1e-8

@@ -1,6 +1,5 @@
 """Preflight gate: verify the frozen locks, schedule, and per-encoder feature caches are
-intact and complete before any fit shard runs (plans/04_implementation.md, phase 01/03
-exit gates re-checked together here as one signed report).
+intact and complete before any fit shard runs, re-checked together as one signed report.
 """
 
 from __future__ import annotations

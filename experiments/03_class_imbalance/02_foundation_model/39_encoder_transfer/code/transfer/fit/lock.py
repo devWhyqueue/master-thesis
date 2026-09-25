@@ -1,4 +1,8 @@
-"""Current signed input and source identity for exp-39 fit records."""
+"""Current signed input and source identity for exp-39 fit records.
+
+The source hash is recorded as provenance only; resume and audit gate on signed inputs
+and config, so code edits after fitting do not invalidate stored records.
+"""
 
 from __future__ import annotations
 
@@ -59,3 +63,8 @@ def fit_lock(config: dict[str, Any], encoder: str, split_idx: int) -> dict[str, 
         "source_sha256": compute_data_hash(code_hashes),
         "signed_sha256": {name: compute_sha256(path) for name, path in signed.items()},
     }
+
+
+def gated_fields(lock: dict[str, Any] | None) -> dict[str, Any]:
+    """Lock fields a stored fit must match to be reused: everything except the source hash."""
+    return {k: v for k, v in (lock or {}).items() if k != "source_sha256"}
