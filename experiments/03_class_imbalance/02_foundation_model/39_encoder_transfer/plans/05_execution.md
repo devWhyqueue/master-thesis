@@ -2,6 +2,8 @@
 
 Input: accepted code and locked artifacts. Output: complete main run records, job/resource ledger, and a completeness audit. No jobs are authorized as already executed by this document.
 
+Phase-02 `input_audit.json` mislabeled test-only patch counts as validation-plus-test counts. The signed `configs/phase05_scope_amendment.json` preserves that original audit and records the corrected requested unions, checked independently against the frozen schedule and source manifests by Hydra job 4923112. Feature preflight now checks the corrected counts before fitting; the patient schedule, model, readout grid, and inference plan are unchanged.
+
 ## Order and job boundaries
 
 1. Re-read `CLUSTER.md` and the project hydra-cluster skill. Check live partitions, available storage, existing jobs, and repo state. Use login-shell SSH for SLURM. Do not discard remote changes to make synchronization work.
@@ -15,7 +17,7 @@ Input: accepted code and locked artifacts. Output: complete main run records, jo
 
 The base main design contains 2 datasets × 2 encoders × 3 splits × 10 draws × 7 arms = **840 selected arm models**. With 11 lambdas, it requires **9,240 candidate optimizations**, not 840 optimizer calls. Fixed-B-lambda sensitivities reuse these candidates. The engineering pilot adds 28 selected arms / 308 candidate optimizations at the initial grid size. Any grid expansion changes this ledger explicitly.
 
-There are 120 main fit shards if each shard handles one dataset/encoder/split/draw and its seven arms. Submit in batches or arrays that keep the account's total queued plus running task count at or below 100, including unrelated existing jobs. Set array concurrency from measured CPU memory and available account capacity; do not queue all 120 tasks at once merely because concurrency is low.
+There are 120 main fit shards if each shard handles one dataset/encoder/split/draw and its seven arms. Submit in batches or arrays that keep the account's total queued plus running task count at or below 100, including unrelated existing jobs. Do not set an array concurrency throttle.
 
 Start extraction with one GPU per task. Pilot on an available compatible GPU; use `gpu-2h` or `gpu-5h` only after throughput supports the wall time. Existing exp-27 configurations request 16 CPUs and 64 GB on `cpu-5h`; these are reference requests, not verified requirements for UNI2-h. Measure a full seven-arm shard and select the shortest sufficient partition with headroom. Avoid nested BLAS/joblib oversubscription.
 
