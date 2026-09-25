@@ -1,0 +1,2930 @@
+{
+  "per_class_recall": {
+    "uni2h": {
+      "B": {
+        "Adrenocortical_carcinoma": 83.02051165014787,
+        "Bladder_Urothelial_Carcinoma": 46.40425388397662,
+        "Brain_Lower_Grade_Glioma": 76.91315230281177,
+        "Breast_invasive_carcinoma": 73.69170196239702,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 42.17600023342673,
+        "Colon_adenocarcinoma": 49.39617682198331,
+        "Esophageal_carcinoma": 28.234633386925797,
+        "Glioblastoma_multiforme": 79.96342407672033,
+        "Head_and_Neck_squamous_cell_carcinoma": 67.68497574955911,
+        "Kidney_Chromophobe": 94.53789470560304,
+        "Kidney_renal_clear_cell_carcinoma": 87.19983691433148,
+        "Kidney_renal_papillary_cell_carcinoma": 78.79877081830207,
+        "Liver_hepatocellular_carcinoma": 91.22572267389339,
+        "Lung_adenocarcinoma": 68.1292651102866,
+        "Lung_squamous_cell_carcinoma": 56.92189493361881,
+        "Mesothelioma": 81.52944202372308,
+        "Ovarian_serous_cystadenocarcinoma": 80.52620640629692,
+        "Pancreatic_adenocarcinoma": 71.81253521876589,
+        "Pheochromocytoma_and_Paraganglioma": 96.74735449735451,
+        "Prostate_adenocarcinoma": 95.05310244500482,
+        "Rectum_adenocarcinoma": 55.79042302106029,
+        "Sarcoma": 86.39886475323866,
+        "Skin_Cutaneous_Melanoma": 67.46562188681266,
+        "Stomach_adenocarcinoma": 51.520946129034385,
+        "Testicular_Germ_Cell_Tumors": 87.43698126832318,
+        "Thymoma": 96.68582737845034,
+        "Thyroid_carcinoma": 95.87252928949357,
+        "Uterine_Carcinosarcoma": 72.19409430438846,
+        "Uterine_Corpus_Endometrial_Carcinoma": 64.58539936442413,
+        "Uveal_Melanoma": 91.37254901960786
+      },
+      "P10": {
+        "Adrenocortical_carcinoma": 82.42360893757613,
+        "Bladder_Urothelial_Carcinoma": 45.075181241078845,
+        "Brain_Lower_Grade_Glioma": 78.01089119091233,
+        "Breast_invasive_carcinoma": 71.37908974000439,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 42.66324917003842,
+        "Colon_adenocarcinoma": 49.02438662741086,
+        "Esophageal_carcinoma": 30.69845353768366,
+        "Glioblastoma_multiforme": 79.19380044929254,
+        "Head_and_Neck_squamous_cell_carcinoma": 65.62108258453449,
+        "Kidney_Chromophobe": 95.3354433760684,
+        "Kidney_renal_clear_cell_carcinoma": 86.6235638444394,
+        "Kidney_renal_papillary_cell_carcinoma": 77.85717232284331,
+        "Liver_hepatocellular_carcinoma": 89.64882565492321,
+        "Lung_adenocarcinoma": 67.34380180024574,
+        "Lung_squamous_cell_carcinoma": 56.964531873355426,
+        "Mesothelioma": 80.88280250371757,
+        "Ovarian_serous_cystadenocarcinoma": 76.12520833448436,
+        "Pancreatic_adenocarcinoma": 70.17147239012566,
+        "Pheochromocytoma_and_Paraganglioma": 96.68518518518518,
+        "Prostate_adenocarcinoma": 94.85044824143307,
+        "Rectum_adenocarcinoma": 55.30197202337726,
+        "Sarcoma": 83.02326182609916,
+        "Skin_Cutaneous_Melanoma": 65.01851680190121,
+        "Stomach_adenocarcinoma": 50.36810595903737,
+        "Testicular_Germ_Cell_Tumors": 89.12986674953585,
+        "Thymoma": 96.5065262248377,
+        "Thyroid_carcinoma": 95.78366596638655,
+        "Uterine_Carcinosarcoma": 72.7677598817305,
+        "Uterine_Corpus_Endometrial_Carcinoma": 62.55716581304387,
+        "Uveal_Melanoma": 90.7201797385621
+      },
+      "P100": {
+        "Adrenocortical_carcinoma": 82.54702660406892,
+        "Bladder_Urothelial_Carcinoma": 46.02891506791321,
+        "Brain_Lower_Grade_Glioma": 77.95803354831315,
+        "Breast_invasive_carcinoma": 68.58026255584114,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 41.53588844797181,
+        "Colon_adenocarcinoma": 50.631270267963856,
+        "Esophageal_carcinoma": 30.966766278704018,
+        "Glioblastoma_multiforme": 78.73417300432934,
+        "Head_and_Neck_squamous_cell_carcinoma": 63.55154729596184,
+        "Kidney_Chromophobe": 94.05394408831908,
+        "Kidney_renal_clear_cell_carcinoma": 85.60768959882803,
+        "Kidney_renal_papillary_cell_carcinoma": 78.68003641323955,
+        "Liver_hepatocellular_carcinoma": 88.4263775971093,
+        "Lung_adenocarcinoma": 66.4339230175697,
+        "Lung_squamous_cell_carcinoma": 55.88118263438935,
+        "Mesothelioma": 80.6204654701387,
+        "Ovarian_serous_cystadenocarcinoma": 73.34468710232288,
+        "Pancreatic_adenocarcinoma": 69.99891845627141,
+        "Pheochromocytoma_and_Paraganglioma": 96.56481481481482,
+        "Prostate_adenocarcinoma": 95.3987475977365,
+        "Rectum_adenocarcinoma": 51.95999671473529,
+        "Sarcoma": 80.8748448237017,
+        "Skin_Cutaneous_Melanoma": 62.521377559214585,
+        "Stomach_adenocarcinoma": 47.692455583632096,
+        "Testicular_Germ_Cell_Tumors": 89.0154024284539,
+        "Thymoma": 96.73260823875579,
+        "Thyroid_carcinoma": 95.98139394646748,
+        "Uterine_Carcinosarcoma": 72.08378073451605,
+        "Uterine_Corpus_Endometrial_Carcinoma": 60.49402734778123,
+        "Uveal_Melanoma": 89.83673747276688
+      },
+      "R10": {
+        "Adrenocortical_carcinoma": 82.0172475439055,
+        "Bladder_Urothelial_Carcinoma": 44.035179033893435,
+        "Brain_Lower_Grade_Glioma": 78.48283715524941,
+        "Breast_invasive_carcinoma": 71.6844454414032,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 42.45310068471836,
+        "Colon_adenocarcinoma": 47.95093232633558,
+        "Esophageal_carcinoma": 30.953429042442906,
+        "Glioblastoma_multiforme": 78.58095938213766,
+        "Head_and_Neck_squamous_cell_carcinoma": 64.92255571329748,
+        "Kidney_Chromophobe": 94.75308048433048,
+        "Kidney_renal_clear_cell_carcinoma": 86.45279405504218,
+        "Kidney_renal_papillary_cell_carcinoma": 77.77290836631371,
+        "Liver_hepatocellular_carcinoma": 89.98656278229447,
+        "Lung_adenocarcinoma": 67.59157146733186,
+        "Lung_squamous_cell_carcinoma": 56.49012406590023,
+        "Mesothelioma": 81.13332122972646,
+        "Ovarian_serous_cystadenocarcinoma": 75.3562090352249,
+        "Pancreatic_adenocarcinoma": 69.24593980867202,
+        "Pheochromocytoma_and_Paraganglioma": 96.53174603174605,
+        "Prostate_adenocarcinoma": 94.79896639150849,
+        "Rectum_adenocarcinoma": 55.76767256285231,
+        "Sarcoma": 82.5324766376588,
+        "Skin_Cutaneous_Melanoma": 65.16678586973725,
+        "Stomach_adenocarcinoma": 50.059345538267145,
+        "Testicular_Germ_Cell_Tumors": 89.11062925024322,
+        "Thymoma": 96.23299276073047,
+        "Thyroid_carcinoma": 95.67255624472013,
+        "Uterine_Carcinosarcoma": 72.28518907563029,
+        "Uterine_Corpus_Endometrial_Carcinoma": 62.166985569406464,
+        "Uveal_Melanoma": 91.13126361655776
+      },
+      "R100": {
+        "Adrenocortical_carcinoma": 80.60072378716752,
+        "Bladder_Urothelial_Carcinoma": 43.05251525957144,
+        "Brain_Lower_Grade_Glioma": 78.96496672602348,
+        "Breast_invasive_carcinoma": 68.35157431486489,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 40.876868191721165,
+        "Colon_adenocarcinoma": 47.34954130397683,
+        "Esophageal_carcinoma": 31.251878211177544,
+        "Glioblastoma_multiforme": 75.41652978073374,
+        "Head_and_Neck_squamous_cell_carcinoma": 61.505593898239425,
+        "Kidney_Chromophobe": 94.09757834757833,
+        "Kidney_renal_clear_cell_carcinoma": 85.72642081736909,
+        "Kidney_renal_papillary_cell_carcinoma": 77.2022411616162,
+        "Liver_hepatocellular_carcinoma": 89.46668925022581,
+        "Lung_adenocarcinoma": 67.03561278806549,
+        "Lung_squamous_cell_carcinoma": 53.6282111301311,
+        "Mesothelioma": 81.24569025140923,
+        "Ovarian_serous_cystadenocarcinoma": 71.05273014860121,
+        "Pancreatic_adenocarcinoma": 67.51834938653825,
+        "Pheochromocytoma_and_Paraganglioma": 96.95370370370371,
+        "Prostate_adenocarcinoma": 95.6307082286712,
+        "Rectum_adenocarcinoma": 53.14483132759279,
+        "Sarcoma": 78.95933429501052,
+        "Skin_Cutaneous_Melanoma": 62.49922926791801,
+        "Stomach_adenocarcinoma": 47.72282782576904,
+        "Testicular_Germ_Cell_Tumors": 89.13378684156257,
+        "Thymoma": 96.37449633366029,
+        "Thyroid_carcinoma": 96.3142507002801,
+        "Uterine_Carcinosarcoma": 70.81876361655775,
+        "Uterine_Corpus_Endometrial_Carcinoma": 59.06004906511013,
+        "Uveal_Melanoma": 89.73461328976035
+      },
+      "S10": {
+        "Adrenocortical_carcinoma": 82.88250358633289,
+        "Bladder_Urothelial_Carcinoma": 46.14338071502329,
+        "Brain_Lower_Grade_Glioma": 77.42986424587853,
+        "Breast_invasive_carcinoma": 73.90629263960889,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 42.55317914202721,
+        "Colon_adenocarcinoma": 48.937295186892,
+        "Esophageal_carcinoma": 28.431027110784914,
+        "Glioblastoma_multiforme": 79.51840369353735,
+        "Head_and_Neck_squamous_cell_carcinoma": 67.49710876208724,
+        "Kidney_Chromophobe": 94.4641292735043,
+        "Kidney_renal_clear_cell_carcinoma": 87.2566115430847,
+        "Kidney_renal_papillary_cell_carcinoma": 78.72271224146225,
+        "Liver_hepatocellular_carcinoma": 91.23746612466125,
+        "Lung_adenocarcinoma": 68.35574213315618,
+        "Lung_squamous_cell_carcinoma": 56.78634823177308,
+        "Mesothelioma": 81.76812515129511,
+        "Ovarian_serous_cystadenocarcinoma": 80.56868246970058,
+        "Pancreatic_adenocarcinoma": 71.4873906580176,
+        "Pheochromocytoma_and_Paraganglioma": 96.76322751322752,
+        "Prostate_adenocarcinoma": 94.99528271734499,
+        "Rectum_adenocarcinoma": 55.95769184216897,
+        "Sarcoma": 86.2463885036337,
+        "Skin_Cutaneous_Melanoma": 67.840501839981,
+        "Stomach_adenocarcinoma": 51.54689342066796,
+        "Testicular_Germ_Cell_Tumors": 87.53665447093755,
+        "Thymoma": 96.69390733734998,
+        "Thyroid_carcinoma": 95.87249399759907,
+        "Uterine_Carcinosarcoma": 72.13215841892315,
+        "Uterine_Corpus_Endometrial_Carcinoma": 64.57376634214441,
+        "Uveal_Melanoma": 91.43981481481481
+      },
+      "S100": {
+        "Adrenocortical_carcinoma": 81.66950041297174,
+        "Bladder_Urothelial_Carcinoma": 44.850225523100065,
+        "Brain_Lower_Grade_Glioma": 77.75170800533851,
+        "Breast_invasive_carcinoma": 74.4339007490991,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 41.97219900923334,
+        "Colon_adenocarcinoma": 46.62864396654724,
+        "Esophageal_carcinoma": 27.06971182412361,
+        "Glioblastoma_multiforme": 77.65383798000677,
+        "Head_and_Neck_squamous_cell_carcinoma": 67.18220139268993,
+        "Kidney_Chromophobe": 94.30147495251661,
+        "Kidney_renal_clear_cell_carcinoma": 87.44297323016053,
+        "Kidney_renal_papillary_cell_carcinoma": 78.44292741402117,
+        "Liver_hepatocellular_carcinoma": 91.47222222222221,
+        "Lung_adenocarcinoma": 67.78635966337886,
+        "Lung_squamous_cell_carcinoma": 55.5972308774801,
+        "Mesothelioma": 81.77217553688142,
+        "Ovarian_serous_cystadenocarcinoma": 80.75906991659257,
+        "Pancreatic_adenocarcinoma": 71.17141915245632,
+        "Pheochromocytoma_and_Paraganglioma": 96.89814814814818,
+        "Prostate_adenocarcinoma": 95.01675838066407,
+        "Rectum_adenocarcinoma": 57.40522573226822,
+        "Sarcoma": 86.10517862555432,
+        "Skin_Cutaneous_Melanoma": 68.38180341996723,
+        "Stomach_adenocarcinoma": 50.80637613113106,
+        "Testicular_Germ_Cell_Tumors": 87.40402354861911,
+        "Thymoma": 96.68807505487834,
+        "Thyroid_carcinoma": 95.9691448801743,
+        "Uterine_Carcinosarcoma": 72.03034547152195,
+        "Uterine_Corpus_Endometrial_Carcinoma": 64.10901204536397,
+        "Uveal_Melanoma": 91.32135076252725
+      }
+    },
+    "virchow2": {
+      "B": {
+        "Adrenocortical_carcinoma": 74.43031809685284,
+        "Bladder_Urothelial_Carcinoma": 48.4155834423823,
+        "Brain_Lower_Grade_Glioma": 78.69979523429079,
+        "Breast_invasive_carcinoma": 69.92417018257423,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 46.699422917315104,
+        "Colon_adenocarcinoma": 54.11669226830521,
+        "Esophageal_carcinoma": 28.571325713886292,
+        "Glioblastoma_multiforme": 76.73907404479456,
+        "Head_and_Neck_squamous_cell_carcinoma": 67.41876639185371,
+        "Kidney_Chromophobe": 93.87783119658121,
+        "Kidney_renal_clear_cell_carcinoma": 86.63095012270554,
+        "Kidney_renal_papillary_cell_carcinoma": 79.05189242521506,
+        "Liver_hepatocellular_carcinoma": 85.37262872628726,
+        "Lung_adenocarcinoma": 64.55179821809485,
+        "Lung_squamous_cell_carcinoma": 56.31687458934194,
+        "Mesothelioma": 76.41342895182764,
+        "Ovarian_serous_cystadenocarcinoma": 74.67457186687959,
+        "Pancreatic_adenocarcinoma": 70.99646686159845,
+        "Pheochromocytoma_and_Paraganglioma": 93.87962962962959,
+        "Prostate_adenocarcinoma": 95.52156589115937,
+        "Rectum_adenocarcinoma": 59.47925744371824,
+        "Sarcoma": 80.87359551869264,
+        "Skin_Cutaneous_Melanoma": 61.128490872251085,
+        "Stomach_adenocarcinoma": 47.92022096458375,
+        "Testicular_Germ_Cell_Tumors": 88.45122030021538,
+        "Thymoma": 94.09335266918875,
+        "Thyroid_carcinoma": 94.77813764394645,
+        "Uterine_Carcinosarcoma": 68.68481559290385,
+        "Uterine_Corpus_Endometrial_Carcinoma": 62.628641570338345,
+        "Uveal_Melanoma": 85.48257080610021
+      },
+      "P10": {
+        "Adrenocortical_carcinoma": 75.39808131194586,
+        "Bladder_Urothelial_Carcinoma": 45.7340628838188,
+        "Brain_Lower_Grade_Glioma": 78.6577684072549,
+        "Breast_invasive_carcinoma": 69.13423957167298,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 46.49613004461046,
+        "Colon_adenocarcinoma": 53.22716973886332,
+        "Esophageal_carcinoma": 29.23004031083618,
+        "Glioblastoma_multiforme": 76.59303968664203,
+        "Head_and_Neck_squamous_cell_carcinoma": 65.85990752143772,
+        "Kidney_Chromophobe": 93.35370073599242,
+        "Kidney_renal_clear_cell_carcinoma": 86.17019679838731,
+        "Kidney_renal_papillary_cell_carcinoma": 78.12494543429746,
+        "Liver_hepatocellular_carcinoma": 84.8362691960253,
+        "Lung_adenocarcinoma": 64.28188168742861,
+        "Lung_squamous_cell_carcinoma": 56.141070780163936,
+        "Mesothelioma": 75.90049538333852,
+        "Ovarian_serous_cystadenocarcinoma": 70.47308629237365,
+        "Pancreatic_adenocarcinoma": 69.3496246744312,
+        "Pheochromocytoma_and_Paraganglioma": 93.6904761904762,
+        "Prostate_adenocarcinoma": 95.46247260064452,
+        "Rectum_adenocarcinoma": 57.77985354635682,
+        "Sarcoma": 79.15758276351559,
+        "Skin_Cutaneous_Melanoma": 60.029118223143975,
+        "Stomach_adenocarcinoma": 48.2648151775603,
+        "Testicular_Germ_Cell_Tumors": 89.05651583256976,
+        "Thymoma": 94.02242632291812,
+        "Thyroid_carcinoma": 94.8281220821662,
+        "Uterine_Carcinosarcoma": 69.60858232181764,
+        "Uterine_Corpus_Endometrial_Carcinoma": 61.31170892008526,
+        "Uveal_Melanoma": 85.86832788671025
+      },
+      "P100": {
+        "Adrenocortical_carcinoma": 75.06353894974797,
+        "Bladder_Urothelial_Carcinoma": 44.33393707716242,
+        "Brain_Lower_Grade_Glioma": 78.81289685692118,
+        "Breast_invasive_carcinoma": 67.79164240529795,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 46.04335161842518,
+        "Colon_adenocarcinoma": 52.57472691585599,
+        "Esophageal_carcinoma": 28.758880762643766,
+        "Glioblastoma_multiforme": 75.82905772198534,
+        "Head_and_Neck_squamous_cell_carcinoma": 64.80183189655175,
+        "Kidney_Chromophobe": 92.85328525641026,
+        "Kidney_renal_clear_cell_carcinoma": 85.71884202914882,
+        "Kidney_renal_papillary_cell_carcinoma": 77.46608737718574,
+        "Liver_hepatocellular_carcinoma": 83.97549683830171,
+        "Lung_adenocarcinoma": 63.51977904608885,
+        "Lung_squamous_cell_carcinoma": 54.52161645241713,
+        "Mesothelioma": 75.06856693294603,
+        "Ovarian_serous_cystadenocarcinoma": 68.07337609600054,
+        "Pancreatic_adenocarcinoma": 68.84690484380889,
+        "Pheochromocytoma_and_Paraganglioma": 93.57804232804234,
+        "Prostate_adenocarcinoma": 95.1214706601615,
+        "Rectum_adenocarcinoma": 56.73807189542486,
+        "Sarcoma": 77.85002592677759,
+        "Skin_Cutaneous_Melanoma": 58.77869887389905,
+        "Stomach_adenocarcinoma": 47.42589083030261,
+        "Testicular_Germ_Cell_Tumors": 89.25590650045307,
+        "Thymoma": 93.79641581430106,
+        "Thyroid_carcinoma": 94.59688180827885,
+        "Uterine_Carcinosarcoma": 69.09230080921262,
+        "Uterine_Corpus_Endometrial_Carcinoma": 60.32442780881033,
+        "Uveal_Melanoma": 85.88425925925928
+      },
+      "R10": {
+        "Adrenocortical_carcinoma": 74.64311315423417,
+        "Bladder_Urothelial_Carcinoma": 45.427816490878065,
+        "Brain_Lower_Grade_Glioma": 79.10702909138223,
+        "Breast_invasive_carcinoma": 69.30576885865383,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 46.41355132793861,
+        "Colon_adenocarcinoma": 52.050926992660884,
+        "Esophageal_carcinoma": 29.04578250789326,
+        "Glioblastoma_multiforme": 75.57023326377933,
+        "Head_and_Neck_squamous_cell_carcinoma": 65.23622789712951,
+        "Kidney_Chromophobe": 93.08282288698955,
+        "Kidney_renal_clear_cell_carcinoma": 86.26710208348985,
+        "Kidney_renal_papillary_cell_carcinoma": 78.11628688407181,
+        "Liver_hepatocellular_carcinoma": 84.78827913279132,
+        "Lung_adenocarcinoma": 64.28873531861409,
+        "Lung_squamous_cell_carcinoma": 55.459664936401076,
+        "Mesothelioma": 76.07182626136874,
+        "Ovarian_serous_cystadenocarcinoma": 69.92282427435144,
+        "Pancreatic_adenocarcinoma": 68.51713700099926,
+        "Pheochromocytoma_and_Paraganglioma": 93.77513227513231,
+        "Prostate_adenocarcinoma": 95.49047201304084,
+        "Rectum_adenocarcinoma": 58.61098704914066,
+        "Sarcoma": 78.790582387746,
+        "Skin_Cutaneous_Melanoma": 60.615296020473735,
+        "Stomach_adenocarcinoma": 48.435038400234504,
+        "Testicular_Germ_Cell_Tumors": 88.82398386313214,
+        "Thymoma": 93.82556994068472,
+        "Thyroid_carcinoma": 94.8696817615935,
+        "Uterine_Carcinosarcoma": 69.44152661064429,
+        "Uterine_Corpus_Endometrial_Carcinoma": 61.039217415361215,
+        "Uveal_Melanoma": 85.57992919389976
+      },
+      "R100": {
+        "Adrenocortical_carcinoma": 70.05804751347605,
+        "Bladder_Urothelial_Carcinoma": 40.827850348461624,
+        "Brain_Lower_Grade_Glioma": 77.79120551768985,
+        "Breast_invasive_carcinoma": 66.7878575636476,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 43.24322971781307,
+        "Colon_adenocarcinoma": 48.42863543266774,
+        "Esophageal_carcinoma": 28.958162216163974,
+        "Glioblastoma_multiforme": 71.6159480964347,
+        "Head_and_Neck_squamous_cell_carcinoma": 62.11969331554464,
+        "Kidney_Chromophobe": 90.97354878917378,
+        "Kidney_renal_clear_cell_carcinoma": 85.55239901835574,
+        "Kidney_renal_papillary_cell_carcinoma": 76.44144144084405,
+        "Liver_hepatocellular_carcinoma": 83.07023486901535,
+        "Lung_adenocarcinoma": 62.54308896046431,
+        "Lung_squamous_cell_carcinoma": 50.63739312082862,
+        "Mesothelioma": 75.3007314036726,
+        "Ovarian_serous_cystadenocarcinoma": 64.6602318935464,
+        "Pancreatic_adenocarcinoma": 65.01486641440202,
+        "Pheochromocytoma_and_Paraganglioma": 93.59259259259258,
+        "Prostate_adenocarcinoma": 94.84402835044844,
+        "Rectum_adenocarcinoma": 55.90050532558704,
+        "Sarcoma": 75.8078352771493,
+        "Skin_Cutaneous_Melanoma": 57.708136795197674,
+        "Stomach_adenocarcinoma": 45.34378864599456,
+        "Testicular_Germ_Cell_Tumors": 88.01020468184682,
+        "Thymoma": 92.66271206389239,
+        "Thyroid_carcinoma": 94.3150039877062,
+        "Uterine_Carcinosarcoma": 67.15172735760973,
+        "Uterine_Corpus_Endometrial_Carcinoma": 57.84307157235866,
+        "Uveal_Melanoma": 84.15822440087148
+      },
+      "S10": {
+        "Adrenocortical_carcinoma": 74.16925752043133,
+        "Bladder_Urothelial_Carcinoma": 48.20135672746039,
+        "Brain_Lower_Grade_Glioma": 78.80157971118226,
+        "Breast_invasive_carcinoma": 70.34331751356318,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 46.832778944911325,
+        "Colon_adenocarcinoma": 53.37128029527228,
+        "Esophageal_carcinoma": 28.286223247468946,
+        "Glioblastoma_multiforme": 76.28037340065588,
+        "Head_and_Neck_squamous_cell_carcinoma": 67.30172261752725,
+        "Kidney_Chromophobe": 93.87747507122508,
+        "Kidney_renal_clear_cell_carcinoma": 86.71921640623044,
+        "Kidney_renal_papillary_cell_carcinoma": 79.0525970489206,
+        "Liver_hepatocellular_carcinoma": 85.37048328816621,
+        "Lung_adenocarcinoma": 64.93348916728266,
+        "Lung_squamous_cell_carcinoma": 55.814572418473595,
+        "Mesothelioma": 76.5373698862261,
+        "Ovarian_serous_cystadenocarcinoma": 74.71195570601681,
+        "Pancreatic_adenocarcinoma": 70.44360984159748,
+        "Pheochromocytoma_and_Paraganglioma": 94.03968253968254,
+        "Prostate_adenocarcinoma": 95.52793913490979,
+        "Rectum_adenocarcinoma": 59.71428398519904,
+        "Sarcoma": 80.3182759479504,
+        "Skin_Cutaneous_Melanoma": 61.712280214792486,
+        "Stomach_adenocarcinoma": 48.41233850572088,
+        "Testicular_Germ_Cell_Tumors": 88.51196305691403,
+        "Thymoma": 94.01654257157537,
+        "Thyroid_carcinoma": 94.95277777777777,
+        "Uterine_Carcinosarcoma": 68.7224751011516,
+        "Uterine_Corpus_Endometrial_Carcinoma": 62.66423193058901,
+        "Uveal_Melanoma": 85.4801198257081
+      },
+      "S100": {
+        "Adrenocortical_carcinoma": 71.22081866197196,
+        "Bladder_Urothelial_Carcinoma": 46.884945757981875,
+        "Brain_Lower_Grade_Glioma": 78.6568795624736,
+        "Breast_invasive_carcinoma": 70.74482183480943,
+        "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma": 46.11375907770518,
+        "Colon_adenocarcinoma": 51.1216461853559,
+        "Esophageal_carcinoma": 27.389279472930014,
+        "Glioblastoma_multiforme": 74.03571093293132,
+        "Head_and_Neck_squamous_cell_carcinoma": 66.46215116234876,
+        "Kidney_Chromophobe": 93.22719017094015,
+        "Kidney_renal_clear_cell_carcinoma": 86.83339218190469,
+        "Kidney_renal_papillary_cell_carcinoma": 79.0738585412069,
+        "Liver_hepatocellular_carcinoma": 85.05250677506774,
+        "Lung_adenocarcinoma": 64.14879399953504,
+        "Lung_squamous_cell_carcinoma": 53.567001863876904,
+        "Mesothelioma": 76.65526766262062,
+        "Ovarian_serous_cystadenocarcinoma": 74.52451740064863,
+        "Pancreatic_adenocarcinoma": 69.55214732091669,
+        "Pheochromocytoma_and_Paraganglioma": 93.98809523809523,
+        "Prostate_adenocarcinoma": 95.42348646015562,
+        "Rectum_adenocarcinoma": 60.13827333402498,
+        "Sarcoma": 80.22980372663847,
+        "Skin_Cutaneous_Melanoma": 61.55528520287508,
+        "Stomach_adenocarcinoma": 47.10212801903982,
+        "Testicular_Germ_Cell_Tumors": 88.01973267359908,
+        "Thymoma": 93.73640535238899,
+        "Thyroid_carcinoma": 94.9299642079054,
+        "Uterine_Carcinosarcoma": 68.0783535636477,
+        "Uterine_Corpus_Endometrial_Carcinoma": 62.419063340085884,
+        "Uveal_Melanoma": 84.78063725490198
+      }
+    }
+  },
+  "per_fit_ba": {
+    "uni2h": {
+      "B": [
+        {
+          "ba": 74.42050494357322,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 73.05768736095747,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 73.92525890112036,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 73.7329845961463,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 73.14235701762858,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 74.00387322781233,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 74.51677141838975,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 73.35328209833811,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 74.29412470371194,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 73.40501188664605,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 73.65401052139462,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 73.85688994319517,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 74.32241677295679,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 74.06689335444769,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 74.04758370046267,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 74.22033135815983,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 72.5448593628862,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 74.1017539106929,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 74.59784918126853,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 74.29002833154983,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 74.09663225087819,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 74.4351847487004,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 73.86707870440311,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.92388405074787,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 73.9005972845643,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 73.7436487833474,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 74.73922321123773,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 75.1100323330048,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 73.73975042783228,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 74.17958784390831,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "P10": [
+        {
+          "ba": 72.50888768976425,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 72.31935312229092,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 72.55219572012932,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 73.04256542662081,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 72.65506875091445,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 73.02561633027985,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 73.65990146440768,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 71.96573103829316,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 74.1674293248648,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 72.89192983516097,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 72.00169125519933,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 72.64591925607516,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 73.60576303705899,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 73.67051584577828,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 73.41162008550532,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 73.20756250985627,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 72.07845033228061,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 73.81811594030351,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 73.92464730199049,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 72.781419970331,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 74.20994183628383,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 73.11640922024206,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 73.6067041289562,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.74740842830137,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 73.7210009783686,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 73.93771153009615,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 73.63617000968092,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 75.27928503386632,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 73.30374980523062,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 73.26245478173324,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "P100": [
+        {
+          "ba": 71.72308027868293,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 71.76456167902587,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 72.18056068710803,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 71.37606307460851,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 72.31785507479407,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 72.12864175211682,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 72.99080003732807,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 70.82984072343494,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 73.27490101380019,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 71.8962642931661,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 70.8899907407033,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 72.39213311579948,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 72.84381084818837,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 72.35202146880803,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 72.51349449383356,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 72.52687042752422,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 71.37983996424492,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 72.44020286142499,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 73.3592229324895,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 72.57919517449449,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 73.49128795237726,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 72.49431415781663,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.27409261140919,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.06030388202409,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 72.27820922249401,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 73.24032213626676,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 72.6086384064707,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 73.74141693008276,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 72.66864258665086,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 73.12071618466288,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "R10": [
+        {
+          "ba": 72.36621718504155,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 72.17989350701473,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 72.55169593191984,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 72.50845017654314,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 72.54999828311252,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 72.86532204585116,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 73.07306256658049,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 71.55478501135907,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 73.81920227355496,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 72.57881631195158,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 71.66462994259653,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 72.32608973576697,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 73.42160571639793,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 73.62109854426005,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 73.40049156262971,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 73.01663791862295,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 71.836406327787,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 73.60711977755723,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 73.74950766872777,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 73.02192248848557,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 73.60931238238445,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 73.26063859484243,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 73.40719131773993,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.4362708793907,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 73.63308559650015,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 73.86056640199816,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 73.3243713584218,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 75.05809200903364,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 73.16856039911514,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 72.84876525209098,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "R100": [
+        {
+          "ba": 70.95052768118961,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 71.37216395287454,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 72.06532889553917,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 70.33956518854184,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 72.42430742567083,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 71.78143440979736,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 71.57960299287205,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 69.27823900849229,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 72.38889934294797,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 70.54661554151397,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 70.35026171930939,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 72.0920320064694,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 71.83708094290542,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 71.65079216671035,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 71.9308503034227,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 71.39189796224288,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 70.60354697490773,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 72.97994721627121,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 71.83682908685996,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 72.35322182811174,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 72.43805328842963,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 71.51337273983482,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.13801338902068,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 72.45555700957557,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 71.74788658297709,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 72.84130622174705,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 71.69331238013697,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 72.92767785252323,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 71.59370464911247,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 71.58828049059932,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "S10": [
+        {
+          "ba": 74.31518437953603,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 72.99967409958418,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 74.108330866612,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 73.70743983613151,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 73.22120694555537,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 74.02530961458335,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 74.28296491661325,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 73.35281880923746,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 74.56280612954706,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 73.28810774947489,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 73.6074537179631,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 73.86490339155611,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 74.416409492253,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 74.20195407893084,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 74.1465977581199,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 74.07286466118057,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 72.59048111698448,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 74.15356247929412,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 74.69991711500855,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 74.4527155121821,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 74.11215137452264,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 74.4893971739589,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 73.93743907370434,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.90159763867265,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 73.90456637977768,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 73.78242597427244,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 74.53481097960994,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 75.02460218615464,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 73.73103369373271,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 74.0563169828665,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "S100": [
+        {
+          "ba": 73.9695062199061,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 72.9912713755348,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 73.6840471339343,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 73.67103471043406,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 73.4005891091253,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 74.04049316598294,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 73.47499247263899,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 73.0760011078284,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 73.99165548850729,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 72.82188112453778,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 73.2601582140412,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 73.46741302907486,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 73.92788137773813,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 74.04630380561777,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 73.52696470938787,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 73.58396881039799,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 72.04185356669973,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 73.9549630001432,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 74.07673031085601,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 74.40732070877662,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 73.7001636621588,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 74.07414072390195,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 74.01759341421459,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.62980009722129,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 73.67069293742898,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 73.5915649315689,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 73.77911430148265,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 74.83250037428677,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 73.5571540951943,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 73.82547005101654,
+          "draw": 19,
+          "split": 2
+        }
+      ]
+    },
+    "virchow2": {
+      "B": [
+        {
+          "ba": 72.2265265387117,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 71.19747148644088,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 71.9730418225165,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 71.5726982073338,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 71.77983849415257,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 71.74973348349091,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 73.28927179461671,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 71.7171193506746,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 72.7347131645376,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 71.55321913233759,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 71.69154233848779,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 71.87017849172409,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 73.10641101420732,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 72.6467087298484,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 72.15890453113633,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 71.62380362924027,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 71.19135491759549,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 71.55176367184194,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 72.50874921395125,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 71.65500450474104,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 72.701650947293,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 72.56648349024118,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.4158692283317,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.16461973871826,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 72.38313619027532,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 72.85139688461375,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 71.82437178607029,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 73.19514680918893,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 72.16859654011355,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 72.7537640210815,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "P10": [
+        {
+          "ba": 70.48463062848421,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 70.6139281255408,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 71.42870027187186,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 70.60286135018687,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 71.21786000648112,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 71.38134251538594,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 72.57225383134815,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 70.55366167902646,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 72.37800019630654,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 71.11685601072352,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 70.5059892024266,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 71.52606339488335,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 72.3309218691975,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 72.17833826479207,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 71.34424666538472,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 71.03452379872803,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 71.2173666554165,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 71.34329126705711,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 72.09758636551187,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 71.17512685177344,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 72.33380207392455,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 72.003857386181,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.40102412057328,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 72.53581026052257,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 71.49946625467872,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 72.72826702143199,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 71.16256685492425,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 72.4271053444679,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 72.03764810400794,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 71.80861595624641,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "P100": [
+        {
+          "ba": 69.5329425752964,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 69.8480298838447,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 70.4226368186133,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 69.5703675210034,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 70.59608588920875,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 70.17487806625347,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 71.88909034214882,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 69.88460179093832,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 71.84580131431052,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 70.58042861265342,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 69.737902008185,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 70.94961424910478,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 71.67635515825944,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 71.34496169720599,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 70.4657226308543,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 70.4949464822047,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 70.69082965442524,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 70.74391179429611,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 71.2715391854247,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 70.36122310560526,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 71.82101595866506,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 71.24787737665703,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 71.69189883580766,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 71.97386460885332,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 70.64234509533644,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 72.09451036606323,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 70.42845427855586,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 71.67621920334045,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 71.58773801073224,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 71.25041907797468,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "R10": [
+        {
+          "ba": 70.2804367275056,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 70.35017597764539,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 70.90339059224203,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 70.11291113740724,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 71.14954920478957,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 71.3893889207675,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 71.69564873276266,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 70.35318122601498,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 72.24838811949812,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 70.83370435414645,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 70.78683300805172,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 71.69269196466462,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 72.23400401574013,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 71.52519768076483,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 71.18422560418094,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 70.93351822854032,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 70.95840477291,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 71.30034670818435,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 71.838348546461,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 71.27803478766812,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 72.14573494453194,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 71.95772099259946,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.3796073453325,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 72.2607232604406,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 71.31520364787322,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 72.72418920984732,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 70.81886318590131,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 72.16104145896942,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 72.07737051529821,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 71.72371042397124,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "R100": [
+        {
+          "ba": 67.66714483018478,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 68.77818858808561,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 68.20691182895642,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 66.68738103711033,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 69.03196953202624,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 69.12866298034061,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 69.406307151851,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 67.45096372110869,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 69.90375602404143,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 69.11561266855276,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 67.71258671441842,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 69.43426171872153,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 70.2617867436484,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 68.64380220518981,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 68.91035849808154,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 68.50242502852615,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 68.66471982613643,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 69.30285703759223,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 68.0459927549717,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 69.41883627398038,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 70.26462336201133,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 69.99918532569956,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 70.30629316203178,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 70.09990861523283,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 68.64321958693453,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 69.78101303230022,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 68.52273325887477,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 69.3631855796083,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 70.59354947257592,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 69.51416012466333,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "S10": [
+        {
+          "ba": 72.1431250056667,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 71.21532648033599,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 71.89072456494209,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 71.49417946927886,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 71.87495078881605,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 71.94102319684731,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 72.71608282461303,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 71.77736107430519,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 72.74010174753171,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 71.45951302166647,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 71.67250698576812,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 71.90377045935799,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 72.98628399136231,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 72.06043067449305,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 72.05397269371073,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 71.54483876642809,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 71.16201412113489,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 71.58877472087943,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 72.43160101840111,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 71.94225708753353,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 72.39075001561922,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 73.01336390453177,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.50825355106053,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 73.02636287213022,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 72.35845379952859,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 72.84365555950407,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 72.01591624395762,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 73.21183980665688,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 72.31991525863643,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 72.8342196998849,
+          "draw": 19,
+          "split": 2
+        }
+      ],
+      "S100": [
+        {
+          "ba": 71.271973286981,
+          "draw": 10,
+          "split": 0
+        },
+        {
+          "ba": 71.09354777929579,
+          "draw": 11,
+          "split": 0
+        },
+        {
+          "ba": 71.48507618089292,
+          "draw": 12,
+          "split": 0
+        },
+        {
+          "ba": 70.46311097550785,
+          "draw": 13,
+          "split": 0
+        },
+        {
+          "ba": 71.50750619601486,
+          "draw": 14,
+          "split": 0
+        },
+        {
+          "ba": 71.75805445666528,
+          "draw": 15,
+          "split": 0
+        },
+        {
+          "ba": 71.86204191282994,
+          "draw": 16,
+          "split": 0
+        },
+        {
+          "ba": 71.25467299334369,
+          "draw": 17,
+          "split": 0
+        },
+        {
+          "ba": 71.92620316565944,
+          "draw": 18,
+          "split": 0
+        },
+        {
+          "ba": 70.7905842342644,
+          "draw": 19,
+          "split": 0
+        },
+        {
+          "ba": 70.91246247905501,
+          "draw": 10,
+          "split": 1
+        },
+        {
+          "ba": 71.41556067902111,
+          "draw": 11,
+          "split": 1
+        },
+        {
+          "ba": 72.2413862821231,
+          "draw": 12,
+          "split": 1
+        },
+        {
+          "ba": 71.5565119634976,
+          "draw": 13,
+          "split": 1
+        },
+        {
+          "ba": 71.48232993122431,
+          "draw": 14,
+          "split": 1
+        },
+        {
+          "ba": 70.76859497957822,
+          "draw": 15,
+          "split": 1
+        },
+        {
+          "ba": 70.376762970132,
+          "draw": 16,
+          "split": 1
+        },
+        {
+          "ba": 70.47491906102216,
+          "draw": 17,
+          "split": 1
+        },
+        {
+          "ba": 71.5655037949143,
+          "draw": 18,
+          "split": 1
+        },
+        {
+          "ba": 71.4575756858189,
+          "draw": 19,
+          "split": 1
+        },
+        {
+          "ba": 72.17112863560563,
+          "draw": 10,
+          "split": 2
+        },
+        {
+          "ba": 72.57350576092718,
+          "draw": 11,
+          "split": 2
+        },
+        {
+          "ba": 72.18899162689632,
+          "draw": 12,
+          "split": 2
+        },
+        {
+          "ba": 72.19496274688085,
+          "draw": 13,
+          "split": 2
+        },
+        {
+          "ba": 71.29204499464821,
+          "draw": 14,
+          "split": 2
+        },
+        {
+          "ba": 71.91180683305743,
+          "draw": 15,
+          "split": 2
+        },
+        {
+          "ba": 71.48245958823465,
+          "draw": 16,
+          "split": 2
+        },
+        {
+          "ba": 72.21151333863871,
+          "draw": 17,
+          "split": 2
+        },
+        {
+          "ba": 71.79516606502065,
+          "draw": 18,
+          "split": 2
+        },
+        {
+          "ba": 72.1799583408321,
+          "draw": 19,
+          "split": 2
+        }
+      ]
+    }
+  },
+  "probability_contrasts": {
+    "damage_uni2h_R100_ece": {
+      "ci_2_5": 0.07691820209735804,
+      "ci_97_5": 7.128541368182966,
+      "point": 3.5178170353244163
+    },
+    "damage_uni2h_R100_ece_ts": {
+      "ci_2_5": 0.5448931223090249,
+      "ci_97_5": 1.7771642156002454,
+      "point": 1.2318822922514716
+    },
+    "damage_uni2h_R100_nll": {
+      "ci_2_5": 0.6499261702973753,
+      "ci_97_5": 0.9368340762687517,
+      "point": 0.7939698105019077
+    },
+    "damage_uni2h_R100_nll_ts": {
+      "ci_2_5": 0.08625196425165631,
+      "ci_97_5": 0.11282690655838035,
+      "point": 0.09956844586644287
+    },
+    "damage_uni2h_R10_ece": {
+      "ci_2_5": -12.313747360143834,
+      "ci_97_5": -6.309811122230859,
+      "point": -9.403996278440413
+    },
+    "damage_uni2h_R10_ece_ts": {
+      "ci_2_5": -0.053192784934125624,
+      "ci_97_5": 0.4679713588749968,
+      "point": 0.2282706688258216
+    },
+    "damage_uni2h_R10_nll": {
+      "ci_2_5": -0.10223246538512591,
+      "ci_97_5": 0.07685965241873527,
+      "point": -0.028718298500428063
+    },
+    "damage_uni2h_R10_nll_ts": {
+      "ci_2_5": 0.041804426610762155,
+      "ci_97_5": 0.0615340121235749,
+      "point": 0.051539098539584605
+    },
+    "damage_virchow2_R100_ece": {
+      "ci_2_5": 9.368073090400141,
+      "ci_97_5": 13.230904978714234,
+      "point": 11.240202740717963
+    },
+    "damage_virchow2_R100_ece_ts": {
+      "ci_2_5": 0.23748800355450952,
+      "ci_97_5": 1.0505027438597165,
+      "point": 0.6575626733346494
+    },
+    "damage_virchow2_R100_nll": {
+      "ci_2_5": 0.4156446920306025,
+      "ci_97_5": 0.7758882121941808,
+      "point": 0.579581743722181
+    },
+    "damage_virchow2_R100_nll_ts": {
+      "ci_2_5": 0.11769570622951032,
+      "ci_97_5": 0.14242702262424278,
+      "point": 0.12991487813945246
+    },
+    "damage_virchow2_R10_ece": {
+      "ci_2_5": -0.906723152096444,
+      "ci_97_5": 1.602192321451089,
+      "point": 0.33715166138716324
+    },
+    "damage_virchow2_R10_ece_ts": {
+      "ci_2_5": -0.03950465735698642,
+      "ci_97_5": 0.367097377743646,
+      "point": 0.18526407597854533
+    },
+    "damage_virchow2_R10_nll": {
+      "ci_2_5": 0.022687724718748623,
+      "ci_97_5": 0.04835146440718588,
+      "point": 0.03464015403227905
+    },
+    "damage_virchow2_R10_nll_ts": {
+      "ci_2_5": 0.02485749458480985,
+      "ci_97_5": 0.0387956995838051,
+      "point": 0.03179658634312865
+    },
+    "delta_B_ece": {
+      "ci_2_5": 7.1066948201774744,
+      "ci_97_5": 13.041715995571126,
+      "point": 10.113747098444255
+    },
+    "delta_B_ece_ts": {
+      "ci_2_5": 0.3465394475835248,
+      "ci_97_5": 1.096169475989809,
+      "point": 0.7807452673827768
+    },
+    "delta_B_nll": {
+      "ci_2_5": 0.03458305774567159,
+      "ci_97_5": 0.11798180210809613,
+      "point": 0.07672139270206657
+    },
+    "delta_B_nll_ts": {
+      "ci_2_5": -0.07898244229952052,
+      "ci_97_5": -0.04149135928304994,
+      "point": -0.06051276645508552
+    },
+    "delta_R100_ece": {
+      "ci_2_5": 0.6419419505587683,
+      "ci_97_5": 4.041769905160847,
+      "point": 2.3913613930507083
+    },
+    "delta_R100_ece_ts": {
+      "ci_2_5": 0.6517630036414322,
+      "ci_97_5": 1.8684243996854946,
+      "point": 1.355064886299599
+    },
+    "delta_R100_nll": {
+      "ci_2_5": 0.08985505985998887,
+      "ci_97_5": 0.4751287240574131,
+      "point": 0.29110945948179334
+    },
+    "delta_R100_nll_ts": {
+      "ci_2_5": -0.1105272930943796,
+      "ci_97_5": -0.07111524184506429,
+      "point": -0.09085919872809511
+    },
+    "delta_R10_ece": {
+      "ci_2_5": -0.7829070167827195,
+      "ci_97_5": 1.7694299072940127,
+      "point": 0.3725991586166799
+    },
+    "delta_R10_ece_ts": {
+      "ci_2_5": 0.42118974708825946,
+      "ci_97_5": 1.1119075801344893,
+      "point": 0.8237518602300531
+    },
+    "delta_R10_nll": {
+      "ci_2_5": -0.05870655545406132,
+      "ci_97_5": 0.1319773545481532,
+      "point": 0.01336294016935946
+    },
+    "delta_R10_nll_ts": {
+      "ci_2_5": -0.05808948087261999,
+      "ci_97_5": -0.02338122902478026,
+      "point": -0.04077025425862957
+    },
+    "delta_damage_R100_ece": {
+      "ci_2_5": -11.006030444419027,
+      "ci_97_5": -4.345303063680205,
+      "point": -7.722385705393547
+    },
+    "delta_damage_R100_ece_ts": {
+      "ci_2_5": -0.05924264442126945,
+      "ci_97_5": 1.1457109694099237,
+      "point": 0.5743196189168223
+    },
+    "delta_damage_R100_nll": {
+      "ci_2_5": 0.011203976800402955,
+      "ci_97_5": 0.40241884318946264,
+      "point": 0.21438806677972677
+    },
+    "delta_damage_R100_nll_ts": {
+      "ci_2_5": -0.043500320391372645,
+      "ci_97_5": -0.018000445782664156,
+      "point": -0.030346432273009594
+    },
+    "delta_damage_R10_ece": {
+      "ci_2_5": -12.391799337007756,
+      "ci_97_5": -6.881903810069602,
+      "point": -9.741147939827577
+    },
+    "delta_damage_R10_ece_ts": {
+      "ci_2_5": -0.208978786112093,
+      "ci_97_5": 0.3011481387535638,
+      "point": 0.04300659284727626
+    },
+    "delta_damage_R10_nll": {
+      "ci_2_5": -0.13587616450870077,
+      "ci_97_5": 0.04146260902422244,
+      "point": -0.06335845253270711
+    },
+    "delta_damage_R10_nll_ts": {
+      "ci_2_5": 0.011638287023299623,
+      "ci_97_5": 0.028107723146517164,
+      "point": 0.019742512196455952
+    }
+  },
+  "validation": {
+    "uni2h": {
+      "arms": {
+        "B": {
+          "margin_raw_mean": 1.655226213498277,
+          "margin_raw_sd": 2.3187086216082973,
+          "margin_standardized_mean": 0.7161016299967717,
+          "validation_ba_mean": 74.15712226118195,
+          "validation_ba_sd": 0.6759248349591093,
+          "zero_variance_fits": 0
+        },
+        "R100": {
+          "margin_raw_mean": 7.984029332317289,
+          "margin_raw_sd": 13.06916476218707,
+          "margin_standardized_mean": 0.6088487925101859,
+          "validation_ba_mean": 71.60539427868315,
+          "validation_ba_sd": 0.6213418523894251,
+          "zero_variance_fits": 0
+        }
+      },
+      "b_top_confusions": [
+        {
+          "patch_rate": 0.3516267281105991,
+          "predicted": "Rectum_adenocarcinoma",
+          "true": "Colon_adenocarcinoma"
+        },
+        {
+          "patch_rate": 0.31947136563876655,
+          "predicted": "Colon_adenocarcinoma",
+          "true": "Rectum_adenocarcinoma"
+        },
+        {
+          "patch_rate": 0.16172661870503596,
+          "predicted": "Sarcoma",
+          "true": "Uterine_Carcinosarcoma"
+        },
+        {
+          "patch_rate": 0.144236013986014,
+          "predicted": "Glioblastoma_multiforme",
+          "true": "Brain_Lower_Grade_Glioma"
+        },
+        {
+          "patch_rate": 0.1389105504587156,
+          "predicted": "Uveal_Melanoma",
+          "true": "Skin_Cutaneous_Melanoma"
+        },
+        {
+          "patch_rate": 0.1253820224719101,
+          "predicted": "Head_and_Neck_squamous_cell_carcinoma",
+          "true": "Esophageal_carcinoma"
+        },
+        {
+          "patch_rate": 0.12169780927835051,
+          "predicted": "Lung_squamous_cell_carcinoma",
+          "true": "Head_and_Neck_squamous_cell_carcinoma"
+        },
+        {
+          "patch_rate": 0.12116152450090745,
+          "predicted": "Ovarian_serous_cystadenocarcinoma",
+          "true": "Uterine_Corpus_Endometrial_Carcinoma"
+        },
+        {
+          "patch_rate": 0.12104412678682411,
+          "predicted": "Lung_squamous_cell_carcinoma",
+          "true": "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma"
+        },
+        {
+          "patch_rate": 0.09831874712114233,
+          "predicted": "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma",
+          "true": "Lung_squamous_cell_carcinoma"
+        }
+      ],
+      "dimension": 1536,
+      "feature_norm": {
+        "mean": 16.889897389851097,
+        "median": 16.35875027304669,
+        "sd": 2.542337393298394
+      }
+    },
+    "virchow2": {
+      "arms": {
+        "B": {
+          "margin_raw_mean": 1.8091888175386204,
+          "margin_raw_sd": 2.8199627130087945,
+          "margin_standardized_mean": 0.6413885310608152,
+          "validation_ba_mean": 72.28511114155405,
+          "validation_ba_sd": 0.8350865661235598,
+          "zero_variance_fits": 0
+        },
+        "R100": {
+          "margin_raw_mean": 3.6695200768839644,
+          "margin_raw_sd": 6.815714499124721,
+          "margin_standardized_mean": 0.5363114570676725,
+          "validation_ba_mean": 69.24275624507507,
+          "validation_ba_sd": 1.1607013954695513,
+          "zero_variance_fits": 0
+        }
+      },
+      "b_top_confusions": [
+        {
+          "patch_rate": 0.33027188940092167,
+          "predicted": "Rectum_adenocarcinoma",
+          "true": "Colon_adenocarcinoma"
+        },
+        {
+          "patch_rate": 0.3077973568281938,
+          "predicted": "Colon_adenocarcinoma",
+          "true": "Rectum_adenocarcinoma"
+        },
+        {
+          "patch_rate": 0.13318881118881118,
+          "predicted": "Glioblastoma_multiforme",
+          "true": "Brain_Lower_Grade_Glioma"
+        },
+        {
+          "patch_rate": 0.12239046391752577,
+          "predicted": "Lung_squamous_cell_carcinoma",
+          "true": "Head_and_Neck_squamous_cell_carcinoma"
+        },
+        {
+          "patch_rate": 0.12085146053449347,
+          "predicted": "Lung_squamous_cell_carcinoma",
+          "true": "Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma"
+        },
+        {
+          "patch_rate": 0.11696415508412582,
+          "predicted": "Liver_hepatocellular_carcinoma",
+          "true": "Adrenocortical_carcinoma"
+        },
+        {
+          "patch_rate": 0.1110561797752809,
+          "predicted": "Head_and_Neck_squamous_cell_carcinoma",
+          "true": "Esophageal_carcinoma"
+        },
+        {
+          "patch_rate": 0.10994604316546762,
+          "predicted": "Sarcoma",
+          "true": "Uterine_Carcinosarcoma"
+        },
+        {
+          "patch_rate": 0.10832186544342508,
+          "predicted": "Uveal_Melanoma",
+          "true": "Skin_Cutaneous_Melanoma"
+        },
+        {
+          "patch_rate": 0.1017816091954023,
+          "predicted": "Ovarian_serous_cystadenocarcinoma",
+          "true": "Uterine_Corpus_Endometrial_Carcinoma"
+        }
+      ],
+      "dimension": 2560,
+      "feature_norm": {
+        "mean": 49.396288865352105,
+        "median": 49.0602786803684,
+        "sd": 4.991932553963147
+      }
+    }
+  }
+}

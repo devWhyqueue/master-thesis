@@ -1,0 +1,66 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+% Primitive input keeps generated table rows expandable, so fragments may start with \multicolumn.
+\makeatletter\let\tabinput\@@input\makeatother
+\title{Class Imbalance in Histopathology:\\Replacing Virchow2 with {UNI2-h} Lowers {TCGA-UT}'s Damage\\and Leaves {BRACS} Unresolved}
+\author{Yannik Queisler}
+\date{September 25, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Earlier studies measured how much balanced accuracy a linear probe on frozen Virchow2 features loses when its training allocation is long-tailed, and split that damage into a prior channel, a support channel, and their interaction. This report asks whether those results transfer to a second encoder. On identical patients and image patches of TCGA-UT (30 classes) and BRACS (7 classes), frozen Virchow2 and frozen UNI2-h each train seven paired probes per split and draw, balanced (B), prior-only, support-only, and combined (R) at imbalance ratios 10 and 100, 840 probes in total, with validation-selected regularization per arm. The primary contrast is the encoder difference in the combined damage at ratio 100, judged with 97.5\% paired-bootstrap intervals against a one-point threshold. On TCGA-UT, UNI2-h is 1.78 points more accurate under balanced training and loses 0.86 points less at ratio 100 (interval $-1.33$ to $-0.40$): the direction is resolved, the practical size is not. On BRACS the contrast is $-0.67$ points ($-2.75$ to $1.85$), unresolved, and both encoders collapse the tail. At ratio 10 the damage is nearly equal on both datasets. UNI2-h carries less support-only damage on both datasets, the only contrast that keeps its sign when each encoder's regularization is held at its balanced value; under that fixed rule the total damage reverses and becomes larger for UNI2-h, so the tuned reduction depends on the probe re-selecting its penalty. The results describe two complete encoder-plus-probe pipelines, not foundation models in general, and identify no representational mechanism.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+Every class-imbalance study in this series so far used one frozen encoder, Virchow2 \citep{zimmermann2024virchow2}. On that encoder, training a linear probe on an exponential long-tailed allocation with imbalance ratio $\rho=100$ costs 2.91 points of test patient-macro balanced accuracy on TCGA-UT and 7.65 points on BRACS, with every patient identity and the total patch budget held fixed \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. Two follow-up studies split that damage into a prior-only part, which reweights the balanced rows toward the long-tailed class shares, and a support-only part, which trains on the long-tailed rows under a uniform class prior. On TCGA-UT the 2.91 points divided into 1.20 (prior), 0.53 (support), and a positive interaction of 1.18 points; on BRACS the 7.65 points divided into 4.47 and 3.29 points with an interaction of $-0.11$ points whose interval did not resolve it \citep{queisler2026causeTcga, queisler2026causeBracs}.
+
+These numbers describe one pipeline: one encoder, its image transform and pooling, and one tuned linear readout. Whether they describe class imbalance in general or a property of Virchow2's feature geometry is untested. The attempts to explain them from inside that geometry have not settled the question either. A separation-and-centre-correction rescue of BRACS depended on the regularization strength and failed its integrity and robustness gates \citep{queisler2026jointMechanism}. A patch-coverage intervention failed its precheck \citep{queisler2026supportCoverage}, and a test-set oracle for the regularization strength did not close the BRACS--TCGA-UT prior gap \citep{queisler2026lambdaSelection}. Earlier patient-shortage work showed that broad, independent patient support matters under frozen Virchow2 \citep{queisler2026patientShortage}; this study holds the patient identities fixed within each dataset, so patient breadth cannot explain an encoder contrast.
+
+This report therefore replaces the encoder and keeps everything else. On the same patients and the same image patches, it asks whether replacing frozen Virchow2 with frozen UNI2-h \citep{mahmoodlab2025uni2h} changes the damage that class imbalance does to balanced accuracy, and if so, whether the change arises in the prior channel, the support channel, or their interaction. A smaller damage estimate alone would be ambiguous, because a worse balanced baseline leaves less accuracy to lose. The report therefore states absolute balanced and imbalanced accuracy next to every damage contrast.
+
+\section{Design}
+\label{sec:design}
+The design reuses the three patient-disjoint splits and the frozen allocator of the earlier prevalence studies \citep{queisler2026prevalenceTcga, queisler2026prevalenceBracs}. TCGA-UT keeps its 30 cancer types, $G=20$ training patients per class, and a total budget of $T=19{,}200$ patches \citep{komura2022universalEncoding}; BRACS keeps its seven lesion subtypes, $G=10$ patients per class, and $T=2{,}240$ patches \citep{brancati2022bracs}. The two budgets differ because only ten to thirteen BRACS training patients per class reach the eligibility depth of 160 patches. Primary inference is therefore within each dataset; a comparison of the two datasets is descriptive and cannot isolate tissue type or class count. Ten fresh training draws per split (draw identifiers 10 to 19, unused by any earlier study) give 30 fits per encoder and arm. The evaluation patients are the same as in the earlier studies, and those studies informed this follow-up, so the fresh draws renew the training samples but not the test cohort.
+
+\subsection{Encoders and paired inputs}
+The patient cohort, the class-rank permutation, and the exact training patch identities of every draw were generated once, without reference to either encoder, and each encoder consumed the same schedule. Virchow2 features were reused from the audited existing caches: a 2,560-dimensional vector that concatenates the class token with the mean patch token. UNI2-h features were extracted from the pinned checkpoint of its model card, with the card's timm architecture, the recommended $224$-pixel resize-and-centre-crop transform with ImageNet normalization, and its single pooled 1,536-dimensional token, in float32 \citep{mahmoodlab2025uni2h}. UNI2-h extends the UNI model family \citep{chen2024uni}; its checkpoint is documented by the model card, not by the UNI paper. The feature audit resolved all 1,201,809 requested TCGA-UT patches and all 168,585 BRACS patches, row for row, against the shared manifest. The comparison concerns each complete pipeline: frozen encoder, its recommended transform and pooling, and the tuned probe on its native features, without PCA, whitening, or normalization.
+
+\subsection{Four-arm decomposition}
+For each encoder, split, and draw, seven multinomial logistic probes were fitted. The balanced arm B trains on the balanced allocation. The ratio arm R$\rho$, $\rho\in\{10,100\}$, trains on the long-tailed allocation with its own realized class prior. The prior arm P$\rho$ keeps B's rows and reweights the loss toward R$\rho$'s realized class shares, and the support arm S$\rho$ keeps R$\rho$'s rows and reweights the loss back to uniform class shares. Row weights are the ratio of target to observed class share and sum to the number of rows. S$\rho$ therefore measures a redistribution of patch support at a fixed total budget, not the removal of tail rows alone. With $A(m,a)$ the test patient-macro balanced accuracy of encoder $m$ and arm $a$, averaged over draws within a split and then equally over the three splits,
+\begin{equation}
+  D_X(m,\rho) = A(m,\mathrm{B}) - A(m,X\rho), \quad X\in\{\mathrm{P},\mathrm{S},\mathrm{R}\}, \qquad
+  I(m,\rho) = D_R - D_P - D_S ,
+  \label{eq:damage}
+\end{equation}
+\noindent so positive damage means worse than balanced training. The primary contrast, one per dataset, is
+\begin{equation}
+  \delta_R = D_R(\text{UNI2-h},100) - D_R(\text{Virchow2},100),
+  \label{eq:primary}
+\end{equation}
+\noindent where a negative value means that UNI2-h loses less accuracy under imbalance. The component contrasts $\delta_P$, $\delta_S$, and $\delta_I$ are defined the same way and sum exactly to $\delta_R$. Ratio 10 is a secondary severity check; two ratios cannot identify the shape of a damage curve.
+
+\subsection{Readout, selection, and calibration}
+Every encoder and arm received the same selection procedure, not the same selected value: an L2 penalty $\lambda$ chosen from eleven decades $10^{-8},\dots,10^{2}$ by validation patient-macro balanced accuracy, with ties broken toward stronger regularization. The grid was frozen before the main run; Section~\ref{sec:deviations} records how its boundary rule was applied. As a secondary sensitivity, each encoder's P100, S100, and R100 arms were re-evaluated at that encoder's own B-selected $\lambda$, using stored candidate coefficients and no refit. The two encoders' numerical $\lambda$ values are never exchanged, because their feature scales differ. One positive temperature per selected arm was fitted on validation patients; it leaves the argmax, and therefore balanced accuracy, unchanged \citep{guo2017calibration}. Probability quality is reported as the macro negative log-likelihood (NLL), which weights every test patient and class equally and depends on discrimination as well as calibration, and as the expected calibration error (ECE) in ten fixed top-label confidence bins with patient weights. ECE depends on the evaluation prevalence, which is the same for all arms and encoders, and it is not class-balanced.
+
+\subsection{Inference and decision rule}
+Intervals come from 10,000 paired bootstrap replicates with seed 39000. Each replicate resamples training draws within split with identical weights across encoders and arms, and independently resamples test patients as clusters with continuous weights \citep{rubin1981bayesian}, carrying each patient's weight to every occurrence across arms, encoders, and splits; BRACS patients with several labels stay one cluster. No replicate lacked support for a class. Intervals are conditional on these three splits and the available test patients. All estimates carry 95\% percentile intervals. For the two primary contrasts, two-sided 97.5\% intervals give Bonferroni family coverage of at least 95\%, and they decide the outcome before any pattern is discussed: an interval that excludes zero resolves the direction; one wholly below $-1$ or above $+1$ point resolves a practically meaningful change; one wholly inside $[-1,+1]$ supports practical similarity; any other interval is unresolved. Secondary metrics and classwise patterns carry no significance claims.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\input{appendix}
+\end{document}
