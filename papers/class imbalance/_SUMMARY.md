@@ -6,11 +6,11 @@ This folder groups the papers according to the local taxonomy in `_TAXONOMY.md`.
 
 | Taxonomy group | Papers | Main role |
 | :--- | :--- | :--- |
-| Reviews and taxonomy | Saini and Susan; Zhang et al. | Broad class-imbalance and long-tailed-learning taxonomies |
-| Data-level sampling and augmentation | Chen and Lu; Majeed et al. | Resampling, SMOTE-style methods, undersampling, feature-level WSI augmentation |
+| Reviews and taxonomy | Krawczyk; Saini and Susan; Zhang et al. | Broad class-imbalance and long-tailed-learning taxonomies |
+| Data-level sampling and augmentation | Chen and Lu; Majeed et al.; Shen et al.; Zhang et al. (mixup) | Resampling, SMOTE-style methods, undersampling, feature-level WSI augmentation |
 | Synthetic data generation | Mueller and Hein; Ruiz-Casado et al.; Ryspayeva et al.; Yuan et al. | GAN/diffusion-based minority or tail-class generation |
-| Algorithm-level losses | Huynh et al.; Mahbub et al.; Scholz et al. | Loss functions that reshape optimization toward minority classes |
-| Hybrid approaches | Guerrero et al.; Ling et al. | Data-level plus loss weighting; ensemble/MIL plus rebalancing and distillation |
+| Algorithm-level losses | Huynh et al.; Mahbub et al.; Scholz et al.; Zhang et al. (DisAlign) | Loss functions that reshape optimization toward minority classes |
+| Hybrid approaches | Guerrero et al.; Li et al. (GCL); Ling et al. | Data-level plus loss weighting; ensemble/MIL plus rebalancing and distillation |
 | Representation and architecture | Cong et al.; Juyal et al.; Nouyed et al. | Graph attention, MIL, contrastive representation learning, partitioning, and cluster-based patch sampling |
 | Evaluation practices | Mosquera et al. | Metrics and calibration under class imbalance |
 
@@ -27,6 +27,8 @@ This folder groups the papers according to the local taxonomy in `_TAXONOMY.md`.
 
 ## 1. Taxonomy Baseline
 
+Krawczyk gives the classic three-family split of imbalance methods: data-level methods modify the training set so a standard learner can be used, algorithm-level methods modify the learner to remove its bias toward majority classes, and hybrid methods combine both. The paper also argues that imbalance ratio alone is a poor description of difficulty; class overlap, small disjuncts, and scarce minority examples matter as much.
+
 Saini and Susan provide the broad computer-vision taxonomy used here: data-level manipulation, synthetic generation, algorithm-level learning, hybrid/ensemble approaches, and representation or architecture-level strategies. For computational pathology, this taxonomy needs one adjustment: WSI methods often operate on bags, patches, or extracted features rather than ordinary fixed-size images. A method can therefore rebalance slides, patches, feature vectors, or classifier decisions.
 
 Zhang et al.'s deep long-tailed learning survey adds a modern visual-recognition framing. It groups long-tailed methods into class re-balancing, information augmentation, and module improvement. This is useful because many pathology problems are not merely binary imbalances; they have head classes, medium-frequency classes, and rare tail classes, so methods must often improve tail recognition without sacrificing head-class performance.
@@ -38,6 +40,10 @@ Data-level methods change what the model sees during training. They are the most
 Chen and Lu propose RankMix for weakly supervised WSI classification. Instead of mixing fixed-size images, RankMix mixes ranked WSI features. This matters because WSIs differ in size and contain variable numbers of patches, so ordinary mixup is not directly applicable. The method uses pseudo-labeling and ranking to identify important WSI regions before mixing, then trains in two stages for stability. In taxonomy terms, this is data-level augmentation adapted to MIL/WSI feature bags.
 
 Majeed et al. compare undersampling and oversampling strategies for oral cavity histopathological WSIs: Near Miss, Edited Nearest Neighbors, SMOTE, Deep SMOTE, and ADASYN, combined with transfer learning. Their main takeaway is that oversampling, especially SMOTE in their experiments, can improve performance under controlled imbalance ratios. This paper is useful as a conventional resampling baseline for pathology experiments.
+
+Shen et al. introduce class-aware sampling in the Relay Backpropagation paper: each minibatch is filled by first drawing a class uniformly and then an image from that class, so every class appears at the same expected rate. This is the usual reference for class-balanced sampling in deep long-tailed learning.
+
+Zhang et al. propose mixup: train on convex combinations of random input pairs and their one-hot labels, with the mixing weight drawn from a Beta(alpha, alpha) distribution. It is a general regularizer, not a class-aware method, but it is a standard baseline in long-tailed benchmarks because it smooths decision boundaries and reduces overconfidence.
 
 Practical takeaway: data-level methods are easy to explain and can be strong baselines, but they can also duplicate artifacts, remove useful majority variation, or create synthetic samples that do not correspond to valid pathology. Undersampling is especially risky in medical imaging because majority-class examples may still contain rare staining, scanner, tissue-preparation, or morphology variation needed for generalization. Naive oversampling can also inflate training time and overfit duplicated samples without increasing the effective number of genuinely distinct examples.
 
@@ -65,6 +71,8 @@ Scholz et al. evaluate imbalance-aware loss functions derived from MCC and F1 sc
 
 Huynh et al. address the intersection of class imbalance and limited labels in semi-supervised medical image classification. Their Adaptive Blended Consistency Loss (ABCL) replaces standard consistency loss in perturbation-based SSL and adapts the target distribution according to class frequency. This is an algorithm-level method because it changes the training objective rather than the dataset.
 
+Zhang et al. propose DisAlign, a second-stage calibration of a CE-trained classifier. The backbone and original classifier stay frozen; each class score is rescaled and shifted by learned per-class parameters, blended in by an input-dependent confidence gate, and trained against a reference distribution defined by generalized re-weighting with weights proportional to (1/r_c)^rho.
+
 Practical takeaway: loss-based methods are attractive because they do not require generating or deleting data. They are especially relevant when deleting majority samples would discard useful pathology variation or when synthetic images are hard to validate. They should be evaluated with minority-aware metrics, not only accuracy or macro averages, because loss changes can shift calibration and class trade-offs. For fine-grained histology, the most interesting loss designs are not just class weights; they also explicitly shape the embedding space through margins, prototypes, affinities, consistency terms, or metric-derived objectives.
 
 ## 5. Hybrid Approaches
@@ -74,6 +82,8 @@ Hybrid methods combine data-level changes with algorithm-level, ensemble, or mod
 Guerrero et al. propose a modified copy-paste augmentation for nuclei detection and combine it with loss weight balancing. The method targets instance-level class imbalance in dense histopathology object detection, where naive copy-paste can create harmful overlaps. This is a clear hybrid case: synthetic placement changes the training data, while loss weighting changes the learning signal.
 
 Ling et al. propose MDE-MIL for long-tailed WSI classification. It uses multiple expert branches to learn both the original long-tailed distribution and a rebalanced distribution, consistency constraints to keep expert behavior aligned, and multimodal distillation from pathology-text encoders to strengthen slide representations. This is best treated as hybrid because it combines ensemble learning, rebalancing, MIL aggregation, and representation distillation.
+
+Li et al. propose Gaussian Clouded Logit (GCL) adjustment. In stage one, cosine logits are perturbed by negative Gaussian noise whose amplitude grows with log n_max - log n_c, so tail classes stay unsaturated under softmax and get larger margins in feature space. In stage two, the representation is frozen and the classifier is re-trained with class-based effective-number (CBEN) sampling, which rebalances classes less aggressively than uniform class sampling.
 
 Practical takeaway: hybrid methods often work because imbalance appears at multiple levels. In pathology detection, there can be both foreground-background imbalance and class imbalance among object types. In WSI classification, there may be slide-level long tails, sparse positive patches inside positive bags, and weak labels. Treating only one level may leave the model biased.
 

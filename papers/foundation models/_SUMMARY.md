@@ -147,6 +147,9 @@ The following lookup table summarizes foundational research papers and their str
 | **Li et al. (Survey)**         | Comprehensive statistics on Virchow/UNI datasets; SSL adaptation strategies (DINOv2/MIM); the six perspectives taxonomy |
 | **Xiong et al. (Survey)**      | Hierarchical taxonomy (scope, pre-training, design); technical MIL constraints; aggregator vs. extractor roles          |
 | **Neidlinger et al. (Survey)** | Benchmarking performance of feature extractors; comparative analysis in weakly supervised settings                      |
+| **Kumar et al. (2022)**        | Full fine-tuning distorts pretrained features; linear probe then fine-tune (LP-FT) as the safer order                   |
+| **Shi et al. (2024)**          | Heavy fine-tuning of foundation models hurts tail classes; lightweight fine-tuning (LIFT) preferred for long tails      |
+| **Hu et al. (2022)**           | LoRA: low-rank trainable updates on frozen weights; standard lightweight adaptation for large encoders                 |
 
 ---
 
