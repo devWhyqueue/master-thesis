@@ -48,7 +48,10 @@ mitigation:
         crt: [null]
         gcl2: [0.05, 0.2]
   train:
-    stage1: {batch_size: 256, steps: 2000, lr: 0.0001, weight_decay: 0.0001}
+    # steps=600 from the pilot (report "Design", pilot subsection): the only candidate within
+    # 0.5pp of the best mean r100 validation BA over {150, 300, 600, 1200} (0.3493 vs 0.3187,
+    # 0.3422, 0.3342); observed wall time ~30-33 min/fit, well inside gpu-2h.
+    stage1: {batch_size: 256, steps: 600, lr: 0.0001, weight_decay: 0.0001}
     stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
 
 slurm:
@@ -61,8 +64,9 @@ slurm:
     - source: /home/space/datasets-sqfs/bracs-roi-tiles.sqfs
       mount: /tmp/bracs_roi_tiles
       stages: [fit]
-  max_array_concurrency: {gpu-5h: 35, gpu-2h: 35, cpu-2h: 50}
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 50, cpu-2h: 50}
   resources:
-    fit: {partition: gpu-5h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}
+    # gpu-2h, not gpu-5h: pilot wall time at steps=600 was ~30-33 min/fit.
+    fit: {partition: gpu-2h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}
     stage2: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 32G}
     analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
