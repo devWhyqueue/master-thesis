@@ -1,0 +1,65 @@
+# Step-length pilot for exp-41 (CE only, r1 + r100, one draw per split -> 6 jobs per steps
+# value, 4 values = 24 jobs total). Picks the smallest `mitigation.train.stage1.steps` within
+# 0.5pp of the best mean validation BA before the full grid runs (report "Design", pilot
+# subsection); also gives per-fit wall time to size the `fit` partition (gpu-5h vs gpu-2h).
+#
+# Run once per steps value in {150, 300, 600, 1200} (cosine schedule needs a fixed T_max, so
+# these are separate runs, not one job that changes steps mid-schedule): before each submit,
+# set `mitigation.train.stage1.steps` below and repoint `paths.outputs`/`slurm.output_dir` at
+# that value's own subdirectory (`outputs/pilot/steps_<value>/...`) so runs at different steps
+# never collide under the same (arm, method) run-record path. One draw per split only: pass
+# `--shard-index` for shard 0/10/20 (draw 0 of each split) instead of a full `submit --stage fit`
+# array, or narrow the array with `--array=0,10,20` on the rendered sbatch script.
+
+prevalence:
+  patients_per_class: 10
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+  seed: 0
+  version: bracs-official-release
+  eligibility_rules:
+    metadata: official_BRACS_xlsx_rows_with_patient_slide_roi_and_subtype
+    images: roi_filename_stem_matches_released_image
+    labels: seven_class_official_roi_subtype
+    tiling: non_overlapping_full_256x256_tiles
+    split_unit: patient
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/outputs/pilot/steps_300
+
+mitigation:
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.0
+  gcl:
+    s: 30
+    a: 0.9
+    b: 0.09
+  grid:
+    r1:
+      stage1:
+        ce: [null]
+    r100:
+      stage1:
+        ce: [null]
+  train:
+    stage1: {batch_size: 256, steps: 300, lr: 0.0001, weight_decay: 0.0001}
+    stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/40_methods/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/outputs/pilot/steps_300
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/bracs/patch
+  squashfs:
+    - source: /home/space/datasets-sqfs/bracs-roi-tiles.sqfs
+      mount: /tmp/bracs_roi_tiles
+      stages: [fit]
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 35}
+  resources:
+    fit: {partition: gpu-5h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}

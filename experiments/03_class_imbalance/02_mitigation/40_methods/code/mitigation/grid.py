@@ -1,8 +1,11 @@
 """Flatten the config-declared arm x method x param grid for submit/fit dispatch.
 
-``mitigation.grid`` in a run config lists the arms and, per method, the swept
-parameter values (``null`` for a paramless method); this expands that into the
-flat job lists ``submit`` and ``stage2`` (all pending) iterate over.
+``mitigation.grid`` in a run config is keyed by arm, each arm listing its own
+stage1/stage2 methods and, per method, the swept parameter values (``null``
+for a paramless method or an unswept one) -- an arm need not declare a stage
+at all (e.g. an anchor arm with only ``stage1: {ce: [null]}``, no stage2).
+This expands that into the flat job lists ``submit`` and ``stage2`` (all
+pending) iterate over.
 """
 
 from __future__ import annotations
@@ -35,12 +38,10 @@ def _params(values: list[Any]) -> list[float | None]:
 
 def _jobs(config: dict[str, Any], key: str) -> list[tuple[str, str, float | None]]:
     grid = config.get("mitigation", {}).get("grid", {})
-    arms = grid.get("arms", [])
-    methods = grid.get(key, {})
     return [
         (arm, method, param)
-        for arm in arms
-        for method, values in methods.items()
+        for arm, arm_grid in grid.items()
+        for method, values in arm_grid.get(key, {}).items()
         for param in _params(values)
     ]
 

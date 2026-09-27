@@ -41,7 +41,10 @@ STAGE2_SOURCE: dict[str, str] = {
     "gcl2": "gcl",
 }
 # Methods whose strength has no free control parameter (Section "Methods").
-PARAMLESS_METHODS: frozenset[str] = frozenset({"ce", "crt", "gcl2"})
+# gcl2 is excluded even though its own grid value is never swept directly: it
+# always carries its source gcl run's sigma (mitigation.fit_stage2._source_run_param),
+# and multiple configured sigmas need distinct run-directory labels.
+PARAMLESS_METHODS: frozenset[str] = frozenset({"ce", "crt"})
 
 # LoRA defaults (rank, scaling alpha, dropout); attention qkv/proj across every
 # block, never patch_embed.proj (also named "proj", excluded by the regex's

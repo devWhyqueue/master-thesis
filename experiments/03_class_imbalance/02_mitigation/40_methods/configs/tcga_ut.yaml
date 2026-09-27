@@ -36,18 +36,19 @@ mitigation:
     a: 0.9
     b: 0.09
   grid:
-    arms: [r1, r100]
-    stage1:
-      ce: [null]
-      bs: [0.5, 1.0]
-      mixup: [0.2]
-      la: [1.0]
-      gcl: [0.1]
-    stage2:
-      posthoc_la: [1.0]
-      crt: [null]
-      disalign: [1.0]
-      gcl2: [null]
+    r1: &methods_grid
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        mixup: [0.2]
+        la: [1.0]
+        gcl: [0.1]
+      stage2:
+        posthoc_la: [1.0]
+        crt: [null]
+        disalign: [1.0]
+        gcl2: [0.1]
+    r100: *methods_grid
   train:
     stage1: {batch_size: 256, steps: 2000, lr: 0.0001, weight_decay: 0.0001}
     stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
@@ -65,3 +66,4 @@ slurm:
   resources:
     fit: {partition: gpu-5h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}
     stage2: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 32G}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}

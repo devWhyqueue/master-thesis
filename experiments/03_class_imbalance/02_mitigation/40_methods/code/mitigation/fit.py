@@ -45,9 +45,6 @@ from mitigation.train import (
 
 __all__ = ["decode_shard_index", "shard_count", "run_fit_stage1"]
 
-# ponytail: only the single sigma configured for a grid's gcl method can feed
-# gcl2, so a config sweeping multiple sigmas needs one gcl2 job per sigma;
-# widen mitigation.fit_stage2._source_run_param's lookup if that's not enough.
 _STAGE2_SOURCES = frozenset(STAGE2_SOURCE.values())
 
 

@@ -19,27 +19,30 @@ def _config() -> dict:
     return {
         "mitigation": {
             "grid": {
-                "arms": ["r1", "r100"],
-                "stage1": {"ce": [None], "bs": [0.5, 1.0]},
-                "stage2": {"posthoc_la": [1.0], "crt": [None]},
+                "r1": {"stage1": {"ce": [None]}},
+                "r100": {
+                    "stage1": {"ce": [None], "bs": [0.5, 1.0]},
+                    "stage2": {"posthoc_la": [1.0], "crt": [None]},
+                },
             }
         }
     }
 
 
 def test_stage1_jobs_flattens_arm_method_param_grid() -> None:
-    """Every arm is crossed with every configured method/param pair."""
+    """Each arm's own stage1 methods/params are flattened; arms need not match."""
     jobs = stage1_jobs(_config())
-    assert len(jobs) == 2 * 3  # 2 arms x (1 ce + 2 bs params)
+    assert len(jobs) == 1 + 3  # r1: 1 ce. r100: 1 ce + 2 bs params.
     assert ("r1", "ce", None) in jobs
     assert ("r100", "bs", 0.5) in jobs
 
 
 def test_stage2_jobs_flattens_arm_method_param_grid() -> None:
-    """Stage-two grid flattens the same way as stage one, over its own method list."""
+    """An arm with no stage2 key (e.g. the anchor arm) contributes no stage2 jobs."""
     jobs = stage2_jobs(_config())
-    assert len(jobs) == 2 * 2  # 2 arms x (posthoc_la + crt)
-    assert ("r1", "crt", None) in jobs
+    assert len(jobs) == 2  # only r100 declares stage2: posthoc_la + crt.
+    assert ("r100", "crt", None) in jobs
+    assert not any(arm == "r1" for arm, _, _ in jobs)
 
 
 def test_cli_parser_builds_fit_stage2_and_submit_subcommands() -> None:

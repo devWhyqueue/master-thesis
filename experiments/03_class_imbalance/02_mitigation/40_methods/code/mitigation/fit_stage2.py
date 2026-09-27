@@ -34,22 +34,32 @@ from mitigation.train import (
 __all__ = ["run_fit_stage2"]
 
 
-def _source_run_param(config: dict[str, Any], method: str) -> float | None:
-    """The single configured param of a stage-two method's stage-one source run."""
+def _source_run_param(
+    config: dict[str, Any], arm: str, method: str, param: float | None
+) -> float | None:
+    """The stage-one source run's param for one stage-two job.
+
+    For a ``ce``-sourced method the source is always paramless. For ``gcl2``
+    the job's own param *is* its source ``gcl`` run's sigma (one gcl2 job per
+    configured sigma); validated against the arm's configured ``gcl`` grid
+    rather than assumed, so a stale grid can't silently source the wrong run.
+    """
     source_method = STAGE2_SOURCE[method]
     if source_method == "ce":
         return None
-    values = (
+    raw_values = (
         config.get("mitigation", {})
         .get("grid", {})
+        .get(arm, {})
         .get("stage1", {})
         .get(source_method, [])
     )
-    if len(values) != 1:
+    values = [None if v is None else float(v) for v in raw_values]
+    if param not in values:
         raise ValueError(
-            f"{method} needs exactly one configured {source_method} param, got {values}"
+            f"{method} param {param} not among configured {arm} {source_method} params {values}"
         )
-    return None if values[0] is None else float(values[0])
+    return param
 
 
 def _dispatch(
@@ -86,7 +96,11 @@ def _fit_one(
     """Dispatch one (arm, method, param) stage-two job and write its run record."""
     arm, method, param = job
     source_dir = run_dir(
-        shard, arm, STAGE2_SOURCE[method], _source_run_param(config, method), seed
+        shard,
+        arm,
+        STAGE2_SOURCE[method],
+        _source_run_param(config, arm, method, param),
+        seed,
     )
     artifacts = load_stage1(source_dir / STAGE1_ARTIFACT_NAME)
     val_logits, test_logits = _dispatch(

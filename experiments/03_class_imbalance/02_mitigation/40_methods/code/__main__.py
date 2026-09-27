@@ -15,6 +15,8 @@ from imbalance_benchmark.hydra.rendering import SlurmJob
 
 from breadth.slurm import submit_workflow
 
+from analyze import run_analyze
+
 from mitigation.fit import decode_shard_index, run_fit_stage1, shard_count
 from mitigation.fit_stage2 import run_fit_stage2
 from mitigation.grid import Stage1Job, stage1_jobs
@@ -23,7 +25,7 @@ __all__ = ["main"]
 
 logger = logging.getLogger(__name__)
 
-_SUBMIT_STAGES = ("fit", "stage2")
+_SUBMIT_STAGES = ("fit", "stage2", "analyze")
 
 
 def _fit_job(config: dict, job: Stage1Job) -> SlurmJob:
@@ -50,6 +52,8 @@ def _stage_jobs(config: dict, stage: str) -> list[SlurmJob]:
     if stage == "stage2":
         stage2_job = build_job(config, "stage2", "stage2", False, resource="stage2")
         return [replace(stage2_job, array_size=shard_count())]
+    if stage == "analyze":
+        return [build_job(config, "analyze", "analyze", False, resource="analyze")]
     raise ValueError(f"unknown submission stage: {stage}")
 
 
@@ -65,6 +69,7 @@ def _parser() -> argparse.ArgumentParser:
     fit.add_argument("--arm", required=True)
     stage2 = sub.add_parser("stage2")
     stage2.add_argument("--shard-index", type=int, required=True)
+    sub.add_parser("analyze")
     submit = sub.add_parser("submit")
     submit.add_argument("--stage", choices=_SUBMIT_STAGES, required=True)
     submit.add_argument("--dry-run", action="store_true")
@@ -85,6 +90,11 @@ def cmd_stage2(args: argparse.Namespace) -> None:
     run_fit_stage2(load_config(args.config), split_idx, draw_idx)
 
 
+def cmd_analyze(args: argparse.Namespace) -> None:
+    """Pool every arm's validation-selected recovery and write the analysis."""
+    run_analyze(load_config(args.config))
+
+
 def cmd_submit(args: argparse.Namespace) -> None:
     """Submit one stage's SLURM jobs.
 
@@ -101,7 +111,12 @@ def cmd_submit(args: argparse.Namespace) -> None:
 
 def _commands() -> dict[str, Callable[[argparse.Namespace], None]]:
     """Return CLI dispatch table."""
-    return {"fit": cmd_fit, "stage2": cmd_stage2, "submit": cmd_submit}
+    return {
+        "fit": cmd_fit,
+        "stage2": cmd_stage2,
+        "analyze": cmd_analyze,
+        "submit": cmd_submit,
+    }
 
 
 def main() -> None:
