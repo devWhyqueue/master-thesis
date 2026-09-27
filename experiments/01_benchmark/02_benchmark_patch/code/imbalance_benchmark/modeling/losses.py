@@ -20,8 +20,12 @@ __all__ = [
 ]
 
 
-def effective_number(counts: np.ndarray, beta: float) -> np.ndarray:
-    """``E_c = (1 - beta**n_c) / (1 - beta)``, floored at ``n_c=1``."""
+def effective_number(counts: np.ndarray, beta: float | np.ndarray) -> np.ndarray:
+    """``E_c = (1 - beta**n_c) / (1 - beta)``, floored at ``n_c=1``.
+
+    ``beta`` broadcasts elementwise against ``counts``, so a per-class beta
+    array (exp-40's GCL sampler) works the same as a single scalar beta.
+    """
     return (1.0 - beta ** np.maximum(counts, 1.0)) / (1.0 - beta)
 
 

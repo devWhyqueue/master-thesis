@@ -43,6 +43,7 @@ __all__ = [
     "shard_count",
     "class_permutation",
     "class_counts",
+    "arm_row_index",
     "run_fit_shard",
 ]
 
@@ -95,13 +96,18 @@ def _patient_counts(total: int, g: int = G) -> list[int]:
     return [base + 1] * remainder + [base] * (g - remainder)
 
 
-def _arm_rows(
+def arm_row_index(
     train_df: pd.DataFrame,
     names: list[str],
     patients: list[list[str]],
     counts: list[int],
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Features and integer targets of one arm's realized allocation."""
+    """Manifest row indices and integer targets of one arm's realized allocation.
+
+    Split out of ``_arm_rows`` so callers needing manifest columns other than
+    cached features (e.g. ``image_path`` for on-the-fly encoding) can select
+    the same rows without going through ``load_features_for_df``.
+    """
     rows: list[int] = []
     y: list[int] = []
     for ci, name in enumerate(names):
@@ -114,8 +120,19 @@ def _arm_rows(
                 class_rows.extend(patient_rows(class_df, [patient], m))
         rows.extend(class_rows)
         y.extend([ci] * len(class_rows))
+    return np.asarray(rows, dtype=np.int64), np.asarray(y, dtype=np.int64)
+
+
+def _arm_rows(
+    train_df: pd.DataFrame,
+    names: list[str],
+    patients: list[list[str]],
+    counts: list[int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Features and integer targets of one arm's realized allocation."""
+    rows, y = arm_row_index(train_df, names, patients, counts)
     x = load_features_for_df(train_df.loc[rows]).astype(np.float64)
-    return x, np.asarray(y, dtype=np.int64)
+    return x, y
 
 
 def _write_temperature(

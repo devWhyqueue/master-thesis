@@ -27,4 +27,4 @@ Why class imbalance hurts accuracy, and what causes it. See `../AGENTS.md` for t
 
 | # | Study | Question | Result |
 |---|---|---|---|
-| 40 | methods | Taxonomy and definitions of the mitigation roster for patch classification: Krawczyk data-level (balanced sampling, MixUp), algorithm-level (logit adjustment, DisAlign), hybrid (cRT, GCL). Virchow2 adapted only via LoRA; two-stage methods freeze encoder in stage 2 | Descriptive, no experiment. Report: `report/40_methods.tex` |
+| 40 | methods | Taxonomy and definitions of the mitigation roster for patch classification: Krawczyk data-level (balanced sampling, MixUp), algorithm-level (logit adjustment, DisAlign), hybrid (cRT, GCL). Virchow2 adapted only via LoRA; two-stage methods freeze encoder in stage 2 | Code: LoRA-adapted Virchow2 + linear/cosine head, all 7 methods, stage1/stage2 train CLI + Hydra submit (`code/mitigation/`). No results yet, protocol/analysis in exp-41+. Report: `report/40_methods.tex` |

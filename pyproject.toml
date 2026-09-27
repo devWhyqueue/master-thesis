@@ -15,6 +15,7 @@ dependencies = [
     "openslide-bin==4.0.0.6",
     "openslide-python==1.4.2",
     "pandas==2.3.3",
+    "peft>=0.21.0",
     "pillow>=12.2.0,<13",
     "pypdf>=6.10.2,<7",
     "pyyaml==6.0.3",
@@ -51,7 +52,7 @@ include-package-data = false
 where = [".agents/skills/bib/src"]
 
 [tool.vulture]
-ignore_names = ["forward", "MAX_TEXT_CHUNK"]
+ignore_names = ["forward", "MAX_TEXT_CHUNK", "allow_tf32"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
