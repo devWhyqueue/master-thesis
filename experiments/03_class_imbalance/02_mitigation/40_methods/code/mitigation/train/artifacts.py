@@ -56,6 +56,10 @@ def save_stage1(path: Path, artifacts: Stage1Artifacts) -> None:
 
 
 def load_stage1(path: Path) -> Stage1Artifacts:
-    """Load a stage-one run's cached embeddings and head state."""
-    payload = torch.load(path, weights_only=False)
+    """Load a stage-one run's cached embeddings and head state.
+
+    Always onto CPU: stage two runs on CPU (``mitigation.data.resolve_device``'s
+    fallback), regardless of which device stage one trained and saved on.
+    """
+    payload = torch.load(path, map_location="cpu", weights_only=False)
     return Stage1Artifacts(**payload)
