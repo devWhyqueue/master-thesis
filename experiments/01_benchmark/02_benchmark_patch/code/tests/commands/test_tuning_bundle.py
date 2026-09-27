@@ -107,6 +107,12 @@ def test_single_shard_runs_without_bundle_indices(monkeypatch) -> None:
 
 def test_scale_thread_env_divides_task_cpus_across_workers(monkeypatch) -> None:
     monkeypatch.setenv("SLURM_CPUS_PER_TASK", "16")
+    # _scale_thread_env writes OMP_NUM_THREADS via a plain os.environ[...] =
+    # assignment (deliberate: a spawned child must inherit it), which
+    # monkeypatch does not track. Pre-registering the key here is what makes
+    # monkeypatch restore it after the test instead of leaking it into every
+    # later test's process (and its BLAS thread count) for the rest of the run.
+    monkeypatch.setenv("OMP_NUM_THREADS", "unset")
 
     shard_workers._scale_thread_env(4)
 
@@ -115,6 +121,7 @@ def test_scale_thread_env_divides_task_cpus_across_workers(monkeypatch) -> None:
 
 def test_scale_thread_env_never_rounds_below_one(monkeypatch) -> None:
     monkeypatch.setenv("SLURM_CPUS_PER_TASK", "3")
+    monkeypatch.setenv("OMP_NUM_THREADS", "unset")  # see sibling test above
 
     shard_workers._scale_thread_env(4)
 
