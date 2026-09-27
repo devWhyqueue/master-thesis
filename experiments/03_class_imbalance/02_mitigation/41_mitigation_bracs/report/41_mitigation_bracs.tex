@@ -1,0 +1,73 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Recovering Class-Imbalance Damage on BRACS:\\How Much Does Each Mitigation Method Give Back?}
+\author{Yannik Queisler}
+\date{September 27, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Class prevalence alone damages balanced accuracy on BRACS by 7.65 percentage points (95\% interval: 5.77 to 9.78) at an imbalance ratio of 100, under a frozen logistic-regression readout \citep{queisler2026prevalenceBracs} -- about seven times the damage the same design finds on TCGA-UT \citep{queisler2026prevalenceTcga}. A companion report defines six mitigation methods for patch classification under a Virchow2 encoder adapted only through low-rank updates, spanning data-level, algorithm-level, and hybrid interventions, plus the unmitigated cross-entropy (CE) reference \citep{queisler2026mitigationMethods}. This protocol asks how much of BRACS's larger imbalance damage each method recovers once the encoder itself can adapt. It reuses the patient draws, class-rank permutation, and total patch budget of the prevalence study (ten patients per class, 2,240 patches, 30 split-draw shards) and fits two arms: an undamaged anchor (CE at ratio 1) and the damage anchor plus every mitigation method at ratio 100. For each method, the configured strength with the best \emph{validation} patient-macro balanced accuracy is selected per shard, never the test set; recovery is the selected method's test-set balanced accuracy minus the CE damage anchor's, and a method is read as recovering a material share of the damage if that gain reaches one percentage point with a 95\% interval excluding zero. The design, endpoints, and pre-stated readings are fixed here before any grid fit is submitted; results and their interpretation are reported separately once the fits complete.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The prevalence study of this series isolates class prevalence from patient shortage at fixed patient support and finds that BRACS suffers far more from it than TCGA-UT: 7.65 percentage points of balanced-accuracy damage at an imbalance ratio of 100, against 2.91 points on TCGA-UT, from a design that differs only in the dataset \citep{queisler2026prevalenceBracs,queisler2026prevalenceTcga}. Both studies use a frozen encoder and a linear readout, so neither asks whether a mitigation method can give any of that damage back. A companion report separately defines six such methods -- balanced sampling and MixUp on the data side, logit adjustment and DisAlign on the algorithm side, and classifier re-training (cRT) and Gaussian clouded logit (GCL) adjustment as hybrids that combine both -- together with the CE reference, all trained under a Virchow2 encoder adapted only through low-rank updates (LoRA) rather than left frozen \citep{queisler2026mitigationMethods}. That report fixes definitions and control parameters; it reports no accuracy numbers.
+
+A parallel mitigation program on patient shortage, the other damage source this series studies, found that of six tested corrections only two showed partial recovery on TCGA-UT and that none worked on BRACS \citep{queisler2026patientShortage}. Whether the same pattern holds for prevalence damage, whose BRACS penalty is far larger to begin with, is untested. This report asks that question directly: \emph{once the encoder can adapt through LoRA, how much of BRACS's ratio-100 prevalence damage does each of exp-40's six methods recover, and does recovery differ between the data-level/algorithm-level methods trained end to end in one stage and the hybrid methods that freeze the encoder and re-fit only the classifier in a second stage?} The comparison is read against exp-26's own frozen-readout damage as an external reference, not a paired contrast, since the two studies use different classifiers on the same allocation design.
+
+\section{Design}
+\label{sec:design}
+The shard design is exp-26's own, unchanged: three fixed patient-disjoint BRACS splits, each drawn ten times, for $G=10$ patients per lesion class sampled from those with at least $D=160$ training patches, and a total training budget of $T=7\cdot G\cdot 32=2{,}240$ patches held fixed across every arm of a draw \citep{queisler2026prevalenceBracs}. Every method reuses these 30 split-draw shards' patient draws and, where an arm needs one, exp-26's class-rank permutation, through the same \texttt{prevalence.fit} code exp-26 and exp-40 already share. Training reads decoded patch images rather than cached features, because every method here adapts the encoder itself through LoRA; \citet{queisler2026mitigationMethods} gives the adaptation's rank, target modules, and each method's loss or sampler.
+
+\subsection{Arms}
+Two ratio arms enter the grid, both from the prevalence study's exponential allocation profile at rank permutation: $\rho=1$, the balanced allocation, and $\rho=100$, the most damaged allocation exp-26 measured. The $\rho=1$ arm trains only the CE reference, an undamaged anchor $\mathrm{BA}(\mathrm{ce},r1)$ against which recovery is ultimately judged. The $\rho=100$ arm trains CE, which is the damage anchor $\mathrm{BA}(\mathrm{ce},r100)$, and every one of exp-40's six methods at a small grid of control-parameter values, so that each method's recovery can be read against a within-study damage figure rather than exp-26's externally measured one. Table~\ref{tab:grid} lists the grid. Stage-one methods (balanced sampling, MixUp, logit adjustment, GCL) train the LoRA update, and where applicable a cosine head, directly; stage-two methods (post-hoc logit adjustment, DisAlign, cRT, GCL's second stage) freeze the stage-one CE or GCL run's encoder and re-fit only the classifier from its cached embeddings, following \citet{queisler2026mitigationMethods}'s two-stage definitions.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Stage & Method & Control parameter & Grid values ($\rho=100$) \\
+\midrule
+1 & CE (reference) & -- & -- \\
+1 & Balanced sampling & $s$ & 0.5, 1.0 \\
+1 & MixUp & $\alpha$ & 0.2, 1.0 \\
+1 & Logit adjustment (train-time) & $\tau$ & 0.5, 1.0 \\
+1 & GCL adjustment & $\sigma$ & 0.05, 0.2 \\
+2 & Post-hoc logit adjustment & $\tau$ & 0.5, 1.0, 1.5, 2.0 \\
+2 & DisAlign & $\rho$ (reweighting exponent) & 0.5, 1.0, 1.5 \\
+2 & cRT & -- & -- \\
+2 & GCL (stage two) & $\sigma$ (of its stage-one source) & 0.05, 0.2 \\
+\bottomrule
+\end{tabular}
+\caption{The $\rho=100$ grid. Each stage-one method's grid brackets the source default \citep{queisler2026mitigationMethods} with one weaker and one stronger value, except MixUp and DisAlign, whose sources report no single default. GCL's stage-two job is labelled and sourced by its own stage-one sigma, so each configured sigma yields one stage-two fit. The $\rho=1$ arm trains only CE.}
+\label{tab:grid}
+\end{table}
+
+\subsection{Selection and fit count}
+Each method's grid entry is a control-parameter sweep, not a single configuration, because the right strength is not known in advance and cannot be fixed by the same criterion as the encoder update itself. For each of the 30 split-draw shards and each method independently, the configured parameter value with the best \emph{validation} patient-macro balanced accuracy is selected; the test partition is never read for selection, so the reported recovery cannot be inflated by choosing the parameter that happens to fit the test draw. The selected parameter can differ from shard to shard, and its distribution over the 30 shards is itself reported as a diagnostic of how stable each method's preferred strength is.
+
+The $\rho=1$ arm contributes one CE fit per shard (30 fits). The $\rho=100$ arm contributes CE plus four stage-one methods at two grid values each (30 fits $\times$ 9 combinations $=$ 270 fits), for 300 stage-one fits in total. Stage-two methods reuse a stage-one run's cached embeddings rather than a fresh forward pass and are cheap by comparison: four methods at up to four grid values each (10 combinations) give 300 further fits per shard total. Stage-one training length is fixed once, before the grid is submitted, by a small pilot: CE at $\rho=1$ and $\rho=100$, one draw per split, trained for $\{150,300,600,1200\}$ steps as separate runs (the cosine learning-rate schedule needs a fixed horizon, so step count cannot change within one run). The pilot selects the smallest step count within 0.5 percentage points of the best mean validation balanced accuracy across the four candidates, and its per-fit wall time informs which SLURM partition the full grid uses. The pilot is a validation-only, pre-registered decision, reported alongside the grid results but not itself part of the recovery comparison.
+
+\section{Evaluation}
+\label{sec:evaluation}
+The primary endpoint is patient-macro balanced accuracy (BA) on the test partition, computed as in exp-26: the mean of per-class patch recalls in which every test patient of a class carries equal weight \citep{queisler2026prevalenceBracs}. Estimates pool over the 30 split-draw shards with equal weight per split, and uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of shards within each split over 2,000 replicates, matching exp-26's own recipe exactly; every arm and every method's selected fit share the same replicate weights, so every contrast below is paired.
+
+\emph{Damage} is $D=\mathrm{BA}(\mathrm{ce},r1)-\mathrm{BA}(\mathrm{ce},r100)$, the within-study analogue of exp-26's ratio-100 damage figure. For a method $m$, let $m^{*}$ denote its per-shard validation-selected fit; \emph{recovery} is $R_m=\mathrm{BA}(m^{*},r100)-\mathrm{BA}(\mathrm{ce},r100)$, and its \emph{share} of the damage is $R_m/D$, computed per bootstrap replicate so that the share itself carries a paired interval. A method \emph{recovers} a material share of the damage if $R_m$ is at least one percentage point and its 95\% interval lies entirely above zero; it shows \emph{full recovery} if $\mathrm{BA}(m^{*},r100)$'s interval contains the point estimate of $\mathrm{BA}(\mathrm{ce},r1)$, i.e. the undamaged anchor is no longer distinguishable from the mitigated arm. These thresholds are fixed here, before the grid is fit, and are not revisited afterward.
+
+Three secondary readings accompany the primary comparison. First, head, body, and tail recall by assigned class rank at $\rho=100$, for the CE anchor and for each method's selected fit, shows whether recovery is concentrated in the tail classes the damage falls hardest on or spread across the distribution. Second, macro negative log-likelihood and expected calibration error, raw and after validation temperature scaling, are reported for the same set of fits, following exp-26's probability-quality recipe. Third, each method's selected-parameter frequency over the 30 shards is reported, and the mean recovered share is compared between the four stage-one methods, trained end to end, and the four stage-two methods, which freeze the encoder and re-fit only the classifier; a systematic gap between the two families would point to where a recoverable correction has to act. Exp-26's own damage figure, 7.65 percentage points (5.77 to 9.78) under a frozen logistic-regression readout, is carried alongside this study's LoRA-based damage $D$ as an external reference \citep{queisler2026prevalenceBracs}; because the two studies use different classifiers on the same allocation design, the comparison is descriptive rather than a paired contrast, and no threshold is pre-stated for it.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
