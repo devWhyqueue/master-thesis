@@ -1,7 +1,8 @@
 # Mitigation recovery on BRACS (exp-41): reuses exp-40's code (`slurm.code_dir` below) and exp-26's
 # design (G=10, DEPTH=160, BALANCED=32, same patient draws/class permutation via prevalence.fit).
-# Arms: r1 CE (damage anchor, undamaged) + r100 CE + every exp-40 method at r100. See
-# report/41_mitigation_bracs.tex "Design" for the grid's param choices.
+# Arms: r1 CE (damage anchor, undamaged) + every exp-40 method at r50, r100, and N (native class
+# shares, realized rho ~6.7 per exp-26). See report/41_mitigation_bracs.tex "Design" for the grid's
+# param choices; r50/N mirror r100's grid unchanged.
 
 prevalence:
   patients_per_class: 10
@@ -35,7 +36,31 @@ mitigation:
     r1:
       stage1:
         ce: [null]
+    r50:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        mixup: [0.2, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.05, 0.2]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5]
+        crt: [null]
+        gcl2: [0.05, 0.2]
     r100:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        mixup: [0.2, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.05, 0.2]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5]
+        crt: [null]
+        gcl2: [0.05, 0.2]
+    N:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]

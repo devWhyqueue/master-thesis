@@ -71,12 +71,12 @@ def pack_methods(
     family_of: dict[str, str],
     dists: Distributions,
     ce_r1: str,
-    ce_r100: str,
+    ce_arm: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Every estimate (CE anchors, damage, and each method's selected/recovery/share) plus per-method verdicts."""
     estimates = {
-        "arm_r1_ce": pack_estimate(dists.ba[ce_r1]),
-        "arm_r100_ce": pack_estimate(dists.ba[ce_r100]),
+        f"arm_{ce_r1}": pack_estimate(dists.ba[ce_r1]),
+        f"arm_{ce_arm}": pack_estimate(dists.ba[ce_arm]),
         "damage": pack_estimate(dists.damage),
     }
     methods_out: dict[str, Any] = {}
@@ -105,24 +105,16 @@ def family_share(
 
 def write_analysis(
     config: dict[str, Any],
-    estimates: dict[str, Any],
-    methods_out: dict[str, Any],
-    shares: dict[str, float | None],
-    thirds: dict[str, dict[str, float]],
-    quality: dict[str, dict[str, dict[str, float]]],
+    arms: dict[str, dict[str, Any]],
     exp26_damage: dict[str, float],
 ) -> Path:
-    """Write the exp-41 analysis.json."""
+    """Write the exp-41 analysis.json, one ``estimates``/``methods``/... block per imbalance arm."""
     path = output_root(config) / "data" / "analysis.json"
     write_json(
         path,
         {
             "shards": {"n_splits": N_SPLITS, "n_draws": N_DRAWS},
-            "estimates": estimates,
-            "methods": methods_out,
-            "family_share": shares,
-            "rank_recall": thirds,
-            "probability_quality": quality,
+            "arms": arms,
             "exp26_damage_reference": exp26_damage,
         },
     )
