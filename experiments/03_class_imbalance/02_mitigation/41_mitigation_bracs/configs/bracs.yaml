@@ -12,6 +12,12 @@
 # bound, so its edge-hugging isn't a grid-scoping problem. bs stayed at {0.5,1.0}: s in [0,1] is
 # the method's own defined range and its picks split near-evenly in 2 of 3 arms. gcl2's values
 # must match gcl's (its stage-two source), so both were widened together.
+#
+# 2026-09-28 (2nd pass): after the first widening, r50/r100 landed interior values for gcl/gcl2/
+# disalign, but arm N alone flipped to hugging the *new* top edge (gcl2->0.2, disalign->2.0) --
+# extended N only (gcl/gcl2 0.5, disalign 3.0) to check whether N's optimum keeps climbing or
+# settles. mixup still hugs its low edge in every arm; not widened further (mechanism finding:
+# uniform partner sampling never touches the class prior, so no amount of alpha fixes it).
 
 prevalence:
   patients_per_class: 10
@@ -75,12 +81,12 @@ mitigation:
         bs: [0.5, 1.0]
         mixup: [0.05, 0.2, 1.0]
         la: [0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2]
+        gcl: [0.02, 0.05, 0.2, 0.5]
       stage2:
         posthoc_la: [0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
         crt: [null]
-        gcl2: [0.02, 0.05, 0.2]
+        gcl2: [0.02, 0.05, 0.2, 0.5]
   train:
     # steps=600 from the pilot (report "Design", pilot subsection): the only candidate within
     # 0.5pp of the best mean r100 validation BA over {150, 300, 600, 1200} (0.3493 vs 0.3187,
