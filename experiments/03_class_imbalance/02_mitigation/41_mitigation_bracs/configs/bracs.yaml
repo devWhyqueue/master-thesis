@@ -1,8 +1,17 @@
 # Mitigation recovery on BRACS (exp-41): reuses exp-40's code (`slurm.code_dir` below) and exp-26's
 # design (G=10, DEPTH=160, BALANCED=32, same patient draws/class permutation via prevalence.fit).
 # Arms: r1 CE (damage anchor, undamaged) + every exp-40 method at r50, r100, and N (native class
-# shares, realized rho ~6.7 per exp-26). See report/41_mitigation_bracs.tex "Design" for the grid's
-# param choices; r50/N mirror r100's grid unchanged.
+# shares, realized rho ~6.7 per exp-26). See report/41_mitigation_bracs.tex "Design" for the original
+# param choices; r50/N mirror r100's grid.
+#
+# 2026-09-28: widened mixup/gcl/gcl2/disalign after the first pass's selected_param_frequency
+# hugged one grid edge in every arm (mixup->0.2, gcl/gcl2->0.05, disalign->1.5, all boundaries of
+# their tested range) -- added a value past that edge (mixup 0.05, gcl/gcl2 0.02, disalign 2.0) to
+# check whether the true optimum sits outside the original grid. la stayed at {0.5,1.0}: tau=1
+# is the theoretical full-correction target (report Sec. "Logit Adjustment"), not an arbitrary
+# bound, so its edge-hugging isn't a grid-scoping problem. bs stayed at {0.5,1.0}: s in [0,1] is
+# the method's own defined range and its picks split near-evenly in 2 of 3 arms. gcl2's values
+# must match gcl's (its stage-two source), so both were widened together.
 
 prevalence:
   patients_per_class: 10
@@ -40,38 +49,38 @@ mitigation:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.2, 1.0]
+        mixup: [0.05, 0.2, 1.0]
         la: [0.5, 1.0]
-        gcl: [0.05, 0.2]
+        gcl: [0.02, 0.05, 0.2]
       stage2:
         posthoc_la: [0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5]
+        disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
-        gcl2: [0.05, 0.2]
+        gcl2: [0.02, 0.05, 0.2]
     r100:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.2, 1.0]
+        mixup: [0.05, 0.2, 1.0]
         la: [0.5, 1.0]
-        gcl: [0.05, 0.2]
+        gcl: [0.02, 0.05, 0.2]
       stage2:
         posthoc_la: [0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5]
+        disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
-        gcl2: [0.05, 0.2]
+        gcl2: [0.02, 0.05, 0.2]
     N:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.2, 1.0]
+        mixup: [0.05, 0.2, 1.0]
         la: [0.5, 1.0]
-        gcl: [0.05, 0.2]
+        gcl: [0.02, 0.05, 0.2]
       stage2:
         posthoc_la: [0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5]
+        disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
-        gcl2: [0.05, 0.2]
+        gcl2: [0.02, 0.05, 0.2]
   train:
     # steps=600 from the pilot (report "Design", pilot subsection): the only candidate within
     # 0.5pp of the best mean r100 validation BA over {150, 300, 600, 1200} (0.3493 vs 0.3187,
