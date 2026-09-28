@@ -35,12 +35,16 @@ mitigation:
     s: 30
     a: 0.9
     b: 0.09
+  cuda:
+    gamma: 0.6
+    check_size: 10
+    max_strength: 10
   grid:
     r1: &methods_grid
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.2]
+        cuda: [0.5]
         la: [1.0]
         gcl: [0.1]
       stage2:

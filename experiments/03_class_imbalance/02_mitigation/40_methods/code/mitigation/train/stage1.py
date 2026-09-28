@@ -1,9 +1,10 @@
 """Stage-one training: LoRA-adapted Virchow2 + linear/cosine head, one method per run.
 
-``ce``, ``bs``, and ``la`` share a plain linear head; ``mixup`` too, mixing the
-normalized pixel batch before the encoder forward; ``gcl`` uses a cosine head
-and the clouded-logit loss. Balanced sampling (``bs``) is the only stage-one
-method that changes the row sampler; every other method draws uniformly.
+``ce``, ``bs``, ``cuda``, and ``la`` share a plain linear head; ``cuda`` augments the
+raw uint8 patch batch before the encoder forward, at each class's current level of
+learning; ``gcl`` uses a cosine head and the clouded-logit loss. Balanced sampling
+(``bs``) is the only stage-one method that changes the row sampler; every other
+method draws uniformly.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from mitigation import TrainHParams, gcl_constants, train_hparams
+from mitigation import TrainHParams, cuda_constants, gcl_constants, train_hparams
 from mitigation.encoder import load_lora_encoder
 from mitigation.images import decode_images, decode_transform
 from mitigation.methods import CosineHead, gcl_delta, sample_weights
@@ -74,16 +75,31 @@ def _build_optimizer(
 
 def _method_extras(
     method: str, counts: np.ndarray, config: dict[str, Any], device: torch.device
-) -> tuple[torch.Tensor | None, torch.Tensor | None, float | None]:
-    """Build the method-specific tensors ``run_stage1`` needs: LA's log-prior, GCL's delta/scale."""
+) -> tuple[
+    torch.Tensor | None,
+    torch.Tensor | None,
+    float | None,
+    tuple[float, int, int, int] | None,
+]:
+    """Build the method-specific tensors ``run_stage1`` needs.
+
+    LA's log-prior, GCL's delta/scale, CUDA's (gamma, check_size, max_strength,
+    steps_per_epoch) -- the epoch length in optimizer steps, since training runs a
+    fixed step count rather than epochs (report "CUDA" thesis variant).
+    """
     if method == "la":
         prior = torch.tensor(counts / counts.sum(), dtype=torch.float32, device=device)
-        return torch.log(prior), None, None
+        return torch.log(prior), None, None, None
     if method == "gcl":
         gcl_s, _, _ = gcl_constants(config)
         delta = torch.tensor(gcl_delta(counts), dtype=torch.float32, device=device)
-        return None, delta, gcl_s
-    return None, None, None
+        return None, delta, gcl_s, None
+    if method == "cuda":
+        gamma, check_size, max_strength = cuda_constants(config)
+        batch_size = train_hparams(config, "stage1").batch_size
+        steps_per_epoch = -(-int(counts.sum()) // batch_size)
+        return None, None, None, (gamma, check_size, max_strength, steps_per_epoch)
+    return None, None, None, None
 
 
 def _build_head(
@@ -114,7 +130,13 @@ class _TrainingSetup:
 
 def _prepare(
     config: dict[str, Any], device: torch.device, arm: ArmBatch, method: str, seed: int
-) -> tuple[_TrainingSetup, torch.Tensor | None, torch.Tensor | None, float | None]:
+) -> tuple[
+    _TrainingSetup,
+    torch.Tensor | None,
+    torch.Tensor | None,
+    float | None,
+    tuple[float, int, int, int] | None,
+]:
     """Load the LoRA encoder, decode the arm's images, and build its head and loss extras."""
     cpu_generator = torch.Generator().manual_seed(seed)
     device_generator = torch.Generator(device=device).manual_seed(seed)
@@ -123,7 +145,9 @@ def _prepare(
     y_t = torch.from_numpy(arm.y).to(device)
     is_cosine = method == "gcl"
     head = _build_head(pooled_dim, arm.num_classes, is_cosine, device)
-    log_prior, delta, gcl_s = _method_extras(method, arm.counts, config, device)
+    log_prior, delta, gcl_s, cuda_params = _method_extras(
+        method, arm.counts, config, device
+    )
     setup = _TrainingSetup(
         encoder,
         head,
@@ -134,7 +158,7 @@ def _prepare(
         device_generator,
         is_cosine,
     )
-    return setup, log_prior, delta, gcl_s
+    return setup, log_prior, delta, gcl_s, cuda_params
 
 
 def _run_training(
@@ -169,11 +193,18 @@ def run_stage1(
     seed: int,
 ) -> Stage1Output:
     """Train one stage-one arm: LoRA-adapted encoder plus a linear or cosine head."""
-    setup, log_prior, delta, gcl_s = _prepare(config, device, arm, method, seed)
+    setup, log_prior, delta, gcl_s, cuda_params = _prepare(
+        config, device, arm, method, seed
+    )
     mean, std = tuple(setup.data_config["mean"]), tuple(setup.data_config["std"])
     model = StepModel(setup.encoder, setup.head, setup.images, setup.y_t, mean, std)
     step_fn = build_loss_step(
-        method, param, model, device, (log_prior, delta, gcl_s), setup.device_generator
+        method,
+        param,
+        model,
+        device,
+        (log_prior, delta, gcl_s, cuda_params),
+        setup.device_generator,
     )
     _run_training(config, setup, arm, method, param, step_fn)
     cosine_scale = gcl_s if setup.is_cosine else None

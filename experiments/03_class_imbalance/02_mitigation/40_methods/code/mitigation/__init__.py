@@ -2,7 +2,7 @@
 
 Six mitigations plus the CE reference, defined in ``report/40_methods.tex``, all
 trained on a Virchow2 encoder adapted only through LoRA (attention ``qkv``/``proj``
-projections, every block) with a linear or cosine head. ``ce``, ``bs``, ``mixup``,
+projections, every block) with a linear or cosine head. ``ce``, ``bs``, ``cuda``,
 ``la``, and ``gcl`` train stage one (encoder LoRA + head); ``posthoc_la``, ``crt``,
 ``disalign``, and ``gcl2`` are stage-two, cached-embedding methods that reuse a
 stage-one run's exported features instead of a fresh forward pass.
@@ -26,12 +26,13 @@ __all__ = [
     "LORA_TARGET_REGEX",
     "lora_constants",
     "gcl_constants",
+    "cuda_constants",
     "method_label",
     "TrainHParams",
     "train_hparams",
 ]
 
-STAGE1_METHODS: tuple[str, ...] = ("ce", "bs", "mixup", "la", "gcl")
+STAGE1_METHODS: tuple[str, ...] = ("ce", "bs", "cuda", "la", "gcl")
 STAGE2_METHODS: tuple[str, ...] = ("posthoc_la", "crt", "disalign", "gcl2")
 # Which stage-one run's exported embeddings a stage-two method is fit from.
 STAGE2_SOURCE: dict[str, str] = {
@@ -78,6 +79,25 @@ def gcl_constants(config: dict[str, Any]) -> tuple[float, float, float]:
             "config must set mitigation.gcl: {s, a, b} before GCL training"
         )
     return float(gcl["s"]), float(gcl["a"]), float(gcl["b"])
+
+
+def cuda_constants(config: dict[str, Any]) -> tuple[float, int, int]:
+    """Return CUDA's accuracy threshold ``gamma``, check size ``T``, and max strength ``S``.
+
+    Fixed before training per the report's CUDA section; unlike ``p_aug`` (the
+    tuned control), these have no code default and must be set explicitly.
+    """
+    cuda = config.get("mitigation", {}).get("cuda")
+    if not cuda:
+        raise ValueError(
+            "config must set mitigation.cuda: {gamma, check_size, max_strength} "
+            "before CUDA training"
+        )
+    return (
+        float(cuda["gamma"]),
+        int(cuda["check_size"]),
+        int(cuda["max_strength"]),
+    )
 
 
 def method_label(method: str, param: float | None) -> str:

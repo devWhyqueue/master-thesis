@@ -11,14 +11,15 @@ import torch.nn.functional as F
 from mitigation.methods import (
     CosineHead,
     DisAlign,
+    augment,
+    cuda_batch,
     disalign_class_weights,
     gcl_delta,
     gcl_logits,
     la_loss,
-    mixup_batch,
-    mixup_loss,
     reinit_linear_head,
     sample_weights,
+    update_levels,
 )
 
 _Y = np.array([0, 0, 0, 1], dtype=np.int64)
@@ -36,18 +37,84 @@ def test_power_sampling_balanced_at_s1() -> None:
     assert weights[_Y == 0].sum() == pytest.approx(weights[_Y == 1].sum())
 
 
-def test_mixup_alpha_zero_is_ce() -> None:
-    """alpha<=0 leaves the batch unmixed and the loss equal to plain CE."""
-    logits = torch.randn(4, 3)
-    y = torch.tensor([0, 1, 2, 0])
-    x = torch.randn(4, 5)
+def test_cuda_batch_p_aug_zero_is_identity() -> None:
+    """p_aug=0 leaves every row unchanged, whatever the per-row levels."""
     generator = torch.Generator().manual_seed(0)
-    mixed, perm, lam = mixup_batch(x, 0.0, generator)
-    assert lam == 1.0
-    assert torch.equal(mixed, x)
-    assert mixup_loss(logits, y, perm, lam).item() == pytest.approx(
-        F.cross_entropy(logits, y).item()
+    images = torch.randint(0, 255, (4, 3, 32, 32), dtype=torch.uint8)
+    levels = torch.tensor([5, 3, 0, 8])
+    out = cuda_batch(images, levels, 0.0, max_strength=10, generator=generator)
+    assert torch.equal(out, images)
+
+
+def test_cuda_batch_strength_zero_is_identity() -> None:
+    """Rows at level 0 are unchanged even when always selected for augmentation."""
+    generator = torch.Generator().manual_seed(0)
+    images = torch.randint(0, 255, (4, 3, 32, 32), dtype=torch.uint8)
+    levels = torch.zeros(4, dtype=torch.long)
+    out = cuda_batch(images, levels, 1.0, max_strength=10, generator=generator)
+    assert torch.equal(out, images)
+
+
+def test_augment_strength_zero_is_identity() -> None:
+    """strength=0 leaves the image unchanged (Eq. cuda-aug)."""
+    generator = torch.Generator().manual_seed(0)
+    img = torch.randint(0, 255, (3, 32, 32), dtype=torch.uint8)
+    assert torch.equal(augment(img, 0, max_strength=10, generator=generator), img)
+
+
+def test_update_levels_rises_when_always_correct() -> None:
+    """A class whose checks all pass climbs by one level (Eq. cuda-lol)."""
+    generator = torch.Generator().manual_seed(0)
+    rows = torch.randint(0, 255, (20, 3, 32, 32), dtype=torch.uint8)
+    levels = torch.tensor([3])
+
+    def always_correct(batch: torch.Tensor) -> torch.Tensor:
+        return torch.zeros(batch.shape[0], dtype=torch.long)
+
+    new_levels = update_levels(
+        levels, [rows], always_correct, gamma=0.6, check_size=10, max_strength=10,
+        generator=generator,
     )
+    assert new_levels[0].item() == 4
+
+
+def test_update_levels_falls_when_always_wrong() -> None:
+    """A class whose checks all fail drops by one level (Eq. cuda-lol)."""
+    generator = torch.Generator().manual_seed(0)
+    rows = torch.randint(0, 255, (20, 3, 32, 32), dtype=torch.uint8)
+    levels = torch.tensor([3])
+
+    def always_wrong(batch: torch.Tensor) -> torch.Tensor:
+        return torch.full((batch.shape[0],), 1, dtype=torch.long)
+
+    new_levels = update_levels(
+        levels, [rows], always_wrong, gamma=0.6, check_size=10, max_strength=10,
+        generator=generator,
+    )
+    assert new_levels[0].item() == 2
+
+
+def test_update_levels_clipped_at_bounds() -> None:
+    """Level 0 never drops below 0; level S never rises above S."""
+    generator = torch.Generator().manual_seed(0)
+    rows = torch.randint(0, 255, (20, 3, 32, 32), dtype=torch.uint8)
+
+    def always_wrong(batch: torch.Tensor) -> torch.Tensor:
+        return torch.full((batch.shape[0],), 1, dtype=torch.long)
+
+    def always_correct(batch: torch.Tensor) -> torch.Tensor:
+        return torch.zeros(batch.shape[0], dtype=torch.long)
+
+    at_floor = update_levels(
+        torch.tensor([0]), [rows], always_wrong, gamma=0.6, check_size=10,
+        max_strength=10, generator=generator,
+    )
+    at_ceiling = update_levels(
+        torch.tensor([10]), [rows], always_correct, gamma=0.6, check_size=10,
+        max_strength=10, generator=generator,
+    )
+    assert at_floor[0].item() == 0
+    assert at_ceiling[0].item() == 10
 
 
 def test_la_loss_tau_zero_is_ce() -> None:
