@@ -21,7 +21,7 @@
 \maketitle
 
 \begin{abstract}
-\noindent Class imbalance lets a patch classifier reach high aggregate accuracy while failing on rare diagnoses. This report defines six mitigation methods for histopathology patch classification and places them in the data-level, algorithm-level, and hybrid families of \citet{krawczyk2016learning}: balanced sampling and MixUp change the training data, logit adjustment and DisAlign change the objective or decision rule, and classifier re-training (cRT) and Gaussian clouded logit (GCL) adjustment combine both. All methods share one setting: a Virchow2 foundation-model encoder that is either frozen or adapted with low-rank updates, and a linear classification head. Each method is stated in its source form, with the control parameter that sets its strength and the adaptations required by this setting.
+\noindent Class imbalance lets a patch classifier reach high aggregate accuracy while failing on rare diagnoses. This report defines six mitigation methods for histopathology patch classification and places them in the data-level, algorithm-level, and hybrid families of \citet{krawczyk2016learning}: balanced sampling and a curriculum of data augmentation (CUDA) change the training data, logit adjustment and DisAlign change the objective or decision rule, and classifier re-training (cRT) and Gaussian clouded logit (GCL) adjustment combine both. All methods share one setting: a Virchow2 foundation-model encoder that is either frozen or adapted with low-rank updates, and a linear classification head. Each method is stated in its source form, with the control parameter that sets its strength and the adaptations required by this setting.
 \end{abstract}
 
 \setcounter{tocdepth}{2}
@@ -60,7 +60,7 @@ Figure~\ref{fig:taxonomy} places the six methods in these families. Two placemen
   ]
     \node[baseline] (ce) at (0,0) {No-mitigation\\reference: CE};
     \node[family] (data) at (-4.6,-1.9) {Data-level\\\footnotesize change the training data};
-    \node[method, below=0.38cm of data] (dataMethods) {Balanced sampling\\MixUp};
+    \node[method, below=0.38cm of data] (dataMethods) {Balanced sampling\\CUDA};
     \node[family] (alg) at (0,-1.9) {Algorithm-level\\\footnotesize change the learner};
     \node[method, below=0.38cm of alg] (algMethods) {Logit adjustment\\DisAlign};
     \node[family] (hyb) at (4.6,-1.9) {Hybrid\\\footnotesize change both};
@@ -99,20 +99,34 @@ Class-aware sampling fills each minibatch by first drawing a class uniformly and
 \end{equation}
 \noindent so that class $c$ receives an expected share proportional to $n_c^{1-s}$. Setting $s=0$ recovers empirical sampling and CE; $s=1$ gives every class the same expected exposure; intermediate values rebalance partly. The loss stays Equation~\eqref{eq:ce}. Balanced sampling repeats tail patches rather than adding new ones, so at high $s$ it can overfit the few tail patches, while the head classes are seen less often per epoch.
 
-\subsubsection{MixUp}
-MixUp trains on convex combinations of random pairs of examples and their labels \citep{zhang2018mixup}. For two training patches $(x_i,y_i)$ and $(x_j,y_j)$ and a mixing weight $\lambda\sim\mathrm{Beta}(\alpha,\alpha)$, the mixed input is
-\begin{equation}
-  \tilde x=\lambda x_i+(1-\lambda)x_j,
-  \label{eq:mixup-input}
-\end{equation}
-\noindent and its target is the same mixture of the two one-hot labels. With logits $\tilde{\mathbf z}$ of the mixed input, the loss is
-\begin{equation}
-  \mathcal L_{\mathrm{MixUp}}=\lambda\,\mathcal L_{\mathrm{CE}}(\tilde{\mathbf z},y_i)+(1-\lambda)\,\mathcal L_{\mathrm{CE}}(\tilde{\mathbf z},y_j).
-  \label{eq:mixup-loss}
-\end{equation}
-\noindent The pair partner $j$ is a random permutation of the minibatch. The parameter $\alpha>0$ sets how strongly the pairs are mixed: as $\alpha\to0$, $\lambda$ concentrates at $0$ or $1$ and the objective returns to CE, while $\alpha=1$ draws $\lambda$ uniformly. MixUp encourages the model to behave linearly between training examples, which smooths decision boundaries and reduces overconfident predictions.
+\subsubsection{Curriculum of Data Augmentation (CUDA)}
+Curriculum of data augmentation (CUDA) assigns each class its own augmentation strength and adapts it during training \citep{ahn2023cuda}. It rests on an observation of the source: strong augmentation of one group of classes tends to raise the accuracy of the other classes, while the augmented classes themselves gain little or even lose accuracy. The appropriate strength therefore differs between classes, and CUDA sets it from how well the model has already learned each class rather than from the class counts.
 
-MixUp does not read class counts, and both partners are drawn from the empirical distribution. Its effect on imbalance is therefore indirect: tail patches are mixed with head patches and gain regularized neighbourhoods, but their share of the training signal is not raised. It is included as a data-level method because it enlarges the effective training set through synthetic examples, and because it is a standard baseline in long-tailed benchmarks.
+The augmentation is built from $K$ predefined image operations, such as rotation, shifts, or brightness changes. Each operation $O_k$ has a magnitude function $m_k(s)$ of an integer strength $s\in\{0,\ldots,S\}$. At strength $s$, the augmentation applies $s$ operations drawn uniformly at random, each at magnitude $m_k(s)$:
+\begin{equation}
+  O(x;s)=O_{k_s}^{m_{k_s}(s)}\circ\cdots\circ O_{k_1}^{m_{k_1}(s)}(x),
+  \qquad
+  k_i\sim\mathcal U\{1,\ldots,K\}.
+  \label{eq:cuda-aug}
+\end{equation}
+\noindent Strength $s=0$ leaves the patch unchanged, and a larger $s$ gives both more and stronger operations.
+
+Each class $c$ carries a \emph{level of learning} $L_c$, which is the strength currently applied to its patches. All levels start at zero and are updated at the start of every epoch. For each candidate strength $l\in\{0,\ldots,L_c\}$, a subset $D'_c$ of $T(l+1)$ patches of class $c$ is drawn with replacement, augmented at strength $l$, and classified by the current model. The level rises only if the model classifies enough of them correctly at every strength:
+\begin{equation}
+  L_c\leftarrow
+  \begin{cases}
+    L_c+1 & \text{if } \sum_{x\in D'_c}\mathbf 1\bigl\{\hat y(O(x;l))=c\bigr\}\geq\gamma\,T(l+1)\ \text{for all } l\leq L_c,\\
+    L_c-1 & \text{otherwise},
+  \end{cases}
+  \label{eq:cuda-lol}
+\end{equation}
+\noindent where $\gamma\in[0,1]$ is the accuracy threshold and $T$ sets how many patches are checked; the check grows with $l$ because the number of possible operation sequences grows with the strength. During the epoch, each training patch $x$ of class $y$ is replaced by $O(x;L_y)$ with probability $p_{\mathrm{aug}}$ and kept unchanged otherwise, and the loss stays Equation~\eqref{eq:ce}. The curriculum thus presents easy versions of a class first and harder ones once the class is learned.
+
+CUDA does not read class counts, and the sampler stays empirical. Its effect on imbalance comes through the levels: head classes are learned sooner, reach higher levels, and receive stronger augmentation, which by the source's observation benefits the other classes. The augmentation probability $p_{\mathrm{aug}}\in[0,1]$ is the control: $p_{\mathrm{aug}}=0$ recovers CE, and larger values apply the curriculum to more patches. The source designs CUDA as an add-on to other long-tailed methods; here it is paired with CE, so that its effect is not mixed with a second rebalancing mechanism.
+
+\paragraph{Thesis variant.}
+The operations act on the image patch before the Virchow2 encoder, so CUDA acts in stage one together with the LoRA update. Training is counted in optimizer steps rather than epochs, so the levels are updated at a fixed step interval. The threshold $\gamma$, the check size $T$, the maximum strength $S$, and the operation set are fixed before training; $p_{\mathrm{aug}}$ is the tuned control.
+
 \subsection{Algorithm-Level Methods}
 Algorithm-level methods keep the empirical data stream and change how the learner turns features into decisions. Both methods below act on the logits: logit adjustment with a fixed shift derived from the class prior, DisAlign with a learned, input-dependent calibration.
 
@@ -195,7 +209,7 @@ Stage one trains the LoRA update and a cosine classifier head with the clouded l
 
 \section{Summary}
 \label{sec:summary}
-This report defines six class-imbalance mitigation methods for patch classification and places them in the three families of \citet{krawczyk2016learning}. Balanced sampling and MixUp are data-level methods, logit adjustment and DisAlign are algorithm-level methods, and cRT and GCL are hybrid methods that pair decoupled classifier learning with a rebalanced sampler. All methods except MixUp read the imbalance from the class counts $n_c$ or the prevalences $\pi_c$, and each method except cRT has one parameter that sets its strength. At zero strength, balanced sampling, MixUp, and logit adjustment reduce to CE, and GCL reduces to CE with a cosine head. The methods share one setting: a Virchow2 encoder adapted only through LoRA, a linear or cosine head, and, for the three two-stage methods, a frozen encoder in stage two. Later experiments compare them against CE with balanced accuracy, classwise recall, and probability quality, with raw and temperature-scaled outputs reported separately.
+This report defines six class-imbalance mitigation methods for patch classification and places them in the three families of \citet{krawczyk2016learning}. Balanced sampling and CUDA are data-level methods, logit adjustment and DisAlign are algorithm-level methods, and cRT and GCL are hybrid methods that pair decoupled classifier learning with a rebalanced sampler. All methods except CUDA read the imbalance from the class counts $n_c$ or the prevalences $\pi_c$; CUDA reads it from the per-class accuracy of the current model, and each method except cRT has one parameter that sets its strength. At zero strength, balanced sampling, CUDA, and logit adjustment reduce to CE, and GCL reduces to CE with a cosine head. The methods share one setting: a Virchow2 encoder adapted only through LoRA, a linear or cosine head, and, for the three two-stage methods, a frozen encoder in stage two. Later experiments compare them against CE with balanced accuracy, classwise recall, and probability quality, with raw and temperature-scaled outputs reported separately.
 
 \clearpage
 \bibliographystyle{plainnat}
