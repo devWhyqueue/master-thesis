@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Callable
 
 import _bootstrap  # noqa: F401
-from imbalance_benchmark.common import load_config
+from imbalance_benchmark.common import RUN_RECORD_NAME, load_config
 from imbalance_benchmark.hydra.job_resources import build_job
 from imbalance_benchmark.hydra.rendering import SlurmJob
 
 from breadth.slurm import submit_workflow
 
 from analyze import run_analyze
+from analyze.paths import result_paths, run_dir, shard_keys
 
 from mitigation.fit import decode_shard_index, run_fit_stage1, shard_count
 from mitigation.fit_stage2 import run_fit_stage2
@@ -45,10 +46,34 @@ def _fit_job(config: dict, job: Stage1Job) -> SlurmJob:
     )
 
 
+def _fit_combo_done(paths: dict, job: Stage1Job) -> bool:
+    """Every shard of one (arm, method, param) combo already has a run record."""
+    return all(
+        (
+            run_dir(paths[s], job.arm, job.method, job.param, d) / RUN_RECORD_NAME
+        ).exists()
+        for s, d in shard_keys()
+    )
+
+
+def _pending_stage1_jobs(config: dict) -> list[Stage1Job]:
+    """``stage1_jobs`` combos not yet fully fit.
+
+    ``submit --stage fit`` rebuilds the whole grid from scratch every call and
+    the shared queue cap (``check_queue_cap``) always blocks partway through
+    it; without this filter, every resubmit re-hits the same combos at the
+    front of the grid's fixed order and never reaches the ones behind them.
+    A completed combo's array is otherwise a costly no-op (every task skips,
+    but still queues and burns the shared cap budget other submissions need).
+    """
+    paths = result_paths(config)
+    return [job for job in stage1_jobs(config) if not _fit_combo_done(paths, job)]
+
+
 def _stage_jobs(config: dict, stage: str) -> list[SlurmJob]:
-    """Build one submission stage's jobs: every grid combo for ``fit``, one array for ``stage2``."""
+    """Build one submission stage's jobs: every pending grid combo for ``fit``, one array for ``stage2``."""
     if stage == "fit":
-        return [_fit_job(config, job) for job in stage1_jobs(config)]
+        return [_fit_job(config, job) for job in _pending_stage1_jobs(config)]
     if stage == "stage2":
         stage2_job = build_job(config, "stage2", "stage2", False, resource="stage2")
         return [replace(stage2_job, array_size=shard_count())]
