@@ -18,6 +18,11 @@
 # extended N only (gcl/gcl2 0.5, disalign 3.0) to check whether N's optimum keeps climbing or
 # settles. mixup still hugs its low edge in every arm; not widened further (mechanism finding:
 # uniform partner sampling never touches the class prior, so no amount of alpha fixes it).
+#
+# 2026-09-28 (3rd pass): MixUp replaced by CUDA (curriculum of data augmentation) per the exp-40
+# methods report's revised "Data-Level Methods" section -- p_aug in {0.25, 0.5, 1.0} in every arm,
+# gamma/check_size/max_strength fixed via mitigation.cuda below. Old mixup* run dirs stay on disk;
+# analyze ignores them (they don't match any grid combo any more).
 
 prevalence:
   patients_per_class: 10
@@ -47,6 +52,10 @@ mitigation:
     s: 30
     a: 0.9
     b: 0.09
+  cuda:
+    gamma: 0.6
+    check_size: 10
+    max_strength: 10
   grid:
     r1:
       stage1:
@@ -55,7 +64,7 @@ mitigation:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.05, 0.2, 1.0]
+        cuda: [0.25, 0.5, 1.0]
         la: [0.5, 1.0]
         gcl: [0.02, 0.05, 0.2]
       stage2:
@@ -67,7 +76,7 @@ mitigation:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.05, 0.2, 1.0]
+        cuda: [0.25, 0.5, 1.0]
         la: [0.5, 1.0]
         gcl: [0.02, 0.05, 0.2]
       stage2:
@@ -79,7 +88,7 @@ mitigation:
       stage1:
         ce: [null]
         bs: [0.5, 1.0]
-        mixup: [0.05, 0.2, 1.0]
+        cuda: [0.25, 0.5, 1.0]
         la: [0.5, 1.0]
         gcl: [0.02, 0.05, 0.2, 0.5]
       stage2:
