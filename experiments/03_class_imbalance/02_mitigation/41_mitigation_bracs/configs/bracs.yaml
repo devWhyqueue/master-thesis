@@ -28,6 +28,12 @@
 # recovery may be generic augmentation. r1 now grids cuda too (90 fits); analyze reports the balanced
 # gain G = BA(cuda*, r1) - BA(ce, r1) and, per arm, the imbalance-specific recovery R - G. Reading
 # fixed before the fits: imbalance-specific if R - G >= 1pp with its CI above zero (same rule as R).
+#
+# 2026-09-29 (5th pass): same check for every method whose r1 gain is not zero by construction.
+# At r1 (equal counts) bs and la/posthoc_la are identical to CE; gcl's delta is 0 for every class,
+# so it is CE with a cosine head and sigma is inert (one value, 0.05); disalign's weights are
+# uniform for any gamma (one value, 1.0). gcl2/crt/disalign re-fit the head on the frozen encoder.
+# Same R - G rule, fixed before these fits.
 
 prevalence:
   patients_per_class: 10
@@ -66,6 +72,11 @@ mitigation:
       stage1:
         ce: [null]
         cuda: [0.25, 0.5, 1.0]
+        gcl: [0.05]
+      stage2:
+        crt: [null]
+        disalign: [1.0]
+        gcl2: [0.05]
     r50:
       stage1:
         ce: [null]

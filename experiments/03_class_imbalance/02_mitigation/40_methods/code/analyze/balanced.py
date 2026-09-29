@@ -1,4 +1,4 @@
-"""Balanced gain of a method also gridded on ``r1`` (CUDA), and its imbalance-specific recovery.
+"""Balanced gain of a method also gridded on ``r1`` (CUDA, GCL, stage-two methods), and its imbalance-specific recovery.
 
 ``G = BA(m*, r1) - BA(CE, r1)`` is the method's gain without imbalance; per arm, ``R - G`` (the
 damage CE suffers minus the damage the method suffers) separates a general training benefit
@@ -31,17 +31,33 @@ def balanced_gains(
     ba_r1_ce: np.ndarray,
     w: np.ndarray,
 ) -> dict[str, dict[str, Any]]:
-    """Per non-CE method gridded on ``r1``, its validation-selected gain over ``r1_ce``."""
+    """Per non-CE method gridded on ``r1`` (either stage), its validation-selected gain over ``r1_ce``."""
     n_classes = len(next(iter(perms.values())))
     out = {}
-    for m in config["mitigation"]["grid"]["r1"]["stage1"]:
-        if m == "ce":
-            continue
-        selection = select(config, paths, "r1", "stage1", m)
-        dirs = {k: run_dir(paths[k[0]], "r1", m, p, k[1]) for k, p in selection.items()}
-        ba = pooled(selected_ba(dirs, ctxs, perms, n_classes), w)
-        out[m] = {"gain": ba - ba_r1_ce, "frequency": selected_frequency(selection)}
+    for stage, methods in config["mitigation"]["grid"]["r1"].items():
+        for m in methods:
+            if m != "ce":
+                out[m] = _gain(
+                    config, paths, (ctxs, perms, n_classes), stage, m, ba_r1_ce, w
+                )
     return out
+
+
+def _gain(
+    config: dict[str, Any],
+    paths: dict[int, dict[str, Path]],
+    bootstrap: tuple[dict[int, Any], dict[int, np.ndarray], int],
+    stage: str,
+    m: str,
+    ba_r1_ce: np.ndarray,
+    w: np.ndarray,
+) -> dict[str, Any]:
+    """One method's validation-selected ``r1`` BA minus ``r1_ce``, with its param frequency."""
+    ctxs, perms, n_classes = bootstrap
+    selection = select(config, paths, "r1", stage, m)
+    dirs = {k: run_dir(paths[k[0]], "r1", m, p, k[1]) for k, p in selection.items()}
+    ba = pooled(selected_ba(dirs, ctxs, perms, n_classes), w)
+    return {"gain": ba - ba_r1_ce, "frequency": selected_frequency(selection)}
 
 
 def specific_estimates(
