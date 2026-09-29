@@ -107,14 +107,17 @@ def write_analysis(
     config: dict[str, Any],
     arms: dict[str, dict[str, Any]],
     exp26_damage: dict[str, float],
+    balanced: dict[str, dict[str, Any]],
 ) -> Path:
-    """Write the exp-41 analysis.json, one ``estimates``/``methods``/... block per imbalance arm."""
+    """Write the exp-41 analysis.json: one ``estimates``/``methods``/... block per imbalance arm,
+    plus each r1-gridded method's balanced gain over ``r1_ce``."""
     path = output_root(config) / "data" / "analysis.json"
     write_json(
         path,
         {
             "shards": {"n_splits": N_SPLITS, "n_draws": N_DRAWS},
             "arms": arms,
+            "balanced": balanced,
             "exp26_damage_reference": exp26_damage,
         },
     )

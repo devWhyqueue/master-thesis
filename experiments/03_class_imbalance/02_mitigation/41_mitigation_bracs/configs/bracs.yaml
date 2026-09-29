@@ -23,6 +23,11 @@
 # methods report's revised "Data-Level Methods" section -- p_aug in {0.25, 0.5, 1.0} in every arm,
 # gamma/check_size/max_strength fixed via mitigation.cuda below. Old mixup* run dirs stay on disk;
 # analyze ignores them (they don't match any grid combo any more).
+#
+# 2026-09-29 (4th pass): CUDA also gains 1.21pp at N, where CE damage is unresolved, so part of its
+# recovery may be generic augmentation. r1 now grids cuda too (90 fits); analyze reports the balanced
+# gain G = BA(cuda*, r1) - BA(ce, r1) and, per arm, the imbalance-specific recovery R - G. Reading
+# fixed before the fits: imbalance-specific if R - G >= 1pp with its CI above zero (same rule as R).
 
 prevalence:
   patients_per_class: 10
@@ -60,6 +65,7 @@ mitigation:
     r1:
       stage1:
         ce: [null]
+        cuda: [0.25, 0.5, 1.0]
     r50:
       stage1:
         ce: [null]

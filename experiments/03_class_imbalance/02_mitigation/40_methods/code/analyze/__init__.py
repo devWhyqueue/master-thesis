@@ -13,6 +13,8 @@ per-shard *varying* winning directory selection produces does not fit those
 wrappers, so ``analyze.bootstrap`` reapplies the same underlying
 recall/probability-quality primitives directly. All arms and methods share one
 set of bootstrap replicate weights, so every contrast stays paired.
+
+A method also gridded on ``r1`` (CUDA) gets an imbalance-specific recovery (``analyze.balanced``).
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from prevalence.analyze import _thirds
 
 from mitigation import STAGE1_METHODS, STAGE2_METHODS
 
+from analyze.balanced import balanced_gains, pack_balanced, specific_estimates
 from analyze.bootstrap import quality_distributions, selected_ba, selected_thirds
 from analyze.figure import recovery_figure
 from analyze.paths import Shard, fixed_dirs, result_paths, run_dir
@@ -187,6 +190,7 @@ def _analyze_arm(
     perms: dict[int, np.ndarray],
     ba: dict[str, np.ndarray],
     w: np.ndarray,
+    gains: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     """Every reported quantity for one imbalance arm's recovery grid."""
     ce_arm = _ce_arm(arm)
@@ -202,6 +206,7 @@ def _analyze_arm(
     dists = Distributions(ba, damage, ba_selected, recovery_dist, share_dist, frequency)
 
     estimates, methods_out = pack_methods(METHODS, FAMILY, dists, CE_R1, ce_arm)
+    estimates.update(specific_estimates(gains, recovery_dist, damage))
     shares = family_share(METHODS, FAMILY, share_dist)
     recovery_figure(
         estimates,
@@ -223,8 +228,11 @@ def run_analyze(config: dict[str, Any]) -> Path:
     """Pool the CE anchors and every method's validation-selected recovery, per arm; write the analysis."""
     names, n_classes, paths, ctxs, perms = _setup(config)
     ba, w = _ce_ba_and_weights(config, names)
+    gains = balanced_gains(config, paths, ctxs, perms, ba[CE_R1], w)
     arms_out = {
-        arm: _analyze_arm(config, arm, names, n_classes, paths, ctxs, perms, ba, w)
+        arm: _analyze_arm(
+            config, arm, names, n_classes, paths, ctxs, perms, ba, w, gains
+        )
         for arm in ARMS
     }
-    return write_analysis(config, arms_out, EXP26_DAMAGE)
+    return write_analysis(config, arms_out, EXP26_DAMAGE, pack_balanced(gains))

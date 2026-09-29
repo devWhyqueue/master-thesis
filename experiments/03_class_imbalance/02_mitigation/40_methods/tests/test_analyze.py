@@ -121,3 +121,15 @@ def test_pack_methods_writes_one_estimate_triple_per_method() -> None:
     assert estimates["damage"]["point"] == 10.0
     assert {"selected_bs", "recovery_bs", "share_bs"} <= estimates.keys()
     assert methods_out["bs"]["family"] == "stage1"
+
+
+def test_specific_recovery_subtracts_balanced_gain() -> None:
+    """Imbalance-specific recovery is ``R - G``, and its share divides by the CE damage."""
+    from analyze.balanced import specific_estimates
+
+    gains = {"cuda": {"gain": np.array([1.0, 0.5, 1.5])}}
+    recovery = {"cuda": np.array([3.0, 2.5, 3.5]), "la": np.zeros(3)}
+    out = specific_estimates(gains, recovery, damage=np.array([4.0, 4.0, 4.0]))
+    assert set(out) == {"specific_recovery_cuda", "specific_share_cuda"}
+    assert out["specific_recovery_cuda"]["point"] == 2.0
+    assert out["specific_share_cuda"]["point"] == 0.5
