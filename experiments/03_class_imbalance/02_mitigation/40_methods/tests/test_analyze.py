@@ -133,3 +133,47 @@ def test_specific_recovery_subtracts_balanced_gain() -> None:
     assert set(out) == {"specific_recovery_cuda", "specific_share_cuda"}
     assert out["specific_recovery_cuda"]["point"] == 2.0
     assert out["specific_share_cuda"]["point"] == 0.5
+
+
+def _encoder(shift: float, recovery: float) -> "EncoderDistributions":
+    from analyze.contrast import EncoderDistributions
+
+    noise = np.array([0.0, 0.1, -0.1, 0.05, -0.05])
+    r = lambda p: p + noise  # noqa: E731
+    return EncoderDistributions(
+        ba_r1=r(50.0 + shift),
+        damage={"r100": r(8.0)},
+        recovery={"r100": {"bs": r(recovery), "la": r(0.2)}},
+        gain={"bs": r(shift)},
+    )
+
+
+def test_encoder_contrast_flags_only_shifts_at_least_1pp_excluding_zero() -> None:
+    from analyze.contrast import encoder_contrast
+
+    out = encoder_contrast(_encoder(2.0, 3.0), _encoder(0.0, 1.0))["r100"]
+    d = out["delta"]
+    assert d["ba_r1_ce"]["point"] == 2.0 and d["ba_r1_ce"]["encoder_dependent"]
+    assert d["recovery_bs"]["point"] == 2.0
+    assert d["specific_recovery_bs"]["point"] == 0.0
+    assert not d["damage"]["encoder_dependent"]
+    assert not d["recovery_la"]["encoder_dependent"]
+    assert out["verdict_agreement"] == {"bs": True, "la": True}
+
+
+def test_encoder_contrast_against_itself_is_zero() -> None:
+    from analyze.contrast import encoder_contrast
+
+    e = _encoder(1.0, 3.0)
+    out = encoder_contrast(e, e)["r100"]
+    assert all(v["point"] == 0.0 and not v["encoder_dependent"] for v in out["delta"].values())
+
+
+def test_check_same_cohort_rejects_different_test_identity() -> None:
+    import pytest
+    from analyze.contrast import check_same_cohort
+
+    ids = {0: np.array(["a", "b"])}
+    check_same_cohort((["x"], ["x"]), (ids, {0: np.array(["a", "b"])}))
+    with pytest.raises(ValueError):
+        check_same_cohort((["x"], ["x"]), (ids, {0: np.array(["a", "c"])}))

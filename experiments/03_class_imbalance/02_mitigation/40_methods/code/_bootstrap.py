@@ -19,6 +19,7 @@ _CODE_DIRS = (
     "14_shortage_decomposition",
     "16_centre_error",
     "17_patient_directions",
+    "39_encoder_transfer",  # transfer.uni: pinned UNI2-h loader
     "25_damage_tcga_ut",  # prevalence.* : arms, allocation, fit/weight helpers reused as-is
 )
 

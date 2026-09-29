@@ -144,3 +144,12 @@ def test_arm_row_index_matches_patient_rows() -> None:
     assert rows.tolist() == expected_rows
     assert len(y) == len(rows) == 50
     assert set(y.tolist()) == {0}
+
+
+def test_pool_tokens_passes_through_already_pooled_output() -> None:
+    """UNI2-h returns (B, D) pooled features; Virchow2 (B, T, D) tokens become CLS + mean."""
+    from mitigation.encoder import pool_tokens
+
+    pooled = torch.ones(3, 8)
+    assert pool_tokens(pooled) is pooled
+    assert pool_tokens(torch.ones(3, 9, 8)).shape == (3, 16)

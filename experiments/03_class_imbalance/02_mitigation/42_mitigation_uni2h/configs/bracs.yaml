@@ -1,0 +1,126 @@
+# Mitigation on BRACS with a LoRA-adapted UNI2-h encoder (exp-42): exp-41 repeated with UNI2-h in
+# place of Virchow2. Only the encoder changes: same 30 split-draw shards, patients, class
+# permutation, test patients, grids (copied from 41_mitigation_bracs/configs/bracs.yaml, final pass),
+# 600 steps (not re-tuned), and bootstrap seed. Pooling is UNI2-h's own token pooling (1536-d);
+# LoRA r8 on blocks.*.attn.(qkv|proj). Every estimate pairs with its Virchow2 counterpart.
+#
+# Pre-fixed before any fit (written 2026-09-30; no report until the whole experiment has run):
+# Encoder contrast: delta X = X(UNI2-h) - X(Virchow2) for BA(CE, r1), D_a, R_m, G_m, R_m - G_m.
+#   Same bootstrap contexts and draw_weights(BOOTSTRAP_SEED), 95% intervals. A quantity is
+#   encoder-dependent only if its delta interval excludes 0 and |delta| >= 1 pp.
+#   Descriptive: agreement of the `recovers` verdict per method; Spearman rho of R_m across the 8
+#   variants per arm.
+# exp-41 claims checked at r100 with UNI2-h: (1) CUDA gives the largest R; (2) logit adjustment is
+#   the only method that lifts tail recall; (3) no share interval reaches 1; (4) CUDA's R - G is not
+#   material while GCL2 and cRT R - G are; (5) classifier-only methods recover about as much as
+#   end-to-end ones; (6) the LoRA r1 model is less accurate than the frozen readout.
+# External reference: frozen UNI2-h damage from exp-39 (B 38.23, D_R100 7.19 [5.23, 9.32]); exp-39
+#   used draws 10-19, so the comparison is descriptive with no paired interval.
+
+prevalence:
+  patients_per_class: 10
+
+dataset:
+  name: bracs
+  regime: patch
+  target: roi_subtype
+  seed: 0
+  version: bracs-official-release
+  eligibility_rules:
+    metadata: official_BRACS_xlsx_rows_with_patient_slide_roi_and_subtype
+    images: roi_filename_stem_matches_released_image
+    labels: seven_class_official_roi_subtype
+    tiling: non_overlapping_full_256x256_tiles
+    split_unit: patient
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/42_mitigation_uni2h/outputs/bracs/patch
+
+mitigation:
+  encoder: uni2h
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.0
+  gcl:
+    s: 30
+    a: 0.9
+    b: 0.09
+  cuda:
+    gamma: 0.6
+    check_size: 10
+    max_strength: 10
+  grid:
+    r1:
+      stage1:
+        ce: [null]
+        cuda: [0.25, 0.5, 1.0]
+        gcl: [0.05]
+      stage2:
+        crt: [null]
+        disalign: [1.0]
+        gcl2: [0.05]
+    r50:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2]
+    r100:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2]
+    N:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2, 0.5]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2, 0.5]
+  train:
+    # steps=600 from the pilot (report "Design", pilot subsection): the only candidate within
+    # 0.5pp of the best mean r100 validation BA over {150, 300, 600, 1200} (0.3493 vs 0.3187,
+    # 0.3422, 0.3342); observed wall time ~30-33 min/fit, well inside gpu-2h.
+    stage1: {batch_size: 256, steps: 600, lr: 0.0001, weight_decay: 0.0001}
+    stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
+
+analyze:
+  # Paired encoder contrast against exp-41 (Virchow2); external damage = exp-39 frozen UNI2-h D_R100.
+  reference_config: experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/configs/bracs.yaml
+  external_damage: {point: 7.19, ci_2_5: 5.23, ci_97_5: 9.32}
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/40_methods/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/42_mitigation_uni2h/outputs/bracs/patch
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/bracs/patch
+  squashfs:
+    - source: /home/space/datasets-sqfs/bracs-roi-tiles.sqfs
+      mount: /tmp/bracs_roi_tiles
+      stages: [fit]
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 50, cpu-2h: 50}
+  resources:
+    # gpu-2h, not gpu-5h: pilot wall time at steps=600 was ~30-33 min/fit.
+    fit: {partition: gpu-2h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}
+    stage2: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 32G}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}

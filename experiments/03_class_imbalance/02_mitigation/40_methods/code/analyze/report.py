@@ -108,6 +108,7 @@ def write_analysis(
     arms: dict[str, dict[str, Any]],
     exp26_damage: dict[str, float],
     balanced: dict[str, dict[str, Any]],
+    extra: dict[str, Any] | None = None,
 ) -> Path:
     """Write the exp-41 analysis.json: one ``estimates``/``methods``/... block per imbalance arm,
     plus each r1-gridded method's balanced gain over ``r1_ce``."""
@@ -119,6 +120,7 @@ def write_analysis(
             "arms": arms,
             "balanced": balanced,
             "exp26_damage_reference": exp26_damage,
+            **(extra or {}),
         },
     )
     return path
