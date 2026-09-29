@@ -6,7 +6,7 @@
 \usepackage[authoryear,round]{natbib}
 \usepackage[hidelinks]{hyperref}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
-\title{Mitigating Class-Imbalance Damage on BRACS:\\Logit Adjustment Recovers Two-Fifths, No Method Closes the Gap}
+\title{Mitigating Class-Imbalance Damage on BRACS:\\CUDA and Logit Adjustment Recover up to Half, No Method Closes the Gap}
 \author{Yannik Queisler}
 \date{September 28, 2026}
 
@@ -17,14 +17,14 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent Class prevalence alone costs 7.65 points of balanced accuracy on BRACS at an imbalance ratio of 100 under a frozen Virchow2 encoder and a logistic-regression readout. This report asks how much of that damage six established mitigation methods give back once the encoder adapts through low-rank updates (LoRA). On the 30 split-draw shards of the prevalence study, the unmitigated cross-entropy (CE) model is trained on a balanced allocation and, together with every method over a grid of strengths, on allocations with ratios 50 and 100 and with BRACS's native class shares; each method's strength is selected per shard on validation patients only. Under LoRA, CE loses 4.95 points at ratio 100 and 3.54 points at ratio 50, while at native shares its 0.85-point loss cannot be distinguished from zero. At ratio 100, five of eight method variants meet the pre-stated recovery criterion of at least one point with an interval above zero. Train-time and post-hoc logit adjustment recover the most, 1.96 and 1.94 points, or about two-fifths of the damage, and they are the only methods that lift tail-class recall substantially. At ratio 100 no paired interval allows a share above 60 percent, MixUp recovers nothing, and methods that re-fit only the classifier on a frozen encoder do as well as methods trained end to end. At native shares no method differs from CE. The smaller LoRA damage reflects a balanced model about three points less accurate than the frozen readout, not a more robust imbalanced one.
+\noindent Class prevalence alone costs 7.65 points of balanced accuracy on BRACS at an imbalance ratio of 100 under a frozen Virchow2 encoder and a logistic-regression readout. This report asks how much of that damage six established mitigation methods give back once the encoder adapts through low-rank updates (LoRA). On the 30 split-draw shards of the prevalence study, the unmitigated cross-entropy (CE) model is trained on a balanced allocation and, together with every method over a grid of strengths, on allocations with ratios 50 and 100 and with BRACS's native class shares; each method's strength is selected per shard on validation patients only. Under LoRA, CE loses 4.95 points at ratio 100 and 3.54 points at ratio 50, while at native shares its 0.85-point loss cannot be distinguished from zero. At ratio 100, six of eight method variants meet the pre-stated recovery criterion of at least one point with an interval above zero. A curriculum of data augmentation (CUDA) recovers the most, 2.59 points or about half of the damage, followed by train-time and post-hoc logit adjustment at 1.96 and 1.94 points, or about two-fifths; the two logit-adjustment forms are the only methods that lift tail-class recall substantially. No paired share interval reaches full recovery. CUDA is also the only method that gains at native shares, by 1.21 points against a damage that cannot be distinguished from zero, so part of its recovery likely reflects augmentation that helps regardless of imbalance. Apart from CUDA, methods that re-fit only the classifier on a frozen encoder do as well as methods trained end to end. The smaller LoRA damage reflects a balanced model about three points less accurate than the frozen readout, not a more robust imbalanced one.
 \end{abstract}
 
 \section{Motivation}
 \label{sec:motivation}
 The prevalence study of this series isolates class prevalence from patient shortage at fixed patient support. On BRACS it finds 7.65 points of balanced-accuracy damage at an imbalance ratio of $\rho=100$, against 2.91 points on TCGA-UT under the same design \citep{queisler2026prevalenceBracs,queisler2026prevalenceTcga}. A follow-up split the BRACS damage into a prior channel and a support channel of similar size and found that post-hoc logit adjustment on the frozen readout recovers only about a quarter of it \citep{queisler2026causeBracs}. Both studies keep the encoder frozen, so neither tests the established long-tailed methods that also shape the representation.
 
-A companion report defines six such methods for patch classification under a Virchow2 encoder adapted only through LoRA: balanced sampling and MixUp at the data level, logit adjustment and DisAlign at the algorithm level, and classifier re-training (cRT) and Gaussian clouded logit (GCL) adjustment as hybrids \citep{queisler2026mitigationMethods}. For the other damage source this series studies, patient shortage, six earlier mitigation studies found that none of their corrections worked on BRACS \citep{queisler2026patientShortage}. This report asks: \emph{once the encoder can adapt, how much of BRACS's prevalence damage does each method recover, and does recovery differ between methods trained end to end and methods that freeze the encoder and re-fit only the classifier?}
+A companion report defines six such methods for patch classification under a Virchow2 encoder adapted only through LoRA: balanced sampling and a curriculum of data augmentation (CUDA) at the data level, logit adjustment and DisAlign at the algorithm level, and classifier re-training (cRT) and Gaussian clouded logit (GCL) adjustment as hybrids \citep{queisler2026mitigationMethods}. For the other damage source this series studies, patient shortage, six earlier mitigation studies found that none of their corrections worked on BRACS \citep{queisler2026patientShortage}. This report asks: \emph{once the encoder can adapt, how much of BRACS's prevalence damage does each method recover, and does recovery differ between methods trained end to end and methods that freeze the encoder and re-fit only the classifier?}
 
 \section{Design}
 \label{sec:design}
@@ -35,7 +35,7 @@ Each shard's patch budget is divided among the seven classes in four ways, all t
 
 Ratio 100 is close to the most severe imbalance this design can express. At $\rho=100$ the rarest class receives about 12 of the 2,240 patches, roughly one per patient. Beyond $\rho\approx125$ it would receive fewer patches than its ten patients, so the tail class could no longer draw on all its patients and the design would mix prevalence with patient shortage.
 
-Methods fall into two training families. \emph{End-to-end} methods (balanced sampling, MixUp, train-time logit adjustment, GCL) train the LoRA update and head together. \emph{Classifier-only} methods freeze an end-to-end model's encoder and re-fit only classifier parameters: post-hoc logit adjustment, DisAlign, and cRT start from the allocation's CE model, and GCL's classifier-only form, its second training stage, starts from the end-to-end GCL model of the same $\sigma$. Logit adjustment and GCL therefore each appear once per family, giving eight method variants.
+Methods fall into two training families. \emph{End-to-end} methods (balanced sampling, CUDA, train-time logit adjustment, GCL) train the LoRA update and head together. CUDA \citep{ahn2023cuda} augments image patches before the encoder, with a per-class strength that rises as the current model learns the class, so it can only act end to end. \emph{Classifier-only} methods freeze an end-to-end model's encoder and re-fit only classifier parameters: post-hoc logit adjustment, DisAlign, and cRT start from the allocation's CE model, and GCL's classifier-only form, its second training stage, starts from the end-to-end GCL model of the same $\sigma$. Logit adjustment and GCL therefore each appear once per family, giving eight method variants.
 
 \begin{table}[htbp]
 \centering
@@ -47,7 +47,7 @@ Training & Method & Strength & Grid \\
 \midrule
 End to end & CE (reference) & -- & -- \\
 End to end & Balanced sampling & $s$ & 0.5, 1.0 \\
-End to end & MixUp & $\alpha$ & 0.05, 0.2, 1.0 \\
+End to end & CUDA & $p_{\mathrm{aug}}$ & 0.25, 0.5, 1.0 \\
 End to end & Logit adjustment (train-time) & $\tau$ & 0.5, 1.0 \\
 End to end & GCL & $\sigma$ & 0.02, 0.05, 0.2 (N: also 0.5) \\
 Classifier only & Logit adjustment (post hoc) & $\tau$ & 0.5, 1.0, 1.5, 2.0 \\
@@ -56,7 +56,7 @@ Classifier only & cRT & -- & -- \\
 Classifier only & GCL & $\sigma$ of its source & as GCL \\
 \bottomrule
 \end{tabular}
-\caption{Strength grids of the imbalanced allocations. Balanced sampling spans the upper half of its defined range $s\in[0,1]$, and train-time $\tau$ stops at the full prior correction $\tau=1$. The other grids bracket the source defaults and extend past any grid edge on which the validation selection would otherwise concentrate; at native shares the GCL and DisAlign grids reach further for that reason. $\gamma$ is DisAlign's reweighting exponent, written $\rho$ in the methods report. The balanced allocation trains only CE.}
+\caption{Strength grids of the imbalanced allocations. Balanced sampling spans the upper half of its defined range $s\in[0,1]$, CUDA's augmentation probability $p_{\mathrm{aug}}$ ends at its maximum of 1, and train-time $\tau$ stops at the full prior correction $\tau=1$. CUDA's acceptance threshold (0.6), check size (10 patches per strength), and maximum strength (10 operations) are fixed, and its per-class levels are updated every nine steps, one pass over the 2,240 training patches. The other grids bracket the source defaults and extend past any grid edge on which the validation selection would otherwise concentrate; at native shares the GCL and DisAlign grids reach further for that reason. $\gamma$ is DisAlign's reweighting exponent, written $\rho$ in the methods report. The balanced allocation trains only CE.}
 \label{tab:grid}
 \end{table}
 
