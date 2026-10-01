@@ -14,6 +14,8 @@
 #   the only method that lifts tail recall; (3) no share interval reaches 1; (4) CUDA's R - G is not
 #   material while GCL2 and cRT R - G are; (5) classifier-only methods recover about as much as
 #   end-to-end ones; (6) the LoRA r1 model is less accurate than the frozen readout.
+# 2026-10-01: fit constraint widened to 80gb|h100|h200|blackwell after pending arrays sat in
+#   fair-share Priority for >10 h; scheduling only, no effect on the fits.
 # External reference: frozen UNI2-h damage from exp-39 (B 38.23, D_R100 7.19 [5.23, 9.32]); exp-39
 #   used draws 10-19, so the comparison is descriptive with no paired interval.
 
@@ -121,6 +123,6 @@ slurm:
   max_array_concurrency: {gpu-5h: 35, gpu-2h: 50, cpu-2h: 50}
   resources:
     # gpu-2h, not gpu-5h: pilot wall time at steps=600 was ~30-33 min/fit.
-    fit: {partition: gpu-2h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}
+    fit: {partition: gpu-2h, gpus: 1, constraint: "80gb|h100|h200|blackwell", cpus: 8, memory: 64G}
     stage2: {partition: cpu-2h, gpus: 0, cpus: 4, memory: 32G}
     analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
