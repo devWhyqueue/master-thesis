@@ -26,7 +26,7 @@ dataset:
     - Cholangiocarcinoma
 
 paths:
-  outputs: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/outputs/pilot/steps_300
+  outputs: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/outputs/pilot/steps_2400
 
 mitigation:
   inline_stage2: true
@@ -50,13 +50,13 @@ mitigation:
       stage1:
         ce: [null]
   train:
-    stage1: {batch_size: 256, steps: 300, lr: 0.0001, weight_decay: 0.0001}
+    stage1: {batch_size: 256, steps: 2400, lr: 0.0001, weight_decay: 0.0001}
     stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
 
 slurm:
   project_root: /home/yannik.qu/master-thesis
   code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/40_methods/code
-  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/outputs/pilot/steps_300
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/outputs/pilot/steps_2400
   container: /home/yannik.qu/master-thesis/experiments/environment.sif
   exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
   shared_squashfs:
