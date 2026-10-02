@@ -153,3 +153,41 @@ def test_pool_tokens_passes_through_already_pooled_output() -> None:
     pooled = torch.ones(3, 8)
     assert pool_tokens(pooled) is pooled
     assert pool_tokens(torch.ones(3, 9, 8)).shape == (3, 16)
+
+
+def test_inline_stage2_fits_from_cache_then_drops_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With ``inline_stage2`` a ce fit runs stage two on the cache, deletes it, records stage one last."""
+    from types import SimpleNamespace
+
+    from mitigation import fit
+
+    events: list[str] = []
+    shard = SimpleNamespace(classes=["a", "b"])
+    monkeypatch.setattr(fit, "load_shard", lambda config, split_idx: shard)
+    monkeypatch.setattr(fit, "run_dir", lambda *args: tmp_path)
+    monkeypatch.setattr(fit, "resolve_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(
+        fit, "train_arm", lambda *args: (["x"], np.zeros(1, dtype=np.int64), np.array([1, 0]))
+    )
+    monkeypatch.setattr(fit, "run_stage1", lambda *args: None)
+    monkeypatch.setattr(fit, "_eval_embeddings", lambda *args: None)
+
+    def save(out_dir: Path, *args) -> None:
+        (out_dir / "stage1.pt").write_text("cache")
+        events.append("save")
+
+    def stage2(*args) -> None:
+        assert (tmp_path / "stage1.pt").exists()
+        events.append("stage2")
+
+    monkeypatch.setattr(fit, "_save_stage1_artifacts", save)
+    monkeypatch.setattr(fit, "run_stage2_from_source", stage2)
+    monkeypatch.setattr(fit, "_record_stage1_run", lambda *args: events.append("record"))
+    monkeypatch.setattr(fit, "patients_per_class", lambda config: 20)
+
+    fit.run_fit_stage1({"mitigation": {"inline_stage2": True}}, 0, 0, "r1", "ce", None)
+
+    assert events == ["save", "stage2", "record"]
+    assert not (tmp_path / "stage1.pt").exists()

@@ -2,7 +2,9 @@
 
 Trains a fresh LoRA-adapted encoder and head per (arm, method, param, draw)
 and exports its embeddings for the two stage-two methods it feeds
-(``STAGE2_SOURCE``); ``mitigation.fit_stage2`` fits those from the cache.
+(``STAGE2_SOURCE``); ``mitigation.fit_stage2`` fits those from the cache, either
+in a later ``stage2`` pass or, with ``mitigation.inline_stage2``, right after
+stage one (the cache is then deleted, which TCGA-UT's embedding size requires).
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from mitigation.data import (
     run_dir,
     train_arm,
 )
+from mitigation.fit_stage2 import run_stage2_from_source
 from mitigation.images import decode_transform
 from mitigation.train import (
     STAGE1_ARTIFACT_NAME,
@@ -133,6 +136,32 @@ def _record_stage1_run(
     )
 
 
+def _finish_stage1(
+    config: dict[str, Any],
+    shard: ImageShard,
+    out_dir: Path,
+    key: tuple[str, str, float | None, int],
+    arm_batch: ArmBatch,
+    output: Stage1Output,
+    evals: _EvalEmbeddings,
+    device: torch.device,
+) -> None:
+    """Export the stage-two cache (and optionally fit from it), then write the stage-one record."""
+    arm, method, param, draw_idx = key
+    class_counts = dict(zip(shard.classes, (int(c) for c in arm_batch.counts)))
+    meta = RunMeta(config, method, param, arm, class_counts)
+    if method not in _STAGE2_SOURCES:
+        _record_stage1_run(out_dir, meta, shard, output, evals, device)
+        return
+    _save_stage1_artifacts(out_dir, output, arm_batch, method, param, device, evals)
+    if config.get("mitigation", {}).get("inline_stage2", False):
+        # Stage-one record last: a kill mid-way reruns the whole fit instead of
+        # leaving stage-two unfitted behind a finished stage-one record.
+        run_stage2_from_source(config, shard, device, arm, (method, param), draw_idx)
+        (out_dir / STAGE1_ARTIFACT_NAME).unlink()
+    _record_stage1_run(out_dir, meta, shard, output, evals, device)
+
+
 def run_fit_stage1(
     config: dict[str, Any],
     split_idx: int,
@@ -156,8 +185,13 @@ def run_fit_stage1(
     output = run_stage1(config, device, arm_batch, method, param or 0.0, draw_idx)
     evals = _eval_embeddings(output, shard, device)
 
-    class_counts = dict(zip(shard.classes, (int(c) for c in counts)))
-    meta = RunMeta(config, method, param, arm, class_counts)
-    _record_stage1_run(out_dir, meta, shard, output, evals, device)
-    if method in _STAGE2_SOURCES:
-        _save_stage1_artifacts(out_dir, output, arm_batch, method, param, device, evals)
+    _finish_stage1(
+        config,
+        shard,
+        out_dir,
+        (arm, method, param, draw_idx),
+        arm_batch,
+        output,
+        evals,
+        device,
+    )

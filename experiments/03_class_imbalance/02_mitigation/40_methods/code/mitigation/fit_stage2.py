@@ -31,7 +31,7 @@ from mitigation.train import (
     run_posthoc_la,
 )
 
-__all__ = ["run_fit_stage2"]
+__all__ = ["run_fit_stage2", "run_stage2_from_source"]
 
 
 def _source_run_param(
@@ -114,6 +114,27 @@ def _fit_one(
         EvalSplit(val_logits, artifacts.val_y, shard.val_identity),
         EvalSplit(test_logits, artifacts.test_y, shard.test_identity),
     )
+
+
+def run_stage2_from_source(
+    config: dict[str, Any],
+    shard: ImageShard,
+    device: torch.device,
+    arm: str,
+    source: tuple[str, float | None],
+    draw_idx: int,
+) -> None:
+    """Fit every pending stage-two job of ``arm`` sourced from one stage-one (method, param) run."""
+    for job_arm, method, param in stage2_jobs(config):
+        if (
+            job_arm != arm
+            or (STAGE2_SOURCE[method], _source_run_param(config, arm, method, param))
+            != source
+        ):
+            continue
+        out_dir = run_dir(shard, arm, method, param, draw_idx)
+        if not (out_dir / RUN_RECORD_NAME).exists():
+            _fit_one(config, device, shard, (arm, method, param), out_dir, draw_idx)
 
 
 def run_fit_stage2(config: dict[str, Any], split_idx: int, draw_idx: int) -> None:
