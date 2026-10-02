@@ -1,0 +1,62 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class-Imbalance Mitigation on BRACS:\\Replacing Virchow2 with a LoRA-Adapted {UNI2-h} Encoder}
+\author{Yannik Queisler}
+\date{October 2, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent Under a LoRA-adapted Virchow2 encoder, six long-tailed mitigation methods recovered up to about half of the balanced accuracy that BRACS loses when its training classes are imbalanced at a ratio of 100. This report repeats that experiment with UNI2-h as the only change: the same 30 patient-disjoint split-draw shards, class allocations, strength grids, training length, and bootstrap weights, so every UNI2-h estimate is paired with its Virchow2 counterpart. Before any fit, a quantity was declared encoder-dependent only if its paired difference has a 95\% interval that excludes zero and a size of at least one point. No damage, recovery, balanced gain, or imbalance-specific recovery meets that rule at any allocation. Under UNI2-h, cross-entropy loses 5.97 points at ratio 100, against 4.95 under Virchow2, a difference of 1.02 points whose interval includes zero. CUDA again gives the largest recovery (2.75 points, share 0.46), closely followed by both forms of GCL and train-time logit adjustment at 2.3 to 2.4 points; logit adjustment remains the only method that substantially lifts tail recall, and no method closes the gap. Of six conclusions checked at ratio 100, four carry over and two weaken. CUDA's imbalance-specific recovery becomes material (1.71 points, interval 0.23 to 3.45), although it differs from its Virchow2 value by only 0.51 points, and classifier-only methods recover as much as end-to-end ones only in matched pairs, not as a family. The method ranking at ratio 100 agrees closely between encoders (Spearman 0.81). On BRACS, the measured effects of mitigation under LoRA therefore do not depend on which of the two encoders is adapted, within a resolution of about two points.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The companion mitigation study on BRACS trained six established long-tailed methods with a Virchow2 encoder \citep{zimmermann2024virchow2} adapted through rank-8 LoRA updates \citep{queisler2026mitigationBracs}. At an imbalance ratio of $\rho=100$, cross-entropy (CE) lost 4.95 points of balanced accuracy, CUDA recovered about half of that loss, logit adjustment about two-fifths, and no method closed the gap. Net of each method's effect on balanced data, GCL's classifier-only form and cRT corrected more of the imbalance than their recovery against CE showed, and CUDA less. That study named its own scope as its main limitation: one dataset, one encoder, and one adaptation scheme.
+
+A second encoder can shift these results in two ways. It can change the damage that the methods have to recover, through a different balanced accuracy or a different sensitivity to the imbalanced allocation. It can also change how the methods act, because CUDA's image augmentation, GCL's feature clouds, and the classifier-only re-fits all operate on the encoder's representation. Under a frozen linear readout, replacing Virchow2 with UNI2-h \citep{chen2024uni,mahmoodlab2025uni2h} left BRACS's imbalance damage unresolved between encoders \citep{queisler2026encoderTransfer}, but that comparison did not include adaptation or mitigation. This report asks: \emph{do the LoRA damage on BRACS and each method's recovery depend on the encoder, or do the conclusions drawn under Virchow2 transfer to UNI2-h?}
+
+\section{Design}
+\label{sec:design}
+The experiment replicates the Virchow2 mitigation study \citep{queisler2026mitigationBracs} with one change, the encoder. Everything that defines a fit is held fixed: the 30 split-draw shards (three patient-disjoint splits, ten draws each, $G=10$ training patients per lesion class and a budget of 2,240 patches), the training patients and patches of every draw, the random assignment of classes to allocation ranks, the validation and test patients, the four allocations (balanced, $\rho=50$, $\rho=100$, and BRACS's native class shares N), the eight method variants and their strength grids, the training length, and the bootstrap seed. Because the shards and allocations coincide, the two encoders see identical training data, and any difference between them can be attributed to the encoder together with its interaction with the fixed recipe.
+
+UNI2-h enters in its pinned public release \citep{mahmoodlab2025uni2h}, the same checkpoint used for the frozen comparison \citep{queisler2026encoderTransfer}. The patch embedding is UNI2-h's own pooled token (1,536 dimensions), whereas Virchow2 concatenates its class token with the mean patch token (2,560 dimensions); each encoder thus keeps the pooling its authors recommend. The adaptation is the same for both: a rank-8 LoRA update ($\alpha=16$) on the query-key-value and output projections of every attention block, trained with a linear head (a cosine head for GCL). The 600 end-to-end training steps were tuned on CE under Virchow2 at $\rho=100$ and were deliberately not re-tuned, so that the training recipe is identical across encoders; the cost of this choice is discussed in Section~\ref{sec:discussion}. Across the 30 shards the experiment runs 1,170 end-to-end and 1,230 classifier-only fits, and every configured fit completed and entered the analysis.
+
+\section{Evaluation}
+\label{sec:evaluation}
+Each encoder is first analysed with the endpoints of the Virchow2 study. The primary endpoint is test patient-macro balanced accuracy (BA). For method $m$ with validation-selected strength $m^{*}$ and allocation $a$, the CE damage, the recovery, its share of the damage, the balanced gain, and the imbalance-specific recovery are
+\begin{equation}
+  \begin{gathered}
+  D_a=\mathrm{BA}(\mathrm{CE},1)-\mathrm{BA}(\mathrm{CE},a),\qquad
+  R_m=\mathrm{BA}(m^{*},a)-\mathrm{BA}(\mathrm{CE},a),\\
+  G_m=\mathrm{BA}(m^{*},1)-\mathrm{BA}(\mathrm{CE},1),\qquad
+  R_m-G_m ,
+  \end{gathered}
+  \label{eq:endpoints}
+\end{equation}
+\noindent with $\text{share}_m=R_m/D_a$ computed per replicate. A recovery is \emph{material} if it is at least one point and its interval lies above zero, and \emph{full} if the interval of $\mathrm{BA}(m^{*},a)$ contains the point estimate of $\mathrm{BA}(\mathrm{CE},1)$. Balanced sampling and both forms of logit adjustment reduce to CE on the balanced allocation, so $G_m=0$ for them by construction. Uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates, and intervals are 95 percent percentile intervals.
+
+The encoder contrast was fixed in the configuration before any fit. For each quantity $X$ among $\mathrm{BA}(\mathrm{CE},1)$, $D_a$, $R_m$, $G_m$, and $R_m-G_m$,
+\begin{equation}
+  \delta X = X(\text{UNI2-h})-X(\text{Virchow2}),
+  \label{eq:delta}
+\end{equation}
+\noindent computed on the same replicate weights for both encoders, so every $\delta$ is paired. A quantity counts as \emph{encoder-dependent} only if the interval of $\delta X$ excludes zero and $|\delta X|\geq1$ point. Two descriptive summaries accompany the rule: the agreement of the material-recovery verdict per method, and the Spearman rank correlation of $R_m$ across the eight variants per allocation. Six conclusions of the Virchow2 study were also listed in advance to be checked at $\rho=100$: (i) CUDA gives the largest recovery; (ii) logit adjustment is the only method that substantially lifts tail recall; (iii) no share interval reaches 1; (iv) CUDA's imbalance-specific recovery is not material, whereas those of classifier-only GCL and cRT are; (v) classifier-only methods recover about as much as end-to-end ones; and (vi) the LoRA model on the balanced allocation is less accurate than the frozen readout.
+
+The frozen UNI2-h readout lost $D_{100}=7.19$ points $[5.23, 9.32]$ from a balanced BA of 38.23 percent \citep{queisler2026encoderTransfer}. That study used a different set of draws, so the comparison with it is descriptive and has no paired interval.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
