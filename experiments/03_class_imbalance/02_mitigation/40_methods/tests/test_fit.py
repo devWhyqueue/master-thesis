@@ -166,7 +166,8 @@ def test_inline_stage2_fits_from_cache_then_drops_it(
     events: list[str] = []
     shard = SimpleNamespace(classes=["a", "b"])
     monkeypatch.setattr(fit, "load_shard", lambda config, split_idx: shard)
-    monkeypatch.setattr(fit, "run_dir", lambda *args: tmp_path)
+    run_dir = tmp_path / "run"  # absent until the fit creates it, as on a fresh shard
+    monkeypatch.setattr(fit, "run_dir", lambda *args: run_dir)
     monkeypatch.setattr(fit, "resolve_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(
         fit, "train_arm", lambda *args: (["x"], np.zeros(1, dtype=np.int64), np.array([1, 0]))
@@ -175,11 +176,12 @@ def test_inline_stage2_fits_from_cache_then_drops_it(
     monkeypatch.setattr(fit, "_eval_embeddings", lambda *args: None)
 
     def save(out_dir: Path, *args) -> None:
+        assert out_dir.is_dir()
         (out_dir / "stage1.pt").write_text("cache")
         events.append("save")
 
     def stage2(*args) -> None:
-        assert (tmp_path / "stage1.pt").exists()
+        assert (run_dir / "stage1.pt").exists()
         events.append("stage2")
 
     monkeypatch.setattr(fit, "_save_stage1_artifacts", save)
@@ -190,4 +192,4 @@ def test_inline_stage2_fits_from_cache_then_drops_it(
     fit.run_fit_stage1({"mitigation": {"inline_stage2": True}}, 0, 0, "r1", "ce", None)
 
     assert events == ["save", "stage2", "record"]
-    assert not (tmp_path / "stage1.pt").exists()
+    assert not (run_dir / "stage1.pt").exists()

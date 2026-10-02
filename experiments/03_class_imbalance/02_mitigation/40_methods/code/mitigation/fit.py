@@ -153,6 +153,7 @@ def _finish_stage1(
     if method not in _STAGE2_SOURCES:
         _record_stage1_run(out_dir, meta, shard, output, evals, device)
         return
+    out_dir.mkdir(parents=True, exist_ok=True)
     _save_stage1_artifacts(out_dir, output, arm_batch, method, param, device, evals)
     if config.get("mitigation", {}).get("inline_stage2", False):
         # Stage-one record last: a kill mid-way reruns the whole fit instead of
