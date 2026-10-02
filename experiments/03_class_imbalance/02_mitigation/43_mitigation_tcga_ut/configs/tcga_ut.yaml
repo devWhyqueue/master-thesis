@@ -1,0 +1,121 @@
+# Mitigation recovery on TCGA-UT (exp-43): exp-41's study with exp-25's design (G=20, DEPTH=160,
+# BALANCED=32, same patient draws/class permutation via prevalence.fit; T=30*20*32=19,200 rows).
+# Arms r1 (CE anchor) + r50/r100/N; grid copied verbatim from exp-41's final pass (41_mitigation_bracs).
+# Reuses exp-40's code. Stage-two methods are fit inline after their stage-one source and the
+# stage1.pt cache is deleted (TCGA-UT val+test embeddings ~2.6 GB per fit); no `submit --stage stage2`.
+#
+# Reading rules, fixed before the fits (no protocol report; single report pass at the end):
+# - steps: smallest candidate in {300, 600, 1200, 2400} (4-32 epochs of T=19,200 at batch 256) within
+#   0.5pp of the best mean r100 validation BA (pilot/pilot.yaml, shards 0/10/20); STEPS PENDING PILOT.
+# - material recovery R >= 1pp with CI above 0; imbalance-specific recovery R - G >= 1pp with CI above 0
+#   (G = balanced gain at r1); full recovery per exp-41's rule.
+# - grid edge: if a method's selection concentrates on an open grid edge, add one value past it and
+#   refit; closed edges (bs s=1, CUDA p=1, LA tau=1) stay.
+# - external reference: exp-25 frozen readout (r1 72.06; D 1.85 / 2.91 / 1.18 at r50 / r100 / N).
+
+prevalence:
+  patients_per_class: 20
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/outputs/tcga_ut/patch
+
+mitigation:
+  inline_stage2: true
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.0
+  gcl:
+    s: 30
+    a: 0.9
+    b: 0.09
+  cuda:
+    gamma: 0.6
+    check_size: 10
+    max_strength: 10
+  grid:
+    r1:
+      stage1:
+        ce: [null]
+        cuda: [0.25, 0.5, 1.0]
+        gcl: [0.05]
+      stage2:
+        crt: [null]
+        disalign: [1.0]
+        gcl2: [0.05]
+    r50:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2]
+    r100:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2]
+    N:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2, 0.5]
+      stage2:
+        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2, 0.5]
+  train:
+    stage1: {batch_size: 256, steps: 600, lr: 0.0001, weight_decay: 0.0001}
+    stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
+
+analyze:
+  # exp-25 frozen-readout D_R100 (Virchow2, TCGA-UT).
+  external_damage: {point: 2.91, ci_2_5: 2.48, ci_97_5: 3.34}
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/40_methods/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/outputs/tcga_ut/patch
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
+  shared_squashfs:
+    - source: /home/space/datasets-sqfs/tcga-ut/patch.sqfs
+      mount: /mnt/tcga-ut
+      stages: [fit]
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 50, cpu-5h: 10}
+  resources:
+    fit: {partition: gpu-5h, gpus: 1, constraint: "80gb|h100|h200|blackwell", cpus: 8, memory: 64G}
+    analyze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 64G}
