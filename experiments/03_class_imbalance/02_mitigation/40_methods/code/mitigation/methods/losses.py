@@ -42,8 +42,11 @@ def gcl_logits(
     """
     if sigma == 0:
         return s * cos_theta
+    # Draw on the generator's device (a CPU generator is valid with CUDA logits).
+    noise_device = cos_theta.device if generator is None else generator.device
     eps = (
-        torch.randn(cos_theta.shape, generator=generator, device=cos_theta.device)
+        torch.randn(cos_theta.shape, generator=generator, device=noise_device)
+        .to(cos_theta.device)
         * sigma
     )
     return s * (cos_theta - delta.unsqueeze(0) * eps.abs())

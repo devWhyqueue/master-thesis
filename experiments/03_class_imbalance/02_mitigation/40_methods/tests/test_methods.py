@@ -186,3 +186,14 @@ def test_cosine_head_returns_unit_range() -> None:
     head = CosineHead(dim=8, num_classes=4)
     out = head(torch.randn(6, 8))
     assert torch.all(out <= 1.0 + 1e-5) and torch.all(out >= -1.0 - 1e-5)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_gcl_logits_cpu_generator_with_cuda_logits() -> None:
+    """Inline stage two draws gcl2 noise from a CPU generator while the head sits on the GPU."""
+    cos_theta = torch.full((4, 3), 0.5, device="cuda")
+    delta = torch.tensor([0.0, 1.0, 2.0], device="cuda")
+    out = gcl_logits(
+        cos_theta, delta, s=30.0, sigma=1.0, generator=torch.Generator().manual_seed(0)
+    )
+    assert out.device.type == "cuda" and out.shape == (4, 3)
