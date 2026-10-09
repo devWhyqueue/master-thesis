@@ -38,11 +38,11 @@ Before finalizing substantial prose, perform a clarity pass: identify sentences 
 - In methods, distinguish what is varied, what remains fixed, and what each design choice is intended to test.
 - In results, prioritize the main finding, supporting evidence, and interpretation over implementation details.
 - Keep abstracts focused on the problem, approach, principal findings, and implications.
-- Use reader-facing scientific terminology instead of internal project names, file paths, pipeline stages, hardware details, or runtime logs unless essential.
+- Use reader-facing scientific terminology instead of internal project names, code references, tuning jargon, run counts, file paths, pipeline stages, hardware details, or runtime logs unless essential.
 - Make transitions between motivation, prior work, methods, results, limitations, and implications explicit.
 - Match the author's voice. For single-author work, avoid editorial "we"; prefer direct or impersonal phrasing without overusing the passive voice.
 - Match existing citation conventions. Use natural author-year citations when applicable; for numeric citations, avoid excessive sentence-by-sentence references unless necessary.
-- Treat revisions as standalone final prose, not change logs. Avoid references to earlier drafts unless historically relevant.
+- Treat revisions as standalone final prose, not change logs. Report the experiment as it finally stands; never narrate amendments, protocol deviations, or reruns.
 
 ## Structure and LaTeX
 
@@ -59,7 +59,8 @@ Before finalizing substantial prose, perform a clarity pass: identify sentences 
 
 - Prefer figures, diagrams, tables, and equations when they improve comprehension.
 - Use TikZ for simple conceptual diagrams; use other suitable visualization tools for more complex figures.
-- Make visuals understandable at paper scale, with legible labels, no overlaps, and dimensions within `\textwidth`.
+- Make visuals understandable at paper scale, with legible labels, no overlapping curves or hidden markers, at most two panels per row, and dimensions within `\textwidth`.
+- Include a panel or table only if the text draws a claim from it. Keep legends, colours, and units consistent across panels and datasets.
 - Use tables for comparisons, taxonomies, ablations, and structured summaries.
 - Wrap tables in `table` floats with `\caption{...}` and `\label{tab:...}`. Follow existing caption placement; otherwise place captions below tables.
 - Keep included table fragments limited to the tabular body; define captions and labels in the parent document.
