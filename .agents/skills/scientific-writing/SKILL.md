@@ -22,7 +22,7 @@ Produce scientific writing that is **easy to understand without sacrificing prec
 - **Make sentences easy to follow.** Prefer short, logically connected sentences. Split sentences with multiple independent claims, excessive clauses, or complicated dependencies.
 - **Make the reasoning explicit.** Explain what a concept means, why it matters, and how it connects to the argument. Do not force readers to infer missing logical steps.
 - **Explain intuition before formalism.** Introduce the underlying idea before detailed mechanisms, notation, or equations when possible.
-- **Use technical terminology deliberately.** Retain established terms when they add precision, define unfamiliar ones on first use, and avoid unnecessary jargon.
+- **Use technical terminology deliberately.** Retain established terms when they add precision, define unfamiliar ones on first use, and avoid unnecessary jargon. Keep one term per concept; do not coin labels (e.g., "stage one", "the diagnostic") or reuse words that already mean something else (e.g., "seed").
 - **Keep paragraphs focused.** Develop one main idea per paragraph with a clear claim, supporting evidence or reasoning, and a connection to the broader argument.
 - **Remove unnecessary complexity.** Eliminate filler, repetition, inflated phrasing, redundant qualifiers, and abstract descriptions that could be stated concretely.
 - **Maintain information fidelity.** Simplification must never change scientific meaning, remove important qualifications, or conceal uncertainty.
@@ -32,22 +32,23 @@ Before finalizing substantial prose, perform a clarity pass: identify sentences 
 ## Scientific Argumentation
 
 - Distinguish observations, assumptions, hypotheses, interpretations, and established findings.
-- Make claims specific and appropriately supported. Avoid hype and unsupported novelty claims.
+- Make claims specific and appropriately supported. Avoid hype and unsupported novelty claims, but state what the evidence supports plainly; keep caveats in the limitations instead of hedging every sentence.
 - Explain representative related work and its relevance rather than listing citations or creating citation piles.
 - For datasets, explain their relevance and limitations, not just their characteristics.
 - In methods, distinguish what is varied, what remains fixed, and what each design choice is intended to test.
-- In results, prioritize the main finding, supporting evidence, and interpretation over implementation details.
+- In results, prioritize the main finding, supporting evidence, and interpretation over implementation details. Say what a number or analysis shows before reporting it.
 - Keep abstracts focused on the problem, approach, principal findings, and implications.
 - Use reader-facing scientific terminology instead of internal project names, code references, tuning jargon, run counts, file paths, pipeline stages, hardware details, or runtime logs unless essential.
 - Make transitions between motivation, prior work, methods, results, limitations, and implications explicit.
 - Match the author's voice. For single-author work, avoid editorial "we"; prefer direct or impersonal phrasing without overusing the passive voice.
 - Match existing citation conventions. Use natural author-year citations when applicable; for numeric citations, avoid excessive sentence-by-sentence references unless necessary.
-- Treat revisions as standalone final prose, not change logs. Report the experiment as it finally stands; never narrate amendments, protocol deviations, or reruns.
+- Treat revisions as standalone final prose, not change logs. Report the experiment as it finally stands, in present or past tense; never narrate the process (amendments, reruns, pilots, checks, fit counts), only its outcomes as results.
+- Refer to related experiments by citation and a neutral description, not by number or as part of a "series" or "program".
 
 ## Structure and LaTeX
 
 - Keep one root document responsible for the preamble and single PDF build target. Place larger chapters or units in separate `.tex` files included through `\input{...}`.
-- Keep section hierarchy restrained. Create subsections only for substantial, distinct topics; merge short or closely related blocks.
+- Keep section hierarchy restrained. Create subsections only for substantial, distinct topics; merge short or closely related blocks. Keep titles and headings plain and academic: no "X and Y" pairs, no catchy phrasing.
 - Never place headings directly next to other headings without meaningful orienting prose.
 - Use consistent labels and cross-references for sections, figures, tables, and equations.
 - Define mathematical symbols near first use. Introduce equations only when they clarify a concept, definition, objective, or method.
