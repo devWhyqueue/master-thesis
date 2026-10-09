@@ -81,51 +81,50 @@ rank r1 r2 r5 r10 r20 r50 r100 N
 \section{Motivation}
 Pathology foundation models provide transferable representations for histopathology patch classification \citep{chen2024uni,vorontsov2024virchow}.
 A classifier can then learn a diagnostic task from these representations without retraining the large model.
-Public benchmarks compare the models on clinical tasks \citep{campanella2025benchmark}, but offer less guidance on a practical question: \textbf{which labeled data does a downstream classifier actually need?}
-This matters because expert annotation is expensive \citep{lu2021dataEfficient}, especially for rare cancers.
+Public benchmarks compare the models on clinical tasks \citep{campanella2025benchmark}, but offer less guidance on a practical question: \textbf{how well do foundation-model-based classifiers cope with scarce training data, and what can be done when they do not?}
+This matters because expert annotation is expensive \citep{lu2021dataEfficient}, so labeled data are often scarce, especially for rare cancers.
 
-The thesis distinguishes two forms of scarcity.
-\emph{Class imbalance} means that common diagnoses receive much more training data than rare ones; this can harm both recognition and the reliability of predicted probabilities \citep{mosquera2024classImbalance}.
+A classifier is judged here by two properties.
+\emph{Discrimination} is its ability to assign the correct class.
+\emph{Calibration} is the reliability of its predicted probabilities: among all patches predicted with 80\% confidence, about 80\% should be correct \citep{guo2017calibration}.
+The two can diverge, since a classifier may pick the right class most of the time and still be systematically overconfident.
+
+Data scarcity takes two forms.
+\emph{Class imbalance} means that common diagnoses receive much more training data than rare ones; this can harm both discrimination and calibration \citep{mosquera2024classImbalance}.
 \emph{Data shortage} means having too little labeled evidence overall, either too few patches or too few independent patients.
 These are different limits: more patches from one patient may add tissue detail without representing the variation between patients.
 Patient separation is also essential for credible evaluation, since mixing a patient's patches across training and testing can inflate performance \citep{bussola2021leakage}.
 
-The study uses foundation models as backbones and examines both data scarcity and whether the choice of backbone changes its effects.
-The aim is to explain when annotation effort should target rare classes, more tissue per patient, or additional patients, and when an algorithm can compensate.
+The study uses foundation models as backbones and examines class imbalance, data shortage, and whether the choice of backbone changes their effects.
+The aim is to explain what annotation effort should target (rare classes, more tissue per patient, or additional patients) and what an algorithm can compensate for instead.
 
 \section{Research Questions}
 Both class imbalance and data shortage are examined through three questions: how much performance they cost, what causes the loss, and how effectively it can be mitigated.
 This progression connects the measured effects to explanations and practical remedies (Figure~\ref{fig:design}).
 \begin{enumerate}
-  \item \textbf{Performance impact:} How do class imbalance and data shortage affect discrimination and probability quality across tasks, and how do patch count and patient count differ in their effects?
-  \item \textbf{Mechanisms:} What causes these performance losses, why are some classes and tasks more vulnerable, and why can additional patches fail to replace additional patients?
+  \item \textbf{Performance impact:} How do class imbalance and data shortage affect discrimination and calibration across tasks and classes, and how do patch count and patient count differ in their effects?
+  \item \textbf{Mechanisms:} What causes these performance losses, and why are some classes and tasks more vulnerable than others?
   \item \textbf{Mitigation:} How effectively do mitigation methods improve performance under class imbalance and data shortage, and why do some methods work better than others?
 \end{enumerate}
 
-\clearpage
 \section{Methodology}
-Controlled experiments use 30 cancer types from TCGA-UT \citep{komura2022universalEncoding} and seven breast-lesion classes from BRACS \citep{brancati2022bracs}.
-A linear classifier on frozen features provides the baseline; matched experiments compare Virchow2 \citep{zimmermann2024virchow2} and UNI2-h to test the relevance of backbone choice.
-Patients stay separate across training, validation and testing.
+I design controlled experiments on two patch classification tasks.
+TCGA-UT contains 30 cancer types from different organs \citep{komura2022universalEncoding}; BRACS contains seven breast-lesion classes that range from normal tissue to invasive carcinoma \citep{brancati2022bracs}.
+Every patch is encoded once by a frozen foundation model, Virchow2 \citep{zimmermann2024virchow2}, and a linear classifier (multinomial logistic regression) is trained on these features.
+To test whether the backbone matters, the experiments are repeated on the same patients and patches with a second encoder, UNI2-h, the successor of UNI \citep{chen2024uni}.
 
-Figure~\ref{fig:design} summarizes the design.
-For \textbf{class imbalance}, class shares change at fixed patch budget and patients per class.
-For \textbf{data shortage}, patch count changes at fixed patient coverage, then patient count at a matched patch budget, with class allocation controlled.
-Recognition gives equal weight to classes and patients; calibration checks confidence against accuracy.
-Paired comparisons across patient splits quantify uncertainty.
-
-\begin{figure}[ht]
+\begin{figure}[!htb]
   \centering
   \begin{tikzpicture}[
       font=\small,
       box/.style={draw, rounded corners=3pt, minimum width=4.2cm, minimum height=1.1cm, align=center},
       var/.style={box, fill=blue!8, draw=blue!60!black, thick},
       arr/.style={-{Latex[length=2mm]}}]
-    \node[var] (c) at (0,0.75) {\textbf{Class allocation}\\[-1pt]{\footnotesize per-class share of the data}};
+    \node[var] (c) at (0,0.75) {\textbf{Class imbalance}\\[-1pt]{\footnotesize per-class share of the data}};
     \node[var] (d) at (0,-0.75) {\textbf{Data shortage}\\[-1pt]{\footnotesize patches per patient, patient count}};
     \node[draw=blue!60!black, dashed, rounded corners=5pt, inner sep=5pt, fit=(c)(d)] (fac) {};
     \node[box] (f) at (5.6,0) {\textbf{FM backbone}\\[-1pt]{\footnotesize encoder choice also compared}};
-    \node[box] (k) at (11.1,0) {\textbf{Classifier}\\[-1pt]{\footnotesize trained on scarce subsets}};
+    \node[box] (k) at (11.1,0) {\textbf{Linear classifier}\\[-1pt]{\footnotesize trained on the reduced data}};
     \node[box] (l) at (1.4,-2.7) {\textbf{Performance impact} (RQ1)\\[-1pt]{\footnotesize discrimination, calibration}};
     \node[box] (m) at (6.3,-2.7) {\textbf{Mechanisms} (RQ2)\\[-1pt]{\footnotesize feature distributions}};
     \node[box] (g) at (11.1,-2.7) {\textbf{Mitigation} (RQ3)\\[-1pt]{\footnotesize effectiveness and limitations}};
@@ -138,14 +137,39 @@ Paired comparisons across patient splits quantify uncertainty.
     \draw[arr] (6.3,-1.8) -- (m.north);
     \draw[arr] (11.1,-1.8) -- (g.north);
   \end{tikzpicture}
-  \caption{Experimental design. Each scarcity factor (blue) is varied alone while the others stay fixed.}
+  \caption{Experimental design. Each scarcity factor (blue) is varied alone while the other stays fixed. The reduced training set is encoded by a frozen foundation model (FM), and the linear classifier trained on it is analyzed for the three research questions.}
   \label{fig:design}
 \end{figure}
 
+\textbf{Patient splits.}
+Each dataset is split by patient, so that all patches of one patient fall into exactly one partition.
+Within each class, patients are assigned at random to training (about 70\%), validation (15\%) and testing (15\%).
+Three such splits are drawn with different random seeds.
+The validation patients serve to select the regularization strength of the classifier and to fit the calibration correction; the test patients are used only for the final evaluation.
+
+For \textbf{class imbalance}, the total number of training patches $T$ and the number of patients per class are the same in every condition (20 patients per class on TCGA-UT, 10 on BRACS).
+What changes is how $T$ is divided among the classes.
+In the balanced condition every class receives the same number of patches, 32 per patient.
+In an imbalanced condition frequent classes receive more patches per patient and rare classes fewer (Figure~\ref{fig:dist}).
+The \emph{imbalance ratio} $\rho$ states how many times more patches the most frequent class receives than the rarest one: $\rho=1$ is balanced, and $\rho=100$ is the most extreme condition tested.
+Which class is frequent and which is rare is assigned at random and redrawn ten times per split, so that the result does not depend on one particular choice.
+
+For \textbf{data shortage}, the classes stay balanced and two experiments separate patch count from patient count.
+In the first, the patients stay the same and each contributes fewer patches.
+In the second, the total number of patches stays the same but comes from fewer patients, each contributing more patches.
+Comparing the two shows whether a classifier is limited by the amount of tissue or by the number of independent patients.
+
+\textbf{Evaluation.}
+Discrimination is measured by \emph{balanced accuracy}: the share of correctly classified test patches is computed per class and then averaged over classes, so that a rare class counts as much as a frequent one; within a class, every patient counts equally regardless of patch count.
+Calibration is measured by the \emph{expected calibration error} (ECE), the average gap between the confidence of a prediction and its accuracy; lower is better.
+The effect of a scarce condition is reported as its difference from the balanced condition on the same patients, in percentage points (pp), with 95\% bootstrap intervals over test patients and repetitions.
+
 \section{Preliminary Findings}
-Initial class-imbalance experiments examine performance impact and underlying mechanisms on both tasks, using Virchow2 and a matched comparison with UNI2-h.
-These experiments vary the largest-to-smallest class ratio $\rho$ from 1 to 100 over 30 combinations of patient split and class allocation (Figure~\ref{fig:dist}).
-Three findings guide the remaining work.
+Initial experiments addressed class imbalance on both tasks, the 30 cancer types of TCGA-UT and the seven breast-lesion classes of BRACS.
+They varied the imbalance ratio $\rho$ between the most frequent and the rarest class from 1 to 100 (Figure~\ref{fig:dist}).
+Each condition was repeated 30 times: three patient splits, each with ten random choices of which class is frequent and which is rare.
+The numbers below refer to Virchow2 unless stated otherwise.
+Four findings guide the remaining work.
 
 \begin{figure}[!htb]
 \centering
@@ -169,27 +193,52 @@ Three findings guide the remaining work.
 \caption{Training class distributions: balanced, native and ratio 100, sorted from most to least frequent. Total patch budget $T$ and patients per class stay fixed; only class shares change.}\label{fig:dist}
 \end{figure}
 
-\newpage
-\noindent\textbf{1. Which class is rare matters as much as the ratio.}
-On TCGA-UT at ratio 100, changing which classes receive few patches changes balanced-accuracy loss from 1.3 to 4.5 percentage points (pp).
-Damage is greatest when a rare class is often mistaken for a class that receives many examples: predictions favor the common alternative.
-On BRACS, classes that are easy to recognize with balanced data have the most to lose when made rare.
-The ratio alone cannot identify which diagnoses need more labels.
+\smallskip\noindent\textbf{1. Imbalance costs far more accuracy on BRACS than on TCGA-UT.}
+Figure~\ref{fig:damage}a shows the \emph{damage}: the balanced accuracy lost when the training data change from balanced to imbalanced at ratio $\rho$.
+With balanced data, the classifier reached 72.1\% balanced accuracy on TCGA-UT and 39.6\% on BRACS.
+TCGA-UT tolerated moderate imbalance: it lost only 0.6 pp at $\rho=10$ and 2.9 pp at $\rho=100$.
+BRACS was more sensitive: it lost 1.2 pp already at $\rho=2$ and 7.7 pp at $\rho=100$.
+The average also hides how hard the rare classes are hit.
+At $\rho=100$, the recall of the two rarest BRACS classes fell from 38.7\% to 7.3\%, so most of their patches were misclassified.
+A likely reason for the difference between the tasks is how similar their classes are.
+TCGA-UT separates cancers from different organs, whereas BRACS separates lesions of one organ with similar morphology, which is why BRACS is harder even with balanced data.
+When two classes look alike, many patches lie close to the boundary between them, and a classifier that leans towards the frequent class then misassigns many patches of the rare one.
+Finding~2 supports this explanation.
 
-\smallskip\noindent\textbf{2. Probability quality is easier to improve than discrimination.}
-At ratio 100, expected calibration error (ECE), the gap between confidence and accuracy, rises from 5.5 to 17.8 pp on TCGA-UT and from 12.3 to 35.7 pp on BRACS (Figure~\ref{fig:damage}b).
-Temperature scaling, one validation-fitted confidence adjustment \citep{guo2017calibration}, removes 92--96\% of the imbalance-induced increase relative to the corrected balanced baseline.
-Predicted classes stay unchanged: better confidence does not recover missed diagnoses.
+\smallskip\noindent\textbf{2. Which class is rare matters as much as the imbalance ratio.}
+The same ratio does very different damage depending on which classes end up rare.
+The losses in finding~1 are averages over random choices of the rare classes.
+With $\rho$ fixed at 100 on TCGA-UT and only this choice changed, the loss was 1.3 pp in the mildest case and 4.5 pp in the worst (not shown in Figure~\ref{fig:damage}).
+The worst case was a rare class that is often confused with a frequent one: the classifier then assigned its patches to the frequent class.
+On BRACS the loss lay between 5.7 pp and 10.0 pp, depending on which class is the rarest.
+It was highest for invasive carcinoma: this class is recognized best with balanced data, so it has the most to lose.
+Knowing the ratio is therefore not enough to tell which diagnoses need more labels.
 
-\smallskip\noindent\textbf{3. Imbalance damage differs strongly between tasks.}
-TCGA-UT tolerates moderate imbalance: balanced accuracy falls by only 0.6 pp at ratio 10 and 2.9 pp at 100.
-BRACS is more sensitive, losing 1.2 pp already at ratio 2 and 7.7 pp at 100 (Figure~\ref{fig:damage}a).
-At ratio 100, its two rarest classes fall from 38.7\% to 7.3\% recall: most of their patches are misclassified.
-The tasks differ in what must be distinguished: TCGA-UT spans cancers from different organs, whereas BRACS separates breast lesions with similar morphology.
-This makes the greater sensitivity of BRACS plausible.
-Experiments also show two sources of damage: rare classes have less influence during training and fewer examples of their variation.
-Giving those examples more weight addresses the first problem, but cannot replace the missing examples.
-The pattern persists with UNI2-h, so changing backbone alone does not solve it.
+\smallskip\noindent\textbf{3. A rare class suffers for two reasons, and reweighting fixes only one.}
+A rare class has two problems.
+It has little \emph{influence}: its few patches carry little weight in training, so the classifier is fitted mainly to the frequent classes.
+And it shows little \emph{diversity}: at $\rho=100$ the classifier sees only one or two of its patches per patient.
+Two additional experiments separated these problems.
+In the first, the rare class kept all its patches, but its weight in training was reduced to that of the imbalanced case (low influence only).
+In the second, it kept only its few patches, but its weight was raised to that of every other class (low diversity only).
+On BRACS at $\rho=100$, low influence alone cost 4.5 pp and low diversity alone 3.3 pp; together they explain the 7.7 pp total.
+On TCGA-UT they cost 1.2 pp and 0.5 pp, and a further 1.2 pp arose only when both occurred together.
+Reweighting gives rare classes more influence but cannot add diversity, so 3.3 pp remain on BRACS.
+Recovering them needs more patches or patients, or methods that learn a class from few examples.
+
+\smallskip\noindent\textbf{4. Calibration is easier to repair than discrimination.}
+Imbalance makes the classifier overconfident.
+When $\rho$ increases from 1 to 100, the ECE rose from 5.5 to 17.8 pp on TCGA-UT and from 12.3 to 35.7 pp on BRACS (solid lines in Figure~\ref{fig:damage}b).
+\emph{Temperature scaling} corrects this with a single number: all class scores are divided by one constant fitted on the validation patients, which lowers every confidence in the same way \citep{guo2017calibration}.
+After this correction the ECE rose only from 1.5 to 2.1 pp on TCGA-UT and from 6.6 to 8.6 pp on BRACS (dashed lines), so 92--96\% of the increase caused by imbalance is gone.
+Dividing all scores by the same constant does not change which class scores highest.
+The predicted classes, and with them the accuracy losses in Figure~\ref{fig:damage}a, stay exactly the same: a better confidence estimate does not recover a missed diagnosis.
+
+\smallskip\noindent\textbf{Backbone.}
+Repeating all conditions with UNI2-h left these findings intact.
+On TCGA-UT, UNI2-h lost 0.9 pp less than Virchow2 at $\rho=100$.
+On BRACS the two encoders did not differ measurably, and the recall of the two rarest classes collapsed to about 9\% with both.
+Changing the backbone alone does not solve the problem.
 
 \begin{figure}[!htb]
 \centering
@@ -229,19 +278,23 @@ The pattern persists with UNI2-h, so changing backbone alone does not solve it.
 \addlegendentry{\shortstack[l]{TCGA-UT,\\corrected}}
 \end{axis}
 \end{tikzpicture}
-\caption{(a) Balanced-accuracy loss (percentage points, pp), with 95\% intervals; diamonds show native class shares and the dotted line marks 1 pp. (b) Calibration error before and after temperature scaling: probability quality is easier to improve than discrimination.}\label{fig:damage}
+\caption{Effect of the imbalance ratio $\rho$; lower is better in both panels. (a) Balanced accuracy lost relative to balanced training data (percentage points, pp), with 95\% intervals; diamonds show the datasets' native class shares and the dotted line marks 1 pp. (b) Expected calibration error (ECE) of the raw predicted probabilities (solid) and after temperature scaling (dashed, ``corrected'').}\label{fig:damage}
 \end{figure}
+
 \section{Next Steps}
-The thesis will extend the imbalance findings to \textbf{data shortage}, then evaluate \textbf{mitigation methods for both forms of scarcity}.
+The thesis will extend the imbalance findings to \textbf{data shortage} and then evaluate \textbf{mitigation methods for both forms of scarcity}.
 The aim is to establish which methods work well, where they fall short, and why, alongside guidance on where additional labels are most valuable.
+The remaining work follows two stages.
 
-The remaining work follows two stages:
-\begin{itemize}
-  \item \textbf{Data shortage.} Reduce patches at fixed patient coverage, then patients at a matched patch budget. Measure the performance impact and explain whether tissue variation or patient diversity limits performance, and when more patches stop helping.
-  \item \textbf{Mitigation.} Evaluate methods for class imbalance and data shortage, including class reweighting, estimation from few examples, and temperature scaling. Compare their effectiveness across tasks and scarcity levels, and analyze why some methods succeed while others offer little improvement.
-\end{itemize}
+\textbf{Data shortage.}
+In the first stage, I will reduce the number of patches per patient while keeping the patients fixed, and then reduce the number of patients while keeping the total number of patches fixed.
+Both experiments measure the loss in discrimination and calibration.
+The analysis then examines whether the variation of tissue within a patient or the diversity between patients limits performance, and from which point additional patches stop helping.
 
-\clearpage
+\textbf{Mitigation.}
+The second stage evaluates methods against class imbalance and data shortage, including class reweighting, methods that estimate a class from few examples, and temperature scaling.
+Their effectiveness is compared across tasks and scarcity levels, with an analysis of why some methods succeed while others offer little improvement.
+
 \bibliographystyle{plainnat}
 \bibliography{references}
 
