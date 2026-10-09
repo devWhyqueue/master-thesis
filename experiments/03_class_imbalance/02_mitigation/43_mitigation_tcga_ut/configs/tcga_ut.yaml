@@ -14,6 +14,11 @@
 #   (G = balanced gain at r1); full recovery per exp-41's rule.
 # - grid edge: if a method's selection concentrates on an open grid edge, add one value past it and
 #   refit; closed edges (bs s=1, CUDA p=1, LA tau=1) stay.
+#   EDGE PASS 2026-10-09: first analysis put 63-77% of r50/r100 selections for LA and posthoc-LA on the
+#   lowest value (tau=0.5; CUDA 53-57% on p=0.25 and disalign N 40% on gamma=3 judged marginal, not extended).
+#   Added tau=0.25 to la and posthoc_la in r50/r100/N. posthoc_la/crt/disalign are fit from the CE cache, so
+#   the whole CE-sourced family (ce, crt, disalign, posthoc_la) of r50/r100/N was refit together so tau=0.25
+#   shares one model with the other tau; superseded records are in split=*/results_superseded/.
 # - external reference: exp-25 frozen readout (r1 72.06; D 1.85 / 2.91 / 1.18 at r50 / r100 / N).
 
 prevalence:
@@ -69,10 +74,10 @@ mitigation:
         ce: [null]
         bs: [0.5, 1.0]
         cuda: [0.25, 0.5, 1.0]
-        la: [0.5, 1.0]
+        la: [0.25, 0.5, 1.0]
         gcl: [0.02, 0.05, 0.2]
       stage2:
-        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
         disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
         gcl2: [0.02, 0.05, 0.2]
@@ -81,10 +86,10 @@ mitigation:
         ce: [null]
         bs: [0.5, 1.0]
         cuda: [0.25, 0.5, 1.0]
-        la: [0.5, 1.0]
+        la: [0.25, 0.5, 1.0]
         gcl: [0.02, 0.05, 0.2]
       stage2:
-        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
         disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
         gcl2: [0.02, 0.05, 0.2]
@@ -93,10 +98,10 @@ mitigation:
         ce: [null]
         bs: [0.5, 1.0]
         cuda: [0.25, 0.5, 1.0]
-        la: [0.5, 1.0]
+        la: [0.25, 0.5, 1.0]
         gcl: [0.02, 0.05, 0.2, 0.5]
       stage2:
-        posthoc_la: [0.5, 1.0, 1.5, 2.0]
+        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
         disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
         crt: [null]
         gcl2: [0.02, 0.05, 0.2, 0.5]
