@@ -1,74 +1,79 @@
 ---
 name: scientific-writing
-description: Scientific writing guidance for drafting, revising, structuring, and polishing research papers, thesis chapters, LaTeX documents, literature review sections, methods/results/discussion text, captions, tables, equations, and conceptual figures. Use when Codex works on academic prose, paper or thesis organization, LaTeX sectioning, scientific argument flow, or research visuals for papers and theses.
+description: Draft, revise, and structure clear, precise scientific writing for papers, theses, LaTeX documents, literature reviews, methods, results, discussions, captions, tables, equations, and figures. Use whenever working on academic prose, scientific arguments, or research visuals.
 ---
 
 # Scientific Writing
 
-Use this skill to produce scientific writing that is clear, structured, evidence-aware, and ready to live in a paper or thesis source tree.
+Produce scientific writing that is **easy to understand without sacrificing precision, nuance, or rigor**. Optimize for reader comprehension, not perceived sophistication. Every sentence should contribute to the reader's understanding.
 
 ## Workflow
 
-1. Identify the target artifact: paper section, thesis chapter, abstract, related work, methods, results, discussion, caption, table, equation, or figure.
-2. Inspect surrounding files before editing existing LaTeX so the sectioning, macros, labels, citation style, and tone match the document.
-3. Preserve the document's thesis, claims, and citation obligations. Flag missing evidence, unclear claims, or citation gaps instead of inventing support.
-4. Draft in complete scientific prose. Avoid placeholder-only paragraphs, outline stubs, and headings without substance.
-5. Add or recommend figures, tables, equations, or schematic diagrams when they make the argument more concrete.
-6. Check LaTeX structure and visual layout before finishing.
+1. Identify the target artifact, intended audience, and central message.
+2. Inspect surrounding files before editing to match existing structure, terminology, macros, citations, and tone.
+3. Preserve the intended claims and scientific contribution. Flag missing evidence, ambiguities, and citation gaps; never invent support.
+4. Draft complete, coherent prose. Avoid placeholders, outline stubs, and headings without substance.
+5. Use figures, tables, or equations where they communicate an idea more clearly than prose.
+6. **Review explicitly for readability**, then verify scientific accuracy, LaTeX structure, and layout.
 
-## LaTeX Structure
+## Readability First
 
-- Compile only one PDF output per LaTeX document.
-- Keep the root document responsible for the preamble and build target. Put larger chapter or unit bodies in separate `.tex` files and include them from `main.tex` with `\input{...}`.
-- Do not give included files their own document preamble. Do not compile included chapter or unit files into separate PDFs.
-- Keep section hierarchy restrained. Use top-level sections only for real chapters or major document units.
-- Use `\subsection{...}` for meaningful internal blocks, but keep each subsection substantial enough to preserve reading flow.
-- Do not create a new subsection after only one short paragraph. Combine closely related points into a larger subsection.
-- Never place `\section{...}` directly before `\subsection{...}`, or one `\subsection{...}` directly before another heading. Add meaningful orienting prose between headings, or remove or merge one heading.
-- Use labels and references consistently for sections, figures, tables, and equations when the surrounding document does so.
+- **Prefer simple, direct language.** Use familiar words, concrete nouns, and active constructions where appropriate. Avoid academic-sounding vocabulary that adds no precision.
+- **Make sentences easy to follow.** Prefer short, logically connected sentences. Split sentences with multiple independent claims, excessive clauses, or complicated dependencies.
+- **Make the reasoning explicit.** Explain what a concept means, why it matters, and how it connects to the argument. Do not force readers to infer missing logical steps.
+- **Explain intuition before formalism.** Introduce the underlying idea before detailed mechanisms, notation, or equations when possible.
+- **Use technical terminology deliberately.** Retain established terms when they add precision, define unfamiliar ones on first use, and avoid unnecessary jargon.
+- **Keep paragraphs focused.** Develop one main idea per paragraph with a clear claim, supporting evidence or reasoning, and a connection to the broader argument.
+- **Remove unnecessary complexity.** Eliminate filler, repetition, inflated phrasing, redundant qualifiers, and abstract descriptions that could be stated concretely.
+- **Maintain information fidelity.** Simplification must never change scientific meaning, remove important qualifications, or conceal uncertainty.
 
-## Writing Standards
+Before finalizing substantial prose, perform a clarity pass: identify sentences that require rereading, simplify their structure, remove unnecessary terminology, and check that all essential meaning remains intact.
 
-- Prioritize readability. Prefer plain words and short, direct sentences; define necessary technical terms on first use, and remove jargon that does not add precision.
-- Prefer precise claims over broad declarations. State what is known, what is assumed, and what follows from the cited evidence.
-- Build paragraphs around one main point: topic sentence, supporting evidence or reasoning, and a clear connection to the section's purpose.
-- Use reader-facing scientific terms instead of local project, pipeline, file-structure, hardware, or runtime-log language. Define specialized terms on first use, using `\emph{...}` for the introduced term when writing LaTeX, then continue in plain text.
-- Keep abstracts focused on the problem, scope, key result, and interpretation; omit low-level implementation details unless they are essential to the claim.
-- Match the document's existing citation style. For author-year documents, use parenthetical or narrative author-year citations naturally, e.g., `(Goodfellow et al., 2016)` or `Goodfellow et al. (2016)`. For numeric styles, place citations outside sentence grammar at the end of the relevant paragraph, not after each sentence, unless a local convention clearly requires otherwise.
-- Avoid citation piles. For important method families, concepts, or debates, briefly explain representative work and connect it to the current study.
-- For datasets, materials, or corpora, explain why they fit the research question and what limitations or biases matter, not only their basic counts or properties.
-- In methods prose, distinguish what is varied, what is held constant, and what each design choice is meant to isolate.
-- Maintain academic restraint. Avoid hype, marketing language, and unsupported novelty claims.
-- Match the authorial voice to the authorship. For single-author work, avoid the editorial "we"; prefer impersonal constructions ("this report", "the benchmark") or the passive voice so the prose does not imply multiple authors.
-- Make transitions explicit when moving between motivation, prior work, method, result, limitation, and implication.
-- Format numbers with a decimal point for fractional values and a comma as the thousands separator, e.g., `0.72` and `2,152`. In LaTeX documents that use `siunitx`, prefer `\num{...}` with a matching document-level setup so generated tables and prose remain consistent.
-- Preserve reader orientation in long sections with short signposting paragraphs rather than excessive headings.
-- Treat each revision as a standalone final artifact, not as a change log. Avoid meta-revision language such as "revised", "earlier", "previous", "new", "old", or "now" unless the document explicitly needs historical comparison. Describe the current claim, evidence, and interpretation directly.
-- When revising, improve argument flow, specificity, and citation placement without changing the author's intended contribution.
+## Scientific Argumentation
 
-## Visuals, Tables, And Math
+- Distinguish observations, assumptions, hypotheses, interpretations, and established findings.
+- Make claims specific and appropriately supported. Avoid hype and unsupported novelty claims.
+- Explain representative related work and its relevance rather than listing citations or creating citation piles.
+- For datasets, explain their relevance and limitations, not just their characteristics.
+- In methods, distinguish what is varied, what remains fixed, and what each design choice is intended to test.
+- In results, prioritize the main finding, supporting evidence, and interpretation over implementation details.
+- Keep abstracts focused on the problem, approach, principal findings, and implications.
+- Use reader-facing scientific terminology instead of internal project names, file paths, pipeline stages, hardware details, or runtime logs unless essential.
+- Make transitions between motivation, prior work, methods, results, limitations, and implications explicit.
+- Match the author's voice. For single-author work, avoid editorial "we"; prefer direct or impersonal phrasing without overusing the passive voice.
+- Match existing citation conventions. Use natural author-year citations when applicable; for numeric citations, avoid excessive sentence-by-sentence references unless necessary.
+- Treat revisions as standalone final prose, not change logs. Avoid references to earlier drafts unless historically relevant.
 
-- Use figures, schematic diagrams, tables, and equations when they clarify concepts more efficiently than prose alone.
-- Use TikZ for simple conceptual diagrams such as pipelines, ambiguity examples, task taxonomies, and evaluation flows.
-- For more complex or richer visualizations, generate a fitting figure directly when appropriate.
-- Keep diagram labels clear and separated from boxes and arrows. Check for overlapping labels before finishing.
-- Keep figures compact enough to fit within `\textwidth` without overfull boxes.
-- Keep figures readable at paper scale; prefer visual summaries that reveal the main pattern over plots that expose every raw detail.
-- Use tables for comparisons, taxonomies, ablations, terminology mappings, and practical checklists.
-- Wrap every tabular in a `table` float and title it with `\caption{...}` plus a matching `\label{tab:...}` when the document uses references. Do not use manual ``Table~X:'' headings, `\textbf{...}` title rows, or `figure` floats for standalone tables.
-- Place table `\caption` after the tabular body unless the surrounding document already places table captions above consistently.
-- Generated table fragments included via `\input` should contain only the tabular body; keep `\caption` and `\label` in the parent document.
-- Include formulas when they clarify a definition, objective, metric, loss, calibration measure, or evaluation protocol.
-- Give every figure and table a short explanatory caption that states what the reader should learn from it.
-- When prose resumes immediately after a displayed formula, figure, table, or list environment, use `\noindent` so the continuation does not start with a paragraph indent.
+## Structure and LaTeX
 
-## LaTeX Editing Checklist
+- Keep one root document responsible for the preamble and single PDF build target. Place larger chapters or units in separate `.tex` files included through `\input{...}`.
+- Keep section hierarchy restrained. Create subsections only for substantial, distinct topics; merge short or closely related blocks.
+- Never place headings directly next to other headings without meaningful orienting prose.
+- Use consistent labels and cross-references for sections, figures, tables, and equations.
+- Define mathematical symbols near first use. Introduce equations only when they clarify a concept, definition, objective, or method.
+- Use `\emph{...}` when first introducing specialized terms, if appropriate to the document's style.
+- Format fractional values with decimal points and thousands with commas (e.g., `0.72`, `2,152`). Prefer `\num{...}` when the document uses `siunitx`.
+- Maintain reader orientation in longer sections through concise signposting rather than excessive headings.
 
-- Ensure included `.tex` files contain body content only.
-- Ensure headings are separated by useful prose.
-- Ensure every new figure or table has a `\caption` and label when the document convention expects labels.
-- Ensure tables use `\caption` inside a `table` float rather than manual titles or figure captions.
-- Ensure formulas define symbols close to first use.
-- Ensure any TikZ diagram fits the page, avoids overlapping text, and has readable labels.
-- Ensure prose after displays or lists uses `\noindent` when it continues the same discussion.
-- Compile or run the document's existing LaTeX check command when feasible; otherwise report that compilation was not run.
+## Figures and Tables
+
+- Prefer figures, diagrams, tables, and equations when they improve comprehension.
+- Use TikZ for simple conceptual diagrams; use other suitable visualization tools for more complex figures.
+- Make visuals understandable at paper scale, with legible labels, no overlaps, and dimensions within `\textwidth`.
+- Use tables for comparisons, taxonomies, ablations, and structured summaries.
+- Wrap tables in `table` floats with `\caption{...}` and `\label{tab:...}`. Follow existing caption placement; otherwise place captions below tables.
+- Keep included table fragments limited to the tabular body; define captions and labels in the parent document.
+- Give figures and tables informative captions explaining their main takeaway, not merely their contents.
+- When prose directly continues after a display or list, use `\noindent` where needed to avoid unintended indentation.
+
+## Final Review
+
+Before finishing, verify:
+
+1. **Clarity:** Can an informed reader understand each paragraph on first reading? Are the main ideas, logical connections, and terminology clear?
+2. **Precision:** Are all claims supported, qualifications preserved, and symbols defined?
+3. **Structure:** Does each section advance the argument without fragmentation, repetition, or unnecessary detail?
+4. **Visuals:** Are figures, tables, captions, labels, and mathematical notation correct and readable?
+5. **LaTeX:** Are included files body-only, references consistent, and layouts free of overlaps or overfull boxes?
+
+Compile or run the existing LaTeX checks when feasible. Otherwise report that compilation was not performed.
