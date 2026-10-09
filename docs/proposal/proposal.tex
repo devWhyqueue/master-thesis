@@ -7,46 +7,112 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{enumitem}
 \usepackage{tikz}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots,fillbetween}
+\pgfplotsset{compat=1.18}
+\usepackage{caption}
+\captionsetup{font=small}
+\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
 \usetikzlibrary{positioning,arrows.meta,calc,fit}
 \setlist{itemsep=2pt,topsep=4pt}
+\definecolor{tcga}{HTML}{2166AC}
+\definecolor{bracs}{HTML}{D6604D}
 
 \title{Understanding Data Scarcity in Foundation-Model-Based\\Histopathology Patch Classification}
 \author{Yannik Queisler\\[2pt]\small Thesis Proposal}
 \date{\today}
 
+% Plot data and figures adapted from experiments/03_class_imbalance/summary/summary.tex.
+% Realized training class counts, sorted head to tail (exp-02 allocator; N = native shares of split 0, draw 0).
+\pgfplotstableread{
+rank r1 r2 r5 r10 r20 r50 r100 N
+1 640 886 1278 1615 1973 2466 2843 1746
+2 640 865 1209 1491 1780 2155 2426 1684
+3 640 845 1144 1378 1605 1883 2070 1675
+4 640 825 1082 1272 1448 1645 1766 1206
+5 640 805 1024 1175 1305 1438 1506 1182
+6 640 786 969 1086 1177 1256 1285 897
+7 640 768 916 1003 1062 1098 1097 894
+8 640 750 867 926 958 959 936 841
+9 640 732 820 856 864 838 798 836
+10 640 715 776 790 779 732 681 807
+11 640 698 734 730 702 640 581 708
+12 640 681 694 674 634 559 496 703
+13 640 665 657 623 571 489 423 702
+14 640 649 621 575 515 427 361 665
+15 640 634 588 531 465 373 308 605
+16 640 619 556 491 419 326 263 596
+17 640 604 526 453 378 285 224 472
+18 640 590 498 419 341 249 191 445
+19 640 576 471 387 307 217 163 422
+20 640 563 445 357 277 190 139 337
+21 640 549 421 330 250 166 119 290
+22 640 536 399 305 226 145 101 247
+23 640 524 377 281 203 127 86 234
+24 640 511 357 260 183 111 74 179
+25 640 499 338 240 165 97 63 176
+26 640 487 319 222 149 85 54 161
+27 640 476 302 205 135 74 46 145
+28 640 465 286 189 121 65 39 130
+29 640 454 270 175 109 56 33 119
+30 640 443 256 161 99 49 28 96
+}\tcgacounts
+\pgfplotstableread{
+rank r1 r2 r5 r10 r20 r50 r100 N
+1 320 441 622 766 908 1084 1206 678
+2 320 392 476 522 551 565 560 556
+3 320 350 364 356 335 294 260 459
+4 320 312 278 242 203 153 120 176
+5 320 278 213 165 123 80 56 129
+6 320 247 163 112 75 42 26 127
+7 320 220 124 77 45 22 12 115
+}\bracscounts
+
+\newcommand{\countlines}[1]{%
+  \addplot[black,thick,mark=*,mark size=1pt] table[x=rank,y=r1]{#1};
+  \addplot[red!80!black,thick,dashed,mark=square*,mark size=1pt] table[x=rank,y=N]{#1};
+  \addplot[tcga,thick,mark=triangle*,mark size=1.4pt] table[x=rank,y=r100]{#1};}
+
+
 \begin{document}
 \maketitle
 
 \section{Motivation}
-Pathology foundation models, pretrained with self-supervision on large slide collections, have become the default way to represent histopathology patches \citep{chen2024uni,vorontsov2024virchow}.
-Public models are now compared systematically on clinical tasks \citep{campanella2025benchmark}, yet such benchmarks vary the model and fix the downstream data.
-How much labelled data a classifier on top of these representations needs is much less understood, although labels are expensive \citep{lu2021dataEfficient} and thinnest for the rare cancers these models are promoted for \citep{vorontsov2024virchow}.
+Pathology foundation models provide transferable representations for histopathology patch classification \citep{chen2024uni,vorontsov2024virchow}.
+A classifier can then learn a diagnostic task from these representations without retraining the large model.
+Public benchmarks compare the models on clinical tasks \citep{campanella2025benchmark}, but offer less guidance on a practical question: \textbf{which labeled data does a downstream classifier actually need?}
+This matters because expert annotation is expensive \citep{lu2021dataEfficient}, especially for rare cancers.
 
-Nominal sample counts are a poor measure of data sufficiency.
-Patches are nested within patients, and mixing them across training and evaluation inflates reported scores by up to 41\% \citep{bussola2021leakage}; thousands of patches may carry the information of a few dozen patients.
-Class frequencies are also strongly uneven, which in medical imaging distorts both discrimination and calibration \citep{mosquera2024classImbalance}, and long-tailed recognition work separates representation from classifier training \citep{kang2020decouplingRepresentation}.
-With frozen features the representation is fixed, so the imbalance effect can be studied on the classifier alone.
-Clinical use also needs well-calibrated probabilities, which modern networks often lack \citep{guo2017calibration}.
+The thesis distinguishes two forms of scarcity.
+\emph{Class imbalance} means that common diagnoses receive much more training data than rare ones; this can harm both recognition and the reliability of predicted probabilities \citep{mosquera2024classImbalance}.
+\emph{Data shortage} means having too little labeled evidence overall, either too few patches or too few independent patients.
+These are different limits: more patches from one patient may add tissue detail without representing the variation between patients.
+Patient separation is also essential for credible evaluation, since mixing a patient's patches across training and testing can inflate performance \citep{bussola2021leakage}.
 
-This thesis therefore separates three forms of scarcity: skewed class allocation, too few patches, and too few patients.
-It asks which of them drives the performance loss of classifiers trained on foundation-model representations, why, and how far algorithms can compensate, telling practitioners where annotation effort pays off and when a better algorithm cannot replace it.
+The study uses foundation models as backbones and examines both data scarcity and whether the choice of backbone changes its effects.
+The aim is to explain when annotation effort should target rare classes, more tissue per patient, or additional patients, and when an algorithm can compensate.
 
 \section{Research Questions}
+Both class imbalance and data shortage are examined through three questions: how much performance they cost, what causes the loss, and how effectively it can be mitigated.
+This progression connects the measured effects to explanations and practical remedies (Figure~\ref{fig:design}).
 \begin{enumerate}
-  \item \textbf{Class imbalance.} How does it affect discrimination and calibration, and which mechanisms cause the loss?
-  \item \textbf{Patch shortage.} How does it affect performance when patient coverage is held constant?
-  \item \textbf{Patient shortage.} How does it affect performance independently of patch count, and which properties of the learned feature distributions explain the loss?
-  \item \textbf{Mitigation.} Which forms of scarcity can be mitigated algorithmically without acquiring more data?
+  \item \textbf{Performance impact:} How do class imbalance and data shortage affect discrimination and probability quality across tasks, and how do patch count and patient count differ in their effects?
+  \item \textbf{Mechanisms:} What causes these performance losses, why are some classes and tasks more vulnerable, and why can additional patches fail to replace additional patients?
+  \item \textbf{Mitigation:} How effectively do mitigation methods improve performance under class imbalance and data shortage, and why do some methods work better than others?
 \end{enumerate}
 
+\clearpage
 \section{Methodology}
-Controlled experiments use TCGA-UT \citep{komura2022universalEncoding} (patches from 32 cancer types) and BRACS \citep{brancati2022bracs} (breast lesions including atypical categories) with frozen pathology foundation-model representations.
-Three factors are manipulated separately while the others are controlled (Figure~\ref{fig:design}):
-\begin{itemize}
-  \item \textbf{Class allocation:} how the training data is distributed across classes.
-  \item \textbf{Patch count:} patches per patient, with patient coverage held constant.
-  \item \textbf{Patient count:} number of independent patients, with patch count held constant.
-\end{itemize}
+Controlled experiments use 30 cancer types from TCGA-UT \citep{komura2022universalEncoding} and seven breast-lesion classes from BRACS \citep{brancati2022bracs}.
+A linear classifier on frozen features provides the baseline; matched experiments compare Virchow2 \citep{zimmermann2024virchow2} and UNI2-h to test the relevance of backbone choice.
+Patients stay separate across training, validation and testing.
+
+Figure~\ref{fig:design} summarizes the design.
+For \textbf{class imbalance}, class shares change at fixed patch budget and patients per class.
+For \textbf{data shortage}, patch count changes at fixed patient coverage, then patient count at a matched patch budget, with class allocation controlled.
+Recognition gives equal weight to classes and patients; calibration checks confidence against accuracy.
+Paired comparisons across patient splits quantify uncertainty.
 
 \begin{figure}[ht]
   \centering
@@ -58,44 +124,122 @@ Three factors are manipulated separately while the others are controlled (Figure
     \node[var] (c) at (0,0.75) {\textbf{Class allocation}\\[-1pt]{\footnotesize per-class share of the data}};
     \node[var] (d) at (0,-0.75) {\textbf{Data shortage}\\[-1pt]{\footnotesize patches per patient, patient count}};
     \node[draw=blue!60!black, dashed, rounded corners=5pt, inner sep=5pt, fit=(c)(d)] (fac) {};
-    \node[box] (f) at (5.6,0) {\textbf{Frozen features}\\[-1pt]{\footnotesize pathology foundation model}};
-    \node[box] (k) at (11.2,0) {\textbf{Classifier}\\[-1pt]{\footnotesize trained on scarce subsets}};
-    \node[box] (l) at (1.4,-3.0) {\textbf{Performance loss} (RQ1--3)\\[-1pt]{\footnotesize discrimination, calibration}};
-    \node[box] (m) at (6.3,-3.0) {\textbf{Mechanisms} (RQ1, RQ3)\\[-1pt]{\footnotesize feature distributions}};
-    \node[box] (g) at (11.2,-3.0) {\textbf{Mitigation} (RQ4)\\[-1pt]{\footnotesize algorithmic, no new data}};
+    \node[box] (f) at (5.6,0) {\textbf{FM backbone}\\[-1pt]{\footnotesize encoder choice also compared}};
+    \node[box] (k) at (11.1,0) {\textbf{Classifier}\\[-1pt]{\footnotesize trained on scarce subsets}};
+    \node[box] (l) at (1.4,-2.7) {\textbf{Performance impact} (RQ1)\\[-1pt]{\footnotesize discrimination, calibration}};
+    \node[box] (m) at (6.3,-2.7) {\textbf{Mechanisms} (RQ2)\\[-1pt]{\footnotesize feature distributions}};
+    \node[box] (g) at (11.1,-2.7) {\textbf{Mitigation} (RQ3)\\[-1pt]{\footnotesize effectiveness and limitations}};
     \node[above=2pt of fac.north west, anchor=south west, font=\footnotesize, text=black!70] {Varied one at a time, others fixed};
     \draw[arr] (fac.east) -- (f.west);
     \draw[arr] (f.east) -- (k.west);
-    \draw (k.south) -- (11.2,-1.8);
-    \draw (1.4,-1.8) -- (11.2,-1.8);
+    \draw (k.south) -- (11.1,-1.8);
+    \draw (1.4,-1.8) -- (11.1,-1.8);
     \draw[arr] (1.4,-1.8) -- (l.north);
     \draw[arr] (6.3,-1.8) -- (m.north);
-    \draw[arr] (11.2,-1.8) -- (g.north);
+    \draw[arr] (11.1,-1.8) -- (g.north);
   \end{tikzpicture}
   \caption{Experimental design. Each scarcity factor (blue) is varied alone while the others stay fixed.}
   \label{fig:design}
 \end{figure}
 
-Every setting is scored on discrimination and calibration.
-Mechanism analyses look at class influence, tail support and how well class-level patient distributions are estimated in feature space.
-Representative mitigation approaches are then tested against the loss each factor causes.
-
 \section{Preliminary Findings}
-First experiments show that class imbalance costs frozen-feature probes little on TCGA-UT at first and then accelerates (balanced-accuracy loss 0.6\,pp at a largest-to-smallest class ratio of 10, 2.9\,pp at 100), but starts immediately and is 2.6 times larger on BRACS (7.7\,pp at 100).
-Unequal class influence and reduced tail support both contribute and compound at high ratios.
-Calibration error rises, but one global temperature removes 92--96\% of the increase.
-Patient shortage produces a distinct loss, caused mainly by poor estimation of class-level patient distributions, and increasing patch depth cannot fully substitute for patient breadth.
-Mitigation of patient-shortage damage has so far been limited.
+Initial class-imbalance experiments examine performance impact and underlying mechanisms on both tasks, using Virchow2 and a matched comparison with UNI2-h.
+These experiments vary the largest-to-smallest class ratio $\rho$ from 1 to 100 over 30 combinations of patient split and class allocation (Figure~\ref{fig:dist}).
+Three findings guide the remaining work.
 
-\section{Expected Contribution}
-The thesis gives a systematic account of how \textbf{class allocation, patch support and patient support} contribute differently to data scarcity in computational pathology.
-The resulting framework should clarify three things:
+\begin{figure}[!htb]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.3cm},
+  width=0.47\textwidth,height=4.3cm,xlabel={Class rank (head $\to$ tail)},
+  ymin=0,scaled y ticks=false,
+  tick label style={font=\scriptsize},label style={font=\small},title style={font=\small},
+  enlarge x limits=0.03]
+\nextgroupplot[title={(a) TCGA-UT (30 classes, $T=19{,}200$)},ylabel={Training patches},xmin=1,xmax=30,
+  legend style={font=\scriptsize,at={(0.98,0.97)},anchor=north east,draw=none,fill=none},
+  legend cell align=left]
+\countlines{\tcgacounts}
+\legend{balanced ($\rho=1$),native ($\rho=18.1$),$\rho=100$}
+\nextgroupplot[title={(b) BRACS (7 classes, $T=2{,}240$)},xmin=1,xmax=7,xtick={1,...,7},
+  legend style={font=\scriptsize,at={(0.98,0.97)},anchor=north east,draw=none,fill=none},legend cell align=left]
+\countlines{\bracscounts}
+\legend{balanced ($\rho=1$),native ($\rho=6.7$),$\rho=100$}
+\end{groupplot}
+\end{tikzpicture}
+\caption{Training class distributions: balanced, native and ratio 100, sorted from most to least frequent. Total patch budget $T$ and patients per class stay fixed; only class shares change.}\label{fig:dist}
+\end{figure}
+
+\newpage
+\noindent\textbf{1. Which class is rare matters as much as the ratio.}
+On TCGA-UT at ratio 100, changing which classes receive few patches changes balanced-accuracy loss from 1.3 to 4.5 percentage points (pp).
+Damage is greatest when a rare class is often mistaken for a class that receives many examples: predictions favor the common alternative.
+On BRACS, classes that are easy to recognize with balanced data have the most to lose when made rare.
+The ratio alone cannot identify which diagnoses need more labels.
+
+\smallskip\noindent\textbf{2. Probability quality is easier to improve than discrimination.}
+At ratio 100, expected calibration error (ECE), the gap between confidence and accuracy, rises from 5.5 to 17.8 pp on TCGA-UT and from 12.3 to 35.7 pp on BRACS (Figure~\ref{fig:damage}b).
+Temperature scaling, one validation-fitted confidence adjustment \citep{guo2017calibration}, removes 92--96\% of the imbalance-induced increase relative to the corrected balanced baseline.
+Predicted classes stay unchanged: better confidence does not recover missed diagnoses.
+
+\smallskip\noindent\textbf{3. Imbalance damage differs strongly between tasks.}
+TCGA-UT tolerates moderate imbalance: balanced accuracy falls by only 0.6 pp at ratio 10 and 2.9 pp at 100.
+BRACS is more sensitive, losing 1.2 pp already at ratio 2 and 7.7 pp at 100 (Figure~\ref{fig:damage}a).
+At ratio 100, its two rarest classes fall from 38.7\% to 7.3\% recall: most of their patches are misclassified.
+The tasks differ in what must be distinguished: TCGA-UT spans cancers from different organs, whereas BRACS separates breast lesions with similar morphology.
+This makes the greater sensitivity of BRACS plausible.
+Experiments also show two sources of damage: rare classes have less influence during training and fewer examples of their variation.
+Giving those examples more weight addresses the first problem, but cannot replace the missing examples.
+The pattern persists with UNI2-h, so changing backbone alone does not solve it.
+
+\begin{figure}[!htb]
+\centering
+\begin{tikzpicture}
+\begin{axis}[name=curve,title={(a) Accuracy damage},title style={font=\small},width=0.44\textwidth,height=4.5cm,xmode=log,log basis x=10,
+  xtick={1,2,5,10,20,50,100},xticklabels={1,2,5,10,20,50,100},
+  xlabel={Imbalance ratio $\rho$},ylabel={Damage $\Delta$ (pp)},ymin=-0.3,ymax=10,
+  tick label style={font=\scriptsize},label style={font=\small},
+  legend style={font=\scriptsize,at={(0.03,0.97)},anchor=north west,draw=none,fill=none},legend cell align=left]
+\addplot[name path=tu,draw=none,forget plot] coordinates {(1,0)(2,0.21)(5,0.60)(10,0.84)(20,1.36)(50,2.24)(100,3.34)};
+\addplot[name path=tl,draw=none,forget plot] coordinates {(1,0)(2,0.01)(5,0.14)(10,0.30)(20,0.67)(50,1.47)(100,2.48)};
+\addplot[tcga,fill opacity=0.2,forget plot] fill between[of=tu and tl];
+\addplot[name path=bu,draw=none,forget plot] coordinates {(1,0)(2,2.35)(5,4.66)(10,5.66)(20,6.87)(50,8.65)(100,9.78)};
+\addplot[name path=bl,draw=none,forget plot] coordinates {(1,0)(2,0.14)(5,1.72)(10,2.50)(20,3.32)(50,4.76)(100,5.77)};
+\addplot[bracs,fill opacity=0.2,forget plot] fill between[of=bu and bl];
+\addplot[bracs,thick,mark=*,mark size=1.3pt] coordinates {(1,0)(2,1.15)(5,3.12)(10,4.02)(20,5.04)(50,6.63)(100,7.65)};
+\addlegendentry{BRACS}
+\addplot[tcga,thick,mark=*,mark size=1.3pt] coordinates {(1,0)(2,0.11)(5,0.37)(10,0.57)(20,1.01)(50,1.85)(100,2.91)};
+\addlegendentry{TCGA-UT}
+\addplot[only marks,mark=diamond*,mark size=2.6pt,black,error bars/.cd,y dir=both,y explicit]
+  coordinates {(18.1,1.18) +- (0,0.32) (6.7,4.05) +- (0,1.45)};
+\addlegendentry{native}
+\draw[densely dotted,gray] (axis cs:1,1) -- (axis cs:100,1);
+\end{axis}
+\begin{axis}[at={(curve.east)},title={(b) Calibration error},title style={font=\small},anchor=west,xshift=1.5cm,width=0.44\textwidth,height=4.5cm,
+  xmode=log,log basis x=10,xtick={1,2,5,10,20,50,100},xticklabels={1,2,5,10,20,50,100},
+  xlabel={Imbalance ratio $\rho$},ylabel={ECE (pp)},ymin=0,ymax=40,
+  tick label style={font=\scriptsize},label style={font=\small},
+  legend style={font=\scriptsize,at={(0.03,0.97)},anchor=north west,draw=none,fill=none},legend cell align=left]
+\addplot[bracs,thick,mark=*,mark size=1.3pt] coordinates {(1,12.29)(2,8.31)(5,12.26)(10,17.19)(20,21.41)(50,28.28)(100,35.66)};
+\addlegendentry{BRACS, raw}
+\addplot[bracs,thick,dashed,mark=o,mark size=1.3pt] coordinates {(1,6.61)(2,6.59)(5,6.37)(10,6.28)(20,6.87)(50,7.86)(100,8.57)};
+\addlegendentry{BRACS, corrected}
+\addplot[tcga,thick,mark=*,mark size=1.3pt] coordinates {(1,5.50)(2,5.52)(5,6.06)(10,6.54)(20,10.45)(50,13.43)(100,17.80)};
+\addlegendentry{TCGA-UT, raw}
+\addplot[tcga,thick,dashed,mark=o,mark size=1.3pt] coordinates {(1,1.52)(2,1.56)(5,1.56)(10,1.65)(20,1.74)(50,1.96)(100,2.08)};
+\addlegendentry{\shortstack[l]{TCGA-UT,\\corrected}}
+\end{axis}
+\end{tikzpicture}
+\caption{(a) Balanced-accuracy loss (percentage points, pp), with 95\% intervals; diamonds show native class shares and the dotted line marks 1 pp. (b) Calibration error before and after temperature scaling: probability quality is easier to improve than discrimination.}\label{fig:damage}
+\end{figure}
+\section{Next Steps}
+The thesis will extend the imbalance findings to \textbf{data shortage}, then evaluate \textbf{mitigation methods for both forms of scarcity}.
+The aim is to establish which methods work well, where they fall short, and why, alongside guidance on where additional labels are most valuable.
+
+The remaining work follows two stages:
 \begin{itemize}
-  \item when additional nominal samples help,
-  \item when independent patient diversity matters more,
-  \item when algorithmic mitigation can compensate for limited data.
+  \item \textbf{Data shortage.} Reduce patches at fixed patient coverage, then patients at a matched patch budget. Measure the performance impact and explain whether tissue variation or patient diversity limits performance, and when more patches stop helping.
+  \item \textbf{Mitigation.} Evaluate methods for class imbalance and data shortage, including class reweighting, estimation from few examples, and temperature scaling. Compare their effectiveness across tasks and scarcity levels, and analyze why some methods succeed while others offer little improvement.
 \end{itemize}
-
 
 \clearpage
 \bibliographystyle{plainnat}
