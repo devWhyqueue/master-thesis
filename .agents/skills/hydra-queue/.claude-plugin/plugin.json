@@ -1,0 +1,5 @@
+{
+  "name": "hydra-queue",
+  "version": "0.1.0",
+  "description": "Guards sbatch submits to the Hydra cluster and shows the SLURM queue in the status line."
+}

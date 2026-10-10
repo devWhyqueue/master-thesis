@@ -1,0 +1,5 @@
+{
+  "name": "heredoc-guard",
+  "version": "0.1.0",
+  "description": "Refuses Bash heredocs that hold doubled backslashes, which the Bash tool collapses."
+}
