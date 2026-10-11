@@ -28,8 +28,8 @@ mitigation:
     dropout: 0.0
   gcl:
     s: 30
-    a: 0.9
-    b: 0.09
+    a: 0.9999
+    b: 0.00001
   cuda:
     gamma: 0.6
     check_size: 10

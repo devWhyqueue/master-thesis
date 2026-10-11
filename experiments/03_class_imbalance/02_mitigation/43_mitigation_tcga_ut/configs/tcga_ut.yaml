@@ -21,6 +21,10 @@
 #   shares one model with the other tau; superseded records are in split=*/results_superseded/.
 # - external reference: exp-25 frozen readout (r1 72.06; D 1.85 / 2.91 / 1.18 at r50 / r100 / N).
 
+# 2026-10-11: gcl stage-two sampler constants corrected to the reference implementation
+#   (Keke921/GCLLoss CBEffectNumSampler: a=0.9999, b=1e-5; was 0.9, 0.09, which saturates the
+#   effective number at 1/(1-beta) <= 10 and amplifies the imbalance). gcl and gcl2 (stage two is inline) at r50/r100/N
+#   refit; superseded records are in split=*/results_superseded/. r1 gcl2 unaffected (delta = 0).
 prevalence:
   patients_per_class: 20
 
@@ -53,8 +57,8 @@ mitigation:
     dropout: 0.0
   gcl:
     s: 30
-    a: 0.9
-    b: 0.09
+    a: 0.9999
+    b: 0.00001
   cuda:
     gamma: 0.6
     check_size: 10

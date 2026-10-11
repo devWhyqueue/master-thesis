@@ -158,8 +158,18 @@ def test_gcl_sampler_between_empirical_and_balanced() -> None:
     delta = gcl_delta(counts)
     empirical_minority = sample_weights(y, 2, "power", 0.0)[y == 1].sum()
     balanced_minority = sample_weights(y, 2, "power", 1.0)[y == 1].sum()
-    gcl_minority = sample_weights(y, 2, "gcl", delta=delta, a=0.9, b=0.09)[y == 1].sum()
+    gcl_minority = sample_weights(y, 2, "gcl", delta=delta, a=0.9999, b=0.00001)[y == 1].sum()
     assert empirical_minority < gcl_minority < balanced_minority
+
+
+def test_gcl_sampler_realistic_counts_near_balanced() -> None:
+    """At TCGA-UT-like counts the reference constants (a=0.9999, b=1e-5) nearly balance classes."""
+    y = np.array([0] * 2843 + [1] * 28, dtype=np.int64)
+    counts = np.bincount(y, minlength=2).astype(np.float64)
+    weights = sample_weights(y, 2, "gcl", delta=gcl_delta(counts), a=0.9999, b=0.00001)
+    class_mass = np.bincount(y, weights=weights, minlength=2)
+    assert class_mass[0] / class_mass[1] < 1.5
+    assert class_mass[0] > class_mass[1]
 
 
 def test_crt_reinit_changes_head_only() -> None:

@@ -105,7 +105,7 @@ def _fake_artifacts(n: int = 32, dim: int = 8, num_classes: int = 2, sigma: floa
 def _stage2_config() -> dict:
     return {
         "mitigation": {
-            "gcl": {"s": 30, "a": 0.9, "b": 0.09},
+            "gcl": {"s": 30, "a": 0.9999, "b": 0.00001},
             "train": {"stage2": {"steps": 5, "batch_size": 8, "lr": 1e-2, "weight_decay": 0.0}},
         }
     }

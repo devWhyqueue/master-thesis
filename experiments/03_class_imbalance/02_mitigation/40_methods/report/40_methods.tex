@@ -202,10 +202,10 @@ In the second stage, the representation is frozen and the classifier is re-train
   \beta_j=b\,\frac{\delta_j-\delta_{\min}}{\delta_{\max}-\delta_{\min}}+a,
   \label{eq:gcl-cben}
 \end{equation}
-\noindent normalized over classes, where $a$ and $b$ set the range $[a,a+b]$ of $\beta_j$. A larger cloud size gives a larger $\beta_j$ and hence a larger effective-number correction, so tail classes are sampled more often, but less aggressively than under uniform class sampling. The stage-two loss is again the clouded loss of Equation~\eqref{eq:gcl-logit}.
+\noindent normalized over classes, where $a$ and $b$ set the range $[a,a+b]$ of $\beta_j$. A larger cloud size gives a larger $\beta_j$ and hence a larger effective-number correction, so tail classes are sampled more often. The reference implementation sets $a=0.9999$ and $b=10^{-5}$, so $1/(1-\beta_j)\approx 10^{4}$ exceeds every class count, $r_j\approx 1/n_j$, and the sampler is close to class-balanced; the head's effective number saturates first, which leaves it slightly over-weighted relative to the tail. The stage-two loss is again the clouded loss of Equation~\eqref{eq:gcl-logit}.
 
 \paragraph{Thesis variant.}
-Stage one trains the LoRA update and a cosine classifier head with the clouded loss. Stage two freezes the encoder and its LoRA update and re-trains only the cosine head with the sampler of Equation~\eqref{eq:gcl-cben}. The scale $s$ and the range $a,b$ are fixed before training; $\sigma$ is the tuned control. GCL replaces the linear head of the reference with a cosine head, so part of its effect may come from the head geometry rather than from the logit noise.
+Stage one trains the LoRA update and a cosine classifier head with the clouded loss. Stage two freezes the encoder and its LoRA update and re-trains only the cosine head with the sampler of Equation~\eqref{eq:gcl-cben}. The scale $s=30$ and the range $a=0.9999$, $b=10^{-5}$ (reference implementation) are fixed before training; $\sigma$ is the tuned control. GCL replaces the linear head of the reference with a cosine head, so part of its effect may come from the head geometry rather than from the logit noise.
 
 \section{Summary}
 \label{sec:summary}
