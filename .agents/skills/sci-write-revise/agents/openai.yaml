@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scientific Writing Review"
+  short_description: "Revise existing prose for clarity and precision"
+  default_prompt: "Use $sci-write-revise to revise the writing quality of a thesis or paper section in place."
