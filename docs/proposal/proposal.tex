@@ -93,7 +93,6 @@ Data scarcity takes two forms.
 \emph{Class imbalance} means that common diagnoses receive much more training data than rare ones; this can harm both discrimination and calibration \citep{mosquera2024classImbalance}.
 \emph{Data shortage} means having too little labeled evidence overall, either too few patches or too few independent patients.
 These are different limits: more patches from one patient may add tissue detail without representing the variation between patients.
-Patient separation is also essential for credible evaluation, since mixing a patient's patches across training and testing can inflate performance \citep{bussola2021leakage}.
 
 The study uses foundation models as backbones and examines class imbalance, data shortage, and whether the choice of backbone changes their effects.
 The aim is to explain what annotation effort should target (rare classes, more tissue per patient, or additional patients) and what an algorithm can compensate for instead.
@@ -147,11 +146,13 @@ Within each class, patients are assigned at random to training (about 70\%), val
 Three such splits are drawn with different random seeds.
 The validation patients serve to select the regularization strength of the classifier and to fit the calibration correction; the test patients are used only for the final evaluation.
 
-For \textbf{class imbalance}, the total number of training patches $T$ and the number of patients per class are the same in every condition (20 patients per class on TCGA-UT, 10 on BRACS).
+For \textbf{class imbalance}, the total number of training patches $T$ and the number of patients per class are the same in every setting (20 patients per class on TCGA-UT, 10 on BRACS).
 What changes is how $T$ is divided among the classes.
-In the balanced condition every class receives the same number of patches, 32 per patient.
-In an imbalanced condition frequent classes receive more patches per patient and rare classes fewer (Figure~\ref{fig:dist}).
-The \emph{imbalance ratio} $\rho$ states how many times more patches the most frequent class receives than the rarest one: $\rho=1$ is balanced, and $\rho=100$ is the most extreme condition tested.
+In the balanced setting every class receives the same number of patches, 32 per patient.
+In an imbalanced setting frequent classes receive more patches per patient and rare classes fewer (Figure~\ref{fig:dist}).
+The \emph{imbalance ratio} $\rho$ states how many times more patches the most frequent class receives than the rarest one: $\rho=1$ is balanced, and $\rho=100$ is the most extreme ratio tested.
+Between these two classes, the patch counts decrease geometrically: the class at rank $k$ of $K$ receives a share of $T$ proportional to $\rho^{-(k-1)/(K-1)}$, so each class receives the same fraction fewer patches than the class ranked above it.
+Each class's patches are divided evenly among its patients.
 Which class is frequent and which is rare is assigned at random and redrawn ten times per split, so that the result does not depend on one particular choice.
 
 For \textbf{data shortage}, the classes stay balanced and two experiments separate patch count from patient count.
@@ -162,14 +163,14 @@ Comparing the two shows whether a classifier is limited by the amount of tissue 
 \textbf{Evaluation.}
 Discrimination is measured by \emph{balanced accuracy}: the share of correctly classified test patches is computed per class and then averaged over classes, so that a rare class counts as much as a frequent one; within a class, every patient counts equally regardless of patch count.
 Calibration is measured by the \emph{expected calibration error} (ECE), the average gap between the confidence of a prediction and its accuracy; lower is better.
-The effect of a scarce condition is reported as its difference from the balanced condition on the same patients, in percentage points (pp), with 95\% bootstrap intervals over test patients and repetitions.
+The effect of a scarce setting is reported as its difference from the balanced setting on the same patients, in percentage points (pp), with 95\% bootstrap intervals over test patients and repetitions.
 
 \section{Preliminary Findings}
-Initial experiments addressed class imbalance on both tasks, the 30 cancer types of TCGA-UT and the seven breast-lesion classes of BRACS.
-They varied the imbalance ratio $\rho$ between the most frequent and the rarest class from 1 to 100 (Figure~\ref{fig:dist}).
-Each condition was repeated 30 times: three patient splits, each with ten random choices of which class is frequent and which is rare.
+In my initial experiments, I investigated the effects of \emph{class imbalance} on both tasks, the 30 cancer types of TCGA-UT and the seven breast-lesion classes of BRACS.
+Specifically, the imbalance ratio $\rho$ between the most frequent and the rarest class was varied from 1 to 100 (Figure~\ref{fig:dist}).
+Each ratio was tested 30 times: three patient splits, each with ten random choices of which class is frequent and which is rare.
 The numbers below refer to Virchow2 unless stated otherwise.
-Four findings guide the remaining work.
+Four findings guide the remaining work:
 
 \begin{figure}[!htb]
 \centering
@@ -201,7 +202,7 @@ BRACS was more sensitive: it lost 1.2 pp already at $\rho=2$ and 7.7 pp at $\rho
 The average also hides how hard the rare classes are hit.
 At $\rho=100$, the recall of the two rarest BRACS classes fell from 38.7\% to 7.3\%, so most of their patches were misclassified.
 A likely reason for the difference between the tasks is how similar their classes are.
-TCGA-UT separates cancers from different organs, whereas BRACS separates lesions of one organ with similar morphology, which is why BRACS is harder even with balanced data.
+TCGA-UT separates cancers from different organs, whereas BRACS separates lesions of one organ with similar morphology, which is why BRACS is arguably harder even with balanced data.
 When two classes look alike, many patches lie close to the boundary between them, and a classifier that leans towards the frequent class then misassigns many patches of the rare one.
 Finding~2 supports this explanation.
 
@@ -214,7 +215,7 @@ On BRACS the loss lay between 5.7 pp and 10.0 pp, depending on which class is th
 It was highest for invasive carcinoma: this class is recognized best with balanced data, so it has the most to lose.
 Knowing the ratio is therefore not enough to tell which diagnoses need more labels.
 
-\smallskip\noindent\textbf{3. A rare class suffers for two reasons, and reweighting fixes only one.}
+\smallskip\noindent\textbf{3. A rare class suffers for two reasons, and reweighting addresses only one.}
 A rare class has two problems.
 It has little \emph{influence}: its few patches carry little weight in training, so the classifier is fitted mainly to the frequent classes.
 And it shows little \emph{diversity}: at $\rho=100$ the classifier sees only one or two of its patches per patient.
@@ -222,7 +223,7 @@ Two additional experiments separated these problems.
 In the first, the rare class kept all its patches, but its weight in training was reduced to that of the imbalanced case (low influence only).
 In the second, it kept only its few patches, but its weight was raised to that of every other class (low diversity only).
 On BRACS at $\rho=100$, low influence alone cost 4.5 pp and low diversity alone 3.3 pp; together they explain the 7.7 pp total.
-On TCGA-UT they cost 1.2 pp and 0.5 pp, and a further 1.2 pp arose only when both occurred together.
+On TCGA-UT at $\rho=100$, low influence alone cost 1.2 pp and low diversity alone 0.5 pp; a further 1.2 pp arose only when both occurred together, which gives the 2.9 pp total.
 Reweighting gives rare classes more influence but cannot add diversity, so 3.3 pp remain on BRACS.
 Recovering them needs more patches or patients, or methods that learn a class from few examples.
 
@@ -235,9 +236,10 @@ Dividing all scores by the same constant does not change which class scores high
 The predicted classes, and with them the accuracy losses in Figure~\ref{fig:damage}a, stay exactly the same: a better confidence estimate does not recover a missed diagnosis.
 
 \smallskip\noindent\textbf{Backbone.}
-Repeating all conditions with UNI2-h left these findings intact.
-On TCGA-UT, UNI2-h lost 0.9 pp less than Virchow2 at $\rho=100$.
-On BRACS the two encoders did not differ measurably, and the recall of the two rarest classes collapsed to about 9\% with both.
+Repeating the experiments at $\rho=10$ and $\rho=100$ with UNI2-h left these findings intact.
+This comparison used new random choices of which class is rare, so the Virchow2 losses below differ slightly from those above.
+On TCGA-UT at $\rho=100$, UNI2-h lost 2.3 pp (0.9 pp less than Virchow2).
+On BRACS, UNI2-h lost 7.2 pp and Virchow2 7.9 pp; this difference of 0.7 pp lies within the uncertainty of the estimate, and the recall of the two rarest classes collapsed to about 9\% with both.
 Changing the backbone alone does not solve the problem.
 
 \begin{figure}[!htb]
@@ -282,9 +284,9 @@ Changing the backbone alone does not solve the problem.
 \end{figure}
 
 \section{Next Steps}
-The thesis will extend the imbalance findings to \textbf{data shortage} and then evaluate \textbf{mitigation methods for both forms of scarcity}.
+For my thesis, I plan to extend the imbalance findings to \textbf{data shortage} and then evaluate \textbf{mitigation methods for both forms of scarcity}.
 The aim is to establish which methods work well, where they fall short, and why, alongside guidance on where additional labels are most valuable.
-The remaining work follows two stages.
+The remaining work follows two stages:\clearpage
 
 \textbf{Data shortage.}
 In the first stage, I will reduce the number of patches per patient while keeping the patients fixed, and then reduce the number of patients while keeping the total number of patches fixed.
