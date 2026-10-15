@@ -103,7 +103,7 @@ async function refusal($: EngineInterface, command: string): Promise<string | un
   )
 }
 
-const SHORT: Record<string, string> = { RUNNING: 'R', PENDING: 'PD' }
+const SHORT: Record<string, string> = { RUNNING: 'R', PENDING: 'P' }
 let seenFailed: Set<string> | undefined
 
 async function poll($: EngineInterface): Promise<void> {
@@ -116,7 +116,7 @@ async function poll($: EngineInterface): Promise<void> {
     counts.set(state, (counts.get(state) ?? 0) + 1)
   }
   const parts = [...counts].map(([state, count]) => `${state} ${count}`)
-  $.ui.status(parts.length > 0 ? `hydra ${parts.join(' · ')}` : undefined)
+  $.ui.status(parts.length > 0 ? parts.join(' · ') : undefined)
 
   // The first poll only seeds, so a reload does not repeat old failures.
   const fresh = queue.failed.filter(line => seenFailed !== undefined && !seenFailed.has(line))
