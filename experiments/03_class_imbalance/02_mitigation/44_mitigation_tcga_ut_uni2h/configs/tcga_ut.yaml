@@ -1,0 +1,131 @@
+# Mitigation on TCGA-UT with a LoRA-adapted UNI2-h encoder (exp-44): exp-43 repeated with UNI2-h in
+# place of Virchow2, as exp-42 did for exp-41 on BRACS. Only the encoder changes: same 30 split-draw
+# shards, patients, class permutation, test patients, grids (copied from 43_mitigation_tcga_ut/configs/
+# tcga_ut.yaml, final pass incl. tau=0.25 and r100 sigma=0.01), 2,400 steps (not re-tuned), inline
+# stage two, and bootstrap seed. Pooling is UNI2-h's own token pooling (1536-d); LoRA r8 on
+# blocks.*.attn.(qkv|proj). Every estimate pairs with its Virchow2 counterpart in exp-43.
+#
+# Pre-fixed before any fit (written 2026-10-16; no report until the whole experiment has run):
+# Encoder contrast (exp-42's rule, analyze/contrast.py): delta X = X(UNI2-h) - X(Virchow2) for
+#   BA(CE, r1), D_a, R_m, G_m, R_m - G_m. Same bootstrap contexts and draw_weights(BOOTSTRAP_SEED),
+#   95% intervals. A quantity is encoder-dependent only if its delta interval excludes 0 and
+#   |delta| >= 1 pp. Descriptive: agreement of the `recovers` verdict per method; Spearman rho of R_m
+#   across the 8 variants per arm.
+# Reading rules otherwise as exp-43 (material recovery R >= 1pp with CI above 0; R - G >= 1pp with CI
+#   above 0; grid edge: one value past an open edge if selections concentrate on it).
+#
+# Throughput only (no design change): grad checkpointing off + micro-batches of 64 (same 256-row
+# update), per-block torch.compile, patch.sqfs staged to node-local /tmp, eval decode overlapped with
+# the forward. Benchmarked 2026-10-16 (UNI2-h, H100 PCIe): ~0.77 h/fit H100 projected, 23 GB peak, so
+# A100 40GB joins the pool. Fit partition is gpu-5h until the pilot (3 shards: r100 ce/cuda/gcl) shows
+# A100 wall time; switch to gpu-2h if it stays <= ~1.4 h.
+prevalence:
+  patients_per_class: 20
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/44_mitigation_tcga_ut_uni2h/outputs/tcga_ut/patch
+
+mitigation:
+  encoder: uni2h
+  perf: {grad_checkpointing: false, compile: true}
+  inline_stage2: true
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.0
+  gcl:
+    s: 30
+    a: 0.9999
+    b: 0.00001
+  cuda:
+    gamma: 0.6
+    check_size: 10
+    max_strength: 10
+  grid:
+    r1:
+      stage1:
+        ce: [null]
+        cuda: [0.25, 0.5, 1.0]
+        gcl: [0.05]
+      stage2:
+        crt: [null]
+        disalign: [1.0]
+        gcl2: [0.05]
+    r50:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.25, 0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2]
+      stage2:
+        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2]
+    r100:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.25, 0.5, 1.0]
+        gcl: [0.01, 0.02, 0.05, 0.2]
+      stage2:
+        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0]
+        crt: [null]
+        gcl2: [0.01, 0.02, 0.05, 0.2]
+    N:
+      stage1:
+        ce: [null]
+        bs: [0.5, 1.0]
+        cuda: [0.25, 0.5, 1.0]
+        la: [0.25, 0.5, 1.0]
+        gcl: [0.02, 0.05, 0.2, 0.5]
+      stage2:
+        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
+        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
+        crt: [null]
+        gcl2: [0.02, 0.05, 0.2, 0.5]
+  train:
+    stage1: {batch_size: 256, steps: 2400, lr: 0.0001, weight_decay: 0.0001, micro_batch: 64}
+    stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
+
+analyze:
+  # Paired encoder contrast against exp-43 (Virchow2); external damage = exp-39 frozen UNI2-h D_R100 (TCGA-UT).
+  reference_config: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/configs/tcga_ut.yaml
+  external_damage: {point: 2.29, ci_2_5: 1.88, ci_97_5: 2.69}
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/40_methods/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/44_mitigation_tcga_ut_uni2h/outputs/tcga_ut/patch
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
+  # Staged to node-local /tmp per fit job (32 GB copy): warm decode 1,375 img/s vs 439 from shared storage.
+  squashfs:
+    - source: /home/space/datasets-sqfs/tcga-ut/patch.sqfs
+      mount: /mnt/tcga-ut
+      stages: [fit]
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 50, cpu-5h: 10}
+  resources:
+    fit: {partition: gpu-5h, gpus: 1, constraint: "80gb|h100|h200|blackwell|40gb", cpus: 8, memory: 64G}
+    analyze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 64G}
