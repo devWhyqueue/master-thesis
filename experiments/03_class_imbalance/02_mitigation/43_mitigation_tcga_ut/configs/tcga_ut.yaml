@@ -25,6 +25,9 @@
 #   (Keke921/GCLLoss CBEffectNumSampler: a=0.9999, b=1e-5; was 0.9, 0.09, which saturates the
 #   effective number at 1/(1-beta) <= 10 and amplifies the imbalance). gcl and gcl2 (stage two is inline) at r50/r100/N
 #   refit; superseded records are in split=*/results_superseded/. r1 gcl2 unaffected (delta = 0).
+# 2026-10-15: EDGE PASS 2: gcl2 picked the lowest sigma (0.02) at r100 in 29/30 shards; added sigma=0.01
+#   to gcl and gcl2 at r100 only (one value past the edge, per the grid-edge rule). CUDA p=0.25 and the
+#   DisAlign edges at r50/N stay unextended (damage < 1pp at r50/N; CUDA's low edge tends to CE).
 prevalence:
   patients_per_class: 20
 
@@ -91,12 +94,12 @@ mitigation:
         bs: [0.5, 1.0]
         cuda: [0.25, 0.5, 1.0]
         la: [0.25, 0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2]
+        gcl: [0.01, 0.02, 0.05, 0.2]
       stage2:
         posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
         disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
-        gcl2: [0.02, 0.05, 0.2]
+        gcl2: [0.01, 0.02, 0.05, 0.2]
     N:
       stage1:
         ce: [null]
