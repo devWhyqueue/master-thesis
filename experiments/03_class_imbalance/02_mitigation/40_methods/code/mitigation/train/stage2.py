@@ -80,8 +80,7 @@ def _train_embeddings_head(
     )
     run_training_steps(
         weights,
-        hparams.steps,
-        hparams.batch_size,
+        hparams,
         optimizer,
         scheduler,
         generator,

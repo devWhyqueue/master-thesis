@@ -15,6 +15,7 @@ from PIL import Image
 from centre.cohort import patient_rows
 from prevalence.fit import arm_row_index
 
+from mitigation import TrainHParams
 from mitigation.train.artifacts import Stage1Artifacts
 from mitigation.train.stage1 import ArmBatch, run_stage1
 from mitigation.train.stage2 import run_crt, run_disalign, run_gcl2, run_posthoc_la
@@ -193,3 +194,81 @@ def test_inline_stage2_fits_from_cache_then_drops_it(
 
     assert events == ["save", "stage2", "record"]
     assert not (run_dir / "stage1.pt").exists()
+
+
+def _train_linear(micro_batch: int | None) -> torch.Tensor:
+    """One SGD step of a linear CE model on a fixed 8-row draw; returns the updated weight."""
+    from mitigation.train.loop import run_training_steps
+
+    torch.manual_seed(0)
+    x, y = torch.randn(16, 5), torch.arange(16) % 3
+    model = torch.nn.Linear(5, 3)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.5)
+    scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+    run_training_steps(
+        np.full(16, 1 / 16),
+        TrainHParams(8, 1, 0.5, 0.0, micro_batch),
+        optimizer,
+        scheduler,
+        torch.Generator().manual_seed(0),
+        lambda idx: torch.nn.functional.cross_entropy(model(x[idx]), y[idx]),
+    )
+    return model.weight.detach().clone()
+
+
+def test_micro_batched_step_matches_full_batch() -> None:
+    """Accumulating gradients over uneven micro-batches (3, 3, 2) gives the full-batch update."""
+    torch.testing.assert_close(_train_linear(3), _train_linear(None))
+
+
+@pytest.mark.parametrize("micro_batch", [None, 2])
+def test_cuda_levels_update_at_same_optimizer_steps(
+    micro_batch: int | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Level updates fire once per epoch, on the first chunk, whether or not steps are micro-batched."""
+    from mitigation.train import stage1_step
+    from mitigation.train.loop import run_training_steps
+
+    updates: list[int] = []
+    monkeypatch.setattr(
+        stage1_step, "update_levels", lambda levels, *args: updates.append(len(calls)) or levels
+    )
+    monkeypatch.setattr(stage1_step, "cuda_batch", lambda raw, *args: raw)
+    images = torch.zeros(8, 3, 2, 2, dtype=torch.uint8)
+    model = stage1_step.StepModel(None, None, images, torch.arange(8) % 2, (0.5,), (0.5,))
+    state = stage1_step._CudaState(model, torch.device("cpu"), (0.6, 2, 10, 2, 4))
+    calls: list[int] = []
+
+    def step_fn(idx: torch.Tensor) -> torch.Tensor:
+        calls.append(len(idx))
+        state.augment_batch(images[idx], model.y_t[idx], 0.5, torch.Generator())
+        return torch.zeros((), requires_grad=True)
+
+    param = torch.nn.Parameter(torch.zeros(1))
+    optimizer = torch.optim.SGD([param], lr=0.1)
+    scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+    hparams = TrainHParams(4, 4, 0.1, 0.0, micro_batch)
+    run_training_steps(np.full(8, 1 / 8), hparams, optimizer, scheduler, torch.Generator(), step_fn)
+
+    chunks_per_step = 2 if micro_batch else 1
+    assert updates == [chunks_per_step + 1, 3 * chunks_per_step + 1]  # first chunk of steps 2 and 4
+
+
+def test_stream_embeddings_matches_decode_then_forward(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The streamed loader yields the same embeddings, in the same order, as decode-then-forward."""
+    from mitigation.images import decode_images, decode_transform
+    from mitigation.train.eval import forward_embeddings, stream_embeddings
+
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "1")  # in-process decode keeps the test fast
+    encoder, data_config, _ = _fake_encoder({}, torch.device("cpu"))
+    transform = decode_transform(data_config)
+    paths = _write_images(tmp_path, 10)
+    mean, std = data_config["mean"], data_config["std"]
+    device = torch.device("cpu")
+
+    expected = forward_embeddings(encoder, decode_images(paths, transform), mean, std, device, 4)
+    streamed = stream_embeddings(encoder, paths, transform, mean, std, device, 4)
+
+    torch.testing.assert_close(streamed, expected)

@@ -22,7 +22,7 @@ from mitigation.encoder import load_lora_encoder
 from mitigation.images import decode_images, decode_transform
 from mitigation.methods import CosineHead, gcl_delta, sample_weights
 from mitigation.train.loop import run_training_steps
-from mitigation.train.stage1_step import StepModel, build_loss_step
+from mitigation.train.stage1_step import CudaParams, StepModel, build_loss_step
 
 __all__ = ["ArmBatch", "Stage1Output", "run_stage1"]
 
@@ -79,13 +79,13 @@ def _method_extras(
     torch.Tensor | None,
     torch.Tensor | None,
     float | None,
-    tuple[float, int, int, int] | None,
+    CudaParams | None,
 ]:
     """Build the method-specific tensors ``run_stage1`` needs.
 
     LA's log-prior, GCL's delta/scale, CUDA's (gamma, check_size, max_strength,
-    steps_per_epoch) -- the epoch length in optimizer steps, since training runs a
-    fixed step count rather than epochs (report "CUDA" thesis variant).
+    steps_per_epoch, batch_size) -- the epoch length in optimizer steps, since training
+    runs a fixed step count rather than epochs (report "CUDA" thesis variant).
     """
     if method == "la":
         prior = torch.tensor(counts / counts.sum(), dtype=torch.float32, device=device)
@@ -98,7 +98,8 @@ def _method_extras(
         gamma, check_size, max_strength = cuda_constants(config)
         batch_size = train_hparams(config, "stage1").batch_size
         steps_per_epoch = -(-int(counts.sum()) // batch_size)
-        return None, None, None, (gamma, check_size, max_strength, steps_per_epoch)
+        cuda_params = (gamma, check_size, max_strength, steps_per_epoch, batch_size)
+        return None, None, None, cuda_params
     return None, None, None, None
 
 
@@ -135,7 +136,7 @@ def _prepare(
     torch.Tensor | None,
     torch.Tensor | None,
     float | None,
-    tuple[float, int, int, int] | None,
+    CudaParams | None,
 ]:
     """Load the LoRA encoder, decode the arm's images, and build its head and loss extras."""
     cpu_generator = torch.Generator().manual_seed(seed)
@@ -175,8 +176,7 @@ def _run_training(
     weights = _row_weights(arm.y, arm.num_classes, method, param)
     run_training_steps(
         weights,
-        hparams.steps,
-        hparams.batch_size,
+        hparams,
         optimizer,
         scheduler,
         setup.cpu_generator,

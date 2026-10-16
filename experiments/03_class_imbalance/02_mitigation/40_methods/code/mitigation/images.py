@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as tv_transforms
 from imbalance_benchmark.datasets.features import _ImagePathDataset
 
-__all__ = ["decode_transform", "decode_images", "normalize_batch"]
+__all__ = ["decode_transform", "image_loader", "decode_images", "normalize_batch"]
 
 
 def decode_transform(data_config: dict[str, Any]) -> tv_transforms.Compose:
@@ -40,17 +40,30 @@ def _decode_workers() -> int:
     return max(0, min(total - 1, 7))
 
 
+def image_loader(
+    image_paths: list[str],
+    transform: tv_transforms.Compose,
+    batch_size: int = 256,
+    pin_memory: bool = False,
+) -> DataLoader:  # type: ignore[type-arg]
+    """Ordered uint8 batches of decoded patch images, decoded ahead in worker processes."""
+    workers = _decode_workers()
+    return DataLoader(
+        _ImagePathDataset(image_paths, transform),
+        batch_size=batch_size,
+        num_workers=workers,
+        pin_memory=pin_memory,
+        prefetch_factor=4 if workers else None,
+    )
+
+
 def decode_images(
     image_paths: list[str], transform: tv_transforms.Compose, batch_size: int = 256
 ) -> torch.Tensor:
     """Decode a list of patch images once into one stacked uint8 (N, 3, H, W) tensor."""
     if not image_paths:
         return torch.empty((0, 3, 0, 0), dtype=torch.uint8)
-    loader = DataLoader(
-        _ImagePathDataset(image_paths, transform),
-        batch_size=batch_size,
-        num_workers=_decode_workers(),
-    )
+    loader = image_loader(image_paths, transform, batch_size)
     return torch.cat([batch for batch in loader], dim=0)
 
 

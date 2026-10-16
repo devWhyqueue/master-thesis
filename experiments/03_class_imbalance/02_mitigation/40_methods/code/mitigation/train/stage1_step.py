@@ -14,9 +14,12 @@ from mitigation.encoder import pool_tokens
 from mitigation.images import normalize_batch
 from mitigation.methods import cuda_batch, gcl_loss, la_loss, update_levels
 
-__all__ = ["StepModel", "build_loss_step"]
+__all__ = ["CudaParams", "StepModel", "build_loss_step"]
 
 logger = logging.getLogger(__name__)
+
+# (gamma, check_size, max_strength, steps_per_epoch, batch_size)
+CudaParams = tuple[float, int, int, int, int]
 
 
 class StepModel(NamedTuple):
@@ -37,16 +40,17 @@ class _CudaState:
         self,
         model: StepModel,
         device: torch.device,
-        params: tuple[float, int, int, int],
+        params: CudaParams,
     ) -> None:
-        """``params`` is (gamma, check_size, max_strength, steps_per_epoch) (Eq. cuda-lol)."""
+        """``params`` is (gamma, check_size, max_strength, steps_per_epoch, batch_size) (Eq. cuda-lol)."""
         self._model = model
         self._device = device
-        self.gamma, self.check_size, self.max_strength, self._steps_per_epoch = params
+        self.gamma, self.check_size, self.max_strength = params[:3]
+        self._steps_per_epoch, self._batch_size = params[3:]
         num_classes = int(model.y_t.max().item()) + 1
         self.levels = torch.zeros(num_classes, dtype=torch.long, device=device)
         self.class_rows = [model.images[model.y_t == c] for c in range(num_classes)]
-        self._step_count = 0
+        self._rows_seen = 0
 
     def _predict(self, batch_u8: torch.Tensor) -> torch.Tensor:
         """Argmax class prediction for an augmented check batch, no grad (Eq. cuda-lol)."""
@@ -70,9 +74,14 @@ class _CudaState:
         p_aug: float,
         generator: torch.Generator,
     ) -> torch.Tensor:
-        """Replace each row by its class's level-of-learning augmentation (Eq. cuda-aug)."""
-        self._step_count += 1
-        if self._step_count % self._steps_per_epoch == 0:
+        """Replace each row by its class's level-of-learning augmentation (Eq. cuda-aug).
+
+        Levels update on the first (micro-)batch of every ``steps_per_epoch``-th optimizer
+        step; rows seen, not calls, count the steps, so micro-batching keeps the timing.
+        """
+        step, offset = divmod(self._rows_seen, self._batch_size)
+        self._rows_seen += len(raw)
+        if offset == 0 and (step + 1) % self._steps_per_epoch == 0:
             self.levels = update_levels(
                 self.levels,
                 self.class_rows,
@@ -82,9 +91,7 @@ class _CudaState:
                 self.max_strength,
                 generator,
             )
-            logger.info(
-                "cuda levels at step %d: %s", self._step_count, self.levels.tolist()
-            )
+            logger.info("cuda levels at step %d: %s", step + 1, self.levels.tolist())
         return cuda_batch(
             raw, self.levels[y_batch], p_aug, self.max_strength, generator
         )
@@ -118,7 +125,7 @@ def _build_step_fn(
     device: torch.device,
     method_step: Any,
     generator: torch.Generator,
-    cuda_params: tuple[float, int, int, int] | None,
+    cuda_params: CudaParams | None,
 ) -> Callable[[torch.Tensor], torch.Tensor]:
     """Build the index-batch -> loss closure the training loop calls every step."""
     cuda_state = None
@@ -152,7 +159,7 @@ def build_loss_step(
         torch.Tensor | None,
         torch.Tensor | None,
         float | None,
-        tuple[float, int, int, int] | None,
+        CudaParams | None,
     ],
     generator: torch.Generator,
 ) -> Callable[[torch.Tensor], torch.Tensor]:

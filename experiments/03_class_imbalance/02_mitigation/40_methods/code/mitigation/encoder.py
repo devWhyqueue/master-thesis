@@ -40,11 +40,19 @@ def pool_tokens(output: torch.Tensor) -> torch.Tensor:
     return torch.cat([class_token, patch_tokens.mean(1)], dim=-1)
 
 
-def _enable_training_perf(peft_model: PeftModel, device: torch.device) -> None:
-    """Gradient checkpointing (measured necessary: 11.6GB card, batch 32, OOM without
-    it) and TF32 matmul; both are training-only, harmless under ``inference_mode``.
+def _enable_training_perf(
+    peft_model: PeftModel, device: torch.device, perf: dict[str, Any]
+) -> None:
+    """Gradient checkpointing, optional per-block ``torch.compile``, and TF32 matmul.
+
+    ``mitigation.perf``: ``grad_checkpointing`` (default on; measured necessary on an
+    11.6GB card at batch 32) can go off when micro-batching bounds activation memory;
+    ``compile`` (default off) compiles each transformer block (needs a C compiler).
     """
-    peft_model.set_grad_checkpointing(True)
+    peft_model.set_grad_checkpointing(bool(perf.get("grad_checkpointing", True)))
+    if perf.get("compile", False):
+        for block in cast(Any, peft_model.base_model).model.blocks:
+            block.compile()
     if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = True
 
@@ -72,7 +80,8 @@ def load_lora_encoder(
     and the pooled feature dimension (``pool_tokens``: CLS + mean patch, twice
     the encoder's embedding width) the head must be sized to.
     """
-    uni2h = config.get("mitigation", {}).get("encoder", "virchow2") == "uni2h"
+    mitigation = config.get("mitigation", {})
+    uni2h = mitigation.get("encoder", "virchow2") == "uni2h"
     base_model = _load_base(uni2h, device, (model_name, revision, weights_sha256))
     data_config: dict[str, Any] = resolve_data_config(
         base_model.pretrained_cfg, model=base_model
@@ -86,5 +95,5 @@ def load_lora_encoder(
         r=r, lora_alpha=alpha, lora_dropout=dropout, target_modules=target_regex
     )
     peft_model = get_peft_model(base_model, lora_config)
-    _enable_training_perf(peft_model, device)
+    _enable_training_perf(peft_model, device, mitigation.get("perf", {}))
     return peft_model, data_config, pooled_dim

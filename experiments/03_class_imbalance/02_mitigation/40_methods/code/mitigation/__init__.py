@@ -114,6 +114,7 @@ class TrainHParams(NamedTuple):
     steps: int
     lr: float
     weight_decay: float
+    micro_batch: int | None = None
 
 
 def train_hparams(config: dict[str, Any], stage: str) -> TrainHParams:
@@ -121,9 +122,11 @@ def train_hparams(config: dict[str, Any], stage: str) -> TrainHParams:
     defaults = {"batch_size": 256, "steps": 2000, "lr": 1e-4, "weight_decay": 1e-4}
     stage_config = config.get("mitigation", {}).get("train", {}).get(stage, {})
     merged = {**defaults, **stage_config}
+    micro_batch = merged.get("micro_batch")
     return TrainHParams(
         int(merged["batch_size"]),
         int(merged["steps"]),
         float(merged["lr"]),
         float(merged["weight_decay"]),
+        int(micro_batch) if micro_batch is not None else None,
     )

@@ -19,7 +19,7 @@ from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
 from imbalance_benchmark.common import write_run_record
 
 from mitigation.encoder import pool_tokens
-from mitigation.images import decode_images, normalize_batch
+from mitigation.images import image_loader, normalize_batch
 
 __all__ = [
     "RunMeta",
@@ -51,6 +51,22 @@ class EvalSplit:
     identity: pd.DataFrame
 
 
+def _pool_batch(
+    encoder: nn.Module,
+    batch: torch.Tensor,
+    mean: tuple[float, ...],
+    std: tuple[float, ...],
+    device: torch.device,
+) -> torch.Tensor:
+    """Pool one uint8 image batch through the (eval-mode) encoder; fp16 embeddings on CPU."""
+    x = normalize_batch(batch.to(device, non_blocking=True), mean, std)
+    with torch.autocast(
+        device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda"
+    ):
+        features = pool_tokens(encoder(x))
+    return features.float().cpu().to(torch.float16)
+
+
 @torch.inference_mode()
 def forward_embeddings(
     encoder: nn.Module,
@@ -62,21 +78,17 @@ def forward_embeddings(
 ) -> torch.Tensor:
     """Pool every image through the encoder in eval batches; returns fp16 embeddings on CPU."""
     encoder.eval()
-    rows = []
-    for start in range(0, len(images), batch_size):
-        batch = images[start : start + batch_size].to(device, non_blocking=True)
-        x = normalize_batch(batch, mean, std)
-        with torch.autocast(
-            device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda"
-        ):
-            features = pool_tokens(encoder(x))
-        rows.append(features.float().cpu().to(torch.float16))
+    rows = [
+        _pool_batch(encoder, images[start : start + batch_size], mean, std, device)
+        for start in range(0, len(images), batch_size)
+    ]
     encoder.train()
     if not rows:
         raise ValueError("forward_embeddings needs at least one image")
     return torch.cat(rows, dim=0)
 
 
+@torch.inference_mode()
 def stream_embeddings(
     encoder: nn.Module,
     image_paths: list[str],
@@ -84,29 +96,24 @@ def stream_embeddings(
     mean: tuple[float, ...],
     std: tuple[float, ...],
     device: torch.device,
-    chunk_size: int = 4096,
+    batch_size: int = 256,
 ) -> torch.Tensor:
-    """Decode and pool a (possibly huge) image list in bounded-memory chunks.
+    """Decode and pool a (possibly huge) image list batch by batch, decode overlapping forward.
 
     A locked validation/test partition can be hundreds of thousands of patches
     (TCGA-UT: ~243k/238k); decoding it as one uint8 tensor needs tens of GB of
-    host RAM. Chunking keeps memory to one ``chunk_size`` batch at a time.
+    host RAM. One worker-backed loader keeps only its prefetched batches in memory
+    and decodes the next batches while the GPU forwards the current one.
     """
-    chunks = [
-        forward_embeddings(
-            encoder,
-            decode_images(image_paths[start : start + chunk_size], transform).to(
-                device
-            ),
-            mean,
-            std,
-            device,
-        )
-        for start in range(0, len(image_paths), chunk_size)
-    ]
-    if not chunks:
+    if not image_paths:
         raise ValueError("stream_embeddings needs at least one image")
-    return torch.cat(chunks, dim=0)
+    loader = image_loader(
+        image_paths, transform, batch_size, pin_memory=device.type == "cuda"
+    )
+    encoder.eval()
+    rows = [_pool_batch(encoder, batch, mean, std, device) for batch in loader]
+    encoder.train()
+    return torch.cat(rows, dim=0)
 
 
 @torch.inference_mode()
