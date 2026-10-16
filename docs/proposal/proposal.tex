@@ -19,7 +19,7 @@
 \definecolor{tcga}{HTML}{2166AC}
 \definecolor{bracs}{HTML}{D6604D}
 
-\title{Understanding Data Scarcity in Foundation-Model-Based\\Histopathology Patch Classification}
+\title{Class Imbalance and Data Scarcity in Foundation-Model-Based\\Histopathology Patch Classification}
 \author{Yannik Queisler\\[2pt]\small Thesis Proposal}
 \date{\today}
 
@@ -81,7 +81,7 @@ rank r1 r2 r5 r10 r20 r50 r100 N
 \section{Motivation}
 Pathology foundation models provide transferable representations for histopathology patch classification \citep{chen2024uni,vorontsov2024virchow}.
 A classifier can then learn a diagnostic task from these representations without retraining the large model.
-Public benchmarks compare the models on clinical tasks \citep{campanella2025benchmark}, but offer less guidance on a practical question: \textbf{how well do foundation-model-based classifiers cope with scarce training data, and what can be done when they do not?}
+Public benchmarks compare the models on clinical tasks \citep{campanella2025benchmark}, but offer less guidance on a practical question: \textbf{how well do foundation-model-based classifiers cope with class imbalance and scarce training data, and what can be done when they do not?}
 This matters because expert annotation is expensive \citep{lu2021dataEfficient}, so labeled data are often scarce, especially for rare cancers.
 
 A classifier is judged here by two properties.
@@ -89,21 +89,21 @@ A classifier is judged here by two properties.
 \emph{Calibration} is the reliability of its predicted probabilities: among all patches predicted with 80\% confidence, about 80\% should be correct \citep{guo2017calibration}.
 The two can diverge, since a classifier may pick the right class most of the time and still be systematically overconfident.
 
-Data scarcity takes two forms.
+Two data limitations are studied.
 \emph{Class imbalance} means that common diagnoses receive much more training data than rare ones; this can harm both discrimination and calibration \citep{mosquera2024classImbalance}.
-\emph{Data shortage} means having too little labeled evidence overall, either too few patches or too few independent patients.
+\emph{Data scarcity} means having too little labeled evidence overall, either too few patches or too few independent patients.
 These are different limits: more patches from one patient may add tissue detail without representing the variation between patients.
 
-The study uses foundation models as backbones and examines class imbalance, data shortage, and whether the choice of backbone changes their effects.
+The study uses foundation models as backbones and examines class imbalance, data scarcity, and whether the choice of backbone changes their effects.
 The aim is to explain what annotation effort should target (rare classes, more tissue per patient, or additional patients) and what an algorithm can compensate for instead.
 
 \section{Research Questions}
-Both class imbalance and data shortage are examined through three questions: how much performance they cost, what causes the loss, and how effectively it can be mitigated.
+Both class imbalance and data scarcity are examined through three questions: how much performance they cost, what causes the loss, and how effectively it can be mitigated.
 This progression connects the measured effects to explanations and practical remedies (Figure~\ref{fig:design}).
 \begin{enumerate}
-  \item \textbf{Performance impact:} How do class imbalance and data shortage affect discrimination and calibration across tasks and classes, and how do patch count and patient count differ in their effects?
+  \item \textbf{Performance impact:} How do class imbalance and data scarcity affect discrimination and calibration across tasks and classes, and how do patch count and patient count differ in their effects?
   \item \textbf{Mechanisms:} What causes these performance losses, and why are some classes and tasks more vulnerable than others?
-  \item \textbf{Mitigation:} How effectively do mitigation methods improve performance under class imbalance and data shortage, and why do some methods work better than others?
+  \item \textbf{Mitigation:} How effectively do mitigation methods improve performance under class imbalance and data scarcity, and why do some methods work better than others?
 \end{enumerate}
 
 \section{Methodology}
@@ -120,7 +120,7 @@ To test whether the backbone matters, the experiments are repeated on the same p
       var/.style={box, fill=blue!8, draw=blue!60!black, thick},
       arr/.style={-{Latex[length=2mm]}}]
     \node[var] (c) at (0,0.75) {\textbf{Class imbalance}\\[-1pt]{\footnotesize per-class share of the data}};
-    \node[var] (d) at (0,-0.75) {\textbf{Data shortage}\\[-1pt]{\footnotesize patches per patient, patient count}};
+    \node[var] (d) at (0,-0.75) {\textbf{Data scarcity}\\[-1pt]{\footnotesize patches per patient, patient count}};
     \node[draw=blue!60!black, dashed, rounded corners=5pt, inner sep=5pt, fit=(c)(d)] (fac) {};
     \node[box] (f) at (5.6,0) {\textbf{FM backbone}\\[-1pt]{\footnotesize encoder choice also compared}};
     \node[box] (k) at (11.1,0) {\textbf{Linear classifier}\\[-1pt]{\footnotesize trained on the reduced data}};
@@ -136,7 +136,7 @@ To test whether the backbone matters, the experiments are repeated on the same p
     \draw[arr] (6.3,-1.8) -- (m.north);
     \draw[arr] (11.1,-1.8) -- (g.north);
   \end{tikzpicture}
-  \caption{Experimental design. Each scarcity factor (blue) is varied alone while the other stays fixed. The reduced training set is encoded by a frozen foundation model (FM), and the linear classifier trained on it is analyzed for the three research questions.}
+  \caption{Experimental design. Each data factor (blue) is varied alone while the other stays fixed. The reduced training set is encoded by a frozen foundation model (FM), and the linear classifier trained on it is analyzed for the three research questions.}
   \label{fig:design}
 \end{figure}
 
@@ -155,7 +155,7 @@ Between these two classes, the patch counts decrease geometrically: the class at
 Each class's patches are divided evenly among its patients.
 Which class is frequent and which is rare is assigned at random and redrawn ten times per split, so that the result does not depend on one particular choice.
 
-For \textbf{data shortage}, the classes stay balanced and two experiments separate patch count from patient count.
+For \textbf{data scarcity}, the classes stay balanced and two experiments separate patch count from patient count.
 In the first, the patients stay the same and each contributes fewer patches.
 In the second, the total number of patches stays the same but comes from fewer patients, each contributing more patches.
 Comparing the two shows whether a classifier is limited by the amount of tissue or by the number of independent patients.
@@ -163,7 +163,7 @@ Comparing the two shows whether a classifier is limited by the amount of tissue 
 \textbf{Evaluation.}
 Discrimination is measured by \emph{balanced accuracy}: the share of correctly classified test patches is computed per class and then averaged over classes, so that a rare class counts as much as a frequent one; within a class, every patient counts equally regardless of patch count.
 Calibration is measured by the \emph{expected calibration error} (ECE), the average gap between the confidence of a prediction and its accuracy; lower is better.
-The effect of a scarce setting is reported as its difference from the balanced setting on the same patients, in percentage points (pp), with 95\% bootstrap intervals over test patients and repetitions.
+The effect of an imbalanced or scarce setting is reported as its difference from the balanced setting on the same patients, in percentage points (pp), with 95\% bootstrap intervals over test patients and repetitions.
 
 \section{Preliminary Findings}
 In my initial experiments, I investigated the effects of \emph{class imbalance} on both tasks, the 30 cancer types of TCGA-UT and the seven breast-lesion classes of BRACS.
@@ -284,18 +284,18 @@ Changing the backbone alone does not solve the problem.
 \end{figure}
 
 \section{Next Steps}
-For my thesis, I plan to extend the imbalance findings to \textbf{data shortage} and then evaluate \textbf{mitigation methods for both forms of scarcity}.
+For my thesis, I plan to extend the imbalance findings to \textbf{data scarcity} and then evaluate \textbf{mitigation methods for both limitations}.
 The aim is to establish which methods work well, where they fall short, and why, alongside guidance on where additional labels are most valuable.
 The remaining work follows two stages:\clearpage
 
-\textbf{Data shortage.}
+\textbf{Data scarcity.}
 In the first stage, I will reduce the number of patches per patient while keeping the patients fixed, and then reduce the number of patients while keeping the total number of patches fixed.
 Both experiments measure the loss in discrimination and calibration.
 The analysis then examines whether the variation of tissue within a patient or the diversity between patients limits performance, and from which point additional patches stop helping.
 
 \textbf{Mitigation.}
-The second stage evaluates methods against class imbalance and data shortage, including class reweighting, methods that estimate a class from few examples, and temperature scaling.
-Their effectiveness is compared across tasks and scarcity levels, with an analysis of why some methods succeed while others offer little improvement.
+The second stage evaluates methods against class imbalance and data scarcity, including class reweighting, methods that estimate a class from few examples, and temperature scaling.
+Their effectiveness is compared across tasks and levels of imbalance and scarcity, with an analysis of why some methods succeed while others offer little improvement.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
