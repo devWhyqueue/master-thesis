@@ -24,6 +24,11 @@
 # PILOT RESULT 2026-10-17 (r100 ce / cuda 0.25 / gcl 0.05, shards 0/10/20, all on A100 40GB, no OOM):
 #   1:30-1:42 h per fit incl. inline stage two (projection 1.15 h) -> above 1.4 h, fit stays gpu-5h.
 #   Records are part of the main grid (same config).
+# SCOPE CUT 2026-10-17 (before any main-grid fit ran; only the 3 pilot r100 fits exist): arms r50 and
+#   N dropped, r1 + r100 kept at all 30 shards (540 fits instead of 1,290). In exp-43 their CE damage
+#   was < 1 pp (0.67, 0.42), recovery shares unstable and the 1-pp rule uninformative, so they cannot
+#   confirm encoder independence. Every pre-fixed contrast quantity above is read at r100 only; grids,
+#   steps, shards and bootstrap unchanged.
 prevalence:
   patients_per_class: 20
 
@@ -74,18 +79,6 @@ mitigation:
         crt: [null]
         disalign: [1.0]
         gcl2: [0.05]
-    r50:
-      stage1:
-        ce: [null]
-        bs: [0.5, 1.0]
-        cuda: [0.25, 0.5, 1.0]
-        la: [0.25, 0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2]
-      stage2:
-        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0]
-        crt: [null]
-        gcl2: [0.02, 0.05, 0.2]
     r100:
       stage1:
         ce: [null]
@@ -98,18 +91,6 @@ mitigation:
         disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
         gcl2: [0.01, 0.02, 0.05, 0.2]
-    N:
-      stage1:
-        ce: [null]
-        bs: [0.5, 1.0]
-        cuda: [0.25, 0.5, 1.0]
-        la: [0.25, 0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2, 0.5]
-      stage2:
-        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
-        crt: [null]
-        gcl2: [0.02, 0.05, 0.2, 0.5]
   train:
     stage1: {batch_size: 256, steps: 2400, lr: 0.0001, weight_decay: 0.0001, micro_batch: 64}
     stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
