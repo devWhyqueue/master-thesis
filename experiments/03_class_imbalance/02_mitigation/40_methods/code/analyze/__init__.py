@@ -1,5 +1,5 @@
 """Analyze stage (exp-41): validation-selected recovery of each mitigation method,
-at every imbalance arm the config grids (``ARMS``: r50, r100, N).
+at every imbalance arm the config grids (``imbalance_arms``, e.g. r50, r100, N).
 
 Per (split, draw) shard, the method's configured param with the best *validation*
 patient-macro balanced accuracy is selected (``analyze.select``, never the test
@@ -34,7 +34,6 @@ from prevalence.analyze import _thirds
 from analyze.balanced import balanced_gains, pack_balanced, specific_estimates
 from analyze.bootstrap import quality_distributions, selected_thirds
 from analyze.common import (
-    ARMS,
     CE_R1,
     FAMILY,
     METHODS,
@@ -44,6 +43,7 @@ from analyze.common import (
     _recovery_distributions,
     _selected_dirs,
     _setup,
+    imbalance_arms,
 )
 from analyze.figure import recovery_figure
 from analyze.paths import Shard, fixed_dirs
@@ -152,7 +152,7 @@ def run_analyze(config: dict[str, Any]) -> Path:
         arm: _analyze_arm(
             config, arm, names, n_classes, paths, ctxs, perms, ba, w, gains
         )
-        for arm in ARMS
+        for arm in imbalance_arms(config)
     }
     settings = config.get("analyze", {})
     extra = {}

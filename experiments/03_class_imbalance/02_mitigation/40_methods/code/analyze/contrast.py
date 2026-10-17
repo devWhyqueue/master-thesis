@@ -17,7 +17,6 @@ from breadth.analyze.secondary import pack_estimate
 
 from analyze.balanced import balanced_gains
 from analyze.common import (
-    ARMS,
     CE_R1,
     _ce_arm,
     _ce_ba_and_weights,
@@ -25,6 +24,7 @@ from analyze.common import (
     _recovery_distributions,
     _selected_dirs,
     _setup,
+    imbalance_arms,
 )
 from analyze.report import RECOVERS_PP
 
@@ -116,7 +116,7 @@ def _encoder_distributions(
     ba, w = _ce_ba_and_weights(config, names)
     gains = balanced_gains(config, paths, ctxs, perms, ba[CE_R1], w)
     damage, recovery = {}, {}
-    for arm in ARMS:
+    for arm in imbalance_arms(config):
         damage[arm] = ba[CE_R1] - ba[_ce_arm(arm)]
         selected = _selected_dirs(paths, _recoveries(config, paths, arm), arm)
         recovery[arm] = _recovery_distributions(

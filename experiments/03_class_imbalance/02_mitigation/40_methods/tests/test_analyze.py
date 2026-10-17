@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from imbalance_benchmark.common import RUN_RECORD_NAME, ensure_dirs, split_paths
 
+from analyze.common import imbalance_arms
 from analyze.paths import fixed_dirs, run_dir
 from analyze.report import Distributions, family_share, method_summary, pack_methods
 from analyze.select import select, selected_frequency
@@ -26,6 +27,11 @@ def _write_validation_ba(paths: dict, arm: str, method: str, param: float | None
     out.mkdir(parents=True, exist_ok=True)
     record = {"splits": {"validation": {"endpoints": {"patient_macro_balanced_accuracy": ba}}}}
     (out / RUN_RECORD_NAME).write_text(json.dumps(record), encoding="utf-8")
+
+
+def test_imbalance_arms_follow_grid_order_without_r1() -> None:
+    grid = {"r1": {}, "r100": {}, "N": {}}
+    assert imbalance_arms({"mitigation": {"grid": grid}}) == ("r100", "N")
 
 
 def test_run_dir_label_matches_mitigation_data_convention(tmp_path: Path) -> None:

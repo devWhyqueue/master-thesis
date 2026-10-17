@@ -23,7 +23,6 @@ from analyze.bootstrap import selected_ba
 from analyze.paths import Shard, result_paths, run_dir
 from analyze.select import select, selected_frequency
 
-ARMS: tuple[str, ...] = ("r50", "r100", "N")
 CE_R1 = "r1_ce"
 METHODS: tuple[str, ...] = (
     tuple(m for m in STAGE1_METHODS if m != "ce") + STAGE2_METHODS
@@ -36,6 +35,11 @@ FAMILY: dict[str, str] = {
 # readout, not LoRA -- an external reference, no fits spent reproducing it here.
 
 
+def imbalance_arms(config: dict[str, Any]) -> tuple[str, ...]:
+    """Imbalance arms the config grids, in grid order; ``r1`` is the balanced reference, not an arm."""
+    return tuple(a for a in config["mitigation"]["grid"] if a != "r1")
+
+
 def _ce_arm(arm: str) -> str:
     """CE damage anchor's arm label for one imbalance arm, e.g. ``r100`` -> ``r100_ce``."""
     return f"{arm}_ce"
@@ -46,7 +50,7 @@ def _ce_ba_and_weights(
 ) -> tuple[dict[str, np.ndarray], np.ndarray]:
     """Pool ``r1_ce`` and every arm's own CE damage anchor under one shared bootstrap weight."""
     ce_acc = arm_accuracy(
-        config, names, arms=(CE_R1,) + tuple(_ce_arm(a) for a in ARMS)
+        config, names, arms=(CE_R1,) + tuple(_ce_arm(a) for a in imbalance_arms(config))
     )
     n_replicates = next(iter(ce_acc.values())).shape[-1]
     fit_split = np.repeat(np.arange(N_SPLITS), N_DRAWS)
