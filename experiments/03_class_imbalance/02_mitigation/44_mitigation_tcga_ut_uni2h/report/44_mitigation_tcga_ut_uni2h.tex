@@ -1,0 +1,87 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\title{Class-Imbalance Mitigation on TCGA-UT:\\Replacing Virchow2 with a LoRA-Adapted {UNI2-h} Encoder}
+\author{Yannik Queisler}
+\date{October 23, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent With a Virchow2 encoder adapted through low-rank adaptation (LoRA), class imbalance at a ratio of 100 reduced balanced accuracy on TCGA-UT by 1.56 percentage points, and logit adjustment recovered approximately all of it in point estimate. This report repeats that experiment with UNI2-h as the only change. It retains the same 30 patient-disjoint split-draw shards, class allocations, strength grids, training length, and bootstrap weights, pairing every UNI2-h estimate with its Virchow2 counterpart. The rule fixed before training defines a quantity as encoder-dependent only if its paired difference has a 95\% interval that excludes zero and a magnitude of at least one point. Of 20 pre-specified quantities, one meets the rule: classifier-only Gaussian clouded logit (GCL) adjustment lowers balanced accuracy on balanced data by 1.07 points more under UNI2-h. Nine further contrasts have intervals that exclude zero but have magnitudes below one point. UNI2-h's balanced cross-entropy model is 0.94 points more accurate, yet at ratio 100 both encoders reach 69.95 percent, so the damage grows from 1.56 to 2.49 points. Most methods reach about the same imbalanced accuracy as under Virchow2, so their recoveries barely change while their shares of the larger damage fall. Logit adjustment recovers 1.61 points (train-time) and 1.51 points (post hoc), shares of 0.65 and 0.60, and their paired share intervals exclude full recovery. A curriculum of data augmentation (CUDA) recovers the most, 1.79 points, because it retains UNI2-h's advantage on balanced data under imbalance. Its imbalance-specific recovery becomes material (1.09 points, interval 0.64 to 1.54), as it did on BRACS. Logit adjustment and classifier-only GCL still restore most of the tail recall. All eight recovery contrasts have point estimates below one point in magnitude. Seven have intervals entirely within $\pm1$ point; CUDA's interval reaches 1.18 points. Recovery shares and verdicts can nevertheless change because UNI2-h has greater CE damage.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The companion mitigation study on TCGA-UT trained eight long-tailed method variants with a Virchow2 encoder \citep{zimmermann2024virchow2} adapted through rank-8 low-rank adaptation (LoRA) updates \citep{queisler2026mitigationTcga,queisler2026mitigationMethods}. At an imbalance ratio of $\rho=100$, cross-entropy (CE) lost 1.56 points of balanced accuracy, about half of what a frozen linear readout lost on the same shards \citep{queisler2026prevalenceTcga}. Both forms of logit adjustment recovered all of that loss. The curriculum of data augmentation (CUDA) gain did not depend on imbalance, and classifier-only Gaussian clouded logit (GCL) adjustment corrected the most imbalance net of its effect on balanced data. That study was limited to one encoder.
+
+A second encoder can change these results in two ways. It can change the damage to recover by changing balanced accuracy or sensitivity to the imbalanced allocation. It can also change how the methods act, because CUDA's image augmentation, GCL's feature clouds, and the classifier-only refits all operate on the encoder's representation. Two earlier comparisons bear on this question. Under a frozen linear readout on TCGA-UT, UNI2-h \citep{chen2024uni,mahmoodlab2025uni2h} was 1.78 points more accurate than Virchow2 on balanced data and lost 0.86 points less under imbalance \citep{queisler2026encoderTransfer}. Under LoRA on BRACS, no damage or recovery contrast between the two encoders met the encoder-dependence rule used here, but the paired intervals there spanned up to four points \citep{queisler2026mitigationUni2h}. This report asks: \emph{on TCGA-UT, do the LoRA damage and each method's recovery depend on the encoder, or do the conclusions drawn under Virchow2 transfer to UNI2-h?}
+
+\section{Design}
+\label{sec:design}
+The experiment replicates the Virchow2 mitigation study on TCGA-UT \citep{queisler2026mitigationTcga} with one change, the encoder. The following are held fixed: the 30 split-draw shards (three patient-disjoint splits, ten draws each, $G=20$ training patients per cancer type and a budget of 19,200 patches), the training patients and patches of every draw, the random assignment of classes to allocation ranks, the validation and test patients, the eight method variants and their strength grids (Table~\ref{tab:grid}), the training length, and the bootstrap seed. The identical shards and allocations give both encoders the same training data. Differences between them can therefore be attributed to the encoder and its interaction with the fixed recipe.
+
+Two allocations are trained: balanced ($\rho=1$) and $\rho=100$, at which the largest class receives 2,843 patches and the rarest 28. The allocations $\rho=50$ and native class shares of the Virchow2 study are not repeated. Their CE damage under Virchow2 was below one point (0.67 and 0.42), so the study focuses on the allocation with the largest reference damage. This scope choice leaves encoder effects at the omitted allocations unmeasured; small Virchow2 damage does not rule them out. Balanced sampling and both forms of logit adjustment reduce to CE on the balanced allocation and are trained only at $\rho=100$.
+
+The experiment uses UNI2-h's pinned public release \citep{mahmoodlab2025uni2h}, the same checkpoint used in the frozen comparison \citep{queisler2026encoderTransfer}. The patch embedding is UNI2-h's own pooled token (1,536 dimensions), whereas Virchow2 concatenates its class token with the mean patch token (2,560 dimensions); each encoder thus keeps the pooling its authors recommend. Both encoders use the same adaptation: a rank-8 LoRA update ($\alpha=16$) on the query-key-value and output projections of every attention block, trained with a linear head (a cosine head for GCL, with scale $s=30$ and a second-stage sampler of effective-number range $a=0.9999$, $b=10^{-5}$). The 2,400 end-to-end training steps (batch size 256, learning rate $10^{-4}$) were chosen for CE under Virchow2 and were not retuned, keeping the training recipe identical across encoders; classifier-only fits use 200 steps. Per shard, the grid contains 18 end-to-end and 17 classifier-only configurations, giving 540 and 510 fits across the 30 shards. Every configured fit completed and entered the analysis.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Training & Method & Strength & Grid at $\rho=100$ (balanced) \\
+\midrule
+End to end & CE (reference) & -- & -- \\
+End to end & Balanced sampling & $s$ & 0.5, 1.0 \\
+End to end & CUDA & $p_{\mathrm{aug}}$ & 0.25, 0.5, 1.0 (same) \\
+End to end & Logit adjustment (train-time) & $\tau$ & 0.25, 0.5, 1.0 \\
+End to end & GCL & $\sigma$ & 0.01, 0.02, 0.05, 0.2 (0.05) \\
+Classifier only & Logit adjustment (post hoc) & $\tau$ & 0.25, 0.5, 1.0, 1.5, 2.0 \\
+Classifier only & DisAlign & $\gamma$ & 0.5, 1.0, 1.5, 2.0 (1.0) \\
+Classifier only & cRT & -- & -- (same) \\
+Classifier only & GCL & $\sigma$ of its source & as GCL (0.05) \\
+\bottomrule
+\end{tabular}
+\caption{Both encoders share the same strength grids, copied from the Virchow2 study. Values in parentheses apply to the balanced allocation, where methods that reduce to CE are not trained. CUDA (curriculum of data augmentation) uses a fixed acceptance threshold (0.6), check size (10), and maximum strength (10). GCL: Gaussian clouded logit adjustment; DisAlign: distribution alignment; cRT: classifier re-training. Classifier-only GCL starts from the end-to-end GCL model with the same $\sigma$; the other classifier-only methods start from the CE model.}
+\label{tab:grid}
+\end{table}
+
+\section{Evaluation}
+\label{sec:evaluation}
+Each encoder is first analysed with the endpoints of the Virchow2 study. The primary endpoint is test patient-macro balanced accuracy (BA). For method $m$ with validation-selected strength $m^{*}$, the CE damage, the recovery, its share of the damage, the balanced gain, and the imbalance-specific recovery at $\rho=100$ are
+\begin{equation}
+  \begin{gathered}
+  D_{100}=\mathrm{BA}(\mathrm{CE},1)-\mathrm{BA}(\mathrm{CE},100),\qquad
+  R_m=\mathrm{BA}(m^{*},100)-\mathrm{BA}(\mathrm{CE},100),\\
+  G_m=\mathrm{BA}(m^{*},1)-\mathrm{BA}(\mathrm{CE},1),\qquad
+  R_m-G_m=D_{100}-\bigl[\mathrm{BA}(m^{*},1)-\mathrm{BA}(m^{*},100)\bigr],
+  \end{gathered}
+  \label{eq:endpoints}
+\end{equation}
+\noindent with $\text{share}_m=R_m/D_{100}$ computed per replicate. The bracket in the last term is the method's own damage, so $R_m-G_m$ measures how much less a method suffers from imbalance than CE does. A recovery is \emph{material} if it is at least one point and its interval lies above zero, and meets the pre-specified \emph{full-recovery criterion} if the interval of $\mathrm{BA}(m^{*},100)$ contains the point estimate of $\mathrm{BA}(\mathrm{CE},1)$. This marginal-interval criterion does not establish equivalence to balanced CE. Separately, a paired share interval entirely below 1 indicates residual damage; an interval containing 1 is compatible with full recovery. Balanced sampling and both forms of logit adjustment have $G_m=0$ by construction. The uncertainty analysis combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split over 2,000 replicates, and reports 95 percent percentile intervals.
+
+The encoder contrast was fixed in the configuration before any fit. For each quantity $X$ among $\mathrm{BA}(\mathrm{CE},1)$, $D_{100}$, $R_m$, $G_m$, and $R_m-G_m$,
+\begin{equation}
+  \delta X = X(\text{UNI2-h})-X(\text{Virchow2}),
+  \label{eq:delta}
+\end{equation}
+\noindent using the same replicate weights for both encoders, so every $\delta$ is paired. A quantity counts as \emph{encoder-dependent} only if the interval of $\delta X$ excludes zero and $|\delta X|\geq1$ point. With eight recoveries and five balanced gains and imbalance-specific recoveries, 20 quantities enter the rule. Two descriptive summaries accompany it: agreement between encoders on each method's material-recovery verdict and the Spearman rank correlation of $R_m$ across the eight variants. The main conclusions of the Virchow2 study are also checked against the UNI2-h results; this comparison was not pre-specified and is descriptive.
+
+Secondary analyses are descriptive: head, body, and tail recall by assigned class rank; macro negative log-likelihood (NLL) and expected calibration error (ECE), raw and after validation temperature scaling; and the frequency of each selected strength. The frozen UNI2-h readout reached 73.98 percent BA on balanced data and lost $D_{100}=2.29$ points $[1.88, 2.69]$ \citep{queisler2026encoderTransfer}. That study used a different set of draws, so the comparison with it has no paired interval.
+
+\input{results}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
