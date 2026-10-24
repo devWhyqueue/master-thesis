@@ -1,0 +1,82 @@
+# GCL cosine-scale pilot (exp-44 sensitivity, not part of the pre-specified contrast): balanced
+# (r1) end-to-end GCL sigma=0.05 + inline classifier-only GCL with cosine scale s=64 instead of 30.
+# Everything else = tcga_ut.yaml. Shards 0,1,10,11,20,21 (2 per split; submit the rendered fit array
+# with sbatch --array=0,1,10,11,20,21). Twin config: pilot_gcl_s16.yaml.
+#
+# Pre-fixed before any fit (2026-10-23). Question: does UNI2-h's encoder-dependent balanced GCL loss
+#   (G_GCL2 delta -1.07 pp at s=30) come from the cosine scale tuned under Virchow2?
+#   Per s and shard: G(s) = test BA(gcl2 or gcl, r1, s) - test BA(ce, r1) from tcga_ut outputs;
+#   dG(s) = G_UNI2-h(s) - G_Virchow2(s=30) (exp-43, same shards). Mean over the 6 shards, no CI.
+#   Scale explanation supported iff for some s in {16, 64} classifier-only mean |dG(s)| < 1 pp AND
+#   it moves >= 0.5 pp toward 0 vs. dG(30) on the same 6 shards; otherwise not supported.
+#   Descriptive only: cannot change the pre-specified encoder-dependence verdict.
+prevalence:
+  patients_per_class: 20
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/44_mitigation_tcga_ut_uni2h/outputs/pilot_gcl_s64
+
+mitigation:
+  encoder: uni2h
+  perf: {grad_checkpointing: false, compile: true}
+  inline_stage2: true
+  lora:
+    r: 8
+    alpha: 16
+    dropout: 0.0
+  gcl:
+    s: 64
+    a: 0.9999
+    b: 0.00001
+  cuda:
+    gamma: 0.6
+    check_size: 10
+    max_strength: 10
+  grid:
+    r1:
+      stage1:
+        gcl: [0.05]
+      stage2:
+        gcl2: [0.05]
+  train:
+    stage1: {batch_size: 256, steps: 2400, lr: 0.0001, weight_decay: 0.0001, micro_batch: 64}
+    stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}
+
+analyze:
+  # Paired encoder contrast against exp-43 (Virchow2); external damage = exp-39 frozen UNI2-h D_R100 (TCGA-UT).
+  reference_config: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/configs/tcga_ut.yaml
+  external_damage: {point: 2.29, ci_2_5: 1.88, ci_97_5: 2.69}
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/40_methods/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/44_mitigation_tcga_ut_uni2h/outputs/pilot_gcl_s64
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
+  # Staged to node-local /tmp per fit job (32 GB copy): warm decode 1,375 img/s vs 439 from shared storage.
+  squashfs:
+    - source: /home/space/datasets-sqfs/tcga-ut/patch.sqfs
+      mount: /mnt/tcga-ut
+      stages: [fit]
+  max_array_concurrency: {gpu-5h: 35, gpu-2h: 50, cpu-5h: 10}
+  resources:
+    fit: {partition: gpu-5h, gpus: 1, constraint: "80gb|h100|h200|blackwell|40gb", cpus: 8, memory: 64G}
+    analyze: {partition: cpu-2d, gpus: 0, cpus: 4, memory: 64G}
