@@ -15,6 +15,7 @@ REPORT = HERE / "report"
 VIRCHOW = HERE.parent / "43_mitigation_tcga_ut" / "report" / "analysis.json"
 UNI = REPORT / "analysis.json"
 METHODS = ("cuda", "la", "posthoc_la", "bs", "gcl", "disalign", "gcl2", "crt")
+BALANCED = ("cuda", "gcl", "gcl2", "crt", "disalign")
 METHOD_LABELS = {
     "bs": "Balanced sampling",
     "cuda": "CUDA",
@@ -27,6 +28,15 @@ METHOD_LABELS = {
     "r1_ce": "CE, balanced",
     "r100_ce": r"CE, $\rho=100$",
 }
+CONTRAST_GROUPS = (
+    ("CE", (("ba_r1_ce", "BA, balanced"), ("damage", r"Damage $D_{100}$"))),
+    (r"$R_m$", tuple((f"recovery_{m}", METHOD_LABELS[m]) for m in METHODS)),
+    (r"$G_m$", tuple((f"gain_{m}", METHOD_LABELS[m]) for m in BALANCED)),
+    (
+        r"$R_m-G_m$",
+        tuple((f"specific_recovery_{m}", METHOD_LABELS[m]) for m in BALANCED),
+    ),
+)
 ENCODERS = {"virchow2": ("Virchow2", "#1f77b4"), "uni2h": ("UNI2-h", "#d62728")}
 
 
@@ -62,31 +72,58 @@ def _save(fig: Any, name: str) -> None:
 
 
 def recovery_figure(data: dict[str, dict[str, Any]]) -> None:
-    """Left: R_m at r100 per encoder, dashed lines mark each encoder's CE damage. Right: paired delta R_m."""
-    fig, (left, right) = plt.subplots(1, 2, figsize=(7.2, 3), sharey=True)
-    left.axvline(0, color="0.4", lw=0.8)
-    left.axvline(1, color="0.4", lw=0.8, ls=":")
-    for offset, (key, (_, color)) in zip((-0.15, 0.15), ENCODERS.items()):
-        estimates = data[key]["arms"]["r100"]["estimates"]
-        left.axvline(estimates["damage"]["point"], color=color, lw=0.8, ls="--")
-        for i, m in enumerate(METHODS):
-            _interval(left, estimates[f"recovery_{m}"], -i + offset, color)
-    left.set_xlabel("Recovery R (pp)", fontsize=8)
-    right.axvspan(-1, 1, color="0.9", zorder=0)
-    right.axvline(0, color="0.4", lw=0.8)
-    delta = data["uni2h"]["encoder_contrast"]["r100"]["delta"]
-    for i, m in enumerate(METHODS):
-        _interval(right, delta[f"recovery_{m}"], -i, "k")
-    right.set_xlabel(r"$\delta R$, UNI2-h minus Virchow2 (pp)", fontsize=8)
-    for ax in (left, right):
+    """Left: R_m at r100 per encoder. Right: R_m - G_m (equal to R_m where G_m = 0). Dashed: CE damage."""
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3), sharey=True, sharex=True)
+    for ax, prefix in zip(axes, ("recovery", "specific_recovery")):
+        ax.axvline(0, color="0.4", lw=0.8)
+        ax.axvline(1, color="0.4", lw=0.8, ls=":")
+        for offset, (key, (_, color)) in zip((-0.15, 0.15), ENCODERS.items()):
+            estimates = data[key]["arms"]["r100"]["estimates"]
+            ax.axvline(estimates["damage"]["point"], color=color, lw=0.8, ls="--")
+            for i, m in enumerate(METHODS):
+                est = estimates.get(f"{prefix}_{m}", estimates[f"recovery_{m}"])
+                _interval(ax, est, -i + offset, color)
         ax.tick_params(labelsize=7)
-    left.set_yticks(
+    axes[0].set_xlabel("Recovery $R$ (pp)", fontsize=8)
+    axes[1].set_xlabel("Imbalance-specific recovery $R-G$ (pp)", fontsize=8)
+    axes[0].set_yticks(
         [-i for i in range(len(METHODS))],
         [METHOD_LABELS[m] for m in METHODS],
         fontsize=7,
     )
     _encoder_legend(fig)
     _save(fig, "fig_recovery.pdf")
+
+
+def _contrast_row(ax: Any, est: dict[str, Any], y: float) -> None:
+    """One delta interval: red if encoder-dependent, hollow marker if its CI contains 0."""
+    color = "#d62728" if est["encoder_dependent"] else "k"
+    _interval(ax, est, y, color)
+    if est["ci_2_5"] <= 0 <= est["ci_97_5"]:
+        ax.plot(est["point"], y, "o", color=color, mfc="white", ms=3.5)
+
+
+def contrast_figure(data: dict[str, dict[str, Any]]) -> None:
+    """All pre-specified paired contrasts delta X with the +-1 pp band, grouped by quantity."""
+    delta = data["uni2h"]["encoder_contrast"]["r100"]["delta"]
+    fig, ax = plt.subplots(figsize=(4.6, 5.2))
+    ax.axvspan(-1, 1, color="0.9", zorder=0)
+    ax.axvline(0, color="0.4", lw=0.8)
+    y, ticks, labels = 0.0, [], []
+    for title, rows in CONTRAST_GROUPS:
+        ax.text(-2.05, y + 0.1, title, fontsize=7, va="center")
+        for key, label in rows:
+            y -= 1
+            _contrast_row(ax, delta[key], y)
+            ticks.append(y)
+            labels.append(label)
+        y -= 1.4
+    ax.set_yticks(ticks, labels, fontsize=7)
+    ax.set_xlim(-2.1, 2.1)
+    ax.set_ylim(y + 0.6, 0.8)
+    ax.tick_params(axis="x", labelsize=7)
+    ax.set_xlabel(r"$\delta X$, UNI2-h minus Virchow2 (pp)", fontsize=8)
+    _save(fig, "fig_contrast.pdf")
 
 
 def _rank_bars(
@@ -126,9 +163,10 @@ def rank_recall_figure(data: dict[str, dict[str, Any]]) -> None:
 
 
 def main() -> None:
-    """Write fig_recovery.pdf and fig_rank_recall.pdf into ``report/``."""
+    """Write fig_recovery.pdf, fig_contrast.pdf and fig_rank_recall.pdf into ``report/``."""
     data = {"virchow2": _load(VIRCHOW), "uni2h": _load(UNI)}
     recovery_figure(data)
+    contrast_figure(data)
     rank_recall_figure(data)
 
 
