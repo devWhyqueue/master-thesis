@@ -1,0 +1,20 @@
+# Strong-mitigations follow-up (exp-45, protocol strong-mitigations-v2), tcga_ut: train-time LA, post-hoc LA
+# and CUDA without LoRA (frozen pretrained Virchow2) vs exp-43's adapted pipelines at r100.
+# Dataset, first-stage recipe and CUDA constants come from the source config below and are validated
+# against the protocol (docs/superpowers/specs/2026-10-26-lora-omission-design.md).
+source_config: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/configs/tcga_ut.yaml
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/45_lora_ablation/outputs/strong_mitigations_v2/tcga_ut/patch
+
+protocol:
+  id: strong-mitigations-v2
+  margin_pp: 1.0
+  init_seed_base: 10000
+  grid:
+    stage1:
+      ce: [null]
+      la: [0.25, 0.5, 1.0]
+      cuda: [0.25, 0.5, 1.0]
+    stage2:
+      posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]

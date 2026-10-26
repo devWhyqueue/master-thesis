@@ -30,7 +30,9 @@
     "experiments/03_class_imbalance/01_cause/cross/34_separation_intervention/code",
     "experiments/03_class_imbalance/01_cause/cross/36_joint_mechanism/code",
     "experiments/03_class_imbalance/01_cause/cross/37_support_coverage/code",
-    "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/code"
+    "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/code",
+    "experiments/03_class_imbalance/02_mitigation/40_methods/code",
+    "experiments/03_class_imbalance/02_mitigation/45_lora_ablation/code"
   ],
   "extraPaths": [
     "experiments/01_benchmark/02_benchmark_patch/code",
@@ -63,7 +65,9 @@
     "experiments/03_class_imbalance/01_cause/cross/34_separation_intervention/code",
     "experiments/03_class_imbalance/01_cause/cross/36_joint_mechanism/code",
     "experiments/03_class_imbalance/01_cause/cross/37_support_coverage/code",
-    "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/code"
+    "experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/code",
+    "experiments/03_class_imbalance/02_mitigation/40_methods/code",
+    "experiments/03_class_imbalance/02_mitigation/45_lora_ablation/code"
   ],
   "venvPath": ".",
   "venv": ".venv_win"
