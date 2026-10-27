@@ -16,22 +16,22 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent Train-time logit adjustment, post-hoc logit adjustment, and the curriculum of data augmentation (CUDA) recovered most of the accuracy lost to class imbalance when a Virchow2 encoder was adapted through low-rank adaptation (LoRA). This protocol asks whether the same three methods lose no more than one percentage point of balanced accuracy at an imbalance ratio of 100 when the foundation model stays entirely unchanged. Six paired contrasts, one per dataset and method, decide the question; omitting LoRA counts as supported in the tested scope only if all six are noninferior. The study adds 390 training fits and 270 score-only candidates and trains no encoder. Omitting LoRA is not supported across the tested scope: two BRACS contrasts are noninferior, but BRACS CUDA and the two TCGA-UT logit-adjustment contrasts are inconclusive, and TCGA-UT CUDA shows a LoRA advantage of more than one point.
+\noindent Three mitigations of class imbalance were among the most effective when a Virchow2 encoder was adapted through low-rank adaptation (LoRA): train-time logit adjustment, post-hoc logit adjustment, and the curriculum of data augmentation (CUDA). At an imbalance ratio of 100, they recovered between about two-fifths and nearly all of the lost balanced accuracy. This experiment asks whether the three methods lose at most one percentage point of balanced accuracy at that ratio when the encoder stays frozen. Six paired contrasts, one per dataset and method, decide the question; omitting LoRA counts as supported only if all six show no material loss. Only the two BRACS logit-adjustment contrasts show no material loss. BRACS CUDA and the two TCGA-UT logit-adjustment contrasts are inconclusive, and TCGA-UT CUDA shows a LoRA advantage of more than one point. LoRA can therefore be omitted for logit adjustment on BRACS, but not across the tested scope. Without LoRA, logit adjustment gains about twice as much over cross-entropy as with it, whereas CUDA gains about the same, so each CUDA contrast largely reflects the gap between the two cross-entropy controls.
 \end{abstract}
 
-\section{Question}
-\label{sec:question}
-The mitigation studies adapted Virchow2 \citep{zimmermann2024virchow2} through LoRA before fitting any head \citep{queisler2026mitigationBracs,queisler2026mitigationTcga}. Logit adjustment recovered the most accuracy on TCGA-UT; CUDA \citep{ahn2023cuda} led in the other settings \citep{queisler2026mitigationMethods}. This follow-up asks: \emph{do these methods retain their balanced accuracy when the foundation model is not adapted at all?}
+\section{Motivation}
+\label{sec:motivation}
+The mitigation studies trained a low-rank adaptation (LoRA) update of Virchow2 \citep{zimmermann2024virchow2} together with the classification head \citep{queisler2026mitigationBracs,queisler2026mitigationTcga}. Logit adjustment (LA) recovered the most accuracy on TCGA-UT; the curriculum of data augmentation (CUDA) \citep{ahn2023cuda} led in the other settings \citep{queisler2026mitigationMethods}. LoRA makes every fit train part of the encoder. If the strongest methods keep their accuracy on a frozen encoder, that step can be dropped. This follow-up asks: \emph{do these methods retain their balanced accuracy when the foundation model is not adapted at all?}
 
-Each method is compared with its own LoRA counterpart under the same imbalanced allocation. A plain linear probe is a reference, not a substitute for applying the same mitigation without LoRA. The experiment allows a LoRA advantage or an inconclusive outcome; it does not assume the desired conclusion.
+Each method is compared with its own LoRA counterpart under the same imbalanced allocation. A plain linear probe is a reference, not a substitute for applying the same mitigation without LoRA.
 
 \section{Design}
 \label{sec:design}
-Both datasets use the 30 split-draw shards of the mitigation studies (three patient-disjoint splits, ten draws each) at one allocation, the severe imbalance $\rho=100$. No balanced, native-share, or intermediate allocation is added. The adapted comparison reuses the final matching records of the BRACS and TCGA-UT mitigation studies. The frozen comparison trains only a linear head on the unchanged pretrained Virchow2 and uses exactly the same training patients, patches, order, labels, and class counts, and the same validation and test partitions.
+Both datasets use the 30 split-draw shards of the mitigation studies (three patient-disjoint splits, ten draws each) at the severe imbalance $\rho=100$. The adapted representation reuses the final matching records of the BRACS and TCGA-UT mitigation studies. The frozen representation trains only a linear head on pretrained Virchow2, with the same training patients, patches, order, labels, class counts, and validation and test partitions.
 
-The first-stage recipe of the source studies is kept: AdamW, batch size 256, learning rate $10^{-4}$, weight decay $10^{-4}$, a cosine schedule, and 600 (BRACS) or 2,400 (TCGA-UT) updates, with empirical row sampling and a linear head. Cross-entropy (CE) and train-time logit adjustment (LA) train on cached fp16 features, with no image or encoder loading. One CE head per split and draw is reused for every post-hoc LA strength. CUDA keeps its image operations, per-class learning levels, classifier checks, and constants ($\gamma=0.6$, check size 10, maximum strength 10). Augmented images still pass through the frozen encoder in evaluation mode; only the head is optimized, with effective batch 256 in micro-batches of 64. Head initialization is seeded with $10000+100\,\text{split}+\text{draw}$ for every candidate; the sampling seed is the draw index. The historical head initialization was not recorded, so the data and inference are paired but the initialization is not.
+Training follows the first stage of the source studies: AdamW, batch size 256, learning rate $10^{-4}$, weight decay $10^{-4}$, a cosine schedule, and 600 (BRACS) or 2,400 (TCGA-UT) updates, with empirical row sampling. Cross-entropy (CE) and train-time LA train on cached encoder features. Post-hoc LA applies each strength to the stored CE head. CUDA keeps its image operations, per-class learning levels, classifier checks, and constants ($\gamma=0.6$, check size 10, maximum strength 10); augmented images pass through the frozen encoder, and only the head trains. The adapted runs did not record their head initialization, so data and inference are paired but initialization is not.
 
-Strength is selected per method, representation, split, and draw by validation patient-macro balanced accuracy alone, with ties broken by configuration order. Table~\ref{tab:grid} lists the grids. No strength is transferred from the adapted runs, and no grid is extended after test results are visible.
+Validation patient-macro balanced accuracy alone selects the strength per method, representation, split, and draw from the grids in Table~\ref{tab:grid}. No strength is transferred from the adapted runs, and no grid is extended after test results are visible.
 
 \begin{table}[htbp]
 \centering
@@ -47,30 +47,26 @@ CUDA, $p_{\mathrm{aug}}$ & 0.25, 0.5, 1.0 & 0.25, 0.5, 1.0 \\
 Updates & 600 & 2,400 \\
 \bottomrule
 \end{tabular}
-\caption{Fixed strength grids at $\rho=100$. CE has no strength and is the supporting control and the source head of post-hoc LA. LA: logit adjustment; CUDA: curriculum of data augmentation.}
+\caption{Fixed strength grids at $\rho=100$. CE has no strength; it is the control and the source head of post-hoc LA. CE: cross-entropy; LA: logit adjustment; CUDA: curriculum of data augmentation.}
 \label{tab:grid}
 \end{table}
 
-\paragraph{Compute.} The 390 training fits are 60 CE, 150 train-time LA, and 180 CUDA fits; the 270 post-hoc candidates only score a stored CE head, giving 660 records. The 210 CE and LA fits run on CPU. The 180 CUDA fits need image forwards and normally run on a GPU; CUDA totals 270,000 optimizer updates, or $6.9\times10^{7}$ batch-row encoder forwards before curriculum checks. Table~\ref{tab:resources} reports the measured runtime and peak memory of all 660 records.
-
-\paragraph{Consistency check.} CUDA evaluates from the unchanged pretrained feature caches. Before reuse, the cached features of the first 32 validation rows of each manifest must match direct forwards of the untouched encoder (per-row cosine similarity at least 0.999 and relative $L_2$ error at most 0.01; zero or nonfinite vectors fail). A mismatch blocks cache reuse pending diagnosis. The check initially failed (minimum cosine 0.9956) when images were resized bilinearly as in the adapted runs. The cache was extracted with the bicubic resize and fp16 autocast of the \texttt{timm} transform; with that recipe the minimum cosine is 1.0000 and the relative $L_2$ error stays below 0.003. The frozen CUDA fits therefore decode with the bicubic recipe, and the check forwards in fp16 with the thresholds unchanged.
-
-\section{Decision rule}
-\label{sec:decision}
+\section{Evaluation}
+\label{sec:evaluation}
 For each dataset and method, the primary contrast at $\rho=100$ is
 \begin{equation}
 \delta = \mathrm{BA}(\text{without LoRA}) - \mathrm{BA}(\text{with LoRA}),
 \end{equation}
-in percentage points, with patient-macro balanced accuracy (BA) pooled over splits and draws. The six contrasts use the repository's patient-clustered bootstrap with shared draw-resampling weights, so each is paired across representations. Ten thousand bootstrap replicates give a two-sided percentile interval from the $0.05/12$ and $1-0.05/12$ quantiles of the replicate columns only (about 99.17\%); the observed estimate is excluded. The six intervals share Bonferroni 95\% familywise coverage, subject to the bootstrap approximation.
+in percentage points, with patient-macro balanced accuracy (BA) pooled over splits and draws. As in the mitigation studies, uncertainty combines Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} with resampling of draws within each split. Both representations share the replicate weights, so every contrast is paired. Because six contrasts decide one question, each interval is a two-sided percentile interval from the $0.05/12$ and $1-0.05/12$ quantiles (about 99.17\%), which gives the six together Bonferroni 95\% familywise coverage. Such extreme quantiles need more replicates than the 95\% intervals of the mitigation studies: this experiment uses 10,000 instead of 2,000, leaving about 42 rather than 8 replicates beyond each bound.
 
-With the practical margin of one point, a lower bound strictly above $-1$ supports omitting LoRA for that dataset and method. An upper bound strictly below $-1$ means that the LoRA pipeline has an advantage larger than one point. Any other outcome, including a bound equal to $-1$, is inconclusive. The joint claim requires all six contrasts to be noninferior and supports ``no material accuracy loss from omitting LoRA in the tested scope'', not equality or the absence of any LoRA benefit. A nonsignificant difference is not evidence of noninferiority.
+A loss counts as material if it exceeds one point. A contrast shows \emph{no material loss} if its lower bound lies strictly above $-1$: omitting LoRA then costs at most one point. It shows a \emph{LoRA advantage} if its upper bound lies strictly below $-1$. Any other outcome, including a bound equal to $-1$, is \emph{inconclusive}. Omitting LoRA is supported only if all six contrasts show no material loss. That result would mean ``no material accuracy loss from omitting LoRA in the tested scope'', not equality or the absence of any LoRA benefit. A nonsignificant difference alone does not show that a loss is not material.
 
-Secondary diagnostics are descriptive: absolute BA, each representation's gain over its CE control, tail recall, validation selections, runtime, and peak memory.
-
-\section{Limits}
-\label{sec:limits}
-The follow-up reuses data already inspected in the mitigation studies; it is not an independent test set. It covers three methods, one encoder, one allocation, fixed training recipes, and the existing 30-draw design. Execution devices, precision, and micro-batching differ from the adapted runs, so training is not bitwise comparable; these settings are recorded. In particular, the frozen CUDA augmentation sees bicubic-resized images, whereas the adapted CUDA runs used a bilinear resize, so image preprocessing is not paired for CUDA, and training forwards use bf16 autocast. A LoRA advantage under these recipes does not show that every optimizer setting needs LoRA, and noninferiority does not establish equivalence for other methods, encoders, or ratios.
+Secondary diagnostics are descriptive: absolute BA, each representation's gain over its CE control, tail recall, and validation selections.
 \input{results}
+
+\section{Limitations}
+\label{sec:limitations}
+The follow-up reuses data already inspected in the mitigation studies; it is not an independent test set. It covers three methods, one encoder, one allocation, fixed training recipes, and the existing 30-draw design. Execution devices, precision, and micro-batching differ from the adapted runs, so training is not bitwise comparable. In particular, frozen CUDA augmentation sees bicubic-resized images, matching the cached features, whereas the adapted CUDA runs used a bilinear resize, so CUDA image preprocessing is not paired. Frozen CUDA training forwards also use bf16 autocast. A LoRA advantage under these recipes does not show that every optimizer setting needs LoRA, and a contrast with no material loss does not extend to other methods, encoders, or ratios.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

@@ -1,46 +1,56 @@
 \section{Results}
 \label{sec:results}
-Table~\ref{tab:contrast} reports the six primary contrasts at $\rho=100$. At least one contrast is not noninferior, so omitting LoRA is not supported for the full tested scope; the individual outcomes stand on their own.
-The CE controls reach BRACS 31.17 (frozen) and 31.57 (adapted), TCGA-UT 67.32 (frozen) and 69.95 (adapted) balanced accuracy.
+Table~\ref{tab:contrast} reports the six primary contrasts at $\rho=100$. Only two of the six contrasts show no material loss, so omitting LoRA is not supported across the tested scope; each contrast still stands as an individual outcome.
+The CE controls reach a balanced accuracy of 31.17 (frozen) and 31.57 (adapted) on BRACS, and 67.32 (frozen) and 69.95 (adapted) on TCGA-UT.
 
 \begin{table}[htbp]
 \centering
 \small
 \renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}llrrrrl@{}}
 \toprule
 Dataset & Method & Without LoRA & With LoRA & $\delta$ (pp) & 99.17\% interval & Decision \\
 \midrule
-BRACS & Train-time LA & 35.75 & 33.54 & 2.22 & [0.43, 3.97] & noninferior \\
-BRACS & Post-hoc LA & 35.34 & 33.51 & 1.83 & [0.11, 3.46] & noninferior \\
+BRACS & Train-time LA & 35.75 & 33.54 & 2.22 & [0.43, 3.97] & no material loss \\
+BRACS & Post-hoc LA & 35.34 & 33.51 & 1.83 & [0.11, 3.46] & no material loss \\
 BRACS & CUDA & 33.01 & 34.17 & -1.16 & [-2.80, 0.40] & inconclusive \\
 TCGA-UT & Train-time LA & 70.84 & 71.49 & -0.65 & [-1.21, -0.11] & inconclusive \\
 TCGA-UT & Post-hoc LA & 70.83 & 71.37 & -0.54 & [-1.14, 0.06] & inconclusive \\
 TCGA-UT & CUDA & 68.20 & 70.97 & -2.77 & [-3.38, -2.13] & LoRA advantage \\
 \bottomrule
 \end{tabular}
-\caption{Balanced accuracy (BA, \%) at $\rho=100$ without and with LoRA, and their paired difference $\delta$ with a 99.17\% percentile interval (Bonferroni over six contrasts). A lower bound above $-1$ is noninferior; an upper bound below $-1$ is a LoRA advantage; anything else is inconclusive.}
+\caption{Balanced accuracy (BA, \%) at $\rho=100$ without and with LoRA, and their paired difference $\delta$ with a 99.17\% percentile interval (Bonferroni over six contrasts). A lower bound above $-1$ shows no material loss; an upper bound below $-1$ is a LoRA advantage; anything else is inconclusive. LA: logit adjustment; CUDA: curriculum of data augmentation.}
 \label{tab:contrast}
 \end{table}
+
+The CE controls explain much of this pattern. Frozen minus adapted CE is $-0.40$ points $[-1.45, 0.56]$ on BRACS but $-2.64$ points $[-3.12, -2.16]$ on TCGA-UT, so on TCGA-UT LoRA already improves the unmitigated model by more than one point. Each contrast $\delta$ equals this CE gap plus the difference between the two representations' gains over their CE controls (Table~\ref{tab:secondary}). Both forms of LA gain about twice as much without LoRA as with it: 4.58 and 4.17 against 1.96 and 1.94 points on BRACS, and 3.52 and 3.51 against 1.54 and 1.41 on TCGA-UT. On BRACS, this larger gain outweighs the small CE gap, so both LA contrasts show no material loss. On TCGA-UT, it closes most of the 2.64-point gap but leaves both lower bounds below $-1$. CUDA gains about the same in both representations (1.83 against 2.59 points on BRACS, 0.89 against 1.02 on TCGA-UT), so its contrasts largely inherit the CE gap: the TCGA-UT LoRA advantage of 2.77 points is close to the CE gap of 2.64.
 
 \begin{table}[htbp]
 \centering
 \small
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}llrrr@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llllrr@{}}
 \toprule
-Dataset & Candidate & Fits & Mean seconds & Peak memory (MB) \\
+& & \multicolumn{2}{c}{Gain over CE (pp)} & \multicolumn{2}{c}{Tail recall (\%)} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Dataset & Method & Without LoRA & With LoRA & Without & With \\
 \midrule
-BRACS & CE control & 30 & 3.8 & 4761 \\
-BRACS & Train-time LA & 60 & 2.2 & 4761 \\
-BRACS & Post-hoc LA & 120 & 0.9 & 4761 \\
-BRACS & CUDA & 90 & 439.3 & 4316 \\
-TCGA-UT & CE control & 30 & 32.4 & 17961 \\
-TCGA-UT & Train-time LA & 90 & 22.0 & 17970 \\
-TCGA-UT & Post-hoc LA & 150 & 15.6 & 17970 \\
-TCGA-UT & CUDA & 90 & 2414.1 & 11174 \\
+BRACS & CE & --- & --- & 2.2 & 5.1 \\
+BRACS & Train-time LA & 4.58 [2.94, 6.39] & 1.96 [0.79, 3.19] & 23.4 & 20.2 \\
+BRACS & Post-hoc LA & 4.17 [2.50, 6.03] & 1.94 [0.80, 3.23] & 24.2 & 22.3 \\
+BRACS & CUDA & 1.83 [0.82, 2.97] & 2.59 [1.46, 3.73] & 6.0 & 11.9 \\
+TCGA-UT & CE & --- & --- & 53.6 & 61.2 \\
+TCGA-UT & Train-time LA & 3.52 [3.13, 3.93] & 1.54 [1.21, 1.86] & 68.1 & 69.4 \\
+TCGA-UT & Post-hoc LA & 3.51 [3.12, 3.91] & 1.41 [1.18, 1.66] & 68.2 & 69.9 \\
+TCGA-UT & CUDA & 0.89 [0.49, 1.32] & 1.02 [0.71, 1.33] & 63.3 & 62.9 \\
 \bottomrule
 \end{tabular}
-\caption{Measured cost of the new fits (GPU peak where recorded, otherwise host peak). Post-hoc LA only scores the stored CE head.}
-\label{tab:resources}
+\caption{Without LoRA, logit adjustment gains about twice as much over CE and lifts tail recall to near the adapted level; CUDA gains about the same in both representations. Gain in balanced accuracy over the representation's own CE control at $\rho=100$, with 99.17\% paired intervals, and mean patient-macro recall of the third of classes with the smallest allocation (descriptive, no intervals). CE: cross-entropy; LA: logit adjustment; CUDA: curriculum of data augmentation.}
+\label{tab:secondary}
 \end{table}
+
+Tail recall shows where the LA gains come from. In the third of classes with the smallest allocation, frozen CE recalls 2.2\% on BRACS and 53.6\% on TCGA-UT, against 5.1\% and 61.2\% with LoRA. Both forms of LA raise frozen tail recall to 23--24\% on BRACS, above their adapted values, and to 68\% on TCGA-UT, one to two points below them. The frozen head third pays for this: its recall falls from 57.0\% to 39.5--40.8\% on BRACS and from 79.6\% to 72.5--72.6\% on TCGA-UT. Frozen CUDA lifts BRACS tail recall only to 6.0\%; its BRACS gain lies in the middle third, whose recall rises from 21.4\% to 39.2\%. On TCGA-UT, frozen CUDA raises tail recall to 63.3\% but lowers head recall to 72.4\%, which leaves a net gain below one point.
+
+Validation selects stronger corrections without LoRA. On BRACS, frozen train-time LA selects the full correction $\tau=1$ in 25 of 30 shards (adapted: 23), post-hoc LA selects it in 21 (adapted: 15), and frozen CUDA selects $p_{\mathrm{aug}}=1$ in 25 (adapted: 14). On TCGA-UT, both forms of frozen LA select $\tau=0.5$ in 19 of 30 shards (adapted: 17 and 20). Frozen CUDA selects $p_{\mathrm{aug}}=0.5$ or 1 in 27 of 30, whereas the adapted runs select 0.25 in 17 and never select 1. Two frozen BRACS selections therefore sit at the upper grid edge in most shards. For CUDA, $p_{\mathrm{aug}}=1$ is the largest possible probability; for train-time LA, values of $\tau$ above 1 remain untested. The grids were fixed before test results and were not extended.
