@@ -7,7 +7,7 @@
 \usepackage[hidelinks]{hyperref}
 \title{Can the Strongest Practical Mitigations Omit {LoRA}?\\A Frozen-Encoder Follow-Up on {BRACS} and {TCGA-UT}}
 \author{Yannik Queisler}
-\date{October 26, 2026}
+\date{October 27, 2026}
 
 \begin{document}
 \raggedbottom
@@ -16,7 +16,7 @@
 \setlength{\emergencystretch}{2em}
 \maketitle
 \begin{abstract}
-\noindent Train-time logit adjustment, post-hoc logit adjustment, and the curriculum of data augmentation (CUDA) recovered most of the accuracy lost to class imbalance when a Virchow2 encoder was adapted through low-rank adaptation (LoRA). This protocol asks whether the same three methods lose no more than one percentage point of balanced accuracy at an imbalance ratio of 100 when the foundation model stays entirely unchanged. Six paired contrasts, one per dataset and method, decide the question; omitting LoRA counts as supported in the tested scope only if all six are noninferior. The study adds 390 training fits and 270 score-only candidates and trains no encoder. The results section is empty until the fits and the paired analysis exist.
+\noindent Train-time logit adjustment, post-hoc logit adjustment, and the curriculum of data augmentation (CUDA) recovered most of the accuracy lost to class imbalance when a Virchow2 encoder was adapted through low-rank adaptation (LoRA). This protocol asks whether the same three methods lose no more than one percentage point of balanced accuracy at an imbalance ratio of 100 when the foundation model stays entirely unchanged. Six paired contrasts, one per dataset and method, decide the question; omitting LoRA counts as supported in the tested scope only if all six are noninferior. The study adds 390 training fits and 270 score-only candidates and trains no encoder. Omitting LoRA is not supported across the tested scope: two BRACS contrasts are noninferior, but BRACS CUDA and the two TCGA-UT logit-adjustment contrasts are inconclusive, and TCGA-UT CUDA shows a LoRA advantage of more than one point.
 \end{abstract}
 
 \section{Question}
@@ -51,9 +51,9 @@ Updates & 600 & 2,400 \\
 \label{tab:grid}
 \end{table}
 
-\paragraph{Compute.} The 390 training fits are 60 CE, 150 train-time LA, and 180 CUDA fits; the 270 post-hoc candidates only score a stored CE head, giving 660 records. The 210 CE and LA fits run on CPU. The 180 CUDA fits need image forwards and normally run on a GPU; CUDA totals 270,000 optimizer updates, or $6.9\times10^{7}$ batch-row encoder forwards before curriculum checks. This is a workload count, not a runtime estimate. A pilot on split 0, draw 0 of both datasets (13 fits and 9 score-only candidates) measures runtime and memory before any full run.
+\paragraph{Compute.} The 390 training fits are 60 CE, 150 train-time LA, and 180 CUDA fits; the 270 post-hoc candidates only score a stored CE head, giving 660 records. The 210 CE and LA fits run on CPU. The 180 CUDA fits need image forwards and normally run on a GPU; CUDA totals 270,000 optimizer updates, or $6.9\times10^{7}$ batch-row encoder forwards before curriculum checks. Table~\ref{tab:resources} reports the measured runtime and peak memory of all 660 records.
 
-\paragraph{Consistency check.} CUDA evaluates from the unchanged pretrained feature caches. Before reuse, the cached features of the first 32 validation rows of each manifest must match direct forwards of the untouched encoder (per-row cosine similarity at least 0.999 and relative $L_2$ error at most 0.01; zero or nonfinite vectors fail). A mismatch blocks cache reuse pending diagnosis.
+\paragraph{Consistency check.} CUDA evaluates from the unchanged pretrained feature caches. Before reuse, the cached features of the first 32 validation rows of each manifest must match direct forwards of the untouched encoder (per-row cosine similarity at least 0.999 and relative $L_2$ error at most 0.01; zero or nonfinite vectors fail). A mismatch blocks cache reuse pending diagnosis. The check initially failed (minimum cosine 0.9956) when images were resized bilinearly as in the adapted runs. The cache was extracted with the bicubic resize and fp16 autocast of the \texttt{timm} transform; with that recipe the minimum cosine is 1.0000 and the relative $L_2$ error stays below 0.003. The frozen CUDA fits therefore decode with the bicubic recipe, and the check forwards in fp16 with the thresholds unchanged.
 
 \section{Decision rule}
 \label{sec:decision}
@@ -69,8 +69,7 @@ Secondary diagnostics are descriptive: absolute BA, each representation's gain o
 
 \section{Limits}
 \label{sec:limits}
-The follow-up reuses data already inspected in the mitigation studies; it is not an independent test set. It covers three methods, one encoder, one allocation, fixed training recipes, and the existing 30-draw design. Execution devices, precision, and micro-batching differ from the adapted runs, so training is not bitwise comparable; these settings are recorded. A LoRA advantage under these recipes does not show that every optimizer setting needs LoRA, and noninferiority does not establish equivalence for other methods, encoders, or ratios. Existing outputs and caches were not checked on the cluster when this protocol was written.
-
+The follow-up reuses data already inspected in the mitigation studies; it is not an independent test set. It covers three methods, one encoder, one allocation, fixed training recipes, and the existing 30-draw design. Execution devices, precision, and micro-batching differ from the adapted runs, so training is not bitwise comparable; these settings are recorded. In particular, the frozen CUDA augmentation sees bicubic-resized images, whereas the adapted CUDA runs used a bilinear resize, so image preprocessing is not paired for CUDA, and training forwards use bf16 autocast. A LoRA advantage under these recipes does not show that every optimizer setting needs LoRA, and noninferiority does not establish equivalence for other methods, encoders, or ratios.
 \input{results}
 
 \bibliographystyle{plainnat}

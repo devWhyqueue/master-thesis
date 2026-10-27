@@ -1,4 +1,46 @@
-% Replaced by generated results after the paired analysis; no outcome exists yet.
 \section{Results}
 \label{sec:results}
-No results yet: the 390 training fits, 270 post-hoc scores, and their paired analysis have not been run.
+Table~\ref{tab:contrast} reports the six primary contrasts at $\rho=100$. At least one contrast is not noninferior, so omitting LoRA is not supported for the full tested scope; the individual outcomes stand on their own.
+The CE controls reach BRACS 31.17 (frozen) and 31.57 (adapted), TCGA-UT 67.32 (frozen) and 69.95 (adapted) balanced accuracy.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrrrl@{}}
+\toprule
+Dataset & Method & Without LoRA & With LoRA & $\delta$ (pp) & 99.17\% interval & Decision \\
+\midrule
+BRACS & Train-time LA & 35.75 & 33.54 & 2.22 & [0.43, 3.97] & noninferior \\
+BRACS & Post-hoc LA & 35.34 & 33.51 & 1.83 & [0.11, 3.46] & noninferior \\
+BRACS & CUDA & 33.01 & 34.17 & -1.16 & [-2.80, 0.40] & inconclusive \\
+TCGA-UT & Train-time LA & 70.84 & 71.49 & -0.65 & [-1.21, -0.11] & inconclusive \\
+TCGA-UT & Post-hoc LA & 70.83 & 71.37 & -0.54 & [-1.14, 0.06] & inconclusive \\
+TCGA-UT & CUDA & 68.20 & 70.97 & -2.77 & [-3.38, -2.13] & LoRA advantage \\
+\bottomrule
+\end{tabular}
+\caption{Balanced accuracy (BA, \%) at $\rho=100$ without and with LoRA, and their paired difference $\delta$ with a 99.17\% percentile interval (Bonferroni over six contrasts). A lower bound above $-1$ is noninferior; an upper bound below $-1$ is a LoRA advantage; anything else is inconclusive.}
+\label{tab:contrast}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Dataset & Candidate & Fits & Mean seconds & Peak memory (MB) \\
+\midrule
+BRACS & CE control & 30 & 3.8 & 4761 \\
+BRACS & Train-time LA & 60 & 2.2 & 4761 \\
+BRACS & Post-hoc LA & 120 & 0.9 & 4761 \\
+BRACS & CUDA & 90 & 439.3 & 4316 \\
+TCGA-UT & CE control & 30 & 32.4 & 17961 \\
+TCGA-UT & Train-time LA & 90 & 22.0 & 17970 \\
+TCGA-UT & Post-hoc LA & 150 & 15.6 & 17970 \\
+TCGA-UT & CUDA & 90 & 2414.1 & 11174 \\
+\bottomrule
+\end{tabular}
+\caption{Measured cost of the new fits (GPU peak where recorded, otherwise host peak). Post-hoc LA only scores the stored CE head.}
+\label{tab:resources}
+\end{table}
