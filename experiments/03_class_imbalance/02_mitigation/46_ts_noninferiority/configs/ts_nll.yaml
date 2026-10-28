@@ -1,0 +1,23 @@
+# Exp-46: do the eight mitigation methods beat temperature-scaled CE in NLL? Confirmatory, no new fits.
+# Prespecified before any contrast is computed:
+#   Endpoint: delta = NLL_ts(method) - NLL_ts(CE) at r100 on the same shards (case-macro NLL, each run
+#     scaled by its own validation temperature). Candidate per shard = validation-BA winner (analyze.select).
+#   Contrasts: 8 methods x 4 settings = 32. Paired patient-clustered bootstrap, 10,000 replicates,
+#     seed 20260909 (breadth.BOOTSTRAP_SEED), intervals at 1 - 0.05/32 (Bonferroni).
+#   Per contrast: no_meaningful_gain if lower > -margin; method_better if upper < -margin; else inconclusive.
+#   Joint: the claim "no method improves on temperature scaling" holds only if all 32 are no_meaningful_gain.
+#   Secondary (descriptive, 95% intervals, no verdict): raw NLL(method) - NLL_ts(CE); ECE_ts difference;
+#     the same delta at every other stored arm; the largest positive primary delta.
+#   Reproduction gate: nll_ts points recomputed for every stored label must match each source
+#     analysis.json to |diff| < 1e-6 before any contrast is computed.
+sources:
+  - experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/configs/bracs.yaml
+  - experiments/03_class_imbalance/02_mitigation/42_mitigation_uni2h/configs/bracs.yaml
+  - experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/configs/tcga_ut.yaml
+  - experiments/03_class_imbalance/02_mitigation/44_mitigation_tcga_ut_uni2h/configs/tcga_ut.yaml
+
+protocol:
+  id: ts-noninferiority-v1
+  margin_nats: 0.05
+  n_replicates: 10000
+  primary_arm: r100
