@@ -29,10 +29,12 @@ from centre.analyze import pooled
 from decomposition.model import draw_weights
 
 from ts_nll import load_source, source_report
+from ts_nll.figure import write_figure
+from ts_nll.render import render_results
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["verdict", "joint_verdict", "run_gate", "run_analyze"]
+__all__ = ["verdict", "joint_verdict", "run_gate", "run_analyze", "run_render"]
 
 GATE_TOLERANCE = 1e-6
 REPORT_DIR = Path(__file__).resolve().parents[2] / "report"
@@ -158,8 +160,17 @@ def _summarize(protocol: dict[str, Any], settings: dict[str, Any]) -> dict[str, 
     }
 
 
+def run_render() -> Path:
+    """Write ``report/results.tex`` and its figure from the stored ``report/analysis.json``."""
+    analysis = json.loads((REPORT_DIR / "analysis.json").read_text(encoding="utf-8"))
+    write_figure(analysis, REPORT_DIR / "fig_contrasts.pdf")
+    path = REPORT_DIR / "results.tex"
+    path.write_text(render_results(analysis), encoding="utf-8")
+    return path
+
+
 def run_analyze(protocol: dict[str, Any]) -> Path:
-    """Write ``report/analysis.json``: 32 primary decisions, the joint verdict, descriptive secondaries."""
+    """Write ``report/analysis.json`` (32 primary decisions, joint verdict, descriptive secondaries) and ``results.tex``."""
     settings = {
         Path(s).parents[1].name: _setting(load_source(s), protocol)
         for s in protocol["sources"]
@@ -168,4 +179,5 @@ def run_analyze(protocol: dict[str, Any]) -> Path:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORT_DIR / "analysis.json"
     path.write_text(json.dumps(analysis, indent=2) + "\n", encoding="utf-8")
+    run_render()
     return path
