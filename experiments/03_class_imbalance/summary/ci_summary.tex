@@ -80,14 +80,14 @@ rank r1 r2 r5 r10 r20 r50 r100 N
 \maketitle
 
 \section{Motivation}
-Histopathology datasets are long-tailed almost by construction. Common cancers and benign tissue dominate archives, while rare subtypes and atypical lesions, often diagnostically decisive, contribute few patients and patches. In convolutional neural networks, imbalance biases predictions toward frequent classes and lowers minority recall \citep{buda2018classImbalance}. In medical imaging, it also distorts calibration, and conclusions depend on whether evaluation uses balanced metrics \citep{mosquera2024classImbalance}. No single remedy works across long-tailed medical benchmarks \citep{ju2024monicaBenchmark}, and researchers continue to propose histopathology-specific models \citep{cong2022imbalancedHistopathology}. Pathology foundation models such as UNI and Virchow2 are commonly evaluated with linear classifiers trained on their frozen patch features \citep{chen2024uni,zimmermann2024virchow2}. Yet how much class imbalance costs such classifiers, and why, remains insufficiently measured in isolation.
+Histopathology datasets are long-tailed almost by construction. Common cancers and benign tissue dominate archives, while rare subtypes and atypical lesions, often diagnostically decisive, contribute few patients and patches. In convolutional neural networks, imbalance degrades classification, and the network absorbs the training class prior \citep{buda2018classImbalance}. In medical imaging, metrics dominated by the majority class can hide poor minority-class performance in both discrimination and calibration \citep{mosquera2024classImbalance}. Researchers continue to propose histopathology-specific models \citep{cong2022imbalancedHistopathology}. Pathology foundation models such as UNI and Virchow2 are commonly evaluated with linear classifiers trained on their frozen patch features \citep{chen2024uni,zimmermann2024virchow2}. Yet how much class imbalance costs such classifiers, and why, remains insufficiently measured in isolation.
 
-This summary follows three questions. How much do discrimination and calibration degrade as the training class distribution becomes more skewed (Section~\ref{sec:effects})? What causes this damage, and why are some classes and tasks more vulnerable than others (Section~\ref{sec:cause})? How much of the damage can mitigation methods recover (Section~\ref{sec:mitigation})?
+Three questions guide this work. How much do discrimination and calibration degrade as the training class distribution becomes more skewed (Section~\ref{sec:effects})? What causes this damage, and why are some classes and tasks more vulnerable than others (Section~\ref{sec:cause})? How much of the damage can mitigation methods recover (Section~\ref{sec:mitigation})?
 
 \section{Setup}
 Multinomial logistic regression on Virchow2 patch features \citep{zimmermann2024virchow2} addresses two tasks: TCGA-UT, 30 cancer types \citep{komura2022universalEncoding}, and BRACS, 7 breast-lesion subtypes from normal tissue to invasive carcinoma \citep{brancati2022bracs}. Allocation conditions use the same patients per class (20 on TCGA-UT, 10 on BRACS) and total patch budget; only class shares change. An exponential profile sets the largest-to-smallest class ratio $\rho$ from 1 to 100 (Figure~\ref{fig:dist}). Class-to-rank assignment is randomized over 30 draws (3 splits $\times$ 10 draws); a native condition preserves each dataset's class shares. The outcome is \emph{damage}, $\Delta(\rho)=\mathrm{BA}(1)-\mathrm{BA}(\rho)$: the loss in test patient-macro balanced accuracy (BA) relative to the balanced condition, with paired bootstrap 95\% intervals. Damage counts as material from 1 percentage point (pp).
 
-The encoder stays frozen when measuring damage and its causes. Mitigation methods that adapt the encoder fine-tune it through low-rank adaptation (LoRA) \citep{hu2022lora}. To rule out dependence on one encoder, the conditions at $\rho=10$ and $\rho=100$ are repeated on the same patients and patches with UNI2-h, the successor of UNI \citep{chen2024uni}.
+The encoder stays frozen when measuring damage and its causes. Mitigation methods that adapt the encoder fine-tune it through low-rank adaptation (LoRA) \citep{hu2022lora}. To rule out dependence on one encoder, the conditions at $\rho=10$ and $\rho=100$ are repeated on the same patients and patches with UNI2-h, the successor of UNI \citep{mahmoodlab2025uniRepo}.
 
 \begin{figure}[!htb]
 \centering
@@ -114,9 +114,9 @@ The encoder stays frozen when measuring damage and its causes. Mitigation method
 
 \section{Effects of class imbalance}
 \label{sec:effects}
-Balanced accuracy in the balanced condition reaches 72.1\% on TCGA-UT and 39.6\% on BRACS. Published evaluations show the same broad gap: region-of-interest (ROI)-level linear probes score 60--68\% on TCGA-UT \citep{mahmoodlab2025uniRepo}, while slide-level linear probes score 34.8--48.1\% on BRACS \citep{vaidya2025threads}. TCGA-UT spans cancer types across organs, while BRACS separates breast lesions with similar morphology, such as atypical ductal hyperplasia (ADH) and ductal carcinoma in situ (DCIS) \citep{brancati2022bracs}. These evaluations make the gap plausible, though their training budgets and evaluation units differ. This study computes patient-macro balanced accuracy from patch predictions.
+Balanced accuracy in the balanced condition reaches 72.1\% on TCGA-UT and 39.6\% on BRACS. Published evaluations show the same broad gap: region-of-interest (ROI)-level benchmarks report 59.5--67.5\% for UNI, Virchow2, and UNI2-h on the 32-class TCGA-UT task \citep{mahmoodlab2025uniRepo}, while slide-level linear probes score 31.8--48.1\% on BRACS \citep{vaidya2025threads}. TCGA-UT spans cancer types across organs, while BRACS separates breast lesions with similar morphology, such as atypical ductal hyperplasia (ADH) and ductal carcinoma in situ (DCIS) \citep{brancati2022bracs}. These evaluations make the gap plausible, though their training budgets and evaluation units differ. This study computes patient-macro balanced accuracy from patch predictions.
 
-Imbalance damage differs strongly between the two tasks (Figure~\ref{fig:damage}a). On TCGA-UT, damage is small but accelerates as $\rho$ increases: 0.57 pp at $\rho=10$, reaching the 1-pp threshold at $\rho=20$ and 2.91 pp [2.48, 3.34] at $\rho=100$. On BRACS, damage appears at $\rho=2$ and grows steadily by about 1.15 pp per doubling of $\rho$: 1.15 pp at $\rho=2$, 4.02 pp at $\rho=10$, and 7.65 pp [5.77, 9.78] at $\rho=100$, a fifth of the balanced accuracy. The native allocations lie on their respective curves (1.18 pp on TCGA-UT and 4.05 pp on BRACS). Aggregate damage hides a large shift in recall from tail to head. At $\rho=100$, the TCGA-UT tail third loses 11.8 pp while the head gains 5.4 pp; on BRACS, the two tail classes drop from 38.7\% to 7.3\% recall.
+Imbalance damage differs strongly between the two tasks (Figure~\ref{fig:damage}a). On TCGA-UT, damage is small but accelerates as $\rho$ increases: 0.57 pp [0.30, 0.84] at $\rho=10$, reaching the 1-pp threshold at $\rho=20$ (1.01 pp [0.67, 1.36]) and 2.91 pp [2.48, 3.34] at $\rho=100$. On BRACS, damage appears at $\rho=2$ and grows steadily by about 1.15 pp per doubling of $\rho$: 1.15 pp [0.14, 2.35] at $\rho=2$, 4.02 pp [2.50, 5.66] at $\rho=10$, and 7.65 pp [5.77, 9.78] at $\rho=100$, a fifth of the balanced accuracy. The native allocations lie on their respective curves (1.18 pp [0.85, 1.48] on TCGA-UT and 4.05 pp [2.69, 5.57] on BRACS). Aggregate damage hides a large shift in recall from tail to head. At $\rho=100$, the TCGA-UT tail third loses 11.8 pp while the head gains 5.4 pp; on BRACS, the two tail classes drop from 38.7\% to 7.3\% recall.
 
 Calibration deteriorates far more than accuracy (Figure~\ref{fig:damage}b). Expected calibration error (ECE), the average gap between the model's confidence and its accuracy, rises from 5.5 to 17.8 pp on TCGA-UT and from 12.3 to 35.7 pp on BRACS at $\rho=100$: the model becomes overconfident, but uniformly so. Temperature scaling divides all logits by one scalar fitted on validation data \citep{guo2017calibration}. This global confidence correction removes 92--96\% of the increase.
 
@@ -266,29 +266,29 @@ On TCGA-UT, a class is especially vulnerable when it receives few patches but a 
 
 \section{Mitigation of class imbalance damage}
 \label{sec:mitigation}
-Established long-tailed methods may reshape the representation, so the encoder adapts through LoRA together with a linear head. The patients, patch budgets, and class-to-rank assignments match those in Section~\ref{sec:effects}. A model trained with cross-entropy (CE) on the balanced allocation provides the undamaged reference. CE and each mitigation method are used to train models at $\rho=100$, and at $\rho=50$ and native shares except on TCGA-UT with UNI2-h. Each method's strength is selected per draw on validation patients.
+Section~\ref{sec:cause} traced the damage to the frequency and support effects. This section asks how much of it established long-tailed methods recover compared with standard cross-entropy (CE) training. Six methods cover the three families of \citet{krawczyk2016learning} (Table~\ref{tab:methods}). Data-level methods change the training data, algorithm-level methods change the loss or the decision rule, and hybrid methods do both.
 
-A method's \emph{recovery} is its gain in balanced accuracy over CE at the same allocation; its \emph{share} is recovery divided by CE's damage. Under LoRA, CE loses 4.95 pp [3.25, 6.74] on BRACS and 1.56 pp [1.17, 1.94] on TCGA-UT at $\rho=100$. Methods whose effect on balanced data is not zero by construction are also fitted on the balanced allocation. Recovery minus this \emph{balanced gain} is the part that corrects the imbalance. Results refer to Virchow2 and $\rho=100$ unless stated otherwise.
+Several of these methods act on the learned representation, not only on the classifier. The encoder is therefore adapted through LoRA together with a linear head. The patients, patch budgets, and class-to-rank assignments match those in Section~\ref{sec:effects}. CE and each method are trained at $\rho=100$, $\rho=50$, and native shares, and a CE model trained on the balanced allocation provides the undamaged reference. Each method except cRT has one control parameter that sets how strongly it acts, such as the scale of the logit adjustment or the probability that CUDA augments a patch; it is selected per draw on validation patients.
 
-Six methods cover the three families of \citet{krawczyk2016learning} (Table~\ref{tab:methods}). Data-level methods change the training data, algorithm-level methods change the loss or the decision rule, and hybrid methods do both. Methods also differ in what they train: end-to-end methods train the LoRA update and the head together; classifier-only methods freeze an adapted encoder and refit only the head or the class scores.
+Under LoRA, CE loses 4.95 pp [3.25, 6.74] on BRACS and 1.56 pp [1.17, 1.94] on TCGA-UT at $\rho=100$. A method's \emph{recovery} is its gain in balanced accuracy over CE at the same allocation; its \emph{share} is recovery divided by CE's damage. Methods whose effect on balanced data is not zero by construction are also fitted on the balanced allocation. Recovery minus this \emph{balanced gain} is the part that corrects the imbalance. Results refer to Virchow2 and $\rho=100$ unless stated otherwise.
 
 \begin{table}[!htb]
 \centering\small
-\begin{tabular}{@{}llp{0.36\textwidth}l@{}}
+\begin{tabular}{@{}llp{0.5\textwidth}@{}}
 \toprule
-Family & Method & What changes & Training \\
+Family & Method & What changes \\
 \midrule
-Data & Balanced sampling \citep{kang2020decouplingRepresentation} & Every class is drawn equally often. & end to end \\
- & CUDA \citep{ahn2023cuda} & Image patches are augmented per class, more strongly once the model has learned the class. & end to end \\
+Data & Balanced sampling \citep{kang2020decouplingRepresentation} & Every class is drawn equally often. \\
+ & CUDA \citep{ahn2023cuda} & Image patches are augmented per class, more strongly once the model has learned the class. \\
 \addlinespace
-Algorithm & Logit adjustment \citep{menon2021longTail} & The training class prior is subtracted from the class scores, in the loss or after training. & both forms \\
- & DisAlign \citep{zhang2021distributionAlignment} & A loss that weights rare classes more trains a per-class score correction. & classifier only \\
+Algorithm & Logit adjustment \citep{menon2021longTail} & The training class prior is subtracted from the class scores, in the loss or after training. \\
+ & DisAlign \citep{zhang2021distributionAlignment} & A loss that weights rare classes more trains a per-class score correction. \\
 \addlinespace
-Hybrid & cRT \citep{kang2020decouplingRepresentation} & The head is refitted with balanced sampling. & classifier only \\
- & GCL \citep{li2022gaussianClouded} & Random noise lowers the scores of rarer classes more during training; the head is then refitted with near-balanced sampling. & both forms \\
+Hybrid & cRT \citep{kang2020decouplingRepresentation} & The head is refitted with balanced sampling. \\
+ & GCL \citep{li2022gaussianClouded} & Random noise lowers the scores of rarer classes more during training; optionally, the head is then refitted with near-balanced sampling. \\
 \bottomrule
 \end{tabular}
-\caption{The six mitigation methods change the data, the learner, or both. Logit adjustment and GCL are tested in both an end-to-end and a classifier-only form, giving eight variants. CUDA: curriculum of data augmentation; DisAlign: distribution alignment; cRT: classifier re-training; GCL: Gaussian clouded logit adjustment.}
+\caption{The six mitigation methods change the data, the learner, or both. Logit adjustment is tested in the loss and after training, GCL with and without the head refit, giving eight variants. CUDA: curriculum of data augmentation; DisAlign: distribution alignment; cRT: classifier re-training; GCL: Gaussian clouded logit adjustment.}
 \label{tab:methods}
 \end{table}
 
@@ -298,26 +298,30 @@ Hybrid & cRT \citep{kang2020decouplingRepresentation} & The head is refitted wit
 \begin{groupplot}[group style={group size=2 by 1,horizontal sep=0.5cm,yticklabels at=edge left},
   width=0.45\textwidth,height=6.2cm,xmin=0,xmax=1.3,xtick={0,0.25,0.5,0.75,1},
   xlabel={Share of damage recovered},ymin=0.4,ymax=8.6,y dir=reverse,ytick={1,...,8},
-  yticklabels={Balanced sampling,CUDA,Logit adj.\ (train-time),Logit adj.\ (post hoc)$^{\dagger}$,DisAlign$^{\dagger}$,cRT$^{\dagger}$,GCL,GCL$^{\dagger}$},
+  yticklabels={Balanced sampling,CUDA,Logit adj.\ (train-time),Logit adj.\ (post hoc),DisAlign,cRT,GCL,GCL (head refit)},
   tick label style={font=\scriptsize},label style={font=\small},title style={font=\small},
-  legend style={font=\scriptsize,at={(0.98,0.03)},anchor=south east,draw=none,fill=none},legend cell align=left]
+  legend style={font=\scriptsize,at={(0.98,0.03)},anchor=south east,draw=none,fill=white},legend cell align=left]
 \nextgroupplot[title={(a) TCGA-UT}]
 \draw[densely dashed,gray] (axis cs:1,0.4) -- (axis cs:1,8.6);
+\draw[gray!40] (axis cs:0,2.5) -- (axis cs:1.3,2.5) (axis cs:0,5.5) -- (axis cs:1.3,5.5);
 \addplot[only marks,mark=*,tcga,mark size=1.6pt,error bars/.cd,x dir=both,x explicit,error bar style={tcga}]
   coordinates {(0.45,0.85) -= (0.17,0) += (0.17,0) (0.65,1.85) -= (0.20,0) += (0.24,0) (0.99,2.85) -= (0.19,0) += (0.25,0) (0.91,3.85) -= (0.15,0) += (0.22,0) (0.53,4.85) -= (0.10,0) += (0.14,0) (0.44,5.85) -= (0.13,0) += (0.15,0) (0.56,6.85) -= (0.20,0) += (0.21,0) (0.73,7.85) -= (0.24,0) += (0.24,0)};
 \addplot[only marks,mark=o,tcga,mark size=1.6pt,error bars/.cd,x dir=both,x explicit,error bar style={tcga}]
   coordinates {(0.47,1.15) -= (0.11,0) += (0.11,0) (0.72,2.15) -= (0.14,0) += (0.17,0) (0.65,3.15) -= (0.11,0) += (0.12,0) (0.60,4.15) -= (0.09,0) += (0.11,0) (0.29,5.15) -= (0.04,0) += (0.06,0) (0.27,6.15) -= (0.07,0) += (0.07,0) (0.35,7.15) -= (0.16,0) += (0.14,0) (0.29,8.15) -= (0.17,0) += (0.14,0)};
 \nextgroupplot[title={(b) BRACS}]
 \draw[densely dashed,gray] (axis cs:1,0.4) -- (axis cs:1,8.6);
-\addplot[only marks,mark=*,bracs,mark size=1.6pt,error bars/.cd,x dir=both,x explicit,error bar style={bracs}]
+\draw[gray!40] (axis cs:0,2.5) -- (axis cs:1.3,2.5) (axis cs:0,5.5) -- (axis cs:1.3,5.5);
+\addplot[forget plot,only marks,mark=*,bracs,mark size=1.6pt,error bars/.cd,x dir=both,x explicit,error bar style={bracs}]
   coordinates {(0.23,0.85) -= (0.16,0) += (0.18,0) (0.52,1.85) -= (0.24,0) += (0.30,0) (0.40,2.85) -= (0.21,0) += (0.21,0) (0.39,3.85) -= (0.21,0) += (0.20,0) (0.12,4.85) -= (0.05,0) += (0.06,0) (0.18,5.85) -= (0.15,0) += (0.13,0) (0.30,6.85) -= (0.18,0) += (0.21,0) (0.39,7.85) -= (0.28,0) += (0.25,0)};
-\addlegendentry{Virchow2}
-\addplot[only marks,mark=o,bracs,mark size=1.6pt,error bars/.cd,x dir=both,x explicit,error bar style={bracs}]
+\addplot[forget plot,only marks,mark=o,bracs,mark size=1.6pt,error bars/.cd,x dir=both,x explicit,error bar style={bracs}]
   coordinates {(0.34,1.15) -= (0.15,0) += (0.15,0) (0.46,2.15) -= (0.20,0) += (0.25,0) (0.38,3.15) -= (0.15,0) += (0.17,0) (0.34,4.15) -= (0.15,0) += (0.15,0) (0.04,5.15) -= (0.03,0) += (0.03,0) (0.12,6.15) -= (0.11,0) += (0.08,0) (0.39,7.15) -= (0.16,0) += (0.21,0) (0.37,8.15) -= (0.25,0) += (0.20,0)};
+\addlegendimage{only marks,mark=*,black,mark size=1.6pt}
+\addlegendentry{Virchow2}
+\addlegendimage{only marks,mark=o,black,mark size=1.6pt}
 \addlegendentry{UNI2-h}
 \end{groupplot}
 \end{tikzpicture}
-\caption{Only logit adjustment on TCGA-UT with Virchow2 recovers the full damage; on BRACS no method recovers much more than half of it. Each method's share of cross-entropy (CE) damage recovered at $\rho=100$, with paired 95\% intervals, for Virchow2 (filled) and UNI2-h (hollow) on the same patients and patches. The dashed line marks full recovery. Methods are ordered by family as in Table~\ref{tab:methods}. $^{\dagger}$Classifier only.}
+\caption{Only logit adjustment on TCGA-UT with Virchow2 recovers the full damage; on BRACS no method recovers much more than half of it. Each method's share of CE damage recovered at $\rho=100$, with paired 95\% intervals, for Virchow2 (filled) and UNI2-h (hollow) on the same patients and patches. The dashed line marks full recovery. Grey lines separate the data-level, algorithm-level, and hybrid families of Table~\ref{tab:methods}.}
 \label{fig:recovery}
 \end{figure}
 
@@ -327,23 +331,22 @@ Hybrid & cRT \citep{kang2020decouplingRepresentation} & The head is refitted wit
 Logit adjustment removes the training prior from the class scores \citep{menon2021longTail}. Applied to the CE model after training, it needs no retraining and recovers as much as its train-time form: 1.41 against 1.54 pp on TCGA-UT and 1.94 against 1.96 pp on BRACS. On TCGA-UT this is essentially the full damage (Figure~\ref{fig:recovery}a). The train-time share is 0.99 [0.80, 1.24], and recall of the tail third of classes rises from 61.2\% to 69.4\%, against 71.6\% when balanced. On BRACS, both forms recover about two-fifths (Figure~\ref{fig:recovery}b). Balanced sampling, which changes only how often each class is drawn, recovers at least 1 pp in three of the four dataset--encoder settings.
 
 \smallskip\noindent\textbf{2. Augmentation improves the model in general.}
-CUDA gives the largest recovery in three of four settings, with shares of 0.46 to 0.72, and ranks fourth on TCGA-UT with Virchow2 (0.65). Most of this gain does not depend on imbalance: CUDA also improves the balanced model, by 0.81 pp on TCGA-UT and 1.39 pp on BRACS. After subtracting this balanced gain, it corrects 0.20 pp [$-0.17$, 0.57] of the imbalance on TCGA-UT and 1.20 pp [$-0.16$, 2.62] on BRACS. At native shares it is the only method that gains at least 1 pp (1.01 and 1.21 pp). On TCGA-UT, CUDA also lowers temperature-scaled negative log-likelihood (NLL) below that of CE, by 0.09 nats [0.07, 0.12] with Virchow2 and 0.15 nats [0.13, 0.17] with UNI2-h (99.84\% intervals), and below that of the balanced CE model. The gain does not depend on adapting the encoder: with a frozen Virchow2, CUDA gains 1.83 pp over CE on BRACS and 0.89 pp on TCGA-UT, against 2.59 and 1.02 pp with LoRA. The best CUDA model on TCGA-UT is still the adapted one, by 2.77 pp (99.17\% interval 2.13 to 3.38), because LoRA already raises CE by 2.64 pp there.
+CUDA recovers 0.46 to 0.72 of the damage across the four settings, the largest share in all but TCGA-UT with Virchow2, where logit adjustment recovers more. Most of this gain does not depend on imbalance: CUDA also improves the balanced model, by 0.81 pp on TCGA-UT and 1.39 pp on BRACS. After subtracting this balanced gain, it corrects 0.20 pp [$-0.17$, 0.57] of the imbalance on TCGA-UT and 1.20 pp [$-0.16$, 2.62] on BRACS. At native shares it is the only method that gains at least 1 pp (1.01 and 1.21 pp). On TCGA-UT, CUDA also lowers temperature-scaled negative log-likelihood (NLL) below that of CE, by 0.09 nats [0.07, 0.12] with Virchow2 and 0.15 nats [0.13, 0.17] with UNI2-h (99.84\% intervals), and below that of the balanced CE model. The gain does not depend on adapting the encoder: with a frozen Virchow2, CUDA gains 1.83 pp over CE on BRACS and 0.89 pp on TCGA-UT, against 2.59 and 1.02 pp with LoRA. The best CUDA model on TCGA-UT is still the adapted one, by 2.77 pp (99.17\% interval 2.13 to 3.38), because LoRA already raises CE by 2.64 pp there.
 
 \smallskip\noindent\textbf{3. Mitigation does not fix calibration; one temperature does.}
-The adapted models are overconfident even on balanced data, with raw ECE of 28--31 pp on BRACS and 17--18 pp on TCGA-UT. Mitigation reduces this only in part. CUDA reduces it most at $\rho=100$: from 36.4 to 20.8 pp on BRACS and from 16.0 to 11.5 pp on TCGA-UT with Virchow2. cRT and balanced sampling can raise it. Without temperature scaling, every method stays at least 6.3 pp above the ECE of scaled CE. After scaling, as in Section~\ref{sec:effects}, every method is as well calibrated as CE or slightly better, by at most 3.7 pp. Apart from CUDA, scaled NLL differs from that of scaled CE by $-0.06$ to $+0.03$ nats. CUDA's lower scaled NLL on TCGA-UT (finding 2) comes without lower ECE, so it reflects its accuracy gain rather than better calibration.
+The adapted CE models are overconfident even on balanced data, with raw ECE of 28--31 pp on BRACS and 17--18 pp on TCGA-UT across the two encoders. At $\rho=100$, raw ECE with Virchow2 rises to 36.4 pp on BRACS and stays at 16.0 pp on TCGA-UT. Mitigation reduces this only in part. CUDA reduces it most, to 20.8 and 11.5 pp. cRT and balanced sampling can raise it. Without temperature scaling, every method stays at least 6.3 pp above the ECE of scaled CE. After scaling, as in Section~\ref{sec:effects}, every method is as well calibrated as CE or slightly better, by at most 3.7 pp. Apart from CUDA, scaled NLL differs from that of scaled CE by $-0.06$ to $+0.03$ nats. CUDA's lower scaled NLL on TCGA-UT (finding 2) comes without lower ECE, so it reflects its accuracy gain rather than better calibration.
 
 \subsection{Limits of mitigation}
 \label{sec:limits}
 \textbf{1. Mitigation cannot add missing knowledge of a class.}
-No method closes the gap on BRACS. The highest upper bound of the share intervals is 0.82 with Virchow2 and 0.71 with UNI2-h. The two tasks differ in what the imbalanced CE model still knows. On TCGA-UT it retains 61\% tail recall at $\rho=100$: the model has learned the rare classes, and the main problem is a misplaced decision boundary, which shifting the class scores can correct. On BRACS, tail recall falls to 5.1\%, against 34.5\% when balanced. Logit adjustment and GCL's head refit raise it only to 20--27\%. This fits the sources of damage in Section~\ref{sec:sources}. Rebalancing acts on the frequency effect but cannot supply missing tail support, which alone cost 3.29 pp on BRACS and 0.53 pp on TCGA-UT. This link is an interpretation; the mitigation experiments do not test it.
-
+No method closes the gap on BRACS. The highest upper bound of the share intervals is 0.82 with Virchow2 and 0.71 with UNI2-h. The two tasks differ in what the imbalanced CE model still knows. On TCGA-UT it retains 61\% tail recall at $\rho=100$: the model has learned the rare classes, and the main problem is a misplaced decision boundary, which shifting the class scores can correct. On BRACS, tail recall falls to 5.1\%, against 34.5\% when balanced. Logit adjustment and GCL's head refit raise it only to 20--27\%. This fits the sources of damage in Section~\ref{sec:sources}. Rebalancing acts on the frequency effect but cannot supply missing tail support, which alone cost 3.29 pp on BRACS and 0.53 pp on TCGA-UT.
 \smallskip\noindent\textbf{2. Mitigation has a cost.}
 Rebalancing shifts recall from head to tail: logit adjustment gives up about 4 pp of head recall on TCGA-UT and 9 pp on BRACS. Methods that change the head can also lower accuracy without imbalance. GCL and cRT lose 0.3 to 0.6 pp on the balanced allocation, and GCL loses up to 1.7 pp with UNI2-h on TCGA-UT. Their recovery over CE therefore understates how much imbalance they correct. Accounting for this balanced loss, GCL's head refit corrects about half of the damage on BRACS and about all of it on TCGA-UT. Logit adjustment and balanced sampling reduce to CE on balanced data and carry no such cost.
 
 \smallskip\noindent\textbf{3. Mitigation matters only under severe imbalance.}
 With the encoder adapted, native class shares cost little: 0.42 pp [0.06, 0.79] on TCGA-UT and 0.85 pp [$-0.31$, 2.08] on BRACS, against 1.18 and 4.05 pp for the frozen readout. On BRACS, this reflects a weaker balanced reference: the adapted balanced model is 3 pp less accurate than the frozen readout (36.53 against 39.57\%), while the imbalanced models are as accurate as the frozen readout. At native shares, only CUDA gains 1 pp; on TCGA-UT at $\rho=50$, no method does.
 
-\medskip\noindent Repeating the mitigation experiments with UNI2-h on the same patients and patches leaves unchanged where each method acts. The same methods lift tail recall, post-hoc and train-time logit adjustment agree, and GCL's head refit corrects the most imbalance. Recovery point estimates change by less than 1 pp, but shares change with the damage. On TCGA-UT, UNI2-h's damage is 0.94 pp larger, so logit adjustment no longer recovers it fully (share 0.65 [0.54, 0.76]). On both tasks, CUDA's correction after subtracting its balanced gain becomes material with UNI2-h.
+\medskip\noindent Repeating the mitigation experiments with UNI2-h on the same patients and patches (on TCGA-UT at $\rho=100$ only) leaves unchanged where each method acts. The same methods lift tail recall, post-hoc and train-time logit adjustment agree, and GCL's head refit corrects the most imbalance. Recovery point estimates change by less than 1 pp, but shares change with the damage. On TCGA-UT, UNI2-h's damage is 0.94 pp larger, so logit adjustment no longer recovers it fully (share 0.65 [0.54, 0.76]). On both tasks, CUDA's correction after subtracting its balanced gain becomes material with UNI2-h.
 
 \clearpage
 \appendix
