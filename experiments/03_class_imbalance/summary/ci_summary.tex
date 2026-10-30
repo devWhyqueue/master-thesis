@@ -348,22 +348,18 @@ With the encoder adapted, native class shares cost little: 0.42 pp [0.06, 0.79] 
 
 \medskip\noindent Repeating the mitigation experiments with UNI2-h on the same patients and patches (on TCGA-UT at $\rho=100$ only) leaves unchanged where each method acts. The same methods lift tail recall, post-hoc and train-time logit adjustment agree, and GCL's head refit corrects the most imbalance. Recovery point estimates change by less than 1 pp, but shares change with the damage. On TCGA-UT, UNI2-h's damage is 0.94 pp larger, so logit adjustment no longer recovers it fully (share 0.65 [0.54, 0.76]). On both tasks, CUDA's correction after subtracting its balanced gain becomes material with UNI2-h.
 
-\clearpage
-\appendix
-\section{Guide to the supporting experiments}
-The numbered folders below are under \path{experiments/03_class_imbalance/}. Each folder's \path{report/} directory contains a PDF and its LaTeX source. These reports provide the protocols, full tables, and uncertainty estimates for the results summarized here.
+\section{Discussion}
+\label{sec:discussion}
+Three questions connect the effects, causes, and mitigation of class imbalance.
 
-\noindent\textbf{Headline results.}
-\begin{itemize}\setlength{\itemsep}{2pt}
-\item \textbf{Imbalance curves and probability quality:} Reports 25 and 26, in \path{00_damage/25_damage_tcga_ut/report/} and \path{00_damage/26_damage_bracs/report/}, give the balanced baselines, damage at every ratio, native allocations, head-to-tail recall, and calibration before and after temperature scaling.
-\item \textbf{Class influence versus tail support:} Reports 27 and 28, in \path{01_cause/tcga_ut/27_prior_vs_support/report/} and \path{01_cause/bracs/28_prior_vs_support/report/}, show the paired frequency-only (called prior-only, P, in the reports) and support-only conditions, their interaction, and its uncertainty on each dataset.
-\item \textbf{Which classes become rare:} Report 29, in \path{01_cause/bracs/29_tail_assignment/report/}, rotates every BRACS class through the tail. Report 32, in \path{01_cause/tcga_ut/32_worst_assignment_rate/report/}, tests predicted damaging and mild class orders on TCGA-UT, including reversal of the most damaging order.
-\item \textbf{Encoder comparison:} Report 39, in \path{01_cause/cross/39_encoder_transfer/report/}, compares Virchow2 and UNI2-h on matched patients and patches and examines sensitivity to regularization selection.
-\item \textbf{Mitigation:} Report 40, in \path{02_mitigation/40_methods/report/}, defines the six methods and their taxonomy. Reports 41 and 43, in \path{02_mitigation/41_mitigation_bracs/report/} and \path{02_mitigation/43_mitigation_tcga_ut/report/}, measure each method's recovery on BRACS and TCGA-UT. Reports 42 and 44, in \path{02_mitigation/42_mitigation_uni2h/report/} and \path{02_mitigation/44_mitigation_tcga_ut_uni2h/report/}, repeat them with UNI2-h and test each difference between the encoders. Report 46, in \path{02_mitigation/46_ts_noninferiority/report/}, tests each method's temperature-scaled NLL against scaled CE with paired intervals.
-\end{itemize}
+\smallskip\noindent\textbf{Do the causes set how much damage mitigation can recover?}
+Largely, yes. Rebalancing acts on the frequency effect and on its interaction with sparse support, but it cannot supply missing tail patches. On TCGA-UT, frequency and interaction make up 0.82 of the damage at $\rho=100$, and logit adjustment recovers about all of it. On BRACS, sparse support alone accounts for 0.43 of the damage, and no method recovers much more than half; the largest imbalance-specific correction, by GCL's head refit, is also about half.
 
-\noindent\textbf{Further reading.} Reports 25 and 26 also track negative log-likelihood and fitted confidence corrections across the full imbalance grid. Reports 29 and 32 give class-level recall and confusion analyses behind the aggregate class-order effects, useful when the identity of a rare class matters. Report 39 adds per-class encoder comparisons and a fixed-regularization analysis, showing how the probe-selection rule affects the encoder contrast. Reports 41--43 add recovery at $\rho=50$, and Reports 41--44 give recall by class rank, the selected method strengths, and probability quality per method.
+\smallskip\noindent\textbf{Does calibration need its own mitigation?}
+No; one temperature suffices. Imbalance raises raw ECE far more than it lowers accuracy (Section~\ref{sec:effects}), and the skewed prior drives this. When only the prior is skewed, the temperature fitted on validation data rises from 0.84 to 1.71 on TCGA-UT and from 0.65 to 5.37 on BRACS at $\rho=100$, whereas sparse support alone leaves it near its balanced value. Temperature scaling corrects exactly this kind of uniform overconfidence. The mitigation methods target accuracy instead: none fixes raw calibration, and after scaling, only CUDA on TCGA-UT reaches a lower NLL than scaled CE, through its accuracy gain. Calibration and accuracy therefore need separate fixes: a temperature for the first and a mitigation method for the second.
 
+\smallskip\noindent\textbf{Which classes pay for imbalance, and does mitigation reach them?}
+Mitigation repairs a misplaced decision boundary but only partly restores a class that the model has stopped recognizing. On TCGA-UT, rare classes remain recognizable and lose recall mainly to a more frequent confusion partner (Section~\ref{sec:vulnerable}). Logit adjustment shifts the boundary back and raises tail recall from 61.2\% to 69.4\%, close to the balanced 71.6\%. On BRACS, rare classes collapse: in the tail position, six of seven classes keep at most 4\% recall, and classes with high balanced recall lose most. Rebalancing recovers half to three quarters of the lost tail recall, from 5.1\% to 20--27\% against 34.5\% when balanced.
 \clearpage
 \bibliographystyle{abbrvnat}
 \bibliography{references}
