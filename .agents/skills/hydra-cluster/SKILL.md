@@ -71,6 +71,16 @@ print("submitted:", jid)
 
 **Float formatting trap**: `f"{1.0:g}"` → `"1"`, but directory names are often `parameter=1.0`. Use plain `f"{value}"` and verify the constructed path exists before submitting.
 
+### Submit Guard
+
+The `hydra-queue` hook (`.agents/skills/hydra-queue/`) checks Bash/PowerShell commands and Write/Edit content. The time rule applies to any command or file; the queue rules apply to commands matching `ssh … sbatch|submit`:
+
+- **No explicit `--time`** (`#SBATCH --time`/`-t` or CLI flag): denied. Each partition caps its own runtime; a tighter limit kills running tasks. Pick a longer partition instead.
+- **Stale dependency**: `--dependency=after…:<id>` on a job no longer in `squeue` is denied. Verify that job's output on disk, then submit without `--dependency`.
+- **Jobs already queued**: first submit is denied and the queue is shown. Diff the indices you submit against it (a "remaining work" list from disk includes in-flight tasks), then re-run the identical command within 10 min.
+- **SSH must work non-interactively** (`BatchMode=yes`). If `ssh hydra` prompts or fails, every submit is denied.
+- Commands containing `--dry-run` skip the queue checks.
+
 ### Dependency Chaining
 
 ```python

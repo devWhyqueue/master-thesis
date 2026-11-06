@@ -1,7 +1,7 @@
 # Hydra Cluster Reference
 
 Reference facts for the TU Berlin Hydra cluster. Workflow rules live in `../SKILL.md`.
-Source documentation: https://git.tu-berlin.de/ml-group/hydra/documentation at commit `bbef4c93688269287b9a1007aab0b50ec637eb87`.
+Source documentation: https://git.tu-berlin.de/ml-group/hydra/documentation at commit `ba24dde139610bb1ccf5ae8615442ba5ad3acbad`.
 
 Hydra = HPC cluster of ML, MLSEC, UNIML, Cognition groups at TU Berlin. SLURM, separate login/main and compute nodes. Unrelated to Python `hydra` or `hydra-zen`.
 
@@ -24,7 +24,20 @@ Host hydra
 
 Key selection, agent forwarding and similar options are machine-specific; set them locally. If the alias is missing, use `ssh yannik.qu@hydra.ml.tu-berlin.de`.
 
+Second entry node `karkinos.ml.tu-berlin.de` (same account; add a `Host karkinos` entry the same way). Use it when `hydra` is down or rebooting.
+
 No compute-heavy work on main/login node. Use it to prepare files, inspect state, submit SLURM jobs.
+
+### Weekly Security Reboots
+
+Entry nodes install security updates and reboot weekly. A reboot kills all ssh, `tmux`, `screen` sessions and other processes on that entry node.
+
+| Entry node | Reboot |
+| --- | --- |
+| `hydra` | Monday 01:00 |
+| `karkinos` | Thursday 01:00 |
+
+Do not leave long-running drivers or wait loops on an entry node across a reboot window.
 
 ## SLURM Job Templates
 
@@ -107,14 +120,30 @@ CPU partitions over 2h use gang scheduling: jobs can be suspended and resumed in
 
 `/home` = shared BeeGFS across heads. Avoid many small files; each lookup creates network filesystem traffic. Prefer single large image files for environments and datasets.
 
+Each user may store at most 500 GB in their home directory; exceeding it lowers SLURM priority. Put project data under `/home/projects` instead.
+
 | Path | Use |
 | --- | --- |
-| `/home/<user>` | Code, job scripts, logs, containers, small config files |
+| `/home/<user>` | Code, job scripts, logs, containers, small config files (≤ 500 GB) |
+| `/home/projects/UMBRELLA/PROJECT` | Shared project data; access via project Unix group |
 | `/tmp` | Per-job fast local storage; removed when job ends |
 | `/temp` | Fast local storage, persists briefly; deleted after 7 days unless refreshed with `touch /temp/<path>` on head |
 | `/archive/YEAR/PROJECT` | Long-term project storage; optimized for capacity, not speed |
 
 Archive data: essential, project-scoped, with sibling metadata JSON file under `/archive/YEAR/`.
+
+### Projects (HyMa)
+
+Shared project directories under `/home/projects/UMBRELLA/PROJECT`, managed with `hyma -p` on the main node. Umbrella = research group or category (e.g. `ml`); each project has Unix group `UMBRELLA-PROJECT`, only members read/write. Projects not written to for six months move to `/archive/YEAR/PROJECT`. Max 25 projects and 3 umbrella projects owned per user.
+
+```bash
+hyma -p list [--me]                                     # check for existing umbrella first
+hyma -p create ml/<project> --description "..."         # --inherit-members / --sync-members to share with umbrella
+hyma -p add-member ml/<project> <user>
+hyma -p fix-perms ml/<project>                          # after cp -p / rsync -a / mv / tar -p kept old group
+```
+
+New memberships take effect at next login (check with `id`). `hyma -p --help` for full command list.
 
 ## Environments
 
