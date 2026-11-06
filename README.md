@@ -34,7 +34,7 @@ Per-experiment questions and results: [`experiments/AGENTS.md`](experiments/AGEN
 | `papers/` | PDFs by topic, `sources.bib` bibliography |
 | `docs/` | Thesis reference PDFs, glossary, FAQ |
 | `meetings/` | Meeting notes by date |
-| `CLUSTER.md` | Hydra cluster runbook (SSH, SLURM, storage) |
+| `.agents/skills/hydra-cluster/references/cluster.md` | Hydra cluster runbook (SSH, SLURM, storage) |
 | `CLAUDE.md` / `AGENTS.md` | Agent instructions |
 | `.agents/skills/` | Repo-local agent skills (`bib`, `scientific-writing`, `notebooklm`, `hydra-cluster`) |
 

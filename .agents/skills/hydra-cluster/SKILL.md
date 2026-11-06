@@ -9,9 +9,9 @@ Use this skill for TU Berlin Hydra cluster work. Hydra here means the ML-group H
 
 ## First Steps
 
-1. Read `CLUSTER.md` (repo root) — authoritative source for SSH, partitions, GPU constraints, storage paths, and dataset locations.
+1. Read `references/cluster.md` (in this skill) — authoritative source for SSH, partitions, GPU constraints, storage paths, and dataset locations.
 2. Know where you are: local/WSL → edit and inspect; login node → prep, queue, `sbatch` only; compute node → heavy work, container builds, SquashFS.
-3. If behavior conflicts with `CLUSTER.md`, treat upstream Hydra docs as truth; update `CLUSTER.md` if asked.
+3. If behavior conflicts with `references/cluster.md`, treat upstream Hydra docs as truth; update `references/cluster.md` if asked.
 
 ## Remote Commands From Local
 
@@ -139,7 +139,7 @@ git pull --ff-only
 
 ## Storage And Data
 
-Full details in `CLUSTER.md`. Key rules:
+Full details in `references/cluster.md`. Key rules:
 
 - `/home` is BeeGFS — avoid many small files.
 - Keep `~` clean: use `/tmp` for transient submission scripts and remove stale files when the job no longer needs them.
@@ -148,3 +148,6 @@ Full details in `CLUSTER.md`. Key rules:
 - `/home/space/` datasets are read-only unless you created the specific files.
 - Stage `.sqfs` images to job-local `/tmp` for repeated training reads.
 - Never cancel others' jobs; never modify shared datasets you didn't create.
+- Validate on `cpu-test` or `gpu-test` before long partitions.
+- Use job-id-specific log names (`%j`).
+- Keep queued+running jobs ≤ 100 per account: count with `squeue -u $USER -r | tail -n +2 | wc -l`. Shrink array/bundle size, pass only incomplete indices on resubmit, or stage submissions instead of flooding queue.

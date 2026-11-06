@@ -39,4 +39,4 @@ uv run pytest experiments/01_benchmark/02_benchmark_patch/code/tests
 uv run python "$env:USERPROFILE\.codex\skills\clean-code\run.py" --scope experiments/01_benchmark/02_benchmark_patch/code --vulture-scope experiments/01_benchmark/02_benchmark_patch/code
 ```
 
-Run the clean-code gate after each Python change and fix findings without weakening rules. For Hydra or SLURM work, first follow the repository's `hydra-cluster` instructions and `CLUSTER.md`.
+Run the clean-code gate after each Python change and fix findings without weakening rules. For Hydra or SLURM work, first follow the repository's `hydra-cluster` skill.

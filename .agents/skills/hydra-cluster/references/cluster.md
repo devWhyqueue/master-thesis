@@ -1,55 +1,32 @@
-# Hydra Cluster
+# Hydra Cluster Reference
 
-Summary of TU Berlin Hydra cluster docs for agents in this repo.
+Reference facts for the TU Berlin Hydra cluster. Workflow rules live in `../SKILL.md`.
 Source documentation: https://git.tu-berlin.de/ml-group/hydra/documentation at commit `bbef4c93688269287b9a1007aab0b50ec637eb87`.
 
 Hydra = HPC cluster of ML, MLSEC, UNIML, Cognition groups at TU Berlin. SLURM, separate login/main and compute nodes. Unrelated to Python `hydra` or `hydra-zen`.
 
 ## Access
 
-SSH shortcut:
+Host `hydra.ml.tu-berlin.de`, user `yannik.qu`. Commands in this skill assume an SSH alias `hydra`:
 
 ```bash
 ssh hydra
 ```
 
-Raw fallback:
-
-```bash
-ssh yannik.qu@hydra.ml.tu-berlin.de
-```
-
-Shortcut resolves to:
+Minimal `~/.ssh/config` entry:
 
 ```sshconfig
 Host hydra
   HostName hydra.ml.tu-berlin.de
   User yannik.qu
-  IdentityFile ~/.ssh/id_ed25519
-  IdentitiesOnly yes
-  ForwardAgent yes
   ServerAliveInterval 60
 ```
 
-PowerShell uses same key via `C:/Users/Yannik/.ssh/id_ed25519`.
+Key selection, agent forwarding and similar options are machine-specific; set them locally. If the alias is missing, use `ssh yannik.qu@hydra.ml.tu-berlin.de`.
 
 No compute-heavy work on main/login node. Use it to prepare files, inspect state, submit SLURM jobs.
 
-## SLURM Basics
-
-Prefer batch jobs (`sbatch`). Interactive jobs only when necessary, keep short.
-
-Common commands:
-
-```bash
-sinfo
-squeue -u "$USER"
-sbatch job.sh
-scancel <job-id>
-seff <job-id>
-scontrol show jobid -dd <job-id>
-sacct -j <job-id> --format=JobID,JobName,MaxRSS,Elapsed
-```
+## SLURM Job Templates
 
 Short interactive sessions:
 
@@ -83,8 +60,6 @@ Minimal GPU job:
 
 apptainer run --nv /opt/apps/pytorch-2.0.1-gpu.sif python script.py
 ```
-
-Use `logs/job-%j.out` or other job-id-based path so parallel jobs not overwrite each other.
 
 ## Partitions And GPUs
 
@@ -143,9 +118,7 @@ Archive data: essential, project-scoped, with sibling metadata JSON file under `
 
 ## Environments
 
-Use Apptainer `.sif` containers for software environments. No large conda or venv trees on `/home`.
-
-Login node has no Apptainer for builds. Build on compute node:
+Build containers on a compute node (login node has no Apptainer):
 
 ```bash
 srun --partition=cpu-2h --pty bash
@@ -171,7 +144,7 @@ Containers immutable. Rebuild when dependencies change; overlay only when job tr
 
 ## Datasets
 
-Use SquashFS images for datasets with many files. Check shared squashed datasets first:
+Shared squashed datasets:
 
 ```text
 /home/space/datasets-sqfs/
@@ -205,8 +178,6 @@ CAMELYON16:
 
 Pre-tiled 20x patches under `patches/20x/<slide>/<id>.jpg`; SquashFS copy staged from `/home/space/datasets-sqfs/camelyon16-patches-20x.sqfs` for `prepare` stage.
 
-Shared dataset directories read-only unless you created the specific files. Inspecting `/home/space/datasets/` fine; never modify, rename, or remove datasets of other users.
-
 Create SquashFS images on compute node, not login node:
 
 ```bash
@@ -238,15 +209,3 @@ Open `127.0.0.1:8888` URL with token from job log.
 ## Git On Hydra
 
 Repo at `~/master-thesis` (clone: `git clone --depth 1 https://github.com/devWhyqueue/master-thesis.git ~/master-thesis`). Sync with `git pull --ff-only`; gitignored artifacts under `experiments/<group>/<name>/` stay on disk. Run Hydra jobs from relevant `experiments/<group>/<name>/` directory (see that experiment's README).
-
-## Agent Safety Checklist
-
-- Before anything expensive, confirm shell is on login node or inside SLURM allocation.
-- Use `cpu-test` or `gpu-test` before long partitions.
-- Keep heavy file reads off `/home`; stage datasets to `/tmp` inside jobs.
-- Never modify or remove shared datasets unless you created the specific files.
-- Prefer Apptainer + SquashFS over many small files.
-- Never cancel jobs you did not start unless explicitly asked.
-- Keep queued+running jobs ≤ 100 per account: count with `squeue -u $USER -r | tail -n +2 | wc -l`. Shrink array/bundle size, pass only incomplete indices on resubmit, or stage submissions instead of flooding queue.
-- Use job-id-specific log names.
-- Upstream docs = source of truth when cluster behavior changes.
