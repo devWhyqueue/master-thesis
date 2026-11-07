@@ -1,0 +1,65 @@
+# TCGA-UT dataset-gap descriptive analysis (exp-47; code shared with the other dataset's config).
+# 0 new fits: reads the stored balanced r1 and r100 fits (slurm.prevalence_outputs) and the
+# prior-only P100 / support-only S100 fits (slurm.p_outputs) for 3 splits x 10 draws, plus frozen
+# Virchow2 features through the exp-2 manifests (slurm.exp2_outputs). CPU-only.
+
+paths:
+  outputs: experiments/03_class_imbalance/01_cause/cross/47_dataset_gap/outputs/tcga_ut/patch
+
+dataset:
+  name: tcga_ut
+  regime: patch
+  target: cancer_type
+  seed: 0
+  version: tcga-ut-komura-2022
+  eligibility_rules:
+    source: zenodo_record_5889558_v1_0_authenticated_class_archives
+    labels: 30_of_32_cancer_types_from_source_slide
+    evidence: materialized_project_owned_squashfs_of_source_jpgs
+    split_unit: tcga_participant
+    class_exclusions:
+      Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma: dlbcl_contribution_cap_infeasible
+      Cholangiocarcinoma: evidence_floor_infeasible_for_split_unit_clustered_inference
+  excluded_classes:
+    - Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma
+    - Cholangiocarcinoma
+  root: /mnt/tcga-ut
+  materialization_sidecar: /home/space/datasets-sqfs/tcga-ut/patch.provenance.json
+  expected_slide_count: 8736
+  expected_class_count: 32
+  expected_patch_count: 1608060
+
+feature_extraction:
+  model_name: hf-hub:paige-ai/Virchow2
+  revision: 3158645804b69e3f3bc4439d4116edddf0840a72
+  weights_sha256: 8d6cea947eb2418c3b0dff48cfb9b238e47744ab0dfca21b2b0637b140769b4b
+  batch_size: 64
+  dtype: float16
+  device: auto
+
+analysis:
+  seed: 20261107
+  n_patients: 10
+  n_patches: 32
+  k_values: [5, 15, 30]
+  primary_k: 15
+  pairs: [[Colon_adenocarcinoma, Rectum_adenocarcinoma]]
+
+slurm:
+  project_root: /home/yannik.qu/master-thesis
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/47_dataset_gap/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/47_dataset_gap/outputs/tcga_ut/patch
+  container: /home/yannik.qu/master-thesis/experiments/environment.sif
+  exp2_outputs: /home/yannik.qu/master-thesis/experiments/01_benchmark/02_benchmark_patch/outputs/tcga_ut/patch
+  prevalence_outputs: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/outputs/tcga_ut/patch
+  p_outputs: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/tcga_ut/27_prior_vs_support/outputs/tcga_ut/patch
+  max_array_concurrency: {cpu-2h: 3}
+  resources:
+    geometry: {partition: cpu-2h, gpus: 0, cpus: 8, memory: 48G}
+    analyze: {partition: cpu-2h, gpus: 0, cpus: 8, memory: 64G}
+    smoke: {partition: cpu-test, gpus: 0, cpus: 4, memory: 32G}
+    images: {partition: cpu-2h, gpus: 0, cpus: 2, memory: 8G}
+  squashfs: []
+  # Example tiles are read at the manifest's own image root (images stage only).
+  shared_squashfs:
+    - {source: /home/space/datasets-sqfs/tcga-ut/patch.sqfs, mount: /mnt/tcga-ut, stages: [images]}
