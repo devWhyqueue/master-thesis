@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,7 +15,13 @@ from mitigation.encoder import pool_tokens
 from mitigation.images import normalize_batch
 from mitigation.methods import cuda_batch, gcl_loss, la_loss, update_levels
 
-__all__ = ["CudaParams", "StepModel", "build_loss_step"]
+__all__ = [
+    "CudaParams",
+    "Stage1Extras",
+    "StepModel",
+    "build_loss_step",
+    "class_weight_tensor",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +125,42 @@ def _method_step_fn(
     return lambda features, y: F.cross_entropy(head(features), y)
 
 
+class Stage1Extras(NamedTuple):
+    """Opt-in stage-one options: fixed CE class weights and a training-audit dict to fill."""
+
+    class_weights: np.ndarray | None = None
+    audit: dict[str, Any] | None = None
+
+
+def class_weight_tensor(
+    class_weights: np.ndarray | None, num_classes: int, device: torch.device
+) -> torch.Tensor | None:
+    """Validate optional fixed CE class weights: one finite positive value per class."""
+    if class_weights is None:
+        return None
+    weights = np.asarray(class_weights, dtype=np.float64)
+    if weights.shape != (num_classes,):
+        raise ValueError(f"need {num_classes} class weights, got shape {weights.shape}")
+    if not np.all(np.isfinite(weights)) or np.any(weights <= 0):
+        raise ValueError(f"class weights must be finite and positive: {weights}")
+    return torch.tensor(weights, dtype=torch.float32, device=device)
+
+
+def _weighted_ce_step_fn(
+    method: str, head: nn.Module, class_weights: torch.Tensor
+) -> Any:
+    """Fixed-class-weight CE: per-row CE times its class weight, averaged over the batch size.
+
+    Never divides by the batch's weight sum, so a batch missing a class keeps the fixed
+    dataset-level normalization (plain CE only).
+    """
+    if method != "ce":
+        raise ValueError(f"class weights apply to plain CE only, not {method!r}")
+    return lambda features, y: (
+        class_weights[y] * F.cross_entropy(head(features), y, reduction="none")
+    ).mean()
+
+
 def _build_step_fn(
     method: str,
     param: float,
@@ -162,11 +205,15 @@ def build_loss_step(
         CudaParams | None,
     ],
     generator: torch.Generator,
+    *,
+    class_weights: torch.Tensor | None = None,
 ) -> Callable[[torch.Tensor], torch.Tensor]:
     """Build the full index-batch -> loss closure for one stage-one method."""
     log_prior, delta, gcl_s, cuda_params = extras
-    method_step = _method_step_fn(
-        method, param, model.head, log_prior, delta, gcl_s, generator
+    method_step = (
+        _method_step_fn(method, param, model.head, log_prior, delta, gcl_s, generator)
+        if class_weights is None
+        else _weighted_ce_step_fn(method, model.head, class_weights)
     )
     return _build_step_fn(
         method, param, model, device, method_step, generator, cuda_params

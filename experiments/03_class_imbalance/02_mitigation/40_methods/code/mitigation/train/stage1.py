@@ -21,10 +21,17 @@ from mitigation import TrainHParams, cuda_constants, gcl_constants, train_hparam
 from mitigation.encoder import load_lora_encoder
 from mitigation.images import decode_images, decode_transform
 from mitigation.methods import CosineHead, gcl_delta, sample_weights
+from mitigation.train.audit import audited_step
 from mitigation.train.loop import run_training_steps
-from mitigation.train.stage1_step import CudaParams, StepModel, build_loss_step
+from mitigation.train.stage1_step import (
+    CudaParams,
+    Stage1Extras,
+    StepModel,
+    build_loss_step,
+    class_weight_tensor,
+)
 
-__all__ = ["ArmBatch", "Stage1Output", "run_stage1"]
+__all__ = ["ArmBatch", "Stage1Extras", "Stage1Output", "run_stage1"]
 
 
 class ArmBatch(NamedTuple):
@@ -184,6 +191,30 @@ def _run_training(
     )
 
 
+def _loss_step(
+    device: torch.device,
+    setup: _TrainingSetup,
+    method: str,
+    param: float,
+    loss_extras: tuple[
+        torch.Tensor | None, torch.Tensor | None, float | None, CudaParams | None
+    ],
+    weights: torch.Tensor | None,
+) -> Callable[[torch.Tensor], torch.Tensor]:
+    """The index-batch -> loss closure over the setup's resident images and head."""
+    mean, std = tuple(setup.data_config["mean"]), tuple(setup.data_config["std"])
+    model = StepModel(setup.encoder, setup.head, setup.images, setup.y_t, mean, std)
+    return build_loss_step(
+        method,
+        param,
+        model,
+        device,
+        loss_extras,
+        setup.device_generator,
+        class_weights=weights,
+    )
+
+
 def run_stage1(
     config: dict[str, Any],
     device: torch.device,
@@ -191,22 +222,26 @@ def run_stage1(
     method: str,
     param: float,
     seed: int,
+    *,
+    extras: Stage1Extras = Stage1Extras(),
 ) -> Stage1Output:
-    """Train one stage-one arm: LoRA-adapted encoder plus a linear or cosine head."""
+    """Train one stage-one arm: LoRA-adapted encoder plus a linear or cosine head.
+
+    ``extras`` optionally fixes CE class weights and fills a training-audit dict.
+    """
+    weights = class_weight_tensor(extras.class_weights, arm.num_classes, device)
     setup, log_prior, delta, gcl_s, cuda_params = _prepare(
         config, device, arm, method, seed
     )
-    mean, std = tuple(setup.data_config["mean"]), tuple(setup.data_config["std"])
-    model = StepModel(setup.encoder, setup.head, setup.images, setup.y_t, mean, std)
-    step_fn = build_loss_step(
-        method,
-        param,
-        model,
-        device,
-        (log_prior, delta, gcl_s, cuda_params),
-        setup.device_generator,
+    loss_extras = (log_prior, delta, gcl_s, cuda_params)
+    step_fn = _loss_step(device, setup, method, param, loss_extras, weights)
+    batch_size = train_hparams(config, "stage1").batch_size
+    step_fn, recorder = audited_step(
+        step_fn, setup.encoder, setup.head, batch_size, extras.audit
     )
     _run_training(config, setup, arm, method, param, step_fn)
+    if recorder is not None:
+        recorder.finish(arm.y, arm.num_classes)
     cosine_scale = gcl_s if setup.is_cosine else None
     return Stage1Output(
         setup.encoder, setup.head, setup.data_config, cosine_scale, setup.images

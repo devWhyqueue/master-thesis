@@ -16,7 +16,7 @@ from mitigation.train.eval import (
     head_logits,
     stream_embeddings,
 )
-from mitigation.train.stage1 import ArmBatch, Stage1Output, run_stage1
+from mitigation.train.stage1 import ArmBatch, Stage1Extras, Stage1Output, run_stage1
 from mitigation.train.stage2 import run_crt, run_disalign, run_gcl2, run_posthoc_la
 
 __all__ = [
@@ -31,6 +31,7 @@ __all__ = [
     "head_logits",
     "stream_embeddings",
     "ArmBatch",
+    "Stage1Extras",
     "Stage1Output",
     "run_stage1",
     "run_crt",

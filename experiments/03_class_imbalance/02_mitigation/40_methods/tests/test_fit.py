@@ -17,7 +17,7 @@ from prevalence.fit import arm_row_index
 
 from mitigation import TrainHParams
 from mitigation.train.artifacts import Stage1Artifacts
-from mitigation.train.stage1 import ArmBatch, run_stage1
+from mitigation.train.stage1 import ArmBatch, Stage1Extras, run_stage1
 from mitigation.train.stage2 import run_crt, run_disalign, run_gcl2, run_posthoc_la
 
 _DIM = 96  # 2 * embed_dim of the tiny model below
@@ -272,3 +272,125 @@ def test_stream_embeddings_matches_decode_then_forward(
     streamed = stream_embeddings(encoder, paths, transform, mean, std, device, 4)
 
     torch.testing.assert_close(streamed, expected)
+
+
+class _FlatEncoder(torch.nn.Module):
+    """Flattens the normalized image batch into pooled features; optionally emits NaN."""
+
+    def __init__(self, emit_nan: bool = False) -> None:
+        super().__init__()
+        self.scale = torch.nn.Parameter(torch.ones(1), requires_grad=False)
+        self.emit_nan = emit_nan
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        features = x.flatten(1) * self.scale
+        return features * float("nan") if self.emit_nan else features
+
+
+def _flat_loader(emit_nan: bool = False):
+    data_config = {"input_size": (3, 4, 4), "mean": (0.5,) * 3, "std": (0.5,) * 3, "crop_pct": 1.0}
+    return lambda config, device: (_FlatEncoder(emit_nan).to(device), data_config, 48)
+
+
+def _flat_step(class_weights: torch.Tensor | None, method: str = "ce"):
+    """A CE step closure over a four-row, two-class linear model (counts [3, 1])."""
+    from mitigation.train.stage1_step import StepModel, build_loss_step
+
+    torch.manual_seed(0)
+    images = torch.randint(0, 255, (4, 3, 2, 2), dtype=torch.uint8)
+    y = torch.tensor([0, 0, 0, 1])
+    head = torch.nn.Linear(12, 2)
+    model = StepModel(_FlatEncoder(), head, images, y, (0.5,) * 3, (0.5,) * 3)
+    step = build_loss_step(
+        method, 0.0, model, torch.device("cpu"), (None, None, None, None),
+        torch.Generator(), class_weights=class_weights,
+    )
+    return step, model
+
+
+def _per_example_ce(model, idx: torch.Tensor) -> torch.Tensor:
+    from mitigation.images import normalize_batch
+
+    x = normalize_batch(model.images[idx], model.mean, model.std).flatten(1)
+    return torch.nn.functional.cross_entropy(model.head(x), model.y_t[idx], reduction="none")
+
+
+def test_weighted_ce_uses_fixed_dataset_normalization() -> None:
+    """A batch of only class 0 keeps weight 2/3; full-data loss/gradient is the explicit weighted mean."""
+    weights = torch.tensor([2 / 3, 2.0])
+    step, model = _flat_step(weights)
+    only_zero = torch.tensor([0, 1, 2])
+    torch.testing.assert_close(step(only_zero), _per_example_ce(model, only_zero).mean() * 2 / 3)
+
+    everything = torch.arange(4)
+    step(everything).backward()
+    weighted_grad = model.head.weight.grad.clone()
+    model.head.zero_grad()
+    (weights[model.y_t] * _per_example_ce(model, everything)).mean().backward()
+    torch.testing.assert_close(weighted_grad, model.head.weight.grad)
+
+    plain_step, plain_model = _flat_step(None)
+    ones_step, _ = _flat_step(torch.ones(2))
+    torch.testing.assert_close(ones_step(everything), plain_step(everything))
+
+
+def _weighted_update(micro_batch: int | None) -> torch.Tensor:
+    from mitigation.train.loop import run_training_steps
+
+    step, model = _flat_step(torch.tensor([2 / 3, 2.0]))
+    optimizer = torch.optim.SGD(model.head.parameters(), lr=0.5)
+    scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+    run_training_steps(
+        np.full(4, 0.25), TrainHParams(4, 1, 0.5, 0.0, micro_batch), optimizer, scheduler,
+        torch.Generator().manual_seed(3), step,
+    )
+    return model.head.weight.detach().clone()
+
+
+def test_weighted_ce_microbatch_matches_full_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Micro-batching keeps the weighted update; malformed weights or non-CE methods raise."""
+    torch.testing.assert_close(_weighted_update(2), _weighted_update(None))
+
+    monkeypatch.setattr("mitigation.train.stage1.load_lora_encoder", _flat_loader())
+    paths = _write_images(tmp_path, 4)
+    y = np.array([0, 0, 0, 1], dtype=np.int64)
+    arm = ArmBatch(paths, y, np.array([3, 1]), num_classes=2)
+    bad = [np.ones(3), np.array([1.0, np.nan]), np.array([1.0, 0.0]), np.array([1.0, -1.0])]
+    for weights in bad:
+        with pytest.raises(ValueError):
+            run_stage1(_stage1_config(), torch.device("cpu"), arm, "ce", 0.0, 0, extras=Stage1Extras(class_weights=weights))
+    for method in ("la", "gcl"):
+        with pytest.raises(ValueError):
+            run_stage1(_stage1_config(), torch.device("cpu"), arm, method, 1.0, 0, extras=Stage1Extras(class_weights=np.ones(2)))
+
+
+def test_training_audit_matches_observed_batches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Audit counts, per-class exposure, and loss means match the consumed batches; NaN loss raises."""
+    from mitigation.train import loop
+
+    drawn: list[torch.Tensor] = []
+    original = loop.draw_indices
+    monkeypatch.setattr(loop, "draw_indices", lambda *a: drawn.append(original(*a)) or drawn[-1])
+    monkeypatch.setattr("mitigation.train.stage1.load_lora_encoder", _flat_loader())
+    paths = _write_images(tmp_path, 8)
+    y = np.array([0, 0, 0, 0, 0, 0, 1, 1], dtype=np.int64)
+    arm = ArmBatch(paths, y, np.array([6, 2]), num_classes=2)
+    config = {"mitigation": {"train": {"stage1": {
+        "steps": 3, "batch_size": 4, "lr": 1e-3, "weight_decay": 0.0, "micro_batch": 3}}}}
+    audit: dict = {}
+    run_stage1(config, torch.device("cpu"), arm, "ce", 0.0, 0, extras=Stage1Extras(audit=audit))
+
+    consumed = torch.cat(drawn).numpy()
+    assert audit["sample_count"] == 3 * 4 == len(consumed)
+    assert audit["unique_rows_per_class"] == np.bincount(y[np.unique(consumed)], minlength=2).tolist()
+    assert np.isfinite(audit["first_loss_mean"]) and np.isfinite(audit["last_loss_mean"])
+    assert audit["loss_finite"] is True
+    assert len(audit["initialization_sha256"]) == len(audit["sample_sequence_sha256"]) == 64
+
+    monkeypatch.setattr("mitigation.train.stage1.load_lora_encoder", _flat_loader(emit_nan=True))
+    with pytest.raises(FloatingPointError):
+        run_stage1(config, torch.device("cpu"), arm, "ce", 0.0, 0, extras=Stage1Extras(audit={}))

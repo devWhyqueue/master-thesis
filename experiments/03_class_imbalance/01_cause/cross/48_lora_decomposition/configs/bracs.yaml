@@ -1,0 +1,24 @@
+# Four-condition LoRA decomposition (exp-48), BRACS: balanced reference B, frequency-only F,
+# coverage-only C, and both R at rho=100, each a fresh LoRA + linear-head CE fit.
+# Dataset, allocation, training recipe, container and dataset mounts come from the source
+# mitigation config below and are validated against the protocol
+# (docs/superpowers/specs/2026-11-08-lora-frequency-coverage-design.md).
+source_config: experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/configs/bracs.yaml
+
+paths:
+  outputs: experiments/03_class_imbalance/01_cause/cross/48_lora_decomposition/outputs/bracs/patch
+
+protocol:
+  id: lora-decomposition-v1
+  balanced_allocation: r1
+  imbalanced_allocation: r100
+
+slurm:
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/48_lora_decomposition/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/48_lora_decomposition/outputs/bracs/patch
+  resources:
+    fit: {partition: gpu-2h, gpus: 1, constraint: "80gb|h100|h200", cpus: 8, memory: 64G}
+    analyze: {partition: cpu-5h, gpus: 0, cpus: 4, memory: 32G}
+  writable_paths:
+    - path: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/01_cause/cross/48_lora_decomposition/report
+      stages: [analyze]
