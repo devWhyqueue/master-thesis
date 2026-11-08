@@ -29,7 +29,7 @@ from centre.fit import decode_shard_index, shard_count
 from centre import N_DRAWS, N_SPLITS
 
 from lora_decomposition import protocol
-from lora_decomposition.fit import validate_run
+from lora_decomposition.fit import is_marked
 from lora_decomposition.protocol import ARMS, is_smoke, validate_protocol
 
 __all__ = [
@@ -149,23 +149,20 @@ def _pending(
             i
             for i in phase_indices(phase)
             if (arm, i) not in in_flight
-            and not validate_run(config, *decode_shard_index(i), arm)
+            and not is_marked(config, *decode_shard_index(i), arm)
         ]
         for arm in (("B",) if phase == "smoke" else ARMS)
     }
 
 
-def _fit_job(
-    config: dict[str, Any], arm: str, indices: list[int], phase: str
-) -> SlurmJob:
+def _fit_job(config: dict[str, Any], arm: str, indices: list[int]) -> SlurmJob:
     """One arm's sparse array; job name stays ``fit`` so the dataset SquashFS mounts apply."""
     check_indices(indices)
-    job = replace(
+    return replace(
         build_job(config, "fit", f"fit --arm {arm}", True, resource="fit"),
         array_size=shard_count(),
         array_indices=tuple(indices),
     )
-    return replace(job, partition="gpu-test") if phase == "smoke" else job
 
 
 def _check_phase(config: dict[str, Any], phase: str) -> None:
@@ -196,7 +193,7 @@ def submit_jobs(
         if not indices:
             continue
         script = render_sbatch(
-            _fit_job(config, arm, indices, phase), config, config["config_path"]
+            _fit_job(config, arm, indices), config, config["config_path"]
         )
         if dry_run:
             logger.info("dry run, arm %s shards %s:\n%s", arm, indices, script)

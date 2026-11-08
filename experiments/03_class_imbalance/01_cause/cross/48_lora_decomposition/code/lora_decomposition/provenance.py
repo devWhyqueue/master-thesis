@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -25,6 +26,7 @@ import mitigation
 __all__ = [
     "PROVENANCE_NAME",
     "check_record",
+    "code_digest",
     "encoder_identity",
     "frame_digest",
     "labels_digest",
@@ -35,7 +37,7 @@ __all__ = [
 ]
 
 PROVENANCE_NAME = "provenance.json"
-_OWN_FILES = ("protocol.py", "provenance.py", "fit.py")
+_OWN_FILES = ("protocol.py", "provenance.py", "resume.py", "fit.py")
 _METHODS_FILES = (
     "__init__.py",
     "data.py",
@@ -51,18 +53,39 @@ _METHODS_FILES = (
 )
 
 
+def _code_only(path: Path) -> str:
+    """Module AST without docstrings: comments, formatting, and docstrings do not count."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (
+            isinstance(body, list)
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            setattr(node, "body", body[1:] or [ast.Pass()])
+    return ast.dump(tree)
+
+
+def code_digest(files: list[Path]) -> str:
+    """SHA-256 over file names and their code (docstrings, comments, layout ignored)."""
+    sha = hashlib.sha256()
+    for path in files:
+        sha.update(path.name.encode("utf-8"))
+        sha.update(_code_only(path).encode("utf-8"))
+    return sha.hexdigest()
+
+
 def source_digest() -> str:
-    """SHA-256 over the training/evaluation source actually used, line endings normalized."""
+    """Code digest of the training/evaluation source actually used."""
     methods_dir = Path(mitigation.__file__).resolve().parent
     own_dir = Path(__file__).resolve().parent
     files = [own_dir / f for f in _OWN_FILES] + [
         methods_dir / f for f in _METHODS_FILES
     ]
-    sha = hashlib.sha256()
-    for path in files:
-        sha.update(path.name.encode("utf-8"))
-        sha.update(path.read_bytes().replace(b"\r\n", b"\n"))
-    return sha.hexdigest()
+    return code_digest(files)
 
 
 def sequence_digest(values: list[str]) -> str:

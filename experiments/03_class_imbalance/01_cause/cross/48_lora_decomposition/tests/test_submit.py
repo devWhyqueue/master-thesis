@@ -38,7 +38,7 @@ def test_phase_indices_and_validation() -> None:
 
 
 def test_completed_and_in_flight_work_is_not_resubmitted(config: dict, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(submit, "validate_run", lambda c, s, d, arm: (arm, s * 10 + d) == ("B", 0))
+    monkeypatch.setattr(submit, "is_marked", lambda c, s, d, arm: (arm, s * 10 + d) == ("B", 0))
     submit.record_submission(config, "777", "F", [10], "pilot")
     scripts: list[str] = []
     ids = iter(["900", "901", "902", "903"])
@@ -57,7 +57,7 @@ def test_completed_and_in_flight_work_is_not_resubmitted(config: dict, monkeypat
 
 
 def test_queue_cap_reserves_every_array_worker(config: dict, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(submit, "validate_run", lambda *a: False)
+    monkeypatch.setattr(submit, "is_marked", lambda *a: False)
     queue = [f"5_{i}" for i in range(98)]
     scripts: list[str] = []
 
@@ -75,15 +75,15 @@ def test_empty_pending_and_dry_run_touch_no_scheduler(config: dict, monkeypatch:
     def forbidden(*args):
         raise AssertionError("scheduler called")
 
-    monkeypatch.setattr(submit, "validate_run", lambda *a: True)
+    monkeypatch.setattr(submit, "is_marked", lambda *a: True)
     assert submit.submit_jobs(config, "pilot", False, queue=lambda: [], sbatch=forbidden) == []
-    monkeypatch.setattr(submit, "validate_run", lambda *a: False)
+    monkeypatch.setattr(submit, "is_marked", lambda *a: False)
     dry = submit.submit_jobs(config, "pilot", True, queue=forbidden, sbatch=forbidden)
     assert dry == [f"dry-run-{arm}" for arm in ARMS]
 
 
 def test_main_phase_needs_passed_pilot_check_and_review(config: dict, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(submit, "validate_run", lambda *a: False)
+    monkeypatch.setattr(submit, "is_marked", lambda *a: False)
     with pytest.raises(ValueError, match="pilot"):
         submit.submit_jobs(config, "main", True, queue=list, sbatch=str)
     report = tmp_path / "report"

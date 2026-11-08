@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 from imbalance_benchmark.common import read_run_record
 
-from centre.fit import decode_shard_index
+from centre.fit import decode_shard_index, shard_count
 
 from lora_decomposition import protocol
 from lora_decomposition.fit import fit_dir, validate_run
@@ -22,7 +22,7 @@ from lora_decomposition.protocol import ARMS, is_smoke
 from lora_decomposition.provenance import PROVENANCE_NAME
 from lora_decomposition.submit import phase_indices
 
-__all__ = ["block_problems", "check_runs"]
+__all__ = ["block_problems", "check_runs", "load_block", "phase_blocks"]
 
 _CRITERIA = (
     "technical only: every arm complete and compatible, shared initialization and seed, paired "
@@ -98,6 +98,26 @@ def block_problems(prov: dict[str, dict[str, Any]]) -> list[str]:
     return [message for ok, message in rules if not ok]
 
 
+def phase_blocks(phase: str) -> list[tuple[int, int]]:
+    """Blocks a phase check covers: the pilot's three, or all 30 for main."""
+    indices = phase_indices("pilot") if phase == "pilot" else range(shard_count())
+    return [decode_shard_index(i) for i in indices]
+
+
+def load_block(
+    config: dict[str, Any], split_idx: int, draw_idx: int
+) -> dict[str, dict[str, Any]]:
+    """The four arms' provenance sidecars of one block."""
+    return {
+        arm: json.loads(
+            (fit_dir(config, split_idx, draw_idx, arm) / PROVENANCE_NAME).read_text(
+                encoding="utf-8"
+            )
+        )
+        for arm in ARMS
+    }
+
+
 def _diagnostic(out_dir: Path, arm: str, prov: dict[str, Any]) -> dict[str, Any]:
     record = read_run_record(out_dir, splits=("validation",), array_fields=())
     endpoints = (record or {})["splits"]["validation"]["endpoints"]
@@ -124,10 +144,7 @@ def _check_block(
     if missing:
         return [f"missing or incomplete arms {missing}"], []
     dirs = {arm: fit_dir(config, split_idx, draw_idx, arm) for arm in ARMS}
-    prov = {
-        arm: json.loads((d / PROVENANCE_NAME).read_text(encoding="utf-8"))
-        for arm, d in dirs.items()
-    }
+    prov = load_block(config, split_idx, draw_idx)
     return block_problems(prov), [
         _diagnostic(dirs[arm], arm, prov[arm]) for arm in ARMS
     ]
@@ -140,8 +157,7 @@ def check_runs(configs: list[dict[str, Any]], phase: str) -> Path:
         if is_smoke(config):
             raise ValueError("smoke runs are not checked as a scientific phase")
         failures, diagnostics = [], []
-        for index in phase_indices(phase):
-            split_idx, draw_idx = decode_shard_index(index)
+        for split_idx, draw_idx in phase_blocks(phase):
             problems, rows = _check_block(config, split_idx, draw_idx)
             failures += [f"block ({split_idx}, {draw_idx}): {p}" for p in problems]
             diagnostics += rows

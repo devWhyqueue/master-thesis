@@ -12,14 +12,16 @@ from centre.fit import decode_shard_index
 from lora_decomposition.analyze import run_analyze
 from lora_decomposition.check import check_runs
 from lora_decomposition.fit import run_fit
+from lora_decomposition import protocol
 from lora_decomposition.protocol import ARMS, load_protocol_config
+from lora_decomposition.report import render_report
 from lora_decomposition.submit import submit_analyze, submit_jobs
 
 __all__ = ["main"]
 
 logger = logging.getLogger(__name__)
 
-_MULTI_CONFIG = ("check", "analyze")
+_MULTI_CONFIG = ("check", "analyze", "render")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -32,6 +34,7 @@ def _parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="technical check of a phase")
     check.add_argument("--phase", required=True, choices=("pilot", "main"))
     commands.add_parser("analyze", help="paired analysis of both datasets")
+    commands.add_parser("render", help="report table and figures from analysis.json")
     submit = commands.add_parser("submit", help="submit pending fits or the analysis")
     submit.add_argument(
         "--phase", required=True, choices=("smoke", "pilot", "main", "analyze")
@@ -56,6 +59,9 @@ def main(argv: list[str] | None = None) -> None:
         logger.info("check written to %s", check_runs(configs, args.phase))
     elif args.command == "analyze":
         logger.info("analysis written to %s", run_analyze(configs))
+    elif args.command == "render":
+        report_dir = protocol.EXPERIMENT_DIR / "report"
+        render_report(report_dir / "analysis.json", report_dir)
     elif args.phase == "analyze":
         logger.info("analyze job: %s", submit_analyze(configs, args.dry_run))
     else:

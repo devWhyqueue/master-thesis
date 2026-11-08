@@ -17,7 +17,7 @@ from PIL import Image
 
 from mitigation.train.stage1 import ArmBatch, Stage1Extras, run_stage1
 
-from lora_decomposition import fit, protocol
+from lora_decomposition import fit, protocol, resume
 from lora_decomposition.protocol import ARMS, load_protocol_config
 
 _CONFIGS = Path(__file__).resolve().parents[1] / "configs"
@@ -62,7 +62,7 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("SLURM_CPUS_PER_TASK", "1")
     monkeypatch.setattr(protocol, "EXPERIMENT_DIR", tmp_path)
     monkeypatch.setitem(protocol.TRAIN_ROWS, "bracs", 16)
-    monkeypatch.setattr(fit, "_IDENTITY_CACHE", {})
+    monkeypatch.setattr(resume, "_IDENTITY_CACHE", {})
     monkeypatch.setattr("mitigation.train.stage1.load_lora_encoder", _tiny_encoder)
     train = _images(tmp_path / "img", "train", 16, 0)
     val_df, val_identity = _eval_frame(_images(tmp_path / "img", "val", 8, 1))
@@ -71,14 +71,14 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         classes=["a", "b"], train_df=pd.DataFrame({"image_path": train}),
         val_df=val_df, test_df=test_df, val_identity=val_identity, test_identity=test_identity,
     )
-    monkeypatch.setattr(fit, "load_shard", lambda config, split_idx: shard)
+    monkeypatch.setattr(resume, "load_shard", lambda config, split_idx: shard)
 
     def train_arm(shard_, split_idx, draw_idx, g, data_arm):
         n_a = 8 if data_arm == "r1" else 14
         y = np.array([0] * n_a + [1] * (16 - n_a), dtype=np.int64)
         return train, y, np.bincount(y, minlength=2)
 
-    monkeypatch.setattr(fit, "train_arm", train_arm)
+    monkeypatch.setattr(resume, "train_arm", train_arm)
 
     def make_config(root: str, steps: int = 2) -> dict:
         config = copy.deepcopy(base)
@@ -169,3 +169,45 @@ def test_resume_rejects_incomplete_and_incompatible_runs(world, monkeypatch: pyt
     np.savez_compressed(arrays, **data)
     with pytest.raises(ValueError, match=str(out_dir.name)):
         fit.validate_run(config, 0, 0, "B")
+
+
+def test_allocation_drift_is_rejected(world, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run whose stored allocation no longer matches the current allocation rule raises."""
+    config = world.make_config("drift")
+    fit.run_fit(config, 0, 0, "C")
+    original = resume.train_arm
+
+    def drifted(shard, split_idx, draw_idx, g, data_arm):
+        paths, y, counts = original(shard, split_idx, draw_idx, g, data_arm)
+        return paths[::-1], y[::-1].copy(), counts
+
+    monkeypatch.setattr(resume, "train_arm", drifted)
+    with pytest.raises(ValueError, match="training_identity_sha256"):
+        fit.validate_run(config, 0, 0, "C")
+
+
+def test_light_marker_skips_manifests_and_arrays(world, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``is_marked`` reads only the sidecar: no shard load, no array decompression."""
+    config = world.make_config("light")
+    out_dir = fit.run_fit(config, 0, 0, "B")
+    monkeypatch.setattr(resume, "load_shard", lambda *a: pytest.fail("shard loaded"))
+    monkeypatch.setattr(resume, "_IDENTITY_CACHE", {})
+    monkeypatch.setattr(resume, "check_record", lambda *a: pytest.fail("arrays read"))
+    assert fit.is_marked(config, 0, 0, "B") is True
+    assert fit.is_marked(config, 0, 1, "B") is False
+    with pytest.raises(ValueError, match="config_sha256"):
+        fit.is_marked(world.make_config("light", steps=3), 0, 0, "B")
+    (out_dir / fit.PROVENANCE_NAME).unlink()
+    assert fit.is_marked(config, 0, 0, "B") is False
+
+
+def test_source_digest_ignores_docstrings_and_comments(tmp_path: Path) -> None:
+    from lora_decomposition.provenance import code_digest
+
+    base, cosmetic, changed = (tmp_path / d / "m.py" for d in ("a", "b", "c"))
+    for path in (base, cosmetic, changed):
+        path.parent.mkdir()
+    base.write_text('"""Doc."""\n\ndef f(x):\n    """One."""\n    return x + 1\n', encoding="utf-8")
+    cosmetic.write_text('"""Other doc."""\n# note\ndef f(x):  # why\n    return x + 1\n', encoding="utf-8")
+    changed.write_text('"""Doc."""\n\ndef f(x):\n    return x + 2\n', encoding="utf-8")
+    assert code_digest([base]) == code_digest([cosmetic]) != code_digest([changed])

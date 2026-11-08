@@ -28,6 +28,7 @@ from centre.analyze import pooled
 from decomposition.model import draw_weights
 
 from lora_decomposition import protocol
+from lora_decomposition.check import block_problems, load_block
 from lora_decomposition.fit import validate_run
 from lora_decomposition.protocol import ARMS, PROTOCOL_ID, config_digest, is_smoke
 from lora_decomposition.provenance import source_digest
@@ -164,6 +165,13 @@ def require_complete(config: dict[str, Any]) -> None:
     ]
     if missing:
         raise ValueError(f"{len(missing)} runs missing or incomplete: {missing[:12]}")
+    broken = [
+        ((s, d), problems)
+        for s, d in shard_keys()
+        if (problems := block_problems(load_block(config, s, d)))
+    ]
+    if broken:
+        raise ValueError(f"blocks break the pairing checks: {broken[:12]}")
 
 
 def _per_fit_ba(config: dict[str, Any]) -> tuple[dict[str, np.ndarray], int]:

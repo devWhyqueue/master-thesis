@@ -120,3 +120,41 @@ def test_patient_repeated_across_splits_shares_its_bootstrap_weight(tmp_path: Pa
     weight0 = ctxs[0].weights.patient[ctxs[0].weights.row_patient[row0]]
     weight1 = ctxs[1].weights.patient[ctxs[1].weights.row_patient[row1]]
     np.testing.assert_array_equal(weight0, weight1)
+
+
+def _synthetic(values: dict[str, float]) -> dict:
+    rng = np.random.default_rng(4)
+    noise = rng.normal(0, 0.2, size=(30, 101))
+    noise[:, 0] = 0.0
+    per_fit = {arm: value + noise for arm, value in values.items()}
+    return summarize_dataset(per_fit, _draw_weights(rng, n_rep=100), _FIT_SPLIT)
+
+
+def test_report_renders_table_and_hides_unusable_benchmark(tmp_path: Path) -> None:
+    from lora_decomposition import report
+
+    stable = _synthetic({"B": 70.0, "F": 68.0, "C": 69.0, "R": 66.0})
+    unstable = _synthetic({"B": 70.0, "F": 69.8, "C": 69.9, "R": 69.5})
+    analysis = tmp_path / "analysis.json"
+    analysis.write_text(json.dumps({"datasets": {"bracs": stable, "tcga_ut": unstable}}), encoding="utf-8")
+    report.render_report(analysis, tmp_path)
+
+    table = (tmp_path / "arm_table.tex").read_text(encoding="utf-8")
+    d_row = next(line for line in table.splitlines() if "$D$" in line)
+    h_row = next(line for line in table.splitlines() if "$h" in line)
+    assert d_row.split("&")[1].strip().startswith("4.00 [")
+    assert h_row.split("&")[1].strip().startswith("0.75 [")
+    assert "unavailable" in h_row.split("&")[2]
+    assert report.benchmark_band(stable) is not None and report.benchmark_band(unstable) is None
+    assert (tmp_path / "component_figure.pdf").is_file() and (tmp_path / "recovery_figure.pdf").is_file()
+
+
+def test_analysis_refuses_blocks_that_break_pairing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from lora_decomposition import check
+
+    monkeypatch.setattr(analyze, "validate_run", lambda *a: True)
+    monkeypatch.setattr(analyze, "load_block", lambda config, s, d: {"block": (s, d)})
+    monkeypatch.setattr(analyze, "block_problems", lambda prov: ["seed differs"] if prov["block"] == (2, 7) else [])
+    with pytest.raises(ValueError, match=r"\(2, 7\).*seed differs"):
+        analyze.require_complete({"protocol": {}})
+    assert len(check.phase_blocks("main")) == 30 and len(check.phase_blocks("pilot")) == 3
