@@ -11,7 +11,7 @@ from gap.plots.style import DATASETS, GAINED, INK, LABEL, LOST, save
 
 __all__ = ["imbalance_figure"]
 
-_ARMS = (("P100", "prior only"), ("S100", "support only"), ("r100", "combined"))
+_ARMS = (("P100", "frequency only"), ("S100", "support only"), ("r100", "ratio (both)"))
 
 
 def _arm_bars(ax: Any, arm: dict[str, Any], y: int) -> None:
