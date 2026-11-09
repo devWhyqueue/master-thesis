@@ -152,21 +152,31 @@ def swap_class_order(config: dict[str, Any]) -> None:
     _yaml(Path(config["mitigation_config"]), {**mitigation, "slurm": {"exp2_outputs": str(swapped)}})
 
 
-def write_source_records(config: dict[str, Any]) -> None:
-    """Minimal reused records (test labels/preds, validation BA) for every shard and source run."""
+def manifest_test_labels(config: dict[str, Any]) -> np.ndarray:
+    """The world's test targets in manifest order (identical for every split)."""
     manifest = pd.read_csv(Path(config["slurm"]["exp2_outputs"]) / "split=0" / "data" / "manifest.csv")
-    test_y = manifest.query("split == 'test'")["cancer_type"].map(CLASSES.index).to_numpy()
-    for _, directory in reused_runs(config):
-        write_run_record(
-            directory,
-            {
-                "selected_lambda": 1e-2,
-                "splits": {
-                    "validation": {"endpoints": {"patient_macro_balanced_accuracy": 0.5}},
-                    "test": {"labels": test_y, "preds": test_y},
-                },
+    return manifest.query("split == 'test'")["cancer_type"].map(CLASSES.index).to_numpy()
+
+
+def write_record(directory: Path, labels: np.ndarray, preds: np.ndarray, validation_ba: float = 0.5) -> None:
+    """One minimal run record: test labels/preds, a validation BA endpoint, a selected lambda."""
+    write_run_record(
+        directory,
+        {
+            "selected_lambda": 1e-2,
+            "splits": {
+                "validation": {"endpoints": {"patient_macro_balanced_accuracy": validation_ba}},
+                "test": {"labels": labels, "preds": preds},
             },
-        )
+        },
+    )
+
+
+def write_source_records(config: dict[str, Any]) -> None:
+    """Minimal reused records for every shard and source run, predicting the truth."""
+    test_y = manifest_test_labels(config)
+    for _, directory in reused_runs(config):
+        write_record(directory, test_y, test_y)
 
 
 def write_damage_records(config: dict[str, Any], shards: list[tuple[int, int]]) -> None:
@@ -183,6 +193,7 @@ def write_damage_records(config: dict[str, Any], shards: list[tuple[int, int]]) 
 def patch_freeze_loader(monkeypatch: Any) -> None:
     """Stand-in for the signed-freeze loader (no signatures in the synthetic world)."""
     from breadth import fit as breadth_fit
+    from breadth.analyze import canonical
     from mitigation import data as mitigation_data
 
     from intended import preflight
@@ -193,3 +204,4 @@ def patch_freeze_loader(monkeypatch: Any) -> None:
     monkeypatch.setattr(breadth_fit, "load_freeze_meta", load)
     monkeypatch.setattr(mitigation_data, "load_freeze_meta", load)
     monkeypatch.setattr(preflight, "load_freeze_meta", load)
+    monkeypatch.setattr(canonical, "load_freeze_meta", load)
