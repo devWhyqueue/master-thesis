@@ -41,6 +41,14 @@ def test_fit_stages_dispatch(cli: dict) -> None:
     assert cli["calls"][2:] == [("sgd", 2, d) for d in range(10)]
 
 
+def test_shard_index_dispatch(cli: dict) -> None:
+    cli["main"](["--config", _CONFIG, "fit", "--stage", "sgd", "--shard-index", "13"])
+    cli["main"](["--config", _CONFIG, "fit", "--stage", "lr", "--shard-index", "29"])
+    assert cli["calls"] == [("sgd", 1, 3), ("lr", 2, 9, "rest")]
+    with pytest.raises(SystemExit):
+        cli["main"](["--config", _CONFIG, "fit", "--stage", "lr"])
+
+
 @pytest.mark.parametrize(("command", "name"), [("preflight", "run_preflight"), ("check-ce", "check_ce")])
 def test_failed_gate_exits_nonzero(cli: dict, monkeypatch, command: str, name: str) -> None:
     monkeypatch.setitem(cli["namespace"], name, cli["gate"](False))

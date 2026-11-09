@@ -38,3 +38,15 @@ protocol:
     r100:
       lr: {ce: [null], la: [0.5, 1.0, 1.5, 2.0], bs: [0.5, 1.0], disalign: [0.5, 1.0, 1.5, 2.0]}
       sgd: {ce: [null]}
+
+# Hydra jobs (no explicit time: partitions cap runtime). output_dir is the experiment dir so
+# outputs/ and report/ (gate JSONs, analysis) are writable inside the container.
+slurm:
+  code_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/49_intended_mitigation/code
+  output_dir: /home/yannik.qu/master-thesis/experiments/03_class_imbalance/02_mitigation/49_intended_mitigation
+  max_array_concurrency: {cpu-2h: 30, cpu-5h: 30, gpu-2h: 30, gpu-5h: 30}
+  resources:
+    preflight: {partition: cpu-5h, gpus: 0, cpus: 8, memory: 64G}
+    fit_lr: {partition: cpu-2h, gpus: 0, cpus: 16, memory: 64G}
+    fit: {partition: gpu-2h, gpus: 1, constraint: "80gb|h100|h200|blackwell", cpus: 8, memory: 64G}
+    analyze: {partition: cpu-2d, gpus: 0, cpus: 8, memory: 64G}

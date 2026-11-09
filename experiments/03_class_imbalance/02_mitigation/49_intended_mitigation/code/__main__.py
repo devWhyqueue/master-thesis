@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import _bootstrap  # noqa: F401
 
@@ -36,8 +37,9 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("preflight", help="gates 1, 2, 4 (no fits)")
     fit = commands.add_parser("fit", help="fit one split (all draws) or one draw")
     fit.add_argument("--stage", required=True, choices=("ce", "lr", "sgd"))
-    fit.add_argument("--split-index", type=int, required=True, choices=(0, 1, 2))
+    fit.add_argument("--split-index", type=int, choices=(0, 1, 2))
     fit.add_argument("--draw-index", type=int, choices=range(N_DRAWS))
+    fit.add_argument("--shard-index", type=int, choices=range(3 * N_DRAWS))
     commands.add_parser("check-ce", help="gate 3: CE refits against exp-25/26")
     commands.add_parser("analyze", help="all contrasts over both configs")
     return parser
@@ -67,12 +69,24 @@ def main(argv: list[str] | None = None) -> None:
         if not _passed(gate(config)):
             raise SystemExit(1)
         return
-    draws = range(N_DRAWS) if args.draw_index is None else [args.draw_index]
-    for draw in draws:
+    _fit(config, args)
+
+
+def _fit(config: dict[str, Any], args: argparse.Namespace) -> None:
+    """One SLURM array shard (``split * 10 + draw``), one draw, or every draw of a split."""
+    if args.shard_index is not None:
+        split, draw = divmod(args.shard_index, N_DRAWS)
+        shards = [(split, draw)]
+    elif args.split_index is not None:
+        draws = range(N_DRAWS) if args.draw_index is None else [args.draw_index]
+        shards = [(args.split_index, d) for d in draws]
+    else:
+        raise SystemExit("fit needs --shard-index or --split-index")
+    for split, draw in shards:
         if args.stage == "sgd":
-            fit_sgd_draw(config, args.split_index, draw)
+            fit_sgd_draw(config, split, draw)
         else:
-            fit_lr_shard(config, args.split_index, draw, _LR_STAGE[args.stage])
+            fit_lr_shard(config, split, draw, _LR_STAGE[args.stage])
 
 
 if __name__ == "__main__":
