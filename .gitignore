@@ -48,3 +48,6 @@ experiments/03_class_imbalance/01_cause/cross/39_encoder_transfer/model_cache/
 experiments/design_dataset/data/
 experiments/design_dataset/results/
 experiments/design_dataset/report/outputs/tuning_selection.json
+
+# Superpowers skill specs/plans (local only)
+docs/superpowers/
