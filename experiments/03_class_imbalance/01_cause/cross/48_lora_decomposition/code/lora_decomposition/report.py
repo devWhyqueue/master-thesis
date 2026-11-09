@@ -60,9 +60,13 @@ def _share_cell(share: dict[str, Any]) -> str:
 
 
 def table_body(analysis: dict[str, Any]) -> str:
-    """Tabular body: condition accuracies (%), contrasts (pp), and the share h per dataset."""
+    """Tabular body with rules: condition accuracies (%), contrasts (pp), and the share h."""
     data = [analysis["datasets"][name] for name in _DATASETS]
-    lines = ["Quantity & " + " & ".join(_DATASETS.values()) + r" \\", r"\midrule"]
+    lines = [
+        r"\toprule",
+        "Quantity & " + " & ".join(_DATASETS.values()) + r" \\",
+        r"\midrule",
+    ]
     lines += [
         f"{label} & " + " & ".join(_cell(d["accuracy"][key]) for d in data) + r" \\"
         for key, label in _ARM_ROWS
@@ -77,6 +81,7 @@ def table_body(analysis: dict[str, Any]) -> str:
         + " & ".join(_share_cell(d["share"]) for d in data)
         + r" \\"
     )
+    lines.append(r"\bottomrule")
     return "\n".join(lines) + "\n"
 
 
@@ -145,27 +150,12 @@ def _to_summary(entry: dict[str, float]) -> dict[str, float]:
 
 def _recovery_panel(ax: Any, name: str, result: dict[str, Any]) -> None:
     band = benchmark_band(result)
+    title = f"{_DATASETS[name]} (benchmark unavailable)"
     if band is not None:
         ax.axvspan(band[1], band[2], color=_BAND, lw=0)
         ax.axvline(band[0], color=_INK, lw=1.2)
         h = result["share"]["interval"]["estimate"]
-        ax.text(
-            band[0],
-            0.6,
-            f" benchmark $G$ (h = {h:.2f})",
-            fontsize=7,
-            color=_INK,
-            va="bottom",
-        )
-    else:
-        ax.text(
-            0.02,
-            0.6,
-            "benchmark unavailable",
-            fontsize=7,
-            color=_INK,
-            transform=ax.get_yaxis_transform(),
-        )
+        title = f"{_DATASETS[name]}, benchmark $h$ = {h:.2f}"
     estimates = _mitigation_estimates(name) or {}
     for y, (method, _) in enumerate(_METHODS):
         if f"recovery_{method}" in estimates:
@@ -181,7 +171,7 @@ def _recovery_panel(ax: Any, name: str, result: dict[str, Any]) -> None:
                 "s",
             )
     ax.axvline(0, color=_INK, lw=0.8)
-    ax.set_title(_DATASETS[name], fontsize=10)
+    ax.set_title(title, fontsize=10)
     ax.set_xlabel("Recovery at $\\rho=100$ (pp)", fontsize=9)
 
 
@@ -192,7 +182,7 @@ def _recovery_figure(analysis: dict[str, Any], path: Path) -> None:
     axes[0].set_yticks(
         [-y for y in range(len(_METHODS))], [m[1] for m in _METHODS], fontsize=8
     )
-    axes[0].set_ylim(-len(_METHODS) + 0.4, 1.0)
+    axes[0].set_ylim(-len(_METHODS) + 0.4, 0.6)
     handles = [
         Line2D([], [], color=_BLUE, marker="o", ls="", label="Recovery"),
         Line2D(
@@ -204,8 +194,9 @@ def _recovery_figure(analysis: dict[str, Any], path: Path) -> None:
             ls="",
             label="Minus balanced-data gain",
         ),
+        Line2D([], [], color=_INK, lw=1.2, label="Benchmark $G$ (band: 95% interval)"),
     ]
-    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=8, frameon=False)
+    fig.legend(handles=handles, loc="lower center", ncol=3, fontsize=8, frameon=False)
     fig.tight_layout(rect=(0, 0.08, 1, 1))
     fig.savefig(path)
     plt.close(fig)

@@ -1,0 +1,46 @@
+\section{Results}
+\label{sec:results}
+All 240 fits completed and passed the technical checks: within every block the four conditions started from identical weights, B and F as well as C and R drew identical patch sequences, and the loss targets matched the paired imbalanced allocation. The balanced reference and the both condition reproduce the cross-entropy runs of the mitigation studies: B is 36.49 on BRACS and 71.45 on TCGA-UT (earlier 36.53 and 71.51), and the total damage is 5.07 and 1.58 percentage points (earlier 4.95 and 1.56). Table~\ref{tab:results} lists all accuracies and contrasts; Figure~\ref{fig:components} shows the contrasts with their intervals.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lll@{}}
+\csname @@input\endcsname arm_table.tex
+\end{tabular}
+\caption{Coverage carries the BRACS damage, whereas on TCGA-UT neither factor harms alone and the interaction carries all of it. Rows one to four are patient-macro balanced accuracies (\%); the remaining rows are contrasts in percentage points, with positive damage meaning lower accuracy under imbalance. Brackets give 95\% paired bootstrap intervals.}
+\label{tab:results}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{component_figure.pdf}
+\caption{Damage components at $\rho=100$ under LoRA adaptation, with 95\% paired intervals. On BRACS, the coverage-only damage is the only resolved component besides the total; on TCGA-UT, the interaction is resolved and both single-factor damages are close to zero. Note the different horizontal scales.}
+\label{fig:components}
+\end{figure}
+
+\paragraph{BRACS.} Training on the imbalanced patches with balanced class influence already costs 3.09 [1.62, 4.67] points, about three-fifths of the total damage of 5.07 [3.32, 6.98]. Skewing class influence on the balanced patches costs 1.26 [$-0.13$, 2.64] points, and the interaction is 0.72 [$-0.58$, 2.03]; neither interval excludes zero. Restoring balanced class influence on the imbalanced patches recovers $G = 1.97$ [1.12, 2.87] points, a share $h = 0.39$ [0.24, 0.56] of the total damage. The share is interpretable: the total damage exceeds one point and its interval lies above zero, and no bootstrap replicate has a non-positive denominator. Across the three splits, the coverage-only damage ranges from 2.69 to 3.77 points and the share from 0.36 to 0.42.
+
+\paragraph{TCGA-UT.} Neither factor harms on its own: the frequency-only damage is 0.20 [$-0.10$, 0.50] and the coverage-only damage $-0.02$ [$-0.30$, 0.25] points. Together they cost 1.58 [1.21, 1.94] points, so the interaction of 1.40 [1.07, 1.73] carries almost all of the damage. Restoring balanced class influence recovers $G = 1.60$ [1.29, 1.91] points, $h = 1.01$ [0.86, 1.22] of the damage; the coverage-only condition is as accurate as the balanced reference. All three splits agree: the interaction ranges from 1.30 to 1.55 points and the share from 0.95 to 1.08.
+
+\paragraph{Sources of uncertainty.} Resampling only patients or only draws gives intervals of similar width, both narrower than the full intervals. On BRACS, for example, the frequency-only damage has a patient-only interval of [0.62, 1.94] and a draw-only interval of [0.15, 2.34]; on TCGA-UT, the interaction has [1.23, 1.56] and [1.15, 1.63]. The uncertainty therefore comes from both the finite test cohort and the variation between allocation draws, which here also includes the random initialization of each draw.
+
+\paragraph{Comparison with the frozen probe.} The decomposition differs from the frozen-encoder logistic-regression readout on the same patients \citep{queisler2026causeBracs,queisler2026causeTcga}, mainly in the frequency part. On BRACS, the frozen readout lost 4.47 points to frequency and 3.29 to coverage; under LoRA, the frequency-only damage falls to 1.26, while the coverage-only damage stays at 3.09. On TCGA-UT, the frozen readout lost 1.20 points to frequency, 0.53 to coverage, and 1.18 to the interaction; under LoRA, both single-factor damages vanish and an interaction of similar size, 1.40, remains. The two learners differ in more than adaptation (loss, optimizer, training length), so this comparison describes the outcome and does not isolate an effect of LoRA.
+
+\paragraph{Comparison with the mitigation methods.} Figure~\ref{fig:recovery} places the recoveries of the mitigation studies beside the benchmark $G$. These recoveries come from the earlier runs and their own damage anchor, so the comparison is descriptive. On BRACS, train-time and post-hoc logit adjustment recover 1.96 and 1.94 points, matching $G = 1.97$. CUDA recovers more, 2.59 points, but after subtracting its gain on balanced data only 1.20 remain, below the benchmark. On TCGA-UT, train-time and post-hoc logit adjustment recover 1.54 and 1.41 points, inside the interval of $G = 1.60$, consistent with the full recovery that the benchmark share of about one implies.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{recovery_figure.pdf}
+\caption{Logit adjustment recovers what restoring balanced class influence recovers on both datasets. Points show each mitigation method's recovery at $\rho=100$ from the mitigation studies (filled) and, where defined, the recovery after subtracting its gain on balanced data (open). The vertical line and band show this experiment's benchmark $G$ and its 95\% interval; the panel titles give the share $h=G/D$.}
+\label{fig:recovery}
+\end{figure}
+
+\section{Discussion}
+\label{sec:discussion}
+Under the LoRA recipe of the mitigation studies, the two datasets lose accuracy to imbalance in different ways. On BRACS, most of the damage remains when every class has balanced influence on the loss: training on the imbalanced patches alone costs about three points. Under this recipe, restoring balanced class influence can therefore recover only about two-fifths of the damage. On TCGA-UT, the thinner coverage of rare classes harms only when it coincides with skewed class influence; once influence is balanced, coverage costs nothing measurable and the full damage is recoverable.
+
+These benchmarks agree with what the class-influence methods achieved. Logit adjustment recovered almost exactly $G$ on both datasets, about two-fifths of the damage on BRACS and all of it on TCGA-UT. This fits the conditional statement of Section~\ref{sec:interpretation}: a method that removes the frequency-related damage but leaves the coverage residual unchanged should recover close to $G$. The agreement does not show that logit adjustment works through the same mechanism as loss reweighting, and it was observed after the mitigation results were known. Within this recipe, however, it explains why no class-influence method closed the BRACS gap: the remaining three points arise with balanced influence and need a change to what the rare-class patches contribute, not to how strongly each class is weighted.
+
+The comparison with the frozen probe adds a caution for interpreting earlier shares. Under the frozen readout, frequency carried the largest BRACS part; under LoRA, coverage does. A share estimated for one learner therefore does not carry over to another learner on the same data, which was the reason for repeating the decomposition here.

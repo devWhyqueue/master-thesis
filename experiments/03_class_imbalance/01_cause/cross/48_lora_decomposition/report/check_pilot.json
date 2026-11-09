@@ -1,0 +1,235 @@
+{
+  "phase": "pilot",
+  "criteria": "technical only: every arm complete and compatible, shared initialization and seed, paired row streams (B/F, C/R), allocation and weight identities, finite training",
+  "passed": true,
+  "datasets": {
+    "bracs": {
+      "passed": true,
+      "failures": [],
+      "diagnostics": [
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "B",
+          "first_loss_mean": 1.825628662109375,
+          "last_loss_mean": 0.03124985843896866,
+          "validation_patient_macro_ba": 0.36928611848478654,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "F",
+          "first_loss_mean": 1.4297274470329284,
+          "last_loss_mean": 0.05059860534965992,
+          "validation_patient_macro_ba": 0.33087642191719385,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "C",
+          "first_loss_mean": 1.915894341468811,
+          "last_loss_mean": 0.048536741361022,
+          "validation_patient_macro_ba": 0.3270264584327185,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "R",
+          "first_loss_mean": 1.418167495727539,
+          "last_loss_mean": 0.017810795921832323,
+          "validation_patient_macro_ba": 0.3120918428235036,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "B",
+          "first_loss_mean": 1.8587295532226562,
+          "last_loss_mean": 0.03599447328597307,
+          "validation_patient_macro_ba": 0.4191584266926131,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "F",
+          "first_loss_mean": 1.8313004493713378,
+          "last_loss_mean": 0.06732141375541686,
+          "validation_patient_macro_ba": 0.3856580817584078,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "C",
+          "first_loss_mean": 1.8435166478157043,
+          "last_loss_mean": 0.06463086195290088,
+          "validation_patient_macro_ba": 0.3950281871253843,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "R",
+          "first_loss_mean": 1.824017333984375,
+          "last_loss_mean": 0.037572425417602064,
+          "validation_patient_macro_ba": 0.35504024410578083,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "B",
+          "first_loss_mean": 1.8528617858886718,
+          "last_loss_mean": 0.05092022195458412,
+          "validation_patient_macro_ba": 0.3867472029838667,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "F",
+          "first_loss_mean": 1.4839776873588562,
+          "last_loss_mean": 0.047039595991373064,
+          "validation_patient_macro_ba": 0.36710783977829775,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "C",
+          "first_loss_mean": 1.8670928597450256,
+          "last_loss_mean": 0.04529856741428375,
+          "validation_patient_macro_ba": 0.3680489148341784,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "R",
+          "first_loss_mean": 1.5079513549804688,
+          "last_loss_mean": 0.02064216174185276,
+          "validation_patient_macro_ba": 0.36848941375824346,
+          "device": "NVIDIA A100 80GB PCIe"
+        }
+      ]
+    },
+    "tcga_ut": {
+      "passed": true,
+      "failures": [],
+      "diagnostics": [
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "B",
+          "first_loss_mean": 3.2584014892578126,
+          "last_loss_mean": 0.003916500648483634,
+          "validation_patient_macro_ba": 0.7041716726274346,
+          "device": "NVIDIA RTX PRO 6000 Blackwell Server Edition"
+        },
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "F",
+          "first_loss_mean": 2.9773136138916017,
+          "last_loss_mean": 0.0076101280748844145,
+          "validation_patient_macro_ba": 0.7059071003122968,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "C",
+          "first_loss_mean": 3.2210152387619018,
+          "last_loss_mean": 0.014595280308276415,
+          "validation_patient_macro_ba": 0.7141169970512566,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 0,
+          "draw": 0,
+          "arm": "R",
+          "first_loss_mean": 2.9674530029296875,
+          "last_loss_mean": 0.008404771471396089,
+          "validation_patient_macro_ba": 0.6921979298759597,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "B",
+          "first_loss_mean": 3.238262939453125,
+          "last_loss_mean": 0.005013243202120066,
+          "validation_patient_macro_ba": 0.7100623879244851,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "F",
+          "first_loss_mean": 3.106690549850464,
+          "last_loss_mean": 0.007792945858091116,
+          "validation_patient_macro_ba": 0.7177727240185542,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "C",
+          "first_loss_mean": 3.158636140823364,
+          "last_loss_mean": 0.023983699269592762,
+          "validation_patient_macro_ba": 0.7099984944647673,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 1,
+          "draw": 0,
+          "arm": "R",
+          "first_loss_mean": 3.049542236328125,
+          "last_loss_mean": 0.008727030782029032,
+          "validation_patient_macro_ba": 0.6915218256634934,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "B",
+          "first_loss_mean": 3.2785491943359375,
+          "last_loss_mean": 0.006898512365296483,
+          "validation_patient_macro_ba": 0.7300743885356057,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "F",
+          "first_loss_mean": 2.962954950332642,
+          "last_loss_mean": 0.005605004588142037,
+          "validation_patient_macro_ba": 0.7127983524823716,
+          "device": "NVIDIA H100 PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "C",
+          "first_loss_mean": 3.5858847856521607,
+          "last_loss_mean": 0.024775565415620805,
+          "validation_patient_macro_ba": 0.7180173646776767,
+          "device": "NVIDIA A100 80GB PCIe"
+        },
+        {
+          "split": 2,
+          "draw": 0,
+          "arm": "R",
+          "first_loss_mean": 2.9631683349609377,
+          "last_loss_mean": 0.003637576149776578,
+          "validation_patient_macro_ba": 0.6983730329789056,
+          "device": "NVIDIA A100 80GB PCIe"
+        }
+      ]
+    }
+  }
+}
