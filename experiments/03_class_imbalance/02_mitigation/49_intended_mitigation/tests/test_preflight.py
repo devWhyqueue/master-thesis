@@ -59,6 +59,9 @@ def test_gate4_passes(world: dict, tmp_path) -> None:
     gate = _report(run_preflight(world, tmp_path / "report"))["gates"]["la_equivalence"]
     assert gate["passed"], gate
     assert gate["ba_difference_pp"] < 0.01
+    assert gate["solvers"]["posthoc"]["converged"] and gate["solvers"]["trained"]["converged"]
+    info = gate["exp25_recipe_vs_converged_ce"]  # solver noise of the reused recipe, reported only
+    assert {"differing_rows", "ba_difference_pp", "issue"} <= set(info)
 
 
 def test_check_ce_reports_mismatch(world: dict, tmp_path) -> None:

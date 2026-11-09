@@ -86,7 +86,9 @@ def test_offset_fit_equals_posthoc(world: dict) -> None:
     plain = world["fits"][list(LAMBDAS).index(lam)]
     # exp-25's tolerance stops near gradient 3e-7; the identity itself is checked at 1e-12.
     exact = fit_multinomial_logistic(x, y, lam, tol=1e-12)
-    coef, intercept = fit_offset_logistic(x, y, lam, tau * log_pi)
+    fit = fit_offset_logistic(x, y, lam, tau * log_pi)
+    coef, intercept = fit.coef, fit.intercept
+    assert fit.converged and fit.gradient_max < 1e-8
     np.testing.assert_allclose(coef, exact.coef, atol=1e-5)
     shifted = exact.intercept - tau * log_pi
     # Softmax is shift-invariant: only intercept differences between classes are identified.

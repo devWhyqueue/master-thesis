@@ -16,10 +16,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from decodability.evidence import load_freeze_meta
-from decodability.linear import fit_multinomial_logistic
-from imbalance_benchmark.analysis.reporting.clustered_endpoints import (
-    _macro_recall_mean,
-)
 from imbalance_benchmark.common import (
     REPO_ROOT,
     RUN_RECORD_NAME,
@@ -28,23 +24,19 @@ from imbalance_benchmark.common import (
     write_json,
 )
 
-from breadth import MAX_ITER, TOLERANCE, exp2_split_paths
-from breadth.fit import init_shard
-
+from breadth import exp2_split_paths
 from prevalence import patients_per_class
-from prevalence.fit import _arm_rows, _shard_context, arm_row_index, class_counts
+from prevalence.fit import _shard_context, arm_row_index, class_counts
 
 from analyze.paths import run_dir, shard_keys
 from mitigation.data import load_shard, train_arm
 
 from intended import ARMS, REPORT_DIR, cuda_r100_dirs, damage_dir, lora_dirs
-from intended.lam import fit_offset_logistic, logits
+from intended.la_gate import la_equivalence
 
 __all__ = ["reused_runs", "run_preflight"]
 
 _GATE_ERRORS = (ValueError, RuntimeError, OSError, KeyError)
-TIE_GAP = 1e-6
-MAX_BA_DIFF_PP = 0.01
 
 
 def reused_runs(config: dict[str, Any]) -> list[tuple[str, Path]]:
@@ -171,46 +163,6 @@ def _records_present(config: dict[str, Any]) -> dict[str, Any]:
     return {"passed": not problems, "checked": len(runs), "problems": problems}
 
 
-def _la_equivalence(config: dict[str, Any]) -> dict[str, Any]:
-    train_df, names, evals, _ = init_shard(config, 0)
-    shard = _shard_context(train_df, names, 0, 0, patients_per_class(config))
-    counts = np.asarray(
-        class_counts("r100", shard.perm, shard.available, shard.pool_counts, shard.g)
-    )
-    x, y = _arm_rows(train_df, names, shard.patients, list(counts))
-    stored = read_run_record(
-        damage_dir(config, 0, "r100", 0), splits=(), array_fields=()
-    )
-    if stored is None:
-        return {
-            "passed": False,
-            "problems": ["stored exp-25/26 r100 record of shard (0, 0) missing"],
-        }
-    lam, log_pi = float(stored["selected_lambda"]), np.log(counts / counts.sum())
-    posthoc = (
-        logits(fit_multinomial_logistic(x, y, lam, TOLERANCE, MAX_ITER), evals.test_x)
-        - log_pi
-    )
-    coef, intercept = fit_offset_logistic(x, y, lam, log_pi)
-    trained = np.asarray(evals.test_x, dtype=np.float64) @ coef.T + intercept
-    top2 = np.sort(posthoc, axis=1)[:, -2:]
-    clear = top2[:, 1] - top2[:, 0] > TIE_GAP
-    differing = int((posthoc.argmax(1) != trained.argmax(1))[clear].sum())
-    cases = evals.test_id["case_id"].astype(str).to_numpy()
-    ba = [
-        _macro_recall_mean(evals.test_y, z.argmax(1), cases) for z in (posthoc, trained)
-    ]
-    diff_pp = abs(ba[0] - ba[1]) * 100
-    return {
-        "passed": differing == 0 and diff_pp < MAX_BA_DIFF_PP,
-        "lambda": lam,
-        "tau": 1.0,
-        "differing_clear_rows": differing,
-        "near_tie_rows": int((~clear).sum()),
-        "ba_difference_pp": diff_pp,
-    }
-
-
 def _guarded(
     gate: Callable[[dict[str, Any]], dict[str, Any]], config: dict[str, Any]
 ) -> dict[str, Any]:
@@ -225,7 +177,7 @@ def run_preflight(config: dict[str, Any], out_dir: Path = REPORT_DIR) -> Path:
     gates = {
         "row_identity": _guarded(_row_identity, config),
         "records_present": _guarded(_records_present, config),
-        "la_equivalence": _guarded(_la_equivalence, config),
+        "la_equivalence": _guarded(la_equivalence, config),
     }
     path = out_dir / f"preflight_{config['dataset']['name']}.json"
     out_dir.mkdir(parents=True, exist_ok=True)

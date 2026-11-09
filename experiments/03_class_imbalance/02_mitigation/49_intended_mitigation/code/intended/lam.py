@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 from decodability.linear import LinearFitResult, fit_multinomial_logistic
@@ -26,6 +26,8 @@ from breadth import LAMBDAS, MAX_ITER, TIE_TOLERANCE, TOLERANCE
 
 __all__ = [
     "fit_lambda_path",
+    "GRADIENT_TOL",
+    "OffsetFit",
     "fit_offset_logistic",
     "load_path",
     "logits",
@@ -101,32 +103,54 @@ def select_lambda(
     return best_index
 
 
+class OffsetFit(NamedTuple):
+    """Offset fit and its stationarity: converged iff the max gradient entry <= ``GRADIENT_TOL``."""
+
+    coef: np.ndarray
+    intercept: np.ndarray
+    converged: bool
+    gradient_max: float
+    iterations: int
+
+
+GRADIENT_TOL = 1e-8
+
+
+def _offset_objective(
+    theta: np.ndarray, x: np.ndarray, onehot: np.ndarray, offset: np.ndarray, lam: float
+) -> tuple[float, np.ndarray]:
+    """Penalized loss and its gradient at the flattened ``(W, b)``."""
+    (n, dim), k = x.shape, len(offset)
+    coef, intercept = theta[: k * dim].reshape(k, dim), theta[k * dim :]
+    log_p = log_softmax(x @ coef.T + intercept + offset, axis=1)
+    residual = (np.exp(log_p) - onehot) / n
+    loss = -float((log_p * onehot).sum()) / n + lam / 2 * float((coef**2).sum())
+    grad = np.concatenate([(residual.T @ x + lam * coef).ravel(), residual.sum(0)])
+    return loss, grad
+
+
 def fit_offset_logistic(
     x: np.ndarray, y: np.ndarray, lam: float, offset: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+) -> OffsetFit:
     """Train-time logit adjustment: mean CE(x W^T + b + offset) + lam/2 ||W||^2, b unpenalized."""
     x = np.asarray(x, dtype=np.float64)
-    n, dim = x.shape
-    k = len(offset)
-    onehot = np.eye(k)[y]
-
-    def objective(theta: np.ndarray) -> tuple[float, np.ndarray]:
-        """Penalized loss and its gradient at the flattened ``(W, b)``."""
-        coef, intercept = theta[: k * dim].reshape(k, dim), theta[k * dim :]
-        log_p = log_softmax(x @ coef.T + intercept + offset, axis=1)
-        residual = (np.exp(log_p) - onehot) / n
-        loss = -float((log_p * onehot).sum()) / n + lam / 2 * float((coef**2).sum())
-        grad = np.concatenate([(residual.T @ x + lam * coef).ravel(), residual.sum(0)])
-        return loss, grad
-
+    dim, k = x.shape[1], len(offset)
     result = minimize(
-        objective,
+        _offset_objective,
         np.zeros(k * dim + k),
+        args=(x, np.eye(k)[y], offset, lam),
         jac=True,
         method="L-BFGS-B",
         options={"gtol": 1e-10, "ftol": 0.0, "maxiter": MAX_ITER},
     )
-    return result.x[: k * dim].reshape(k, dim), result.x[k * dim :]
+    gradient_max = float(np.abs(result.jac).max())
+    return OffsetFit(
+        result.x[: k * dim].reshape(k, dim),
+        result.x[k * dim :],
+        gradient_max <= GRADIENT_TOL,
+        gradient_max,
+        int(result.nit),
+    )
 
 
 def save_path(path: Path, fits: list[LinearFitResult]) -> None:

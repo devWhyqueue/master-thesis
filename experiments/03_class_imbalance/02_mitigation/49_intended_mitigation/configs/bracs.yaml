@@ -22,6 +22,9 @@
 #   Full recovery iff share interval contains 1. No pre-registered prediction about recovery size.
 # - Gates before fits: row identity, records present, CE baseline reproduction (selected lambda and test
 #   predictions identical to exp-26 for all 60 arm-shards), LA offset equivalence. A failed gate stops the run.
+# - 2026-11-09, after the first preflight: gate 4 failed on both datasets because it paired exp-25's solver
+#   recipe (tol 1e-8, stops far from the optimum; issue #5) with a tight offset fit. Re-specified: both LA arms
+#   use the same solver at the same precision; the recipe's gap to the converged CE is reported, not gated.
 damage_config: experiments/03_class_imbalance/00_damage/26_damage_bracs/configs/bracs.yaml
 mitigation_config: experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/configs/bracs.yaml
 frozen_cuda_config: experiments/03_class_imbalance/02_mitigation/45_lora_ablation/configs/bracs.yaml
