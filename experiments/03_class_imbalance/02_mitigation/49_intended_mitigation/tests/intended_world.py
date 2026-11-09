@@ -4,26 +4,37 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
-from imbalance_benchmark.common import compute_sha256
+import yaml
+from imbalance_benchmark.common import compute_sha256, write_run_record
 
 from breadth.fit import init_shard
+
 
 from prevalence.fit import _fit_arm, _shard_context
 
 from lora_ablation import CUDA_CONSTANTS, STAGE1_RECIPES
 
-from intended import SPEC_GRIDS
+from intended import ARMS, SPEC_GRIDS
+from intended.preflight import reused_runs
 
 CLASSES = ["A", "B", "C"]
 G = 2
 DIM = 4
 DAMAGE_ARMS = ("r1", "r100")
+LORA_GRID = {
+    arm: {
+        "stage1": {"ce": [None], "gcl": [0.05] if arm == "r1" else [0.02, 0.05]},
+        "stage2": {"crt": [None], "gcl2": [0.05] if arm == "r1" else [0.02, 0.05]},
+    }
+    for arm in ARMS
+}
 
 
 def make_manifest(feature_dir: Path, image_dir: Path) -> pd.DataFrame:
@@ -84,6 +95,10 @@ def make_config(tmp_path: Path, dataset: str) -> dict[str, Any]:
             "grid": copy.deepcopy(SPEC_GRIDS[dataset]),
         },
         "protocol": {"id": "intended-mitigation-v1"},
+        "sources": {
+            "mitigation_grid": copy.deepcopy(LORA_GRID),
+            "frozen_cuda_grid": {"stage1": {"ce": [None], "cuda": [0.25, 0.5, 1.0]}},
+        },
     }
 
 
@@ -103,7 +118,55 @@ def build_world(tmp_path: Path, dataset: str = "bracs") -> dict[str, Any]:
         (data / "manifest_freeze.json").write_text(
             json.dumps({"class_names": CLASSES, "manifest_sha256": compute_sha256(data / "manifest.csv")})
         )
-    return make_config(tmp_path, dataset)
+    config = make_config(tmp_path, dataset)
+    _write_source_configs(tmp_path, config)
+    return config
+
+
+def _yaml(path: Path, payload: dict[str, Any]) -> str:
+    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    return str(path)
+
+
+def _write_source_configs(tmp_path: Path, config: dict[str, Any]) -> None:
+    """Damage, LoRA and frozen-CUDA source configs as YAML files, as the real config references them."""
+    base = {"dataset": config["dataset"], "prevalence": config["prevalence"], "slurm": config["slurm"]}
+    outputs = config["source_outputs"]
+    config["damage_config"] = _yaml(tmp_path / "damage.yaml", {**base, "paths": {"outputs": outputs["damage"]}})
+    config["mitigation_config"] = _yaml(
+        tmp_path / "mitigation.yaml", {**base, "paths": {"outputs": outputs["mitigation"]}}
+    )
+    frozen = {"source_config": config["mitigation_config"], "paths": {"outputs": outputs["frozen_cuda"]}}
+    config["frozen_cuda_config"] = _yaml(tmp_path / "frozen_cuda.yaml", frozen)
+
+
+def swap_class_order(config: dict[str, Any]) -> None:
+    """Point the LoRA source config at an exp-2 copy whose freeze lists the classes reversed."""
+    exp2 = Path(config["slurm"]["exp2_outputs"])
+    swapped = exp2.parent / "exp2_swapped"
+    shutil.copytree(exp2, swapped)
+    for freeze in swapped.glob("split=*/data/manifest_freeze.json"):
+        payload = json.loads(freeze.read_text())
+        freeze.write_text(json.dumps({**payload, "class_names": CLASSES[::-1]}))
+    mitigation = yaml.safe_load(Path(config["mitigation_config"]).read_text(encoding="utf-8"))
+    _yaml(Path(config["mitigation_config"]), {**mitigation, "slurm": {"exp2_outputs": str(swapped)}})
+
+
+def write_source_records(config: dict[str, Any]) -> None:
+    """Minimal reused records (test labels/preds, validation BA) for every shard and source run."""
+    manifest = pd.read_csv(Path(config["slurm"]["exp2_outputs"]) / "split=0" / "data" / "manifest.csv")
+    test_y = manifest.query("split == 'test'")["cancer_type"].map(CLASSES.index).to_numpy()
+    for _, directory in reused_runs(config):
+        write_run_record(
+            directory,
+            {
+                "selected_lambda": 1e-2,
+                "splits": {
+                    "validation": {"endpoints": {"patient_macro_balanced_accuracy": 0.5}},
+                    "test": {"labels": test_y, "preds": test_y},
+                },
+            },
+        )
 
 
 def write_damage_records(config: dict[str, Any], shards: list[tuple[int, int]]) -> None:
@@ -122,8 +185,11 @@ def patch_freeze_loader(monkeypatch: Any) -> None:
     from breadth import fit as breadth_fit
     from mitigation import data as mitigation_data
 
+    from intended import preflight
+
     def load(paths: dict[str, Path]) -> dict[str, Any]:
         return json.loads((paths["data"] / "manifest_freeze.json").read_text())
 
     monkeypatch.setattr(breadth_fit, "load_freeze_meta", load)
     monkeypatch.setattr(mitigation_data, "load_freeze_meta", load)
+    monkeypatch.setattr(preflight, "load_freeze_meta", load)
