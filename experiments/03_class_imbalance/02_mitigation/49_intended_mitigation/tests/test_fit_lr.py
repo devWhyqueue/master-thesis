@@ -26,7 +26,7 @@ from intended.fit_lr import (
     fit_lr_shard,
 )
 from intended.lam import fit_lambda_path, load_path, logits
-from intended.reproduction import MISMATCH_NAME, ReproductionError
+from intended.reproduction import MISMATCH_NAME, ReproductionError, compare_to_stored
 
 from intended_world import build_world, patch_freeze_loader, write_damage_records
 
@@ -65,9 +65,9 @@ def test_ce_mismatch_raises(world: dict) -> None:
     stored_dir = damage_dir(world, 0, "r100", 0)
     with np.load(stored_dir / EVAL_ARRAYS_NAME) as arrays:
         corrupted = {k: arrays[k].copy() for k in arrays.files}
-    corrupted["test_preds"][0] = 1 - corrupted["test_preds"][0]
+    corrupted["test_preds"][:6] = (corrupted["test_preds"][:6] + 1) % 3  # BA moves well past 0.01 pp
     np.savez_compressed(stored_dir / EVAL_ARRAYS_NAME, **corrupted)
-    with pytest.raises(ReproductionError, match=r"split 0 draw 0 arm r100.*1 test rows differ"):
+    with pytest.raises(ReproductionError, match=r"split 0 draw 0 arm r100: not reproduced.*'differing_rows': 6"):
         fit_lr_shard(world, 0, 0, "ce")
     own = _dir(world, "r100", "ce", None)
     assert (own / MISMATCH_NAME).is_file() and not (own / RUN_RECORD_NAME).exists()
@@ -155,3 +155,38 @@ def test_records_selectable(fitted: dict, monkeypatch) -> None:
                 (_dir(fitted, arm, method, param) / EVAL_ARRAYS_NAME).unlink()  # test arrays gone
             chosen = select_module.select(fitted, lr_paths(fitted), arm, "lr", method)
             assert chosen[(0, 0)] in params
+
+
+def test_mismatch_does_not_abort_other_arm(world: dict) -> None:
+    stored_dir = damage_dir(world, 0, "r1", 0)
+    with np.load(stored_dir / EVAL_ARRAYS_NAME) as arrays:
+        corrupted = {k: arrays[k].copy() for k in arrays.files}
+    corrupted["test_preds"][:3] = (corrupted["test_preds"][:3] + 1) % 3
+    np.savez_compressed(stored_dir / EVAL_ARRAYS_NAME, **corrupted)
+    with pytest.raises(ReproductionError, match="arm r1"):
+        fit_lr_shard(world, 0, 0, "ce")
+    assert (_dir(world, "r100", "ce", None) / RUN_RECORD_NAME).is_file()
+    assert not (_dir(world, "r1", "ce", None) / RUN_RECORD_NAME).exists()
+
+
+def _stored(tmp_path, preds: np.ndarray, labels: np.ndarray, lam: float = 0.1):
+    from imbalance_benchmark.common import write_run_record
+
+    write_run_record(tmp_path / "stored", {"selected_lambda": lam, "splits": {"test": {"labels": labels, "preds": preds}}})
+    return tmp_path / "stored"
+
+
+def test_tiny_difference_tolerated(tmp_path) -> None:
+    rng = np.random.default_rng(0)
+    labels = rng.integers(0, 3, 30000)
+    cases = np.array([f"p{i % 60}" for i in range(30000)])
+    theirs = np.where(rng.random(30000) < 0.8, labels, (labels + 1) % 3)
+    ours = theirs.copy()
+    first_correct = int(np.flatnonzero(theirs == labels)[0])
+    ours[first_correct] = (ours[first_correct] + 1) % 3  # one row: ~0.004 pp
+    tolerated = compare_to_stored(_stored(tmp_path, theirs, labels), 0.1, ours, cases)
+    assert tolerated["reproduced"] and tolerated["differing_rows"] == 1
+    assert 0 < tolerated["ba_difference_pp"] < 0.01
+    assert not compare_to_stored(tmp_path / "stored", 1.0, theirs, cases)["reproduced"]  # lambda differs
+    many = np.where(np.arange(30000) < 3000, (theirs + 1) % 3, theirs)
+    assert not compare_to_stored(tmp_path / "stored", 0.1, many, cases)["reproduced"]

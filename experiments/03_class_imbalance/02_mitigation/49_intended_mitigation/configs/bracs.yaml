@@ -25,6 +25,9 @@
 # - 2026-11-09, after the first preflight: gate 4 failed on both datasets because it paired exp-25's solver
 #   recipe (tol 1e-8, stops far from the optimum; issue #5) with a tight offset fit. Re-specified: both LA arms
 #   use the same solver at the same precision; the recipe's gap to the converged CE is reported, not gated.
+# - 2026-11-09, after the CE stage: gate 3 exact identity failed on 4/60 arm-shards (same lambda, 1-68 test
+#   rows; floating-point order under exp-25's early-stopping solver, issue #5). Re-specified: same lambda and
+#   test BA within 0.01 pp of the stored record; differing rows and BA gap recorded per arm-shard.
 damage_config: experiments/03_class_imbalance/00_damage/26_damage_bracs/configs/bracs.yaml
 mitigation_config: experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/configs/bracs.yaml
 frozen_cuda_config: experiments/03_class_imbalance/02_mitigation/45_lora_ablation/configs/bracs.yaml
