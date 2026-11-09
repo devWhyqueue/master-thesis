@@ -8,7 +8,9 @@ a strictly better or tied (``TIE_TOLERANCE``) validation score.
 
 from __future__ import annotations
 
-from typing import cast
+from dataclasses import fields
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 from decodability.linear import LinearFitResult, fit_multinomial_logistic
@@ -22,7 +24,15 @@ from scipy.special import log_softmax
 
 from breadth import LAMBDAS, MAX_ITER, TIE_TOLERANCE, TOLERANCE
 
-__all__ = ["fit_lambda_path", "fit_offset_logistic", "logits", "select_lambda"]
+__all__ = [
+    "fit_lambda_path",
+    "fit_offset_logistic",
+    "load_path",
+    "logits",
+    "save_path",
+    "select_lambda",
+    "validation_scores",
+]
 
 
 def fit_lambda_path(
@@ -51,6 +61,25 @@ def logits(fit: LinearFitResult, x: np.ndarray) -> np.ndarray:
     return np.asarray(x, dtype=np.float64) @ fit.coef.T + fit.intercept
 
 
+def validation_scores(
+    fits: list[LinearFitResult],
+    val_x: np.ndarray,
+    val_y: np.ndarray,
+    val_cases: np.ndarray,
+    offset: np.ndarray | None = None,
+) -> list[float | None]:
+    """Patient-macro recall mean per fit (``None`` if not converged), ``offset`` added to logits."""
+    shift = 0.0 if offset is None else offset
+    return [
+        _macro_recall_mean(
+            val_y, (logits(fit, val_x) + shift).argmax(axis=1), val_cases
+        )
+        if fit.converged
+        else None
+        for fit in fits
+    ]
+
+
 def select_lambda(
     fits: list[LinearFitResult],
     val_x: np.ndarray,
@@ -60,11 +89,10 @@ def select_lambda(
 ) -> int:
     """Index of the validation-selected lambda; ``offset`` is added to every logit before argmax."""
     best_index, best_score = None, -1.0
-    for index, fit in enumerate(fits):
-        if not fit.converged:
+    scores = validation_scores(fits, val_x, val_y, val_cases, offset)
+    for index, score in enumerate(scores):
+        if score is None:
             continue
-        scores = logits(fit, val_x) if offset is None else logits(fit, val_x) + offset
-        score = _macro_recall_mean(val_y, scores.argmax(axis=1), val_cases)
         diff = score - best_score
         if best_index is None or diff > TIE_TOLERANCE or abs(diff) <= TIE_TOLERANCE:
             best_index, best_score = index, score
@@ -99,3 +127,24 @@ def fit_offset_logistic(
         options={"gtol": 1e-10, "ftol": 0.0, "maxiter": MAX_ITER},
     )
     return result.x[: k * dim].reshape(k, dim), result.x[k * dim :]
+
+
+def save_path(path: Path, fits: list[LinearFitResult]) -> None:
+    """Every lambda's fit, one stacked array per ``LinearFitResult`` field."""
+    columns = {
+        f.name: np.asarray([getattr(fit, f.name) for fit in fits])
+        for f in fields(LinearFitResult)
+    }
+    np.savez(path, **cast(Any, columns))
+
+
+def load_path(path: Path) -> list[LinearFitResult]:
+    """The cached lambda path written by ``save_path``."""
+    with np.load(path) as stored:
+        columns = {f.name: stored[f.name] for f in fields(LinearFitResult)}
+    return [
+        LinearFitResult(
+            **{k: v[i] if v.ndim > 1 else v[i].item() for k, v in columns.items()}
+        )
+        for i in range(len(columns["coef"]))
+    ]
