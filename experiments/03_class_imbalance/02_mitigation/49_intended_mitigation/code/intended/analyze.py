@@ -142,19 +142,25 @@ def _require_gates(config: dict[str, Any], report_dir: Path) -> None:
             raise ValueError(f"{name} did not pass (or is missing): {path}")
 
 
+def _has_labels(directory: Path) -> bool:
+    record = read_run_record(directory, splits=("test",), array_fields=("labels",))
+    return record is not None and "labels" in record["splits"].get("test", {})
+
+
 def _require_records(specs: dict[str, Spec]) -> None:
+    """Every candidate record must exist with its test labels; else list the directories."""
     missing = [
         str(run_dir(roots[s], arm, method, param, d))
         for cfg, roots, arm, stage, method in specs.values()
         for s, d in shard_keys()
         for param in candidate_params(cfg, arm, stage, method)
-        if read_run_record(
-            run_dir(roots[s], arm, method, param, d), splits=(), array_fields=()
-        )
-        is None
+        if not _has_labels(run_dir(roots[s], arm, method, param, d))
     ]
     if missing:
-        raise ValueError(f"{len(missing)} records missing:\n" + "\n".join(missing))
+        raise ValueError(
+            f"{len(missing)} records missing or without test labels:\n"
+            + "\n".join(missing)
+        )
 
 
 def _labels(directory: Path) -> np.ndarray:

@@ -110,6 +110,14 @@ def test_missing_record_refused(world: dict) -> None:
     assert str(missing) in str(error.value)
 
 
+def test_missing_arrays_refused(world: dict) -> None:
+    broken = run_dir(sgd_paths(world["config"])[0], "r1", "cuda", 0.5, 7)
+    (broken / "eval_arrays.npz").unlink()
+    with pytest.raises(ValueError, match="missing") as error:
+        analyze_dataset(world["config"], world["report"])
+    assert str(broken) in str(error.value)
+
+
 def test_failed_gate_refused(world: dict) -> None:
     write_json(world["report"] / "ce_reproduction_bracs.json", {"passed": False})
     with pytest.raises(ValueError, match="ce_reproduction"):
