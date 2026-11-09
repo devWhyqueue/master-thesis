@@ -1,0 +1,40 @@
+# Mitigation as intended (exp-49, protocol intended-mitigation-v1), tcga_ut: frozen readout for methods without a
+# representation-learning stage, LoRA only where the method's design has one; every method against the frozen
+# logistic-regression CE of exp-25 (spec docs/superpowers/specs/2026-11-09-intended-mitigation-design.md).
+# Virchow2, arms r1/r100, 3 splits x 10 draws = 30 shards (exp-25 design, G=20, T=19,200).
+#
+# Method assignment:
+#   method    representation          readout / head                                       source of fits
+#   CE        frozen                  logistic regression, lambda on validation            refit here; must reproduce exp-25
+#   BS        frozen                  logistic regression, class weights n_c^(-s)           new, CPU
+#   LA        frozen                  CE refit logits - tau*log(pi), (tau, lambda) on val   score-only on the CE refit
+#   DisAlign  frozen                  exp-40 DisAlign on CE at its selected lambda          new, CPU
+#   cRT       LoRA stage 1 (CE)       exp-40 stage 2, balanced head refit (SGD)             exp-43 records
+#   GCL       LoRA stage 1 (GCL)      own stage-1 cosine head                               exp-43 records
+#   GCL2      LoRA stage 1 (GCL)      exp-40 stage 2, GCL loss + CB sampler (SGD)            exp-43 records
+#   CUDA      frozen                  exp-45 SGD trainer, linear head                       r100 exp-45; r1 new, GPU
+#   CUDA's control is CE_SGD through the same frozen_cuda path with augmentation off (r1, r100, new GPU).
+#
+# Decision rules, fixed before any fit:
+# - Strength selection per shard on validation BA only (exp-40 analyze.select); test never read for selection.
+# - Inference: 10,000 replicates, breadth.BOOTSTRAP_SEED, one shared set of draw weights; 95 % per-contrast
+#   intervals, no multiplicity correction. Material iff point >= 1 pp and lower bound > 0 (R and R - G).
+#   Full recovery iff share interval contains 1. No pre-registered prediction about recovery size.
+# - Gates before fits: row identity, records present, CE baseline reproduction (selected lambda and test
+#   predictions identical to exp-25 for all 60 arm-shards), LA offset equivalence. A failed gate stops the run.
+damage_config: experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/configs/tcga_ut.yaml
+mitigation_config: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/configs/tcga_ut.yaml
+frozen_cuda_config: experiments/03_class_imbalance/02_mitigation/45_lora_ablation/configs/tcga_ut.yaml
+
+paths:
+  outputs: experiments/03_class_imbalance/02_mitigation/49_intended_mitigation/outputs/tcga_ut
+
+protocol:
+  id: intended-mitigation-v1
+  grid:
+    r1:
+      lr: {ce: [null], disalign: [1.0]}
+      sgd: {ce: [null], cuda: [0.25, 0.5, 1.0]}
+    r100:
+      lr: {ce: [null], la: [0.25, 0.5, 1.0, 1.5, 2.0], bs: [0.5, 1.0], disalign: [0.5, 1.0, 1.5, 2.0]}
+      sgd: {ce: [null]}
