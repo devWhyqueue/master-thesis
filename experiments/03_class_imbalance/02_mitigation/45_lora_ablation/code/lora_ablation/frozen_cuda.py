@@ -105,8 +105,9 @@ def run_frozen_cuda(
     task: CudaTask,
     param: float,
     seeds: tuple[int, int],
+    method: str = "cuda",
 ) -> nn.Module:
-    """Train one CUDA candidate's head; ``seeds`` are (sampling/augmentation, head initialization)."""
+    """Train one CUDA (``method="ce"``: unaugmented CE) head; ``seeds`` are (sampling/augmentation, head init)."""
     encoder, data_config, arm, images = task
     freeze_encoder(encoder)
     hparams = train_hparams(config, "stage1")._replace(micro_batch=CUDA_MICRO_BATCH)
@@ -116,11 +117,10 @@ def run_frozen_cuda(
     head = head.to(device)
     optimizer, scheduler = make_optimizer(head, hparams)
     mean, std = tuple(data_config["mean"]), tuple(data_config["std"])
-    y_t = torch.from_numpy(arm.y).to(device)
     step = build_loss_step(
-        "cuda",
+        method,
         param,
-        StepModel(encoder, head, images, y_t, mean, std),
+        StepModel(encoder, head, images, torch.from_numpy(arm.y).to(device), mean, std),
         device,
         (None, None, None, cuda_params),
         torch.Generator(device=device).manual_seed(seeds[0]),
