@@ -26,7 +26,7 @@ from intended.fit_lr import (
     fit_lr_shard,
 )
 from intended.lam import fit_lambda_path, load_path, logits
-from intended.reproduction import MISMATCH_NAME, ReproductionError, compare_to_stored
+from intended.reproduction import MISMATCH_NAME, ReproductionError, check_reproduction, compare_to_stored
 
 from intended_world import build_world, patch_freeze_loader, write_damage_records
 
@@ -190,3 +190,16 @@ def test_tiny_difference_tolerated(tmp_path) -> None:
     assert not compare_to_stored(tmp_path / "stored", 1.0, theirs, cases)["reproduced"]  # lambda differs
     many = np.where(np.arange(30000) < 3000, (theirs + 1) % 3, theirs)
     assert not compare_to_stored(tmp_path / "stored", 0.1, many, cases)["reproduced"]
+
+
+def test_accepted_exception_needs_same_lambda(tmp_path) -> None:
+    labels = np.array([0, 1, 2] * 10)
+    cases = np.array([f"p{i % 6}" for i in range(30)])
+    stored = _stored(tmp_path, labels, labels)
+    wrong = (labels + 1) % 3
+    out = tmp_path / "own"
+    with pytest.raises(ReproductionError):
+        check_reproduction(stored, "s", (0.1, wrong, cases), out)
+    assert check_reproduction(stored, "s", (0.1, wrong, cases), out, accepted=True)["accepted_exception"]
+    with pytest.raises(ReproductionError):
+        check_reproduction(stored, "s", (1.0, wrong, cases), out, accepted=True)

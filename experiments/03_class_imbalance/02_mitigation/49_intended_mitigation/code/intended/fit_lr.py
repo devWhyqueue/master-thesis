@@ -30,7 +30,7 @@ from mitigation.train.stage2 import run_disalign
 
 from lora_ablation import init_seed
 
-from intended import ARMS, damage_dir, lr_paths
+from intended import ARMS, lr_paths
 from intended.lam import (
     fit_lambda_path,
     load_path,
@@ -39,7 +39,7 @@ from intended.lam import (
     select_lambda,
     validation_scores,
 )
-from intended.reproduction import ReproductionError, check_reproduction
+from intended.reproduction import ReproductionError, reproduce_ce
 
 __all__ = [
     "LAMBDA_NAME",
@@ -158,12 +158,9 @@ def _fit_ce(ctx: _Context, arm: ArmData) -> None:
     test_logits = logits(best, ctx.evals.test_x)
     out_dir = _out(ctx, arm.name, "ce", None)
     cases = ctx.evals.test_id["case_id"].astype(str).to_numpy()
-    selection["reproduction"] = check_reproduction(
-        damage_dir(ctx.config, ctx.split, arm.name, ctx.draw),
-        f"split {ctx.split} draw {ctx.draw} arm {arm.name}",
-        (selection["selected_lambda"], test_logits.argmax(1), cases),
-        out_dir,
-    )
+    refit = (selection["selected_lambda"], test_logits.argmax(1), cases)
+    where = (ctx.split, ctx.draw, arm.name)
+    selection["reproduction"] = reproduce_ce(ctx.config, where, refit, out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     save_path(out_dir / PATH_NAME, fits)
     _record(

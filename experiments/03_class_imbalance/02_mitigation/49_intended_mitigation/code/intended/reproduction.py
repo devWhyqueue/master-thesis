@@ -31,12 +31,15 @@ __all__ = [
     "MISMATCH_NAME",
     "ReproductionError",
     "check_ce",
+    "accepted_exception",
     "check_reproduction",
     "compare_to_stored",
+    "reproduce_ce",
 ]
 
 MISMATCH_NAME = "mismatch.json"
 MAX_BA_DIFF_PP = 0.01
+_STATUSES = ("exact", "tolerated", "accepted", "mismatch", "missing")
 
 
 class ReproductionError(RuntimeError):
@@ -68,19 +71,52 @@ def compare_to_stored(
     }
 
 
+def accepted_exception(config: dict[str, Any], split: int, draw: int, arm: str) -> bool:
+    """Whether the config lists this arm-shard as an accepted, disclosed gate-3 exception."""
+    exceptions = config["protocol"].get("accepted_ce_exceptions", [])
+    return {"split": split, "draw": draw, "arm": arm} in exceptions
+
+
+def _acceptable(comparison: dict[str, Any], accepted: bool) -> bool:
+    same_lambda = "lambda" in comparison and float(comparison["lambda"]) == float(
+        comparison["stored_lambda"]
+    )
+    return accepted and same_lambda
+
+
 def check_reproduction(
     stored_dir: Path,
     where: str,
     refit: tuple[float, np.ndarray, np.ndarray],
     out_dir: Path,
+    accepted: bool = False,
 ) -> dict[str, Any]:
-    """The comparison if reproduced; else write ``mismatch.json`` and raise."""
+    """The comparison if reproduced (or an accepted exception); else write ``mismatch.json``, raise."""
     comparison = compare_to_stored(stored_dir, *refit)
     if comparison["reproduced"]:
         return comparison
+    if _acceptable(comparison, accepted):
+        return {**comparison, "accepted_exception": True}
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / MISMATCH_NAME, {"where": where, **comparison})
     raise ReproductionError(f"{where}: not reproduced: {comparison}")
+
+
+def reproduce_ce(
+    config: dict[str, Any],
+    where: tuple[int, int, str],
+    refit: tuple[float, np.ndarray, np.ndarray],
+    out_dir: Path,
+) -> dict[str, Any]:
+    """Gate 3 for one CE refit at ``(split, draw, arm)`` against its exp-25/26 record."""
+    split, draw, arm = where
+    return check_reproduction(
+        damage_dir(config, split, arm, draw),
+        f"split {split} draw {draw} arm {arm}",
+        refit,
+        out_dir,
+        accepted_exception(config, split, draw, arm),
+    )
 
 
 def _test_cases(config: dict[str, Any], split: int) -> np.ndarray:
@@ -91,7 +127,7 @@ def _test_cases(config: dict[str, Any], split: int) -> np.ndarray:
 def _arm_shard(
     config: dict[str, Any], shard: tuple[int, int], arm: str, cases: np.ndarray
 ) -> tuple[str, Any]:
-    """``("exact" | "tolerated" | "mismatch" | "missing", detail)`` of one CE refit."""
+    """``(status, detail)`` of one CE refit; status is one of ``_STATUSES``."""
     s, d = shard
     own, where = (
         run_dir(lr_paths(config)[s], arm, "ce", None, d),
@@ -112,17 +148,21 @@ def _arm_shard(
         **compare_to_stored(damage_dir(config, s, arm, d), lam, preds, cases),
     }
     if not comparison["reproduced"]:
-        return "mismatch", comparison
+        accepted = accepted_exception(config, s, d, arm)
+        return (
+            "accepted" if _acceptable(comparison, accepted) else "mismatch"
+        ), comparison
     return ("exact" if comparison["differing_rows"] == 0 else "tolerated"), comparison
 
 
 def _summary(found: dict[str, list[Any]], expected: int) -> dict[str, Any]:
-    matched = len(found["exact"]) + len(found["tolerated"])
+    matched = sum(len(found[k]) for k in ("exact", "tolerated", "accepted"))
     return {
         "matched": matched,
         "exact": len(found["exact"]),
         "expected": expected,
         "tolerated": found["tolerated"],
+        "accepted": found["accepted"],
         "mismatches": found["mismatch"],
         "missing": found["missing"],
         "passed": matched == expected,
@@ -131,12 +171,7 @@ def _summary(found: dict[str, list[Any]], expected: int) -> dict[str, Any]:
 
 def check_ce(config: dict[str, Any], out_dir: Path = REPORT_DIR) -> Path:
     """Summarize gate 3 over every arm-shard into ``ce_reproduction_<dataset>.json``."""
-    found: dict[str, list[Any]] = {
-        "exact": [],
-        "tolerated": [],
-        "mismatch": [],
-        "missing": [],
-    }
+    found: dict[str, list[Any]] = {k: [] for k in _STATUSES}
     cases = {s: _test_cases(config, s) for s in sorted({s for s, _ in shard_keys()})}
     for shard in shard_keys():
         for arm in ARMS:
