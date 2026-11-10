@@ -82,14 +82,22 @@ def test_logistic_c_and_regularization():
 
 
 def test_logistic_tolerance_is_on_mean_objective():
-    """Solver gtol == tol * N, so the criterion does not tighten with sample count."""
+    """Solver gtol == tol and the mean-objective gradient ends within tol."""
     np.random.seed(7)
     x = np.random.randn(500, 8)
     y = np.random.randint(0, 3, size=500)
 
-    res = fit_multinomial_logistic(x, y, lambda_val=1e-6, tol=1e-8, max_iter=300)
-    assert np.isclose(res.solver_tolerance, 1e-8 * 500)
+    lam, tol = 1e-6, 1e-8
+    res = fit_multinomial_logistic(x, y, lambda_val=lam, tol=tol, max_iter=300)
+    assert res.solver_tolerance == tol
     assert res.converged
+
+    logits = x @ res.coef.T + res.intercept
+    probs = np.exp(logits - logits.max(axis=1, keepdims=True))
+    resid = probs / probs.sum(axis=1, keepdims=True) - np.eye(3)[y]
+    grad_w = resid.T @ x / len(y) + lam * res.coef
+    grad_b = resid.mean(axis=0)
+    assert max(np.abs(grad_w).max(), np.abs(grad_b).max()) <= 2 * tol
 
 
 def test_selection_tie_rule_prefers_larger(tmp_path):

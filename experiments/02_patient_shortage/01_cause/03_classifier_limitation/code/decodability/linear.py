@@ -125,14 +125,14 @@ def fit_multinomial_logistic(
     sample_weight: np.ndarray | None = None,
 ) -> LinearFitResult:
     """Fit with C = 1 / (N * lambda) and ``tol`` as a gradient tolerance on the mean
-    objective; scikit-learn applies its own ``tol`` to the summed objective, so the
-    solver receives ``tol * N``. ``sample_weight``, when given, must sum to N so this
-    mapping stays valid.
+    objective; scikit-learn >= 1.2 already minimizes the mean objective, so ``tol``
+    reaches L-BFGS ``gtol`` unchanged. ``sample_weight``, when given, must sum to N so
+    the C mapping stays valid.
     """
     feat64, lab_int = np.asarray(features, np.float64), np.asarray(labels, np.int64)
     n_samples = feat64.shape[0]
     weight64 = None if sample_weight is None else np.asarray(sample_weight, np.float64)
-    c_val, solver_tol = 1.0 / (n_samples * lambda_val), tol * n_samples
+    c_val, solver_tol = 1.0 / (n_samples * lambda_val), tol
     model, conv = _fit_once(feat64, lab_int, c_val, max_iter, solver_tol, weight64)
     return _build_result(
         model,
