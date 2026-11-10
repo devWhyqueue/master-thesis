@@ -1,5 +1,5 @@
 \begin{table}[t]\centering\small
-\caption{CE baselines (patient-macro BA, \%). $D$ = BA(r1) $-$ BA(r100), 95\,\% interval; $^{*}$ material (point $\geq 1$ pp, lower bound $> 0$).}
+\caption{Cross-entropy (CE) references: patient-macro balanced accuracy (BA, \%) for logistic regression (LR) and stochastic gradient descent (SGD). r1 and r100 denote class ratios $\rho=1$ and $\rho=100$. Damage $D$ = BA(r1) $-$ BA(r100), with 95\,\% intervals; $^{*}$ material (point estimate $\geq 1$ percentage point, lower bound $> 0$).}
 \label{tab:baselines}
 \begin{tabular}{lrrlrrl}\toprule
 Dataset & LR r1 & LR r100 & $D$ & SGD r1 & SGD r100 & $D_\mathrm{SGD}$ \\ \midrule
@@ -8,7 +8,7 @@ TCGA-UT & 72.06 & 69.14 & 2.91 [2.51, 3.33]$^{*}$ & 71.51 & 67.31 & 4.20 [3.77, 
 \bottomrule\end{tabular}\end{table}
 
 \begin{table}[t]\centering\small
-\caption{Recovery $R$, share $R/D$, balanced gain $G$ and imbalance-specific recovery $R-G$ (pp, 95\,\% interval; CUDA against CE$_\mathrm{SGD}$). $^{*}$ material.}
+\caption{Recovery $R$, recovery share $R/D$, balanced gain $G$ and imbalance-specific recovery $R-G$, with 95\,\% intervals. Accuracy contrasts are in percentage points; $R/D$ is dimensionless. LA: logit adjustment; BS: balanced sampling; cRT: classifier re-training; GCL: Gaussian clouded logit adjustment; GCL2: its two-stage variant; CUDA: curriculum of data augmentation. CUDA uses a cross-entropy reference trained by stochastic gradient descent (CE$_\mathrm{SGD}$). $^{*}$ material (point estimate $\geq 1$ percentage point, lower bound $> 0$).}
 \label{tab:contrasts}
 \begin{tabular}{llllll}\toprule
 Dataset & Method & $R$ & $R/D$ & $G$ & $R-G$ \\ \midrule
