@@ -1,0 +1,35 @@
+{
+  "accepted": [],
+  "exact": 57,
+  "expected": 60,
+  "matched": 60,
+  "mismatches": [],
+  "missing": [],
+  "passed": true,
+  "tolerated": [
+    {
+      "ba_difference_pp": 0.0011994203196366016,
+      "differing_rows": 68,
+      "lambda": 0.1,
+      "reproduced": true,
+      "stored_lambda": 0.1,
+      "where": "split 2 draw 0 arm r1"
+    },
+    {
+      "ba_difference_pp": 0.0035912798167743176,
+      "differing_rows": 7,
+      "lambda": 0.0001,
+      "reproduced": true,
+      "stored_lambda": 0.0001,
+      "where": "split 2 draw 0 arm r100"
+    },
+    {
+      "ba_difference_pp": 0.0,
+      "differing_rows": 1,
+      "lambda": 0.1,
+      "reproduced": true,
+      "stored_lambda": 0.1,
+      "where": "split 2 draw 1 arm r1"
+    }
+  ]
+}

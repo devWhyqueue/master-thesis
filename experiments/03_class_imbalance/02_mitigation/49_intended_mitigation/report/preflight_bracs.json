@@ -1,0 +1,43 @@
+{
+  "gates": {
+    "la_equivalence": {
+      "ba_difference_pp": 0.0,
+      "differing_clear_rows": 0,
+      "differing_rows": 0,
+      "exp25_recipe_vs_converged_ce": {
+        "ba_difference_pp": 0.6566246878467241,
+        "differing_clear_rows": 2425,
+        "differing_rows": 2425,
+        "issue": "https://github.com/devWhyqueue/master-thesis/issues/5",
+        "near_tie_rows": 0
+      },
+      "lambda": 1e-06,
+      "near_tie_rows": 0,
+      "passed": true,
+      "solvers": {
+        "posthoc": {
+          "converged": true,
+          "gradient_max": 9.798495067825464e-11,
+          "iterations": 2665
+        },
+        "trained": {
+          "converged": true,
+          "gradient_max": 6.818702351425771e-11,
+          "iterations": 3373
+        }
+      },
+      "tau": 1.0
+    },
+    "records_present": {
+      "checked": 540,
+      "passed": true,
+      "problems": []
+    },
+    "row_identity": {
+      "checked": 60,
+      "passed": true,
+      "problems": []
+    }
+  },
+  "passed": true
+}

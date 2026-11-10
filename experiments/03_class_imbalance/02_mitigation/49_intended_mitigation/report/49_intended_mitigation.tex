@@ -1,0 +1,108 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+\title{Class-Imbalance Mitigation as Intended:\\Frozen Readout, with {LoRA} Only Where a Method Learns a Representation}
+\author{Yannik Queisler}
+\date{November 10, 2026}
+
+\begin{document}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\setlength{\emergencystretch}{2em}
+\maketitle
+\begin{abstract}
+\noindent The earlier mitigation studies adapted the Virchow2 encoder through low-rank adaptation (LoRA) for every method, including the cross-entropy reference, which lowered the reference's balanced accuracy and shrank the damage being mitigated. This study replays the mitigations in the intended form: methods without a representation-learning stage read out from frozen features, and only cRT, GCL and its two-stage variant use LoRA. Every method is measured against the frozen logistic-regression reference of the damage studies, whose balanced accuracy drops by 7.65 points on BRACS and 2.91 points on TCGA-UT when the class ratio grows from 1 to 100. Balanced sampling and logit adjustment on frozen features recover the most: 4.42 and 3.75 points on BRACS, 2.39 and 2.16 points on TCGA-UT. The LoRA methods correct the imbalance-specific part of the damage about as strongly, but on BRACS their generic deficit of about 3.5 points at balanced classes cancels most of that correction. No method closes the gap fully.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+The damage studies measured how much patient-macro balanced accuracy a linear readout of frozen Virchow2 features \citep{zimmermann2024virchow2} loses when the training classes become imbalanced \citep{queisler2026prevalenceTcga,queisler2026prevalenceBracs}. At a class ratio of $\rho=100$, the loss is 7.65 points on BRACS and 2.91 points on TCGA-UT. The mitigation studies then tested eight mitigations, but trained a LoRA update \citep{hu2022lora} of the encoder for every method, including the cross-entropy (CE) reference \citep{queisler2026mitigationBracs,queisler2026mitigationTcga}. LoRA was meant only for methods whose design contains a representation-learning stage. Applied to CE, it changed the baseline: on BRACS, LoRA CE at balanced classes reached 36.53 points instead of the frozen readout's 39.57, and the measured damage shrank accordingly. A frozen-encoder follow-up showed that some methods keep or even gain accuracy without LoRA \citep{queisler2026loraAblation}.
+
+This study asks: \emph{how much of the measured damage does each mitigation recover when it is applied as intended and measured against the frozen reference of the damage studies?} The answer connects the mitigation results directly to the damage they are meant to repair.
+
+\section{Design}
+\label{sec:design}
+The study uses the damage studies' design: Virchow2, three patient-disjoint splits with ten patient draws each (30 shards per dataset), the same validation and test patients, class order and class-to-rank permutations, and the balanced ($\rho=1$) and severe ($\rho=100$) allocations of a fixed patch budget. Table~\ref{tab:assignment} lists how each method is realized.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}ll>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+Method & Representation & Readout & Strengths at $\rho=100$ \\
+\midrule
+CE (reference) & frozen & logistic regression & none \\
+Logit adjustment (LA) & frozen & CE logits $-\,\tau\log\hat\pi$ & $\tau\in\{0.5,1,1.5,2\}$; TCGA-UT adds 0.25 \\
+Balanced sampling (BS) & frozen & class-weighted logistic regression & $s\in\{0.5,1\}$ \\
+DisAlign & frozen & learned calibration of the CE head & $\gamma\in\{0.5,1,1.5,2\}$ \\
+cRT & LoRA (CE) & re-trained linear head, balanced sampling & none \\
+GCL & LoRA (GCL loss) & its own cosine head & $\sigma$ grid of the mitigation studies \\
+GCL2 & LoRA (GCL loss) & re-trained cosine head, GCL loss & as GCL \\
+CUDA & frozen & linear head, augmented images & $p_{\mathrm{aug}}\in\{0.25,0.5,1\}$ \\
+\bottomrule
+\end{tabularx}
+\caption{Method assignment. Methods without a representation-learning stage read out from frozen Virchow2 features; cRT, GCL and GCL2 \citep{kang2020decouplingRepresentation,li2022gaussianClouded} keep the LoRA first stage of the mitigation studies. $\hat\pi$: realized training class shares.}
+\label{tab:assignment}
+\end{table}
+
+\paragraph{Frozen readouts.}
+CE is the multinomial logistic regression of the damage studies, with the L2 strength $\lambda$ chosen on validation from nine values between $10^{-6}$ and $100$. Logit adjustment \citep{menon2021longTail} subtracts $\tau\log\hat\pi$ from the CE logits and re-selects $\lambda$ for each $\tau$. Training with the offset added to the logits gives the same predictions: with an unpenalized intercept, the offset moves only the optimal intercept. Train-time and post-hoc adjustment are therefore one method here. Balanced sampling is realized as its expected-loss equivalent, class weights $w_c\propto n_c^{-s}$. DisAlign \citep{zhang2021distributionAlignment} trains its calibration module on the frozen features and the CE head at its selected $\lambda$, with the stage-two recipe of the mitigation studies.
+
+\paragraph{LoRA methods.}
+cRT, GCL and GCL2 reuse the records of the mitigation studies unchanged, at both class ratios. Their heads are trained by stochastic gradient descent (SGD), whereas the frozen methods use logistic regression; this readout difference is generic and enters the balanced gain $G$ defined below, not the imbalance-specific recovery.
+
+\paragraph{CUDA.}
+The curriculum of data augmentation \citep{ahn2023cuda} needs image forwards at every step, which a logistic regression on fixed features cannot host. CUDA therefore keeps the frozen-encoder SGD trainer of the follow-up study \citep{queisler2026loraAblation}, and its reference is a CE head trained through the same code path with augmentation switched off (CE$_\mathrm{SGD}$), at both ratios. The $\rho=100$ CUDA runs are reused from the follow-up study.
+
+\paragraph{Reference reproduction.}
+Every CE refit must match the damage studies' stored fit: the same selected $\lambda$ and a test balanced accuracy within 0.01 points. On each dataset, 57 of the 60 shard-ratio combinations match prediction for prediction. Five more (two on BRACS, three on TCGA-UT) keep $\lambda$ and differ on 1 to 68 test patches, by at most 0.004 points. One BRACS combination keeps $\lambda$ but differs on 38 of 22,133 test patches by 0.056 points; it is kept and listed as an exception. The differences arise because the damage studies' solver stops before the optimum, so patches near the decision boundary depend on floating-point order.
+
+\section{Evaluation}
+\label{sec:evaluation}
+With patient-macro balanced accuracy (BA) in percentage points, pooled over the 30 shards, the damage, the recovery of method $m$, its share of the damage, its balanced gain and its imbalance-specific recovery are
+\begin{align}
+D &= \mathrm{BA}_{\mathrm{CE}}(\rho{=}1) - \mathrm{BA}_{\mathrm{CE}}(\rho{=}100), &
+R &= \mathrm{BA}_m(\rho{=}100) - \mathrm{BA}_{\mathrm{CE}}(\rho{=}100), &
+&R/D,\\
+G &= \mathrm{BA}_m(\rho{=}1) - \mathrm{BA}_{\mathrm{CE}}(\rho{=}1), &
+&R-G.
+\end{align}
+$G$ captures what a method changes at balanced classes; $R-G$ is the part of the recovery that the balanced setting does not explain. For LA and BS, $G=0$ by construction, because equal class counts make the offset constant and the weights equal. For CUDA, CE$_\mathrm{SGD}$ replaces CE in all four quantities. Each method's strength is chosen per shard on validation BA only.
+
+Uncertainty follows the mitigation studies: Bayesian bootstrap weights on test patients \citep{rubin1981bayesian} combined with resampling of draws within each split, 10,000 replicates, one shared set of weights, so every contrast is paired. Intervals are 95\% percentile intervals per contrast, without multiplicity correction, since no joint claim is made. A recovery $R$ (or $R-G$) is \emph{material} if its point estimate is at least one point and its lower bound exceeds zero. A method recovers the damage \emph{fully} if the interval of $R/D$ contains one. No prediction about the size of the recovery was made in advance.
+
+\section{Results}
+\label{sec:results}
+The frozen reference reproduces the damage studies (Table~\ref{tab:baselines}). The SGD reference loses a similar amount on BRACS (7.34 points) but more on TCGA-UT (4.20 against 2.91 points), because its $\rho=100$ head is 1.83 points weaker than the logistic regression there. Exchanging the follow-up study's CPU-trained CE$_\mathrm{SGD}$ for the GPU-trained one used here changes BA by at most 0.02 points.
+
+{\setlength{\tabcolsep}{4pt}\input{results}}
+
+\paragraph{Frozen methods.}
+Balanced sampling and logit adjustment recover the most on both datasets (Table~\ref{tab:contrasts}): BS 4.42 points on BRACS and 2.39 points on TCGA-UT, LA 3.75 and 2.16 points. On TCGA-UT this is 82\% and 74\% of the damage; on BRACS, a little over half. Both mainly lift the rarest classes: in the third of classes with the fewest training patches, recall rises from 7.3\% under CE to 25.5\% (LA) and 19.1\% (BS) on BRACS, and from 60.1\% to 68.4\% and 68.2\% on TCGA-UT. DisAlign recovers little: 0.65 points on BRACS and 1.00 point on TCGA-UT, the latter just meeting the materiality rule while its imbalance-specific part (0.99) does not.
+
+\paragraph{LoRA methods.}
+At $\rho=100$, cRT, GCL and GCL2 are not materially better than the frozen reference on BRACS (0.54 to 1.61 points, all intervals containing zero), but they are on TCGA-UT (1.49 to 1.95 points). The balanced gain explains the gap between the datasets. At $\rho=1$, the LoRA pipelines are 3.4 to 3.7 points below the frozen reference on BRACS and 1.0 to 1.2 points below it on TCGA-UT. Their imbalance-specific recovery $R-G$ is therefore the largest of all methods: 4.05 to 5.29 points on BRACS and 2.46 to 3.09 points on TCGA-UT. GCL2 also lifts the rarest third the most (27.3\% on BRACS, 72.2\% on TCGA-UT). LoRA adaptation thus carries a generic cost that, on BRACS, nearly cancels the strong correction of the imbalance.
+
+\paragraph{CUDA.}
+Measured against its own SGD reference, CUDA recovers 1.82 points on BRACS (25\% of $D_\mathrm{SGD}$, material) and 0.89 points on TCGA-UT (21\%, not material). Its balanced gain is close to zero; at $\rho=1$, validation selects the weakest augmentation ($p_{\mathrm{aug}}=0.25$) in 29 of 30 shards on both datasets.
+
+\paragraph{Full recovery and selection.}
+No method recovers the damage fully: the highest share is 0.58 [0.43, 0.72] on BRACS (BS) and 0.82 [0.77, 0.87] on TCGA-UT (BS). Balanced sampling selects its maximum strength $s=1$ in 28 of 30 BRACS shards and in all TCGA-UT shards, the natural end of its range. Two selections sit on an open grid edge: DisAlign's largest $\gamma=2$ in 13 of 30 BRACS shards, and GCL2's smallest $\sigma=0.01$ in 16 of 30 TCGA-UT shards, as in the mitigation studies. The grids were not extended.
+
+\paragraph{Choice of reference.}
+Against the LoRA CE reference of the mitigation studies instead of the frozen one, every recovery shifts by the same amount: 0.34 points larger on BRACS, where LoRA CE is weaker at $\rho=100$, and 0.81 to 0.82 points smaller on TCGA-UT, where it is stronger (e.g.\ LA 1.35 instead of 2.16). The ranking of the methods is unchanged.
+
+\section{Limitations}
+\label{sec:limitations}
+The study reuses data already inspected by the damage and mitigation studies; it is not an independent test. It covers one encoder and one severe ratio. The frozen methods and the LoRA methods differ in their readout as well as their representation (logistic regression against SGD heads), so a direct comparison of their recoveries mixes both differences; $R-G$ removes only the part visible at balanced classes. CUDA's recovery is measured on a different reference than the others, and the frozen-versus-LoRA question within cRT and GCL is outside this design.
+
+Two acceptance rules were relaxed after their first evaluation, and the results above use the relaxed rules. The check that train-time and post-hoc logit adjustment agree initially compared a fit at the damage studies' solver tolerance with a tightly converged one and failed on both datasets; at matched precision, the two agree on every test patch. The reference reproduction initially required identical test predictions; the 0.01-point tolerance and the single listed exception replaced that rule. Both changes trace back to the same cause: the damage studies' logistic-regression solver stops early. Refitting the reference at tight tolerance would change BRACS reference accuracy by about half a point on one examined shard; how much this moves $D$ itself is not known.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
