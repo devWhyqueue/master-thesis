@@ -5,25 +5,25 @@
       "differing_clear_rows": 0,
       "differing_rows": 0,
       "exp25_recipe_vs_converged_ce": {
-        "ba_difference_pp": 0.016456878422854704,
-        "differing_clear_rows": 3473,
-        "differing_rows": 3473,
+        "ba_difference_pp": 0.00038580246913832994,
+        "differing_clear_rows": 1,
+        "differing_rows": 1,
         "issue": "https://github.com/devWhyqueue/master-thesis/issues/5",
         "near_tie_rows": 0
       },
-      "lambda": 0.001,
+      "lambda": 0.0001,
       "near_tie_rows": 0,
       "passed": true,
       "solvers": {
         "posthoc": {
           "converged": true,
-          "gradient_max": 2.0923409268235624e-09,
-          "iterations": 3132
+          "gradient_max": 1.586442714032324e-09,
+          "iterations": 3128
         },
         "trained": {
           "converged": true,
-          "gradient_max": 1.113218085365001e-09,
-          "iterations": 3334
+          "gradient_max": 1.3128139191455107e-09,
+          "iterations": 3769
         }
       },
       "tau": 1.0

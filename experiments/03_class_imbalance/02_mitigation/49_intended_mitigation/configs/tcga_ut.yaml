@@ -28,6 +28,9 @@
 # - 2026-11-09, after the CE stage: gate 3 exact identity failed on 4/60 arm-shards (same lambda, 1-68 test
 #   rows; floating-point order under exp-25's early-stopping solver, issue #5). Re-specified: same lambda and
 #   test BA within 0.01 pp of the stored record; differing rows and BA gap recorded per arm-shard.
+# - 2026-11-13, refit after the logreg gtol fix (issue #5): all frozen-readout records refit; gate 3 then holds
+#   exactly on 54/60 arm-shards, the rest within 0.01 pp. The gate-4 offset fit warm-restarts L-BFGS
+#   (BRACS stalled at gradient 1.5e-8 > 1e-8 with identical predictions); gate rule unchanged.
 damage_config: experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/configs/tcga_ut.yaml
 mitigation_config: experiments/03_class_imbalance/02_mitigation/43_mitigation_tcga_ut/configs/tcga_ut.yaml
 frozen_cuda_config: experiments/03_class_imbalance/02_mitigation/45_lora_ablation/configs/tcga_ut.yaml

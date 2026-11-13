@@ -1,6 +1,6 @@
 {
   "accepted": [],
-  "exact": 57,
+  "exact": 54,
   "expected": 60,
   "matched": 60,
   "mismatches": [],
@@ -8,28 +8,52 @@
   "passed": true,
   "tolerated": [
     {
-      "ba_difference_pp": 0.0011994203196366016,
-      "differing_rows": 68,
-      "lambda": 0.1,
-      "reproduced": true,
-      "stored_lambda": 0.1,
-      "where": "split 2 draw 0 arm r1"
-    },
-    {
-      "ba_difference_pp": 0.0035912798167743176,
-      "differing_rows": 7,
-      "lambda": 0.0001,
-      "reproduced": true,
-      "stored_lambda": 0.0001,
-      "where": "split 2 draw 0 arm r100"
-    },
-    {
-      "ba_difference_pp": 0.0,
+      "ba_difference_pp": 0.0004357298474815252,
       "differing_rows": 1,
       "lambda": 0.1,
       "reproduced": true,
       "stored_lambda": 0.1,
-      "where": "split 2 draw 1 arm r1"
+      "where": "split 1 draw 0 arm r1"
+    },
+    {
+      "ba_difference_pp": 0.001565255731918569,
+      "differing_rows": 9,
+      "lambda": 0.0001,
+      "reproduced": true,
+      "stored_lambda": 0.0001,
+      "where": "split 1 draw 0 arm r100"
+    },
+    {
+      "ba_difference_pp": 0.0003429355281241442,
+      "differing_rows": 5,
+      "lambda": 0.0001,
+      "reproduced": true,
+      "stored_lambda": 0.0001,
+      "where": "split 1 draw 6 arm r100"
+    },
+    {
+      "ba_difference_pp": 1.0668462437024573e-05,
+      "differing_rows": 5,
+      "lambda": 0.0001,
+      "reproduced": true,
+      "stored_lambda": 0.0001,
+      "where": "split 2 draw 3 arm r100"
+    },
+    {
+      "ba_difference_pp": 0.001424501424509117,
+      "differing_rows": 2,
+      "lambda": 0.1,
+      "reproduced": true,
+      "stored_lambda": 0.1,
+      "where": "split 2 draw 4 arm r1"
+    },
+    {
+      "ba_difference_pp": 6.858710561630232e-05,
+      "differing_rows": 4,
+      "lambda": 0.001,
+      "reproduced": true,
+      "stored_lambda": 0.001,
+      "where": "split 2 draw 4 arm r100"
     }
   ]
 }

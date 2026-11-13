@@ -31,6 +31,9 @@
 # - 2026-11-09, after the CE reruns: split 2 draw 3 r100 keeps the same lambda (0.1) but 38/22,133 test rows
 #   differ deterministically (BA gap 0.056 pp > 0.01). Accepted as a listed exception (same lambda required),
 #   reported as `accepted` in ce_reproduction_bracs.json and disclosed in the report.
+# - 2026-11-13, refit after the logreg gtol fix (issue #5): all frozen-readout records refit; gate 3 then holds
+#   exactly on 60/60 arm-shards, so the exception above is no longer used. The gate-4 offset fit warm-restarts
+#   L-BFGS (it stalled at gradient 1.5e-8 > 1e-8 with identical predictions); gate rule unchanged.
 damage_config: experiments/03_class_imbalance/00_damage/26_damage_bracs/configs/bracs.yaml
 mitigation_config: experiments/03_class_imbalance/02_mitigation/41_mitigation_bracs/configs/bracs.yaml
 frozen_cuda_config: experiments/03_class_imbalance/02_mitigation/45_lora_ablation/configs/bracs.yaml
