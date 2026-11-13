@@ -98,3 +98,11 @@ def test_offset_fit_equals_posthoc(world: dict) -> None:
     top2 = np.sort(posthoc, axis=1)[:, -2:]
     clear = (top2[:, 1] - top2[:, 0]) > 1e-6
     np.testing.assert_array_equal(posthoc.argmax(1)[clear], trained.argmax(1)[clear])
+
+
+def test_offset_fit_warm_restarts_past_iteration_cap(world: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("intended.lam.MAX_ITER", 5)
+    x, y = world["x"], world["y"]
+    fit = fit_offset_logistic(x, y, 1e-2, np.zeros(K))
+    assert fit.iterations > 5  # a single capped run cannot exceed 5
+

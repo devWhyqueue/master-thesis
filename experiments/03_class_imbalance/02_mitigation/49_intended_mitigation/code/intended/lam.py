@@ -114,6 +114,9 @@ class OffsetFit(NamedTuple):
 
 
 GRADIENT_TOL = 1e-8
+# L-BFGS can stop on a failed line search short of GRADIENT_TOL (BRACS gate 4, 2026-11-13);
+# a warm restart from its last iterate resets the curvature memory.
+RESTARTS = 5
 
 
 def _offset_objective(
@@ -132,24 +135,32 @@ def _offset_objective(
 def fit_offset_logistic(
     x: np.ndarray, y: np.ndarray, lam: float, offset: np.ndarray
 ) -> OffsetFit:
-    """Train-time logit adjustment: mean CE(x W^T + b + offset) + lam/2 ||W||^2, b unpenalized."""
+    """Train-time logit adjustment: mean CE(x W^T + b + offset) + lam/2 ||W||^2, b unpenalized.
+
+    Warm-restarts L-BFGS up to ``RESTARTS`` times while the gradient exceeds ``GRADIENT_TOL``.
+    """
     x = np.asarray(x, dtype=np.float64)
     dim, k = x.shape[1], len(offset)
-    result = minimize(
-        _offset_objective,
-        np.zeros(k * dim + k),
-        args=(x, np.eye(k)[y], offset, lam),
-        jac=True,
-        method="L-BFGS-B",
-        options={"gtol": 1e-10, "ftol": 0.0, "maxiter": MAX_ITER},
-    )
-    gradient_max = float(np.abs(result.jac).max())
+    theta, iterations = np.zeros(k * dim + k), 0
+    for _ in range(RESTARTS + 1):
+        result = minimize(
+            _offset_objective,
+            theta,
+            args=(x, np.eye(k)[y], offset, lam),
+            jac=True,
+            method="L-BFGS-B",
+            options={"gtol": 1e-10, "ftol": 0.0, "maxiter": MAX_ITER},
+        )
+        theta, iterations = result.x, iterations + int(result.nit)
+        gradient_max = float(np.abs(result.jac).max())
+        if gradient_max <= GRADIENT_TOL:
+            break
     return OffsetFit(
-        result.x[: k * dim].reshape(k, dim),
-        result.x[k * dim :],
+        theta[: k * dim].reshape(k, dim),
+        theta[k * dim :],
         gradient_max <= GRADIENT_TOL,
         gradient_max,
-        int(result.nit),
+        iterations,
     )
 
 
