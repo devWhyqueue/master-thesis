@@ -173,10 +173,11 @@ def test_feasibility_flags_short_classes(monkeypatch: pytest.MonkeyPatch) -> Non
     cfg = {"prevalence": {"patients_per_class": 17, "patches_per_patient": 27}}
     names = [f"c{i}" for i in range(7)]
     enough = {c: [17, 18, 19] for c in names}
-    monkeypatch.setattr(feasibility, "_eligible_counts", lambda config, depth: enough)
+    monkeypatch.setattr(feasibility, "_patch_counts", lambda config: enough)
+    monkeypatch.setattr(feasibility, "_eligible_counts", lambda counts, depth: counts)
     table = feasibility.check_feasibility(cfg)
     assert (table["eligibility_depth"], table["budget"]) == (102, 3213)
     short = {**enough, "c3": [17, 16, 19]}
-    monkeypatch.setattr(feasibility, "_eligible_counts", lambda config, depth: short)
+    monkeypatch.setattr(feasibility, "_patch_counts", lambda config: short)
     with pytest.raises(ValueError, match="eligible patients"):
         feasibility.check_feasibility(cfg)

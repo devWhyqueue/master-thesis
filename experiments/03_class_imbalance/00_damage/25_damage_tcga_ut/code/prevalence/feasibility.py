@@ -15,7 +15,6 @@ from typing import Any
 
 import pandas as pd
 from breadth import N_SPLITS, exp2_split_paths
-from breadth.sampling import eligible_patients_by_class
 from decodability.evidence import load_freeze_meta
 from imbalance_benchmark.construction import allocate_counts
 
@@ -25,18 +24,28 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["check_feasibility"]
 
+_COLUMNS = {"split", "cancer_type", "case_id"}
 
-def _eligible_counts(config: dict[str, Any], depth: int) -> dict[str, list[int]]:
-    """Per class, the number of eligible patients in each split's train manifest."""
-    counts: dict[str, list[int]] = {}
+
+def _patch_counts(config: dict[str, Any]) -> dict[str, list[pd.Series]]:
+    """Per class, each split's patches-per-patient counts of the train manifest (read once)."""
+    out: dict[str, list[pd.Series]] = {}
     for split in range(N_SPLITS):
         paths = exp2_split_paths(config, split)
-        manifest = pd.read_csv(paths["data"] / "manifest.csv").query("split == 'train'")
+        manifest = pd.read_csv(
+            paths["data"] / "manifest.csv", usecols=lambda c: c in _COLUMNS
+        ).query("split == 'train'")
         for name in load_freeze_meta(paths)["class_names"]:
-            counts.setdefault(name, []).append(
-                len(eligible_patients_by_class(manifest, name, depth))
-            )
-    return counts
+            cases = manifest.loc[manifest["cancer_type"] == name, "case_id"]
+            out.setdefault(name, []).append(cases.astype(str).value_counts())
+    return out
+
+
+def _eligible_counts(
+    counts: dict[str, list[pd.Series]], depth: int
+) -> dict[str, list[int]]:
+    """Per class, the number of patients holding at least ``depth`` patches in each split."""
+    return {c: [int((s >= depth).sum()) for s in v] for c, v in counts.items()}
 
 
 def _problems(g: int, n: int, depth: int, eligible: dict[str, list[int]]) -> list[str]:
@@ -58,9 +67,10 @@ def check_feasibility(config: dict[str, Any]) -> dict[str, Any]:
     """Print and return the feasibility table; raise ``ValueError`` if the design is infeasible."""
     g = patients_per_class(config)
     n = balanced_of(g)
-    k = len(_eligible_counts(config, 0))
+    counts = _patch_counts(config)
+    k = len(counts)
     depth = depth_of(g, k)
-    eligible = _eligible_counts(config, depth)
+    eligible = _eligible_counts(counts, depth)
     problems = _problems(int(g), n, depth, eligible)
     table = {
         "patients_per_class": int(g),
