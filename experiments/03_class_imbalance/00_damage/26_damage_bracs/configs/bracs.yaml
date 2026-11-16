@@ -1,12 +1,13 @@
-# BRACS prevalence imbalance (exp-26; code shared with exp-25). At a fixed total patch budget T = G x BALANCED x num_classes
-# (G = 20 patients/class, BALANCED = 32 patches/patient), ratio arms r1..r100 redistribute T across a
+# BRACS prevalence imbalance (exp-26; code shared with exp-25). At a fixed total patch budget T = P x n x num_classes
+# (P = 17 patients/class, n = 27 patches/patient: 459 per class at rho 1, issue #7), ratio arms r1..r100 redistribute T across a
 # permuted class rank with exp-02's exponential-profile allocator; N keeps native class shares.
 # Every arm is fit fresh (no reuse). CPU-only.
 
-# BRACS deviates from G = 20: at DEPTH = 160 only 10-13 ADH train patients per split qualify, so
-# G = 10 (T = 10 x 32 x 7); the full ratio grid up to r = 100 stays feasible (head 1206 <= 1600).
+# BRACS deviates from TCGA-UT's P = 30: P = 17 uses every eligible patient of the bottleneck classes
+# (T = 17 x 27 x 7 = 3,213); eligibility depth is derived (head share at rho 100, ``eligibility_depth``).
 prevalence:
-  patients_per_class: 10
+  patients_per_class: 17
+  patches_per_patient: 27
 
 paths:
   outputs: experiments/03_class_imbalance/00_damage/26_damage_bracs/outputs/bracs/patch

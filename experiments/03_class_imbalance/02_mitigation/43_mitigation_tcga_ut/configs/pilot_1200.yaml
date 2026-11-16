@@ -5,7 +5,8 @@
 # no stage1.pt remains (the main grid, tcga_ut.yaml, picks steps by the 0.5pp rule).
 
 prevalence:
-  patients_per_class: 20
+  patients_per_class: 30
+  patches_per_patient: 36
 
 dataset:
   name: tcga_ut

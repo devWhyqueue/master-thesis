@@ -5,7 +5,8 @@
 # feature_extraction (per encoder) is locked in phase 02, not here.
 
 prevalence:
-  patients_per_class: 10
+  patients_per_class: 17
+  patches_per_patient: 27
 
 dataset:
   name: bracs

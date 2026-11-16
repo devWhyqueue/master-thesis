@@ -1,7 +1,11 @@
-# TCGA-UT prevalence imbalance (exp-25). At a fixed total patch budget T = G x BALANCED x num_classes
-# (G = 20 patients/class, BALANCED = 32 patches/patient), ratio arms r1..r100 redistribute T across a
+# TCGA-UT prevalence imbalance (exp-25). At a fixed total patch budget T = P x n x num_classes
+# (P = 30 patients/class, n = 36 patches/patient: 1,080 per class at rho 1, issue #7), ratio arms r1..r100 redistribute T across a
 # permuted class rank with exp-02's exponential-profile allocator; N keeps native class shares.
 # Every arm is fit fresh (no reuse). CPU-only.
+
+prevalence:
+  patients_per_class: 30
+  patches_per_patient: 36
 
 paths:
   outputs: experiments/03_class_imbalance/00_damage/25_damage_tcga_ut/outputs/tcga_ut/patch

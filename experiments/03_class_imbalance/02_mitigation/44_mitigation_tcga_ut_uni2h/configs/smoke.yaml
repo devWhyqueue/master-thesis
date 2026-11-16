@@ -6,7 +6,8 @@
 # must match within float noise.
 
 prevalence:
-  patients_per_class: 20
+  patients_per_class: 30
+  patches_per_patient: 36
 
 dataset:
   name: tcga_ut

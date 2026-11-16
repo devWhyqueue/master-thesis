@@ -4,6 +4,10 @@
 # with one easy-tail/hard-tail contrast at rho 100, ordered by exp-25's pooled r1 test recall.
 # Same G = 20 patients/class, class permutation, and patient draws as exp-25/27. CPU-only.
 
+prevalence:
+  patients_per_class: 30
+  patches_per_patient: 36
+
 paths:
   outputs: experiments/03_class_imbalance/01_cause/tcga_ut/30_tail_assignment/outputs/tcga_ut/patch
 

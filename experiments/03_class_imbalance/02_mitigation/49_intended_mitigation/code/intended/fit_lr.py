@@ -1,10 +1,11 @@
 """CPU logistic-regression candidates of one (split, draw): CE refit, LA, BS, DisAlign.
 
-Stage ``ce`` refits exp-25's CE per arm over the full lambda grid; its record is written only if
-it reproduces the stored exp-25/26 record (gate 3, ``intended.reproduction``), with every
-lambda's fit cached for stage ``rest``. Stage ``rest`` scores logit adjustment on that path
-(lambda re-selected per tau), refits class-weighted CE for BS, and trains exp-40's DisAlign on
-the CE head at its selected lambda. Existing run records are skipped; the record is written last.
+Stage ``ce`` refits exp-25's CE per arm over the full lambda grid and must reproduce the stored
+exp-25/26 record exactly (gate 3: same selected lambda, same test predictions); only then is the
+record written, with every lambda's fit cached for stage ``rest``. Stage ``rest`` scores logit
+adjustment on that cached path (lambda re-selected per tau), refits class-weighted CE for BS,
+and trains exp-40's DisAlign on the CE head at its selected lambda. A candidate whose run record
+exists is skipped; the record is written last.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from mitigation.train.stage2 import run_disalign
 
 from lora_ablation import init_seed
 
-from intended import ARMS, lr_paths
+from intended import ARMS, damage_dir, lr_paths
 from intended.lam import (
     fit_lambda_path,
     load_path,
@@ -39,7 +40,7 @@ from intended.lam import (
     select_lambda,
     validation_scores,
 )
-from intended.reproduction import ReproductionError, reproduce_ce
+from intended.reproduction import MISMATCH_NAME, check_reproduction
 
 __all__ = [
     "LAMBDA_NAME",
@@ -157,11 +158,14 @@ def _fit_ce(ctx: _Context, arm: ArmData) -> None:
     best = fits[selection["selected_index"]]
     test_logits = logits(best, ctx.evals.test_x)
     out_dir = _out(ctx, arm.name, "ce", None)
-    cases = ctx.evals.test_id["case_id"].astype(str).to_numpy()
-    refit = (selection["selected_lambda"], test_logits.argmax(1), cases)
-    where = (ctx.split, ctx.draw, arm.name)
-    selection["reproduction"] = reproduce_ce(ctx.config, where, refit, out_dir)
+    check_reproduction(
+        damage_dir(ctx.config, ctx.split, arm.name, ctx.draw),
+        f"split {ctx.split} draw {ctx.draw} arm {arm.name}",
+        (selection["selected_lambda"], test_logits.argmax(1)),
+        out_dir,
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / MISMATCH_NAME).unlink(missing_ok=True)
     save_path(out_dir / PATH_NAME, fits)
     _record(
         ctx, arm, ("ce", None), (logits(best, ctx.evals.val_x), test_logits), selection
@@ -237,11 +241,5 @@ def fit_lr_shard(config: dict[str, Any], split: int, draw: int, stage: str) -> N
     train_df, names, evals, _ = init_shard(config, split)
     shard = _shard_context(train_df, names, split, draw, patients_per_class(config))
     ctx = _Context(config, split, draw, names, evals, lr_paths(config)[split])
-    failures: list[str] = []
     for arm in ARMS:
-        try:
-            (_fit_ce if stage == "ce" else _fit_rest)(ctx, _arm(shard, arm))
-        except ReproductionError as error:
-            failures.append(str(error))
-    if failures:
-        raise ReproductionError("; ".join(failures))
+        (_fit_ce if stage == "ce" else _fit_rest)(ctx, _arm(shard, arm))

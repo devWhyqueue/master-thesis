@@ -50,7 +50,7 @@ def test_invalid_arms_and_counts_are_rejected():
             loss_weights(np.array(data), np.array(target))
 
 
-@pytest.mark.parametrize("name,steps,patients", [("bracs", 600, 10), ("tcga_ut", 2400, 20)])
+@pytest.mark.parametrize("name,steps,patients", [("bracs", 600, 17), ("tcga_ut", 2400, 30)])
 def test_protocol_config_keeps_source_and_recipe(name: str, steps: int, patients: int):
     own = load_config(_CONFIGS / f"{name}.yaml")
     source_path = REPO_ROOT / own["source_config"]

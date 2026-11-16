@@ -4,7 +4,8 @@
 # G = 20: at DEPTH = 160 only 10-13 ADH train patients per split qualify). CPU-only.
 
 prevalence:
-  patients_per_class: 10
+  patients_per_class: 17
+  patches_per_patient: 27
 
 paths:
   outputs: experiments/03_class_imbalance/01_cause/bracs/28_prior_vs_support/outputs/bracs/patch

@@ -53,8 +53,8 @@ _RECIPES = {
     "bracs": {"batch_size": 256, "steps": 600, "lr": 0.0001, "weight_decay": 0.0001},
     "tcga_ut": {"batch_size": 256, "steps": 2400, "lr": 0.0001, "weight_decay": 0.0001},
 }
-_PATIENTS = {"bracs": 10, "tcga_ut": 20}
-TRAIN_ROWS = {"bracs": 2240, "tcga_ut": 19200}
+_PATIENTS = {"bracs": 17, "tcga_ut": 30}
+TRAIN_ROWS = {"bracs": 3213, "tcga_ut": 32400}
 _LORA = {"r": 8, "alpha": 16, "dropout": 0.0}
 _DROPPED_MITIGATION_KEYS = ("grid", "inline_stage2", "gcl", "cuda")
 

@@ -10,7 +10,17 @@ from centre.cohort import patient_rows
 
 from imbalance_benchmark.manifest.statistics import achieved_rho
 
-from prevalence import ARMS, BALANCED, DEPTH, G, RATIOS
+from prevalence import (
+    ARMS,
+    BALANCED,
+    DEPTH,
+    G,
+    RATIOS,
+    Quota,
+    depth_of,
+    eligibility_depth,
+    patients_per_class,
+)
 from prevalence.analyze import _native_gap, _slope
 from prevalence.fit import class_counts, class_permutation, _patient_counts
 
@@ -117,3 +127,56 @@ def test_bracs_g10_grid_is_feasible(rho: int) -> None:
     counts = class_counts(f"r{rho}", _PERM, [g * DEPTH] * N_CLASSES, _POOL_COUNTS, g)
     assert sum(counts) == g * BALANCED * N_CLASSES
     assert achieved_rho(dict(enumerate(counts))) == pytest.approx(rho, rel=0.05)
+
+
+@pytest.mark.parametrize(
+    ("patients", "n", "k"), [(30, 36, 30), (17, 27, 7), (10, 32, 7), (20, 32, 30)]
+)
+def test_quota_design_budget_and_head_cap(patients: int, n: int, k: int) -> None:
+    """A configured (P, n) keeps the exact budget; P x depth covers the r100 head; tail >= 1 per patient."""
+    g = Quota(patients, n, True)
+    depth = depth_of(g, k)
+    available = [g * depth] * k
+    for r in RATIOS:
+        counts = class_counts(f"r{r}", np.arange(k), available, [10**6] * k, g)
+        assert sum(counts) == patients * n * k
+        assert max(counts) <= g * depth
+        assert min(counts) >= patients
+    head = class_counts("r100", np.arange(k), available, [10**6] * k, g)[0]
+    assert head > g * (depth - 1)  # the derived depth is the smallest sufficient one
+
+
+def test_plain_int_and_unconfigured_quota_keep_legacy_design() -> None:
+    """Frozen experiments pass a plain int; configs without patches_per_patient keep DEPTH and n = 32."""
+    assert depth_of(G, N_CLASSES) == DEPTH
+    legacy = patients_per_class({"prevalence": {"patients_per_class": 10}})
+    assert (int(legacy), legacy.balanced, depth_of(legacy, N_CLASSES)) == (10, BALANCED, DEPTH)
+    new = patients_per_class({"prevalence": {"patients_per_class": 17, "patches_per_patient": 27}})
+    assert (int(new), new.balanced) == (17, 27)
+    assert eligibility_depth({"prevalence": {"patients_per_class": 17, "patches_per_patient": 27}}, 7) == depth_of(new, 7)
+
+
+def test_quota_survives_copy_and_pickle() -> None:
+    """Configs holding a Quota are deep-copied and pickled for workers."""
+    import copy
+    import pickle
+
+    quota = Quota(17, 27, True)
+    for clone in (copy.deepcopy(quota), pickle.loads(pickle.dumps(quota))):
+        assert (int(clone), clone.balanced, clone.derive_depth) == (17, 27, True)
+
+
+def test_feasibility_flags_short_classes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The design check passes with >= P eligible patients per class and raises otherwise."""
+    from prevalence import feasibility
+
+    cfg = {"prevalence": {"patients_per_class": 17, "patches_per_patient": 27}}
+    names = [f"c{i}" for i in range(7)]
+    enough = {c: [17, 18, 19] for c in names}
+    monkeypatch.setattr(feasibility, "_eligible_counts", lambda config, depth: enough)
+    table = feasibility.check_feasibility(cfg)
+    assert (table["eligibility_depth"], table["budget"]) == (102, 3213)
+    short = {**enough, "c3": [17, 16, 19]}
+    monkeypatch.setattr(feasibility, "_eligible_counts", lambda config, depth: short)
+    with pytest.raises(ValueError, match="eligible patients"):
+        feasibility.check_feasibility(cfg)

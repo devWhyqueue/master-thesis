@@ -3,7 +3,8 @@
 # cached Virchow2 features, since every method here adapts the encoder itself via LoRA.
 
 prevalence:
-  patients_per_class: 20
+  patients_per_class: 30
+  patches_per_patient: 36
 
 dataset:
   name: tcga_ut

@@ -11,7 +11,8 @@
 #   it moves >= 0.5 pp toward 0 vs. dG(30) on the same 6 shards; otherwise not supported.
 #   Descriptive only: cannot change the pre-specified encoder-dependence verdict.
 prevalence:
-  patients_per_class: 20
+  patients_per_class: 30
+  patches_per_patient: 36
 
 dataset:
   name: tcga_ut

@@ -40,7 +40,8 @@
 #   effective number at 1/(1-beta) <= 10 and amplifies the imbalance). gcl2 at r50/r100/N
 #   refit; superseded records are in split=*/results_superseded/. r1 gcl2 unaffected (delta = 0).
 prevalence:
-  patients_per_class: 10
+  patients_per_class: 17
+  patches_per_patient: 27
 
 dataset:
   name: bracs

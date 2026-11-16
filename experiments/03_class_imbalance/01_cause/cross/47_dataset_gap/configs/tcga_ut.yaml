@@ -39,8 +39,8 @@ feature_extraction:
 
 analysis:
   seed: 20261107
-  n_patients: 10
-  n_patches: 32
+  n_patients: 30
+  n_patches: 36
   k_values: [5, 15, 30]
   primary_k: 15
   pairs: [[Colon_adenocarcinoma, Rectum_adenocarcinoma]]

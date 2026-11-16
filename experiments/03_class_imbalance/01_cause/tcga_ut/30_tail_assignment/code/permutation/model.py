@@ -23,7 +23,7 @@ from typing import NamedTuple
 import numpy as np
 from scipy.stats import spearmanr
 
-from prevalence import BALANCED, DEPTH
+from prevalence import balanced_of, depth_of
 from prevalence.fit import class_counts as _class_counts
 
 __all__ = [
@@ -42,7 +42,7 @@ __all__ = [
 
 def ranked_counts(rho: int, g: int, k: int) -> np.ndarray:
     """(K,) patch count by rank (0 = head/largest) for one ratio arm; independent of assignment."""
-    available = [g * DEPTH] * k  # uniform availability cap, same for every class
+    available = [g * depth_of(g, k)] * k
     identity = np.arange(k)
     return np.asarray(
         _class_counts(f"r{rho}", identity, available, [0] * k, g), dtype=np.float64
@@ -51,7 +51,7 @@ def ranked_counts(rho: int, g: int, k: int) -> np.ndarray:
 
 def z_of_counts(counts: np.ndarray, g: int) -> np.ndarray:
     """Log2 deviation from the balanced (rho = 1) per-class count."""
-    return np.log2(counts / (g * BALANCED))
+    return np.log2(counts / (g * balanced_of(g)))
 
 
 def tail_z(rho: int, g: int, k: int) -> float:

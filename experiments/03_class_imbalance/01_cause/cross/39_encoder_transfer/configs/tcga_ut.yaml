@@ -5,7 +5,8 @@
 # feature_extraction (per encoder) is locked in phase 02, not here.
 
 prevalence:
-  patients_per_class: 20
+  patients_per_class: 30
+  patches_per_patient: 36
 
 dataset:
   name: tcga_ut

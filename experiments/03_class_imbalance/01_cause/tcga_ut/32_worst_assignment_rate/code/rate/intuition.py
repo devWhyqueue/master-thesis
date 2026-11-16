@@ -16,12 +16,13 @@ from matplotlib.axes import Axes
 from matplotlib.patches import Arc
 
 from permutation.model import ranked_counts, z_of_counts
+from prevalence import Quota
 
 from rate import RATIO_SEARCH
 
 __all__ = ["TCGA_CODES", "score_intuition_figure"]
 
-_G = 20
+_G = Quota(30, 36, True)
 _N_CLASSES = 30
 _C_COLOR = "tab:red"
 _D_COLOR = "tab:blue"
@@ -162,7 +163,7 @@ def score_intuition_figure(diagnostics_path: Path, dest: Path) -> None:
         ax = fig.add_subplot(grid[0, i])
         _pair_panel(ax, z, case)
         if i == 0:
-            ax.set_ylabel("$z_r=\\log_2(n_r/640)$", fontsize=7)
+            ax.set_ylabel("$z_r=\\log_2(n_r/1080)$", fontsize=7)
     for i, key in enumerate(("worst", "mild")):
         ax = fig.add_subplot(grid[1, 2 * i : 2 * i + 2])
         _order_panel(

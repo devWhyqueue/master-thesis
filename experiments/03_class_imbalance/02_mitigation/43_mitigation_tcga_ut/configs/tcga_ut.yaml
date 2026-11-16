@@ -29,7 +29,8 @@
 #   to gcl and gcl2 at r100 only (one value past the edge, per the grid-edge rule). CUDA p=0.25 and the
 #   DisAlign edges at r50/N stay unextended (damage < 1pp at r50/N; CUDA's low edge tends to CE).
 prevalence:
-  patients_per_class: 20
+  patients_per_class: 30
+  patches_per_patient: 36
 
 dataset:
   name: tcga_ut

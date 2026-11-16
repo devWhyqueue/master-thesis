@@ -4,6 +4,10 @@
 # r1's balanced shares), plus their LP{rho}/Lr{rho} post-hoc logit-adjusted derivatives (no fit).
 # Same G = 20 patients/class, class permutation, and patient draws as exp-25 (fully paired). CPU-only.
 
+prevalence:
+  patients_per_class: 30
+  patches_per_patient: 36
+
 paths:
   outputs: experiments/03_class_imbalance/01_cause/tcga_ut/27_prior_vs_support/outputs/tcga_ut/patch
 

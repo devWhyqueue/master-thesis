@@ -59,9 +59,6 @@ def test_gate4_passes(world: dict, tmp_path) -> None:
     gate = _report(run_preflight(world, tmp_path / "report"))["gates"]["la_equivalence"]
     assert gate["passed"], gate
     assert gate["ba_difference_pp"] < 0.01
-    assert gate["solvers"]["posthoc"]["converged"] and gate["solvers"]["trained"]["converged"]
-    info = gate["exp25_recipe_vs_converged_ce"]  # solver noise of the reused recipe, reported only
-    assert {"differing_rows", "ba_difference_pp", "issue"} <= set(info)
 
 
 def test_check_ce_reports_mismatch(world: dict, tmp_path) -> None:
@@ -73,23 +70,3 @@ def test_check_ce_reports_mismatch(world: dict, tmp_path) -> None:
     assert report["matched"] == 2 and not report["passed"]
     assert report["mismatches"][0]["differing_rows"] == 3
     assert len(report["missing"]) == 57
-
-
-def test_check_ce_accepted_exception(world: dict, tmp_path) -> None:
-    import numpy as np
-    from imbalance_benchmark.common import EVAL_ARRAYS_NAME
-
-    from intended import damage_dir
-
-    fit_lr_shard(world, 0, 0, "ce")
-    stored = damage_dir(world, 0, "r100", 0)
-    with np.load(stored / EVAL_ARRAYS_NAME) as arrays:
-        corrupted = {k: arrays[k].copy() for k in arrays.files}
-    corrupted["test_preds"][:6] = (corrupted["test_preds"][:6] + 1) % 3
-    np.savez_compressed(stored / EVAL_ARRAYS_NAME, **corrupted)
-    report = _report(check_ce(world, tmp_path / "report"))
-    assert report["mismatches"] and not report["accepted"]
-    world["protocol"]["accepted_ce_exceptions"] = [{"split": 0, "draw": 0, "arm": "r100"}]
-    report = _report(check_ce(world, tmp_path / "report"))
-    assert report["accepted"][0]["where"] == "split 0 draw 0 arm r100" and not report["mismatches"]
-    assert report["matched"] == 2

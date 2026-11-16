@@ -1,7 +1,9 @@
 """Fit stage: prevalence-imbalance arms (r1..r100, N) of one (split, draw) shard.
 
-Draws G eligible patients per class (20; config ``prevalence.patients_per_class`` overrides) at depth DEPTH = 160, fixed across every arm of a draw.
-Ratio arms ``r{rho}`` reallocate the shared budget T = G x BALANCED x num_classes across classes with
+Draws P eligible patients per class (config ``prevalence.patients_per_class``, legacy 20) at the
+eligibility depth ``prevalence.depth_of``, fixed across every arm of a draw.
+Ratio arms ``r{rho}`` reallocate the shared budget T = P x n x num_classes (n = config
+``prevalence.patches_per_patient``, legacy 32) across classes with
 exp-02's exponential-profile allocator, class order permuted per draw; ``N`` keeps native class
 shares. Patients take a nested round-robin patch prefix (``centre.cohort.patient_rows``), so a
 class's smaller-arm rows are always a prefix of its larger-arm rows for the same patient.
@@ -15,7 +17,6 @@ from typing import Any, NamedTuple, cast
 import numpy as np
 import pandas as pd
 from imbalance_benchmark.common import RUN_RECORD_NAME, write_json, write_run_record
-from imbalance_benchmark.construction import _adjust_alloc, allocate_counts
 from imbalance_benchmark.manifest.statistics import achieved_rho
 
 from breadth.calibrate import (
@@ -36,7 +37,8 @@ from centre.fit import decode_shard_index, shard_count
 
 from sites import allocation_dir
 
-from prevalence import ARMS, BALANCED, DEPTH, G, PREVALENCE_SEED, patients_per_class
+from prevalence import ARMS, DEPTH, PREVALENCE_SEED, depth_of, patients_per_class
+from prevalence.counts import _patient_counts, class_counts
 
 __all__ = [
     "decode_shard_index",
@@ -49,51 +51,31 @@ __all__ = [
 
 
 def class_permutation(split_idx: int, draw_idx: int, num_classes: int) -> np.ndarray:
-    """Deterministic class-to-rank permutation for one draw's ratio arms."""
+    """Deterministic class-to-rank permutation for one draw's ratio arms.
+
+    Seeded with the legacy ``DEPTH`` on purpose: the class order stays independent of the
+    configured design, so analyses can rebuild it without a config.
+    """
     seed = derive_draw_seed(PREVALENCE_SEED, split_idx, num_classes, DEPTH, draw_idx, 0)
     return np.random.default_rng(seed).permutation(num_classes)
 
 
 def _draw_patients(
-    train_df: pd.DataFrame, names: list[str], split_idx: int, draw_idx: int, g: int
+    train_df: pd.DataFrame,
+    names: list[str],
+    split_idx: int,
+    draw_idx: int,
+    g: int,
+    depth: int,
 ) -> list[list[str]]:
     """g eligible patients per class, fixed across every arm of this draw."""
     chosen = []
     for ci, name in enumerate(names):
-        eligible = eligible_patients_by_class(train_df, name, DEPTH)
-        seed = derive_draw_seed(PREVALENCE_SEED, split_idx, g, DEPTH, draw_idx, ci)
+        eligible = eligible_patients_by_class(train_df, name, depth)
+        seed = derive_draw_seed(PREVALENCE_SEED, split_idx, g, depth, draw_idx, ci)
         rng = np.random.default_rng(seed)
         chosen.append([str(p) for p in rng.choice(eligible, size=g, replace=False)])
     return chosen
-
-
-def class_counts(
-    arm: str,
-    perm: np.ndarray,
-    available: list[int],
-    pool_counts: list[int],
-    g: int = G,
-) -> list[int]:
-    """Per-class total patch counts for one arm at the shared budget T = g x BALANCED x K."""
-    num_classes = len(available)
-    total = g * BALANCED * num_classes
-    if arm == "N":
-        share = sum(pool_counts)
-        target = [total * c / share for c in pool_counts]
-        allocated = [min(max(round(t), g), a) for t, a in zip(target, available)]
-        _adjust_alloc(allocated, available, target, total - sum(allocated), g)
-        return allocated
-    ranked = allocate_counts(available, total, float(arm[1:]), g)
-    counts = [0] * num_classes
-    for rank, cls_idx in enumerate(perm):
-        counts[cls_idx] = ranked[rank]
-    return counts
-
-
-def _patient_counts(total: int, g: int = G) -> list[int]:
-    """Split one class's total across its g patients; nesting is per-patient (patient_rows), not here."""
-    base, remainder = divmod(total, g)
-    return [base + 1] * remainder + [base] * (g - remainder)
 
 
 def arm_row_index(
@@ -163,20 +145,23 @@ class _Shard(NamedTuple):
     available: list[int]
     pool_counts: list[int]
     g: int
+    depth: int = DEPTH
 
 
 def _shard_context(
     train_df: pd.DataFrame, names: list[str], split_idx: int, draw_idx: int, g: int
 ) -> _Shard:
     """Patient draws, class permutation, per-class availability cap, and native pool counts."""
+    depth = depth_of(g, len(names))
     return _Shard(
         train_df,
         names,
-        _draw_patients(train_df, names, split_idx, draw_idx, g),
+        _draw_patients(train_df, names, split_idx, draw_idx, g, depth),
         class_permutation(split_idx, draw_idx, len(names)),
-        [g * DEPTH] * len(names),
+        [g * depth] * len(names),
         [int((train_df["cancer_type"] == name).sum()) for name in names],
         g,
+        depth,
     )
 
 
@@ -223,7 +208,7 @@ def _fit_arm(
     )
     rec = _build_draw_record(
         config,
-        (shard.g, DEPTH, draw_idx),
+        (shard.g, shard.depth, draw_idx),
         lam,
         fit,
         (test_preds, test_probs, val_end, test_end),

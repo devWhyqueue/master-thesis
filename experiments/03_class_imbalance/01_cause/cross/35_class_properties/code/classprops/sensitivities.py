@@ -11,8 +11,6 @@ from typing import Any
 
 import numpy as np
 
-from prevalence import BALANCED
-
 from classprops.model import DatasetCovariates, fit_model, fit_pool, gather_covariates
 from classprops.pool import Observations, observations_from_arrays
 
@@ -46,9 +44,8 @@ def sensitivity_b(
     bracs_cov: DatasetCovariates,
 ) -> dict[str, Any]:
     """(b) absolute allocation basis (tail patches/patient) instead of relative-to-balanced."""
-    shift = math.log2(BALANCED)
-    tcga_abs = tcga_obs._replace(z=tcga_obs.z + shift)
-    bracs_abs = bracs_obs._replace(z=bracs_obs.z + shift)
+    tcga_abs = tcga_obs._replace(z=tcga_obs.z + math.log2(36))
+    bracs_abs = bracs_obs._replace(z=bracs_obs.z + math.log2(27))
     return fit_pool(tcga_abs, tcga_cov, bracs_abs, bracs_cov)
 
 

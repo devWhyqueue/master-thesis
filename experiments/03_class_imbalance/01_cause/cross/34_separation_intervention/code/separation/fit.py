@@ -90,7 +90,7 @@ def decode_main_shard_index(dataset: str, shard_index: int) -> tuple[str, int, i
 
 def _tcga10_shard(train_df, names, split_idx: int, draw_idx: int) -> _Shard:
     """TCGA-UT's own 10-patient nested prefix of exp-25/27's paired 20-patient draw."""
-    patients20 = _draw_patients(train_df, names, split_idx, draw_idx, 20)
+    patients20 = _draw_patients(train_df, names, split_idx, draw_idx, 20, DEPTH)
     patients10 = [p[:G] for p in patients20]
     perm = class_permutation(split_idx, draw_idx, len(names))
     pool_counts = [int((train_df["cancer_type"] == name).sum()) for name in names]

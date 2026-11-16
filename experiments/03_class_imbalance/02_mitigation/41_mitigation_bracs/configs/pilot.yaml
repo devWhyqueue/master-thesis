@@ -12,7 +12,8 @@
 # array, or narrow the array with `--array=0,10,20` on the rendered sbatch script.
 
 prevalence:
-  patients_per_class: 10
+  patients_per_class: 17
+  patches_per_patient: 27
 
 dataset:
   name: bracs
