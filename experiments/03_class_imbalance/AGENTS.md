@@ -2,6 +2,8 @@
 
 Why class imbalance hurts accuracy, and what causes it. See `../AGENTS.md` for the shared code/configs/tests/report layout.
 
+> https://claude.ai/artifact/WHp8HWbYaCUDYx9iXbD8NR
+
 ## 00_damage
 
 | # | Study | Question | Result |
