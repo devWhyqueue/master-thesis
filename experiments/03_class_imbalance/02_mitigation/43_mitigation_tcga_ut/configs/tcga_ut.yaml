@@ -1,3 +1,5 @@
+# 2026-11-20 (issue #7 refit): arms r50 and N dropped from the grid; only r1 and r100 are refit on the larger design.
+# The summary quotes only r1/r100; the old r50/N records stay in patch_pre_issue7/ (earlier design).
 # Mitigation recovery on TCGA-UT (exp-43): exp-41's study with exp-25's design (G=20, DEPTH=160,
 # BALANCED=32, same patient draws/class permutation via prevalence.fit; T=30*20*32=19,200 rows).
 # Arms r1 (CE anchor) + r50/r100/N; grid copied verbatim from exp-41's final pass (41_mitigation_bracs).
@@ -77,18 +79,6 @@ mitigation:
         crt: [null]
         disalign: [1.0]
         gcl2: [0.05]
-    r50:
-      stage1:
-        ce: [null]
-        bs: [0.5, 1.0]
-        cuda: [0.25, 0.5, 1.0]
-        la: [0.25, 0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2]
-      stage2:
-        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0]
-        crt: [null]
-        gcl2: [0.02, 0.05, 0.2]
     r100:
       stage1:
         ce: [null]
@@ -101,18 +91,6 @@ mitigation:
         disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
         gcl2: [0.01, 0.02, 0.05, 0.2]
-    N:
-      stage1:
-        ce: [null]
-        bs: [0.5, 1.0]
-        cuda: [0.25, 0.5, 1.0]
-        la: [0.25, 0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2, 0.5]
-      stage2:
-        posthoc_la: [0.25, 0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
-        crt: [null]
-        gcl2: [0.02, 0.05, 0.2, 0.5]
   train:
     stage1: {batch_size: 256, steps: 2400, lr: 0.0001, weight_decay: 0.0001}
     stage2: {batch_size: 512, steps: 200, lr: 0.001, weight_decay: 0.0}

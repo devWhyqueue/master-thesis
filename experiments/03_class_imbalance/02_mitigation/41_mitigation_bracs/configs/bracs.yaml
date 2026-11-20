@@ -1,3 +1,5 @@
+# 2026-11-20 (issue #7 refit): arms r50 and N dropped from the grid; only r1 and r100 are refit on the larger design.
+# The summary quotes only r1/r100; the old r50/N records stay in patch_pre_issue7/ (earlier design).
 # Mitigation recovery on BRACS (exp-41): reuses exp-40's code (`slurm.code_dir` below) and exp-26's
 # design (G=10, DEPTH=160, BALANCED=32, same patient draws/class permutation via prevalence.fit).
 # Arms: r1 CE (damage anchor, undamaged) + every exp-40 method at r50, r100, and N (native class
@@ -82,18 +84,6 @@ mitigation:
         crt: [null]
         disalign: [1.0]
         gcl2: [0.05]
-    r50:
-      stage1:
-        ce: [null]
-        bs: [0.5, 1.0]
-        cuda: [0.25, 0.5, 1.0]
-        la: [0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2]
-      stage2:
-        posthoc_la: [0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0]
-        crt: [null]
-        gcl2: [0.02, 0.05, 0.2]
     r100:
       stage1:
         ce: [null]
@@ -106,18 +96,6 @@ mitigation:
         disalign: [0.5, 1.0, 1.5, 2.0]
         crt: [null]
         gcl2: [0.02, 0.05, 0.2]
-    N:
-      stage1:
-        ce: [null]
-        bs: [0.5, 1.0]
-        cuda: [0.25, 0.5, 1.0]
-        la: [0.5, 1.0]
-        gcl: [0.02, 0.05, 0.2, 0.5]
-      stage2:
-        posthoc_la: [0.5, 1.0, 1.5, 2.0]
-        disalign: [0.5, 1.0, 1.5, 2.0, 3.0]
-        crt: [null]
-        gcl2: [0.02, 0.05, 0.2, 0.5]
   train:
     # steps=600 from the pilot (report "Design", pilot subsection): the only candidate within
     # 0.5pp of the best mean r100 validation BA over {150, 300, 600, 1200} (0.3493 vs 0.3187,
